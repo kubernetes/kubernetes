@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
+	"k8s.io/kubernetes/pkg/client/retry"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/labels"
@@ -766,7 +767,7 @@ func updateRcWithRetries(rcClient coreclient.ReplicationControllersGetter, names
 		return nil, fmt.Errorf("failed to deep copy rc before updating it: %v", err)
 	}
 	oldRc := obj.(*api.ReplicationController)
-	err = client.RetryOnConflict(client.DefaultBackoff, func() (e error) {
+	err = retry.RetryOnConflict(retry.DefaultBackoff, func() (e error) {
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(rc)
 		if rc, e = rcClient.ReplicationControllers(namespace).Update(rc); e == nil {
@@ -801,7 +802,7 @@ func updatePodWithRetries(podClient coreclient.PodsGetter, namespace string, pod
 		return nil, fmt.Errorf("failed to deep copy pod before updating it: %v", err)
 	}
 	oldPod := obj.(*api.Pod)
-	err = client.RetryOnConflict(client.DefaultBackoff, func() (e error) {
+	err = retry.RetryOnConflict(retry.DefaultBackoff, func() (e error) {
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(pod)
 		if pod, e = podClient.Pods(namespace).Update(pod); e == nil {
