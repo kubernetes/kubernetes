@@ -22,10 +22,15 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	jose "github.com/square/go-jose"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
+
+// the amount of time to wait between each request to the discovery API
+const discoveryRetryTimeout = 5 * time.Second
 
 func RetrieveTrustedClusterInfo(s *kubeadmapi.NodeConfiguration) (*kubeadmapi.ClusterInfo, error) {
 	host, port := s.MasterAddresses[0], 9898
@@ -37,10 +42,16 @@ func RetrieveTrustedClusterInfo(s *kubeadmapi.NodeConfiguration) (*kubeadmapi.Cl
 
 	fmt.Printf("<node/discovery> created cluster info discovery client, requesting info from %q\n", requestURL)
 
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("<node/discovery> failed to request cluster info [%v]", err)
-	}
+	var res *http.Response
+	wait.PollInfinite(discoveryRetryTimeout, func() (bool, error) {
+		res, err = http.DefaultClient.Do(req)
+		if err != nil {
+			fmt.Printf("<node/discovery> failed to request cluster info, will try again: [%s]\n", err)
+			return false, nil
+		}
+		return true, nil
+	})
+
 	buf := new(bytes.Buffer)
 	io.Copy(buf, res.Body)
 	res.Body.Close()
