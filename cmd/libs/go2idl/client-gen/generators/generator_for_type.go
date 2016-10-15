@@ -197,7 +197,7 @@ var newStructNamespaced = `
 // new$.type|publicPlural$ returns a $.type|publicPlural$
 func new$.type|publicPlural$(c *$.Group$Client, namespace string) *$.type|privatePlural$ {
 	return &$.type|privatePlural${
-		client: c.GetRESTClient(),
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }
@@ -207,7 +207,7 @@ var newStructNonNamespaced = `
 // new$.type|publicPlural$ returns a $.type|publicPlural$
 func new$.type|publicPlural$(c *$.Group$Client) *$.type|privatePlural$ {
 	return &$.type|privatePlural${
-		client: c.GetRESTClient(),
+		client: c.RESTClient(),
 	}
 }
 `

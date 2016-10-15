@@ -128,7 +128,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 
 var groupInterfaceTemplate = `
 type $.Group$Interface interface {
-    GetRESTClient() $.RESTClientInterface|raw$
+    RESTClient() $.RESTClientInterface|raw$
     $range .types$ $.|publicPlural$Getter
     $end$
 }
@@ -137,7 +137,7 @@ type $.Group$Interface interface {
 var groupClientTemplate = `
 // $.Group$Client is used to interact with features provided by the $.Group$ group.
 type $.Group$Client struct {
-	RESTClient $.RESTClientInterface|raw$
+	restClient $.RESTClientInterface|raw$
 }
 `
 
@@ -181,13 +181,13 @@ func NewForConfigOrDie(c *$.Config|raw$) *$.Group$Client {
 `
 
 var getRESTClient = `
-// GetRESTClient returns a RESTClient that is used to communicate
+// RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *$.Group$Client) GetRESTClient() $.RESTClientInterface|raw$ {
+func (c *$.Group$Client) RESTClient() $.RESTClientInterface|raw$ {
 	if c == nil {
 		return nil
 	}
-	return c.RESTClient
+	return c.restClient
 }
 `
 

@@ -104,9 +104,9 @@ func (c *Fake$.Group$) $.type|publicPlural$() $.realClientPackage$.$.type|public
 `
 
 var getRESTClient = `
-// GetRESTClient returns a RESTClient that is used to communicate
+// RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *Fake$.Group$) GetRESTClient() $.RESTClientInterface|raw$ {
+func (c *Fake$.Group$) RESTClient() $.RESTClientInterface|raw$ {
 	var ret *$.RESTClient|raw$
 	return ret
 }
