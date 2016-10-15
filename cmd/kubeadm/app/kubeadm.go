@@ -21,6 +21,8 @@ import (
 
 	"github.com/spf13/pflag"
 
+	// Register the kubeadm api group
+	_ "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/install"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/logs"

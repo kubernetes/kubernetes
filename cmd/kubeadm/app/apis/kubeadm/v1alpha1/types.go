@@ -19,7 +19,7 @@ package v1alpha1
 import "k8s.io/kubernetes/pkg/api/unversioned"
 
 type MasterConfiguration struct {
-	unversioned.TypeMeta
+	unversioned.TypeMeta `json:",inline"`
 
 	Secrets           Secrets    `json:"secrets"`
 	API               API        `json:"api"`
@@ -55,7 +55,7 @@ type Secrets struct {
 }
 
 type NodeConfiguration struct {
-	unversioned.TypeMeta
+	unversioned.TypeMeta `json:",inline"`
 
 	MasterAddresses []string `json:"masterAddresses"`
 	Secrets         Secrets  `json:"secrets"`
@@ -63,7 +63,7 @@ type NodeConfiguration struct {
 
 // ClusterInfo TODO add description
 type ClusterInfo struct {
-	unversioned.TypeMeta
+	unversioned.TypeMeta `json:",inline"`
 	// TODO(phase1+) this may become simply `api.Config`
 	CertificateAuthorities []string `json:"certificateAuthorities"`
 	Endpoints              []string `json:"endpoints"`
