@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -27,6 +28,8 @@ import (
 	kubenode "k8s.io/kubernetes/cmd/kubeadm/app/node"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 var (
@@ -44,12 +47,14 @@ var (
 func NewCmdJoin(out io.Writer) *cobra.Command {
 	cfg := &kubeadmapi.NodeConfiguration{}
 	var skipPreFlight bool
+	var cfgPath string
 	cmd := &cobra.Command{
 		Use:   "join",
 		Short: "Run this on any machine you wish to join an existing cluster.",
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunJoin(out, cmd, args, cfg, skipPreFlight)
+			j, err := NewJoin(cfgPath, args, cfg, skipPreFlight)
 			kubeadmutil.CheckErr(err)
+			kubeadmutil.CheckErr(j.Run(out))
 		},
 	}
 
@@ -57,6 +62,8 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		&cfg.Secrets.GivenToken, "token", "",
 		"(required) Shared secret used to secure bootstrap. Must match the output of 'kubeadm init'",
 	)
+
+	cmd.PersistentFlags().StringVar(&cfgPath, "config", "", "Path to kubeadm config file")
 
 	cmd.PersistentFlags().BoolVar(
 		&skipPreFlight, "skip-preflight-checks", false,
@@ -66,38 +73,56 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-// RunJoin executes worked node provisioning and tries to join an existing cluster.
-func RunJoin(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.NodeConfiguration, skipPreFlight bool) error {
-	// TODO(phase1+) this we are missing args from the help text, there should be a way to tell cobra about it
+type Join struct {
+	cfg *kubeadmapi.NodeConfiguration
+}
+
+func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, skipPreFlight bool) (*Join, error) {
+	if cfgPath != "" {
+		b, err := ioutil.ReadFile(cfgPath)
+		if err != nil {
+			return nil, fmt.Errorf("unable to read config from %q [%v]", cfgPath, err)
+		}
+		if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), b, cfg); err != nil {
+			return nil, fmt.Errorf("unable to decode config from %q [%v]", cfgPath, err)
+		}
+	}
+
 	if !skipPreFlight {
 		fmt.Println("Running pre-flight checks")
 		err := preflight.RunJoinNodeChecks()
 		if err != nil {
-			return &preflight.PreFlightError{Msg: err.Error()}
+			return nil, &preflight.PreFlightError{Msg: err.Error()}
 		}
 	} else {
 		fmt.Println("Skipping pre-flight checks")
 	}
 
+	// TODO(phase1+) this we are missing args from the help text, there should be a way to tell cobra about it
 	if len(args) == 0 {
-		return fmt.Errorf("<cmd/join> must specify master IP address (see --help)")
+		return nil, fmt.Errorf("must specify master IP address (see --help)")
 	}
-	s.MasterAddresses = append(s.MasterAddresses, args...)
+	cfg.MasterAddresses = append(cfg.MasterAddresses, args...)
 
-	ok, err := kubeadmutil.UseGivenTokenIfValid(&s.Secrets)
+	ok, err := kubeadmutil.UseGivenTokenIfValid(&cfg.Secrets)
 	if !ok {
 		if err != nil {
-			return fmt.Errorf("<cmd/join> %v (see --help)\n", err)
+			return nil, fmt.Errorf("%v (see --help)\n", err)
 		}
-		return fmt.Errorf("Must specify --token (see --help)\n")
+		return nil, fmt.Errorf("Must specify --token (see --help)\n")
 	}
 
-	clusterInfo, err := kubenode.RetrieveTrustedClusterInfo(s)
+	return &Join{cfg: cfg}, nil
+}
+
+// Run executes worked node provisioning and tries to join an existing cluster.
+func (j *Join) Run(out io.Writer) error {
+	clusterInfo, err := kubenode.RetrieveTrustedClusterInfo(j.cfg)
 	if err != nil {
 		return err
 	}
 
-	connectionDetails, err := kubenode.EstablishMasterConnection(s, clusterInfo)
+	connectionDetails, err := kubenode.EstablishMasterConnection(j.cfg, clusterInfo)
 	if err != nil {
 		return err
 	}
