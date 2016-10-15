@@ -1688,15 +1688,15 @@ type Taint struct {
 	// that do not tolerate the taint.
 	// Valid effects are NoSchedule, PreferNoSchedule and NoExecute.
 	Effect TaintEffect `json:"effect"`
-	// AddedTime represents the time at which the taint was added.
+	// TimeAdded represents the time at which the taint was added.
 	// Taint's effect must be NoExecute, otherwise this field is ignored.
 	// Toleration with forgivenessSeconds will tolerate the taint for
 	// only a duration (indicated with toleration.forgivenessSeconds)
-	// that starts at addedTime. By default, it is not set, which means
+	// that starts at timeAdded. By default, it is not set, which means
 	// the taint can only be tolerated by toleration that tolerates
 	// infinite duration.
 	// +optional
-	AddedTime unversioned.Time `json:"addedTime,omitempty"`
+	TimeAdded unversioned.Time `json:"timeAdded,omitempty"`
 }
 
 type TaintEffect string
@@ -1712,22 +1712,23 @@ const (
 	// onto the node entirely. Enforced by the scheduler.
 	TaintEffectPreferNoSchedule TaintEffect = "PreferNoSchedule"
 	// NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented.
-	// Do not allow pods to start on Kubelet unless they tolerate the taint,
-	// but allow all already-running pods to continue running.
-	// Enforced by Kubelet.
-	// TaintEffectNoAdmit TaintEffect = "NoAdmit"
+	// Like TaintEffectNoSchedule, but additionally do not allow pods submitted to
+	// Kubelet without going through the scheduler to start.
+	// Enforced by Kubelet and the scheduler.
+	// TaintEffectNoScheduleNoAdmit TaintEffect = "NoScheduleNoAdmit"
 	// Evict any already-running pods that do not tolerate the taint.
-	// Enforced by Kubelet.
+	// Currently enforced by NodeController.
 	TaintEffectNoExecute TaintEffect = "NoExecute"
 )
 
 // The pod this Toleration is attached to tolerates any taint that matches
 // the triple <key,value,effect> using the matching operator <operator>.
 type Toleration struct {
-	// Required. Key is the taint key that the toleration applies to.
+	// Key is the taint key that the toleration applies to. Empty means match all taint keys.
+	// If the key is empty, operator must be Exists, which means to match all values and all keys.
 	// +optional
 	Key string `json:"key,omitempty" patchStrategy:"merge" patchMergeKey:"key"`
-	// operator represents a key's relationship to the value.
+	// Operator represents a key's relationship to the value.
 	// Valid operators are Exists and Equal. Defaults to Equal.
 	// Exists is equivalent to wildcard for value, so that a pod can
 	// tolerate all taints of a particular category.

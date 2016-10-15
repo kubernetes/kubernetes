@@ -510,24 +510,27 @@ func GetTaintsFromNodeAnnotations(annotations map[string]string) ([]Taint, error
 	return taints, nil
 }
 
-// TolerationToleratesTaint checks if the toleration tolerates the taint.
+// ToleratesTaint checks if the toleration tolerates the taint.
 func (t *Toleration) ToleratesTaint(taint *Taint) bool {
-	if len(t.Effect) != 0 && t.Effect != taint.Effect {
+	if len(t.Effect) > 0 && t.Effect != taint.Effect {
 		return false
 	}
 
-	if t.Key != taint.Key {
+	// empty toleration key means match all taint keys
+	if len(t.Key) > 0 && t.Key != taint.Key {
 		return false
 	}
 
-	// check forgivenessSeconds time out
+	// nil ForgivenessSeconds means tolerate the taint forever
 	if t.ForgivenessSeconds != nil {
 		// taint with no added time indicated can only be tolerated
 		// by toleration with no forgivenessSeconds.
-		if taint.AddedTime.IsZero() {
+		if taint.TimeAdded.IsZero() {
 			return false
 		}
-		if unversioned.Now().After(taint.AddedTime.Add(time.Second * time.Duration(*t.ForgivenessSeconds))) {
+
+		// TODO: need to take time skew into consideration, make sure we don't evict pods earlier than we promised.
+		if unversioned.Now().After(taint.TimeAdded.Add(time.Second * time.Duration(*t.ForgivenessSeconds))) {
 			return false
 		}
 	}
@@ -545,45 +548,48 @@ func (t *Toleration) ToleratesTaint(taint *Taint) bool {
 
 // TolerationsTolerateTaint checks if taint is tolerated by any of the tolerations.
 func TolerationsTolerateTaint(tolerations []Toleration, taint *Taint) bool {
-	tolerated := false
 	for i := range tolerations {
 		if tolerations[i].ToleratesTaint(taint) {
-			tolerated = true
-			break
+			return true
 		}
 	}
-	return tolerated
+	return false
 }
 
-type taintsFilterFunc func(Taint) bool
+type taintsFilterFunc func(*Taint) bool
 
 // TolerationsTolerateTaintsWithFilter checks if given tolerations tolerates
-// all the interested taints in given taint list.
-// isInterestedTaint judges whether the taints is an interested one or not.
-func TolerationsTolerateTaintsWithFilter(tolerations []Toleration, taints []Taint, isInterestedTaint taintsFilterFunc) bool {
-	// If the taint list is nil/empty, it is tolerated by all tolerations by default.
+// all the interesting taints in given taint list.
+func TolerationsTolerateTaintsWithFilter(tolerations []Toleration, taints []Taint, isInterestingTaint taintsFilterFunc) bool {
 	if len(taints) == 0 {
 		return true
 	}
 
-	// The taint list isn't nil/empty, a nil/empty toleration list can't tolerate them.
-	if len(tolerations) == 0 {
-		return false
-	}
-
-	for _, taint := range taints {
-		// skip taints that is not interested
-		// if isInterestedTaint is nil, regards all taints are interested
-		if isInterestedTaint != nil && !isInterestedTaint(taint) {
+	for i := range taints {
+		if isInterestingTaint != nil && !isInterestingTaint(&taints[i]) {
 			continue
 		}
 
-		if !TolerationsTolerateTaint(tolerations, &taint) {
+		if !TolerationsTolerateTaint(tolerations, &taints[i]) {
 			return false
 		}
 	}
 
 	return true
+}
+
+func DeleteTaint(taints []Taint, taintToDelete Taint) ([]Taint, bool) {
+	newTaints := []Taint{}
+	deleted := false
+	for i := range taints {
+		// if taintToRemove doesn't indicate effect, remove all the taints that have the same key
+		if (len(taintToDelete.Effect) == 0 && taintToDelete.Key == taints[i].Key) || taintToDelete.MatchTaint(taints[i]) {
+			deleted = true
+			continue
+		}
+		newTaints = append(newTaints, taints[i])
+	}
+	return newTaints, deleted
 }
 
 // MatchTaint checks if the taint matches taintToMatch. Taints are unique by key:effect,

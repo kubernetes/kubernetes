@@ -195,7 +195,9 @@ type ActionFunc func(TimedValue) (bool, time.Duration)
 // Try processes the queue. Ends prematurely if RateLimiter forbids an action and leak is true.
 // Otherwise, requeues the item to be processed. Each value is processed once if fn returns true,
 // otherwise it is added back to the queue. The returned remaining is used to identify the minimum
-// time to execute the next item in the queue.
+// time to execute the next item in the queue. The same value is processed only once unless
+// Remove is explicitly called on it (it's done by the cancelPodEviction function in NodeController
+// when Node becomes Ready again)
 // TODO: figure out a good way to do garbage collection for all Nodes that were removed from
 // the cluster.
 func (q *RateLimitedTimedQueue) Try(fn ActionFunc) {
@@ -219,7 +221,7 @@ func (q *RateLimitedTimedQueue) Try(fn ActionFunc) {
 			val.ProcessAt = now.Add(wait + 1)
 			q.queue.Replace(val)
 		} else {
-			q.queue.Remove(val.Value)
+			q.queue.RemoveFromQueue(val.Value)
 		}
 		val, ok = q.queue.Head()
 	}

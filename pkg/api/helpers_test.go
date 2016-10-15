@@ -437,6 +437,20 @@ func TestTolerationToleratesTaint(t *testing.T) {
 			expectTolerated: true,
 		},
 		{
+			description: "toleration and taint have the same effect, toleration has empty key and operator is Exists, means match all taints, expect tolerated",
+			toleration: Toleration{
+				Key:      "",
+				Operator: TolerationOpExists,
+				Effect:   TaintEffectNoSchedule,
+			},
+			taint: Taint{
+				Key:    "foo",
+				Value:  "bar",
+				Effect: TaintEffectNoSchedule,
+			},
+			expectTolerated: true,
+		},
+		{
 			description: "toleration and taint have the same key, effect and value, and operator is Equal, expect tolerated",
 			toleration: Toleration{
 				Key:      "foo",
@@ -482,7 +496,7 @@ func TestTolerationToleratesTaint(t *testing.T) {
 			expectTolerated: false,
 		},
 		{
-			description: "expect toleration with nil forgivenessSeconds tolerats taint that is newly added",
+			description: "expect toleration with nil forgivenessSeconds tolerates taint that is newly added",
 			toleration: Toleration{
 				Key:      "foo",
 				Operator: TolerationOpExists,
@@ -491,12 +505,12 @@ func TestTolerationToleratesTaint(t *testing.T) {
 			taint: Taint{
 				Key:       "foo",
 				Effect:    TaintEffectNoExecute,
-				AddedTime: unversioned.Now(),
+				TimeAdded: unversioned.Now(),
 			},
 			expectTolerated: true,
 		},
 		{
-			description: "forgiveness toleration is not time out, expect tolerated",
+			description: "forgiveness toleration has not timed out, expect tolerated",
 			toleration: Toleration{
 				Key:                "foo",
 				Operator:           TolerationOpExists,
@@ -506,12 +520,12 @@ func TestTolerationToleratesTaint(t *testing.T) {
 			taint: Taint{
 				Key:       "foo",
 				Effect:    TaintEffectNoExecute,
-				AddedTime: unversioned.Unix(unversioned.Now().Unix()-100, 0),
+				TimeAdded: unversioned.Unix(unversioned.Now().Unix()-100, 0),
 			},
 			expectTolerated: true,
 		},
 		{
-			description: "forgiveness toleration is time out, expect not tolerated",
+			description: "forgiveness toleration has timed out, expect not tolerated",
 			toleration: Toleration{
 				Key:                "foo",
 				Operator:           TolerationOpExists,
@@ -521,7 +535,7 @@ func TestTolerationToleratesTaint(t *testing.T) {
 			taint: Taint{
 				Key:       "foo",
 				Effect:    TaintEffectNoExecute,
-				AddedTime: unversioned.Unix(unversioned.Now().Unix()-1000, 0),
+				TimeAdded: unversioned.Unix(unversioned.Now().Unix()-1000, 0),
 			},
 			expectTolerated: false,
 		},
@@ -549,21 +563,21 @@ func TestTolerationToleratesTaint(t *testing.T) {
 
 func TestTolerationsTolerateTaintsWithFilter(t *testing.T) {
 	testCases := []struct {
-		description       string
-		tolerations       []Toleration
-		taints            []Taint
-		isInterestedTaint taintsFilterFunc
-		expectTolerated   bool
+		description        string
+		tolerations        []Toleration
+		taints             []Taint
+		isInterestingTaint taintsFilterFunc
+		expectTolerated    bool
 	}{
 		{
-			description:       "empty tolerations tolerate emtpy taints",
-			tolerations:       []Toleration{},
-			taints:            []Taint{},
-			isInterestedTaint: func(t Taint) bool { return true },
-			expectTolerated:   true,
+			description:        "empty tolerations tolerate empty taints",
+			tolerations:        []Toleration{},
+			taints:             []Taint{},
+			isInterestingTaint: func(t *Taint) bool { return true },
+			expectTolerated:    true,
 		},
 		{
-			description: "non-empty tolerations tolerate emtpy taints",
+			description: "non-empty tolerations tolerate empty taints",
 			tolerations: []Toleration{
 				{
 					Key:      "foo",
@@ -571,9 +585,9 @@ func TestTolerationsTolerateTaintsWithFilter(t *testing.T) {
 					Effect:   TaintEffectNoSchedule,
 				},
 			},
-			taints:            []Taint{},
-			isInterestedTaint: func(t Taint) bool { return true },
-			expectTolerated:   true,
+			taints:             []Taint{},
+			isInterestingTaint: func(t *Taint) bool { return true },
+			expectTolerated:    true,
 		},
 		{
 			description: "tolerations match all taints, expect tolerated",
@@ -590,8 +604,8 @@ func TestTolerationsTolerateTaintsWithFilter(t *testing.T) {
 					Effect: TaintEffectNoSchedule,
 				},
 			},
-			isInterestedTaint: func(t Taint) bool { return true },
-			expectTolerated:   true,
+			isInterestingTaint: func(t *Taint) bool { return true },
+			expectTolerated:    true,
 		},
 		{
 			description: "tolerations don't match taints, but no taint is interested, expect tolerated",
@@ -608,8 +622,8 @@ func TestTolerationsTolerateTaintsWithFilter(t *testing.T) {
 					Effect: TaintEffectNoSchedule,
 				},
 			},
-			isInterestedTaint: func(t Taint) bool { return false },
-			expectTolerated:   true,
+			isInterestingTaint: func(t *Taint) bool { return false },
+			expectTolerated:    true,
 		},
 		{
 			description: "no isInterestedTaint indicated, means all taints are interested, tolerations don't match taints, expect untolerated",
@@ -626,8 +640,8 @@ func TestTolerationsTolerateTaintsWithFilter(t *testing.T) {
 					Effect: TaintEffectNoSchedule,
 				},
 			},
-			isInterestedTaint: nil,
-			expectTolerated:   false,
+			isInterestingTaint: nil,
+			expectTolerated:    false,
 		},
 		{
 			description: "tolerations match interested taints, expect tolerated",
@@ -648,16 +662,16 @@ func TestTolerationsTolerateTaintsWithFilter(t *testing.T) {
 					Effect: TaintEffectNoSchedule,
 				},
 			},
-			isInterestedTaint: func(t Taint) bool { return t.Effect == TaintEffectNoExecute },
-			expectTolerated:   true,
+			isInterestingTaint: func(t *Taint) bool { return t.Effect == TaintEffectNoExecute },
+			expectTolerated:    true,
 		},
 	}
 
 	for _, tc := range testCases {
-		if tc.expectTolerated != TolerationsTolerateTaintsWithFilter(tc.tolerations, tc.taints, tc.isInterestedTaint) {
+		if tc.expectTolerated != TolerationsTolerateTaintsWithFilter(tc.tolerations, tc.taints, tc.isInterestingTaint) {
 			filteredTaints := []Taint{}
 			for _, taint := range tc.taints {
-				if tc.isInterestedTaint != nil && !tc.isInterestedTaint(taint) {
+				if tc.isInterestingTaint != nil && !tc.isInterestingTaint(&taint) {
 					continue
 				}
 				filteredTaints = append(filteredTaints, taint)

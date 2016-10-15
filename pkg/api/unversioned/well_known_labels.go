@@ -32,7 +32,8 @@ const (
 	// and removed when node becomes ready.
 	TaintNodeNotReady = "node.alpha.kubernetes.io/notready"
 
-	// TaintNodeUnreachable would be automatically added by node controller when node becomes unknown
-	// and removed when node becomes ready.
+	// TaintNodeUnreachable would be automatically added by node controller when node becomes
+	// unreachable (corresponding to NodeReady status ConditionUnknown)
+	// and removed when node becomes reachable (NodeReady status ConditionTrue).
 	TaintNodeUnreachable = "node.alpha.kubernetes.io/unreachable"
 )

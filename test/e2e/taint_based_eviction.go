@@ -21,9 +21,9 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -32,14 +32,16 @@ import (
 )
 
 var _ = framework.KubeDescribe("Eviction based on taints [Serial] [Slow] [Destructive]", func() {
-	var c *client.Client
+	const pollTimeout = 1 * time.Minute
+
+	var cs clientset.Interface
 	f := framework.NewDefaultFramework("pod-eviction")
 
 	It("validates that unreachable taint can be auto added/removed [Feature:forgiveness]", func() {
-		c = f.Client
+		cs = f.ClientSet
 		nodeName := getNodeThatCanRunPod(f)
 
-		node, err := c.Nodes().Get(nodeName)
+		node, err := cs.Core().Nodes().Get(nodeName)
 		framework.ExpectNoError(err)
 
 		// switch the network interface off for a while to simulate a network outage
@@ -53,16 +55,16 @@ var _ = framework.KubeDescribe("Eviction based on taints [Serial] [Slow] [Destru
 			Key:    unversioned.TaintNodeUnreachable,
 			Effect: api.TaintEffectNoExecute,
 		}
-		framework.ExpectNodeHasTaint(c, nodeName, unreachableTaint)
+		framework.ExpectNodeHasTaint(cs, nodeName, unreachableTaint)
 
-		isNodeReady := !framework.WaitForNodeToBeReady(c, nodeName, framework.NodeReadyInitialTimeout)
-		Expect(isNodeReady).To(Equal(true))
+		isNodeReady := !framework.WaitForNodeToBeReady(cs, nodeName, framework.NodeReadyInitialTimeout)
+		Expect(isNodeReady).To(BeTrue())
 
-		framework.ExpectNodeDoesNotHaveTaint(c, nodeName, unreachableTaint)
+		framework.ExpectNodeDoesNotHaveTaint(cs, nodeName, unreachableTaint)
 	})
 
 	It("validates that pod evicted by nodecontroller when NoExectue taint added to node", func() {
-		c = f.Client
+		cs = f.ClientSet
 		nodeName, podName := runAndKeepPodWithLabelAndGetNodeName(f)
 
 		By("Trying to apply a NoExectue taint on the found node.")
@@ -71,18 +73,10 @@ var _ = framework.KubeDescribe("Eviction based on taints [Serial] [Slow] [Destru
 			Value:  "testing-taint-value",
 			Effect: api.TaintEffectNoExecute,
 		}
-		framework.AddOrUpdateTaintOnNode(c, nodeName, testTaint)
-		framework.ExpectNodeHasTaint(c, nodeName, testTaint)
-		defer framework.RemoveTaintOffNode(c, nodeName, testTaint)
+		framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
+		framework.ExpectNodeHasTaint(cs, nodeName, testTaint)
+		defer framework.RemoveTaintOffNode(cs, nodeName, testTaint)
 
-		// Wait a bit to allow node controller monitor taints can evict pods
-		// TODO: this is brittle; there's no guarantee the node controller will have run in 10 seconds.
-		framework.Logf("Sleeping 15 seconds to wait for pod to be evicted")
-		time.Sleep(15 * time.Second)
-
-		_, err := f.PodClient().Get(podName)
-		if !apierrs.IsNotFound(err) {
-			framework.ExpectNoError(err)
-		}
+		Expect(framework.WaitForPodToDisappear(cs, f.Namespace.Name, podName, labels.Everything(), pollInterval, pollTimeout)).To(Succeed())
 	})
 })

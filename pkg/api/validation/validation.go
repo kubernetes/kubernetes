@@ -1781,14 +1781,14 @@ func validateTaintEffect(effect *api.TaintEffect, allowEmpty bool, fldPath *fiel
 	switch *effect {
 	// TODO: Replace next line with subsequent commented-out line when implement TaintEffectNoScheduleNoAdmit, TaintEffectNoScheduleNoAdmitNoExecute.
 	case api.TaintEffectNoSchedule, api.TaintEffectPreferNoSchedule, api.TaintEffectNoExecute:
-		// case api.TaintEffectNoSchedule, api.TaintEffectPreferNoSchedule, api.TaintEffectNoAdmit, api.TaintEffectNoExecute:
+		// case api.TaintEffectNoSchedule, api.TaintEffectPreferNoSchedule, api.TaintEffectNoScheduleNoAdmit, api.TaintEffectNoExecute:
 	default:
 		validValues := []string{
 			string(api.TaintEffectNoSchedule),
 			string(api.TaintEffectPreferNoSchedule),
 			string(api.TaintEffectNoExecute),
-			// TODO: Uncomment this block when implement TaintEffectNoAdmit.
-			// string(api.TaintEffectNoAdmit),
+			// TODO: Uncomment this block when implement TaintEffectNoScheduleNoAdmit.
+			// string(api.TaintEffectNoScheduleNoAdmit),
 		}
 		allErrors = append(allErrors, field.NotSupported(fldPath, effect, validValues))
 	}
@@ -1801,17 +1801,24 @@ func validateTolerations(tolerations []api.Toleration, fldPath *field.Path) fiel
 	for i, toleration := range tolerations {
 		idxPath := fldPath.Index(i)
 		// validate the toleration key
-		allErrors = append(allErrors, unversionedvalidation.ValidateLabelName(toleration.Key, idxPath.Child("key"))...)
+		if len(toleration.Key) > 0 {
+			allErrors = append(allErrors, unversionedvalidation.ValidateLabelName(toleration.Key, idxPath.Child("key"))...)
+		}
+
+		// empty toleration key with Exists operator and empty value means match all taints
+		if len(toleration.Key) == 0 && toleration.Operator != api.TolerationOpExists {
+			allErrors = append(allErrors, field.Invalid(idxPath.Child("operator"), toleration.Operator,
+				"operator must be Exists when `key` is empty, which means \"match all values and all keys\""))
+		}
 
 		if toleration.ForgivenessSeconds != nil {
 			if *toleration.ForgivenessSeconds <= 0 {
-				allErrors = append(allErrors, field.Invalid(idxPath.Child("forgivenessSeconds"), toleration.ForgivenessSeconds, "forgivenessSeconds must be greater than zero when set"))
+				allErrors = append(allErrors, field.Invalid(idxPath.Child("forgivenessSeconds"), toleration.ForgivenessSeconds,
+					"forgivenessSeconds must be greater than zero when set"))
 			}
 			if toleration.Effect != api.TaintEffectNoExecute {
-				allErrors = append(allErrors, field.Invalid(idxPath.Child("effect"), toleration.Effect, "effect must be NoExecute when `ForgivenessSeconds` is set"))
-			}
-			if toleration.Operator != api.TolerationOpExists {
-				allErrors = append(allErrors, field.Invalid(idxPath.Child("operator"), toleration.Operator, "operator must be Exists when `key` is 'nodeNotReady'"))
+				allErrors = append(allErrors, field.Invalid(idxPath.Child("effect"), toleration.Effect,
+					"effect must be 'NoExecute' when `forgivenessSeconds` is set"))
 			}
 		}
 
