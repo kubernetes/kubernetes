@@ -1581,9 +1581,9 @@ __EOF__
   # Clean up
   kubectl delete namespace my-namespace
 
-  ##############
+  ######################
   # Pods in Namespaces #
-  ##############
+  ######################
 
   ### Create a new namespace
   # Pre-condition: the other namespace does not exist
@@ -1602,6 +1602,9 @@ __EOF__
   kube::test::get_object_assert 'pods --namespace=other' "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
   # Post-condition: verify shorthand `-n other` has the same results as `--namespace=other`
   kube::test::get_object_assert 'pods -n other' "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
+  # Post-condition: a resource cannot be retrieved by name across all namespaces
+  output_message=$(! kubectl get "${kube_flags[@]}" pod valid-pod --all-namespaces 2>&1)
+  kube::test::if_has_string "${output_message}" "a resource cannot be retrieved by name across all namespaces"
 
   ### Delete POD valid-pod in specific namespace
   # Pre-condition: valid-pod POD exists
@@ -1613,9 +1616,9 @@ __EOF__
   # Clean up
   kubectl delete namespace other
 
-  ##############
+  ###########
   # Secrets #
-  ##############
+  ###########
 
   ### Create a new namespace
   # Pre-condition: the test-secrets namespace does not exist
