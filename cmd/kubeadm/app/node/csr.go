@@ -20,8 +20,6 @@ import (
 	"fmt"
 
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/apis/certificates"
-	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/kubelet/util/csr"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
@@ -56,26 +54,4 @@ func PerformTLSBootstrap(connection *ConnectionDetails) (*clientcmdapi.Config, e
 	)
 
 	return finalConfig, nil
-}
-
-// Checks if the certificates API for this endpoint is functional
-func checkCertsAPI(discoveryClient *discovery.DiscoveryClient) error {
-	serverGroups, err := discoveryClient.ServerGroups()
-
-	if err != nil {
-		return fmt.Errorf("failed to retrieve a list of supported API objects [%v]", err)
-	}
-
-	for _, group := range serverGroups.Groups {
-		if group.Name == certificates.GroupName {
-			return nil
-		}
-	}
-
-	version, err := discoveryClient.ServerVersion()
-	if err != nil {
-		return fmt.Errorf("unable to obtain API version [%v]", err)
-	}
-
-	return fmt.Errorf("API version %s does not support certificates API, use v1.4.0 or newer", version.String())
 }
