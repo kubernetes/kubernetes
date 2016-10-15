@@ -2509,6 +2509,19 @@ func ExpectNodeHasTaint(c clientset.Interface, nodeName string, taint api.Taint)
 	}
 }
 
+func ExpectNodeDoesNotHaveTaint(c *client.Client, nodeName string, taint api.Taint) {
+	By("verifying the node doesn't have the taint " + taint.ToString())
+	node, err := c.Nodes().Get(nodeName)
+	ExpectNoError(err)
+
+	nodeTaints, err := api.GetTaintsFromNodeAnnotations(node.Annotations)
+	ExpectNoError(err)
+
+	if len(nodeTaints) != 0 && taintExists(nodeTaints, taint) {
+		Failf("taint %s exists on node %s", taint.ToString(), nodeName)
+	}
+}
+
 func deleteTaint(oldTaints []api.Taint, taintToDelete api.Taint) ([]api.Taint, error) {
 	newTaints := []api.Taint{}
 	found := false

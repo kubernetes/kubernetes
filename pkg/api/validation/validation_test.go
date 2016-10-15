@@ -3518,6 +3518,27 @@ func TestValidatePod(t *testing.T) {
 			},
 			Spec: validPodSpec,
 		},
+		{ // populate forgiverness tolerations in annotations.
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.TolerationsAnnotationKey: `
+					[{
+						"key": "` + unversioned.TaintNodeNotReady + `",
+						"operator": "Exists",
+						"value": "",
+						"effect": "NoExecute",
+						"forgivenessSeconds": 60
+					}]`,
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
 		{ // populate tolerations equal operator in annotations.
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
@@ -4012,6 +4033,38 @@ func TestValidatePod(t *testing.T) {
 						"operator": "Exists",
 						"value": "bar",
 						"effect": "NoSchedule"
+					}]`,
+				},
+			},
+			Spec: validPodSpec,
+		},
+		"effect must be NoExecute when `ForgivenessSeconds` is set": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "pod-forgiveness-invalid",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.TolerationsAnnotationKey: `
+					[{
+						"key": ` + unversioned.TaintNodeNotReady + `,
+						"operator": "Exists",
+						"effect": "NoSchedule",
+						"forgivenessSeconds": 20
+					}]`,
+				},
+			},
+			Spec: validPodSpec,
+		},
+		"forgivenessSeconds must be greater than zero when set": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "pod-forgiveness-invalid",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.TolerationsAnnotationKey: `
+					[{
+						"key": ` + unversioned.TaintNodeNotReady + `,
+						"operator": "Exists",
+						"effect": "NoExecute",
+						"forgivenessSeconds": 0
 					}]`,
 				},
 			},
@@ -5940,7 +5993,7 @@ func TestValidateNode(t *testing.T) {
 					[{
 						"key": "dedicated",
 						"value": "special-user-3",
-						"effect": "NoExecute"
+						"effect": "NoAdmitNoExecute"
 					}]`,
 				},
 			},

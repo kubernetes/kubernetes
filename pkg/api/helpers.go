@@ -511,34 +511,79 @@ func GetTaintsFromNodeAnnotations(annotations map[string]string) ([]Taint, error
 }
 
 // TolerationToleratesTaint checks if the toleration tolerates the taint.
-func TolerationToleratesTaint(toleration *Toleration, taint *Taint) bool {
-	if len(toleration.Effect) != 0 && toleration.Effect != taint.Effect {
+func (t *Toleration) ToleratesTaint(taint *Taint) bool {
+	if len(t.Effect) != 0 && t.Effect != taint.Effect {
 		return false
 	}
 
-	if toleration.Key != taint.Key {
+	if t.Key != taint.Key {
 		return false
 	}
+
+	// check forgivenessSeconds time out
+	if t.ForgivenessSeconds != nil {
+		// taint with no added time indicated can only be tolerated
+		// by toleration with no forgivenessSeconds.
+		if taint.AddedTime.IsZero() {
+			return false
+		}
+		if unversioned.Now().After(taint.AddedTime.Add(time.Second * time.Duration(*t.ForgivenessSeconds))) {
+			return false
+		}
+	}
+
 	// TODO: Use proper defaulting when Toleration becomes a field of PodSpec
-	if (len(toleration.Operator) == 0 || toleration.Operator == TolerationOpEqual) && toleration.Value == taint.Value {
+	switch t.Operator {
+	case "", TolerationOpEqual:
+		return t.Value == taint.Value
+	case TolerationOpExists:
 		return true
+	default:
+		return false
 	}
-	if toleration.Operator == TolerationOpExists {
-		return true
-	}
-	return false
 }
 
-// TaintToleratedByTolerations checks if taint is tolerated by any of the tolerations.
-func TaintToleratedByTolerations(taint *Taint, tolerations []Toleration) bool {
+// TolerationsTolerateTaint checks if taint is tolerated by any of the tolerations.
+func TolerationsTolerateTaint(tolerations []Toleration, taint *Taint) bool {
 	tolerated := false
 	for i := range tolerations {
-		if TolerationToleratesTaint(&tolerations[i], taint) {
+		if tolerations[i].ToleratesTaint(taint) {
 			tolerated = true
 			break
 		}
 	}
 	return tolerated
+}
+
+type taintsFilterFunc func(Taint) bool
+
+// TolerationsTolerateTaintsWithFilter checks if given tolerations tolerates
+// all the interested taints in given taint list.
+// isInterestedTaint judges whether the taints is an interested one or not.
+func TolerationsTolerateTaintsWithFilter(tolerations []Toleration, taints []Taint, isInterestedTaint taintsFilterFunc) bool {
+	// If the taint list is nil/empty, it is tolerated by all tolerations by default.
+	if len(taints) == 0 {
+		return true
+	}
+
+	// The taint list isn't nil/empty, a nil/empty toleration list can't tolerate them.
+	if len(tolerations) == 0 {
+		return false
+	}
+
+	for _, taint := range taints {
+		// skip taints that is not interested
+		// if isInterestedTaint is nil, regards all taints are interested
+		if isInterestedTaint != nil && !isInterestedTaint(taint) {
+			continue
+		}
+
+		if !TolerationsTolerateTaint(tolerations, &taint) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // MatchTaint checks if the taint matches taintToMatch. Taints are unique by key:effect,

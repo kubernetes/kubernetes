@@ -1686,8 +1686,17 @@ type Taint struct {
 	Value string `json:"value,omitempty"`
 	// Required. The effect of the taint on pods
 	// that do not tolerate the taint.
-	// Valid effects are NoSchedule and PreferNoSchedule.
+	// Valid effects are NoSchedule, PreferNoSchedule and NoExecute.
 	Effect TaintEffect `json:"effect"`
+	// AddedTime represents the time at which the taint was added.
+	// Taint's effect must be NoExecute, otherwise this field is ignored.
+	// Toleration with forgivenessSeconds will tolerate the taint for
+	// only a duration (indicated with toleration.forgivenessSeconds)
+	// that starts at addedTime. By default, it is not set, which means
+	// the taint can only be tolerated by toleration that tolerates
+	// infinite duration.
+	// +optional
+	AddedTime unversioned.Time `json:"addedTime,omitempty"`
 }
 
 type TaintEffect string
@@ -1703,17 +1712,13 @@ const (
 	// onto the node entirely. Enforced by the scheduler.
 	TaintEffectPreferNoSchedule TaintEffect = "PreferNoSchedule"
 	// NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented.
-	// Do not allow new pods to schedule onto the node unless they tolerate the taint,
-	// do not allow pods to start on Kubelet unless they tolerate the taint,
+	// Do not allow pods to start on Kubelet unless they tolerate the taint,
 	// but allow all already-running pods to continue running.
-	// Enforced by the scheduler and Kubelet.
-	// TaintEffectNoScheduleNoAdmit TaintEffect = "NoScheduleNoAdmit"
-	// NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented.
-	// Do not allow new pods to schedule onto the node unless they tolerate the taint,
-	// do not allow pods to start on Kubelet unless they tolerate the taint,
-	// and evict any already-running pods that do not tolerate the taint.
-	// Enforced by the scheduler and Kubelet.
-	// TaintEffectNoScheduleNoAdmitNoExecute = "NoScheduleNoAdmitNoExecute"
+	// Enforced by Kubelet.
+	// TaintEffectNoAdmit TaintEffect = "NoAdmit"
+	// Evict any already-running pods that do not tolerate the taint.
+	// Enforced by Kubelet.
+	TaintEffectNoExecute TaintEffect = "NoExecute"
 )
 
 // The pod this Toleration is attached to tolerates any taint that matches
@@ -1733,11 +1738,15 @@ type Toleration struct {
 	// +optional
 	Value string `json:"value,omitempty"`
 	// Effect indicates the taint effect to match. Empty means match all taint effects.
-	// When specified, allowed values are NoSchedule and PreferNoSchedule.
+	// When specified, allowed values are NoSchedule, PreferNoSchedule, and NoExecute.
 	// +optional
 	Effect TaintEffect `json:"effect,omitempty"`
-	// TODO: For forgiveness (#1574), we'd eventually add at least a grace period
-	// here, and possibly an occurrence threshold and period.
+	// ForgivenessSeconds represents the period of time the toleration (which must be
+	// of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default,
+	// it is not set, which means tolerate the taint forever (do not evict). Zero and
+	// negative values are not allowed.
+	// +optional
+	ForgivenessSeconds *int64 `json:"forgivenessSeconds,omitempty"`
 }
 
 // A toleration operator is the set of operators that can be used in a toleration.
