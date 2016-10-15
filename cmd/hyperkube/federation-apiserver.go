@@ -30,6 +30,8 @@ func NewFederationAPIServer() *Server {
 		SimpleUsage: "federation-apiserver",
 		Long:        "The API entrypoint for the federation control plane",
 		Run: func(_ *Server, args []string) error {
+			// Register all plugins the app is using
+			app.RegisterPlugins()
 			return app.Run(s)
 		},
 	}

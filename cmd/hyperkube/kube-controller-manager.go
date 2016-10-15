@@ -30,6 +30,8 @@ func NewKubeControllerManager() *Server {
 		SimpleUsage: "controller-manager",
 		Long:        "A server that runs a set of active components. This includes replication controllers, service endpoints and nodes.",
 		Run: func(_ *Server, args []string) error {
+			// Register all plugins the app is using
+			app.RegisterPlugins()
 			return app.Run(s)
 		},
 	}

@@ -21,10 +21,19 @@ package app
 // given binary target.
 import (
 	// Cloud providers
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers"
 
 	// Admission policies
-	_ "k8s.io/kubernetes/plugin/pkg/admission/admit"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/deny"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/namespace/lifecycle"
+	"k8s.io/kubernetes/plugin/pkg/admission/admit"
+	"k8s.io/kubernetes/plugin/pkg/admission/deny"
+	"k8s.io/kubernetes/plugin/pkg/admission/namespace/lifecycle"
 )
+
+// RegisterPlugins registers all admission controllers and cloud providers
+func RegisterPlugins() {
+	providers.RegisterCloudProviders()
+
+	admit.RegisterPlugin()
+	deny.RegisterPlugin()
+	lifecycle.RegisterPlugin()
+}

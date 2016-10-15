@@ -112,7 +112,8 @@ type Config struct {
 	LoadBalancer LoadBalancerOpts
 }
 
-func init() {
+// RegisterCloudProvider registers the current cloud provider
+func RegisterCloudProvider() {
 	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
 		cfg, err := readConfig(config)
 		if err != nil {

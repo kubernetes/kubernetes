@@ -48,7 +48,7 @@ type jwtProvider struct {
 
 // init registers the various means by which credentials may
 // be resolved on GCP.
-func init() {
+func RegisterPlugin() {
 	credentialprovider.RegisterCredentialProvider("google-jwt-key",
 		&credentialprovider.CachingDockerConfigProvider{
 			Provider: &jwtProvider{

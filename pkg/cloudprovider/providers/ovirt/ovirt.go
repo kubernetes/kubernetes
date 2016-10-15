@@ -79,7 +79,8 @@ type XmlVmsList struct {
 	Vm      []XmlVmInfo `xml:"vm"`
 }
 
-func init() {
+// RegisterCloudProvider registers the current cloud provider
+func RegisterCloudProvider() {
 	cloudprovider.RegisterCloudProvider(ProviderName,
 		func(config io.Reader) (cloudprovider.Interface, error) {
 			return newOVirtCloud(config)

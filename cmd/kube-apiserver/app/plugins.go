@@ -21,24 +21,47 @@ package app
 // given binary target.
 import (
 	// Cloud providers
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers"
 
 	// Admission policies
-	_ "k8s.io/kubernetes/plugin/pkg/admission/admit"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/alwayspullimages"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/antiaffinity"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/deny"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/exec"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/imagepolicy"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/initialresources"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/limitranger"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/namespace/autoprovision"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/namespace/exists"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/namespace/lifecycle"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/persistentvolume/label"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/resourcequota"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/security/podsecuritypolicy"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/securitycontext/scdeny"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/storageclass/default"
+	"k8s.io/kubernetes/plugin/pkg/admission/admit"
+	"k8s.io/kubernetes/plugin/pkg/admission/alwayspullimages"
+	"k8s.io/kubernetes/plugin/pkg/admission/antiaffinity"
+	"k8s.io/kubernetes/plugin/pkg/admission/deny"
+	"k8s.io/kubernetes/plugin/pkg/admission/exec"
+	"k8s.io/kubernetes/plugin/pkg/admission/imagepolicy"
+	"k8s.io/kubernetes/plugin/pkg/admission/initialresources"
+	"k8s.io/kubernetes/plugin/pkg/admission/limitranger"
+	"k8s.io/kubernetes/plugin/pkg/admission/namespace/autoprovision"
+	"k8s.io/kubernetes/plugin/pkg/admission/namespace/exists"
+	"k8s.io/kubernetes/plugin/pkg/admission/namespace/lifecycle"
+	"k8s.io/kubernetes/plugin/pkg/admission/persistentvolume/label"
+	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota"
+	"k8s.io/kubernetes/plugin/pkg/admission/security/podsecuritypolicy"
+	"k8s.io/kubernetes/plugin/pkg/admission/securitycontext/scdeny"
+	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
+	defaultstorage "k8s.io/kubernetes/plugin/pkg/admission/storageclass/default"
 )
+
+// RegisterPlugins registers all admission controllers and cloud providers
+func RegisterPlugins() {
+	providers.RegisterCloudProviders()
+
+	admit.RegisterPlugin()
+	alwayspullimages.RegisterPlugin()
+	antiaffinity.RegisterPlugin()
+	deny.RegisterPlugin()
+	exec.RegisterPlugin()
+	imagepolicy.RegisterPlugin()
+	initialresources.RegisterPlugin()
+	limitranger.RegisterPlugin()
+	autoprovision.RegisterPlugin()
+	exists.RegisterPlugin()
+	lifecycle.RegisterPlugin()
+	label.RegisterPlugin()
+	resourcequota.RegisterPlugin()
+	podsecuritypolicy.RegisterPlugin()
+	scdeny.RegisterPlugin()
+	serviceaccount.RegisterPlugin()
+	defaultstorage.RegisterPlugin()
+}

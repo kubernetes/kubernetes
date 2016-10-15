@@ -147,7 +147,8 @@ type Disks interface {
 	GetAutoLabelsForPD(name string, zone string) (map[string]string, error)
 }
 
-func init() {
+// RegisterCloudProvider registers the current cloud provider
+func RegisterCloudProvider() {
 	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) { return newGCECloud(config) })
 }
 

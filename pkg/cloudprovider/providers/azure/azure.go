@@ -63,7 +63,8 @@ type Cloud struct {
 	VirtualMachinesClient   compute.VirtualMachinesClient
 }
 
-func init() {
+// RegisterCloudProvider registers the current cloud provider
+func RegisterCloudProvider() {
 	cloudprovider.RegisterCloudProvider(CloudProviderName, NewCloud)
 }
 

@@ -48,7 +48,8 @@ var (
 	noHostNameSpecified = errors.New("No hostname specified")
 )
 
-func init() {
+// RegisterCloudProvider registers the current cloud provider
+func RegisterCloudProvider() {
 	cloudprovider.RegisterCloudProvider(
 		ProviderName,
 		func(configReader io.Reader) (cloudprovider.Interface, error) {

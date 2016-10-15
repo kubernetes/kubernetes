@@ -34,6 +34,8 @@ func NewKubelet() *Server {
 		configuration data, with the running set of containers by starting or stopping
 		Docker containers.`,
 		Run: func(_ *Server, _ []string) error {
+			// Register all plugins the app is using
+			app.RegisterPlugins()
 			return app.Run(s, nil)
 		},
 	}

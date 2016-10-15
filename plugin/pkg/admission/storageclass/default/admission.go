@@ -36,7 +36,8 @@ const (
 	PluginName = "DefaultStorageClass"
 )
 
-func init() {
+// RegisterPlugin registers the current admission plugin
+func RegisterPlugin() {
 	admission.RegisterPlugin(PluginName, func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
 		plugin := newPlugin(client)
 		plugin.Run()
