@@ -34,7 +34,7 @@ func countIntolerableTaintsPreferNoSchedule(taints []api.Taint, tolerations []ap
 			continue
 		}
 
-		if !api.TaintToleratedByTolerations(taint, tolerations) {
+		if !api.TolerationsTolerateTaint(tolerations, taint) {
 			intolerableTaints++
 		}
 	}

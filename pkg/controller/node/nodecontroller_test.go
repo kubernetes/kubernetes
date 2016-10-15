@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"encoding/json"
 	"net"
 	"strings"
 	"testing"
@@ -61,13 +62,14 @@ func NewNodeControllerFromClient(
 	clusterCIDR *net.IPNet,
 	serviceCIDR *net.IPNet,
 	nodeCIDRMaskSize int,
-	allocateNodeCIDRs bool) (*NodeController, error) {
+	allocateNodeCIDRs bool,
+	useTaintBasedEvictions bool) (*NodeController, error) {
 
 	factory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 
 	nc, err := NewNodeController(factory.Pods(), factory.Nodes(), factory.DaemonSets(), cloud, kubeClient, podEvictionTimeout, evictionLimiterQPS, secondaryEvictionLimiterQPS,
 		largeClusterThreshold, unhealthyZoneThreshold, nodeMonitorGracePeriod, nodeStartupGracePeriod, nodeMonitorPeriod, clusterCIDR,
-		serviceCIDR, nodeCIDRMaskSize, allocateNodeCIDRs)
+		serviceCIDR, nodeCIDRMaskSize, allocateNodeCIDRs, useTaintBasedEvictions)
 	if err != nil {
 		return nil, err
 	}
@@ -499,7 +501,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 	for _, item := range table {
 		nodeController, _ := NewNodeControllerFromClient(nil, item.fakeNodeHandler,
 			evictionTimeout, testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealtyThreshold, testNodeMonitorGracePeriod,
-			testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false)
+			testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false, false)
 		nodeController.now = func() unversioned.Time { return fakeNow }
 		for _, ds := range item.daemonSets {
 			nodeController.daemonSetStore.Add(&ds)
@@ -511,9 +513,17 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 			nodeController.now = func() unversioned.Time { return unversioned.Time{Time: fakeNow.Add(item.timeToPass)} }
 			item.fakeNodeHandler.Existing[0].Status = item.newNodeStatus
 			item.fakeNodeHandler.Existing[1].Status = item.secondNodeNewStatus
+			for _, node := range item.fakeNodeHandler.Existing {
+				nodeController.kubeClient.Core().Nodes().Update(node)
+			}
 		}
 		if err := nodeController.monitorNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
+		}
+
+		nodeController.nodeStore.Store = cache.NewStore(cache.MetaNamespaceKeyFunc)
+		for i := range item.fakeNodeHandler.UpdatedNodes {
+			nodeController.nodeStore.Store.Add(item.fakeNodeHandler.UpdatedNodes[i])
 		}
 		zones := getZones(item.fakeNodeHandler)
 		for _, zone := range zones {
@@ -523,6 +533,19 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 				return true, 0
 			})
 		}
+
+		nodeController.untoleratedTaintEvictor.Try(func(value TimedValue) (bool, time.Duration) {
+			podNamespace, podName, _ := cache.SplitMetaNamespaceKey(value.Value)
+			pod, err := nodeController.kubeClient.Core().Pods(podNamespace).Get(podName)
+			if err != nil {
+				// pod has been deleted, no more action needed
+				t.Errorf("%v: Unexpected err: %v: %v instead %v", item.description, err)
+				return false, 0
+			}
+
+			deleteSinglePod(nodeController.kubeClient, nodeController.recorder, pod, nodeController.daemonSetStore)
+			return true, 0
+		})
 
 		podEvicted := false
 		for _, action := range item.fakeNodeHandler.Actions() {
@@ -1008,7 +1031,7 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 		}
 		nodeController, _ := NewNodeControllerFromClient(nil, fakeNodeHandler,
 			evictionTimeout, testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealtyThreshold, testNodeMonitorGracePeriod,
-			testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false)
+			testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false, false)
 		nodeController.now = func() unversioned.Time { return fakeNow }
 		nodeController.enterPartialDisruptionFunc = func(nodeNum int) float32 {
 			return testRateLimiterQPS
@@ -1042,6 +1065,12 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 				t.Errorf("%v: Unexpected zone state: %v: %v instead %v", item.description, zone, nodeController.zoneStates[zone], state)
 			}
 		}
+
+		nodeController.nodeStore.Store = cache.NewStore(cache.MetaNamespaceKeyFunc)
+		for i := range fakeNodeHandler.UpdatedNodes {
+			nodeController.nodeStore.Store.Add(fakeNodeHandler.UpdatedNodes[i])
+		}
+
 		zones := getZones(fakeNodeHandler)
 		for _, zone := range zones {
 			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
@@ -1050,6 +1079,19 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 				return true, 0
 			})
 		}
+
+		nodeController.untoleratedTaintEvictor.Try(func(value TimedValue) (bool, time.Duration) {
+			podNamespace, podName, _ := cache.SplitMetaNamespaceKey(value.Value)
+			pod, err := nodeController.kubeClient.Core().Pods(podNamespace).Get(podName)
+			if err != nil {
+				// pod has been deleted, no more action needed
+				t.Errorf("%v: Unexpected err: %v: %v instead %v", item.description, err)
+				return false, 0
+			}
+
+			deleteSinglePod(nodeController.kubeClient, nodeController.recorder, pod, nodeController.daemonSetStore)
+			return true, 0
+		})
 
 		podEvicted := false
 		for _, action := range fakeNodeHandler.Actions() {
@@ -1094,7 +1136,7 @@ func TestCloudProviderNoRateLimit(t *testing.T) {
 	nodeController, _ := NewNodeControllerFromClient(nil, fnh, 10*time.Minute,
 		testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealtyThreshold,
 		testNodeMonitorGracePeriod, testNodeStartupGracePeriod,
-		testNodeMonitorPeriod, nil, nil, 0, false)
+		testNodeMonitorPeriod, nil, nil, 0, false, false)
 	nodeController.cloud = &fakecloud.FakeCloud{}
 	nodeController.now = func() unversioned.Time { return unversioned.Date(2016, 1, 1, 12, 0, 0, 0, time.UTC) }
 	nodeController.nodeExistsInCloudProvider = func(nodeName types.NodeName) (bool, error) {
@@ -1119,13 +1161,25 @@ func TestCloudProviderNoRateLimit(t *testing.T) {
 
 func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 	fakeNow := unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
+
+	fakeUnreachableTaintJson := func(t unversioned.Time) string {
+		taints := []api.Taint{{
+			Key:       unversioned.TaintNodeUnreachable,
+			Effect:    api.TaintEffectNoExecute,
+			TimeAdded: t,
+		}}
+		taintsJson, _ := json.Marshal(taints)
+		return string(taintsJson)
+	}
+
 	table := []struct {
-		fakeNodeHandler      *FakeNodeHandler
-		timeToPass           time.Duration
-		newNodeStatus        api.NodeStatus
-		expectedEvictPods    bool
-		expectedRequestCount int
-		expectedNodes        []*api.Node
+		fakeNodeHandler        *FakeNodeHandler
+		timeToPass             time.Duration
+		newNodeStatus          api.NodeStatus
+		expectedEvictPods      bool
+		expectedRequestCount   int
+		expectedNodes          []*api.Node
+		useTaintBasedEvictions bool
 	}{
 		// Node created long time ago, without status:
 		// Expect Unknown status posted from node controller.
@@ -1171,6 +1225,51 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 				},
 			},
 		},
+		// Enabled taint based evictions: Node created long time ago, without status:
+		// Expect Unknown status posted from node controller.
+		{
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
+			},
+			expectedRequestCount: 3, // List+Update+UpdateStatus
+			expectedNodes: []*api.Node{
+				{
+					ObjectMeta: api.ObjectMeta{
+						Name:              "node0",
+						CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{
+							{
+								Type:               api.NodeReady,
+								Status:             api.ConditionUnknown,
+								Reason:             "NodeStatusNeverUpdated",
+								Message:            "Kubelet never posted node status.",
+								LastHeartbeatTime:  unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+								LastTransitionTime: fakeNow,
+							},
+							{
+								Type:               api.NodeOutOfDisk,
+								Status:             api.ConditionUnknown,
+								Reason:             "NodeStatusNeverUpdated",
+								Message:            "Kubelet never posted node status.",
+								LastHeartbeatTime:  unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+								LastTransitionTime: fakeNow,
+							},
+						},
+					},
+				},
+			},
+			useTaintBasedEvictions: true,
+		},
 		// Node created recently, without status.
 		// Expect no action from node controller (within startup grace period).
 		{
@@ -1187,6 +1286,31 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 			},
 			expectedRequestCount: 1, // List
 			expectedNodes:        nil,
+		},
+		// Enabled taint based evictions: Node created recently, without status.
+		// Expect no action from node controller (within startup grace period).
+		{
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: fakeNow,
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
+			},
+			expectedRequestCount: 2, // List+Get
+			expectedNodes: []*api.Node{
+				{
+					ObjectMeta: api.ObjectMeta{
+						Name:              "node0",
+						CreationTimestamp: fakeNow,
+					},
+				},
+			},
+			useTaintBasedEvictions: true,
 		},
 		// Node created long time ago, with status updated by kubelet exceeds grace period.
 		// Expect Unknown status posted from node controller.
@@ -1287,6 +1411,109 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 				},
 			},
 		},
+		// Enabled taint based evictions: Node created long time ago, with status updated by kubelet exceeds grace period.
+		// Expect Unknown status posted from node controller.
+		{
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						},
+						Status: api.NodeStatus{
+							Conditions: []api.NodeCondition{
+								{
+									Type:   api.NodeReady,
+									Status: api.ConditionTrue,
+									// Node status hasn't been updated for 1hr.
+									LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+								{
+									Type:   api.NodeOutOfDisk,
+									Status: api.ConditionFalse,
+									// Node status hasn't been updated for 1hr.
+									LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+							Capacity: api.ResourceList{
+								api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+								api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+							},
+						},
+						Spec: api.NodeSpec{
+							ExternalID: "node0",
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
+			},
+			expectedRequestCount: 5, // List+Get+List+Update+UpdateStatus
+			timeToPass:           time.Hour,
+			newNodeStatus: api.NodeStatus{
+				Conditions: []api.NodeCondition{
+					{
+						Type:   api.NodeReady,
+						Status: api.ConditionTrue,
+						// Node status hasn't been updated for 1hr.
+						LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+					},
+					{
+						Type:   api.NodeOutOfDisk,
+						Status: api.ConditionFalse,
+						// Node status hasn't been updated for 1hr.
+						LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+					},
+				},
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+				},
+			},
+			expectedNodes: []*api.Node{
+				{
+					ObjectMeta: api.ObjectMeta{
+						Name:              "node0",
+						CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						Annotations: map[string]string{
+							api.TaintsAnnotationKey: fakeUnreachableTaintJson(unversioned.Time{Time: fakeNow.Add(time.Hour)}),
+						},
+					},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{
+							{
+								Type:               api.NodeReady,
+								Status:             api.ConditionUnknown,
+								Reason:             "NodeStatusUnknown",
+								Message:            "Kubelet stopped posting node status.",
+								LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								LastTransitionTime: unversioned.Time{Time: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC).Add(time.Hour)},
+							},
+							{
+								Type:               api.NodeOutOfDisk,
+								Status:             api.ConditionUnknown,
+								Reason:             "NodeStatusUnknown",
+								Message:            "Kubelet stopped posting node status.",
+								LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								LastTransitionTime: unversioned.Time{Time: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC).Add(time.Hour)},
+							},
+						},
+						Capacity: api.ResourceList{
+							api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+							api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+						},
+					},
+					Spec: api.NodeSpec{
+						ExternalID: "node0",
+					},
+				},
+			},
+			useTaintBasedEvictions: true,
+		},
 		// Node created long time ago, with status updated recently.
 		// Expect no action from node controller (within monitor grace period).
 		{
@@ -1322,31 +1549,92 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 			expectedRequestCount: 1, // List
 			expectedNodes:        nil,
 		},
+		// Enabled taint based Evictions: Node created long time ago, with status updated recently.
+		// Expect no action from node controller (within monitor grace period).
+		{
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						},
+						Status: api.NodeStatus{
+							Conditions: []api.NodeCondition{
+								{
+									Type:   api.NodeReady,
+									Status: api.ConditionTrue,
+									// Node status has just been updated.
+									LastHeartbeatTime:  fakeNow,
+									LastTransitionTime: fakeNow,
+								},
+							},
+							Capacity: api.ResourceList{
+								api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+								api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+							},
+						},
+						Spec: api.NodeSpec{
+							ExternalID: "node0",
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
+			},
+			expectedRequestCount: 2, // List+Get
+			expectedNodes: []*api.Node{
+				{
+					ObjectMeta: api.ObjectMeta{
+						Name:              "node0",
+						CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{
+							{
+								Type:   api.NodeReady,
+								Status: api.ConditionTrue,
+								// Node status has just been updated.
+								LastHeartbeatTime:  fakeNow,
+								LastTransitionTime: fakeNow,
+							},
+						},
+						Capacity: api.ResourceList{
+							api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+							api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+						},
+					},
+					Spec: api.NodeSpec{
+						ExternalID: "node0",
+					},
+				},
+			},
+			useTaintBasedEvictions: true,
+		},
 	}
 
 	for i, item := range table {
 		nodeController, _ := NewNodeControllerFromClient(nil, item.fakeNodeHandler, 5*time.Minute,
 			testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealtyThreshold,
-			testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false)
+			testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false, item.useTaintBasedEvictions)
 		nodeController.now = func() unversioned.Time { return fakeNow }
 		if err := nodeController.monitorNodeStatus(); err != nil {
-			t.Errorf("unexpected error: %v", err)
+			t.Errorf("Case[%d] unexpected error: %v", i, err)
 		}
 		if item.timeToPass > 0 {
 			nodeController.now = func() unversioned.Time { return unversioned.Time{Time: fakeNow.Add(item.timeToPass)} }
 			item.fakeNodeHandler.Existing[0].Status = item.newNodeStatus
 			if err := nodeController.monitorNodeStatus(); err != nil {
-				t.Errorf("unexpected error: %v", err)
+				t.Errorf("Case[%d] unexpected error: %v", i, err)
 			}
 		}
 		if item.expectedRequestCount != item.fakeNodeHandler.RequestCount {
-			t.Errorf("expected %v call, but got %v.", item.expectedRequestCount, item.fakeNodeHandler.RequestCount)
+			t.Errorf("Case[%d] expected %v call, but got %v.", i, item.expectedRequestCount, item.fakeNodeHandler.RequestCount)
 		}
 		if len(item.fakeNodeHandler.UpdatedNodes) > 0 && !api.Semantic.DeepEqual(item.expectedNodes, item.fakeNodeHandler.UpdatedNodes) {
 			t.Errorf("Case[%d] unexpected nodes: %s", i, diff.ObjectDiff(item.expectedNodes[0], item.fakeNodeHandler.UpdatedNodes[0]))
 		}
-		if len(item.fakeNodeHandler.UpdatedNodeStatuses) > 0 && !api.Semantic.DeepEqual(item.expectedNodes, item.fakeNodeHandler.UpdatedNodeStatuses) {
-			t.Errorf("Case[%d] unexpected nodes: %s", i, diff.ObjectDiff(item.expectedNodes[0], item.fakeNodeHandler.UpdatedNodeStatuses[0]))
+		if len(item.fakeNodeHandler.UpdatedNodeStatuses) > 0 && !api.Semantic.DeepEqual(item.expectedNodes[0].Status, item.fakeNodeHandler.UpdatedNodeStatuses[0].Status) {
+			t.Errorf("Case[%d] unexpected node statuses: %s", i, diff.ObjectDiff(item.expectedNodes[0], item.fakeNodeHandler.UpdatedNodeStatuses[0]))
 		}
 	}
 }
@@ -1554,7 +1842,7 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 	for i, item := range table {
 		nodeController, _ := NewNodeControllerFromClient(nil, item.fakeNodeHandler, 5*time.Minute,
 			testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealtyThreshold,
-			testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false)
+			testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false, false)
 		nodeController.now = func() unversioned.Time { return fakeNow }
 		if err := nodeController.monitorNodeStatus(); err != nil {
 			t.Errorf("Case[%d] unexpected error: %v", i, err)
@@ -1610,7 +1898,7 @@ func TestNodeEventGeneration(t *testing.T) {
 	nodeController, _ := NewNodeControllerFromClient(nil, fakeNodeHandler, 5*time.Minute,
 		testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealtyThreshold,
 		testNodeMonitorGracePeriod, testNodeStartupGracePeriod,
-		testNodeMonitorPeriod, nil, nil, 0, false)
+		testNodeMonitorPeriod, nil, nil, 0, false, false)
 	nodeController.cloud = &fakecloud.FakeCloud{}
 	nodeController.nodeExistsInCloudProvider = func(nodeName types.NodeName) (bool, error) {
 		return false, nil
@@ -1718,7 +2006,7 @@ func TestCheckPod(t *testing.T) {
 		},
 	}
 
-	nc, _ := NewNodeControllerFromClient(nil, fake.NewSimpleClientset(), 0, 0, 0, 0, 0, 0, 0, 0, nil, nil, 0, false)
+	nc, _ := NewNodeControllerFromClient(nil, fake.NewSimpleClientset(), 0, 0, 0, 0, 0, 0, 0, 0, nil, nil, 0, false, false)
 	nc.nodeStore.Store = cache.NewStore(cache.MetaNamespaceKeyFunc)
 	nc.nodeStore.Store.Add(&api.Node{
 		ObjectMeta: api.ObjectMeta{

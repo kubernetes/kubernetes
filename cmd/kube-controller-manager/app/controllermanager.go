@@ -293,7 +293,7 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 		cloud, client("node-controller"),
 		s.PodEvictionTimeout.Duration, s.NodeEvictionRate, s.SecondaryNodeEvictionRate, s.LargeClusterSizeThreshold, s.UnhealthyZoneThreshold, s.NodeMonitorGracePeriod.Duration,
 		s.NodeStartupGracePeriod.Duration, s.NodeMonitorPeriod.Duration, clusterCIDR, serviceCIDR,
-		int(s.NodeCIDRMaskSize), s.AllocateNodeCIDRs)
+		int(s.NodeCIDRMaskSize), s.AllocateNodeCIDRs, s.UseTaintBasedEvictions)
 	if err != nil {
 		glog.Fatalf("Failed to initialize nodecontroller: %v", err)
 	}
