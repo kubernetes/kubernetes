@@ -33,7 +33,6 @@ var (
 )
 
 func NewCmdSet(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
-
 	cmd := &cobra.Command{
 		Use:     "set SUBCOMMAND",
 		Short:   "Set specific features on objects",
@@ -46,6 +45,7 @@ func NewCmdSet(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 
 	// add subcommands
 	cmd.AddCommand(NewCmdImage(f, out, err))
+	cmd.AddCommand(NewCmdResources(f, out, err))
 
 	return cmd
 }
