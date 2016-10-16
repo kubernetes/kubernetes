@@ -42,25 +42,62 @@ write_files:
       KUBE_USER:KUBE_PASSWORD
 
 coreos:
-  etcd:
-    name: kubernetes-master
+  etcd2:
     discovery: https://discovery.etcd.io/DISCOVERY_ID
-    addr: $private_ipv4:4001
-    peer-addr: $private_ipv4:7001
-    peer-bind-addr: $private_ipv4:7001
+    advertise-client-urls: http://$private_ipv4:2379,http://$private_ipv4:4001
+    initial-advertise-peer-urls: http://$private_ipv4:2380
+    listen-client-urls: http://0.0.0.0:2379,http://0.0.0.0:4001
+    listen-peer-urls: http://$private_ipv4:2380,http://$private_ipv4:7001
+
+  flannel:
+    ip_masq: true
+    interface: eth2
 
   fleet:
     public-ip: $private_ipv4
     metadata: kubernetes_role=master
 
   update:
-    reboot-strategy: etcd-lock
+    reboot-strategy: off
 
   units:
-    - name: etcd.service
+    - name: etcd2.service
       command: start
     - name: fleet.service
       command: start
+    - name: flanneld.service
+      drop-ins:
+        - name: 50-flannel.conf
+          content: |
+            [Unit]
+            Requires=etcd2.service
+            After=etcd2.service
+
+            [Service]
+            ExecStartPre=-/usr/bin/etcdctl mk /coreos.com/network/config '{"Network":"KUBE_NETWORK", "Backend": {"Type": "host-gw"}}'
+      command: start
+    - name: generate-serviceaccount-key.service
+      command: start
+      content: |
+        [Unit]
+        Description=Generate service-account key file
+
+        [Service]
+        ExecStartPre=-/usr/bin/mkdir -p /var/run/kubernetes/
+        ExecStart=/bin/openssl genrsa -out /var/run/kubernetes/kube-serviceaccount.key 2048 2>/dev/null
+        RemainAfterExit=yes
+        Type=oneshot
+    - name: docker.service
+      command: start
+      drop-ins:
+        - name: 51-docker-mirror.conf
+          content: |
+            [Unit]
+            # making sure that flanneld finished startup, otherwise containers
+            # won't land in flannel's network...
+            Requires=flanneld.service
+            After=flanneld.service
+            Restart=Always
     - name: download-release.service
       command: start
       content: |
@@ -82,6 +119,8 @@ coreos:
         Requires=network-online.target
         After=download-release.service
         Requires=download-release.service
+        Requires=generate-serviceaccount-key.service
+        After=generate-serviceaccount-key.service
         [Service]
         ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kube-apiserver /opt/bin/kube-apiserver
         ExecStartPre=/usr/bin/mkdir -p /var/lib/kube-apiserver
@@ -94,7 +133,10 @@ coreos:
         --port=8080 \
         --service-cluster-ip-range=SERVICE_CLUSTER_IP_RANGE \
         --token-auth-file=/var/lib/kube-apiserver/known_tokens.csv \
-        --v=2
+        --v=2 \
+        --service-account-key-file=/var/run/kubernetes/kube-serviceaccount.key \
+        --service-account-lookup=false \
+        --admission-control=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
         Restart=always
         RestartSec=5
     - name: apiserver-advertiser.service
@@ -102,8 +144,8 @@ coreos:
       content: |
         [Unit]
         Description=Kubernetes Apiserver Advertiser
-        After=etcd.service
-        Requires=etcd.service
+        After=etcd2.service
+        Requires=etcd2.service
         After=master-apiserver.service
         [Service]
         ExecStart=/bin/sh -c 'etcdctl set /corekube/apiservers/$public_ipv4 $public_ipv4'
@@ -126,7 +168,9 @@ coreos:
         --cloud-config=/etc/cloud.conf \
         --logtostderr=true \
         --master=127.0.0.1:8080 \
-        --v=2
+        --v=2 \
+        --service-account-private-key-file=/var/run/kubernetes/kube-serviceaccount.key \
+        --root-ca-file=/run/kubernetes/apiserver.crt
         Restart=always
         RestartSec=5
     - name: kube-scheduler.service
