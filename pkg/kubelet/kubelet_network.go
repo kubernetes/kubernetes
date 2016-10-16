@@ -45,6 +45,12 @@ const (
 
 	// kubernetes firewall rules
 	KubeFirewallChain utiliptables.Chain = "KUBE-FIREWALL"
+
+	// The bridge kubelet is responsible for managing when --configure-cbr0 is enabled
+	BridgeName = "cbr0"
+
+	// The MTU a kubelet-managed bridge should have
+	BridgeMTU = 1460
 )
 
 // effectiveHairpinMode determines the effective hairpin mode given the
@@ -199,7 +205,7 @@ func (kl *Kubelet) cleanupBandwidthLimits(allPods []*api.Pod) error {
 // NOTE!!! if you make changes here, also make them to kubenet
 func (kl *Kubelet) reconcileCBR0(podCIDR string) error {
 	if podCIDR == "" {
-		glog.V(5).Info("PodCIDR not set. Will not configure cbr0.")
+		glog.V(5).Infof("PodCIDR not set. Will not configure bridge %s.", BridgeName)
 		return nil
 	}
 	glog.V(5).Infof("PodCIDR is set to %q", podCIDR)
@@ -209,13 +215,13 @@ func (kl *Kubelet) reconcileCBR0(podCIDR string) error {
 	}
 	// Set cbr0 interface address to first address in IPNet
 	cidr.IP.To4()[3] += 1
-	if err := ensureCbr0(cidr, kl.hairpinMode == componentconfig.PromiscuousBridge, kl.babysitDaemons); err != nil {
+	if err := ensureBridge(BridgeName, BridgeMTU, cidr, kl.hairpinMode == componentconfig.PromiscuousBridge, kl.babysitDaemons); err != nil {
 		return err
 	}
 	if kl.shapingEnabled() {
 		if kl.shaper == nil {
 			glog.V(5).Info("Shaper is nil, creating")
-			kl.shaper = bandwidth.NewTCShaper("cbr0")
+			kl.shaper = bandwidth.NewTCShaper(BridgeName)
 		}
 		return kl.shaper.ReconcileInterface()
 	}
