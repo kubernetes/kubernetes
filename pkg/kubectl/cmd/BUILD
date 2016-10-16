@@ -23,6 +23,7 @@ go_library(
         "cmd.go",
         "completion.go",
         "convert.go",
+        "cp.go",
         "create.go",
         "create_configmap.go",
         "create_deployment.go",
@@ -110,6 +111,7 @@ go_library(
         "//vendor:github.com/evanphx/json-patch",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/jonboulle/clockwork",
+        "//vendor:github.com/renstrom/dedent",
         "//vendor:github.com/spf13/cobra",
     ],
 )
@@ -122,6 +124,7 @@ go_test(
         "attach_test.go",
         "clusterinfo_dump_test.go",
         "cmd_test.go",
+        "cp_test.go",
         "create_configmap_test.go",
         "create_deployment_test.go",
         "create_namespace_test.go",
