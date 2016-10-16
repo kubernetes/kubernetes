@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
+	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/diff"
@@ -38,6 +39,14 @@ func (o orderedGroupVersionKinds) Len() int      { return len(o) }
 func (o orderedGroupVersionKinds) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 func (o orderedGroupVersionKinds) Less(i, j int) bool {
 	return o[i].String() < o[j].String()
+}
+
+func TestVerifyDefaulting(t *testing.T) {
+	job := &batchv2alpha1.JobTemplate{}
+	batchv2alpha1.SetObjectDefaults_JobTemplate(job)
+	if job.Template.Spec.Template.Spec.DNSPolicy != apiv1.DNSClusterFirst {
+		t.Errorf("unexpected defaulting: %#v", job)
+	}
 }
 
 // TODO: add a reflexive test that verifies that all SetDefaults functions are registered
