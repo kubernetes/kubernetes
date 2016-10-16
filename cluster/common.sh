@@ -770,7 +770,6 @@ KUBERNETES_CONTAINER_RUNTIME: $(yaml-quote ${CONTAINER_RUNTIME:-rkt})
 RKT_VERSION: $(yaml-quote ${RKT_VERSION:-})
 RKT_PATH: $(yaml-quote ${RKT_PATH:-})
 RKT_STAGE1_IMAGE: $(yaml-quote ${RKT_STAGE1_IMAGE:-})
-KUBERNETES_CONFIGURE_CBR0: $(yaml-quote ${KUBERNETES_CONFIGURE_CBR0:-true})
 EOF
   fi
   if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then
