@@ -265,6 +265,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 				NewCmdExec(f, in, out, err),
 				NewCmdPortForward(f, out, err),
 				NewCmdProxy(f, out),
+				NewCmdCp(f, in, out, err),
 			},
 		},
 		{
