@@ -609,9 +609,9 @@ function upload-server-tars() {
       local project_hash=
       local key=$(aws configure get aws_access_key_id)
       if which md5 > /dev/null 2>&1; then
-        project_hash=$(md5 -q -s "${USER} ${key}")
+        project_hash=$(md5 -q -s "${USER} ${key} ${INSTANCE_PREFIX}")
       else
-        project_hash=$(echo -n "${USER} ${key}" | md5sum | awk '{ print $1 }')
+        project_hash=$(echo -n "${USER} ${key} ${INSTANCE_PREFIX}" | md5sum | awk '{ print $1 }')
       fi
       AWS_S3_BUCKET="kubernetes-staging-${project_hash}"
   fi
