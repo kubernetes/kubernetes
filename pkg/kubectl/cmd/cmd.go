@@ -290,6 +290,7 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 				NewCmdExec(f, in, out, err),
 				NewCmdPortForward(f, out, err),
 				NewCmdProxy(f, out),
+				NewCmdCp(f, in, out, err),
 			},
 		},
 		{
