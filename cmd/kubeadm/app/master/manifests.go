@@ -225,7 +225,6 @@ func getComponentCommand(component string, s *kubeadmapi.MasterConfiguration) (c
 	baseFlags := map[string][]string{
 		apiServer: {
 			"--insecure-bind-address=127.0.0.1",
-			"--etcd-servers=http://127.0.0.1:2379",
 			"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
 			"--service-cluster-ip-range=" + s.Networking.ServiceSubnet,
 			"--service-account-key-file=" + pkiDir + "/apiserver-key.pem",
