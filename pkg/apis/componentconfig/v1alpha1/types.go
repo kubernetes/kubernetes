@@ -372,18 +372,14 @@ type KubeletConfiguration struct {
 	// This will cause the kubelet to listen to inotify events on the lock file,
 	// releasing it and exiting when another process tries to open that file.
 	ExitOnLockContention bool `json:"exitOnLockContention"`
-	// configureCBR0 enables the kublet to configure cbr0 based on
-	// Node.Spec.PodCIDR.
-	ConfigureCBR0 *bool `json:"configureCbr0"`
 	// How should the kubelet configure the container bridge for hairpin packets.
 	// Setting this flag allows endpoints in a Service to loadbalance back to
 	// themselves if they should try to access their own Service. Values:
 	//   "promiscuous-bridge": make the container bridge promiscuous.
 	//   "hairpin-veth":       set the hairpin flag on container veth interfaces.
 	//   "none":               do nothing.
-	// Setting --configure-cbr0 to false implies that to achieve hairpin NAT
-	// one must set --hairpin-mode=veth-flag, because bridge assumes the
-	// existence of a container bridge named cbr0.
+	// Generally, one must set --hairpin-mode=veth-flag to achieve hairpin NAT,
+	// because promiscous-bridge assumes the existence of a container bridge named cbr0.
 	HairpinMode string `json:"hairpinMode"`
 	// The node has babysitter process monitoring docker and kubelet.
 	BabysitDaemons bool `json:"babysitDaemons"`
@@ -409,10 +405,10 @@ type KubeletConfiguration struct {
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
 	MaxOpenFiles int64 `json:"maxOpenFiles"`
 	// reconcileCIDR is Reconcile node CIDR with the CIDR specified by the
-	// API server. No-op if register-node or configure-cbr0 is false.
+	// API server. Won't have any effect if register-node is false.
 	ReconcileCIDR *bool `json:"reconcileCIDR"`
 	// registerSchedulable tells the kubelet to register the node as
-	// schedulable. No-op if register-node is false.
+	// schedulable. Won't have any effect if register-node is false.
 	RegisterSchedulable *bool `json:"registerSchedulable"`
 	// contentType is contentType of requests sent to apiserver.
 	ContentType string `json:"contentType"`

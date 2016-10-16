@@ -161,9 +161,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.CertDirectory == "" {
 		obj.CertDirectory = "/var/run/kubernetes"
 	}
-	if obj.ConfigureCBR0 == nil {
-		obj.ConfigureCBR0 = boolVar(false)
-	}
 	if obj.CgroupsPerQOS == nil {
 		obj.CgroupsPerQOS = boolVar(false)
 	}
