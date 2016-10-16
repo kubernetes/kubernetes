@@ -176,6 +176,7 @@ function create-kubeconfig-for-federation() {
 
 function tear_down_alive_resources() {
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+  "${kubectl}" delete deployments --all || true
   "${kubectl}" delete rc --all || true
   "${kubectl}" delete pods --all || true
   "${kubectl}" delete svc --all || true
