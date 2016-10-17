@@ -107,8 +107,6 @@ type Config struct {
 	Tunneler          genericapiserver.Tunneler
 	EnableUISupport   bool
 	EnableLogsSupport bool
-
-	disableThirdPartyControllerForTesting bool
 }
 
 // EndpointReconcilerConfig holds the endpoint reconciler and endpoint reconciliation interval to be
@@ -130,8 +128,6 @@ type Master struct {
 	thirdPartyResources map[string]*thirdPartyEntry
 	// protects the map
 	thirdPartyResourcesLock sync.RWMutex
-	// Useful for reliable testing.  Shouldn't be used otherwise.
-	disableThirdPartyControllerForTesting bool
 
 	// nodeClient is used to back the tunneler
 	nodeClient coreclient.NodeInterface
@@ -205,8 +201,6 @@ func (c completedConfig) New() (*Master, error) {
 		GenericAPIServer:        s,
 		deleteCollectionWorkers: c.DeleteCollectionWorkers,
 		nodeClient:              coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes(),
-
-		disableThirdPartyControllerForTesting: c.disableThirdPartyControllerForTesting,
 	}
 
 	restOptionsFactory := restOptionsFactory{
@@ -246,10 +240,7 @@ func (c completedConfig) New() (*Master, error) {
 	c.RESTStorageProviders[autoscaling.GroupName] = autoscalingrest.RESTStorageProvider{}
 	c.RESTStorageProviders[batch.GroupName] = batchrest.RESTStorageProvider{}
 	c.RESTStorageProviders[certificates.GroupName] = certificatesrest.RESTStorageProvider{}
-	c.RESTStorageProviders[extensions.GroupName] = extensionsrest.RESTStorageProvider{
-		ResourceInterface:                     m,
-		DisableThirdPartyControllerForTesting: m.disableThirdPartyControllerForTesting,
-	}
+	c.RESTStorageProviders[extensions.GroupName] = extensionsrest.RESTStorageProvider{ResourceInterface: m}
 	c.RESTStorageProviders[policy.GroupName] = policyrest.RESTStorageProvider{}
 	c.RESTStorageProviders[rbac.GroupName] = &rbacrest.RESTStorageProvider{AuthorizerRBACSuperUser: c.GenericConfig.AuthorizerRBACSuperUser}
 	c.RESTStorageProviders[storage.GroupName] = storagerest.RESTStorageProvider{}
