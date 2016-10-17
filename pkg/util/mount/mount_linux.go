@@ -52,7 +52,9 @@ const (
 // Mounter provides the default implementation of mount.Interface
 // for the linux platform.  This implementation assumes that the
 // kubelet is running in the host's root mount namespace.
-type Mounter struct{}
+type Mounter struct {
+	mounterPath string
+}
 
 // Mount mounts source to target as fstype with given options. 'source' and 'fstype' must
 // be an emtpy string in case it's not required, e.g. for remount, or for auto filesystem
@@ -61,15 +63,14 @@ type Mounter struct{}
 // required, call Mount with an empty string list or nil.
 func (mounter *Mounter) Mount(source string, target string, fstype string, options []string) error {
 	bind, bindRemountOpts := isBind(options)
-
 	if bind {
-		err := doMount(source, target, fstype, []string{"bind"})
+		err := doMount(mounter.mounterPath, source, target, fstype, []string{"bind"})
 		if err != nil {
 			return err
 		}
-		return doMount(source, target, fstype, bindRemountOpts)
+		return doMount(mounter.mounterPath, source, target, fstype, bindRemountOpts)
 	} else {
-		return doMount(source, target, fstype, options)
+		return doMount(mounter.mounterPath, source, target, fstype, options)
 	}
 }
 
@@ -99,10 +100,11 @@ func isBind(options []string) (bool, []string) {
 }
 
 // doMount runs the mount command.
-func doMount(source string, target string, fstype string, options []string) error {
+func doMount(mountCmd string, source string, target string, fstype string, options []string) error {
 	glog.V(5).Infof("Mounting %s %s %s %v", source, target, fstype, options)
 	mountArgs := makeMountArgs(source, target, fstype, options)
-	command := exec.Command("mount", mountArgs...)
+
+	command := exec.Command(mountCmd, mountArgs...)
 	output, err := command.CombinedOutput()
 	if err != nil {
 		glog.Errorf("Mount failed: %v\nMounting arguments: %s %s %s %v\nOutput: %s\n", err, source, target, fstype, options, string(output))
