@@ -102,6 +102,12 @@ hack/local-up-cluster.sh
 This will build and start a lightweight local cluster, consisting of a master
 and a single node. Type Control-C to shut it down.
 
+If you've already compiled the Kubernetes components, then you can avoid rebuilding them with this script by using the `-O` flag.
+
+```sh
+./hack/local-up-cluster.sh -O
+```
+
 You can use the cluster/kubectl.sh script to interact with the local cluster. hack/local-up-cluster.sh will
 print the commands to run to point kubectl at the local cluster.
 
