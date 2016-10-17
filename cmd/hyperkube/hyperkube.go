@@ -178,7 +178,7 @@ func (hk *HyperKube) Run(args []string) error {
 
 	err = s.Run(s, s.Flags().Args())
 	if err != nil {
-		hk.Println("Error:", err)
+		hk.Printf("Error: %v\n\n", err)
 	}
 
 	return err
