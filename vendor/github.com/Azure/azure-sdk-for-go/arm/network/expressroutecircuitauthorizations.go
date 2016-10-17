@@ -36,7 +36,13 @@ type ExpressRouteCircuitAuthorizationsClient struct {
 // NewExpressRouteCircuitAuthorizationsClient creates an instance of the
 // ExpressRouteCircuitAuthorizationsClient client.
 func NewExpressRouteCircuitAuthorizationsClient(subscriptionID string) ExpressRouteCircuitAuthorizationsClient {
-	return ExpressRouteCircuitAuthorizationsClient{New(subscriptionID)}
+	return NewExpressRouteCircuitAuthorizationsClientWithBaseURI(DefaultBaseURI, subscriptionID)
+}
+
+// NewExpressRouteCircuitAuthorizationsClientWithBaseURI creates an instance
+// of the ExpressRouteCircuitAuthorizationsClient client.
+func NewExpressRouteCircuitAuthorizationsClientWithBaseURI(baseURI string, subscriptionID string) ExpressRouteCircuitAuthorizationsClient {
+	return ExpressRouteCircuitAuthorizationsClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
 // CreateOrUpdate the Put Authorization operation creates/updates an

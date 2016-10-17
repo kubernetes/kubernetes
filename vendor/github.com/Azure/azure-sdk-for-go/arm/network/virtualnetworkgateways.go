@@ -36,7 +36,13 @@ type VirtualNetworkGatewaysClient struct {
 // NewVirtualNetworkGatewaysClient creates an instance of the
 // VirtualNetworkGatewaysClient client.
 func NewVirtualNetworkGatewaysClient(subscriptionID string) VirtualNetworkGatewaysClient {
-	return VirtualNetworkGatewaysClient{New(subscriptionID)}
+	return NewVirtualNetworkGatewaysClientWithBaseURI(DefaultBaseURI, subscriptionID)
+}
+
+// NewVirtualNetworkGatewaysClientWithBaseURI creates an instance of the
+// VirtualNetworkGatewaysClient client.
+func NewVirtualNetworkGatewaysClientWithBaseURI(baseURI string, subscriptionID string) VirtualNetworkGatewaysClient {
+	return VirtualNetworkGatewaysClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
 // CreateOrUpdate the Put VirtualNetworkGateway operation creates/updates a
@@ -312,7 +318,7 @@ func (client VirtualNetworkGatewaysClient) GetResponder(resp *http.Response) (re
 	return
 }
 
-// List the List VirtualNetworkGateways opertion retrieves all the virtual
+// List the List VirtualNetworkGateways operation retrieves all the virtual
 // network gateways stored.
 //
 // resourceGroupName is the name of the resource group.
