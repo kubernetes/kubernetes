@@ -196,7 +196,6 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 		By("Creating a pod with one valid and two invalid sysctls")
 		client := f.Client.Pods(f.Namespace.Name)
 		_, err := client.Create(pod)
-		defer client.Delete(pod.Name, nil)
 
 		Expect(err).NotTo(BeNil())
 		Expect(err.Error()).To(ContainSubstring(`Invalid value: "foo-"`))
