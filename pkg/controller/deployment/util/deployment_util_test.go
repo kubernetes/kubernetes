@@ -98,40 +98,6 @@ func newPod(now time.Time, ready bool, beforeSec int) api.Pod {
 	}
 }
 
-func TestCountAvailablePods(t *testing.T) {
-	now := time.Now()
-	tests := []struct {
-		pods            []api.Pod
-		minReadySeconds int
-		expected        int
-	}{
-		{
-			[]api.Pod{
-				newPod(now, true, 0),
-				newPod(now, true, 2),
-				newPod(now, false, 1),
-			},
-			1,
-			1,
-		},
-		{
-			[]api.Pod{
-				newPod(now, true, 2),
-				newPod(now, true, 11),
-				newPod(now, true, 5),
-			},
-			10,
-			1,
-		},
-	}
-
-	for _, test := range tests {
-		if count := countAvailablePods(test.pods, int32(test.minReadySeconds)); int(count) != test.expected {
-			t.Errorf("Pods = %#v, minReadySeconds = %d, expected %d, got %d", test.pods, test.minReadySeconds, test.expected, count)
-		}
-	}
-}
-
 // generatePodFromRS creates a pod, with the input ReplicaSet's selector and its template
 func generatePodFromRS(rs extensions.ReplicaSet) api.Pod {
 	return api.Pod{
