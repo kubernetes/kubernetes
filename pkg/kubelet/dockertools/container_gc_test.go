@@ -148,6 +148,7 @@ func TestGarbageCollectNoMaxLimit(t *testing.T) {
 	})
 	addPods(gc.podGetter, "foo", "foo1", "foo2", "foo3", "foo4")
 
+	assert.Nil(t, gc.GarbageCollect(kubecontainer.ContainerGCPolicy{MinAge: time.Minute, MaxPerPodContainer: -1, MaxContainers: -1}, true))
 	assert.Len(t, fakeDocker.Removed, 0)
 }
 

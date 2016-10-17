@@ -22,8 +22,9 @@ import (
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
-func BuildContainerName(metadata *runtimeApi.ContainerMetadata) string {
-	return fmt.Sprintf("%s_%d", metadata.GetName(), metadata.GetAttempt())
+func BuildContainerName(metadata *runtimeApi.ContainerMetadata, sandboxID string) string {
+	// include the sandbox ID to make the container ID unique.
+	return fmt.Sprintf("%s_%s_%d", sandboxID, metadata.GetName(), metadata.GetAttempt())
 }
 
 func BuildSandboxName(metadata *runtimeApi.PodSandboxMetadata) string {
