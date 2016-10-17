@@ -191,7 +191,7 @@ var _ = framework.KubeDescribe("ServiceAccounts", func() {
 
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				Name: "pod-service-account-" + string(uuid.NewUUID()),
+				GenerateName: "pod-service-account-" + string(uuid.NewUUID()) + "-",
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{

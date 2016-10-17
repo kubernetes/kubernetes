@@ -149,10 +149,6 @@ var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 		if err != nil {
 			framework.Failf("Failed to create pod: %v", err)
 		}
-		// We call defer here in case there is a problem with
-		// the test so we can ensure that we clean up after
-		// ourselves
-		defer podClient.Delete(pod.Name, v1.NewDeleteOptions(0))
 
 		By("verifying the pod is in kubernetes")
 		options = v1.ListOptions{
@@ -212,10 +208,6 @@ var _ = framework.KubeDescribe("Staging client repo client", func() {
 		if err != nil {
 			framework.Failf("Failed to create pod: %v", err)
 		}
-		// We call defer here in case there is a problem with
-		// the test so we can ensure that we clean up after
-		// ourselves
-		defer podClient.Delete(pod.Name, clientapi.NewDeleteOptions(0))
 
 		By("verifying the pod is in kubernetes")
 		timeout := 1 * time.Minute

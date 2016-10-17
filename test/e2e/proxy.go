@@ -105,12 +105,6 @@ func proxyContext(version string) {
 			},
 		})
 		Expect(err).NotTo(HaveOccurred())
-		defer func(name string) {
-			err := f.Client.Services(f.Namespace.Name).Delete(name)
-			if err != nil {
-				framework.Logf("Failed deleting service %v: %v", name, err)
-			}
-		}(service.Name)
 
 		// Make an RC with a single pod. The 'porter' image is
 		// a simple server which serves the values of the
