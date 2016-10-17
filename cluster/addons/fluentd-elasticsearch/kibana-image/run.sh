@@ -16,4 +16,4 @@
 
 export ELASTICSEARCH_URL=${ELASTICSEARCH_URL:-"http://localhost:9200"}
 echo ELASTICSEARCH_URL=${ELASTICSEARCH_URL}
-/kibana-4.0.2-linux-x64/bin/kibana -e ${ELASTICSEARCH_URL}
+/kibana-4.6.1-linux-x86_64/bin/kibana -e ${ELASTICSEARCH_URL}
