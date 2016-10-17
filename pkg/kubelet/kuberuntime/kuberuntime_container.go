@@ -97,6 +97,19 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 	}
 	m.recorder.Eventf(ref, api.EventTypeNormal, events.StartedContainer, "Started container with id %v", containerID)
 
+	// Symlink container logs to the legacy container log location for cluster logging
+	// support.
+	// TODO(random-liu): Remove this after cluster logging supports CRI container log path.
+	containerMeta := containerConfig.GetMetadata()
+	sandboxMeta := podSandboxConfig.GetMetadata()
+	legacySymlink := legacyLogSymlink(containerID, containerMeta.GetName(), sandboxMeta.GetName(),
+		sandboxMeta.GetNamespace())
+	containerLog := filepath.Join(podSandboxConfig.GetLogDirectory(), containerConfig.GetLogPath())
+	if err := m.osInterface.Symlink(containerLog, legacySymlink); err != nil {
+		glog.Errorf("Failed to create legacy symbolic link %q to container %q log %q: %v",
+			legacySymlink, containerID, containerLog, err)
+	}
+
 	// Step 4: execute the post start hook.
 	if container.Lifecycle != nil && container.Lifecycle.PostStart != nil {
 		kubeContainerID := kubecontainer.ContainerID{
@@ -111,8 +124,6 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 			return "PostStart Hook Failed", err
 		}
 	}
-
-	// TODO(random-liu): Add legacy container log location support.
 
 	return "", nil
 }
@@ -706,6 +717,7 @@ func (m *kubeGenericRuntimeManager) removeContainer(containerID string) error {
 
 // removeContainerLog removes the container log.
 func (m *kubeGenericRuntimeManager) removeContainerLog(containerID string) error {
+	// Remove the container log.
 	status, err := m.runtimeService.ContainerStatus(containerID)
 	if err != nil {
 		glog.Errorf("ContainerStatus for %q error: %v", containerID, err)
@@ -717,6 +729,16 @@ func (m *kubeGenericRuntimeManager) removeContainerLog(containerID string) error
 		getContainerLogsPath(labeledInfo.ContainerName, annotatedInfo.RestartCount))
 	if err := m.osInterface.Remove(path); err != nil && !os.IsNotExist(err) {
 		glog.Errorf("Failed to remove container %q log %q: %v", containerID, path, err)
+		return err
+	}
+
+	// Remove the legacy container log symlink.
+	// TODO(random-liu): Remove this after cluster logging supports CRI container log path.
+	legacySymlink := legacyLogSymlink(containerID, labeledInfo.ContainerName, labeledInfo.PodName,
+		labeledInfo.PodNamespace)
+	if err := m.osInterface.Remove(legacySymlink); err != nil && !os.IsNotExist(err) {
+		glog.Errorf("Failed to remove container %q log legacy symbolic link %q: %v",
+			containerID, legacySymlink, err)
 		return err
 	}
 	return nil
