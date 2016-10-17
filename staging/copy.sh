@@ -19,11 +19,10 @@ set -o nounset
 set -o pipefail
 
 # PREREQUISITES: run `godep restore` in the main repo before calling this script.
-RELEASE="1.5"
 CLIENTSET="release_1_5"
 MAIN_REPO_FROM_SRC="${1:-"k8s.io/kubernetes"}"
 MAIN_REPO="${GOPATH%:*}/src/${MAIN_REPO_FROM_SRC}"
-CLIENT_REPO_FROM_SRC="${2:-"k8s.io/client-go/${RELEASE}"}"
+CLIENT_REPO_FROM_SRC="${2:-"k8s.io/client-go"}"
 CLIENT_REPO="${MAIN_REPO}/staging/src/${CLIENT_REPO_FROM_SRC}"
 CLIENT_REPO_TEMP="${CLIENT_REPO}"/_tmp
 
@@ -77,15 +76,12 @@ rm -rf "${CLIENT_REPO}"/vendor/k8s.io/kubernetes
 # client-go will share the vendor of the main repo for now. When client-go
 # becomes a standalone repo, it will have its own vendor
 mv "${CLIENT_REPO}"/vendor "${CLIENT_REPO}"/_vendor
-# remove the pkg/util/net/sets/README.md to silent hack/verify-munge-docs.sh
-# TODO: probably we should convert the README.md a doc.go
-find ./ -name "README.md" -delete
 
 echo "rewriting Godeps.json"
 go run "${DIR}/godeps-json-updater.go" --godeps-file="${CLIENT_REPO}/Godeps/Godeps.json" --client-go-import-path="${CLIENT_REPO_FROM_SRC}"
 
 echo "rewriting imports"
-grep -Rl "\"${MAIN_REPO_FROM_SRC}" ./ | grep ".go" | grep -v "vendor/" | xargs sed -i "s|\"${MAIN_REPO_FROM_SRC}|\"${CLIENT_REPO_FROM_SRC}|g"
+grep -Rl "\"${MAIN_REPO_FROM_SRC}" "${CLIENT_REPO}" | grep ".go" | grep -v "vendor/" | xargs sed -i "s|\"${MAIN_REPO_FROM_SRC}|\"${CLIENT_REPO_FROM_SRC}|g"
 
 echo "converting pkg/client/record to v1"
 # need a v1 version of ref.go
@@ -111,7 +107,7 @@ sed -i "s/request_status_codes/request_status_codes_copy/g" "${CLIENT_REPO}"/pkg
 sed -i "s/kubernetes_build_info/kubernetes_build_info_copy/g" "${CLIENT_REPO}"/pkg/version/version.go
 
 echo "rewrite proto names in proto.RegisterType"
-find "${CLIENT_REPO}" -type f -name "generated.pb.go" -print0 | xargs -0 sed -i "s/k8s\.io\.kubernetes/k8s.io.client-go.${RELEASE}/g"
+find "${CLIENT_REPO}" -type f -name "generated.pb.go" -print0 | xargs -0 sed -i "s/k8s\.io\.kubernetes/k8s.io.client-go/g"
 
 echo "rearranging directory layout"
 # $1 and $2 are relative to ${CLIENT_REPO}
@@ -155,6 +151,7 @@ mvfolder pkg/client/unversioned/portforward tools/portforward
 mvfolder pkg/client/metrics tools/metrics
 mvfolder pkg/client/testing/core testing
 mvfolder pkg/client/testing/cache tools/cache/testing
+mvfolder cmd/kubeadm/app/apis/kubeadm pkg/apis/kubeadm
 if [ "$(find "${CLIENT_REPO}"/pkg/client -type f -name "*.go")" ]; then
     echo "${CLIENT_REPO}/pkg/client is expected to be empty"
     exit 1
