@@ -132,7 +132,7 @@ func (pf *PortForwarder) ForwardPorts() error {
 	defer pf.Close()
 
 	var err error
-	pf.streamConn, _, err = pf.dialer.Dial(portforward.PortForwardProtocolV1Name)
+	pf.streamConn, _, err = pf.dialer.Dial(portforward.ProtocolV1Name)
 	if err != nil {
 		return fmt.Errorf("error upgrading connection: %s", err)
 	}
