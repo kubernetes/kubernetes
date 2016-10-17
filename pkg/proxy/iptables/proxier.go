@@ -1329,7 +1329,13 @@ func openLocalPort(lp *localPort) (closeable, error) {
 	var socket closeable
 	switch lp.protocol {
 	case "tcp":
-		listener, err := net.Listen("tcp", net.JoinHostPort(lp.ip, strconv.Itoa(lp.port)))
+		var protocolV string
+		if net.ParseIP(lp.ip).To16() != nil && net.ParseIP(lp.ip).To4() == nil {
+			protocolV = "tcp6"
+		} else {
+			protocolV = "tcp4"
+		}
+		listener, err := net.Listen(protocolV, net.JoinHostPort(lp.ip, strconv.Itoa(lp.port)))
 		if err != nil {
 			return nil, err
 		}
