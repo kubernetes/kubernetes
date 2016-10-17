@@ -18,6 +18,7 @@ package kuberuntime
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 	"time"
@@ -248,6 +249,18 @@ func (cgc *containerGC) evictPodLogsDirectories(allSourcesReady bool) error {
 			err := osInterface.RemoveAll(filepath.Join(podLogsRootDirectory, dir.Name()))
 			if err != nil {
 				glog.Errorf("Failed to remove pod logs directory %q: %v", dir.Name(), err)
+			}
+		}
+	}
+
+	// Remove dead container log symlinks.
+	// TODO(random-liu): Remove this after cluster logging supports CRI container log path.
+	logSymlinks, _ := filepath.Glob(filepath.Join(legacyContainerLogsDir, fmt.Sprintf("*.%s", legacyLogSuffix)))
+	for _, logSymlink := range logSymlinks {
+		if _, err := osInterface.Stat(logSymlink); os.IsNotExist(err) {
+			err := osInterface.Remove(logSymlink)
+			if err != nil {
+				glog.Errorf("Failed to remove container log dead symlink %q: %v", logSymlink, err)
 			}
 		}
 	}
