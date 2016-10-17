@@ -371,6 +371,7 @@ minion-max-log-age
 minion-max-log-backups
 minion-max-log-size
 minion-path-override
+mounter-path
 namespace-sync-period
 network-plugin
 network-plugin-dir
