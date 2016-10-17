@@ -618,36 +618,10 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 		manageReplicasErr = rsc.manageReplicas(filteredPods, &rs)
 	}
 
-	// Count the number of pods that have labels matching the labels of the pod
-	// template of the replicaSet, the matching pods may have more labels than
-	// are in the template. Because the label of podTemplateSpec is a superset
-	// of the selector of the replicaset, so the possible matching pods must be
-	// part of the filteredPods.
-	fullyLabeledReplicasCount := 0
-	readyReplicasCount := 0
-	availableReplicasCount := 0
-	templateLabel := labels.Set(rs.Spec.Template.Labels).AsSelectorPreValidated()
-	for _, pod := range filteredPods {
-		if templateLabel.Matches(labels.Set(pod.Labels)) {
-			fullyLabeledReplicasCount++
-		}
-		if api.IsPodReady(pod) {
-			readyReplicasCount++
-			if api.IsPodAvailable(pod, rs.Spec.MinReadySeconds, unversioned.Now()) {
-				availableReplicasCount++
-			}
-		}
-	}
+	newStatus := calculateStatus(rs, filteredPods, manageReplicasErr)
 
 	// Always updates status as pods come up or die.
-	if err := updateReplicaCount(
-		rsc.kubeClient.Extensions().ReplicaSets(rs.Namespace),
-		rs,
-		len(filteredPods),
-		fullyLabeledReplicasCount,
-		readyReplicasCount,
-		availableReplicasCount,
-	); err != nil {
+	if err := updateReplicaSetStatus(rsc.kubeClient.Extensions().ReplicaSets(rs.Namespace), rs, newStatus); err != nil {
 		// Multiple things could lead to this update failing. Requeuing the replica set ensures
 		// Returning an error causes a requeue without forcing a hotloop
 		return err
