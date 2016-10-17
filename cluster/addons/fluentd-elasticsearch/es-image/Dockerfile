@@ -16,28 +16,37 @@
 # to work with Kubernetes logging. Inspired by the Dockerfile
 # dockerfile/elasticsearch
 
-FROM java:openjdk-7-jre
-MAINTAINER Satnam Singh "satnam@google.com"
+FROM java:openjdk-8-jre
+
+MAINTAINER Mik Vyatskov "vmik@google.com"
 
 ENV DEBIAN_FRONTEND noninteractive
+ENV ELASTICSEARCH_VERSION 2.4.1
 
-RUN apt-get update && \
-    apt-get install -y curl && \
-    apt-get clean
+RUN apt-get update \
+    && apt-get install -y curl \
+    && apt-get clean
 
-RUN cd / && \
-    curl -O https://download.elastic.co/elasticsearch/elasticsearch/elasticsearch-1.5.2.tar.gz && \
-    tar xf elasticsearch-1.5.2.tar.gz && \
-    rm elasticsearch-1.5.2.tar.gz
+RUN set -x \
+    && cd / \
+    && mkdir /elasticsearch \
+    && curl -O https://download.elastic.co/elasticsearch/release/org/elasticsearch/distribution/tar/elasticsearch/$ELASTICSEARCH_VERSION/elasticsearch-$ELASTICSEARCH_VERSION.tar.gz \
+    && tar xf elasticsearch-$ELASTICSEARCH_VERSION.tar.gz -C /elasticsearch --strip-components=1 \
+    && rm elasticsearch-$ELASTICSEARCH_VERSION.tar.gz
 
-RUN mkdir -p /elasticsearch-1.5.2/config/templates
+RUN mkdir -p /elasticsearch/config/templates
+COPY template-k8s-logstash.json /elasticsearch/config/templates/template-k8s-logstash.json
 
-COPY elasticsearch.yml /elasticsearch-1.5.2/config/elasticsearch.yml
-COPY template-k8s-logstash.json /elasticsearch-1.5.2/config/templates/template-k8s-logstash.json
+COPY config /elasticsearch/config
+
 COPY run.sh /
 COPY elasticsearch_logging_discovery /
+
+RUN useradd --no-create-home --user-group elasticsearch \
+    && mkdir /data \
+    && chown -R elasticsearch:elasticsearch /elasticsearch /elasticsearch_logging_discovery /run.sh /data
 
 VOLUME ["/data"]
 EXPOSE 9200 9300
 
-CMD ["/run.sh"]
+CMD ["/bin/su", "-c", "/run.sh", "elasticsearch"]
