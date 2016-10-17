@@ -1101,6 +1101,9 @@ func makePortString(ports []api.ServicePort) string {
 	for ix := range ports {
 		port := &ports[ix]
 		pieces[ix] = fmt.Sprintf("%d/%s", port.Port, port.Protocol)
+		if port.NodePort > 0 {
+			pieces[ix] = fmt.Sprintf("%d:%d/%s", port.Port, port.NodePort, port.Protocol)
+		}
 	}
 	return strings.Join(pieces, ",")
 }
