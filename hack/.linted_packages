@@ -50,6 +50,7 @@ federation/apis/federation/install
 federation/cmd/federation-apiserver
 federation/cmd/federation-controller-manager
 federation/cmd/genfeddocs
+hack/boilerplate/test
 hack/cmd/teststale
 pkg/api
 pkg/api/annotations
