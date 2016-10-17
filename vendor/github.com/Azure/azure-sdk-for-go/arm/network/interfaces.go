@@ -35,7 +35,13 @@ type InterfacesClient struct {
 
 // NewInterfacesClient creates an instance of the InterfacesClient client.
 func NewInterfacesClient(subscriptionID string) InterfacesClient {
-	return InterfacesClient{New(subscriptionID)}
+	return NewInterfacesClientWithBaseURI(DefaultBaseURI, subscriptionID)
+}
+
+// NewInterfacesClientWithBaseURI creates an instance of the InterfacesClient
+// client.
+func NewInterfacesClientWithBaseURI(baseURI string, subscriptionID string) InterfacesClient {
+	return InterfacesClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
 // CreateOrUpdate the Put NetworkInterface operation creates/updates a
@@ -243,6 +249,74 @@ func (client InterfacesClient) GetResponder(resp *http.Response) (result Interfa
 	return
 }
 
+// GetEffectiveRouteTable the get effective routetable operation retrieves all
+// the route tables applied on a networkInterface. This method may poll for
+// completion. Polling can be canceled by passing the cancel channel
+// argument. The channel will be used to cancel polling and any outstanding
+// HTTP requests.
+//
+// resourceGroupName is the name of the resource group. networkInterfaceName
+// is the name of the network interface.
+func (client InterfacesClient) GetEffectiveRouteTable(resourceGroupName string, networkInterfaceName string, cancel <-chan struct{}) (result autorest.Response, err error) {
+	req, err := client.GetEffectiveRouteTablePreparer(resourceGroupName, networkInterfaceName, cancel)
+	if err != nil {
+		return result, autorest.NewErrorWithError(err, "network.InterfacesClient", "GetEffectiveRouteTable", nil, "Failure preparing request")
+	}
+
+	resp, err := client.GetEffectiveRouteTableSender(req)
+	if err != nil {
+		result.Response = resp
+		return result, autorest.NewErrorWithError(err, "network.InterfacesClient", "GetEffectiveRouteTable", resp, "Failure sending request")
+	}
+
+	result, err = client.GetEffectiveRouteTableResponder(resp)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "network.InterfacesClient", "GetEffectiveRouteTable", resp, "Failure responding to request")
+	}
+
+	return
+}
+
+// GetEffectiveRouteTablePreparer prepares the GetEffectiveRouteTable request.
+func (client InterfacesClient) GetEffectiveRouteTablePreparer(resourceGroupName string, networkInterfaceName string, cancel <-chan struct{}) (*http.Request, error) {
+	pathParameters := map[string]interface{}{
+		"networkInterfaceName": autorest.Encode("path", networkInterfaceName),
+		"resourceGroupName":    autorest.Encode("path", resourceGroupName),
+		"subscriptionId":       autorest.Encode("path", client.SubscriptionID),
+	}
+
+	queryParameters := map[string]interface{}{
+		"api-version": client.APIVersion,
+	}
+
+	preparer := autorest.CreatePreparer(
+		autorest.AsPost(),
+		autorest.WithBaseURL(client.BaseURI),
+		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/networkInterfaces/{networkInterfaceName}/effectiveRouteTable", pathParameters),
+		autorest.WithQueryParameters(queryParameters))
+	return preparer.Prepare(&http.Request{Cancel: cancel})
+}
+
+// GetEffectiveRouteTableSender sends the GetEffectiveRouteTable request. The method will close the
+// http.Response Body if it receives an error.
+func (client InterfacesClient) GetEffectiveRouteTableSender(req *http.Request) (*http.Response, error) {
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoPollForAsynchronous(client.PollingDelay))
+}
+
+// GetEffectiveRouteTableResponder handles the response to the GetEffectiveRouteTable request. The method always
+// closes the http.Response Body.
+func (client InterfacesClient) GetEffectiveRouteTableResponder(resp *http.Response) (result autorest.Response, err error) {
+	err = autorest.Respond(
+		resp,
+		client.ByInspecting(),
+		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted),
+		autorest.ByClosing())
+	result.Response = resp
+	return
+}
+
 // GetVirtualMachineScaleSetNetworkInterface the Get ntework interface
 // operation retreives information about the specified network interface in a
 // virtual machine scale set.
@@ -315,7 +389,7 @@ func (client InterfacesClient) GetVirtualMachineScaleSetNetworkInterfaceResponde
 	return
 }
 
-// List the List networkInterfaces opertion retrieves all the
+// List the List networkInterfaces operation retrieves all the
 // networkInterfaces in a resource group.
 //
 // resourceGroupName is the name of the resource group.
@@ -401,7 +475,7 @@ func (client InterfacesClient) ListNextResults(lastResults InterfaceListResult) 
 	return
 }
 
-// ListAll the List networkInterfaces opertion retrieves all the
+// ListAll the List networkInterfaces operation retrieves all the
 // networkInterfaces in a subscription.
 func (client InterfacesClient) ListAll() (result InterfaceListResult, err error) {
 	req, err := client.ListAllPreparer()
@@ -481,6 +555,74 @@ func (client InterfacesClient) ListAllNextResults(lastResults InterfaceListResul
 		err = autorest.NewErrorWithError(err, "network.InterfacesClient", "ListAll", resp, "Failure responding to next results request request")
 	}
 
+	return
+}
+
+// ListEffectiveNetworkSecurityGroups the list effective network security
+// group operation retrieves all the network security groups applied on a
+// networkInterface. This method may poll for completion. Polling can be
+// canceled by passing the cancel channel argument. The channel will be used
+// to cancel polling and any outstanding HTTP requests.
+//
+// resourceGroupName is the name of the resource group. networkInterfaceName
+// is the name of the network interface.
+func (client InterfacesClient) ListEffectiveNetworkSecurityGroups(resourceGroupName string, networkInterfaceName string, cancel <-chan struct{}) (result autorest.Response, err error) {
+	req, err := client.ListEffectiveNetworkSecurityGroupsPreparer(resourceGroupName, networkInterfaceName, cancel)
+	if err != nil {
+		return result, autorest.NewErrorWithError(err, "network.InterfacesClient", "ListEffectiveNetworkSecurityGroups", nil, "Failure preparing request")
+	}
+
+	resp, err := client.ListEffectiveNetworkSecurityGroupsSender(req)
+	if err != nil {
+		result.Response = resp
+		return result, autorest.NewErrorWithError(err, "network.InterfacesClient", "ListEffectiveNetworkSecurityGroups", resp, "Failure sending request")
+	}
+
+	result, err = client.ListEffectiveNetworkSecurityGroupsResponder(resp)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "network.InterfacesClient", "ListEffectiveNetworkSecurityGroups", resp, "Failure responding to request")
+	}
+
+	return
+}
+
+// ListEffectiveNetworkSecurityGroupsPreparer prepares the ListEffectiveNetworkSecurityGroups request.
+func (client InterfacesClient) ListEffectiveNetworkSecurityGroupsPreparer(resourceGroupName string, networkInterfaceName string, cancel <-chan struct{}) (*http.Request, error) {
+	pathParameters := map[string]interface{}{
+		"networkInterfaceName": autorest.Encode("path", networkInterfaceName),
+		"resourceGroupName":    autorest.Encode("path", resourceGroupName),
+		"subscriptionId":       autorest.Encode("path", client.SubscriptionID),
+	}
+
+	queryParameters := map[string]interface{}{
+		"api-version": client.APIVersion,
+	}
+
+	preparer := autorest.CreatePreparer(
+		autorest.AsPost(),
+		autorest.WithBaseURL(client.BaseURI),
+		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/networkInterfaces/{networkInterfaceName}/effectiveNetworkSecurityGroups", pathParameters),
+		autorest.WithQueryParameters(queryParameters))
+	return preparer.Prepare(&http.Request{Cancel: cancel})
+}
+
+// ListEffectiveNetworkSecurityGroupsSender sends the ListEffectiveNetworkSecurityGroups request. The method will close the
+// http.Response Body if it receives an error.
+func (client InterfacesClient) ListEffectiveNetworkSecurityGroupsSender(req *http.Request) (*http.Response, error) {
+	return autorest.SendWithSender(client,
+		req,
+		azure.DoPollForAsynchronous(client.PollingDelay))
+}
+
+// ListEffectiveNetworkSecurityGroupsResponder handles the response to the ListEffectiveNetworkSecurityGroups request. The method always
+// closes the http.Response Body.
+func (client InterfacesClient) ListEffectiveNetworkSecurityGroupsResponder(resp *http.Response) (result autorest.Response, err error) {
+	err = autorest.Respond(
+		resp,
+		client.ByInspecting(),
+		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted),
+		autorest.ByClosing())
+	result.Response = resp
 	return
 }
 

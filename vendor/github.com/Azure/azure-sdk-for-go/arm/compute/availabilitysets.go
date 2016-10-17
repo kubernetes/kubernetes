@@ -32,7 +32,13 @@ type AvailabilitySetsClient struct {
 // NewAvailabilitySetsClient creates an instance of the AvailabilitySetsClient
 // client.
 func NewAvailabilitySetsClient(subscriptionID string) AvailabilitySetsClient {
-	return AvailabilitySetsClient{New(subscriptionID)}
+	return NewAvailabilitySetsClientWithBaseURI(DefaultBaseURI, subscriptionID)
+}
+
+// NewAvailabilitySetsClientWithBaseURI creates an instance of the
+// AvailabilitySetsClient client.
+func NewAvailabilitySetsClientWithBaseURI(baseURI string, subscriptionID string) AvailabilitySetsClient {
+	return AvailabilitySetsClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
 // CreateOrUpdate the operation to create or update the availability set.

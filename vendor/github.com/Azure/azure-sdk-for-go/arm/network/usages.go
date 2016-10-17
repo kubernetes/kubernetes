@@ -35,7 +35,12 @@ type UsagesClient struct {
 
 // NewUsagesClient creates an instance of the UsagesClient client.
 func NewUsagesClient(subscriptionID string) UsagesClient {
-	return UsagesClient{New(subscriptionID)}
+	return NewUsagesClientWithBaseURI(DefaultBaseURI, subscriptionID)
+}
+
+// NewUsagesClientWithBaseURI creates an instance of the UsagesClient client.
+func NewUsagesClientWithBaseURI(baseURI string, subscriptionID string) UsagesClient {
+	return UsagesClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
 // List lists compute usages for a subscription.

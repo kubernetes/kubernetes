@@ -36,7 +36,13 @@ type ExpressRouteCircuitPeeringsClient struct {
 // NewExpressRouteCircuitPeeringsClient creates an instance of the
 // ExpressRouteCircuitPeeringsClient client.
 func NewExpressRouteCircuitPeeringsClient(subscriptionID string) ExpressRouteCircuitPeeringsClient {
-	return ExpressRouteCircuitPeeringsClient{New(subscriptionID)}
+	return NewExpressRouteCircuitPeeringsClientWithBaseURI(DefaultBaseURI, subscriptionID)
+}
+
+// NewExpressRouteCircuitPeeringsClientWithBaseURI creates an instance of the
+// ExpressRouteCircuitPeeringsClient client.
+func NewExpressRouteCircuitPeeringsClientWithBaseURI(baseURI string, subscriptionID string) ExpressRouteCircuitPeeringsClient {
+	return ExpressRouteCircuitPeeringsClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
 // CreateOrUpdate the Put Pering operation creates/updates an peering in the

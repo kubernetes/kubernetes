@@ -35,7 +35,12 @@ type SubnetsClient struct {
 
 // NewSubnetsClient creates an instance of the SubnetsClient client.
 func NewSubnetsClient(subscriptionID string) SubnetsClient {
-	return SubnetsClient{New(subscriptionID)}
+	return NewSubnetsClientWithBaseURI(DefaultBaseURI, subscriptionID)
+}
+
+// NewSubnetsClientWithBaseURI creates an instance of the SubnetsClient client.
+func NewSubnetsClientWithBaseURI(baseURI string, subscriptionID string) SubnetsClient {
+	return SubnetsClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
 // CreateOrUpdate the Put Subnet operation creates/updates a subnet in
@@ -247,7 +252,7 @@ func (client SubnetsClient) GetResponder(resp *http.Response) (result Subnet, er
 	return
 }
 
-// List the List subnets opertion retrieves all the subnets in a virtual
+// List the List subnets operation retrieves all the subnets in a virtual
 // network.
 //
 // resourceGroupName is the name of the resource group. virtualNetworkName is
