@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pvscpod
+spec:
+  containers:
+  - name: redis
+    image: redis
+    volumeMounts:
+    - name: vmdk-storage
+      mountPath: /data/
+  volumes:
+  - name: vmdk-storage
+    persistentVolumeClaim:
+      claimName: pvcsc001
