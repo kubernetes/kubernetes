@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -206,7 +207,7 @@ func (w *watchCache) List() []interface{} {
 	return w.store.List()
 }
 
-func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64) ([]interface{}, uint64, error) {
+func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, trace *util.Trace) ([]interface{}, uint64, error) {
 	startTime := w.clock.Now()
 	go func() {
 		// Wake us up when the time limit has expired.  The docs
@@ -227,6 +228,9 @@ func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64) ([]interface{
 			return nil, 0, fmt.Errorf("time limit exceeded while waiting for resource version %v (current value: %v)", resourceVersion, w.resourceVersion)
 		}
 		w.cond.Wait()
+	}
+	if trace != nil {
+		trace.Step("Cache is fresh enough")
 	}
 	return w.store.List(), w.resourceVersion, nil
 }
