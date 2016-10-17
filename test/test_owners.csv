@@ -215,6 +215,9 @@ Kubectl client Simple pod should support port-forward,ncdc,0
 Kubectl client Update Demo should create and stop a replication controller,sttts,0
 Kubectl client Update Demo should do a rolling update of a replication controller,sttts,0
 Kubectl client Update Demo should scale a replication controller,sttts,0
+Kubelet Cgroup Manager Pod containers On scheduling a BestEffort Pod Pod containers should have been created under the BestEffort cgroup,derekwaynecarr,0
+Kubelet Cgroup Manager Pod containers On scheduling a Burstable Pod Pod containers should have been created under the Burstable cgroup,derekwaynecarr,0
+Kubelet Cgroup Manager Pod containers On scheduling a Guaranteed Pod Pod containers should have been created under the cgroup-root,derekwaynecarr,0
 Kubelet Cgroup Manager QOS containers On enabling QOS cgroup hierarchy Top level QoS containers should have been created,davidopp,1
 Kubelet Container Manager Validate OOM score adjustments once the node is setup Kubelet's oom-score-adj should be -999,kargakis,1
 "Kubelet Container Manager Validate OOM score adjustments once the node is setup burstable container's oom-score-adj should be between [2, 1000)",derekwaynecarr,1
