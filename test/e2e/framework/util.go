@@ -2896,7 +2896,18 @@ func WaitForDeploymentStatusValid(c clientset.Interface, d *extensions.Deploymen
 			Logf(reason)
 			return false, nil
 		}
-		return true, nil
+
+		// When the deployment status and its underlying resources reach the desired state, we're done
+		if deployment.Status.Replicas == deployment.Spec.Replicas &&
+			deployment.Status.UpdatedReplicas == deployment.Spec.Replicas &&
+			deployment.Status.AvailableReplicas == deployment.Spec.Replicas {
+			return true, nil
+		}
+
+		reason = fmt.Sprintf("deployment status: %#v", deployment.Status)
+		Logf(reason)
+
+		return false, nil
 	})
 
 	if err == wait.ErrWaitTimeout {
@@ -2960,9 +2971,7 @@ func WaitForDeploymentStatus(c clientset.Interface, d *extensions.Deployment) er
 
 		// When the deployment status and its underlying resources reach the desired state, we're done
 		if deployment.Status.Replicas == deployment.Spec.Replicas &&
-			deployment.Status.UpdatedReplicas == deployment.Spec.Replicas &&
-			deploymentutil.GetReplicaCountForReplicaSets(oldRSs) == 0 &&
-			deploymentutil.GetReplicaCountForReplicaSets([]*extensions.ReplicaSet{newRS}) == deployment.Spec.Replicas {
+			deployment.Status.UpdatedReplicas == deployment.Spec.Replicas {
 			return true, nil
 		}
 		return false, nil
