@@ -368,7 +368,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 	}
 
 	trace := util.NewTrace(fmt.Sprintf("cacher %v: List", c.objectType.String()))
-	defer trace.LogIfLong(250 * time.Millisecond)
+	defer trace.LogIfLong(500 * time.Millisecond)
 
 	c.ready.wait()
 	trace.Step("Ready")
@@ -749,7 +749,7 @@ func (c *cacheWatcher) process(initEvents []watchCacheEvent, resourceVersion uin
 	// We should understand what is blocking us in those cases (e.g.
 	// is it lack of CPU, network, or sth else) and potentially
 	// consider increase size of result buffer in those cases.
-	const initProcessThreshold = 100 * time.Millisecond
+	const initProcessThreshold = 500 * time.Millisecond
 	startTime := time.Now()
 	for _, event := range initEvents {
 		c.sendWatchCacheEvent(event)
