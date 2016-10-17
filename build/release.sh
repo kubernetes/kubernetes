@@ -40,6 +40,8 @@ if [[ $KUBE_RELEASE_RUN_TESTS =~ ^[yY]$ ]]; then
   kube::build::run_build_command make test-integration
 fi
 
+kube::build::copy_output
+
 if [[ "${FEDERATION:-}" == "true" ]];then
     (
 	source "${KUBE_ROOT}/build/util.sh"
@@ -48,6 +50,5 @@ if [[ "${FEDERATION:-}" == "true" ]];then
     )
 fi
 
-kube::build::copy_output
 kube::release::package_tarballs
 kube::release::package_hyperkube
