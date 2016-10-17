@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"gopkg.in/gcfg.v1"
@@ -605,11 +606,16 @@ func (vs *VSphere) Zones() (cloudprovider.Zones, bool) {
 func (vs *VSphere) GetZone() (cloudprovider.Zone, error) {
 	glog.V(4).Infof("Current datacenter is %v, cluster is %v", vs.cfg.Global.Datacenter, vs.clusterName)
 
+	// vSphere Datacenters and Cluster Names can have names that are invalid Kubernetes labels
+	invalidchars := regexp.MustCompile(`[^a-zA-Z0-9_\.-]`)
+	region := invalidchars.ReplaceAllString(vs.cfg.Global.Datacenter, "_")
+	failuredomain := invalidchars.ReplaceAllString(vs.clusterName, "_")
+
 	// The clusterName is determined from the VirtualMachine ManagedObjectReference during init
 	// If the VM is not created within a Cluster, this will return empty-string
 	return cloudprovider.Zone{
-		Region:        vs.cfg.Global.Datacenter,
-		FailureDomain: vs.clusterName,
+		Region:        region,
+		FailureDomain: failuredomain,
 	}, nil
 }
 

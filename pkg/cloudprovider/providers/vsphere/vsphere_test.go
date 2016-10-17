@@ -127,8 +127,8 @@ func TestVSphereLogin(t *testing.T) {
 
 func TestZones(t *testing.T) {
 	cfg := VSphereConfig{}
-	cfg.Global.Datacenter = "myDatacenter"
-	failureZone := "myCluster"
+	cfg.Global.Datacenter = "my Datacenter"
+	failureZone := "my Cluster"
 
 	// Create vSphere configuration object
 	vs := VSphere{
@@ -146,11 +146,11 @@ func TestZones(t *testing.T) {
 		t.Fatalf("GetZone() returned error: %s", err)
 	}
 
-	if zone.Region != vs.cfg.Global.Datacenter {
+	if zone.Region != "my_Datacenter" {
 		t.Fatalf("GetZone() returned wrong region (%s)", zone.Region)
 	}
 
-	if zone.FailureDomain != failureZone {
+	if zone.FailureDomain != "my_Cluster" {
 		t.Fatalf("GetZone() returned wrong Failure Zone (%s)", zone.FailureDomain)
 	}
 }
