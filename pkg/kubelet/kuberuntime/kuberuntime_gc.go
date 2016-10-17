@@ -136,6 +136,12 @@ func (cgc *containerGC) removeSandbox(sandboxID string) {
 	}
 }
 
+// isPodDeleted returns true if the pod is already deleted.
+func (cgc *containerGC) isPodDeleted(podUID types.UID) bool {
+	_, found := cgc.podGetter.GetPodByUID(podUID)
+	return !found
+}
+
 // evictableContainers gets all containers that are evictable. Evictable containers are: not running
 // and created more than MinAge ago.
 func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByEvictUnit, error) {
@@ -179,17 +185,64 @@ func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByE
 	return evictUnits, nil
 }
 
-// evictableSandboxes gets all sandboxes that are evictable. Evictable sandboxes are: not running
+// evict all containers that are evictable
+func (cgc *containerGC) evictContainers(gcPolicy kubecontainer.ContainerGCPolicy, allSourcesReady bool) error {
+	// Separate containers by evict units.
+	evictUnits, err := cgc.evictableContainers(gcPolicy.MinAge)
+	if err != nil {
+		return err
+	}
+
+	// Remove deleted pod containers if all sources are ready.
+	if allSourcesReady {
+		for key, unit := range evictUnits {
+			if cgc.isPodDeleted(key.uid) {
+				cgc.removeOldestN(unit, len(unit)) // Remove all.
+				delete(evictUnits, key)
+			}
+		}
+	}
+
+	// Enforce max containers per evict unit.
+	if gcPolicy.MaxPerPodContainer >= 0 {
+		cgc.enforceMaxContainersPerEvictUnit(evictUnits, gcPolicy.MaxPerPodContainer)
+	}
+
+	// Enforce max total number of containers.
+	if gcPolicy.MaxContainers >= 0 && evictUnits.NumContainers() > gcPolicy.MaxContainers {
+		// Leave an equal number of containers per evict unit (min: 1).
+		numContainersPerEvictUnit := gcPolicy.MaxContainers / evictUnits.NumEvictUnits()
+		if numContainersPerEvictUnit < 1 {
+			numContainersPerEvictUnit = 1
+		}
+		cgc.enforceMaxContainersPerEvictUnit(evictUnits, numContainersPerEvictUnit)
+
+		// If we still need to evict, evict oldest first.
+		numContainers := evictUnits.NumContainers()
+		if numContainers > gcPolicy.MaxContainers {
+			flattened := make([]containerGCInfo, 0, numContainers)
+			for key := range evictUnits {
+				flattened = append(flattened, evictUnits[key]...)
+			}
+			sort.Sort(byCreated(flattened))
+
+			cgc.removeOldestN(flattened, numContainers-gcPolicy.MaxContainers)
+		}
+	}
+	return nil
+}
+
+// evictSandboxes evicts all sandboxes that are evictable. Evictable sandboxes are: not running
 // and contains no containers at all.
-func (cgc *containerGC) evictableSandboxes(minAge time.Duration) ([]string, error) {
+func (cgc *containerGC) evictSandboxes(minAge time.Duration) error {
 	containers, err := cgc.manager.getKubeletContainers(true)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	sandboxes, err := cgc.manager.getKubeletSandboxes(true)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	evictSandboxes := make([]string, 0)
@@ -222,13 +275,10 @@ func (cgc *containerGC) evictableSandboxes(minAge time.Duration) ([]string, erro
 		evictSandboxes = append(evictSandboxes, sandboxID)
 	}
 
-	return evictSandboxes, nil
-}
-
-// isPodDeleted returns true if the pod is already deleted.
-func (cgc *containerGC) isPodDeleted(podUID types.UID) bool {
-	_, found := cgc.podGetter.GetPodByUID(podUID)
-	return !found
+	for _, sandbox := range evictSandboxes {
+		cgc.removeSandbox(sandbox)
+	}
+	return nil
 }
 
 // evictPodLogsDirectories evicts all evictable pod logs directories. Pod logs directories
@@ -278,59 +328,16 @@ func (cgc *containerGC) evictPodLogsDirectories(allSourcesReady bool) error {
 // * gets evictable sandboxes which are not ready and contains no containers.
 // * removes evictable sandboxes.
 func (cgc *containerGC) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy, allSourcesReady bool) error {
-	// Separate containers by evict units.
-	evictUnits, err := cgc.evictableContainers(gcPolicy.MinAge)
-	if err != nil {
+	// Remove evictable containers
+	if err := cgc.evictContainers(gcPolicy, allSourcesReady); err != nil {
 		return err
-	}
-
-	// Remove deleted pod containers if all sources are ready.
-	if allSourcesReady {
-		for key, unit := range evictUnits {
-			if cgc.isPodDeleted(key.uid) {
-				cgc.removeOldestN(unit, len(unit)) // Remove all.
-				delete(evictUnits, key)
-			}
-		}
-	}
-
-	// Enforce max containers per evict unit.
-	if gcPolicy.MaxPerPodContainer >= 0 {
-		cgc.enforceMaxContainersPerEvictUnit(evictUnits, gcPolicy.MaxPerPodContainer)
-	}
-
-	// Enforce max total number of containers.
-	if gcPolicy.MaxContainers >= 0 && evictUnits.NumContainers() > gcPolicy.MaxContainers {
-		// Leave an equal number of containers per evict unit (min: 1).
-		numContainersPerEvictUnit := gcPolicy.MaxContainers / evictUnits.NumEvictUnits()
-		if numContainersPerEvictUnit < 1 {
-			numContainersPerEvictUnit = 1
-		}
-		cgc.enforceMaxContainersPerEvictUnit(evictUnits, numContainersPerEvictUnit)
-
-		// If we still need to evict, evict oldest first.
-		numContainers := evictUnits.NumContainers()
-		if numContainers > gcPolicy.MaxContainers {
-			flattened := make([]containerGCInfo, 0, numContainers)
-			for key := range evictUnits {
-				flattened = append(flattened, evictUnits[key]...)
-			}
-			sort.Sort(byCreated(flattened))
-
-			cgc.removeOldestN(flattened, numContainers-gcPolicy.MaxContainers)
-		}
 	}
 
 	// Remove sandboxes with zero containers
-	evictSandboxes, err := cgc.evictableSandboxes(sandboxMinGCAge)
-	if err != nil {
+	if err := cgc.evictSandboxes(sandboxMinGCAge); err != nil {
 		return err
-	}
-	for _, sandbox := range evictSandboxes {
-		cgc.removeSandbox(sandbox)
 	}
 
 	// Remove pod sandbox log directory
-	// TODO(random-liu): Add legacy container log localtion cleanup.
 	return cgc.evictPodLogsDirectories(allSourcesReady)
 }
