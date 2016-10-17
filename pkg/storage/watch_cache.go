@@ -223,6 +223,9 @@ func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, trace *util.T
 
 	w.RLock()
 	defer w.RUnlock()
+	if trace != nil {
+		trace.Step("watchCache locked acquired")
+	}
 	for w.resourceVersion < resourceVersion {
 		if w.clock.Since(startTime) >= MaximumListWait {
 			return nil, 0, fmt.Errorf("time limit exceeded while waiting for resource version %v (current value: %v)", resourceVersion, w.resourceVersion)
@@ -230,7 +233,7 @@ func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, trace *util.T
 		w.cond.Wait()
 	}
 	if trace != nil {
-		trace.Step("Cache is fresh enough")
+		trace.Step("watchCache fresh enough")
 	}
 	return w.store.List(), w.resourceVersion, nil
 }
