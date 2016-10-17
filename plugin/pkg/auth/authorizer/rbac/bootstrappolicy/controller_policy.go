@@ -58,6 +58,7 @@ func init() {
 	addControllerRole(rbac.ClusterRole{
 		ObjectMeta: api.ObjectMeta{Name: saRolePrefix + "replication-controller"},
 		Rules: []rbac.PolicyRule{
+			// 1.0 controllers needed get, update, so without these old controllers break on new servers
 			rbac.NewRule("get", "list", "watch", "update").Groups(legacyGroup).Resources("replicationcontrollers").RuleOrDie(),
 			rbac.NewRule("update").Groups(legacyGroup).Resources("replicationcontrollers/status").RuleOrDie(),
 			rbac.NewRule("list", "watch", "create", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
