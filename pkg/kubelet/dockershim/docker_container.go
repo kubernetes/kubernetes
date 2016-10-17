@@ -129,6 +129,7 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 	if lc := sandboxConfig.GetLinux(); lc != nil {
 		// Apply Cgroup options.
 		// TODO: Check if this works with per-pod cgroups.
+		// TODO: we need to pass the cgroup in syntax expected by cgroup driver but shim does not use docker info yet...
 		hc.CgroupParent = lc.GetCgroupParent()
 
 		// Apply namespace options.
