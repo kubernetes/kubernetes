@@ -335,7 +335,13 @@ func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
 	ws = new(restful.WebService)
 	ws.
 		Path("/portForward")
+	ws.Route(ws.GET("/{podNamespace}/{podID}").
+		To(s.getPortForward).
+		Operation("getPortForward"))
 	ws.Route(ws.POST("/{podNamespace}/{podID}").
+		To(s.getPortForward).
+		Operation("getPortForward"))
+	ws.Route(ws.GET("/{podNamespace}/{podID}/{uid}").
 		To(s.getPortForward).
 		Operation("getPortForward"))
 	ws.Route(ws.POST("/{podNamespace}/{podID}/{uid}").
@@ -720,7 +726,8 @@ func (s *Server) getPortForward(request *restful.Request, response *restful.Resp
 		kubecontainer.GetPodFullName(pod),
 		params.podUID,
 		s.host.StreamingConnectionIdleTimeout(),
-		remotecommand.DefaultStreamCreationTimeout)
+		remotecommand.DefaultStreamCreationTimeout,
+		portforward.SupportedProtocols)
 }
 
 // ServeHTTP responds to HTTP requests on the Kubelet.
