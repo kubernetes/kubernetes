@@ -20,6 +20,22 @@ sed -i -e "s/http.us.debian.org/mirrors.kernel.org/" /etc/apt/sources.list
 # Prepopulate the name of the Master
 mkdir -p /etc/salt/minion.d
 echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
+CLOUD_CONFIG=/etc/vsphere_cloud.config
+
+# Configuration to initialize vsphere cloud provider
+cat <<EOF > $CLOUD_CONFIG
+[Global]
+        user = $GOVC_USERNAME
+        password = $GOVC_PASSWORD
+        server = $GOVC_URL
+        port = $GOVC_PORT
+        insecure-flag = $GOVC_INSECURE
+        datacenter = $GOVC_DATACENTER
+        datastore = $GOVC_DATASTORE
+
+[Disk]
+	scsicontrollertype = pvscsi
+EOF
 
 cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
@@ -29,6 +45,7 @@ grains:
   cloud: vsphere
   master_extra_sans: $MASTER_EXTRA_SANS
   kube_user: $KUBE_USER
+  cloud_config: $CLOUD_CONFIG
 EOF
 
 # Auto accept all keys from minions that try to join
@@ -53,5 +70,5 @@ EOF
 #
 # -M installs the master
 set +x
-curl -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s -- -M -X
+curl -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s -- -M -X stable 2016.3.2
 set -x
