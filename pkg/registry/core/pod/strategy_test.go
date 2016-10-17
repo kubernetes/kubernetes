@@ -17,6 +17,7 @@ limitations under the License.
 package pod
 
 import (
+	"net/url"
 	"reflect"
 	"testing"
 
@@ -27,8 +28,10 @@ import (
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/fields"
 	genericapirequest "k8s.io/kubernetes/pkg/genericapiserver/api/request"
+	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 func TestMatchPod(t *testing.T) {
@@ -258,4 +261,65 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 		PodToSelectableFields(&api.Pod{}),
 		nil,
 	)
+}
+
+type mockConnectionInfoGetter struct {
+	info *client.ConnectionInfo
+}
+
+func (g mockConnectionInfoGetter) GetConnectionInfo(nodeName types.NodeName) (*client.ConnectionInfo, error) {
+	return g.info, nil
+}
+
+func TestPortForwardLocation(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	tcs := []struct {
+		in          *api.Pod
+		info        *client.ConnectionInfo
+		opts        *api.PodPortForwardOptions
+		expectedErr error
+		expectedURL *url.URL
+	}{
+		{
+			in: &api.Pod{
+				Spec: api.PodSpec{},
+			},
+			opts:        &api.PodPortForwardOptions{},
+			expectedErr: errors.NewBadRequest("pod test does not have a host assigned"),
+		},
+		{
+			in: &api.Pod{
+				Spec: api.PodSpec{
+					NodeName: "node1",
+				},
+			},
+			opts:        &api.PodPortForwardOptions{},
+			expectedErr: errors.NewBadRequest("at least one port must be specified"),
+		},
+		{
+			in: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Namespace: "ns",
+					Name:      "pod1",
+				},
+				Spec: api.PodSpec{
+					NodeName: "node1",
+				},
+			},
+			info:        &client.ConnectionInfo{},
+			opts:        &api.PodPortForwardOptions{Ports: []int32{80}},
+			expectedURL: &url.URL{Host: ":", Path: "/portForward/ns/pod1", RawQuery: "port=80"},
+		},
+	}
+	for _, tc := range tcs {
+		getter := &mockPodGetter{tc.in}
+		connectionGetter := &mockConnectionInfoGetter{tc.info}
+		loc, _, err := PortForwardLocation(getter, connectionGetter, ctx, "test", tc.opts)
+		if !reflect.DeepEqual(err, tc.expectedErr) {
+			t.Errorf("expected %v, got %v", tc.expectedErr, err)
+		}
+		if !reflect.DeepEqual(loc, tc.expectedURL) {
+			t.Errorf("expected %v, got %v", tc.expectedURL, loc)
+		}
+	}
 }

@@ -17,6 +17,8 @@ limitations under the License.
 package e2e
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -28,6 +30,8 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/net/websocket"
+
 	"k8s.io/kubernetes/pkg/api/v1"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -35,6 +39,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 const (
@@ -368,6 +373,102 @@ var _ = framework.KubeDescribe("Port forwarding", func() {
 			verifyLogMessage(logOutput, "Done")
 		})
 	})
+
+	It("should support port forwarding over websockets", func() {
+		config, err := framework.LoadConfig()
+		Expect(err).NotTo(HaveOccurred(), "unable to get base config")
+
+		By("creating the pod")
+		pod := pfPod("def", "10", "10", "100")
+		if _, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod); err != nil {
+			framework.Failf("Couldn't create pod: %v", err)
+		}
+		if err := f.WaitForPodReady(pod.Name); err != nil {
+			framework.Failf("Pod did not start running: %v", err)
+		}
+		defer func() {
+			logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
+			if err != nil {
+				framework.Logf("Error getting pod log: %v", err)
+			} else {
+				framework.Logf("Pod log:\n%s", logs)
+			}
+		}()
+
+		req := f.ClientSet.Core().RESTClient().Get().
+			Namespace(f.Namespace.Name).
+			Resource("pods").
+			Name(pod.Name).
+			Suffix("portforward").
+			Param("ports", "80")
+
+		url := req.URL()
+		ws, err := framework.OpenWebSocketForURL(url, config, []string{"v4.channel.k8s.io"})
+		if err != nil {
+			framework.Failf("Failed to open websocket to %s: %v", url.String(), err)
+		}
+		defer ws.Close()
+
+		Eventually(func() error {
+			channel, msg, err := wsRead(ws)
+			if err != nil {
+				return fmt.Errorf("Failed to read completely from websocket %s: %v", url.String(), err)
+			}
+			if channel != 0 {
+				return fmt.Errorf("Got message from server that didn't start with channel 0 (data): %v", msg)
+			}
+			if p := binary.LittleEndian.Uint16(msg); p != 80 {
+				return fmt.Errorf("Received the wrong port: %d", p)
+			}
+			return nil
+		}, time.Minute, 10*time.Second).Should(BeNil())
+
+		Eventually(func() error {
+			channel, msg, err := wsRead(ws)
+			if err != nil {
+				return fmt.Errorf("Failed to read completely from websocket %s: %v", url.String(), err)
+			}
+			if channel != 1 {
+				return fmt.Errorf("Got message from server that didn't start with channel 1 (error): %v", msg)
+			}
+			if p := binary.LittleEndian.Uint16(msg); p != 80 {
+				return fmt.Errorf("Received the wrong port: %d", p)
+			}
+			return nil
+		}, time.Minute, 10*time.Second).Should(BeNil())
+
+		By("sending the expected data to the local port")
+		err = wsWrite(ws, 0, []byte("def"))
+		if err != nil {
+			framework.Failf("Failed to write to websocket %s: %v", url.String(), err)
+		}
+
+		By("reading data from the local port")
+		buf := bytes.Buffer{}
+		expectedData := bytes.Repeat([]byte("x"), 100)
+		Eventually(func() error {
+			channel, msg, err := wsRead(ws)
+			if err != nil {
+				return fmt.Errorf("Failed to read completely from websocket %s: %v", url.String(), err)
+			}
+			if channel != 0 {
+				return fmt.Errorf("Got message from server that didn't start with channel 0 (data): %v", msg)
+			}
+			buf.Write(msg)
+			if bytes.Equal(expectedData, buf.Bytes()) {
+				return fmt.Errorf("Expected %q from server, got %q", expectedData, buf.Bytes())
+			}
+			return nil
+		}, time.Minute, 10*time.Second).Should(BeNil())
+
+		By("verifying logs")
+		logOutput, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
+		if err != nil {
+			framework.Failf("Error retrieving pod logs: %v", err)
+		}
+		verifyLogMessage(logOutput, "^Accepted client connection$")
+		verifyLogMessage(logOutput, "^Received expected client data$")
+	})
 })
 
 func verifyLogMessage(log, expected string) {
@@ -379,4 +480,31 @@ func verifyLogMessage(log, expected string) {
 		}
 	}
 	framework.Failf("Missing %q from log: %s", expected, log)
+}
+
+func wsRead(conn *websocket.Conn) (byte, []byte, error) {
+	for {
+		var data []byte
+		err := websocket.Message.Receive(conn, &data)
+		if err != nil {
+			return 0, nil, err
+		}
+
+		if len(data) == 0 {
+			continue
+		}
+
+		channel := data[0]
+		data = data[1:]
+
+		return channel, data, err
+	}
+}
+
+func wsWrite(conn *websocket.Conn, channel byte, data []byte) error {
+	frame := make([]byte, len(data)+1)
+	frame[0] = channel
+	copy(frame[1:], data)
+	err := websocket.Message.Send(conn, frame)
+	return err
 }
