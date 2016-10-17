@@ -367,7 +367,11 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 		return err
 	}
 
+	trace := util.NewTrace(fmt.Sprintf("cacher %v: List", c.objectType.String()))
+	defer trace.LogIfLong(250 * time.Millisecond)
+
 	c.ready.wait()
+	trace.Step("Ready")
 
 	// List elements from cache, with at least 'listRV'.
 	listPtr, err := meta.GetItemsPtr(listObj)
@@ -380,10 +384,11 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 	}
 	filter := filterFunction(key, c.keyFunc, pred)
 
-	objs, readResourceVersion, err := c.watchCache.WaitUntilFreshAndList(listRV)
+	objs, readResourceVersion, err := c.watchCache.WaitUntilFreshAndList(listRV, trace)
 	if err != nil {
 		return fmt.Errorf("failed to wait for fresh list: %v", err)
 	}
+	trace.Step(fmt.Sprintf("Listed %d items from cache", len(objs)))
 	for _, obj := range objs {
 		object, ok := obj.(runtime.Object)
 		if !ok {
@@ -393,6 +398,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 			listVal.Set(reflect.Append(listVal, reflect.ValueOf(object).Elem()))
 		}
 	}
+	trace.Step(fmt.Sprintf("Filtered %d items", listVal.Len()))
 	if c.versioner != nil {
 		if err := c.versioner.UpdateList(listObj, readResourceVersion); err != nil {
 			return err
