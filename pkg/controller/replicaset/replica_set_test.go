@@ -23,6 +23,7 @@ import (
 	"math/rand"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -386,6 +387,7 @@ func TestSyncReplicaSetDormancy(t *testing.T) {
 		StatusCode:    200,
 		ResponseBody:  "{}",
 		SkipRequestFn: skipListerFunc,
+		T:             t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
@@ -443,9 +445,9 @@ func TestSyncReplicaSetDormancy(t *testing.T) {
 	manager.syncReplicaSet(getKey(rsSpec, t))
 	validateSyncReplicaSet(t, &fakePodControl, 1, 0, 0)
 
-	// 1 PUT for the ReplicaSet status during dormancy window.
+	// 2 PUT for the ReplicaSet status during dormancy window.
 	// Note that the pod creates go through pod control so they're not recorded.
-	fakeHandler.ValidateRequestCount(t, 1)
+	fakeHandler.ValidateRequestCount(t, 2)
 }
 
 func TestPodControllerLookup(t *testing.T) {
@@ -715,8 +717,9 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 		return true, &extensions.ReplicaSet{}, fmt.Errorf("Fake error")
 	})
 	fakeRSClient := fakeClient.Extensions().ReplicaSets("default")
-	numReplicas := 10
-	updateReplicaCount(fakeRSClient, *rs, numReplicas, 0, 0, 0)
+	numReplicas := int32(10)
+	newStatus := extensions.ReplicaSetStatus{Replicas: numReplicas}
+	updateReplicaSetStatus(fakeRSClient, *rs, newStatus)
 	updates, gets := 0, 0
 	for _, a := range fakeClient.Actions() {
 		if a.GetResource().Resource != "replicasets" {
@@ -737,7 +740,7 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 			// returned a ReplicaSet with replicas=1.
 			if c, ok := action.GetObject().(*extensions.ReplicaSet); !ok {
 				t.Errorf("Expected a ReplicaSet as the argument to update, got %T", c)
-			} else if int(c.Status.Replicas) != numReplicas {
+			} else if c.Status.Replicas != numReplicas {
 				t.Errorf("Expected update for ReplicaSet to contain replicas %v, got %v instead",
 					numReplicas, c.Status.Replicas)
 			}
@@ -1429,4 +1432,164 @@ func TestAvailableReplicas(t *testing.T) {
 	decRs := runtime.EncodeOrDie(testapi.Extensions.Codec(), rs)
 	fakeHandler.ValidateRequest(t, testapi.Extensions.ResourcePath(replicaSetResourceName(), rs.Namespace, rs.Name)+"/status", "PUT", &decRs)
 	validateSyncReplicaSet(t, &fakePodControl, 0, 0, 0)
+}
+
+var (
+	imagePullBackOff extensions.ReplicaSetConditionType = "ImagePullBackOff"
+
+	condImagePullBackOff = func() extensions.ReplicaSetCondition {
+		return extensions.ReplicaSetCondition{
+			Type:   imagePullBackOff,
+			Status: api.ConditionTrue,
+			Reason: "NonExistentImage",
+		}
+	}
+
+	condReplicaFailure = func() extensions.ReplicaSetCondition {
+		return extensions.ReplicaSetCondition{
+			Type:   extensions.ReplicaSetReplicaFailure,
+			Status: api.ConditionTrue,
+			Reason: "OtherFailure",
+		}
+	}
+
+	condReplicaFailure2 = func() extensions.ReplicaSetCondition {
+		return extensions.ReplicaSetCondition{
+			Type:   extensions.ReplicaSetReplicaFailure,
+			Status: api.ConditionTrue,
+			Reason: "AnotherFailure",
+		}
+	}
+
+	status = func() *extensions.ReplicaSetStatus {
+		return &extensions.ReplicaSetStatus{
+			Conditions: []extensions.ReplicaSetCondition{condReplicaFailure()},
+		}
+	}
+)
+
+func TestGetCondition(t *testing.T) {
+	exampleStatus := status()
+
+	tests := []struct {
+		name string
+
+		status     extensions.ReplicaSetStatus
+		condType   extensions.ReplicaSetConditionType
+		condStatus api.ConditionStatus
+		condReason string
+
+		expected bool
+	}{
+		{
+			name: "condition exists",
+
+			status:   *exampleStatus,
+			condType: extensions.ReplicaSetReplicaFailure,
+
+			expected: true,
+		},
+		{
+			name: "condition does not exist",
+
+			status:   *exampleStatus,
+			condType: imagePullBackOff,
+
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		cond := GetCondition(test.status, test.condType)
+		exists := cond != nil
+		if exists != test.expected {
+			t.Errorf("%s: expected condition to exist: %t, got: %t", test.name, test.expected, exists)
+		}
+	}
+}
+
+func TestSetCondition(t *testing.T) {
+	tests := []struct {
+		name string
+
+		status *extensions.ReplicaSetStatus
+		cond   extensions.ReplicaSetCondition
+
+		expectedStatus *extensions.ReplicaSetStatus
+	}{
+		{
+			name: "set for the first time",
+
+			status: &extensions.ReplicaSetStatus{},
+			cond:   condReplicaFailure(),
+
+			expectedStatus: &extensions.ReplicaSetStatus{Conditions: []extensions.ReplicaSetCondition{condReplicaFailure()}},
+		},
+		{
+			name: "simple set",
+
+			status: &extensions.ReplicaSetStatus{Conditions: []extensions.ReplicaSetCondition{condImagePullBackOff()}},
+			cond:   condReplicaFailure(),
+
+			expectedStatus: &extensions.ReplicaSetStatus{Conditions: []extensions.ReplicaSetCondition{condImagePullBackOff(), condReplicaFailure()}},
+		},
+		{
+			name: "overwrite",
+
+			status: &extensions.ReplicaSetStatus{Conditions: []extensions.ReplicaSetCondition{condReplicaFailure()}},
+			cond:   condReplicaFailure2(),
+
+			expectedStatus: &extensions.ReplicaSetStatus{Conditions: []extensions.ReplicaSetCondition{condReplicaFailure2()}},
+		},
+	}
+
+	for _, test := range tests {
+		SetCondition(test.status, test.cond)
+		if !reflect.DeepEqual(test.status, test.expectedStatus) {
+			t.Errorf("%s: expected status: %v, got: %v", test.name, test.expectedStatus, test.status)
+		}
+	}
+}
+
+func TestRemoveCondition(t *testing.T) {
+	tests := []struct {
+		name string
+
+		status   *extensions.ReplicaSetStatus
+		condType extensions.ReplicaSetConditionType
+
+		expectedStatus *extensions.ReplicaSetStatus
+	}{
+		{
+			name: "remove from empty status",
+
+			status:   &extensions.ReplicaSetStatus{},
+			condType: extensions.ReplicaSetReplicaFailure,
+
+			expectedStatus: &extensions.ReplicaSetStatus{},
+		},
+		{
+			name: "simple remove",
+
+			status:   &extensions.ReplicaSetStatus{Conditions: []extensions.ReplicaSetCondition{condReplicaFailure()}},
+			condType: extensions.ReplicaSetReplicaFailure,
+
+			expectedStatus: &extensions.ReplicaSetStatus{},
+		},
+		{
+			name: "doesn't remove anything",
+
+			status:   status(),
+			condType: imagePullBackOff,
+
+			expectedStatus: status(),
+		},
+	}
+
+	for _, test := range tests {
+		RemoveCondition(test.status, test.condType)
+		if !reflect.DeepEqual(test.status, test.expectedStatus) {
+			t.Errorf("%s: expected status: %v, got: %v", test.name, test.expectedStatus, test.status)
+		}
+	}
 }
