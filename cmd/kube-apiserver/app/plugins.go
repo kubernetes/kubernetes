@@ -29,6 +29,7 @@ import (
 	_ "k8s.io/kubernetes/plugin/pkg/admission/antiaffinity"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/deny"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/exec"
+	_ "k8s.io/kubernetes/plugin/pkg/admission/gc"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/imagepolicy"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/initialresources"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/limitranger"
