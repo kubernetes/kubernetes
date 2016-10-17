@@ -2562,21 +2562,6 @@ func (gce *GCECloud) GetAutoLabelsForPD(name string, zone string) (map[string]st
 	return labels, nil
 }
 
-// TestDisk checks that a disk has given type. It should be used only for
-// testing!
-func (gce *GCECloud) TestDisk(diskName, volumeType string) error {
-	disk, err := gce.getDiskByNameUnknownZone(diskName)
-	if err != nil {
-		return err
-	}
-
-	if strings.HasSuffix(disk.Type, volumeType) {
-		return nil
-	}
-
-	return fmt.Errorf("unexpected disk type %q, expected suffix %q", disk.Type, volumeType)
-}
-
 func (gce *GCECloud) AttachDisk(diskName string, nodeName types.NodeName, readOnly bool) error {
 	instanceName := mapNodeNameToInstanceName(nodeName)
 	instance, err := gce.getInstanceByName(instanceName)
@@ -2660,7 +2645,6 @@ func (gce *GCECloud) findDiskByName(diskName string, zone string) (*gceDisk, err
 			Zone: lastComponent(disk.Zone),
 			Name: disk.Name,
 			Kind: disk.Kind,
-			Type: disk.Type,
 		}
 		return d, nil
 	}
@@ -2781,7 +2765,6 @@ type gceDisk struct {
 	Zone string
 	Name string
 	Kind string
-	Type string
 }
 
 // Gets the named instances, returning cloudprovider.InstanceNotFound if any instance is not found
