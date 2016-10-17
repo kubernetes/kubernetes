@@ -132,9 +132,6 @@ type GenericAPIServer struct {
 	Handler         http.Handler
 	InsecureHandler http.Handler
 
-	// Used for custom proxy dialing, and proxy TLS options
-	ProxyTransport http.RoundTripper
-
 	// Map storing information about all groups to be exposed in discovery response.
 	// The map is from name to the group.
 	apiGroupsForDiscoveryLock sync.RWMutex

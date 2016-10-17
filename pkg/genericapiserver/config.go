@@ -17,7 +17,6 @@ limitations under the License.
 package genericapiserver
 
 import (
-	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
@@ -36,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apiserver"
 	apiserverfilters "k8s.io/kubernetes/pkg/apiserver/filters"
 	"k8s.io/kubernetes/pkg/apiserver/request"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
@@ -138,10 +136,6 @@ type Config struct {
 
 	// The range of ports to be assigned to services with type=NodePort or greater
 	ServiceNodePortRange utilnet.PortRange
-
-	// Used to customize default proxy dial/tls options
-	ProxyDialer          apiserver.ProxyDialerFunc
-	ProxyTLSClientConfig *tls.Config
 
 	// Additional ports to be exposed on the GenericAPIServer service
 	// extraServicePorts is injectable in the event that more ports
@@ -398,13 +392,6 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 	}
 
 	s.HandlerContainer = mux.NewAPIContainer(http.NewServeMux(), c.Serializer)
-
-	if c.ProxyDialer != nil || c.ProxyTLSClientConfig != nil {
-		s.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{
-			Dial:            c.ProxyDialer,
-			TLSClientConfig: c.ProxyTLSClientConfig,
-		})
-	}
 
 	s.installAPI(c.Config)
 
