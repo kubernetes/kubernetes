@@ -1505,9 +1505,12 @@ func (kl *Kubelet) rejectPod(pod *api.Pod, reason, message string) {
 // can be admitted, a brief single-word reason and a message explaining why
 // the pod cannot be admitted.
 func (kl *Kubelet) canAdmitPod(pods []*api.Pod, pod *api.Pod) (bool, string, string) {
-  if (!podUsesHostNetwork(pod)) {
-    return false, "NetworkNotReady", fmt.Sprintf("Network is not ready: %v", rs)
-  }
+
+	if rs := kl.runtimeState.networkErrors(); len(rs) != 0 {
+		if (!podUsesHostNetwork(pod)) {
+			return false, "NetworkNotReady", fmt.Sprintf("Network is not ready: %v", rs)
+		}
+	}
 
 	// the kubelet will invoke each pod admit handler in sequence
 	// if any handler rejects, the pod is rejected.
