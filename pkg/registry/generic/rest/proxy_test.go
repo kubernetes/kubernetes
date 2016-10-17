@@ -368,40 +368,55 @@ func TestProxyUpgrade(t *testing.T) {
 	}
 
 	for k, tc := range testcases {
+		for _, redirect := range []bool{false, true} {
+			tcName := k
+			backendPath := "/hello"
+			if redirect {
+				tcName += " with redirect"
+				backendPath = "/redirect"
+			}
+			func() { // Cleanup after each test case.
+				backend := http.NewServeMux()
+				backend.Handle("/hello", websocket.Handler(func(ws *websocket.Conn) {
+					defer ws.Close()
+					body := make([]byte, 5)
+					ws.Read(body)
+					ws.Write([]byte("hello " + string(body)))
+				}))
+				backend.Handle("/redirect", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					http.Redirect(w, r, "/hello", http.StatusFound)
+				}))
+				backendServer := tc.ServerFunc(backend)
+				defer backendServer.Close()
 
-		backendServer := tc.ServerFunc(websocket.Handler(func(ws *websocket.Conn) {
-			defer ws.Close()
-			body := make([]byte, 5)
-			ws.Read(body)
-			ws.Write([]byte("hello " + string(body)))
-		}))
-		defer backendServer.Close()
+				serverURL, _ := url.Parse(backendServer.URL)
+				serverURL.Path = backendPath
+				proxyHandler := &UpgradeAwareProxyHandler{
+					Location:  serverURL,
+					Transport: tc.ProxyTransport,
+				}
+				proxy := httptest.NewServer(proxyHandler)
+				defer proxy.Close()
 
-		serverURL, _ := url.Parse(backendServer.URL)
-		proxyHandler := &UpgradeAwareProxyHandler{
-			Location:  serverURL,
-			Transport: tc.ProxyTransport,
-		}
-		proxy := httptest.NewServer(proxyHandler)
-		defer proxy.Close()
+				ws, err := websocket.Dial("ws://"+proxy.Listener.Addr().String()+"/some/path", "", "http://127.0.0.1/")
+				if err != nil {
+					t.Fatalf("%s: websocket dial err: %s", tcName, err)
+				}
+				defer ws.Close()
 
-		ws, err := websocket.Dial("ws://"+proxy.Listener.Addr().String()+"/some/path", "", "http://127.0.0.1/")
-		if err != nil {
-			t.Fatalf("%s: websocket dial err: %s", k, err)
-		}
-		defer ws.Close()
+				if _, err := ws.Write([]byte("world")); err != nil {
+					t.Fatalf("%s: write err: %s", tcName, err)
+				}
 
-		if _, err := ws.Write([]byte("world")); err != nil {
-			t.Fatalf("%s: write err: %s", k, err)
-		}
-
-		response := make([]byte, 20)
-		n, err := ws.Read(response)
-		if err != nil {
-			t.Fatalf("%s: read err: %s", k, err)
-		}
-		if e, a := "hello world", string(response[0:n]); e != a {
-			t.Fatalf("%s: expected '%#v', got '%#v'", k, e, a)
+				response := make([]byte, 20)
+				n, err := ws.Read(response)
+				if err != nil {
+					t.Fatalf("%s: read err: %s", tcName, err)
+				}
+				if e, a := "hello world", string(response[0:n]); e != a {
+					t.Fatalf("%s: expected '%#v', got '%#v'", tcName, e, a)
+				}
+			}()
 		}
 	}
 }
