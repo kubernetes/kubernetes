@@ -111,8 +111,7 @@ func checkElasticsearchReadiness(f *framework.Framework) error {
 
 	By("Checking to make sure we are talking to an Elasticsearch service.")
 	// Perform a few checks to make sure this looks like an Elasticsearch cluster.
-	var statusCode float64
-	var esResponse map[string]interface{}
+	var statusCode int
 	err = nil
 	var body []byte
 	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(10 * time.Second) {
@@ -122,27 +121,14 @@ func checkElasticsearchReadiness(f *framework.Framework) error {
 			continue
 		}
 		// Query against the root URL for Elasticsearch.
-		body, err = proxyRequest.Namespace(api.NamespaceSystem).
+		response := proxyRequest.Namespace(api.NamespaceSystem).
 			Name("elasticsearch-logging").
-			DoRaw()
+			Do()
+		err = response.Error()
+		response.StatusCode(&statusCode)
+
 		if err != nil {
 			framework.Logf("After %v proxy call to elasticsearch-loigging failed: %v", time.Since(start), err)
-			continue
-		}
-		err = json.Unmarshal(body, &esResponse)
-		if err != nil {
-			framework.Logf("After %v failed to convert Elasticsearch JSON response %v to map[string]interface{}: %v", time.Since(start), string(body), err)
-			continue
-		}
-		statusIntf, ok := esResponse["status"]
-		if !ok {
-			framework.Logf("After %v Elasticsearch response has no status field: %v", time.Since(start), esResponse)
-			continue
-		}
-		statusCode, ok = statusIntf.(float64)
-		if !ok {
-			// Assume this is a string returning Failure. Retry.
-			framework.Logf("After %v expected status to be a float64 but got %v of type %T", time.Since(start), statusIntf, statusIntf)
 			continue
 		}
 		if int(statusCode) != 200 {
@@ -151,23 +137,9 @@ func checkElasticsearchReadiness(f *framework.Framework) error {
 		}
 		break
 	}
-
-	if err != nil {
-		return err
-	}
-
+	Expect(err).NotTo(HaveOccurred())
 	if int(statusCode) != 200 {
-		return fmt.Errorf("Elasticsearch cluster has a bad status: %v", statusCode)
-	}
-
-	// Check to see if have a cluster_name field.
-	clusterName, ok := esResponse["cluster_name"]
-	if !ok {
-		return fmt.Errorf("No cluster_name field in Elasticsearch response: %v", esResponse)
-	}
-
-	if clusterName != "kubernetes-logging" {
-		return fmt.Errorf("Connected to wrong cluster %q (expecting kubernetes_logging)", clusterName)
+		framework.Failf("Elasticsearch cluster has a bad status: %v", statusCode)
 	}
 
 	// Now assume we really are talking to an Elasticsearch instance.
@@ -188,8 +160,7 @@ func checkElasticsearchReadiness(f *framework.Framework) error {
 		if err != nil {
 			continue
 		}
-
-		var health map[string]interface{}
+		health := make(map[string]interface{})
 		err := json.Unmarshal(body, &health)
 		if err != nil {
 			framework.Logf("Bad json response from elasticsearch: %v", err)
@@ -210,7 +181,6 @@ func checkElasticsearchReadiness(f *framework.Framework) error {
 			break
 		}
 	}
-
 	if !healthy {
 		return fmt.Errorf("After %v elasticsearch cluster is not healthy", graceTime)
 	}
