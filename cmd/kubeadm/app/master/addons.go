@@ -32,7 +32,7 @@ import (
 )
 
 // TODO(phase1+): kube-proxy should be a daemonset, three different daemonsets should not be here
-func createKubeProxyPodSpec(s *kubeadmapi.MasterConfiguration, architecture string) api.PodSpec {
+func createKubeProxyPodSpec(cfg *kubeadmapi.MasterConfiguration, architecture string) api.PodSpec {
 	envParams := kubeadmapi.GetEnvParams()
 	privilegedTrue := true
 	return api.PodSpec{
@@ -42,8 +42,8 @@ func createKubeProxyPodSpec(s *kubeadmapi.MasterConfiguration, architecture stri
 		},
 		Containers: []api.Container{{
 			Name:            kubeProxy,
-			Image:           images.GetCoreImage(images.KubeProxyImage, s, envParams["hyperkube_image"]),
-			Command:         append(getComponentCommand("proxy", s), "--kubeconfig=/run/kubeconfig"),
+			Image:           images.GetCoreImage(images.KubeProxyImage, cfg, envParams["hyperkube_image"]),
+			Command:         append(getComponentCommand("proxy", cfg), "--kubeconfig=/run/kubeconfig"),
 			SecurityContext: &api.SecurityContext{Privileged: &privilegedTrue},
 			VolumeMounts: []api.VolumeMount{
 				{
@@ -85,7 +85,7 @@ func createKubeProxyPodSpec(s *kubeadmapi.MasterConfiguration, architecture stri
 	}
 }
 
-func createKubeDNSPodSpec(s *kubeadmapi.MasterConfiguration) api.PodSpec {
+func createKubeDNSPodSpec(cfg *kubeadmapi.MasterConfiguration) api.PodSpec {
 
 	dnsPodResources := api.ResourceList{
 		api.ResourceName(api.ResourceCPU):    resource.MustParse("100m"),
@@ -100,7 +100,7 @@ func createKubeDNSPodSpec(s *kubeadmapi.MasterConfiguration) api.PodSpec {
 	kubeDNSPort := int32(10053)
 	dnsmasqPort := int32(53)
 
-	nslookup := fmt.Sprintf("nslookup kubernetes.default.svc.%s 127.0.0.1", s.Networking.DNSDomain)
+	nslookup := fmt.Sprintf("nslookup kubernetes.default.svc.%s 127.0.0.1", cfg.Networking.DNSDomain)
 
 	nslookup = fmt.Sprintf("-cmd=%s:%d >/dev/null && %s:%d >/dev/null",
 		nslookup, dnsmasqPort,
@@ -121,7 +121,7 @@ func createKubeDNSPodSpec(s *kubeadmapi.MasterConfiguration) api.PodSpec {
 					Requests: dnsPodResources,
 				},
 				Args: []string{
-					fmt.Sprintf("--domain=%s", s.Networking.DNSDomain),
+					fmt.Sprintf("--domain=%s", cfg.Networking.DNSDomain),
 					fmt.Sprintf("--dns-port=%d", kubeDNSPort),
 					// TODO __PILLAR__FEDERATIONS__DOMAIN__MAP__
 				},
@@ -214,14 +214,14 @@ func createKubeDNSPodSpec(s *kubeadmapi.MasterConfiguration) api.PodSpec {
 
 }
 
-func createKubeDNSServiceSpec(s *kubeadmapi.MasterConfiguration) (*api.ServiceSpec, error) {
-	_, n, err := net.ParseCIDR(s.Networking.ServiceSubnet)
+func createKubeDNSServiceSpec(cfg *kubeadmapi.MasterConfiguration) (*api.ServiceSpec, error) {
+	_, n, err := net.ParseCIDR(cfg.Networking.ServiceSubnet)
 	if err != nil {
-		return nil, fmt.Errorf("could not parse %q: %v", s.Networking.ServiceSubnet, err)
+		return nil, fmt.Errorf("could not parse %q: %v", cfg.Networking.ServiceSubnet, err)
 	}
 	ip, err := ipallocator.GetIndexedIP(n, 10)
 	if err != nil {
-		return nil, fmt.Errorf("unable to allocate IP address for kube-dns addon from the given CIDR (%q) [%v]", s.Networking.ServiceSubnet, err)
+		return nil, fmt.Errorf("unable to allocate IP address for kube-dns addon from the given CIDR (%q) [%v]", cfg.Networking.ServiceSubnet, err)
 	}
 
 	svc := &api.ServiceSpec{
@@ -236,11 +236,11 @@ func createKubeDNSServiceSpec(s *kubeadmapi.MasterConfiguration) (*api.ServiceSp
 	return svc, nil
 }
 
-func CreateEssentialAddons(s *kubeadmapi.MasterConfiguration, client *clientset.Clientset) error {
+func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset) error {
 	arches := [3]string{"amd64", "arm", "arm64"}
 
 	for _, arch := range arches {
-		kubeProxyDaemonSet := NewDaemonSet(kubeProxy+"-"+arch, createKubeProxyPodSpec(s, arch))
+		kubeProxyDaemonSet := NewDaemonSet(kubeProxy+"-"+arch, createKubeProxyPodSpec(cfg, arch))
 		SetMasterTaintTolerations(&kubeProxyDaemonSet.Spec.Template.ObjectMeta)
 
 		if _, err := client.Extensions().DaemonSets(api.NamespaceSystem).Create(kubeProxyDaemonSet); err != nil {
@@ -250,14 +250,14 @@ func CreateEssentialAddons(s *kubeadmapi.MasterConfiguration, client *clientset.
 
 	fmt.Println("<master/addons> created essential addon: kube-proxy")
 
-	kubeDNSDeployment := NewDeployment("kube-dns", 1, createKubeDNSPodSpec(s))
+	kubeDNSDeployment := NewDeployment("kube-dns", 1, createKubeDNSPodSpec(cfg))
 	SetMasterTaintTolerations(&kubeDNSDeployment.Spec.Template.ObjectMeta)
 
 	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(kubeDNSDeployment); err != nil {
 		return fmt.Errorf("<master/addons> failed creating essential kube-dns addon [%v]", err)
 	}
 
-	kubeDNSServiceSpec, err := createKubeDNSServiceSpec(s)
+	kubeDNSServiceSpec, err := createKubeDNSServiceSpec(cfg)
 	if err != nil {
 		return fmt.Errorf("<master/addons> failed creating essential kube-dns addon - %v", err)
 	}
