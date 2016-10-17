@@ -1134,10 +1134,12 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	firstCond := client.ReplicaSetHasDesiredReplicas(c.Extensions(), first)
-	wait.PollImmediate(10*time.Millisecond, 1*time.Minute, firstCond)
+	err = wait.PollImmediate(10*time.Millisecond, 1*time.Minute, firstCond)
+	Expect(err).NotTo(HaveOccurred())
 
 	secondCond := client.ReplicaSetHasDesiredReplicas(c.Extensions(), second)
-	wait.PollImmediate(10*time.Millisecond, 1*time.Minute, secondCond)
+	err = wait.PollImmediate(10*time.Millisecond, 1*time.Minute, secondCond)
+	Expect(err).NotTo(HaveOccurred())
 
 	By(fmt.Sprintf("Updating the size (up) and template at the same time for deployment %q", deploymentName))
 	newReplicas := int32(20)
@@ -1193,10 +1195,12 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	oldCond := client.ReplicaSetHasDesiredReplicas(c.Extensions(), oldRs)
-	wait.PollImmediate(10*time.Millisecond, 1*time.Minute, oldCond)
+	err = wait.PollImmediate(10*time.Millisecond, 1*time.Minute, oldCond)
+	Expect(err).NotTo(HaveOccurred())
 
 	newCond := client.ReplicaSetHasDesiredReplicas(c.Extensions(), newRs)
-	wait.PollImmediate(10*time.Millisecond, 1*time.Minute, newCond)
+	err = wait.PollImmediate(10*time.Millisecond, 1*time.Minute, newCond)
+	Expect(err).NotTo(HaveOccurred())
 
 	By(fmt.Sprintf("Updating the size (down) and template at the same time for deployment %q", deploymentName))
 	newReplicas = int32(5)
