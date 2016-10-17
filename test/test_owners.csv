@@ -335,8 +335,10 @@ Reboot each node by triggering kernel panic and ensure they function upon restar
 Redis should create and stop redis servers,timstclair,1
 ReplicaSet should serve a basic image on each replica with a private image,pmorie,1
 ReplicaSet should serve a basic image on each replica with a public image,krousey,0
+ReplicaSet should surface a failure condition on a common issue like exceeded quota,kargakis,0
 ReplicationController should serve a basic image on each replica with a private image,jbeda,1
 ReplicationController should serve a basic image on each replica with a public image,krousey,1
+ReplicationController should surface a failure condition on a common issue like exceeded quota,kargakis,0
 Rescheduler should ensure that critical pod is scheduled in case there is no resources available,mtaufen,1
 Resource-usage regular resource usage tracking resource tracking for * pods per node,janetkuo,1
 ResourceQuota should create a ResourceQuota and capture the life of a configMap.,timstclair,1

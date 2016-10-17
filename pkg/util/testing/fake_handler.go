@@ -88,6 +88,9 @@ func (f *FakeHandler) ServeHTTP(response http.ResponseWriter, request *http.Requ
 		f.T.Logf("Received read error: %v", err)
 	}
 	f.RequestBody = string(bodyReceived)
+	if f.T != nil {
+		f.T.Logf("request body: %s", f.RequestBody)
+	}
 }
 
 func (f *FakeHandler) ValidateRequestCount(t TestInterface, count int) bool {
