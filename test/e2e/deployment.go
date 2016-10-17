@@ -99,33 +99,6 @@ var _ = framework.KubeDescribe("Deployment", func() {
 	// See https://github.com/kubernetes/kubernetes/issues/29229
 })
 
-func newRS(rsName string, replicas int32, rsPodLabels map[string]string, imageName string, image string) *extensions.ReplicaSet {
-	zero := int64(0)
-	return &extensions.ReplicaSet{
-		ObjectMeta: api.ObjectMeta{
-			Name: rsName,
-		},
-		Spec: extensions.ReplicaSetSpec{
-			Replicas: replicas,
-			Selector: &unversioned.LabelSelector{MatchLabels: rsPodLabels},
-			Template: api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
-					Labels: rsPodLabels,
-				},
-				Spec: api.PodSpec{
-					TerminationGracePeriodSeconds: &zero,
-					Containers: []api.Container{
-						{
-							Name:  imageName,
-							Image: image,
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
 func newDeployment(deploymentName string, replicas int32, podLabels map[string]string, imageName string, image string, strategyType extensions.DeploymentStrategyType, revisionHistoryLimit *int32) *extensions.Deployment {
 	zero := int64(0)
 	return &extensions.Deployment{

@@ -3200,6 +3200,29 @@ func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, 
 	return deployment, err
 }
 
+type updateRsFunc func(d *extensions.ReplicaSet)
+
+func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateRsFunc) (*extensions.ReplicaSet, error) {
+	var rs *extensions.ReplicaSet
+	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
+		var err error
+		if rs, err = c.Extensions().ReplicaSets(namespace).Get(name); err != nil {
+			return false, err
+		}
+		// Apply the update, then attempt to push it to the apiserver.
+		applyUpdate(rs)
+		if rs, err = c.Extensions().ReplicaSets(namespace).Update(rs); err == nil {
+			Logf("Updating replica set %q", name)
+			return true, nil
+		}
+		return false, nil
+	})
+	if pollErr == wait.ErrWaitTimeout {
+		pollErr = fmt.Errorf("couldn't apply the provided updated to replicaset %q", name)
+	}
+	return rs, pollErr
+}
+
 // NodeAddresses returns the first address of the given type of each node.
 func NodeAddresses(nodelist *api.NodeList, addrType api.NodeAddressType) []string {
 	hosts := []string{}
