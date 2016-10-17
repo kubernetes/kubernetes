@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/exec"
 
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/pkg/util/initsystem"
 )
 
@@ -156,15 +157,16 @@ func (ipc InPathCheck) Check() (warnings, errors []error) {
 	return nil, nil
 }
 
-func RunInitMasterChecks() error {
+func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 	// TODO: Some of these ports should come from kubeadm config eventually:
 	checks := []PreFlightCheck{
 		IsRootCheck{root: true},
 		ServiceCheck{Service: "kubelet"},
 		ServiceCheck{Service: "docker"},
-		PortOpenCheck{port: 443},
+		PortOpenCheck{port: int(cfg.API.BindPort)},
 		PortOpenCheck{port: 2379},
 		PortOpenCheck{port: 8080},
+		PortOpenCheck{port: int(cfg.Discovery.BindPort)},
 		PortOpenCheck{port: 10250},
 		PortOpenCheck{port: 10251},
 		PortOpenCheck{port: 10252},
