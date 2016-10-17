@@ -2249,6 +2249,13 @@ __EOF__
   kubectl get rs nginx-618515232 -o yaml | grep "deployment.kubernetes.io/revision-history: 1,3"
   # Check that trying to watch the status of a superseded revision returns an error
   ! kubectl rollout status deployment/nginx --revision=3
+  cat hack/testdata/deployment-revision1.yaml | $SED "s/name: nginx$/name: nginx2/" | kubectl create -f - "${kube_flags[@]}"
+  # Newest deployment should be marked as overlapping
+  kubectl get deployment nginx2 -o yaml "${kube_flags[@]}" | grep "deployment.kubernetes.io/error-selector-overlapping-with"
+  # Oldest deployment should not be marked as overlapping
+  ! kubectl get deployment nginx -o yaml "${kube_flags[@]}" | grep "deployment.kubernetes.io/error-selector-overlapping-with"
+  # Deletion of both deployments should not be blocked
+   kubectl delete deployment nginx2 "${kube_flags[@]}"
   # Clean up
   kubectl delete deployment nginx "${kube_flags[@]}"
 
