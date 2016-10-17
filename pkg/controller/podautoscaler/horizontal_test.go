@@ -382,8 +382,17 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 
 		obj := action.(core.CreateAction).GetObject().(*api.Event)
 		if tc.verifyEvents {
-			assert.Equal(t, "SuccessfulRescale", obj.Reason)
-			assert.Equal(t, fmt.Sprintf("New size: %d; reason: CPU utilization above target", tc.desiredReplicas), obj.Message)
+			switch obj.Reason {
+			case "SuccessfulRescale":
+				assert.Equal(t, fmt.Sprintf("New size: %d; reason: CPU utilization above target", tc.desiredReplicas), obj.Message)
+			case "DesiredReplicasComputed":
+				assert.Equal(t, fmt.Sprintf(
+					"Computed the desired num of replicas: %d, on a base of %d report(s) (avgCPUutil: %d, current replicas: %d)",
+					tc.desiredReplicas, len(tc.reportedLevels),
+					(int64(tc.reportedLevels[0])*100)/tc.reportedCPURequests[0].MilliValue(), tc.initialReplicas), obj.Message)
+			default:
+				assert.False(t, true, fmt.Sprintf("Unexpected event: %s / %s", obj.Reason, obj.Message))
+			}
 		}
 		tc.eventCreated = true
 		return true, obj, nil
@@ -796,6 +805,34 @@ func TestEventNotCreated(t *testing.T) {
 		reportedLevels:      []uint64{200, 200},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("0.4"), resource.MustParse("0.4")},
 		verifyEvents:        true,
+		useMetricsApi:       true,
+	}
+	tc.runTest(t)
+}
+
+func TestMissingReports(t *testing.T) {
+	tc := testCase{
+		minReplicas:         1,
+		maxReplicas:         5,
+		initialReplicas:     4,
+		desiredReplicas:     2,
+		CPUTarget:           50,
+		reportedLevels:      []uint64{200},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("0.2")},
+		useMetricsApi:       true,
+	}
+	tc.runTest(t)
+}
+
+func TestUpscaleCap(t *testing.T) {
+	tc := testCase{
+		minReplicas:         1,
+		maxReplicas:         100,
+		initialReplicas:     3,
+		desiredReplicas:     6,
+		CPUTarget:           10,
+		reportedLevels:      []uint64{100, 200, 300},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
 		useMetricsApi:       true,
 	}
 	tc.runTest(t)
