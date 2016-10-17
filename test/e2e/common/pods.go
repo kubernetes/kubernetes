@@ -27,6 +27,7 @@ import (
 	"golang.org/x/net/websocket"
 
 	"k8s.io/kubernetes/pkg/api"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -165,42 +166,25 @@ var _ = framework.KubeDescribe("Pods", func() {
 			},
 		}
 
-		By("setting up watch")
-		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
-		options := api.ListOptions{LabelSelector: selector}
-		pods, err := podClient.List(options)
-		Expect(err).NotTo(HaveOccurred(), "failed to query for pods")
-		Expect(len(pods.Items)).To(Equal(0))
-		options = api.ListOptions{
-			LabelSelector:   selector,
-			ResourceVersion: pods.ListMeta.ResourceVersion,
-		}
-		w, err := podClient.Watch(options)
-		Expect(err).NotTo(HaveOccurred(), "failed to set up watch")
-
 		By("submitting the pod to kubernetes")
 		// We call defer here in case there is a problem with
 		// the test so we can ensure that we clean up after
 		// ourselves
 		defer podClient.Delete(pod.Name, api.NewDeleteOptions(0))
-		podClient.Create(pod)
+		startedPod := podClient.Create(pod)
 
 		By("verifying the pod is in kubernetes")
-		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
-		options = api.ListOptions{LabelSelector: selector}
-		pods, err = podClient.List(options)
+		w, err := podClient.Watch(api.SingleObject(startedPod.ObjectMeta))
+		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
+		wr := watch.NewRecorder(w)
+		_, err = watch.Until(framework.PodStartTimeout, wr, client.PodRunning)
+		Expect(err).To(BeNil())
+
+		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
+		options := api.ListOptions{LabelSelector: selector}
+		pods, err := podClient.List(options)
 		Expect(err).NotTo(HaveOccurred(), "failed to query for pods")
 		Expect(len(pods.Items)).To(Equal(1))
-
-		By("verifying pod creation was observed")
-		select {
-		case event, _ := <-w.ResultChan():
-			if event.Type != watch.Added {
-				framework.Failf("Failed to observe pod creation: %v", event)
-			}
-		case <-time.After(framework.PodStartTimeout):
-			Fail("Timeout while waiting for pod creation")
-		}
 
 		// We need to wait for the pod to be running, otherwise the deletion
 		// may be carried out immediately rather than gracefully.
