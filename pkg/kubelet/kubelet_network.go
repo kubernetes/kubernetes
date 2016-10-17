@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net"
 	"strings"
 
 	"github.com/golang/glog"
