@@ -204,6 +204,45 @@ func (s *StoreToReplicationControllerLister) GetPodControllers(pod *api.Pod) (co
 	return
 }
 
+// StoreToServiceAccountLister helps list service accounts
+type StoreToServiceAccountLister struct {
+	Indexer Indexer
+}
+
+func (s *StoreToServiceAccountLister) List(selector labels.Selector) (ret []*api.ServiceAccount, err error) {
+	err = ListAll(s.Indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*api.ServiceAccount))
+	})
+	return ret, err
+}
+
+func (s *StoreToServiceAccountLister) ServiceAccounts(namespace string) storeServiceAccountsNamespacer {
+	return storeServiceAccountsNamespacer{s.Indexer, namespace}
+}
+
+type storeServiceAccountsNamespacer struct {
+	indexer   Indexer
+	namespace string
+}
+
+func (s storeServiceAccountsNamespacer) List(selector labels.Selector) (ret []*api.ServiceAccount, err error) {
+	err = ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*api.ServiceAccount))
+	})
+	return ret, err
+}
+
+func (s storeServiceAccountsNamespacer) Get(name string) (*api.ServiceAccount, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(api.Resource("serviceaccount"), name)
+	}
+	return obj.(*api.ServiceAccount), nil
+}
+
 // StoreToLimitRangeLister helps list limit ranges
 type StoreToLimitRangeLister struct {
 	Indexer Indexer
