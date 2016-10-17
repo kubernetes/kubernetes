@@ -22,6 +22,7 @@ package app
 import (
 	"crypto/tls"
 	"net"
+	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -55,6 +56,7 @@ import (
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/serviceaccount"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	authenticatorunion "k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
@@ -288,7 +290,12 @@ func Run(s *options.APIServer) error {
 		glog.Fatalf("Failed to initialize plugins: %v", err)
 	}
 
+	proxyTransport := utilnet.SetTransportDefaults(&http.Transport{
+		Dial:            proxyDialerFn,
+		TLSClientConfig: proxyTLSClientConfig,
+	})
 	kubeVersion := version.Get()
+
 	genericConfig.Version = &kubeVersion
 	genericConfig.LoopbackClientConfig = selfClientConfig
 	genericConfig.Authenticator = apiAuthenticator
@@ -298,8 +305,6 @@ func Run(s *options.APIServer) error {
 	genericConfig.AdmissionControl = admissionController
 	genericConfig.APIResourceConfigSource = storageFactory.APIResourceConfigSource
 	genericConfig.MasterServiceNamespace = s.MasterServiceNamespace
-	genericConfig.ProxyDialer = proxyDialerFn
-	genericConfig.ProxyTLSClientConfig = proxyTLSClientConfig
 	genericConfig.OpenAPIConfig.Info.Title = "Kubernetes"
 	genericConfig.OpenAPIConfig.Definitions = generatedopenapi.OpenAPIDefinitions
 	genericConfig.OpenAPIConfig.GetOperationID = openapi.GetOperationID
@@ -316,6 +321,7 @@ func Run(s *options.APIServer) error {
 		KubeletClientConfig:     s.KubeletConfig,
 		EnableUISupport:         true,
 		EnableLogsSupport:       true,
+		ProxyTransport:          proxyTransport,
 
 		Tunneler: tunneler,
 	}
