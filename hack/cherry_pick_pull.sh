@@ -29,6 +29,8 @@ cd "${KUBE_ROOT}"
 declare -r STARTINGBRANCH=$(git symbolic-ref --short HEAD)
 declare -r REBASEMAGIC="${KUBE_ROOT}/.git/rebase-apply"
 DRY_RUN=${DRY_RUN:-""}
+UPSTREAM_REMOTE=${UPSTREAM_REMOTE:-upstream}
+FORK_REMOTE=${FORK_REMOTE:-origin}
 
 if [[ -z ${GITHUB_USER:-} ]]; then
   echo "Please export GITHUB_USER=<your-user> (or GH organization, if that's where your fork lives)"
@@ -51,6 +53,9 @@ if [[ "$#" -lt 2 ]]; then
   echo "  Set the DRY_RUN environment var to skip git push and creating PR."
   echo "  This is useful for creating patches to a release branch without making a PR."
   echo "  When DRY_RUN is set the script will leave you in a branch containing the commits you cherry-picked."
+  echo
+  echo " Set UPSTREAM_REMOTE (default: upstream) and FORK_REMOTE (default: origin)"
+  echo " To override the default remote names to what you have locally."
   exit 2
 fi
 
@@ -73,10 +78,10 @@ declare -r PULLDASH=$(join - "${PULLS[@]/#/#}") # Generates something like "#123
 declare -r PULLSUBJ=$(join " " "${PULLS[@]/#/#}") # Generates something like "#12345 #56789"
 
 echo "+++ Updating remotes..."
-git remote update upstream origin
+git remote update "${UPSTREAM_REMOTE}" "${FORK_REMOTE}"
 
 if ! git log -n1 --format=%H "${BRANCH}" >/dev/null 2>&1; then
-  echo "!!! '${BRANCH}' not found. The second argument should be something like upstream/release-0.21."
+  echo "!!! '${BRANCH}' not found. The second argument should be something like ${UPSTREAM_REMOTE}/release-0.21."
   echo "    (In particular, it needs to be a valid, existing remote branch that I can 'git checkout'.)"
   exit 1
 fi
@@ -186,7 +191,7 @@ if [[ -n "${DRY_RUN}" ]]; then
   exit 0
 fi
 
-if git remote -v | grep ^origin | grep kubernetes/kubernetes.git; then
+if git remote -v | grep ^${FORK_REMOTE} | grep kubernetes/kubernetes.git; then
   echo "!!! You have 'origin' configured as your kubernetes/kubernetes.git"
   echo "This isn't normal. Leaving you with push instructions:"
   echo
@@ -195,6 +200,7 @@ if git remote -v | grep ^origin | grep kubernetes/kubernetes.git; then
   echo "  git push REMOTE ${NEWBRANCHUNIQ}:${NEWBRANCH}"
   echo
   echo "where REMOTE is your personal fork (maybe 'upstream'? Consider swapping those.)."
+  echo "OR consider setting UPSTREAM_REMOTE and FORK_REMOTE to different values."
   echo
   make-a-pr
   cleanbranch=""
@@ -204,7 +210,7 @@ fi
 echo
 echo "+++ I'm about to do the following to push to GitHub (and I'm assuming origin is your personal fork):"
 echo
-echo "  git push origin ${NEWBRANCHUNIQ}:${NEWBRANCH}"
+echo "  git push ${FORK_REMOTE} ${NEWBRANCHUNIQ}:${NEWBRANCH}"
 echo
 read -p "+++ Proceed (anything but 'y' aborts the cherry-pick)? [y/n] " -r
 if ! [[ "${REPLY}" =~ ^[yY]$ ]]; then
@@ -212,5 +218,5 @@ if ! [[ "${REPLY}" =~ ^[yY]$ ]]; then
   exit 1
 fi
 
-git push origin -f "${NEWBRANCHUNIQ}:${NEWBRANCH}"
+git push "${FORK_REMOTE}" -f "${NEWBRANCHUNIQ}:${NEWBRANCH}"
 make-a-pr
