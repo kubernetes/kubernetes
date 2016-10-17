@@ -210,8 +210,6 @@ make test_e2e_node TEST_ARGS="--disable-kubenet=false" # disable kubenet
 
 For testing with the QoS Cgroup Hierarchy enabled, you can pass --cgroups-per-qos flag as an argument into Ginkgo using TEST_ARGS
 
-*Note: Disabled pending feature stabilization.*
-
 ```sh
 make test_e2e_node TEST_ARGS="--cgroups-per-qos=true"
 ```

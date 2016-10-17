@@ -106,6 +106,8 @@ type NodeTestContextType struct {
 	DisableKubenet bool
 	// Whether to enable the QoS Cgroup Hierarchy or not
 	CgroupsPerQOS bool
+	// How the kubelet should interface with the cgroup hierarchy (cgroupfs or systemd)
+	CgroupDriver string
 	// The hard eviction thresholds
 	EvictionHard string
 	// ManifestPath is the static pod manifest path.
@@ -210,9 +212,9 @@ func RegisterNodeFlags() {
 	// TODO(random-liu): Remove kubelet related flags when we move the kubelet start logic out of the test.
 	// TODO(random-liu): Find someway to get kubelet configuration, and automatic config and filter test based on the configuration.
 	flag.BoolVar(&TestContext.DisableKubenet, "disable-kubenet", false, "If true, start kubelet without kubenet. (default false)")
-	// TODO: uncomment this when the flag is re-enabled in kubelet
-	//flag.BoolVar(&TestContext.CgroupsPerQOS, "cgroups-per-qos", false, "Enable creation of QoS cgroup hierarchy, if true top level QoS and pod cgroups are created.")
 	flag.StringVar(&TestContext.EvictionHard, "eviction-hard", "memory.available<250Mi,nodefs.available<10%,nodefs.inodesFree<5%", "The hard eviction thresholds. If set, pods get evicted when the specified resources drop below the thresholds.")
+	flag.BoolVar(&TestContext.CgroupsPerQOS, "cgroups-per-qos", false, "Enable creation of QoS cgroup hierarchy, if true top level QoS and pod cgroups are created.")
+	flag.StringVar(&TestContext.CgroupDriver, "cgroup-driver", "", "Driver that the kubelet uses to manipulate cgroups on the host.  Possible values: 'cgroupfs', 'systemd'")
 	flag.StringVar(&TestContext.ManifestPath, "manifest-path", "", "The path to the static pod manifest file.")
 	flag.BoolVar(&TestContext.PrepullImages, "prepull-images", true, "If true, prepull images so image pull failures do not cause test failures.")
 	flag.StringVar(&TestContext.RuntimeIntegrationType, "runtime-integration-type", "", "Choose the integration path for the container runtime, mainly used for CRI validation.")
