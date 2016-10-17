@@ -261,7 +261,7 @@ func Run(s *options.APIServer) error {
 		glog.Errorf("Failed to create clientset: %v", err)
 	}
 	sharedInformers := informers.NewSharedInformerFactory(client, 10*time.Minute)
-	pluginInitializer := admission.NewPluginInitializer(sharedInformers)
+	pluginInitializer := admission.NewPluginInitializer(sharedInformers, authorizer)
 
 	admissionController, err := admission.NewFromPlugins(client, admissionControlPluginNames, s.AdmissionControlConfigFile, pluginInitializer)
 	if err != nil {
