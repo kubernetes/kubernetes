@@ -71,21 +71,35 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 function usage {
             echo "This script starts a local kube cluster. "
             echo "Example 1: hack/local-up-cluster.sh -o _output/dockerized/bin/linux/amd64/ (run from docker output)"
-            echo "Example 2: hack/local-up-cluster.sh (build a local copy of the source)"
+            echo "Example 2: hack/local-up-cluster.sh -O (auto-guess the bin path for your platform)"
+            echo "Example 3: hack/local-up-cluster.sh (build a local copy of the source)"
+}
+
+# This function guesses where the existing cached binary build is for the `-O`
+# flag
+function guess_built_binary_path {
+  local hyperkube_path=$(kube::util::find-binary "hyperkube")
+  if [[ -z "${hyperkube_path}" ]]; then
+    return
+  fi
+  echo -n "$(dirname "${hyperkube_path}")"
 }
 
 ### Allow user to supply the source directory.
 GO_OUT=""
-while getopts "o:" OPTION
+while getopts "o:O" OPTION
 do
     case $OPTION in
         o)
             echo "skipping build"
-            echo "using source $OPTARG"
             GO_OUT="$OPTARG"
+            echo "using source $GO_OUT"
+            ;;
+        O)
+            GO_OUT=$(guess_built_binary_path)
             if [ $GO_OUT == "" ]; then
-                echo "You provided an invalid value for the build output directory."
-                exit
+                echo "Could not guess the correct output directory to use."
+                exit 1
             fi
             ;;
         ?)
