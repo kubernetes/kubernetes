@@ -47,8 +47,7 @@ func TestRemoveContainer(t *testing.T) {
 	}
 
 	// Create fake sandbox and container
-	_, fakeContainers, err := makeAndSetFakePod(m, fakeRuntime, pod)
-	assert.NoError(t, err)
+	_, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
 	assert.Equal(t, len(fakeContainers), 1)
 
 	containerId := fakeContainers[0].GetId()
