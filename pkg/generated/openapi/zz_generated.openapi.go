@@ -2568,6 +2568,13 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "",
 						},
 					},
+					"mounterPath": {
+						SchemaProps: spec.SchemaProps{
+							Description: "mounterPath is the path of mounter binary. Leave empty to use the default mount path",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"rktAPIEndpoint": {
 						SchemaProps: spec.SchemaProps{
 							Description: "rktApiEndpoint is the endpoint of the rkt API service to communicate with.",
@@ -14170,6 +14177,13 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					"rktPath": {
 						SchemaProps: spec.SchemaProps{
 							Description: "rktPath is the  path of rkt binary. Leave empty to use the first rkt in $PATH.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"mounterPath": {
+						SchemaProps: spec.SchemaProps{
+							Description: "mounterPath is the path of mounter binary. If not set, kubelet will user default mount, otherwise, set to the given mounter path.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
