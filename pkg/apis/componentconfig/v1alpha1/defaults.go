@@ -371,6 +371,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.CgroupDriver == "" {
 		obj.CgroupDriver = "cgroupfs"
 	}
+	if obj.CgroupRoot == "" {
+		obj.CgroupRoot = "/"
+	}
 	if obj.CgroupsPerQOS == nil {
 		temp := false
 		obj.CgroupsPerQOS = &temp
