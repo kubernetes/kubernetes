@@ -38,6 +38,7 @@ type SharedInformerFactory interface {
 	PersistentVolumes() PVInformer
 
 	DaemonSets() DaemonSetInformer
+	ServiceAccounts() ServiceAccountInformer
 }
 
 type sharedInformerFactory struct {
@@ -101,4 +102,9 @@ func (f *sharedInformerFactory) PersistentVolumes() PVInformer {
 
 func (f *sharedInformerFactory) DaemonSets() DaemonSetInformer {
 	return &daemonSetInformer{sharedInformerFactory: f}
+}
+
+// ServiceAccounts returns a SharedIndexInformer that lists and watches all service accounts.
+func (f *sharedInformerFactory) ServiceAccounts() ServiceAccountInformer {
+	return &serviceAccountInformer{sharedInformerFactory: f}
 }
