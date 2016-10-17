@@ -117,14 +117,6 @@
 {% endif -%}
 
 {% set pod_cidr = "" %}
-{% if grains['roles'][0] == 'kubernetes-master' %}
-  {% if grains.get('cbr-cidr') %}
-    {% set pod_cidr = "--pod-cidr=" + grains['cbr-cidr'] %}
-  {% elif api_servers_with_port == '' and pillar.get('network_provider', '').lower() == 'kubenet' %}
-    # Kubelet standalone mode needs a PodCIDR since there is no controller-manager
-    {% set pod_cidr = "--pod-cidr=10.76.0.0/16" %}
-  {% endif -%}
-{% endif %}
 
 {% set cpu_cfs_quota = "" %}
 {% if pillar['enable_cpu_cfs_quota'] is defined -%}
