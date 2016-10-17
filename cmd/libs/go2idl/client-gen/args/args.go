@@ -39,6 +39,8 @@ type Args struct {
 	// ClientsetOutputPath is the path the clientset will be generated at. It's
 	// populated from command-line arguments.
 	ClientsetOutputPath string
+	// ClientsetAPIPath is the default API path for generated clients.
+	ClientsetAPIPath string
 	// ClientsetOnly determines if we should generate the clients for groups and
 	// types along with the clientset. It's populated from command-line
 	// arguments.
