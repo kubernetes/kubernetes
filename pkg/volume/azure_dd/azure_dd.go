@@ -59,6 +59,10 @@ type azureCloudProvider interface {
 	GetNextDiskLun(nodeName types.NodeName) (int32, error)
 	// InstanceID returns the cloud provider ID of the specified instance.
 	InstanceID(nodeName types.NodeName) (string, error)
+	// Create a VHD blob
+	CreateVolume(name, storageAccount, storageType, location string, requestGB int) (string, string, int, error)
+	// Delete a VHD blob
+	DeleteVolume(name, uri string) error
 }
 
 var _ volume.VolumePlugin = &azureDataDiskPlugin{}

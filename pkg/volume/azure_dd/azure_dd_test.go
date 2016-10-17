@@ -91,6 +91,14 @@ func (fake *fakeAzureProvider) InstanceID(name string) (string, error) {
 	return "localhost", nil
 }
 
+func (fake *fakeAzureProvider) CreateVolume(name, storageAccount, storageType, location string, requestGB int) (string, string, int, error) {
+	return "", "", 0, fmt.Errorf("not implemented")
+}
+
+func (fake *fakeAzureProvider) DeleteVolume(name, uri string) error {
+	return fmt.Errorf("not implemented")
+}
+
 func TestPlugin(t *testing.T) {
 	tmpDir, err := utiltesting.MkTmpdir("azure_ddTest")
 	if err != nil {
