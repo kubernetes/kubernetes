@@ -55,6 +55,7 @@ import (
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/version"
 )
 
 const (
@@ -77,11 +78,12 @@ type Config struct {
 	// allow downstream consumers to disable the index route
 	EnableIndex             bool
 	EnableProfiling         bool
-	EnableVersion           bool
 	EnableGarbageCollection bool
-	APIGroupPrefix          string
-	CorsAllowedOriginList   []string
-	Authenticator           authenticator.Request
+
+	Version               *version.Info
+	APIGroupPrefix        string
+	CorsAllowedOriginList []string
+	Authenticator         authenticator.Request
 	// TODO(roberthbailey): Remove once the server no longer supports http basic auth.
 	SupportsBasicAuth      bool
 	Authorizer             authorizer.Authorizer
@@ -213,7 +215,6 @@ func NewConfig() *Config {
 
 		EnableIndex:          true,
 		EnableSwaggerSupport: true,
-		EnableVersion:        true,
 		OpenAPIConfig: &common.Config{
 			ProtocolList:   []string{"https"},
 			IgnorePrefixes: []string{"/swaggerapi"},
@@ -471,9 +472,7 @@ func (s *GenericAPIServer) installAPI(c *Config) {
 	if c.EnableProfiling {
 		routes.Profiling{}.Install(s.HandlerContainer)
 	}
-	if c.EnableVersion {
-		routes.Version{}.Install(s.HandlerContainer)
-	}
+	routes.Version{Version: c.Version}.Install(s.HandlerContainer)
 	s.HandlerContainer.Add(s.DynamicApisDiscovery())
 }
 

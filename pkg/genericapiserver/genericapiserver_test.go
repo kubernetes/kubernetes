@@ -42,6 +42,7 @@ import (
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -230,7 +231,9 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 	config.EnableIndex = true
 	config.EnableProfiling = true
 	config.EnableSwaggerSupport = true
-	config.EnableVersion = true
+
+	kubeVersion := version.Get()
+	config.Version = &kubeVersion
 
 	s, err := config.SkipComplete().New()
 	if err != nil {
