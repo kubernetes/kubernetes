@@ -103,8 +103,24 @@ func (runner *runner) DeletePortProxyRule(args []string) error {
 	return fmt.Errorf("error deleting portproxy rule: %v: %s", err, out)
 }
 
-// EnsureIPAddress checks if the specified IP Address is added to vEthernet (HNSTransparent) interface, if not, add it.  If the address existed, return true.
+// EnsureIPAddress checks if the specified IP Address is added to interface identified by Environment variable INTERFACE_TO_ADD_SERVICE_IP, if not, add it.  If the address existed, return true.
 func (runner *runner) EnsureIPAddress(args []string, ip net.IP) (bool, error) {
+	// Check if the ip address exists
+	intName := runner.GetInterfaceToAddIP()
+	argsShowAddress := []string{
+		"interface", "ipv4", "show", "address",
+		"name=" + intName,
+	}
+
+	ipToCheck := ip.String()
+
+	exists, _ := checkIPExists(ipToCheck, argsShowAddress, runner)
+	if exists == true {
+		glog.V(4).Infof("not adding IP address %q as it already exists", ipToCheck)
+		return true, nil
+	}
+
+	// IP Address is not already added, add it now
 	glog.V(4).Infof("running netsh interface ipv4 add address %v", args)
 	out, err := runner.exec.Command(cmdNetsh, args...).CombinedOutput()
 
@@ -113,21 +129,9 @@ func (runner *runner) EnsureIPAddress(args []string, ip net.IP) (bool, error) {
 		// Query all the IP addresses and see if the one we added is present
 		// PS: We are using netsh interface ipv4 show address here to query all the IP addresses, instead of
 		// querying net.InterfaceAddrs() as it returns the IP address as soon as it is added even though it is uninitialized
-		ipToWait := ip.String()
-		glog.V(3).Infof("Waiting until IP: %v is added to the network adapter", ipToWait)
-		intName := runner.GetInterfaceToAddIP()
-		args := []string{
-			"interface", "ipv4", "show", "address",
-			"name=" + intName,
-		}
+		glog.V(3).Infof("Waiting until IP: %v is added to the network adapter", ipToCheck)
 		for {
-			ipAddress, err := runner.exec.Command(cmdNetsh, args...).CombinedOutput()
-			if err != nil {
-				return false, nil
-			}
-			ipAddressString := string(ipAddress[:])
-			glog.V(3).Infof("Searching for IP: %v in IP dump: %v", ipToWait, ipAddressString)
-			if strings.Contains(ipAddressString, ipToWait) {
+			if exists, _ := checkIPExists(ipToCheck, argsShowAddress, runner); exists {
 				return true, nil
 			}
 			time.Sleep(500 * time.Millisecond)
@@ -163,15 +167,37 @@ func (runner *runner) DeleteIPAddress(args []string) error {
 
 // GetInterfaceToAddIP returns the interface name where Service IP needs to be added
 // IP Address needs to be added for netsh portproxy to redirect traffic
-// Reads Environment variable INTERFACE_TO_ADD_SERVICE_IP, if it is not defined then "vEthernet (HNSTransparent)" is returned
+// Reads Environment variable INTERFACE_TO_ADD_SERVICE_IP, if it is not defined then "vEthernet (HNS Internal NIC)" is returned
 func (runner *runner) GetInterfaceToAddIP() string {
 	if iface := os.Getenv("INTERFACE_TO_ADD_SERVICE_IP"); len(iface) > 0 {
 		return iface
 	}
-	return "vEthernet (HNSTransparent)"
+	return "vEthernet (HNS Internal NIC)"
 }
 
 // Restore is part of Interface.
 func (runner *runner) Restore(args []string) error {
 	return nil
+}
+
+// FIXME 10.0.0.1 returns true for 10.0.0.10. One solution is to add a space at the end and compare
+func checkIPExists(ipToCheck string, args []string, runner *runner) (bool, error) {
+	ipAddress, err := runner.exec.Command(cmdNetsh, args...).CombinedOutput()
+	if err != nil {
+		return false, err
+	}
+	ipAddressString := string(ipAddress[:])
+	glog.V(3).Infof("Searching for IP: %v in IP dump: %v", ipToCheck, ipAddressString)
+	showAddressArray := strings.Split(ipAddressString, "\n")
+	for _, showAddress := range showAddressArray {
+		if strings.Contains(showAddress, "IP Address:") {
+			ipFromNetsh := strings.TrimLeft(showAddress, "IP Address:")
+			ipFromNetsh = strings.TrimSpace(ipFromNetsh)
+			if ipFromNetsh == ipToCheck {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
 }

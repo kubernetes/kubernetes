@@ -27,15 +27,20 @@ import (
 )
 
 func (proxier *Proxier) openOnePortal(portal portal, protocol api.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) error {
-	if local, err := isLocalIP(portal.ip); err != nil {
-		return fmt.Errorf("can't determine if IP is local, assuming not: %v", err)
-	} else if local {
-		err := proxier.claimNodePort(portal.ip, portal.port, protocol, name)
-		if err != nil {
-			return err
-		}
+	if protocol == api.ProtocolUDP {
+		glog.Warningf("Not adding rule for %q on %s:%d as UDP protocol is not supported by netsh portproxy", name, portal.ip, portal.port)
+		return nil
 	}
 
+	/*	if local, err := isLocalIP(portal.ip); err != nil {
+			return fmt.Errorf("can't determine if IP is local, assuming not: %v", err)
+		} else if local {
+			err := proxier.claimNodePort(portal.ip, portal.port, protocol, name)
+			if err != nil {
+				return err
+			}
+		}
+	*/
 	// Add IP address to "vEthernet (HNSTransparent)" so that portproxy could be used to redirect the traffic
 	args := proxier.netshIpv4AddressAddArgs(portal.ip)
 	existed, err := proxier.netsh.EnsureIPAddress(args, portal.ip)
@@ -63,6 +68,11 @@ func (proxier *Proxier) openOnePortal(portal portal, protocol api.Protocol, prox
 }
 
 func (proxier *Proxier) openNodePort(nodePort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) error {
+	if protocol == api.ProtocolUDP {
+		glog.Warningf("Not adding node port rule for %q on port %d as UDP protocol is not supported by netsh portproxy", name, nodePort)
+		return nil
+	}
+
 	err := proxier.claimNodePort(nil, nodePort, protocol, name)
 	if err != nil {
 		return err
@@ -126,7 +136,7 @@ func (proxier *Proxier) closeNodePort(nodePort int, protocol api.Protocol, proxy
 
 func (proxier *Proxier) netshPortProxyAddArgs(destIP net.IP, destPort int, proxyIP net.IP, proxyPort int, service proxy.ServicePortName) []string {
 	args := []string{
-		"interface", "portproxy", "add", "v4tov4",
+		"interface", "portproxy", "set", "v4tov4",
 		"listenPort=" + strconv.Itoa(destPort),
 		"connectaddress=" + proxyIP.String(),
 		"connectPort=" + strconv.Itoa(proxyPort),
