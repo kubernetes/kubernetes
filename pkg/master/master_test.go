@@ -440,12 +440,10 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 	}
 
 	thirdPartyGV := unversioned.GroupVersionForDiscovery{GroupVersion: "company.com/v1", Version: "v1"}
-	master.addThirdPartyResourceStorage("/apis/company.com/v1", "foos", nil,
-		unversioned.APIGroup{
-			Name:             "company.com",
-			Versions:         []unversioned.GroupVersionForDiscovery{thirdPartyGV},
-			PreferredVersion: thirdPartyGV,
-		})
+	master.thirdPartyResourceServer.InstallThirdPartyResource(&extensions.ThirdPartyResource{
+		ObjectMeta: api.ObjectMeta{Name: "foo.company.com"},
+		Versions:   []extensions.APIVersion{{Name: "v1"}},
+	})
 
 	resp, err = http.Get(server.URL + "/apis")
 	if !assert.NoError(err) {
