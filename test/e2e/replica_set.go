@@ -21,8 +21,10 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/controller/replicaset"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -31,6 +33,45 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
+
+func newRS(rsName string, replicas int32, rsPodLabels map[string]string, imageName string, image string) *extensions.ReplicaSet {
+	zero := int64(0)
+	return &extensions.ReplicaSet{
+		ObjectMeta: api.ObjectMeta{
+			Name: rsName,
+		},
+		Spec: extensions.ReplicaSetSpec{
+			Replicas: replicas,
+			Template: api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: rsPodLabels,
+				},
+				Spec: api.PodSpec{
+					TerminationGracePeriodSeconds: &zero,
+					Containers: []api.Container{
+						{
+							Name:  imageName,
+							Image: image,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func newPodQuota(name, number string) *api.ResourceQuota {
+	return &api.ResourceQuota{
+		ObjectMeta: api.ObjectMeta{
+			Name: name,
+		},
+		Spec: api.ResourceQuotaSpec{
+			Hard: api.ResourceList{
+				api.ResourcePods: resource.MustParse(number),
+			},
+		},
+	}
+}
 
 var _ = framework.KubeDescribe("ReplicaSet", func() {
 	f := framework.NewDefaultFramework("replicaset")
@@ -44,6 +85,10 @@ var _ = framework.KubeDescribe("ReplicaSet", func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 
 		ReplicaSetServeImageOrFail(f, "private", "b.gcr.io/k8s_authenticated_test/serve_hostname:v1.4")
+	})
+
+	It("should surface a failure condition on a common issue like exceeded quota", func() {
+		rsConditionCheck(f)
 	})
 })
 
@@ -117,4 +162,89 @@ func ReplicaSetServeImageOrFail(f *framework.Framework, test string, image strin
 	if err != nil {
 		framework.Failf("Did not get expected responses within the timeout period of %.2f seconds.", retryTimeout.Seconds())
 	}
+}
+
+// 1. Create a quota restricting pods in the current namespace to 2.
+// 2. Create a replica set that wants to run 3 pods.
+// 3. Check replica set conditions for a ReplicaFailure condition.
+// 4. Scale down the replica set and observe the condition is gone.
+func rsConditionCheck(f *framework.Framework) {
+	c := f.ClientSet
+	namespace := f.Namespace.Name
+	name := "condition-test"
+
+	By(fmt.Sprintf("Creating quota %q that allows only two pods to run in the current namespace", name))
+	quota := newPodQuota(name, "2")
+	_, err := c.Core().ResourceQuotas(namespace).Create(quota)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+		quota, err = c.Core().ResourceQuotas(namespace).Get(name)
+		if err != nil {
+			return false, err
+		}
+		quantity := resource.MustParse("2")
+		podQuota := quota.Status.Hard[api.ResourcePods]
+		return (&podQuota).Cmp(quantity) == 0, nil
+	})
+	if err == wait.ErrWaitTimeout {
+		err = fmt.Errorf("resource quota %q never synced", name)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	By(fmt.Sprintf("Creating replica set %q that asks for more than the allowed pod quota", name))
+	rs := newRS(name, 3, map[string]string{"name": name}, nginxImageName, nginxImage)
+	rs, err = c.Extensions().ReplicaSets(namespace).Create(rs)
+	Expect(err).NotTo(HaveOccurred())
+
+	By(fmt.Sprintf("Checking replica set %q has the desired failure condition set", name))
+	generation := rs.Generation
+	conditions := rs.Status.Conditions
+	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+		rs, err = c.Extensions().ReplicaSets(namespace).Get(name)
+		if err != nil {
+			return false, err
+		}
+
+		if generation > rs.Status.ObservedGeneration {
+			return false, nil
+		}
+		conditions = rs.Status.Conditions
+
+		cond := replicaset.GetCondition(rs.Status, extensions.ReplicaSetReplicaFailure)
+		return cond != nil, nil
+
+	})
+	if err == wait.ErrWaitTimeout {
+		err = fmt.Errorf("rs controller never added the failure condition for replica set %q: %#v", name, conditions)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	By(fmt.Sprintf("Scaling down replica set %q to satisfy pod quota", name))
+	rs, err = framework.UpdateReplicaSetWithRetries(c, namespace, name, func(update *extensions.ReplicaSet) {
+		update.Spec.Replicas = 2
+	})
+	Expect(err).NotTo(HaveOccurred())
+
+	By(fmt.Sprintf("Checking replica set %q has no failure condition set", name))
+	generation = rs.Generation
+	conditions = rs.Status.Conditions
+	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+		rs, err = c.Extensions().ReplicaSets(namespace).Get(name)
+		if err != nil {
+			return false, err
+		}
+
+		if generation > rs.Status.ObservedGeneration {
+			return false, nil
+		}
+		conditions = rs.Status.Conditions
+
+		cond := replicaset.GetCondition(rs.Status, extensions.ReplicaSetReplicaFailure)
+		return cond == nil, nil
+	})
+	if err == wait.ErrWaitTimeout {
+		err = fmt.Errorf("rs controller never removed the failure condition for rs %q: %#v", name, conditions)
+	}
+	Expect(err).NotTo(HaveOccurred())
 }
