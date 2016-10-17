@@ -123,10 +123,13 @@ func (r *FakeRuntimeService) RunPodSandbox(config *runtimeApi.PodSandboxConfig) 
 	readyState := runtimeApi.PodSandBoxState_READY
 	r.Sandboxes[podSandboxID] = &FakePodSandbox{
 		PodSandboxStatus: runtimeApi.PodSandboxStatus{
-			Id:          &podSandboxID,
-			Metadata:    config.Metadata,
-			State:       &readyState,
-			CreatedAt:   &createdAt,
+			Id:        &podSandboxID,
+			Metadata:  config.Metadata,
+			State:     &readyState,
+			CreatedAt: &createdAt,
+			Network: &runtimeApi.PodSandboxNetworkStatus{
+				Ip: &FakePodSandboxIP,
+			},
 			Labels:      config.Labels,
 			Annotations: config.Annotations,
 		},
@@ -174,17 +177,8 @@ func (r *FakeRuntimeService) PodSandboxStatus(podSandboxID string) (*runtimeApi.
 		return nil, fmt.Errorf("pod sandbox %q not found", podSandboxID)
 	}
 
-	return &runtimeApi.PodSandboxStatus{
-		Id:        &podSandboxID,
-		Metadata:  s.Metadata,
-		CreatedAt: s.CreatedAt,
-		State:     s.State,
-		Network: &runtimeApi.PodSandboxNetworkStatus{
-			Ip: &FakePodSandboxIP,
-		},
-		Labels:      s.Labels,
-		Annotations: s.Annotations,
-	}, nil
+	status := s.PodSandboxStatus
+	return &status, nil
 }
 
 func (r *FakeRuntimeService) ListPodSandbox(filter *runtimeApi.PodSandboxFilter) ([]*runtimeApi.PodSandbox, error) {
@@ -228,7 +222,7 @@ func (r *FakeRuntimeService) CreateContainer(podSandboxID string, config *runtim
 
 	// ContainerID should be randomized for real container runtime, but here just use
 	// fixed BuildContainerName() for easily making fake containers.
-	containerID := BuildContainerName(config.Metadata)
+	containerID := BuildContainerName(config.Metadata, podSandboxID)
 	createdAt := time.Now().Unix()
 	createdState := runtimeApi.ContainerState_CREATED
 	imageRef := config.Image.GetImage()
@@ -351,21 +345,8 @@ func (r *FakeRuntimeService) ContainerStatus(containerID string) (*runtimeApi.Co
 		return nil, fmt.Errorf("container %q not found", containerID)
 	}
 
-	return &runtimeApi.ContainerStatus{
-		Id:          c.Id,
-		Metadata:    c.Metadata,
-		State:       c.State,
-		CreatedAt:   c.CreatedAt,
-		Image:       c.Image,
-		ImageRef:    c.ImageRef,
-		Labels:      c.Labels,
-		Annotations: c.Annotations,
-		ExitCode:    c.ExitCode,
-		StartedAt:   c.StartedAt,
-		FinishedAt:  c.FinishedAt,
-		Reason:      c.Reason,
-		Mounts:      c.Mounts,
-	}, nil
+	status := c.ContainerStatus
+	return &status, nil
 }
 
 func (r *FakeRuntimeService) Exec(containerID string, cmd []string, tty bool, stdin io.Reader, stdout, stderr io.WriteCloser) error {
