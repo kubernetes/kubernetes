@@ -17,15 +17,12 @@ limitations under the License.
 package deployment
 
 import (
-	"fmt"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	exp "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -187,84 +184,14 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 		newSelector := map[string]string{"foo": "new"}
 		oldSelector := map[string]string{"foo": "old"}
 		newRS := rs("foo-new", test.newReplicas, newSelector, noTimestamp)
+		newRS.Status.AvailableReplicas = int32(test.readyPodsFromNewRS)
 		oldRS := rs("foo-old", test.oldReplicas, oldSelector, noTimestamp)
+		oldRS.Status.AvailableReplicas = int32(test.readyPodsFromOldRS)
 		oldRSs := []*exp.ReplicaSet{oldRS}
 		allRSs := []*exp.ReplicaSet{oldRS, newRS}
 		maxSurge := intstr.FromInt(0)
 		deployment := newDeployment("foo", test.deploymentReplicas, nil, &maxSurge, &test.maxUnavailable, newSelector)
 		fakeClientset := fake.Clientset{}
-		fakeClientset.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-			switch action.(type) {
-			case core.ListAction:
-				podList := &api.PodList{}
-				for podIndex := 0; podIndex < test.readyPodsFromOldRS; podIndex++ {
-					podList.Items = append(podList.Items, api.Pod{
-						ObjectMeta: api.ObjectMeta{
-							Name:   fmt.Sprintf("%s-oldReadyPod-%d", oldRS.Name, podIndex),
-							Labels: oldSelector,
-						},
-						Status: api.PodStatus{
-							Conditions: []api.PodCondition{
-								{
-									Type:   api.PodReady,
-									Status: api.ConditionTrue,
-								},
-							},
-						},
-					})
-				}
-				for podIndex := 0; podIndex < test.oldReplicas-test.readyPodsFromOldRS; podIndex++ {
-					podList.Items = append(podList.Items, api.Pod{
-						ObjectMeta: api.ObjectMeta{
-							Name:   fmt.Sprintf("%s-oldUnhealthyPod-%d", oldRS.Name, podIndex),
-							Labels: oldSelector,
-						},
-						Status: api.PodStatus{
-							Conditions: []api.PodCondition{
-								{
-									Type:   api.PodReady,
-									Status: api.ConditionFalse,
-								},
-							},
-						},
-					})
-				}
-				for podIndex := 0; podIndex < test.readyPodsFromNewRS; podIndex++ {
-					podList.Items = append(podList.Items, api.Pod{
-						ObjectMeta: api.ObjectMeta{
-							Name:   fmt.Sprintf("%s-newReadyPod-%d", oldRS.Name, podIndex),
-							Labels: newSelector,
-						},
-						Status: api.PodStatus{
-							Conditions: []api.PodCondition{
-								{
-									Type:   api.PodReady,
-									Status: api.ConditionTrue,
-								},
-							},
-						},
-					})
-				}
-				for podIndex := 0; podIndex < test.oldReplicas-test.readyPodsFromOldRS; podIndex++ {
-					podList.Items = append(podList.Items, api.Pod{
-						ObjectMeta: api.ObjectMeta{
-							Name:   fmt.Sprintf("%s-newUnhealthyPod-%d", oldRS.Name, podIndex),
-							Labels: newSelector,
-						},
-						Status: api.PodStatus{
-							Conditions: []api.PodCondition{
-								{
-									Type:   api.PodReady,
-									Status: api.ConditionFalse,
-								},
-							},
-						},
-					})
-				}
-				return true, podList, nil
-			}
-			return false, nil, nil
-		})
 		controller := &DeploymentController{
 			client:        &fakeClientset,
 			eventRecorder: &record.FakeRecorder{},
@@ -327,55 +254,18 @@ func TestDeploymentController_cleanupUnhealthyReplicas(t *testing.T) {
 	for i, test := range tests {
 		t.Logf("executing scenario %d", i)
 		oldRS := rs("foo-v2", test.oldReplicas, nil, noTimestamp)
+		oldRS.Status.AvailableReplicas = int32(test.readyPods)
 		oldRSs := []*exp.ReplicaSet{oldRS}
 		maxSurge := intstr.FromInt(2)
 		maxUnavailable := intstr.FromInt(2)
 		deployment := newDeployment("foo", 10, nil, &maxSurge, &maxUnavailable, nil)
 		fakeClientset := fake.Clientset{}
-		fakeClientset.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-			switch action.(type) {
-			case core.ListAction:
-				podList := &api.PodList{}
-				for podIndex := 0; podIndex < test.readyPods; podIndex++ {
-					podList.Items = append(podList.Items, api.Pod{
-						ObjectMeta: api.ObjectMeta{
-							Name: fmt.Sprintf("%s-readyPod-%d", oldRS.Name, podIndex),
-						},
-						Status: api.PodStatus{
-							Conditions: []api.PodCondition{
-								{
-									Type:   api.PodReady,
-									Status: api.ConditionTrue,
-								},
-							},
-						},
-					})
-				}
-				for podIndex := 0; podIndex < test.unHealthyPods; podIndex++ {
-					podList.Items = append(podList.Items, api.Pod{
-						ObjectMeta: api.ObjectMeta{
-							Name: fmt.Sprintf("%s-unHealthyPod-%d", oldRS.Name, podIndex),
-						},
-						Status: api.PodStatus{
-							Conditions: []api.PodCondition{
-								{
-									Type:   api.PodReady,
-									Status: api.ConditionFalse,
-								},
-							},
-						},
-					})
-				}
-				return true, podList, nil
-			}
-			return false, nil, nil
-		})
 
 		controller := &DeploymentController{
 			client:        &fakeClientset,
 			eventRecorder: &record.FakeRecorder{},
 		}
-		_, cleanupCount, err := controller.cleanupUnhealthyReplicas(oldRSs, deployment, 0, int32(test.maxCleanupCount))
+		_, cleanupCount, err := controller.cleanupUnhealthyReplicas(oldRSs, deployment, int32(test.maxCleanupCount))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -439,35 +329,12 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 		test := tests[i]
 		t.Logf("executing scenario %d", i)
 		oldRS := rs("foo-v2", test.oldReplicas, nil, noTimestamp)
+		oldRS.Status.AvailableReplicas = int32(test.readyPods)
 		allRSs := []*exp.ReplicaSet{oldRS}
 		oldRSs := []*exp.ReplicaSet{oldRS}
 		maxSurge := intstr.FromInt(0)
 		deployment := newDeployment("foo", test.deploymentReplicas, nil, &maxSurge, &test.maxUnavailable, map[string]string{"foo": "bar"})
 		fakeClientset := fake.Clientset{}
-		fakeClientset.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-			switch action.(type) {
-			case core.ListAction:
-				podList := &api.PodList{}
-				for podIndex := 0; podIndex < test.readyPods; podIndex++ {
-					podList.Items = append(podList.Items, api.Pod{
-						ObjectMeta: api.ObjectMeta{
-							Name:   fmt.Sprintf("%s-pod-%d", oldRS.Name, podIndex),
-							Labels: map[string]string{"foo": "bar"},
-						},
-						Status: api.PodStatus{
-							Conditions: []api.PodCondition{
-								{
-									Type:   api.PodReady,
-									Status: api.ConditionTrue,
-								},
-							},
-						},
-					})
-				}
-				return true, podList, nil
-			}
-			return false, nil, nil
-		})
 		controller := &DeploymentController{
 			client:        &fakeClientset,
 			eventRecorder: &record.FakeRecorder{},

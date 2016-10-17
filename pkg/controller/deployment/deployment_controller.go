@@ -113,11 +113,6 @@ func NewDeploymentController(dInformer informers.DeploymentInformer, rsInformer 
 		UpdateFunc: dc.updateReplicaSet,
 		DeleteFunc: dc.deleteReplicaSet,
 	})
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    dc.addPod,
-		UpdateFunc: dc.updatePod,
-		DeleteFunc: dc.deletePod,
-	})
 
 	dc.syncHandler = dc.syncDeployment
 	dc.dLister = dInformer.Lister()
@@ -256,83 +251,6 @@ func (dc *DeploymentController) deleteReplicaSet(obj interface{}) {
 	}
 	glog.V(4).Infof("ReplicaSet %s deleted.", rs.Name)
 	if d := dc.getDeploymentForReplicaSet(rs); d != nil {
-		dc.enqueueDeployment(d)
-	}
-}
-
-// getDeploymentForPod returns the deployment that manages the given Pod.
-// If there are multiple deployments for a given Pod, only return the oldest one.
-func (dc *DeploymentController) getDeploymentForPod(pod *api.Pod) *extensions.Deployment {
-	deployments, err := dc.dLister.GetDeploymentsForPod(pod)
-	if err != nil || len(deployments) == 0 {
-		glog.V(4).Infof("Error: %v. No deployment found for Pod %v, deployment controller will avoid syncing.", err, pod.Name)
-		return nil
-	}
-
-	if len(deployments) > 1 {
-		sort.Sort(util.BySelectorLastUpdateTime(deployments))
-		glog.Errorf("user error! more than one deployment is selecting pod %s/%s with labels: %#v, returning %s/%s", pod.Namespace, pod.Name, pod.Labels, deployments[0].Namespace, deployments[0].Name)
-	}
-	return deployments[0]
-}
-
-// When a pod is created, ensure its controller syncs
-func (dc *DeploymentController) addPod(obj interface{}) {
-	pod, ok := obj.(*api.Pod)
-	if !ok {
-		return
-	}
-	glog.V(4).Infof("Pod %s created: %#v.", pod.Name, pod)
-	if d := dc.getDeploymentForPod(pod); d != nil {
-		dc.enqueueDeployment(d)
-	}
-}
-
-// updatePod figures out what deployment(s) manage the ReplicaSet that manages the Pod when the Pod
-// is updated and wake them up. If anything of the Pods have changed, we need to awaken both
-// the old and new deployments. old and cur must be *api.Pod types.
-func (dc *DeploymentController) updatePod(old, cur interface{}) {
-	curPod := cur.(*api.Pod)
-	oldPod := old.(*api.Pod)
-	if curPod.ResourceVersion == oldPod.ResourceVersion {
-		// Periodic resync will send update events for all known pods.
-		// Two different versions of the same pod will always have different RVs.
-		return
-	}
-	glog.V(4).Infof("Pod %s updated %#v -> %#v.", curPod.Name, oldPod, curPod)
-	if d := dc.getDeploymentForPod(curPod); d != nil {
-		dc.enqueueDeployment(d)
-	}
-	if !api.Semantic.DeepEqual(oldPod, curPod) {
-		if oldD := dc.getDeploymentForPod(oldPod); oldD != nil {
-			dc.enqueueDeployment(oldD)
-		}
-	}
-}
-
-// When a pod is deleted, ensure its controller syncs.
-// obj could be an *api.Pod, or a DeletionFinalStateUnknown marker item.
-func (dc *DeploymentController) deletePod(obj interface{}) {
-	pod, ok := obj.(*api.Pod)
-	// When a delete is dropped, the relist will notice a pod in the store not
-	// in the list, leading to the insertion of a tombstone object which contains
-	// the deleted key/value. Note that this value might be stale. If the pod
-	// changed labels the new ReplicaSet will not be woken up till the periodic
-	// resync.
-	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			glog.Errorf("Couldn't get object from tombstone %#v", obj)
-			return
-		}
-		pod, ok = tombstone.Obj.(*api.Pod)
-		if !ok {
-			glog.Errorf("Tombstone contained object that is not a pod %#v", obj)
-			return
-		}
-	}
-	glog.V(4).Infof("Pod %s deleted: %#v.", pod.Name, pod)
-	if d := dc.getDeploymentForPod(pod); d != nil {
 		dc.enqueueDeployment(d)
 	}
 }

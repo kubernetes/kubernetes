@@ -39,7 +39,6 @@ import (
 	intstrutil "k8s.io/kubernetes/pkg/util/intstr"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	podutil "k8s.io/kubernetes/pkg/util/pod"
-	rsutil "k8s.io/kubernetes/pkg/util/replicaset"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -636,65 +635,35 @@ func SetFromReplicaSetTemplate(deployment *extensions.Deployment, template api.P
 
 // GetReplicaCountForReplicaSets returns the sum of Replicas of the given replica sets.
 func GetReplicaCountForReplicaSets(replicaSets []*extensions.ReplicaSet) int32 {
-	totalReplicaCount := int32(0)
+	totalReplicas := int32(0)
 	for _, rs := range replicaSets {
 		if rs != nil {
-			totalReplicaCount += rs.Spec.Replicas
+			totalReplicas += rs.Spec.Replicas
 		}
 	}
-	return totalReplicaCount
+	return totalReplicas
 }
 
 // GetActualReplicaCountForReplicaSets returns the sum of actual replicas of the given replica sets.
 func GetActualReplicaCountForReplicaSets(replicaSets []*extensions.ReplicaSet) int32 {
-	totalReplicaCount := int32(0)
+	totalActualReplicas := int32(0)
 	for _, rs := range replicaSets {
 		if rs != nil {
-			totalReplicaCount += rs.Status.Replicas
+			totalActualReplicas += rs.Status.Replicas
 		}
 	}
-	return totalReplicaCount
+	return totalActualReplicas
 }
 
-// GetAvailablePodsForReplicaSets returns the number of available pods (listed from clientset) corresponding to the given replica sets.
-func GetAvailablePodsForReplicaSets(c clientset.Interface, deployment *extensions.Deployment, rss []*extensions.ReplicaSet, minReadySeconds int32) (int32, error) {
-	podList, err := listPods(deployment, c)
-	if err != nil {
-		return 0, err
-	}
-	return CountAvailablePodsForReplicaSets(podList, rss, minReadySeconds)
-}
-
-// CountAvailablePodsForReplicaSets returns the number of available pods corresponding to the given pod list and replica sets.
-// Note that the input pod list should be the pods targeted by the deployment of input replica sets.
-func CountAvailablePodsForReplicaSets(podList *api.PodList, rss []*extensions.ReplicaSet, minReadySeconds int32) (int32, error) {
-	rsPods, err := filterPodsMatchingReplicaSets(rss, podList)
-	if err != nil {
-		return 0, err
-	}
-	return countAvailablePods(rsPods, minReadySeconds), nil
-}
-
-// GetAvailablePodsForDeployment returns the number of available pods (listed from clientset) corresponding to the given deployment.
-func GetAvailablePodsForDeployment(c clientset.Interface, deployment *extensions.Deployment) (int32, error) {
-	podList, err := listPods(deployment, c)
-	if err != nil {
-		return 0, err
-	}
-	return countAvailablePods(podList.Items, deployment.Spec.MinReadySeconds), nil
-}
-
-func countAvailablePods(pods []api.Pod, minReadySeconds int32) int32 {
-	availablePodCount := int32(0)
-	for _, pod := range pods {
-		// TODO: Make the time.Now() as argument to allow unit test this.
-		// FIXME: avoid using time.Now
-		if IsPodAvailable(&pod, minReadySeconds, time.Now()) {
-			glog.V(4).Infof("Pod %s/%s is available.", pod.Namespace, pod.Name)
-			availablePodCount++
+// GetAvailableReplicaCountForReplicaSets returns the number of available pods corresponding to the given replica sets.
+func GetAvailableReplicaCountForReplicaSets(replicaSets []*extensions.ReplicaSet) int32 {
+	totalAvailableReplicas := int32(0)
+	for _, rs := range replicaSets {
+		if rs != nil {
+			totalAvailableReplicas += rs.Status.AvailableReplicas
 		}
 	}
-	return availablePodCount
+	return totalAvailableReplicas
 }
 
 // IsPodAvailable return true if the pod is available.
@@ -720,22 +689,6 @@ func IsPodAvailable(pod *api.Pod, minReadySeconds int32, now time.Time) bool {
 		}
 	}
 	return false
-}
-
-// filterPodsMatchingReplicaSets filters the given pod list and only return the ones targeted by the input replicasets
-func filterPodsMatchingReplicaSets(replicaSets []*extensions.ReplicaSet, podList *api.PodList) ([]api.Pod, error) {
-	rsPods := []api.Pod{}
-	for _, rs := range replicaSets {
-		matchingFunc, err := rsutil.MatchingPodsFunc(rs)
-		if err != nil {
-			return nil, err
-		}
-		if matchingFunc == nil {
-			continue
-		}
-		rsPods = append(rsPods, podutil.Filter(podList, matchingFunc)...)
-	}
-	return rsPods, nil
 }
 
 // IsRollingUpdate returns true if the strategy type is a rolling update.
