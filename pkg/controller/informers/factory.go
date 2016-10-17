@@ -45,6 +45,8 @@ type SharedInformerFactory interface {
 	ClusterRoleBindings() ClusterRoleBindingInformer
 	Roles() RoleInformer
 	RoleBindings() RoleBindingInformer
+
+	LimitRanges() LimitRangeInformer
 }
 
 type sharedInformerFactory struct {
@@ -106,6 +108,7 @@ func (f *sharedInformerFactory) PersistentVolumes() PVInformer {
 	return &pvInformer{sharedInformerFactory: f}
 }
 
+// DaemonSets returns a SharedIndexInformer that lists and watches all daemon sets.
 func (f *sharedInformerFactory) DaemonSets() DaemonSetInformer {
 	return &daemonSetInformer{sharedInformerFactory: f}
 }
@@ -132,4 +135,9 @@ func (f *sharedInformerFactory) Roles() RoleInformer {
 
 func (f *sharedInformerFactory) RoleBindings() RoleBindingInformer {
 	return &roleBindingInformer{sharedInformerFactory: f}
+}
+
+// LimitRanges returns a SharedIndexInformer that lists and watches all limit ranges.
+func (f *sharedInformerFactory) LimitRanges() LimitRangeInformer {
+	return &limitRangeInformer{sharedInformerFactory: f}
 }
