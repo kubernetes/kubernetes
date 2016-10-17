@@ -273,13 +273,6 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 			out.LockFilePath = nil
 		}
 		out.ExitOnLockContention = in.ExitOnLockContention
-		if in.ConfigureCBR0 != nil {
-			in, out := &in.ConfigureCBR0, &out.ConfigureCBR0
-			*out = new(bool)
-			**out = **in
-		} else {
-			out.ConfigureCBR0 = nil
-		}
 		out.HairpinMode = in.HairpinMode
 		out.BabysitDaemons = in.BabysitDaemons
 		out.MaxPods = in.MaxPods
