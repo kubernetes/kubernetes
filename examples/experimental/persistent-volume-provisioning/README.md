@@ -283,6 +283,21 @@ Create a Pod to use the PVC:
 $ kubectl create -f examples/experimental/persistent-volume-provisioning/quobyte/example-pod.yaml
 ```
 
+#### Azure Disk
+
+```yaml
+kind: StorageClass
+apiVersion: storage.k8s.io/v1beta1
+metadata:
+  name: slow
+provisioner: kubernetes.io/azure-disk
+parameters:
+  skuName: Standard_LRS
+  location: eastus
+```
+
+* `skuName`: Azure storage account Sku tier. Default is empty.
+* `location`: Azure storage account location. Default is empty.
 
 ### User provisioning requests
 
