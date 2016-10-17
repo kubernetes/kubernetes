@@ -89,10 +89,10 @@ parameters:
 kind: StorageClass
 apiVersion: storage.k8s.io/v1beta1
 metadata:
-  name: slow
+  name: fast
 provisioner: kubernetes.io/vsphere-volume
 parameters:
-  diskformat: thin
+  diskformat: zeroedthick
 ```
 
 * `diskformat`: `thin`, `zeroedthick` and `eagerzeroedthick`. See vSphere docs for details. Default: `"thin"`.
