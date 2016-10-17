@@ -252,7 +252,7 @@ func fakePortForwardServer(t *testing.T, testName string, serverSends, expectedF
 			received: make(map[uint16]string),
 			send:     serverSends,
 		}
-		portforward.ServePortForward(w, req, pf, "pod", "uid", 0, 10*time.Second)
+		portforward.ServePortForward(w, req, pf, "pod", "uid", 0, 10*time.Second, portforward.SupportedProtocols)
 
 		for port, expected := range expectedFromClient {
 			actual, ok := pf.received[port]

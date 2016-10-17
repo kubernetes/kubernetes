@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/httpstream"
 )
 
-func TestPortForwardStreamReceived(t *testing.T) {
+func TestHTTPStreamReceived(t *testing.T) {
 	tests := map[string]struct {
 		port          string
 		streamType    string
@@ -62,7 +62,7 @@ func TestPortForwardStreamReceived(t *testing.T) {
 	}
 	for name, test := range tests {
 		streams := make(chan httpstream.Stream, 1)
-		f := portForwardStreamReceived(streams)
+		f := httpStreamReceived(streams)
 		stream := newFakeHttpStream()
 		if len(test.port) > 0 {
 			stream.headers.Set("port", test.port)
@@ -92,48 +92,11 @@ func TestPortForwardStreamReceived(t *testing.T) {
 	}
 }
 
-type fakeHttpStream struct {
-	headers http.Header
-	id      uint32
-}
-
-func newFakeHttpStream() *fakeHttpStream {
-	return &fakeHttpStream{
-		headers: make(http.Header),
-	}
-}
-
-var _ httpstream.Stream = &fakeHttpStream{}
-
-func (s *fakeHttpStream) Read(data []byte) (int, error) {
-	return 0, nil
-}
-
-func (s *fakeHttpStream) Write(data []byte) (int, error) {
-	return 0, nil
-}
-
-func (s *fakeHttpStream) Close() error {
-	return nil
-}
-
-func (s *fakeHttpStream) Reset() error {
-	return nil
-}
-
-func (s *fakeHttpStream) Headers() http.Header {
-	return s.headers
-}
-
-func (s *fakeHttpStream) Identifier() uint32 {
-	return s.id
-}
-
 func TestGetStreamPair(t *testing.T) {
 	timeout := make(chan time.Time)
 
-	h := &portForwardStreamHandler{
-		streamPairs: make(map[string]*portForwardStreamPair),
+	h := &httpStreamHandler{
+		streamPairs: make(map[string]*httpStreamPair),
 	}
 
 	// test adding a new entry
@@ -223,7 +186,7 @@ func TestGetStreamPair(t *testing.T) {
 }
 
 func TestRequestID(t *testing.T) {
-	h := &portForwardStreamHandler{}
+	h := &httpStreamHandler{}
 
 	s := newFakeHttpStream()
 	s.headers.Set(api.StreamType, api.StreamTypeError)
@@ -243,4 +206,41 @@ func TestRequestID(t *testing.T) {
 	if e, a := "2", h.requestID(s); e != a {
 		t.Errorf("expected %q, got %q", e, a)
 	}
+}
+
+type fakeHttpStream struct {
+	headers http.Header
+	id      uint32
+}
+
+func newFakeHttpStream() *fakeHttpStream {
+	return &fakeHttpStream{
+		headers: make(http.Header),
+	}
+}
+
+var _ httpstream.Stream = &fakeHttpStream{}
+
+func (s *fakeHttpStream) Read(data []byte) (int, error) {
+	return 0, nil
+}
+
+func (s *fakeHttpStream) Write(data []byte) (int, error) {
+	return 0, nil
+}
+
+func (s *fakeHttpStream) Close() error {
+	return nil
+}
+
+func (s *fakeHttpStream) Reset() error {
+	return nil
+}
+
+func (s *fakeHttpStream) Headers() http.Header {
+	return s.headers
+}
+
+func (s *fakeHttpStream) Identifier() uint32 {
+	return s.id
 }
