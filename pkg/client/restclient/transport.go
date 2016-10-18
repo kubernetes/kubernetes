@@ -41,6 +41,7 @@ func TransportFor(config *Config) (http.RoundTripper, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return transport.New(cfg)
 }
 
@@ -73,7 +74,10 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 			wt = provider.WrapTransport
 		}
 	}
+
 	return &transport.Config{
+		Scheme:        c.Scheme,
+		Host:          c.Host,
 		UserAgent:     c.UserAgent,
 		Transport:     c.Transport,
 		WrapTransport: wt,

@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	gruntime "runtime"
@@ -46,10 +47,14 @@ const (
 // Config holds the common attributes that can be passed to a Kubernetes client on
 // initialization.
 type Config struct {
-	// Host must be a host string, a host:port pair, or a URL to the base of the apiserver.
-	// If a URL is given then the (optional) Path of that URL represents a prefix that must
-	// be appended to all request URIs used to access the apiserver. This allows a frontend
-	// proxy to easily relocate all of the apiserver endpoints.
+	// Scheme is the name of protocol used for communication with the server (http or
+	// unix).
+	Scheme string
+	// Host must be a host string, a host:port pair or a path to unix socket to the
+	// base of the apiserver. If a host is given then the (optional) Path of that
+	// represents a prefix that must be appended to create all request URIs used to
+	// access the apiserver. This allows a frontend proxy to easily relocate all of
+	// the apiserver endpoints.
 	Host string
 	// APIPath is a sub-path that points to an API root.
 	APIPath string
@@ -176,7 +181,15 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		burst = DefaultBurst
 	}
 
-	baseURL, versionedAPIPath, err := defaultServerUrlFor(config)
+	var baseURL *url.URL
+	var versionedAPIPath string
+	var err error
+	switch config.Scheme {
+	case "", "http":
+		baseURL, versionedAPIPath, err = defaultServerUrlFor(config)
+	case "unix":
+		baseURL, versionedAPIPath, err = defaultServerUnixSocketPathFor(config)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -348,6 +361,7 @@ func AddUserAgent(config *Config, userAgent string) *Config {
 func AnonymousClientConfig(config *Config) *Config {
 	// copy only known safe fields
 	return &Config{
+		Scheme:        config.Scheme,
 		Host:          config.Host,
 		APIPath:       config.APIPath,
 		Prefix:        config.Prefix,

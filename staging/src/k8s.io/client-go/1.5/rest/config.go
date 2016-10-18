@@ -46,6 +46,9 @@ const (
 // Config holds the common attributes that can be passed to a Kubernetes client on
 // initialization.
 type Config struct {
+	// Scheme is the name of protocol used for communication with the server (http or
+	// unix).
+	Scheme string
 	// Host must be a host string, a host:port pair, or a URL to the base of the apiserver.
 	// If a URL is given then the (optional) Path of that URL represents a prefix that must
 	// be appended to all request URIs used to access the apiserver. This allows a frontend
