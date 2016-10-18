@@ -43,6 +43,7 @@ import (
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	policyapiv1alpha1 "k8s.io/kubernetes/pkg/apis/policy/v1alpha1"
+	policyapiv1beta1 "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	"k8s.io/kubernetes/pkg/apis/storage"
@@ -426,6 +427,7 @@ func DefaultAPIResourceConfigSource() *genericapiserver.ResourceConfig {
 		autoscalingapiv1.SchemeGroupVersion,
 		appsapi.SchemeGroupVersion,
 		policyapiv1alpha1.SchemeGroupVersion,
+		policyapiv1beta1.SchemeGroupVersion,
 		rbacapi.SchemeGroupVersion,
 		storageapiv1beta1.SchemeGroupVersion,
 		certificatesapiv1alpha1.SchemeGroupVersion,

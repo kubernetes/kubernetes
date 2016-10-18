@@ -541,8 +541,8 @@ Pod:
 	return
 }
 
-// failSafe is an attempt to at least update the PodDisruptionAllowed field to
-// false if everything something else has failed.  This is one place we
+// failSafe is an attempt to at least update the PodDisruptionsAllowed field to
+// 0 if everything else has failed.  This is one place we
 // implement the  "fail open" part of the design since if we manage to update
 // this field correctly, we will prevent the /evict handler from approving an
 // eviction when it may be unsafe to do so.
@@ -552,7 +552,7 @@ func (dc *DisruptionController) failSafe(pdb *policy.PodDisruptionBudget) error 
 		return err
 	}
 	newPdb := obj.(policy.PodDisruptionBudget)
-	newPdb.Status.PodDisruptionAllowed = false
+	newPdb.Status.PodDisruptionsAllowed = 0
 
 	return dc.getUpdater()(&newPdb)
 }
@@ -562,9 +562,12 @@ func (dc *DisruptionController) updatePdbSpec(pdb *policy.PodDisruptionBudget, c
 	// pods are in a safe state when their first pods appear but this controller
 	// has not updated their status yet.  This isn't the only race, but it's a
 	// common one that's easy to detect.
-	disruptionAllowed := currentHealthy-1 >= desiredHealthy && expectedCount > 0
+	disruptionsAllowed := currentHealthy - desiredHealthy
+	if expectedCount <= 0 || disruptionsAllowed <= 0 {
+		disruptionsAllowed = 0
+	}
 
-	if pdb.Status.CurrentHealthy == currentHealthy && pdb.Status.DesiredHealthy == desiredHealthy && pdb.Status.ExpectedPods == expectedCount && pdb.Status.PodDisruptionAllowed == disruptionAllowed {
+	if pdb.Status.CurrentHealthy == currentHealthy && pdb.Status.DesiredHealthy == desiredHealthy && pdb.Status.ExpectedPods == expectedCount && pdb.Status.PodDisruptionsAllowed == disruptionsAllowed {
 		return nil
 	}
 
@@ -575,10 +578,10 @@ func (dc *DisruptionController) updatePdbSpec(pdb *policy.PodDisruptionBudget, c
 	newPdb := obj.(policy.PodDisruptionBudget)
 
 	newPdb.Status = policy.PodDisruptionBudgetStatus{
-		CurrentHealthy:       currentHealthy,
-		DesiredHealthy:       desiredHealthy,
-		ExpectedPods:         expectedCount,
-		PodDisruptionAllowed: disruptionAllowed,
+		CurrentHealthy:        currentHealthy,
+		DesiredHealthy:        desiredHealthy,
+		ExpectedPods:          expectedCount,
+		PodDisruptionsAllowed: disruptionsAllowed,
 	}
 
 	return dc.getUpdater()(&newPdb)
