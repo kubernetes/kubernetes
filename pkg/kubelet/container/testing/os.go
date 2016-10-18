@@ -74,6 +74,7 @@ func (f *FakeOS) Remove(path string) error {
 
 // RemoveAll is a fake call that just returns nil.
 func (f *FakeOS) RemoveAll(path string) error {
+	f.Removes = append(f.Removes, path)
 	return nil
 }
 
@@ -102,5 +103,10 @@ func (f *FakeOS) ReadDir(dirname string) ([]os.FileInfo, error) {
 	if f.ReadDirFn != nil {
 		return f.ReadDirFn(dirname)
 	}
+	return nil, nil
+}
+
+// Glob is a fake call that returns nil.
+func (f *FakeOS) Glob(pattern string) ([]string, error) {
 	return nil, nil
 }
