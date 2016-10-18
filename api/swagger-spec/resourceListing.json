@@ -86,6 +86,10 @@
     "description": "API at /apis/policy/v1alpha1"
    },
    {
+    "path": "/apis/policy/v1beta1",
+    "description": "API at /apis/policy/v1beta1"
+   },
+   {
     "path": "/apis/policy",
     "description": "get information of a group"
    },
