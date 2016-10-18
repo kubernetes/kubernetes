@@ -2385,6 +2385,30 @@ mergeItemPtr:
 `),
 			},
 		},
+		{
+			Description: "defined null values should propagate overwrite current fields (with conflict) (ignore two-way application)",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`name: 2`),
+				TwoWay: []byte(`
+          name: 1
+          value: 1
+          other: null`),
+				Modified: []byte(`
+          name: 1
+          value: 1
+          other: null`),
+				Current: []byte(`
+          name: a
+          other: a`),
+				ThreeWay: []byte(`
+          name: 1
+          value: 1
+          other: null`),
+				Result: []byte(`
+          name: 1
+          value: 1`),
+			},
+		},
 	},
 }
 
@@ -2439,7 +2463,9 @@ func testTwoWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
 	} else {
 		testPatchCreationWithoutSorting(t, expectedJSON, actualJSON, c.Description)
 	}
-	testPatchApplication(t, originalJSON, actualJSON, modifiedJSON, c.Description)
+	if !strings.Contains(c.Description, "ignore two-way application") {
+		testPatchApplication(t, originalJSON, actualJSON, modifiedJSON, c.Description)
+	}
 }
 
 func testThreeWayPatch(t *testing.T, c StrategicMergePatchTestCase) {

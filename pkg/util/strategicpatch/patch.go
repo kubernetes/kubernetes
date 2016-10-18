@@ -582,7 +582,7 @@ func StrategicMergePatch(original, patch []byte, dataStruct interface{}) ([]byte
 		return nil, err
 	}
 
-	result, err := mergeMap(originalMap, patchMap, t)
+	result, err := mergeMap(originalMap, patchMap, t, true)
 	if err != nil {
 		return nil, err
 	}
@@ -612,7 +612,10 @@ var errBadPatchTypeFmt = "unknown patch type: %s in map: %v"
 // Merge fields from a patch map into the original map. Note: This may modify
 // both the original map and the patch because getting a deep copy of a map in
 // golang is highly non-trivial.
-func mergeMap(original, patch map[string]interface{}, t reflect.Type) (map[string]interface{}, error) {
+// If patch contains any null field (e.g. field_1: null) that is not
+// present in original, then to propagate it to the end result use
+// ignoreUnmatchedNulls == false.
+func mergeMap(original, patch map[string]interface{}, t reflect.Type, ignoreUnmatchedNulls bool) (map[string]interface{}, error) {
 	if v, ok := patch[directiveMarker]; ok {
 		if v == replaceDirective {
 			// If the patch contains "$patch: replace", don't merge it, just use the
@@ -654,7 +657,9 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type) (map[strin
 				delete(original, k)
 			}
 
-			continue
+			if ignoreUnmatchedNulls {
+				continue
+			}
 		}
 
 		_, ok := original[k]
@@ -685,7 +690,7 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type) (map[strin
 				typedOriginal := original[k].(map[string]interface{})
 				typedPatch := patchV.(map[string]interface{})
 				var err error
-				original[k], err = mergeMap(typedOriginal, typedPatch, fieldType)
+				original[k], err = mergeMap(typedOriginal, typedPatch, fieldType, ignoreUnmatchedNulls)
 				if err != nil {
 					return nil, err
 				}
@@ -697,7 +702,7 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type) (map[strin
 				elemType := fieldType.Elem()
 				typedOriginal := original[k].([]interface{})
 				var err error
-				original[k], err = mergeSlice(typedOriginal, patchV, elemType, fieldPatchMergeKey)
+				original[k], err = mergeSlice(typedOriginal, patchV, elemType, fieldPatchMergeKey, ignoreUnmatchedNulls)
 				if err != nil {
 					return nil, err
 				}
@@ -723,7 +728,7 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type) (map[strin
 // it returns an error. Please check patch_test.go and find the test case named
 // "merge lists of scalars for list of primitives" to see what the patch looks like.
 // Patch is still []interface{} for all the other types.
-func mergeSlice(original []interface{}, patch interface{}, elemType reflect.Type, mergeKey string) ([]interface{}, error) {
+func mergeSlice(original []interface{}, patch interface{}, elemType reflect.Type, mergeKey string, ignoreUnmatchedNulls bool) ([]interface{}, error) {
 	t, err := sliceElementType(original)
 	if err != nil && err != errNoElementsInSlice {
 		return nil, err
@@ -823,7 +828,7 @@ func mergeSlice(original []interface{}, patch interface{}, elemType reflect.Type
 			var mergedMaps interface{}
 			var err error
 			// Merge into original.
-			mergedMaps, err = mergeMap(originalMap, typedV, elemType)
+			mergedMaps, err = mergeMap(originalMap, typedV, elemType, ignoreUnmatchedNulls)
 			if err != nil {
 				return nil, err
 			}
@@ -1338,7 +1343,8 @@ func mapsOfMapsHaveConflicts(typedLeft, typedRight map[string]interface{}, struc
 // configurations. Conflicts are defined as keys changed differently from original to modified
 // than from original to current. In other words, a conflict occurs if modified changes any key
 // in a way that is different from how it is changed in current (e.g., deleting it, changing its
-// value).
+// value). We also propagate values fields that do not exist in original but are explicitly
+// defined in modified.
 func CreateThreeWayMergePatch(original, modified, current []byte, dataStruct interface{}, overwrite bool, smPatchVersion StrategicMergePatchVersion, fns ...PreconditionFunc) ([]byte, error) {
 	originalMap := map[string]interface{}{}
 	if len(original) > 0 {
@@ -1380,7 +1386,7 @@ func CreateThreeWayMergePatch(original, modified, current []byte, dataStruct int
 		return nil, err
 	}
 
-	patchMap, err := mergeMap(deletionsMap, deltaMap, t)
+	patchMap, err := mergeMap(deletionsMap, deltaMap, t, false)
 	if err != nil {
 		return nil, err
 	}
