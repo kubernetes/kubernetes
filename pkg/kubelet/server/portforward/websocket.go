@@ -21,6 +21,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -43,25 +44,33 @@ const (
 // options contains details about which streams are required for
 // port forwarding.
 type v4Options struct {
-	port uint16
+	ports []uint16
 }
 
 // newOptions creates a new options from the Request.
 func newV4Options(req *http.Request) (*v4Options, error) {
-	portString := req.FormValue(api.PortHeader)
-	if len(portString) == 0 {
+	portStrings := req.URL.Query()[api.PortHeader]
+	if len(portStrings) == 0 {
 		return nil, fmt.Errorf("%q is required", api.PortHeader)
 	}
-	port, err := strconv.ParseUint(portString, 10, 16)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse %q as a port: %v", portString, err)
-	}
-	if port < 1 {
-		return nil, fmt.Errorf("port %q must be > 0", portString)
+
+	ports := make([]uint16, 0, len(portStrings))
+	for _, portString := range portStrings {
+		if len(portString) == 0 {
+			return nil, fmt.Errorf("%q is cannot be empty", api.PortHeader)
+		}
+		port, err := strconv.ParseUint(portString, 10, 16)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse %q as a port: %v", portString, err)
+		}
+		if port < 1 {
+			return nil, fmt.Errorf("port %q must be > 0", portString)
+		}
+		ports = append(ports, uint16(port))
 	}
 
 	return &v4Options{
-		port: uint16(port),
+		ports: ports,
 	}, nil
 }
 
@@ -73,7 +82,10 @@ func handleWebSocketStreams(req *http.Request, w http.ResponseWriter, portForwar
 		return err
 	}
 
-	channels := []wsstream.ChannelType{wsstream.ReadWriteChannel, wsstream.WriteChannel}
+	channels := make([]wsstream.ChannelType, 0, len(opts.ports)*2)
+	for i := 0; i < len(opts.ports); i++ {
+		channels = append(channels, wsstream.ReadWriteChannel, wsstream.WriteChannel)
+	}
 	conn := wsstream.NewConn(map[string]wsstream.ChannelProtocolConfig{
 		"": {
 			Binary:   true,
@@ -95,49 +107,77 @@ func handleWebSocketStreams(req *http.Request, w http.ResponseWriter, portForwar
 		return err
 	}
 	defer conn.Close()
+	streamPairs := make([]*websocketStreamPair, len(opts.ports))
+	for i, _ := range streamPairs {
+		streamPair := websocketStreamPair{
+			port:        opts.ports[i],
+			dataStream:  streams[i*2+dataChannel],
+			errorStream: streams[i*2+errorChannel],
+		}
+		streamPairs[i] = &streamPair
 
-	streams[dataChannel].Write([]byte{})
-	streams[errorChannel].Write([]byte{})
-
-	h := &websocketStreamHandler{
-		conn:      conn,
-		port:      opts.port,
-		streams:   streams,
-		pod:       podName,
-		uid:       uid,
-		forwarder: portForwarder,
+		streamPair.dataStream.Write([]byte{})
+		streamPair.errorStream.Write([]byte{})
 	}
-
+	h := &websocketStreamHandler{
+		conn:        conn,
+		streamPairs: streamPairs,
+		pod:         podName,
+		uid:         uid,
+		forwarder:   portForwarder,
+	}
 	h.run()
 
 	return nil
 }
 
+// websocketStreamPair represents the error and data streams for a port
+// forwarding request.
+type websocketStreamPair struct {
+	port        uint16
+	dataStream  io.ReadWriteCloser
+	errorStream io.WriteCloser
+}
+
 // websocketStreamHandler is capable of processing a single port forward
 // request over a websocket connection
 type websocketStreamHandler struct {
-	conn      *wsstream.Conn
-	port      uint16
-	streams   []io.ReadWriteCloser
-	pod       string
-	uid       types.UID
-	forwarder PortForwarder
+	conn        *wsstream.Conn
+	ports       []uint16
+	streamPairs []*websocketStreamPair
+	pod         string
+	uid         types.UID
+	forwarder   PortForwarder
 }
 
 // run invokes the websocketStreamHandler's forwarder.PortForward
 // function for the given stream pair.
 func (h *websocketStreamHandler) run() {
-	defer h.streams[dataChannel].Close()
-	defer h.streams[errorChannel].Close()
-	defer h.conn.Close()
+	wg := sync.WaitGroup{}
+	wg.Add(len(h.streamPairs))
 
-	glog.V(5).Infof("(conn=%p) invoking forwarder.PortForward for port %d", h.conn, h.port)
-	err := h.forwarder.PortForward(h.pod, h.uid, h.port, h.streams[dataChannel])
-	glog.V(5).Infof("(conn=%p) done invoking forwarder.PortForward for port %d", h.conn, h.port)
+	for _, pair := range h.streamPairs {
+		p := pair
+		go func() {
+			defer wg.Done()
+			h.portForward(p)
+		}()
+	}
+
+	wg.Wait()
+}
+
+func (h *websocketStreamHandler) portForward(p *websocketStreamPair) {
+	defer p.dataStream.Close()
+	defer p.errorStream.Close()
+
+	glog.V(5).Infof("(conn=%p) invoking forwarder.PortForward for port %d", h.conn, p.port)
+	err := h.forwarder.PortForward(h.pod, h.uid, p.port, p.dataStream)
+	glog.V(5).Infof("(conn=%p) done invoking forwarder.PortForward for port %d", h.conn, p.port)
 
 	if err != nil {
-		msg := fmt.Errorf("error forwarding port %d to pod %s, uid %v: %v", h.port, h.pod, h.uid, err)
+		msg := fmt.Errorf("error forwarding port %d to pod %s, uid %v: %v", p.port, h.pod, h.uid, err)
 		runtime.HandleError(msg)
-		fmt.Fprint(h.streams[errorChannel], msg.Error())
+		fmt.Fprint(p.errorStream, msg.Error())
 	}
 }

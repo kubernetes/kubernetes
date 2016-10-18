@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -121,7 +122,10 @@ func TestServeWSPortForward(t *testing.T) {
 				t.Fatalf("%d: websocket dial expected err", i)
 			}
 			continue
+		} else if err != nil {
+			t.Fatalf("%d: websocket dial unexpected err: %v", i, err)
 		}
+
 		defer ws.Close()
 
 		channel, data, err := wsRead(ws)
@@ -168,6 +172,117 @@ func TestServeWSPortForward(t *testing.T) {
 	}
 }
 
+func TestServeWSMultiplePortForward(t *testing.T) {
+	ports := []uint16{8000, 9000}
+	podNamespace := "other"
+	podName := "foo"
+	expectedPodName := getPodName(podName, podNamespace)
+
+	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
+
+	fw.fakeKubelet.streamingConnectionIdleTimeoutFunc = func() time.Duration {
+		return 0
+	}
+
+	portForwardWG := sync.WaitGroup{}
+	portForwardWG.Add(len(ports))
+
+	portsMutex := sync.Mutex{}
+	portsForwarded := map[uint16]struct{}{}
+
+	fw.fakeKubelet.portForwardFunc = func(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error {
+		defer portForwardWG.Done()
+
+		if e, a := expectedPodName, name; e != a {
+			t.Fatalf("%d: pod name: expected '%v', got '%v'", port, e, a)
+		}
+
+		portsMutex.Lock()
+		portsForwarded[port] = struct{}{}
+		portsMutex.Unlock()
+
+		fromClient := make([]byte, 32)
+		n, err := stream.Read(fromClient)
+		if err != nil {
+			t.Fatalf("%d: error reading client data: %v", port, err)
+		}
+		if e, a := fmt.Sprintf("client data on port %d", port), string(fromClient[0:n]); e != a {
+			t.Fatalf("%d: client data: expected to receive '%v', got '%v'", port, e, a)
+		}
+
+		_, err = stream.Write([]byte(fmt.Sprintf("container data on port %d", port)))
+		if err != nil {
+			t.Fatalf("%d: error writing container data: %v", port, err)
+		}
+
+		return nil
+	}
+
+	url := fmt.Sprintf("ws://%s/portForward/%s/%s?", fw.testHTTPServer.Listener.Addr().String(), podNamespace, podName)
+	for _, port := range ports {
+		url = url + fmt.Sprintf("port=%d&", port)
+	}
+
+	ws, err := websocket.Dial(url, "", "http://127.0.0.1/")
+	if err != nil {
+		t.Fatalf("websocket dial unexpected err: %v", err)
+	}
+
+	defer ws.Close()
+
+	for i, port := range ports {
+		channel, data, err := wsRead(ws)
+		if err != nil {
+			t.Fatalf("%d: read failed: expected no error: got %v", port, err)
+		}
+		if int(channel) != i*2+dataChannel {
+			t.Fatalf("%d: wrong channel: got %q: expected %q", port, channel, i*2+dataChannel)
+		}
+		if len(data) != 0 {
+			t.Fatalf("%d: wrong data: got %q: expected nothing", port, data)
+		}
+
+		channel, data, err = wsRead(ws)
+		if err != nil {
+			t.Fatalf("%d: read succeeded: expected no error: got %v", port, err)
+		}
+		if int(channel) != i*2+errorChannel {
+			t.Fatalf("%d: wrong channel: got %q: expected %q", port, channel, i*2+errorChannel)
+		}
+		if len(data) != 0 {
+			t.Fatalf("%d: wrong data: got %q: expected nothing", port, data)
+		}
+	}
+
+	for i, port := range ports {
+		println("writing the client data", port)
+		err := wsWrite(ws, byte(i*2+dataChannel), []byte(fmt.Sprintf("client data on port %d", port)))
+		if err != nil {
+			t.Fatalf("%d: unexpected error writing client data: %v", i, err)
+		}
+
+		channel, data, err := wsRead(ws)
+		if err != nil {
+			t.Fatalf("%d: unexpected error reading container data: %v", i, err)
+		}
+
+		if int(channel) != i*2+dataChannel {
+			t.Fatalf("%d: wrong channel: got %q: expected %q", port, channel, i*2+dataChannel)
+		}
+		if e, a := fmt.Sprintf("container data on port %d", port), string(data); e != a {
+			t.Fatalf("%d: expected to receive '%v' from container, got '%v'", i, e, a)
+		}
+	}
+
+	portForwardWG.Wait()
+
+	portsMutex.Lock()
+	defer portsMutex.Unlock()
+	if len(ports) != len(portsForwarded) {
+		t.Fatalf("expected to forward %d ports; got %v", len(ports), portsForwarded)
+	}
+}
 func wsWrite(conn *websocket.Conn, channel byte, data []byte) error {
 	frame := make([]byte, len(data)+1)
 	frame[0] = channel
