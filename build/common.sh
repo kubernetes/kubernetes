@@ -85,46 +85,6 @@ readonly KUBE_RSYNC_PORT="${KUBE_RSYNC_PORT:-}"
 # mapped to KUBE_RSYNC_PORT via docker networking.
 readonly KUBE_CONTAINER_RSYNC_PORT=8730
 
-# Get the set of master binaries that run in Docker (on Linux)
-# Entry format is "<name-of-binary>,<base-image>".
-# Binaries are placed in /usr/local/bin inside the image.
-#
-# $1 - server architecture
-kube::build::get_docker_wrapped_binaries() {
-  case $1 in
-    "amd64")
-        local targets=(
-          kube-apiserver,busybox
-          kube-controller-manager,busybox
-          kube-scheduler,busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-amd64:v4
-        );;
-    "arm")
-        local targets=(
-          kube-apiserver,armel/busybox
-          kube-controller-manager,armel/busybox
-          kube-scheduler,armel/busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-arm:v4
-        );;
-    "arm64")
-        local targets=(
-          kube-apiserver,aarch64/busybox
-          kube-controller-manager,aarch64/busybox
-          kube-scheduler,aarch64/busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-arm64:v4
-        );;
-    "ppc64le")
-        local targets=(
-          kube-apiserver,ppc64le/busybox
-          kube-controller-manager,ppc64le/busybox
-          kube-scheduler,ppc64le/busybox
-          kube-proxy,gcr.io/google_containers/debian-iptables-ppc64le:v4
-        );;
-  esac
-
-  echo "${targets[@]}"
-}
-
 # ---------------------------------------------------------------------------
 # Basic setup functions
 

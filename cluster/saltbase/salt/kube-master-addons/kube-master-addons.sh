@@ -24,33 +24,17 @@ function load-docker-images() {
   
     if which docker 1>/dev/null 2>&1; then
   
-      timeout 120 docker load -i /srv/salt/kube-bins/kube-apiserver.tar 1>/dev/null 2>&1
+      timeout 120 docker load -i /srv/salt/kube-bins/hyperkube.tar 1>/dev/null 2>&1
       rc=$?
       if [[ $rc == 0 ]]; then
-        let loadedImageFlags="$loadedImageFlags|1"
-      elif [[ $rc == 124 ]]; then
-        restart_docker=true
-      fi
-  
-      timeout 120 docker load -i /srv/salt/kube-bins/kube-scheduler.tar 1>/dev/null 2>&1
-      rc=$?
-      if [[ $rc == 0 ]]; then
-        let loadedImageFlags="$loadedImageFlags|2"
-      elif [[ $rc == 124 ]]; then
-        restart_docker=true
-      fi
-  
-      timeout 120 docker load -i /srv/salt/kube-bins/kube-controller-manager.tar 1>/dev/null 2>&1
-      rc=$?
-      if [[ $rc == 0 ]]; then
-        let loadedImageFlags="$loadedImageFlags|4"
+        let loadedImages="true"
       elif [[ $rc == 124 ]]; then
         restart_docker=true
       fi
     fi
   
-    # required docker images got installed. exit while loop.
-    if [[ $loadedImageFlags == 7 ]]; then break; fi
+    # required docker image got installed. exit while loop.
+    if [[ "${loadedImages}" == "true" ]]; then break; fi
   
     # Sometimes docker load hang, restart docker daemon resolve the issue
     if [[ $restart_docker ]]; then
@@ -70,9 +54,7 @@ function convert-rkt-image() {
 }
 
 function load-rkt-images() {
-  convert-rkt-image /srv/salt/kube-bins/kube-apiserver.tar
-  convert-rkt-image /srv/salt/kube-bins/kube-scheduler.tar
-  convert-rkt-image /srv/salt/kube-bins/kube-controller-manager.tar
+  convert-rkt-image /srv/salt/kube-bins/hyperkube.tar
 
   # Currently, we can't run docker image tarballs directly,
   # So we use 'rkt fetch' to load the docker images into rkt image stores.

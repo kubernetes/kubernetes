@@ -27,6 +27,7 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/build/common.sh"
+source "${KUBE_ROOT}/build/util.sh"
 source "${KUBE_ROOT}/build/lib/release.sh"
 
 KUBE_RELEASE_RUN_TESTS=${KUBE_RELEASE_RUN_TESTS-y}
@@ -43,12 +44,9 @@ fi
 kube::build::copy_output
 
 if [[ "${FEDERATION:-}" == "true" ]];then
-    (
-	source "${KUBE_ROOT}/build/util.sh"
 	# Write federated docker image tag to workspace
 	kube::release::semantic_image_tag_version > "${KUBE_ROOT}/federation/manifests/federated-image.tag"
-    )
 fi
 
+kube::release::build_hyperkube
 kube::release::package_tarballs
-kube::release::package_hyperkube

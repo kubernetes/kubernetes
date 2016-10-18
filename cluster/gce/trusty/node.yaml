@@ -198,7 +198,7 @@ script
 	if [ -n "${KUBE_DOCKER_REGISTRY:-}" ]; then
 		kube_docker_registry=${KUBE_DOCKER_REGISTRY}
 	fi
-	kube_proxy_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-proxy.docker_tag)
+	hyperkube_docker_tag=$(cat /home/kubernetes/kube-docker-files/hyperkube.docker_tag)
 	test_args=""
 	if [ -n "${KUBEPROXY_TEST_ARGS:-}" ]; then
 		test_args="${KUBEPROXY_TEST_ARGS}"
@@ -210,7 +210,7 @@ script
 	api_servers="--master=https://${KUBERNETES_MASTER_NAME}"
 	sed -i -e "s@{{kubeconfig}}@${kubeconfig}@g" ${tmp_file}
 	sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${kube_docker_registry}@g" ${tmp_file}
-	sed -i -e "s@{{pillar\['kube-proxy_docker_tag'\]}}@${kube_proxy_docker_tag}@g" ${tmp_file}
+	sed -i -e "s@{{pillar\['hyperkube_docker_tag'\]}}@${hyperkube_docker_tag}@g" ${tmp_file}
 	sed -i -e "s@{{test_args}}@${test_args}@g" ${tmp_file}
 	sed -i -e "s@{{ cpurequest }}@100m@g" ${tmp_file}
 	sed -i -e "s@{{log_level}}@${log_level}@g" ${tmp_file}
