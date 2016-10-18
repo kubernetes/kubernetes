@@ -36,12 +36,14 @@ type TypeMeta struct {
 	// Cannot be updated.
 	// In CamelCase.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	// +optional
 	Kind string `json:"kind,omitempty" protobuf:"bytes,1,opt,name=kind"`
 
 	// APIVersion defines the versioned schema of this representation of an object.
 	// Servers should convert recognized schemas to the latest internal value, and
 	// may reject unrecognized values.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources
+	// +optional
 	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,2,opt,name=apiVersion"`
 }
 
@@ -51,6 +53,7 @@ type ListMeta struct {
 	// SelfLink is a URL representing this object.
 	// Populated by the system.
 	// Read-only.
+	// +optional
 	SelfLink string `json:"selfLink,omitempty" protobuf:"bytes,1,opt,name=selfLink"`
 
 	// String that identifies the server's internal version of this object that
@@ -59,6 +62,7 @@ type ListMeta struct {
 	// Populated by the system.
 	// Read-only.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency
+	// +optional
 	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,2,opt,name=resourceVersion"`
 }
 
@@ -76,25 +80,31 @@ type Status struct {
 	TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	// +optional
 	ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Status of the operation.
 	// One of: "Success" or "Failure".
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+	// +optional
 	Status string `json:"status,omitempty" protobuf:"bytes,2,opt,name=status"`
 	// A human-readable description of the status of this operation.
+	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
 	// A machine-readable description of why this operation is in the
 	// "Failure" status. If this value is empty there
 	// is no information available. A Reason clarifies an HTTP status
 	// code but does not override it.
+	// +optional
 	Reason StatusReason `json:"reason,omitempty" protobuf:"bytes,4,opt,name=reason,casttype=StatusReason"`
 	// Extended data associated with the reason.  Each reason may define its
 	// own extended details. This field is optional and the data returned
 	// is not guaranteed to conform to any schema except that defined by
 	// the reason type.
+	// +optional
 	Details *StatusDetails `json:"details,omitempty" protobuf:"bytes,5,opt,name=details"`
 	// Suggested HTTP return code for this status, 0 if not set.
+	// +optional
 	Code int32 `json:"code,omitempty" protobuf:"varint,6,opt,name=code"`
 }
 
@@ -107,17 +117,22 @@ type Status struct {
 type StatusDetails struct {
 	// The name attribute of the resource associated with the status StatusReason
 	// (when there is a single name which can be described).
+	// +optional
 	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 	// The group attribute of the resource associated with the status StatusReason.
+	// +optional
 	Group string `json:"group,omitempty" protobuf:"bytes,2,opt,name=group"`
 	// The kind attribute of the resource associated with the status StatusReason.
 	// On some operations may differ from the requested resource Kind.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	// +optional
 	Kind string `json:"kind,omitempty" protobuf:"bytes,3,opt,name=kind"`
 	// The Causes array includes more details associated with the StatusReason
 	// failure. Not all StatusReasons may provide detailed causes.
+	// +optional
 	Causes []StatusCause `json:"causes,omitempty" protobuf:"bytes,4,rep,name=causes"`
 	// If specified, the time in seconds before the operation should be retried.
+	// +optional
 	RetryAfterSeconds int32 `json:"retryAfterSeconds,omitempty" protobuf:"varint,5,opt,name=retryAfterSeconds"`
 }
 
@@ -257,9 +272,11 @@ const (
 type StatusCause struct {
 	// A machine-readable description of the cause of the error. If this value is
 	// empty there is no information available.
+	// +optional
 	Type CauseType `json:"reason,omitempty" protobuf:"bytes,1,opt,name=reason,casttype=CauseType"`
 	// A human-readable description of the cause of the error.  This field may be
 	// presented as-is to a reader.
+	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,2,opt,name=message"`
 	// The field of the resource that has caused this error, as named by its JSON
 	// serialization. May include dot and postfix notation for nested attributes.
@@ -270,6 +287,7 @@ type StatusCause struct {
 	// Examples:
 	//   "name" - the field "name" on the current resource
 	//   "items[0].name" - the field "name" on the first array entry in "items"
+	// +optional
 	Field string `json:"field,omitempty" protobuf:"bytes,3,opt,name=field"`
 }
 
@@ -336,6 +354,7 @@ type APIGroup struct {
 	Versions []GroupVersionForDiscovery `json:"versions" protobuf:"bytes,2,rep,name=versions"`
 	// preferredVersion is the version preferred by the API server, which
 	// probably is the storage version.
+	// +optional
 	PreferredVersion GroupVersionForDiscovery `json:"preferredVersion,omitempty" protobuf:"bytes,3,opt,name=preferredVersion"`
 	// a map of client CIDR to server address that is serving this group.
 	// This is to help clients reach servers in the most network-efficient way possible.
@@ -429,8 +448,10 @@ type LabelSelector struct {
 	// matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
 	// map is equivalent to an element of matchExpressions, whose key field is "key", the
 	// operator is "In", and the values array contains only "value". The requirements are ANDed.
+	// +optional
 	MatchLabels map[string]string `json:"matchLabels,omitempty" protobuf:"bytes,1,rep,name=matchLabels"`
 	// matchExpressions is a list of label selector requirements. The requirements are ANDed.
+	// +optional
 	MatchExpressions []LabelSelectorRequirement `json:"matchExpressions,omitempty" protobuf:"bytes,2,rep,name=matchExpressions"`
 }
 
@@ -446,6 +467,7 @@ type LabelSelectorRequirement struct {
 	// the values array must be non-empty. If the operator is Exists or DoesNotExist,
 	// the values array must be empty. This array is replaced during a strategic
 	// merge patch.
+	// +optional
 	Values []string `json:"values,omitempty" protobuf:"bytes,3,rep,name=values"`
 }
 

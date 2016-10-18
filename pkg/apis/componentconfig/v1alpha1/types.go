@@ -343,8 +343,10 @@ type KubeletConfiguration struct {
 	// Enable QoS based Cgroup hierarchy: top level cgroups for QoS Classes
 	// And all Burstable and BestEffort pods are brought up under their
 	// specific top level QoS cgroup.
+	// +optional
 	CgroupsPerQOS *bool `json:"cgroupsPerQOS,omitempty"`
 	// driver that the kubelet uses to manipulate cgroups on the host (cgroupfs or systemd)
+	// +optional
 	CgroupDriver string `json:"cgroupDriver,omitempty"`
 	// containerRuntime is the container runtime to use.
 	ContainerRuntime string `json:"containerRuntime"`
@@ -482,8 +484,10 @@ type KubeletConfiguration struct {
 	IPTablesDropBit *int32 `json:"iptablesDropBit"`
 	// Whitelist of unsafe sysctls or sysctl patterns (ending in *). Use these at your own risk.
 	// Resource isolation might be lacking and pod might influence each other on the same node.
+	// +optional
 	AllowedUnsafeSysctls []string `json:"allowedUnsafeSysctls,omitempty"`
 	// How to integrate with runtime. If set to CRI, kubelet will switch to
 	// using the new Container Runtine Interface.
+	// +optional
 	ExperimentalRuntimeIntegrationType string `json:"experimentalRuntimeIntegrationType,omitempty"`
 }
