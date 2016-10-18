@@ -60,7 +60,7 @@ func installExtensionsAPIs(g *genericapiserver.GenericAPIServer, restOptionsFact
 		ParameterCodec:         api.ParameterCodec,
 		NegotiatedSerializer:   api.Codecs,
 	}
-	if err := g.InstallAPIGroup(&apiGroupInfo); err != nil {
+	if err := g.InstallAPIGroup("/apis", &apiGroupInfo); err != nil {
 		glog.Fatalf("Error in registering group versions: %v", err)
 	}
 }

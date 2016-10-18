@@ -344,7 +344,7 @@ func (m *Master) InstallAPIs(c *Config, restOptionsGetter genericapiserver.RESTO
 	}
 
 	for i := range apiGroupsInfo {
-		if err := m.GenericAPIServer.InstallAPIGroup(&apiGroupsInfo[i]); err != nil {
+		if err := m.GenericAPIServer.InstallAPIGroup("/apis", &apiGroupsInfo[i]); err != nil {
 			glog.Fatalf("Error in registering group versions: %v", err)
 		}
 	}
@@ -427,7 +427,7 @@ func (m *Master) removeThirdPartyStorage(path, resource string) error {
 	delete(entry.storage, resource)
 	if len(entry.storage) == 0 {
 		delete(m.thirdPartyResources, path)
-		m.GenericAPIServer.RemoveAPIGroupForDiscovery(extensionsrest.GetThirdPartyGroupName(path))
+		m.GenericAPIServer.RemoveAPIGroupForDiscovery("/apis", extensionsrest.GetThirdPartyGroupName(path))
 	} else {
 		m.thirdPartyResources[path] = entry
 	}
@@ -527,7 +527,7 @@ func (m *Master) addThirdPartyResourceStorage(path, resource string, storage *th
 	}
 	entry.storage[resource] = storage
 	if !found {
-		m.GenericAPIServer.AddAPIGroupForDiscovery(apiGroup)
+		m.GenericAPIServer.AddAPIGroupForDiscovery("/apis", apiGroup)
 	}
 }
 

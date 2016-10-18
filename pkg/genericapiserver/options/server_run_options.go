@@ -55,7 +55,7 @@ var AuthorizationModeChoices = []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABA
 
 // ServerRunOptions contains the options while running a generic api server.
 type ServerRunOptions struct {
-	APIGroupPrefix             string
+	APIGroupPrefixes           []string
 	AdmissionControl           string
 	AdmissionControlConfigFile string
 	AdvertiseAddress           net.IP
@@ -123,7 +123,7 @@ type ServerRunOptions struct {
 
 func NewServerRunOptions() *ServerRunOptions {
 	return &ServerRunOptions{
-		APIGroupPrefix:                           "/apis",
+		APIGroupPrefixes:                         []string{"/apis"},
 		AdmissionControl:                         "AlwaysAdmit",
 		AnonymousAuth:                            true,
 		AuthorizationMode:                        "AlwaysAllow",

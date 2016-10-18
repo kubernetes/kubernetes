@@ -102,7 +102,7 @@ func Run(serverOptions *genericoptions.ServerRunOptions) error {
 		Scheme:               api.Scheme,
 		NegotiatedSerializer: api.Codecs,
 	}
-	if err := s.InstallAPIGroup(&apiGroupInfo); err != nil {
+	if err := s.InstallAPIGroup(config.APIGroupPrefixes[0], &apiGroupInfo); err != nil {
 		return fmt.Errorf("Error in installing API: %v", err)
 	}
 	s.Run()

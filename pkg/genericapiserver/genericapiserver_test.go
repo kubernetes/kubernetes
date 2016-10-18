@@ -56,7 +56,7 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	config.ProxyDialer = func(network, addr string) (net.Conn, error) { return nil, nil }
 	config.ProxyTLSClientConfig = &tls.Config{}
 	config.LegacyAPIGroupPrefixes = sets.NewString("/api")
-	config.APIGroupPrefix = "/apis"
+	config.APIGroupPrefixes = []string{"/apis"}
 
 	return etcdServer, *config, assert.New(t)
 }
@@ -80,7 +80,7 @@ func TestNew(t *testing.T) {
 	// Verify many of the variables match their config counterparts
 	assert.Equal(s.enableSwaggerSupport, config.EnableSwaggerSupport)
 	assert.Equal(s.legacyAPIGroupPrefixes, config.LegacyAPIGroupPrefixes)
-	assert.Equal(s.apiPrefix, config.APIGroupPrefix)
+	assert.EqualValues(s.apiPrefixes, config.APIGroupPrefixes)
 	assert.Equal(s.admissionControl, config.AdmissionControl)
 	assert.Equal(s.RequestContextMapper(), config.RequestContextMapper)
 
@@ -105,7 +105,7 @@ func TestInstallAPIGroups(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	config.LegacyAPIGroupPrefixes = sets.NewString("/apiPrefix")
-	config.APIGroupPrefix = "/apiGroupPrefix"
+	config.APIGroupPrefixes = []string{"/apiGroupPrefix"}
 
 	s, err := config.SkipComplete().New()
 	if err != nil {
@@ -133,7 +133,7 @@ func TestInstallAPIGroups(t *testing.T) {
 		},
 	}
 	for i := range apiGroupsInfo {
-		s.InstallAPIGroup(&apiGroupsInfo[i])
+		s.InstallAPIGroup(config.APIGroupPrefixes[0], &apiGroupsInfo[i])
 	}
 
 	server := httptest.NewServer(s.InsecureHandler)
@@ -144,9 +144,9 @@ func TestInstallAPIGroups(t *testing.T) {
 		// "/api/v1"
 		config.LegacyAPIGroupPrefixes.List()[0] + "/" + apiGroupMeta.GroupVersion.Version,
 		// "/apis/extensions"
-		config.APIGroupPrefix + "/" + extensionsGroupMeta.GroupVersion.Group,
+		config.APIGroupPrefixes[0] + "/" + extensionsGroupMeta.GroupVersion.Group,
 		// "/apis/extensions/v1beta1"
-		config.APIGroupPrefix + "/" + extensionsGroupMeta.GroupVersion.String(),
+		config.APIGroupPrefixes[0] + "/" + extensionsGroupMeta.GroupVersion.String(),
 	}
 	for _, path := range validPaths {
 		_, err := http.Get(server.URL + path)
@@ -223,7 +223,7 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 	authz := mockAuthorizer{}
 
 	config.LegacyAPIGroupPrefixes = sets.NewString("/apiPrefix")
-	config.APIGroupPrefix = "/apiGroupPrefix"
+	config.APIGroupPrefixes = []string{"/apiGroupPrefix"}
 	config.Authorizer = &authz
 
 	config.EnableSwaggerUI = true
@@ -343,7 +343,7 @@ func getGroupList(server *httptest.Server) (*unversioned.APIGroupList, error) {
 }
 
 func TestDiscoveryAtAPIS(t *testing.T) {
-	master, etcdserver, _, assert := newMaster(t)
+	master, etcdserver, config, assert := newMaster(t)
 	defer etcdserver.Terminate(t)
 
 	server := httptest.NewServer(master.InsecureHandler)
@@ -364,7 +364,7 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 		GroupVersion: extensions.GroupName + "/preferred",
 		Version:      "preferred",
 	}
-	master.AddAPIGroupForDiscovery(unversioned.APIGroup{
+	master.AddAPIGroupForDiscovery(config.APIGroupPrefixes[0], unversioned.APIGroup{
 		Name:             extensions.GroupName,
 		Versions:         extensionsVersions,
 		PreferredVersion: extensionsPreferredVersion,
@@ -383,7 +383,7 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 	assert.Equal(master.getServerAddressByClientCIDRs(&http.Request{}), groupListGroup.ServerAddressByClientCIDRs)
 
 	// Remove the group.
-	master.RemoveAPIGroupForDiscovery(extensions.GroupName)
+	master.RemoveAPIGroupForDiscovery(config.APIGroupPrefixes[0], extensions.GroupName)
 	groupList, err = getGroupList(server)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
