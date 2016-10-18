@@ -201,7 +201,10 @@ func (s *StoreToReplicaSetLister) GetPodReplicaSets(pod *api.Pod) (rss []*extens
 		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
 			continue
 		}
-		rss = append(rss, rs)
+		// Do not take in consideration controllers that are being deleted
+		if rs.DeletionTimestamp == nil {
+			rss = append(rss, rs)
+		}
 	}
 	if len(rss) == 0 {
 		err = fmt.Errorf("could not find ReplicaSet for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)

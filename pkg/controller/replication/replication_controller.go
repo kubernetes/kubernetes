@@ -234,8 +234,8 @@ func (rm *ReplicationManager) Run(workers int, stopCh <-chan struct{}) {
 
 // getPodController returns the controller managing the given pod.
 // TODO: Surface that we are ignoring multiple controllers for a single pod.
-// TODO: use ownerReference.Controller to determine if the rc controls the pod.
-func (rm *ReplicationManager) getPodController(pod *api.Pod) *api.ReplicationController {
+func (rm *ReplicationManager) getPodController(pod *api.Pod) (ret_rc *api.ReplicationController) {
+	controllerRef := controller.GetControllerOf(pod.ObjectMeta)
 	// look up in the cache, if cached and the cache is valid, just return cached value
 	if obj, cached := rm.lookupCache.GetMatchingObject(pod); cached {
 		controller, ok := obj.(*api.ReplicationController)
@@ -244,7 +244,13 @@ func (rm *ReplicationManager) getPodController(pod *api.Pod) *api.ReplicationCon
 			glog.Errorf("lookup cache does not return a ReplicationController object")
 			return nil
 		}
-		if cached && rm.isCacheValid(pod, controller) {
+		// For the case when we have several active controllers with the same labels in the system,
+		// the cache will return the oldest controller for all pods with the same label and namespace
+		// So we need to check here that the oldest one is actually controls the pod,
+		// or the pod doesn't have controller set
+		isValidController := (controllerRef == nil || controllerRef.UID == controller.ObjectMeta.UID)
+		if isValidController && rm.isCacheValid(pod, controller) {
+			glog.V(4).Infof("Return for pod %s controller from cache: %+v", pod.Name, *controller)
 			return controller
 		}
 	}
@@ -266,19 +272,42 @@ func (rm *ReplicationManager) getPodController(pod *api.Pod) *api.ReplicationCon
 		// the first.
 		glog.Errorf("user error! more than one replication controller is selecting pods with labels: %+v", pod.Labels)
 		sort.Sort(OverlappingControllers(controllers))
+
 	}
 
-	// update lookup cache
-	rm.lookupCache.Update(pod, controllers[0])
+	ret_rc = controllers[0]
 
-	return controllers[0]
+	// check ownerReference.Controller and UID to determine if the rc controls the pod
+	// in case of multiple controllers match the pod's label
+	if controllerRef != nil {
+		ret_rc = nil
+		for _, rc := range controllers {
+			if controllerRef.UID == rc.ObjectMeta.UID {
+				ret_rc = rc
+				break
+			}
+		}
+	}
+
+	if ret_rc == controllers[0] {
+		// update lookup cache only for the oldest controller
+		rm.lookupCache.Update(pod, ret_rc)
+		glog.V(4).Infof("Return for pod %s controller: %+v", pod.Name, *ret_rc)
+	}
+
+	if ret_rc != nil {
+		// This should not happen
+		glog.Errorf("Pod %v ownerReference.Controller is true but failed to find correspondent controller!", pod.Name)
+	}
+
+	return
 }
 
 // isCacheValid check if the cache is valid
 func (rm *ReplicationManager) isCacheValid(pod *api.Pod, cachedRC *api.ReplicationController) bool {
-	_, err := rm.rcStore.ReplicationControllers(cachedRC.Namespace).Get(cachedRC.Name)
+	rc, err := rm.rcStore.ReplicationControllers(cachedRC.Namespace).Get(cachedRC.Name)
 	// rc has been deleted or updated, cache is invalid
-	if err != nil || !isControllerMatch(pod, cachedRC) {
+	if err != nil || !isControllerMatch(pod, cachedRC) || rc.ResourceVersion != cachedRC.ResourceVersion {
 		return false
 	}
 	return true

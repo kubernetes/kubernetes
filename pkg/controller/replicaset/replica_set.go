@@ -175,8 +175,8 @@ func (rsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
 
 // getPodReplicaSet returns the replica set managing the given pod.
 // TODO: Surface that we are ignoring multiple replica sets for a single pod.
-// TODO: use ownerReference.Controller to determine if the rs controls the pod.
-func (rsc *ReplicaSetController) getPodReplicaSet(pod *api.Pod) *extensions.ReplicaSet {
+func (rsc *ReplicaSetController) getPodReplicaSet(pod *api.Pod) (ret_rs *extensions.ReplicaSet) {
+	controllerRef := controller.GetControllerOf(pod.ObjectMeta)
 	// look up in the cache, if cached and the cache is valid, just return cached value
 	if obj, cached := rsc.lookupCache.GetMatchingObject(pod); cached {
 		rs, ok := obj.(*extensions.ReplicaSet)
@@ -185,7 +185,13 @@ func (rsc *ReplicaSetController) getPodReplicaSet(pod *api.Pod) *extensions.Repl
 			utilruntime.HandleError(fmt.Errorf("lookup cache does not return a ReplicaSet object"))
 			return nil
 		}
-		if cached && rsc.isCacheValid(pod, rs) {
+		// For the case when we have several active controllers with the same labels in the system,
+		// the cache will return the oldest controller for all pods with the same label and namespace
+		// So we need to check here that the oldest one is actually controls the pod,
+		// or the pod doesn't have controller set
+		isValidController := (controllerRef == nil || controllerRef.UID == rs.ObjectMeta.UID)
+		if isValidController && rsc.isCacheValid(pod, rs) {
+			glog.V(4).Infof("Return for pod %s controller from cache: %+v", pod.Name, *rs)
 			return rs
 		}
 	}
@@ -209,10 +215,32 @@ func (rsc *ReplicaSetController) getPodReplicaSet(pod *api.Pod) *extensions.Repl
 		sort.Sort(overlappingReplicaSets(rss))
 	}
 
-	// update lookup cache
-	rsc.lookupCache.Update(pod, rss[0])
+	ret_rs = rss[0]
 
-	return rss[0]
+	// check ownerReference.Controller and UID to determine if the rc controls the pod
+	// in case of multiple controllers match the pod's label
+	if controllerRef != nil {
+		ret_rs = nil
+		for _, rs := range rss {
+			if controllerRef.UID == rs.ObjectMeta.UID {
+				ret_rs = rs
+				break
+			}
+		}
+	}
+
+	if ret_rs == rss[0] {
+		// update lookup cache only for the oldest controller
+		glog.V(4).Infof("Return for pod %s controller: %+v", pod.Name, *ret_rs)
+		rsc.lookupCache.Update(pod, ret_rs)
+	}
+
+	if ret_rs == nil {
+		// This should not happen
+		glog.Errorf("Pod %v ownerReference.Controller is true but failed to find correspondent controller!", pod.Name)
+	}
+
+	return
 }
 
 // callback when RS is updated
@@ -255,9 +283,9 @@ func (rsc *ReplicaSetController) updateRS(old, cur interface{}) {
 
 // isCacheValid check if the cache is valid
 func (rsc *ReplicaSetController) isCacheValid(pod *api.Pod, cachedRS *extensions.ReplicaSet) bool {
-	_, err := rsc.rsLister.ReplicaSets(cachedRS.Namespace).Get(cachedRS.Name)
+	rs, err := rsc.rsLister.ReplicaSets(cachedRS.Namespace).Get(cachedRS.Name)
 	// rs has been deleted or updated, cache is invalid
-	if err != nil || !isReplicaSetMatch(pod, cachedRS) {
+	if err != nil || !isReplicaSetMatch(pod, cachedRS) || rs.ResourceVersion != cachedRS.ResourceVersion {
 		return false
 	}
 	return true

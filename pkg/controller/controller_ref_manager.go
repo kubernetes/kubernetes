@@ -64,7 +64,7 @@ func (m *PodControllerRefManager) Classify(pods []*api.Pod) (
 				pod.Namespace, pod.Name, pod.Status.Phase, pod.DeletionTimestamp)
 			continue
 		}
-		controllerRef := getControllerOf(pod.ObjectMeta)
+		controllerRef := GetControllerOf(pod.ObjectMeta)
 		if controllerRef != nil {
 			if controllerRef.UID == m.controllerObject.UID {
 				// already controlled
@@ -91,7 +91,7 @@ func (m *PodControllerRefManager) Classify(pods []*api.Pod) (
 
 // getControllerOf returns the controllerRef if controllee has a controller,
 // otherwise returns nil.
-func getControllerOf(controllee api.ObjectMeta) *api.OwnerReference {
+func GetControllerOf(controllee api.ObjectMeta) *api.OwnerReference {
 	for _, owner := range controllee.OwnerReferences {
 		// controlled by other controller
 		if owner.Controller != nil && *owner.Controller == true {
