@@ -491,7 +491,7 @@ testCases:
     threeWay:
       name: null
       value: null
-    result: 
+    result:
       other: a
   - description: delete all fields from map with conflict
     original:
@@ -508,7 +508,7 @@ testCases:
     threeWay:
       name: null
       value: null
-    result: 
+    result:
       other: a
   - description: add field and delete all fields from map
     original:
@@ -636,12 +636,12 @@ testCases:
       mergingList:
         - name: 3
           value: 3
-        - name: 4 
-          value: 4 
+        - name: 4
+          value: 4
     modified:
       mergingList:
-        - name: 4 
-          value: 4 
+        - name: 4
+          value: 4
         - name: 1
         - name: 2
           value: 2
@@ -658,8 +658,8 @@ testCases:
       mergingList:
         - name: 3
           value: 3
-        - name: 4 
-          value: 4 
+        - name: 4
+          value: 4
     result:
       mergingList:
         - name: 1
@@ -669,8 +669,8 @@ testCases:
           other: b
         - name: 3
           value: 3
-        - name: 4 
-          value: 4 
+        - name: 4
+          value: 4
   - description: merge lists of maps with conflict
     original:
       mergingList:
@@ -1776,6 +1776,27 @@ testCases:
               other: b
         - name: 2
           other: b
+  - description: defined null values should propagate overwrite current fields (with conflict) (ignore two-way application)
+    original:
+      name: 2
+    twoWay:
+      name: 1
+      value: 1
+      other: null
+    modified:
+      name: 1
+      value: 1
+      other: null
+    current:
+      name: a
+      other: a
+    threeWay:
+      name: 1
+      value: 1
+      other: null
+    result:
+      name: 1
+      value: 1
 `)
 
 func TestStrategicMergePatch(t *testing.T) {
@@ -1827,7 +1848,9 @@ func testTwoWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
 	}
 
 	testPatchCreation(t, expected, actual, c.Description)
-	testPatchApplication(t, original, actual, modified, c.Description)
+	if !strings.Contains(c.Description, "ignore two-way application") {
+		testPatchApplication(t, original, actual, modified, c.Description)
+	}
 }
 
 func twoWayTestCaseToJSONOrFail(t *testing.T, c StrategicMergePatchTestCase) ([]byte, []byte, []byte) {
