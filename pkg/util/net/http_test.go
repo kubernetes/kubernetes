@@ -52,6 +52,8 @@ func TestCloneTLSConfig(t *testing.T) {
 		// These fields are not copied
 		"SessionTicketsDisabled",
 		"SessionTicketKey",
+		"DynamicRecordSizingDisabled",
+		"Renegotiation",
 
 		// These fields are unexported
 		"serverInitOnce",
