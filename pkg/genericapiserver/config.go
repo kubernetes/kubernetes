@@ -56,6 +56,7 @@ import (
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
+	"sort"
 )
 
 const (
@@ -334,6 +335,28 @@ func (c *Config) Complete() completedConfig {
 			hostAndPort = net.JoinHostPort(hostAndPort, strconv.Itoa(c.ReadWritePort))
 		}
 		c.ExternalHost = hostAndPort
+	}
+	// All APIs will have the same authentication for now.
+	if c.OpenAPIConfig != nil && c.OpenAPIConfig.SecurityDefinitions != nil {
+		c.OpenAPIConfig.DefaultSecurity = []map[string][]string{}
+		keys := []string{}
+		for k := range c.OpenAPIConfig.SecurityDefinitions.SecurityDefinitions {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			c.OpenAPIConfig.DefaultSecurity = append(c.OpenAPIConfig.DefaultSecurity, map[string][]string{k: {}})
+		}
+		if c.OpenAPIConfig.CommonResponses == nil {
+			c.OpenAPIConfig.CommonResponses = &map[int]spec.Response{}
+		}
+		if _, exists := (*c.OpenAPIConfig.CommonResponses)[http.StatusUnauthorized]; !exists {
+			(*c.OpenAPIConfig.CommonResponses)[http.StatusUnauthorized] = spec.Response{
+				ResponseProps: spec.ResponseProps{
+					Description: "Unauthorized",
+				},
+			}
+		}
 	}
 	return completedConfig{c}
 }

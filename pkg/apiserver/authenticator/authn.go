@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
 	"k8s.io/kubernetes/pkg/auth/group"
 	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/password/keystone"
@@ -58,30 +59,37 @@ type AuthenticatorConfig struct {
 
 // New returns an authenticator.Request or an error that supports the standard
 // Kubernetes authentication mechanisms.
-func New(config AuthenticatorConfig) (authenticator.Request, error) {
+func New(config AuthenticatorConfig) (authenticator.Request, *common.SecurityDefinitions, error) {
 	var authenticators []authenticator.Request
+	securityDefinitions := common.NewSecurityDefinition()
 
 	// BasicAuth methods, local first, then remote
 	if len(config.BasicAuthFile) > 0 {
 		basicAuth, err := newAuthenticatorFromBasicAuthFile(config.BasicAuthFile)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		authenticators = append(authenticators, basicAuth)
+		if err := securityDefinitions.AddBasicDefinition("HTTP"); err != nil {
+			return nil, nil, err
+		}
 	}
 	if len(config.KeystoneURL) > 0 {
 		keystoneAuth, err := newAuthenticatorFromKeystoneURL(config.KeystoneURL)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		authenticators = append(authenticators, keystoneAuth)
+		if err := securityDefinitions.AddBasicDefinition("Keystone"); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	// X509 methods
 	if len(config.ClientCAFile) > 0 {
 		certAuth, err := newAuthenticatorFromClientCAFile(config.ClientCAFile)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		authenticators = append(authenticators, certAuth)
 	}
@@ -90,16 +98,22 @@ func New(config AuthenticatorConfig) (authenticator.Request, error) {
 	if len(config.TokenAuthFile) > 0 {
 		tokenAuth, err := newAuthenticatorFromTokenFile(config.TokenAuthFile)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		authenticators = append(authenticators, tokenAuth)
+		if err := securityDefinitions.AddTokenBearerDefinition("Token"); err != nil {
+			return nil, nil, err
+		}
 	}
 	if len(config.ServiceAccountKeyFiles) > 0 {
 		serviceAccountAuth, err := newServiceAccountAuthenticator(config.ServiceAccountKeyFiles, config.ServiceAccountLookup, config.ServiceAccountTokenGetter)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		authenticators = append(authenticators, serviceAccountAuth)
+		if err := securityDefinitions.AddTokenBearerDefinition("ServiceAccount"); err != nil {
+			return nil, nil, err
+		}
 	}
 	// NOTE(ericchiang): Keep the OpenID Connect after Service Accounts.
 	//
@@ -110,32 +124,41 @@ func New(config AuthenticatorConfig) (authenticator.Request, error) {
 	if len(config.OIDCIssuerURL) > 0 && len(config.OIDCClientID) > 0 {
 		oidcAuth, err := newAuthenticatorFromOIDCIssuerURL(config.OIDCIssuerURL, config.OIDCClientID, config.OIDCCAFile, config.OIDCUsernameClaim, config.OIDCGroupsClaim)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		authenticators = append(authenticators, oidcAuth)
+		if err := securityDefinitions.AddTokenBearerDefinition("OIDC_Token"); err != nil {
+			return nil, nil, err
+		}
 	}
 	if len(config.WebhookTokenAuthnConfigFile) > 0 {
 		webhookTokenAuth, err := newWebhookTokenAuthenticator(config.WebhookTokenAuthnConfigFile, config.WebhookTokenAuthnCacheTTL)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		authenticators = append(authenticators, webhookTokenAuth)
+		if err := securityDefinitions.AddTokenBearerDefinition("WebhookToken"); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	// always add anytoken last, so that every other token authenticator gets to try first
 	if config.AnyToken {
 		authenticators = append(authenticators, bearertoken.New(anytoken.AnyTokenAuthenticator{}))
+		if err := securityDefinitions.AddTokenBearerDefinition("AnyToken"); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	if len(authenticators) == 0 {
 		if config.Anonymous {
-			return anonymous.NewAuthenticator(), nil
+			return anonymous.NewAuthenticator(), &securityDefinitions, nil
 		}
 	}
 
 	switch len(authenticators) {
 	case 0:
-		return nil, nil
+		return nil, &securityDefinitions, nil
 	}
 
 	authenticator := union.New(authenticators...)
@@ -147,7 +170,7 @@ func New(config AuthenticatorConfig) (authenticator.Request, error) {
 		authenticator = union.NewFailOnError(authenticator, anonymous.NewAuthenticator())
 	}
 
-	return authenticator, nil
+	return authenticator, &securityDefinitions, nil
 }
 
 // IsValidServiceAccountKeyFile returns true if a valid public RSA key can be read from the given file

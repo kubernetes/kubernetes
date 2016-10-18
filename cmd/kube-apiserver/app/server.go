@@ -214,7 +214,7 @@ func Run(s *options.APIServer) error {
 		serviceAccountGetter = serviceaccountcontroller.NewGetterFromStorageInterface(storageConfig, storageFactory.ResourcePrefix(api.Resource("serviceaccounts")), storageFactory.ResourcePrefix(api.Resource("secrets")))
 	}
 
-	apiAuthenticator, err := authenticator.New(authenticator.AuthenticatorConfig{
+	apiAuthenticator, securityDefinitions, err := authenticator.New(authenticator.AuthenticatorConfig{
 		Anonymous:                   s.AnonymousAuth,
 		AnyToken:                    s.EnableAnyToken,
 		BasicAuthFile:               s.BasicAuthFile,
@@ -276,6 +276,9 @@ func Run(s *options.APIServer) error {
 
 		tokenAuthenticator := authenticator.NewAuthenticatorFromTokens(tokens)
 		apiAuthenticator = authenticatorunion.New(tokenAuthenticator, apiAuthenticator)
+		if err := securityDefinitions.AddTokenBearerDefinition("LoopbackToken"); err != nil {
+			glog.Fatalf("Failed to add security definition for LoopbackToken: %v", err)
+		}
 
 		tokenAuthorizer := authorizer.NewPrivilegedGroups(user.SystemPrivilegedGroup)
 		apiAuthorizer = authorizerunion.New(tokenAuthorizer, apiAuthorizer)
@@ -304,6 +307,7 @@ func Run(s *options.APIServer) error {
 	genericConfig.OpenAPIConfig.Definitions = generatedopenapi.OpenAPIDefinitions
 	genericConfig.OpenAPIConfig.GetOperationID = openapi.GetOperationID
 	genericConfig.EnableOpenAPISupport = true
+	genericConfig.OpenAPIConfig.SecurityDefinitions = securityDefinitions
 
 	config := &master.Config{
 		GenericConfig: genericConfig.Config,

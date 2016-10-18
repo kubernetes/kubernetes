@@ -42,12 +42,16 @@ trap cleanup EXIT SIGINT
 
 kube::golang::setup_env
 
+TMP_DIR=$(mktemp -d /tmp/update-openapi-spec.XXXX)
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
 API_PORT=${API_PORT:-8050}
 API_HOST=${API_HOST:-127.0.0.1}
 
 kube::etcd::start
+
+echo "admin,admin,admin" > $TMP_DIR/basicauth.csv
+echo "dummy_token,admin,admin" > $TMP_DIR/tokenauth.csv
 
 # Start federation-apiserver
 kube::log::status "Starting federation-apiserver"
@@ -57,6 +61,8 @@ kube::log::status "Starting federation-apiserver"
   --insecure-port="${API_PORT}" \
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --advertise-address="10.10.10.10" \
+  --basic-auth-file=$TMP_DIR/basicauth.csv \
+  --token-auth-file=$TMP_DIR/tokenauth.csv \
   --service-cluster-ip-range="10.0.0.0/24" >/tmp/openapi-federation-api-server.log 2>&1 &
 APISERVER_PID=$!
 kube::util::wait_for_url "${API_HOST}:${API_PORT}/" "apiserver: "
