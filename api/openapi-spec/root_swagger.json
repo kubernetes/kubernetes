@@ -26124,7 +26124,7 @@
     ],
     "properties": {
      "devicePath": {
-      "description": "DevicePath represents the device path where the volume should be avilable",
+      "description": "DevicePath represents the device path where the volume should be available",
       "type": "string"
      },
      "name": {
