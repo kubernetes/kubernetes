@@ -2168,12 +2168,25 @@ __EOF__
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_second_image_field}}:{{end}}" "${IMAGE_PERL}:"
   # Set the deployment's cpu limits
-  kubectl set resources deployment nginx-deployment --limits=cpu=100m "${kube_flags[@]}"
-  kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 0).resources.limits.cpu}}:{{end}}" "100m:"
-  kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 1).resources.limits.cpu}}:{{end}}" "100m:"
+  kubectl set resources deployment nginx-deployment --limits=cpu=200m "${kube_flags[@]}"
+  kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 0).resources.limits.cpu}}:{{end}}" "200m:"
+  kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 1).resources.limits.cpu}}:{{end}}" "200m:"
+  # Set the deployments memory limits without affecting the cpu limits
+  kubectl set resources deployment nginx-deployment --limits=memory=256Mi "${kube_flags[@]}"
+  kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 0).resources.limits.cpu}}:{{end}}" "200m:"
+  kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 0).resources.limits.memory}}:{{end}}" "256Mi:"
+  # Set the deployments resource requests without effecting the deployments limits
+  kubectl set resources deployment nginx-deployment --requests=cpu=100m,memory=256Mi "${kube_flags[@]}"
+  kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 0).resources.limits.cpu}}:{{end}}" "200m:"
+  kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 0).resources.limits.memory}}:{{end}}" "256Mi:"
+  kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 0).resources.requests.cpu}}:{{end}}" "100m:"
+  kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 0).resources.requests.memory}}:{{end}}" "256Mi:"
+  # Set the deployments resource requests and limits to zero
+  kubectl set resources deployment nginx-deployment --requests=cpu=0,memory=0 --limits=cpu=0,memory=0 "${kube_flags[@]}"
   # Set a non-existing container should fail
   ! kubectl set resources deployment nginx-deployment -c=redis --limits=cpu=100m
   # Set the limit of a specific container in deployment
+  kubectl set resources deployment nginx-deployment --limits=cpu=100m "${kube_flags[@]}"
   kubectl set resources deployment nginx-deployment -c=nginx --limits=cpu=200m "${kube_flags[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 0).resources.limits.cpu}}:{{end}}" "200m:"
   kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 1).resources.limits.cpu}}:{{end}}" "100m:"
