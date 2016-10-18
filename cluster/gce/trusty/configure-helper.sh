@@ -635,7 +635,7 @@ start_kube_apiserver() {
   elif [ -n "${MASTER_ADVERTISE_ADDRESS:-}" ]; then
     params="${params} --advertise-address=${MASTER_ADVERTISE_ADDRESS}"
   fi
-  readonly kube_apiserver_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-apiserver.docker_tag)
+  readonly hyperkube_docker_tag=$(cat "${kube_hom}/kube-docker-files/hyperkube.docker_tag")
 
   local webhook_authn_config_mount=""
   local webhook_authn_config_volume=""
@@ -672,7 +672,7 @@ start_kube_apiserver() {
   sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
   sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${DOCKER_REGISTRY}@g" "${src_file}"
-  sed -i -e "s@{{pillar\['kube-apiserver_docker_tag'\]}}@${kube_apiserver_docker_tag}@g" "${src_file}"
+  sed -i -e "s@{{pillar\['hyperkube_docker_tag'\]}}@${hyperkube_docker_tag}@g" "${src_file}"
   sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
   sed -i -e "s@{{secure_port}}@443@g" "${src_file}"
   sed -i -e "s@{{secure_port}}@8080@g" "${src_file}"
@@ -727,14 +727,14 @@ start_kube_controller_manager() {
     log_level="${CONTROLLER_MANAGER_TEST_LOG_LEVEL}"
   fi
   params="${params} ${log_level}"
-  readonly kube_rc_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-controller-manager.docker_tag)
+  readonly hyperkube_docker_tag=$(cat "${kube_hom}/kube-docker-files/hyperkube.docker_tag")
 
   src_file="/home/kubernetes/kube-manifests/kubernetes/gci-trusty/kube-controller-manager.manifest"
   remove_salt_config_comments "${src_file}"
   # Evaluate variables
   sed -i -e "s@{{srv_kube_path}}@/etc/srv/kubernetes@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${DOCKER_REGISTRY}@g" "${src_file}"
-  sed -i -e "s@{{pillar\['kube-controller-manager_docker_tag'\]}}@${kube_rc_docker_tag}@g" "${src_file}"
+  sed -i -e "s@{{pillar\['hyperkube_docker_tag'\]}}@${hyperkube_docker_tag}@g" "${src_file}"
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
   sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
   sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
@@ -766,14 +766,14 @@ start_kube_scheduler() {
     params="${params} --algorithm-provider=${SCHEDULING_ALGORITHM_PROVIDER}"
   fi
   
-  readonly kube_scheduler_docker_tag=$(cat "${kube_home}/kube-docker-files/kube-scheduler.docker_tag")
+  readonly hyperkube_docker_tag=$(cat "${kube_home}/kube-docker-files/hyperkube.docker_tag")
 
   # Remove salt comments and replace variables with values
   src_file="${kube_home}/kube-manifests/kubernetes/gci-trusty/kube-scheduler.manifest"
   remove_salt_config_comments "${src_file}"
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${DOCKER_REGISTRY}@g" "${src_file}"
-  sed -i -e "s@{{pillar\['kube-scheduler_docker_tag'\]}}@${kube_scheduler_docker_tag}@g" "${src_file}"
+  sed -i -e "s@{{pillar\['hyperkube_docker_tag'\]}}@${hyperkube_docker_tag}@g" "${src_file}"
   cp "${src_file}" /etc/kubernetes/manifests
 }
 

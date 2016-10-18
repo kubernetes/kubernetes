@@ -481,13 +481,6 @@ function stage-images() {
 
   KUBE_IMAGE_TAG="$(echo """${KUBE_GIT_VERSION}""" | sed 's/+/-/g')"
 
-  local docker_wrapped_binaries=(
-    "kube-apiserver"
-    "kube-controller-manager"
-    "kube-scheduler"
-    "kube-proxy"
-  )
-
   local docker_cmd=("docker")
 
   if [[ "${KUBE_DOCKER_REGISTRY}" == "gcr.io/"* ]]; then
@@ -500,18 +493,15 @@ function stage-images() {
 
   tar xzfv "${SERVER_BINARY_TAR}" -C "${temp_dir}" &> /dev/null
 
-  for binary in "${docker_wrapped_binaries[@]}"; do
-    local docker_tag="$(cat ${temp_dir}/kubernetes/server/bin/${binary}.docker_tag)"
-    (
-      "${docker_cmd[@]}" load -i "${temp_dir}/kubernetes/server/bin/${binary}.tar"
-	  docker rmi "${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_IMAGE_TAG}" || true
-	  "${docker_cmd[@]}" tag "gcr.io/google_containers/${binary}:${docker_tag}" "${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_IMAGE_TAG}"
-      "${docker_push_cmd[@]}" push "${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_IMAGE_TAG}"
-    ) &> "${temp_dir}/${binary}-push.log" &
-  done
-
-  kube::util::wait-for-jobs || {
-    kube::log::error "unable to push images. See ${temp_dir}/*.log for more info."
+  local hyperkube_tag="$(cat ${temp_dir}/kubernetes/server/bin/hyperkube.docker_tag)"
+  (
+    local image_ref="${KUBE_DOCKER_REGISTRY}/hyperkube-amd64:${KUBE_IMAGE_TAG}"
+    "${docker_cmd[@]}" load -i "${temp_dir}/kubernetes/server/bin/hyperkube.tar"
+    docker rmi "${image_ref}" || true
+    "${docker_cmd[@]}" tag "gcr.io/google_containers/hyperkube-amd64:${hyperkube_tag}" "${image_ref}"
+    "${docker_push_cmd[@]}" push "${image_ref}"
+  ) &> "${temp_dir}/hyperkube-push.log" || {
+    kube::log::error "unable to push hyperkube image. See ${temp_dir}/hyperkube-push.log for more info."
     return 1
   }
 

@@ -192,7 +192,7 @@
 "containers":[
     {
     "name": "kube-apiserver",
-    "image": "{{pillar['kube_docker_registry']}}/kube-apiserver:{{pillar['kube-apiserver_docker_tag']}}",
+    "image": "{{pillar['kube_docker_registry']}}/hyperkube-amd64:{{pillar['hyperkube_docker_tag']}}",
     "resources": {
       "requests": {
         "cpu": "250m"
@@ -201,7 +201,7 @@
     "command": [
                  "/bin/sh",
                  "-c",
-                 "/usr/local/bin/kube-apiserver {{params}} --allow-privileged={{pillar['allow_privileged']}} 1>>/var/log/kube-apiserver.log 2>&1"
+                 "/apiserver {{params}} --allow-privileged={{pillar['allow_privileged']}} 1>>/var/log/kube-apiserver.log 2>&1"
                ],
     "livenessProbe": {
       "httpGet": {

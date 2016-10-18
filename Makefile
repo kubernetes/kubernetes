@@ -53,6 +53,11 @@ KUBE_GOFLAGS := $(GOFLAGS)
 KUBE_GOLDFLAGS := $(GOLDFLAGS)
 KUBE_GOGCFLAGS = $(GOGCFLAGS)
 
+# Extra options for the release or quick-release options:
+KUBE_RELEASE_RUN_TESTS := $(KUBE_RELEASE_RUN_TESTS) 
+KUBE_FASTBUILD := $(KUBE_FASTBUILD)
+KUBE_RELEASE_HYPERKUBE_ONLY := $(KUBE_RELEASE_HYPERKUBE_ONLY)
+
 # This controls the verbosity of the build.  Higher numbers mean more output.
 KUBE_VERBOSE ?= 1
 

@@ -69,14 +69,18 @@ function kube::release::clean_cruft() {
   find ${RELEASE_STAGE} -name '.DS*' -exec rm {} \;
 }
 
-function kube::release::package_hyperkube() {
-  # If we have these variables set then we want to build all docker images.
-  if [[ -n "${KUBE_DOCKER_IMAGE_TAG-}" && -n "${KUBE_DOCKER_REGISTRY-}" ]]; then
-    for arch in "${KUBE_SERVER_PLATFORMS[@]##*/}"; do
-      kube::log::status "Building hyperkube image for arch: ${arch}"
-      REGISTRY="${KUBE_DOCKER_REGISTRY}" VERSION="${KUBE_DOCKER_IMAGE_TAG}" ARCH="${arch}" make -C cluster/images/hyperkube/ build
-    done
+function kube::release::build_hyperkube() {
+  # If these variables aren't set, default them sanely
+  if [[ "${KUBE_DOCKER_IMAGE_TAG:-}" == "" ]]; then
+    KUBE_DOCKER_IMAGE_TAG=$(kube::release::semantic_image_tag_version )
   fi
+  if [[ "${KUBE_DOCKER_REGISTRY:-}" == "" ]]; then
+    KUBE_DOCKER_REGISTRY="gcr.io/google_containers"
+  fi
+  for arch in "${KUBE_SERVER_PLATFORMS[@]##*/}"; do
+    kube::log::status "Building hyperkube image for arch: ${arch}"
+    REGISTRY="${KUBE_DOCKER_REGISTRY}" VERSION="${KUBE_DOCKER_IMAGE_TAG}" ARCH="${arch}" make -C cluster/images/hyperkube/ build
+  done
 }
 
 function kube::release::package_tarballs() {
@@ -249,8 +253,58 @@ function kube::release::sha1() {
   fi
 }
 
-# This will take binaries that run on master and creates Docker images
-# that wrap the binary in them. (One docker image per binary)
+function kube::release::wrap_docker_binary() {
+  local binary_dir="$1"
+  local binary_name="$2"
+  local base_image="$3"
+
+  kube::log::status "Starting Docker build for image: ${binary_name}"
+  local md5_sum
+  md5_sum=$(kube::release::md5 "${binary_dir}/${binary_name}")
+
+  local docker_build_path="${binary_dir}/${binary_name}.dockerbuild"
+  local docker_file_path="${docker_build_path}/Dockerfile"
+  local binary_file_path="${binary_dir}/${binary_name}"
+
+  rm -rf ${docker_build_path}
+  mkdir -p ${docker_build_path}
+  ln ${binary_dir}/${binary_name} ${docker_build_path}/${binary_name}
+  printf " FROM ${base_image} \n ADD ${binary_name} /usr/local/bin/${binary_name}\n" > ${docker_file_path}
+
+  if [[ ${arch} == "amd64" ]]; then
+    # If we are building a amd64 docker image, preserve the original image name
+    local docker_image_tag=gcr.io/google_containers/${binary_name}:${md5_sum}
+  else
+    # If we are building a docker image for another architecture, append the arch in the image tag
+    local docker_image_tag=gcr.io/google_containers/${binary_name}-${arch}:${md5_sum}
+  fi
+
+  "${DOCKER[@]}" build -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
+  "${DOCKER[@]}" save ${docker_image_tag} > ${binary_dir}/${binary_name}.tar
+  echo $md5_sum > ${binary_dir}/${binary_name}.docker_tag
+
+  rm -rf ${docker_build_path}
+
+  # If we are building an official/alpha/beta release we want to keep docker images
+  # and tag them appropriately.
+  if [[ -n "${KUBE_DOCKER_IMAGE_TAG-}" && -n "${KUBE_DOCKER_REGISTRY-}" ]]; then
+    local release_docker_image_tag="${KUBE_DOCKER_REGISTRY}/${binary_name}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"
+    kube::log::status "Tagging docker image ${docker_image_tag} as ${release_docker_image_tag}"
+    docker rmi "${release_docker_image_tag}" || true
+    "${DOCKER[@]}" tag "${docker_image_tag}" "${release_docker_image_tag}" 2>/dev/null
+  fi
+
+  kube::log::status "Deleting docker image ${docker_image_tag}"
+  "${DOCKER[@]}" rmi ${docker_image_tag} 2>/dev/null || true
+}
+
+# This will take binaries that run on Kubernetes masters and/or nodes and
+# package them as thin docker images, one per binar.
+# In addition, this function creates a docker image tarball for the "hyperkube"
+# image which is a superset of all other images and should be used instead of
+# the individual docker images.
+# All of the images are still created for release for backwards compatibility.
+# Deprecation issue: https://issues.k8s.io/16508
 # Args:
 #  $1 - binary_dir, the directory to save the tared images to.
 #  $2 - arch, architecture for which we are building docker images.
@@ -262,63 +316,33 @@ function kube::release::create_docker_images_for_server() {
     local binary_name
     local binaries=($(kube::build::get_docker_wrapped_binaries ${arch}))
 
-    for wrappable in "${binaries[@]}"; do
+    if [[ ${#binaries[@]} -gt 0 ]]; then
+      for wrappable in "${binaries[@]}"; do
+        local oldifs=$IFS
+        IFS=","
+        set $wrappable
+        IFS=$oldifs
 
-      local oldifs=$IFS
-      IFS=","
-      set $wrappable
-      IFS=$oldifs
+        local binary_name="$1"
+        local base_image="$2"
 
-      local binary_name="$1"
-      local base_image="$2"
-
-      kube::log::status "Starting Docker build for image: ${binary_name}"
-
-      (
-        local md5_sum
-        md5_sum=$(kube::release::md5 "${binary_dir}/${binary_name}")
-
-        local docker_build_path="${binary_dir}/${binary_name}.dockerbuild"
-        local docker_file_path="${docker_build_path}/Dockerfile"
-        local binary_file_path="${binary_dir}/${binary_name}"
-
-        rm -rf ${docker_build_path}
-        mkdir -p ${docker_build_path}
-        ln ${binary_dir}/${binary_name} ${docker_build_path}/${binary_name}
-        printf " FROM ${base_image} \n ADD ${binary_name} /usr/local/bin/${binary_name}\n" > ${docker_file_path}
-
-        if [[ ${arch} == "amd64" ]]; then
-          # If we are building a amd64 docker image, preserve the original image name
-          local docker_image_tag=gcr.io/google_containers/${binary_name}:${md5_sum}
-        else
-          # If we are building a docker image for another architecture, append the arch in the image tag
-          local docker_image_tag=gcr.io/google_containers/${binary_name}-${arch}:${md5_sum}
-        fi
-
-        "${DOCKER[@]}" build -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
-        "${DOCKER[@]}" save ${docker_image_tag} > ${binary_dir}/${binary_name}.tar
-        echo $md5_sum > ${binary_dir}/${binary_name}.docker_tag
-
-        rm -rf ${docker_build_path}
-
-        # If we are building an official/alpha/beta release we want to keep docker images
-        # and tag them appropriately.
-        if [[ -n "${KUBE_DOCKER_IMAGE_TAG-}" && -n "${KUBE_DOCKER_REGISTRY-}" ]]; then
-          local release_docker_image_tag="${KUBE_DOCKER_REGISTRY}/${binary_name}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"
-          kube::log::status "Tagging docker image ${docker_image_tag} as ${release_docker_image_tag}"
-          docker rmi "${release_docker_image_tag}" || true
-          "${DOCKER[@]}" tag "${docker_image_tag}" "${release_docker_image_tag}" 2>/dev/null
-        fi
-
-        kube::log::status "Deleting docker image ${docker_image_tag}"
-        "${DOCKER[@]}" rmi ${docker_image_tag} 2>/dev/null || true
-      ) &
-    done
+        kube::release::wrap_docker_binary "$binary_dir" "$binary_name" "$base_image" &
+      done
+    fi
+    (
+      # Hyperkube image
+      # We know this was built above in package_hyperkube, just reuse its tag
+      local tag_arch="-${arch}"
+      # Leak from cluster/images/hyperkube/Makefile, this is the format it tags them in
+      local docker_image="${KUBE_DOCKER_REGISTRY}/hyperkube${tag_arch}:${KUBE_DOCKER_IMAGE_TAG}"
+      kube::log::status "Saving hyperkube image ${docker_image}"
+      "${DOCKER[@]}" save "${docker_image}" > ${binary_dir}/hyperkube.tar
+      echo "${KUBE_DOCKER_IMAGE_TAG}" > ${binary_dir}/hyperkube.docker_tag
+    ) &
 
     kube::util::wait-for-jobs || { kube::log::error "previous Docker build failed"; return 1; }
     kube::log::status "Docker builds done"
   )
-
 }
 
 # Package up the salt configuration tree.  This is an optional helper to getting
