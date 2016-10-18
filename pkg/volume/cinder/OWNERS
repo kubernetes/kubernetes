@@ -1,7 +1,3 @@
-maintainers:
+approvers:
 - jsafrane
 - spothanis
-to_migrate_to_approvers:
-  approvers:
-  - jsafrane
-  - spothanis

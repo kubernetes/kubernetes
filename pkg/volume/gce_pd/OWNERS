@@ -1,7 +1,3 @@
-maintainers:
+approvers:
 - saad-ali
 - thockin
-to_migrate_to_approvers:
-  approvers:
-  - saad-ali
-  - thockin

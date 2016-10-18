@@ -1,15 +1,7 @@
-maintainers:
-- dagnello
+approvers:
 - abithap
-- imkin
 - abrarshivani
+- dagnello
+- imkin
 - kerneltime
 - luomiao
-to_migrate_to_approvers:
-  approvers:
-  - dagnello
-  - abithap
-  - imkin
-  - abrarshivani
-  - kerneltime
-  - luomiao

@@ -1,15 +1,7 @@
-assignees:
+approvers:
 - brendandburns
 - deads2k
 - janetkuo
 - jlowdermilk
 - pwittrock
 - smarterclayton
-to_migrate_to_approvers:
-  approvers:
-  - brendandburns
-  - deads2k
-  - janetkuo
-  - jlowdermilk
-  - pwittrock
-  - smarterclayton

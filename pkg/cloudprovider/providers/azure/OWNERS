@@ -1,7 +1,3 @@
-assignees:
-- colemickens
+approvers:
 - brendandburns
-to_migrate_to_approvers:
-  approvers:
-  - colemickens
-  - brendandburns
+- colemickens

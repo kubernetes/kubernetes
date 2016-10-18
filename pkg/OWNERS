@@ -1,13 +1,6 @@
-assignees:
+approvers:
 - brendandburns
 - dchen1107
 - lavalamp
 - smarterclayton
 - thockin
-to_migrate_to_approvers:
-  approvers:
-  - brendandburns
-  - dchen1107
-  - lavalamp
-  - smarterclayton
-  - thockin

@@ -1,13 +1,6 @@
-assignees:
+approvers:
 - bgrant0607
 - erictune
 - lavalamp
 - smarterclayton
 - thockin
-to_migrate_to_approvers:
-  approvers:
-  - bgrant0607
-  - erictune
-  - lavalamp
-  - smarterclayton
-  - thockin

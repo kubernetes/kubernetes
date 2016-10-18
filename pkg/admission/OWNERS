@@ -1,13 +1,6 @@
-assignees:
+approvers:
 - davidopp
 - derekwaynecarr
 - erictune
 - lavalamp
 - liggitt
-to_migrate_to_approvers:
-  approvers:
-  - davidopp
-  - derekwaynecarr
-  - erictune
-  - lavalamp
-  - liggitt

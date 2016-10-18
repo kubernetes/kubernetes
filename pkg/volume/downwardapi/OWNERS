@@ -1,7 +1,3 @@
-maintainers:
+approvers:
 - pmorie
 - sdminonne
-to_migrate_to_approvers:
-  approvers:
-  - pmorie
-  - sdminonne

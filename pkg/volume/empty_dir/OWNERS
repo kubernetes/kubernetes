@@ -1,9 +1,4 @@
-maintainers:
+approvers:
 - pmorie
 - saad-ali
 - thockin
-to_migrate_to_approvers:
-  approvers:
-  - pmorie
-  - saad-ali
-  - thockin

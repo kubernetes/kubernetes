@@ -1,9 +1,4 @@
-assignees:
+approvers:
 - lavalamp
 - smarterclayton
 - wojtek-t
-to_migrate_to_approvers:
-  approvers:
-  - lavalamp
-  - smarterclayton
-  - wojtek-t
