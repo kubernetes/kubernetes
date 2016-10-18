@@ -349,3 +349,57 @@ func NewLimitRangeInformer(client clientset.Interface, resyncPeriod time.Duratio
 
 	return sharedIndexInformer
 }
+
+/*****************************************************************************/
+
+// ServiceAccountInformer is type of SharedIndexInformer which watches and lists all ServiceAccounts.
+// Interface provides constructor for informer and lister for ServiceAccounts
+type ServiceAccountInformer interface {
+	Informer() cache.SharedIndexInformer
+	Lister() *cache.StoreToServiceAccountLister
+}
+
+type serviceAccountInformer struct {
+	*sharedInformerFactory
+}
+
+// Informer checks whether ServiceAccountInformer exists in sharedInformerFactory and if not, it creates new informer of type
+// ServiceAccountInformer and connects it to sharedInformerFactory
+func (f *serviceAccountInformer) Informer() cache.SharedIndexInformer {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	informerType := reflect.TypeOf(&api.ServiceAccount{})
+	informer, exists := f.informers[informerType]
+	if exists {
+		return informer
+	}
+	informer = NewServiceAccountInformer(f.client, f.defaultResync)
+	f.informers[informerType] = informer
+
+	return informer
+}
+
+// Lister returns lister for ServiceAccountInformer
+func (f *serviceAccountInformer) Lister() *cache.StoreToServiceAccountLister {
+	informer := f.Informer()
+	return &cache.StoreToServiceAccountLister{Indexer: informer.GetIndexer()}
+}
+
+// NewServiceAccountInformer returns a SharedIndexInformer that lists and watches all ServiceAccounts
+func NewServiceAccountInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	sharedIndexInformer := cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return client.Core().ServiceAccounts(api.NamespaceAll).List(options)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return client.Core().ServiceAccounts(api.NamespaceAll).Watch(options)
+			},
+		},
+		&api.ServiceAccount{},
+		resyncPeriod,
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+
+	return sharedIndexInformer
+}
