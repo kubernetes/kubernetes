@@ -26,9 +26,9 @@ import (
 	"sync"
 	"time"
 
-	staging "k8s.io/client-go/1.5/kubernetes"
-	"k8s.io/client-go/1.5/pkg/util/sets"
-	clientreporestclient "k8s.io/client-go/1.5/rest"
+	staging "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/util/sets"
+	clientreporestclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"

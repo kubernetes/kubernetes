@@ -22,13 +22,12 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/client-go/1.5/kubernetes"
-	apiapi "k8s.io/client-go/1.5/pkg/api"
-	"k8s.io/client-go/1.5/pkg/api/unversioned"
-	api "k8s.io/client-go/1.5/pkg/api/v1"
-	extensions "k8s.io/client-go/1.5/pkg/apis/extensions/v1beta1"
-	policy "k8s.io/client-go/1.5/pkg/apis/policy/v1alpha1"
-	"k8s.io/client-go/1.5/pkg/util/intstr"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api/unversioned"
+	api "k8s.io/client-go/pkg/api/v1"
+	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	policy "k8s.io/client-go/pkg/apis/policy/v1alpha1"
+	"k8s.io/client-go/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -132,7 +131,7 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 			// Locate a running pod.
 			var pod api.Pod
 			err := wait.PollImmediate(framework.Poll, schedulingTimeout, func() (bool, error) {
-				podList, err := cs.Pods(ns).List(apiapi.ListOptions{})
+				podList, err := cs.Pods(ns).List(api.ListOptions{})
 				if err != nil {
 					return false, err
 				}
