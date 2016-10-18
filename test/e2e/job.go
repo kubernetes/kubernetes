@@ -22,7 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -50,11 +50,11 @@ var _ = framework.KubeDescribe("Job", func() {
 	It("should run a job to completion when tasks succeed", func() {
 		By("Creating a job")
 		job := newTestJob("succeed", "all-succeed", api.RestartPolicyNever, parallelism, completions)
-		job, err := createJob(f.Client, f.Namespace.Name, job)
+		job, err := createJob(f.ClientSet, f.Namespace.Name, job)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring job reaches completions")
-		err = waitForJobFinish(f.Client, f.Namespace.Name, job.Name, completions)
+		err = waitForJobFinish(f.ClientSet, f.Namespace.Name, job.Name, completions)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -69,11 +69,11 @@ var _ = framework.KubeDescribe("Job", func() {
 		// due to successive failures too likely with a reasonable
 		// test timeout.
 		job := newTestJob("failOnce", "fail-once-local", api.RestartPolicyOnFailure, parallelism, completions)
-		job, err := createJob(f.Client, f.Namespace.Name, job)
+		job, err := createJob(f.ClientSet, f.Namespace.Name, job)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring job reaches completions")
-		err = waitForJobFinish(f.Client, f.Namespace.Name, job.Name, completions)
+		err = waitForJobFinish(f.ClientSet, f.Namespace.Name, job.Name, completions)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -87,23 +87,23 @@ var _ = framework.KubeDescribe("Job", func() {
 		// run due to some slowness, 1 in 2^15 chance of happening,
 		// causing test flake.  Should be very rare.
 		job := newTestJob("randomlySucceedOrFail", "rand-non-local", api.RestartPolicyNever, parallelism, completions)
-		job, err := createJob(f.Client, f.Namespace.Name, job)
+		job, err := createJob(f.ClientSet, f.Namespace.Name, job)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring job reaches completions")
-		err = waitForJobFinish(f.Client, f.Namespace.Name, job.Name, completions)
+		err = waitForJobFinish(f.ClientSet, f.Namespace.Name, job.Name, completions)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("should keep restarting failed pods", func() {
 		By("Creating a job")
 		job := newTestJob("fail", "all-fail", api.RestartPolicyNever, parallelism, completions)
-		job, err := createJob(f.Client, f.Namespace.Name, job)
+		job, err := createJob(f.ClientSet, f.Namespace.Name, job)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring job shows many failures")
 		err = wait.Poll(framework.Poll, jobTimeout, func() (bool, error) {
-			curr, err := getJob(f.Client, f.Namespace.Name, job.Name)
+			curr, err := getJob(f.ClientSet, f.Namespace.Name, job.Name)
 			if err != nil {
 				return false, err
 			}
@@ -116,11 +116,11 @@ var _ = framework.KubeDescribe("Job", func() {
 		endParallelism := int32(2)
 		By("Creating a job")
 		job := newTestJob("notTerminate", "scale-up", api.RestartPolicyNever, startParallelism, completions)
-		job, err := createJob(f.Client, f.Namespace.Name, job)
+		job, err := createJob(f.ClientSet, f.Namespace.Name, job)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring active pods == startParallelism")
-		err = waitForAllPodsRunning(f.Client, f.Namespace.Name, job.Name, startParallelism)
+		err = waitForAllPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, startParallelism)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("scale job up")
@@ -132,7 +132,7 @@ var _ = framework.KubeDescribe("Job", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring active pods == endParallelism")
-		err = waitForAllPodsRunning(f.Client, f.Namespace.Name, job.Name, endParallelism)
+		err = waitForAllPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, endParallelism)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -141,11 +141,11 @@ var _ = framework.KubeDescribe("Job", func() {
 		endParallelism := int32(1)
 		By("Creating a job")
 		job := newTestJob("notTerminate", "scale-down", api.RestartPolicyNever, startParallelism, completions)
-		job, err := createJob(f.Client, f.Namespace.Name, job)
+		job, err := createJob(f.ClientSet, f.Namespace.Name, job)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring active pods == startParallelism")
-		err = waitForAllPodsRunning(f.Client, f.Namespace.Name, job.Name, startParallelism)
+		err = waitForAllPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, startParallelism)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("scale job down")
@@ -157,18 +157,18 @@ var _ = framework.KubeDescribe("Job", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring active pods == endParallelism")
-		err = waitForAllPodsRunning(f.Client, f.Namespace.Name, job.Name, endParallelism)
+		err = waitForAllPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, endParallelism)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("should delete a job", func() {
 		By("Creating a job")
 		job := newTestJob("notTerminate", "foo", api.RestartPolicyNever, parallelism, completions)
-		job, err := createJob(f.Client, f.Namespace.Name, job)
+		job, err := createJob(f.ClientSet, f.Namespace.Name, job)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring active pods == parallelism")
-		err = waitForAllPodsRunning(f.Client, f.Namespace.Name, job.Name, parallelism)
+		err = waitForAllPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, parallelism)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("delete a job")
@@ -179,7 +179,7 @@ var _ = framework.KubeDescribe("Job", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring job was deleted")
-		_, err = getJob(f.Client, f.Namespace.Name, job.Name)
+		_, err = getJob(f.ClientSet, f.Namespace.Name, job.Name)
 		Expect(err).To(HaveOccurred())
 		Expect(errors.IsNotFound(err)).To(BeTrue())
 	})
@@ -189,21 +189,21 @@ var _ = framework.KubeDescribe("Job", func() {
 		job := newTestJob("notTerminate", "foo", api.RestartPolicyNever, parallelism, completions)
 		activeDeadlineSeconds := int64(10)
 		job.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
-		job, err := createJob(f.Client, f.Namespace.Name, job)
+		job, err := createJob(f.ClientSet, f.Namespace.Name, job)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring job was failed")
-		err = waitForJobFail(f.Client, f.Namespace.Name, job.Name, 20*time.Second)
+		err = waitForJobFail(f.ClientSet, f.Namespace.Name, job.Name, 20*time.Second)
 		if err == wait.ErrWaitTimeout {
-			job, err = getJob(f.Client, f.Namespace.Name, job.Name)
+			job, err = getJob(f.ClientSet, f.Namespace.Name, job.Name)
 			Expect(err).NotTo(HaveOccurred())
 			// the job stabilized and won't be synced until modification or full
 			// resync happens, we don't want to wait for the latter so we force
 			// sync modifying it
 			job.Spec.Parallelism = &completions
-			job, err = updateJob(f.Client, f.Namespace.Name, job)
+			job, err = updateJob(f.ClientSet, f.Namespace.Name, job)
 			Expect(err).NotTo(HaveOccurred())
-			err = waitForJobFail(f.Client, f.Namespace.Name, job.Name, jobTimeout)
+			err = waitForJobFail(f.ClientSet, f.Namespace.Name, job.Name, jobTimeout)
 		}
 		Expect(err).NotTo(HaveOccurred())
 	})
@@ -218,7 +218,7 @@ func newTestJob(behavior, name string, rPol api.RestartPolicy, parallelism, comp
 		Spec: batch.JobSpec{
 			Parallelism:    &parallelism,
 			Completions:    &completions,
-			ManualSelector: newBool(true),
+			ManualSelector: newBool(false),
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{jobSelectorKey: name},
@@ -272,28 +272,28 @@ func newTestJob(behavior, name string, rPol api.RestartPolicy, parallelism, comp
 	return job
 }
 
-func getJob(c *client.Client, ns, name string) (*batch.Job, error) {
-	return c.Extensions().Jobs(ns).Get(name)
+func getJob(c clientset.Interface, ns, name string) (*batch.Job, error) {
+	return c.Batch().Jobs(ns).Get(name)
 }
 
-func createJob(c *client.Client, ns string, job *batch.Job) (*batch.Job, error) {
-	return c.Extensions().Jobs(ns).Create(job)
+func createJob(c clientset.Interface, ns string, job *batch.Job) (*batch.Job, error) {
+	return c.Batch().Jobs(ns).Create(job)
 }
 
-func updateJob(c *client.Client, ns string, job *batch.Job) (*batch.Job, error) {
-	return c.Extensions().Jobs(ns).Update(job)
+func updateJob(c clientset.Interface, ns string, job *batch.Job) (*batch.Job, error) {
+	return c.Batch().Jobs(ns).Update(job)
 }
 
-func deleteJob(c *client.Client, ns, name string) error {
-	return c.Extensions().Jobs(ns).Delete(name, nil)
+func deleteJob(c clientset.Interface, ns, name string) error {
+	return c.Batch().Jobs(ns).Delete(name, nil)
 }
 
 // Wait for all pods to become Running.  Only use when pods will run for a long time, or it will be racy.
-func waitForAllPodsRunning(c *client.Client, ns, jobName string, parallelism int32) error {
+func waitForAllPodsRunning(c clientset.Interface, ns, jobName string, parallelism int32) error {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{jobSelectorKey: jobName}))
 	return wait.Poll(framework.Poll, jobTimeout, func() (bool, error) {
 		options := api.ListOptions{LabelSelector: label}
-		pods, err := c.Pods(ns).List(options)
+		pods, err := c.Core().Pods(ns).List(options)
 		if err != nil {
 			return false, err
 		}
@@ -308,9 +308,9 @@ func waitForAllPodsRunning(c *client.Client, ns, jobName string, parallelism int
 }
 
 // Wait for job to reach completions.
-func waitForJobFinish(c *client.Client, ns, jobName string, completions int32) error {
+func waitForJobFinish(c clientset.Interface, ns, jobName string, completions int32) error {
 	return wait.Poll(framework.Poll, jobTimeout, func() (bool, error) {
-		curr, err := c.Extensions().Jobs(ns).Get(jobName)
+		curr, err := c.Batch().Jobs(ns).Get(jobName)
 		if err != nil {
 			return false, err
 		}
@@ -319,9 +319,9 @@ func waitForJobFinish(c *client.Client, ns, jobName string, completions int32) e
 }
 
 // Wait for job fail.
-func waitForJobFail(c *client.Client, ns, jobName string, timeout time.Duration) error {
+func waitForJobFail(c clientset.Interface, ns, jobName string, timeout time.Duration) error {
 	return wait.Poll(framework.Poll, timeout, func() (bool, error) {
-		curr, err := c.Extensions().Jobs(ns).Get(jobName)
+		curr, err := c.Batch().Jobs(ns).Get(jobName)
 		if err != nil {
 			return false, err
 		}

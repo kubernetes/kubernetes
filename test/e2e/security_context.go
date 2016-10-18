@@ -167,11 +167,11 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	}
 	pod.Spec.Containers[0].Command = []string{"sleep", "6000"}
 
-	client := f.Client.Pods(f.Namespace.Name)
+	client := f.ClientSet.Core().Pods(f.Namespace.Name)
 	pod, err := client.Create(pod)
 
 	framework.ExpectNoError(err, "Error creating pod %v", pod)
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, pod))
+	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.ClientSet, pod))
 
 	testContent := "hello"
 	testFilePath := mountPath + "/TEST"
@@ -181,7 +181,7 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	Expect(err).To(BeNil())
 	Expect(content).To(ContainSubstring(testContent))
 
-	foundPod, err := f.Client.Pods(f.Namespace.Name).Get(pod.Name)
+	foundPod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(pod.Name)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Confirm that the file can be accessed from a second

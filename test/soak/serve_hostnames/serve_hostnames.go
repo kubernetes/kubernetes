@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -82,7 +82,7 @@ func main() {
 		glog.Fatalf("Failed to construct config: %v", err)
 	}
 
-	c, err := client.New(config)
+	client, err := clientset.NewForConfig(config)
 	if err != nil {
 		glog.Fatalf("Failed to make client: %v", err)
 	}
@@ -117,7 +117,7 @@ func main() {
 	}
 	ns := got.Name
 	defer func(ns string) {
-		if err := c.Namespaces().Delete(ns); err != nil {
+		if err := client.Core().Namespaces().Delete(ns, nil); err != nil {
 			glog.Warningf("Failed to delete namespace ns: %e", ns, err)
 		} else {
 			// wait until the namespace disappears

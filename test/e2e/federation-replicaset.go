@@ -46,7 +46,7 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 
 	Describe("ReplicaSet objects", func() {
 		AfterEach(func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 
 			// Delete registered replicasets.
 			nsName := f.FederationNamespace.Name
@@ -59,7 +59,7 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 		})
 
 		It("should be created and deleted successfully", func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 
 			nsName := f.FederationNamespace.Name
 			replicaset := createReplicaSetOrFail(f.FederationClientset_1_5, nsName)
@@ -79,7 +79,7 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 			federationName string
 		)
 		BeforeEach(func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 			if federationName = os.Getenv("FEDERATION_NAME"); federationName == "" {
 				federationName = DefaultFederationName
 			}

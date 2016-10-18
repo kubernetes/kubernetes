@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/apps"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller/petset"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -71,7 +71,7 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 	}
 	f := framework.NewFramework("petset", options, nil)
 	var ns string
-	var c *client.Client
+	var c clientset.Interface
 
 	BeforeEach(func() {
 		// PetSet is in alpha, so it's disabled on some platforms. We skip this
@@ -82,7 +82,7 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 			framework.SkipIfMissingResource(f.ClientPool, unversioned.GroupVersionResource{Group: apps.GroupName, Version: "v1alpha1", Resource: "petsets"}, f.Namespace.Name)
 		}
 
-		c = f.Client
+		c = f.ClientSet
 		ns = f.Namespace.Name
 	})
 
@@ -97,7 +97,7 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 		BeforeEach(func() {
 			By("creating service " + headlessSvcName + " in namespace " + ns)
 			headlessService := createServiceSpec(headlessSvcName, "", true, labels)
-			_, err := c.Services(ns).Create(headlessService)
+			_, err := c.Core().Services(ns).Create(headlessService)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -254,7 +254,7 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 
 var _ = framework.KubeDescribe("Pet set recreate [Slow] [Feature:PetSet]", func() {
 	f := framework.NewDefaultFramework("pet-set-recreate")
-	var c *client.Client
+	var c clientset.Interface
 	var ns string
 
 	labels := map[string]string{
@@ -270,9 +270,9 @@ var _ = framework.KubeDescribe("Pet set recreate [Slow] [Feature:PetSet]", func(
 		framework.SkipUnlessProviderIs("gce", "vagrant")
 		By("creating service " + headlessSvcName + " in namespace " + f.Namespace.Name)
 		headlessService := createServiceSpec(headlessSvcName, "", true, labels)
-		_, err := f.Client.Services(f.Namespace.Name).Create(headlessService)
+		_, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(headlessService)
 		framework.ExpectNoError(err)
-		c = f.Client
+		c = f.ClientSet
 		ns = f.Namespace.Name
 	})
 
@@ -306,7 +306,7 @@ var _ = framework.KubeDescribe("Pet set recreate [Slow] [Feature:PetSet]", func(
 				NodeName: node.Name,
 			},
 		}
-		pod, err := f.Client.Pods(f.Namespace.Name).Create(pod)
+		pod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
 		framework.ExpectNoError(err)
 
 		By("creating petset with conflicting port in namespace " + f.Namespace.Name)
@@ -314,7 +314,7 @@ var _ = framework.KubeDescribe("Pet set recreate [Slow] [Feature:PetSet]", func(
 		petContainer := &ps.Spec.Template.Spec.Containers[0]
 		petContainer.Ports = append(petContainer.Ports, conflictingPort)
 		ps.Spec.Template.Spec.NodeName = node.Name
-		_, err = f.Client.Apps().PetSets(f.Namespace.Name).Create(ps)
+		_, err = f.ClientSet.Apps().PetSets(f.Namespace.Name).Create(ps)
 		framework.ExpectNoError(err)
 
 		By("waiting until pod " + podName + " will start running in namespace " + f.Namespace.Name)
@@ -324,7 +324,7 @@ var _ = framework.KubeDescribe("Pet set recreate [Slow] [Feature:PetSet]", func(
 
 		var initialPetPodUID types.UID
 		By("waiting until pet pod " + petPodName + " will be recreated and deleted at least once in namespace " + f.Namespace.Name)
-		w, err := f.Client.Pods(f.Namespace.Name).Watch(api.SingleObject(api.ObjectMeta{Name: petPodName}))
+		w, err := f.ClientSet.Core().Pods(f.Namespace.Name).Watch(api.SingleObject(api.ObjectMeta{Name: petPodName}))
 		framework.ExpectNoError(err)
 		// we need to get UID from pod in any state and wait until pet set controller will remove pod atleast once
 		_, err = watch.Until(petPodTimeout, w, func(event watch.Event) (bool, error) {
@@ -347,13 +347,13 @@ var _ = framework.KubeDescribe("Pet set recreate [Slow] [Feature:PetSet]", func(
 		}
 
 		By("removing pod with conflicting port in namespace " + f.Namespace.Name)
-		err = f.Client.Pods(f.Namespace.Name).Delete(pod.Name, api.NewDeleteOptions(0))
+		err = f.ClientSet.Core().Pods(f.Namespace.Name).Delete(pod.Name, api.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 
 		By("waiting when pet pod " + petPodName + " will be recreated in namespace " + f.Namespace.Name + " and will be in running state")
 		// we may catch delete event, thats why we are waiting for running phase like this, and not with watch.Until
 		Eventually(func() error {
-			petPod, err := f.Client.Pods(f.Namespace.Name).Get(petPodName)
+			petPod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(petPodName)
 			if err != nil {
 				return err
 			}
@@ -367,8 +367,8 @@ var _ = framework.KubeDescribe("Pet set recreate [Slow] [Feature:PetSet]", func(
 	})
 })
 
-func dumpDebugInfo(c *client.Client, ns string) {
-	pl, _ := c.Pods(ns).List(api.ListOptions{LabelSelector: labels.Everything()})
+func dumpDebugInfo(c clientset.Interface, ns string) {
+	pl, _ := c.Core().Pods(ns).List(api.ListOptions{LabelSelector: labels.Everything()})
 	for _, p := range pl.Items {
 		desc, _ := framework.RunKubectl("describe", "po", p.Name, fmt.Sprintf("--namespace=%v", ns))
 		framework.Logf("\nOutput of kubectl describe %v:\n%v", p.Name, desc)
@@ -526,7 +526,7 @@ func petSetFromManifest(fileName, ns string) *apps.PetSet {
 
 // petSetTester has all methods required to test a single petset.
 type petSetTester struct {
-	c *client.Client
+	c clientset.Interface
 }
 
 func (p *petSetTester) createPetSet(manifestPath, ns string) *apps.PetSet {
@@ -588,7 +588,7 @@ func (p *petSetTester) deletePetAtIndex(index int, ps *apps.PetSet) {
 	// pull the name out from an identity mapper.
 	name := fmt.Sprintf("%v-%v", ps.Name, index)
 	noGrace := int64(0)
-	if err := p.c.Pods(ps.Namespace).Delete(name, &api.DeleteOptions{GracePeriodSeconds: &noGrace}); err != nil {
+	if err := p.c.Core().Pods(ps.Namespace).Delete(name, &api.DeleteOptions{GracePeriodSeconds: &noGrace}); err != nil {
 		framework.Failf("Failed to delete pet %v for PetSet %v: %v", name, ps.Name, ps.Namespace, err)
 	}
 }
@@ -646,7 +646,7 @@ func (p *petSetTester) update(ns, name string, update func(ps *apps.PetSet)) {
 func (p *petSetTester) getPodList(ps *apps.PetSet) *api.PodList {
 	selector, err := unversioned.LabelSelectorAsSelector(ps.Spec.Selector)
 	ExpectNoError(err)
-	podList, err := p.c.Pods(ps.Namespace).List(api.ListOptions{LabelSelector: selector})
+	podList, err := p.c.Core().Pods(ps.Namespace).List(api.ListOptions{LabelSelector: selector})
 	ExpectNoError(err)
 	return podList
 }
@@ -735,7 +735,7 @@ func (p *petSetTester) waitForStatus(ps *apps.PetSet, expectedReplicas int32) {
 	}
 }
 
-func deleteAllPetSets(c *client.Client, ns string) {
+func deleteAllPetSets(c clientset.Interface, ns string) {
 	pst := &petSetTester{c: c}
 	psList, err := c.Apps().PetSets(ns).List(api.ListOptions{LabelSelector: labels.Everything()})
 	ExpectNoError(err)
@@ -759,7 +759,7 @@ func deleteAllPetSets(c *client.Client, ns string) {
 	pvNames := sets.NewString()
 	// TODO: Don't assume all pvcs in the ns belong to a petset
 	pvcPollErr := wait.PollImmediate(petsetPoll, petsetTimeout, func() (bool, error) {
-		pvcList, err := c.PersistentVolumeClaims(ns).List(api.ListOptions{LabelSelector: labels.Everything()})
+		pvcList, err := c.Core().PersistentVolumeClaims(ns).List(api.ListOptions{LabelSelector: labels.Everything()})
 		if err != nil {
 			framework.Logf("WARNING: Failed to list pvcs, retrying %v", err)
 			return false, nil
@@ -768,7 +768,7 @@ func deleteAllPetSets(c *client.Client, ns string) {
 			pvNames.Insert(pvc.Spec.VolumeName)
 			// TODO: Double check that there are no pods referencing the pvc
 			framework.Logf("Deleting pvc: %v with volume %v", pvc.Name, pvc.Spec.VolumeName)
-			if err := c.PersistentVolumeClaims(ns).Delete(pvc.Name); err != nil {
+			if err := c.Core().PersistentVolumeClaims(ns).Delete(pvc.Name, nil); err != nil {
 				return false, nil
 			}
 		}
@@ -779,7 +779,7 @@ func deleteAllPetSets(c *client.Client, ns string) {
 	}
 
 	pollErr := wait.PollImmediate(petsetPoll, petsetTimeout, func() (bool, error) {
-		pvList, err := c.PersistentVolumes().List(api.ListOptions{LabelSelector: labels.Everything()})
+		pvList, err := c.Core().PersistentVolumes().List(api.ListOptions{LabelSelector: labels.Everything()})
 		if err != nil {
 			framework.Logf("WARNING: Failed to list pvs, retrying %v", err)
 			return false, nil

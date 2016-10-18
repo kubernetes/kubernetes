@@ -43,7 +43,7 @@ import (
 	"google.golang.org/api/googleapi"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -68,7 +68,7 @@ const (
 )
 
 type testJig struct {
-	client  *client.Client
+	client  clientset.Interface
 	rootCAs map[string][]byte
 	address string
 	ing     *extensions.Ingress
@@ -269,7 +269,7 @@ func buildInsecureClient(timeout time.Duration) *http.Client {
 // createSecret creates a secret containing TLS certificates for the given Ingress.
 // If a secret with the same name already exists in the namespace of the
 // Ingress, it's updated.
-func createSecret(kubeClient *client.Client, ing *extensions.Ingress) (host string, rootCA, privKey []byte, err error) {
+func createSecret(kubeClient clientset.Interface, ing *extensions.Ingress) (host string, rootCA, privKey []byte, err error) {
 	var k, c bytes.Buffer
 	tls := ing.Spec.TLS[0]
 	host = strings.Join(tls.Hosts, ",")
@@ -290,14 +290,14 @@ func createSecret(kubeClient *client.Client, ing *extensions.Ingress) (host stri
 		},
 	}
 	var s *api.Secret
-	if s, err = kubeClient.Secrets(ing.Namespace).Get(tls.SecretName); err == nil {
+	if s, err = kubeClient.Core().Secrets(ing.Namespace).Get(tls.SecretName); err == nil {
 		// TODO: Retry the update. We don't really expect anything to conflict though.
 		framework.Logf("Updating secret %v in ns %v with hosts %v for ingress %v", secret.Name, secret.Namespace, host, ing.Name)
 		s.Data = secret.Data
-		_, err = kubeClient.Secrets(ing.Namespace).Update(s)
+		_, err = kubeClient.Core().Secrets(ing.Namespace).Update(s)
 	} else {
 		framework.Logf("Creating secret %v in ns %v with hosts %v for ingress %v", secret.Name, secret.Namespace, host, ing.Name)
-		_, err = kubeClient.Secrets(ing.Namespace).Create(secret)
+		_, err = kubeClient.Core().Secrets(ing.Namespace).Create(secret)
 	}
 	return host, cert, key, err
 }
@@ -684,7 +684,7 @@ func (j *testJig) createIngress(manifestPath, ns string, ingAnnotations map[stri
 	}
 	framework.Logf(fmt.Sprintf("creating" + j.ing.Name + " ingress"))
 	var err error
-	j.ing, err = j.client.Extensions().Ingress(ns).Create(j.ing)
+	j.ing, err = j.client.Extensions().Ingresses(ns).Create(j.ing)
 	ExpectNoError(err)
 }
 
@@ -692,12 +692,12 @@ func (j *testJig) update(update func(ing *extensions.Ingress)) {
 	var err error
 	ns, name := j.ing.Namespace, j.ing.Name
 	for i := 0; i < 3; i++ {
-		j.ing, err = j.client.Extensions().Ingress(ns).Get(name)
+		j.ing, err = j.client.Extensions().Ingresses(ns).Get(name)
 		if err != nil {
 			framework.Failf("failed to get ingress %q: %v", name, err)
 		}
 		update(j.ing)
-		j.ing, err = j.client.Extensions().Ingress(ns).Update(j.ing)
+		j.ing, err = j.client.Extensions().Ingresses(ns).Update(j.ing)
 		if err == nil {
 			describeIng(j.ing.Namespace)
 			return
@@ -732,7 +732,7 @@ func (j *testJig) getRootCA(secretName string) (rootCA []byte) {
 }
 
 func (j *testJig) deleteIngress() {
-	ExpectNoError(j.client.Extensions().Ingress(j.ing.Namespace).Delete(j.ing.Name, nil))
+	ExpectNoError(j.client.Extensions().Ingresses(j.ing.Namespace).Delete(j.ing.Name, nil))
 }
 
 func (j *testJig) waitForIngress() {
@@ -803,7 +803,7 @@ func ingFromManifest(fileName string) *extensions.Ingress {
 
 func (cont *GCEIngressController) getL7AddonUID() (string, error) {
 	framework.Logf("Retrieving UID from config map: %v/%v", api.NamespaceSystem, uidConfigMap)
-	cm, err := cont.c.ConfigMaps(api.NamespaceSystem).Get(uidConfigMap)
+	cm, err := cont.c.Core().ConfigMaps(api.NamespaceSystem).Get(uidConfigMap)
 	if err != nil {
 		return "", err
 	}
@@ -833,11 +833,11 @@ type GCEIngressController struct {
 	staticIPName string
 	rc           *api.ReplicationController
 	svc          *api.Service
-	c            *client.Client
+	c            clientset.Interface
 	cloud        framework.CloudConfig
 }
 
-func newTestJig(c *client.Client) *testJig {
+func newTestJig(c clientset.Interface) *testJig {
 	return &testJig{client: c, rootCAs: map[string][]byte{}}
 }
 
@@ -846,7 +846,7 @@ type NginxIngressController struct {
 	ns         string
 	rc         *api.ReplicationController
 	pod        *api.Pod
-	c          *client.Client
+	c          clientset.Interface
 	externalIP string
 }
 
@@ -857,14 +857,14 @@ func (cont *NginxIngressController) init() {
 	framework.Logf("initializing nginx ingress controller")
 	framework.RunKubectlOrDie("create", "-f", mkpath("rc.yaml"), fmt.Sprintf("--namespace=%v", cont.ns))
 
-	rc, err := cont.c.ReplicationControllers(cont.ns).Get("nginx-ingress-controller")
+	rc, err := cont.c.Core().ReplicationControllers(cont.ns).Get("nginx-ingress-controller")
 	ExpectNoError(err)
 	cont.rc = rc
 
 	framework.Logf("waiting for pods with label %v", rc.Spec.Selector)
 	sel := labels.SelectorFromSet(labels.Set(rc.Spec.Selector))
 	ExpectNoError(testutils.WaitForPodsWithLabelRunning(cont.c, cont.ns, sel))
-	pods, err := cont.c.Pods(cont.ns).List(api.ListOptions{LabelSelector: sel})
+	pods, err := cont.c.Core().Pods(cont.ns).List(api.ListOptions{LabelSelector: sel})
 	ExpectNoError(err)
 	if len(pods.Items) == 0 {
 		framework.Failf("Failed to find nginx ingress controller pods with selector %v", sel)

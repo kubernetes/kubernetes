@@ -19,12 +19,13 @@ package e2e
 import (
 	"bytes"
 	"fmt"
-	. "github.com/onsi/ginkgo"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/test/e2e/framework"
 	"os/exec"
 	"path"
 	"strconv"
+
+	. "github.com/onsi/ginkgo"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 func addMasterReplica() error {
@@ -47,13 +48,13 @@ func removeMasterReplica() error {
 	return nil
 }
 
-func verifyRCs(c *client.Client, ns string, names []string) {
+func verifyRCs(c clientset.Interface, ns string, names []string) {
 	for _, name := range names {
 		framework.ExpectNoError(framework.VerifyPods(c, ns, name, true, 1))
 	}
 }
 
-func createNewRC(c *client.Client, ns string, name string) {
+func createNewRC(c clientset.Interface, ns string, name string) {
 	_, err := newRCByName(c, ns, name, 1)
 	framework.ExpectNoError(err)
 }
@@ -77,14 +78,14 @@ func verifyNumberOfMasterReplicas(expected int) {
 
 var _ = framework.KubeDescribe("HA-master [Feature:HAMaster]", func() {
 	f := framework.NewDefaultFramework("ha-master")
-	var c *client.Client
+	var c clientset.Interface
 	var ns string
 	var additionalReplicas int
 	var existingRCs []string
 
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("gce")
-		c = f.Client
+		c = f.ClientSet
 		ns = f.Namespace.Name
 		verifyNumberOfMasterReplicas(1)
 		additionalReplicas = 0
