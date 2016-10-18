@@ -1,4 +1,11 @@
 assignees:
+- lavalamp
+- liggitt
+- timothysc
+- wojtek-t
+- xiang90
+to_migrate_to_approvers:
+  approvers:
   - lavalamp
   - liggitt
   - timothysc

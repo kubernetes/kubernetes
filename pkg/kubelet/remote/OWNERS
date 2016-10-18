@@ -1,2 +1,5 @@
 assignees:
-  - feiskyer 
+- feiskyer
+to_migrate_to_approvers:
+  approvers:
+  - feiskyer

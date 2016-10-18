@@ -2,3 +2,8 @@ assignees:
 - runseb
 - ngtuna
 - svanharmelen
+to_migrate_to_approvers:
+  approvers:
+  - runseb
+  - ngtuna
+  - svanharmelen

@@ -1,4 +1,10 @@
 assignees:
+- bgrant0607
+- brendandburns
+- smarterclayton
+- thockin
+to_migrate_to_approvers:
+  approvers:
   - bgrant0607
   - brendandburns
   - smarterclayton

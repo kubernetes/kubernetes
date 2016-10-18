@@ -1,8 +1,16 @@
 assignees:
+- chuckbutler
+- mbruzek
+- marcoceppi
+- castrojo
+owners:
+- chuckbutler
+- mbruzek
+to_migrate_to_approvers:
+  approvers:
   - chuckbutler
   - mbruzek
   - marcoceppi
   - castrojo
-owners:
   - chuckbutler
   - mbruzek
