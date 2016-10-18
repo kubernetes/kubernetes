@@ -12,8 +12,8 @@
      ],
      "operationId": "logFileListHandler",
      "responses": {
-      "default": {
-       "description": "Default Response."
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -25,8 +25,8 @@
      ],
      "operationId": "logFileHandler",
      "responses": {
-      "default": {
-       "description": "Default Response."
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -42,5 +42,18 @@
     ]
    }
   },
-  "definitions": {}
+  "definitions": {},
+  "securityDefinitions": {
+   "BearerToken": {
+    "description": "Bearer Token authentication",
+    "type": "apiKey",
+    "name": "authorization",
+    "in": "header"
+   }
+  },
+  "security": [
+   {
+    "BearerToken": []
+   }
+  ]
  }
