@@ -107,6 +107,10 @@ function create-federation-api-objects {
 
     cleanup-federation-api-objects
 
+    if [[ "${FEDERATION_DNS_PROVIDER}" == "local-coredns" ]]; then
+        create-federation-dns-server-objects
+    fi
+
     export FEDERATION_API_HOST=""
     export KUBE_MASTER_IP=""
     export IS_DNS_NAME="false"
@@ -241,6 +245,44 @@ function create-federation-api-objects {
 	fi
 
 	sleep 4
+    done
+)
+}
+
+function create-federation-dns-server-objects {
+(
+    export FEDERATION_DNS_SERVER_DEPLOYMENT_NAME="federation-dns-server"
+
+    manifests_root="${KUBE_ROOT}/federation/manifests/"
+
+    cat > "${manifests_root}/federation-dns-server.conf" <<EOF
+.:53 {
+    etcd ${DNS_ZONE_NAME} {
+        endpoint http://127.0.0.1:2379
+    }
+    loadbalance
+}
+EOF
+
+    $host_kubectl create configmap federation-dns-server-config --from-file="${manifests_root}/federation-dns-server.conf" --namespace="${FEDERATION_NAMESPACE}"
+    rm -f ${manifests_root}/federation-dns-server.conf
+
+    $template "${manifests_root}/federation-dns-server-deployment.yaml" | $host_kubectl create -f -
+
+    $template "${manifests_root}/federation-dns-server-service.yaml" | $host_kubectl create -f -
+    for i in {1..30};do
+        echo "attempting to get federation-dns-server loadbalancer hostname ($i / 30)"
+        for field in ip hostname;do
+            FEDERATION_DNS_HOST=`${host_kubectl} get -o=jsonpath svc/${FEDERATION_DNS_SERVER_DEPLOYMENT_NAME} --template '{.status.loadBalancer.ingress[*].'"${field}}"`
+            if [[ ! -z "${FEDERATION_DNS_HOST// }" ]];then
+                break 2
+            fi
+        done
+        if [[ $i -eq 30 ]];then
+            echo "Could not find ingress hostname for federation-dns-server loadbalancer service"
+            exit 1
+        fi
+        sleep 5
     done
 )
 }

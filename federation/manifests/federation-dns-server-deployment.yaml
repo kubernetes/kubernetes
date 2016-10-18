@@ -1,0 +1,46 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: {{.FEDERATION_DNS_SERVER_DEPLOYMENT_NAME}}
+  namespace: {{.FEDERATION_NAMESPACE}}
+  labels:
+    app: federated-cluster
+spec:
+  template:
+    metadata:
+      name: federation-dns-server
+      labels:
+        app: federated-cluster
+        module: federation-dns-server
+    spec:
+      containers:
+      - name: etcd
+        image: quay.io/coreos/etcd:v2.3.3
+        command:
+          - /etcd
+          - -data-dir
+          - /var/etcd/data
+          - -listen-client-urls
+          - http://0.0.0.0:2379
+          - -advertise-client-urls
+          - http://127.0.0.1:2379
+        ports:
+         - containerPort: 2379
+           name: etcd
+      - name: coredns
+        image: shashidharatd/coredns:v001-a69e88d
+        args:
+        - -conf
+        - /tmp/dns-config/federation-dns-server.conf
+        - -logtostderr
+        ports:
+         - containerPort: 53
+           name: dns
+           protocol: UDP
+        volumeMounts:
+        - name: config-volume
+          mountPath: /tmp/dns-config
+      volumes:
+      - name: config-volume
+        configMap:
+          name: federation-dns-server-config
