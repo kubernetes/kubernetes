@@ -16,7 +16,7 @@ The basic idea is this: three replication controllers with a single pod, corresp
 
 By defaults, there are only three pods (hence replication controllers) for this cluster. This number can be increased using the variable NUM_NODES, specified in the replication controller configuration file. It's important to know the number of nodes must always be odd.
 
-When the replication controller is created, it results in the corresponding container to start, run an entrypoint script that installs the mysql system tables, set up users, and build up a list of servers that is used with the galera parameter ```wsrep_cluster_address```.  This is a list of running nodes that galera uses for election of a node to obtain SST (Single State Transfer) from.
+When the replication controller is created, it results in the corresponding container to start, run an entrypoint script that installs the MySQL system tables, set up users, and build up a list of servers that is used with the galera parameter ```wsrep_cluster_address```.  This is a list of running nodes that galera uses for election of a node to obtain SST (Single State Transfer) from.
 
 Note: Kubernetes best-practices is to pre-create the services for each controller, and the configuration files which contain the service and replication controller for each node, when created, will result in both a service and replication contrller running for the given node. An important thing to know is that it's important that initially pxc-node1.yaml be processed first and no other pxc-nodeN services that don't have corresponding replication controllers should exist. The reason for this is that if there is a node in ```wsrep_clsuter_address``` without a backing galera node there will be nothing to obtain SST from which will cause the node to shut itself down and the container in question to exit (and another soon relaunched, repeatedly).
 
@@ -32,7 +32,7 @@ Create the service and replication controller for the first node:
 
 Repeat the same previous steps for ```pxc-node2``` and ```pxc-node3```
 
-When complete, you should be able connect with a mysql client to the IP address
+When complete, you should be able connect with a MySQL client to the IP address
  service ```pxc-cluster``` to find a working cluster
 
 ### An example of creating a cluster

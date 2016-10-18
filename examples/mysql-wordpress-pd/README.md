@@ -23,7 +23,7 @@ Demonstrated Kubernetes Concepts:
 
 ## Quickstart
 
-Put your desired mysql password in a file called `password.txt` with
+Put your desired MySQL password in a file called `password.txt` with
 no trailing newline. The first `tr` command will remove the newline if
 your editor added one.
 

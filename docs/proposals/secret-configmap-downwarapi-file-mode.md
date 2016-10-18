@@ -172,7 +172,7 @@ not specify all files in the object.
 The are two downside:
 
  * The files are symlinks pointint to the real file, and the realfile
-   permissions are only set. The symlink has the clasic symlink permissions.
+   permissions are only set. The symlink has the classic symlink permissions.
    This is something already present in 1.3, and it seems applications like ssh
    work just fine with that. Something worth mentioning, but doesn't seem to be
    an issue.
