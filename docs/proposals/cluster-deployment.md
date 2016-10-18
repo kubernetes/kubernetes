@@ -56,7 +56,7 @@ ship with all of the requirements for the node specification by default.
 
 **Objective**: Generate security certificates used to configure secure communication between client, master and nodes
 
-TODO: Enumerate ceritificates which have to be generated.
+TODO: Enumerate certificates which have to be generated.
 
 ## Step 3: Deploy master
 

@@ -88,7 +88,7 @@ type JobSpec struct {
 }
 ```
 
-`JobStatus` structure is defined to contain informations about pods executing
+`JobStatus` structure is defined to contain information about pods executing
 specified job.  The structure holds information about pods currently executing
 the job.
 

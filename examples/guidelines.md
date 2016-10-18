@@ -68,7 +68,7 @@ Examples are not:
     in the example config.
 * Only use the code highlighting types
   [supported by Rouge](https://github.com/jneen/rouge/wiki/list-of-supported-languages-and-lexers),
-  as this is what Github Pages uses.
+  as this is what GitHub Pages uses.
 * Commands to be copied use the `shell` syntax highlighting type, and
   do not include any kind of prompt.
 * Example output is in a separate block quote to distinguish it from

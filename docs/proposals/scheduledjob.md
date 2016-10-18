@@ -303,7 +303,7 @@ in namespace `ns1` might create a job `nightly-earnings-report-3m4d3`, and later
 a job called `nightly-earnings-report-6k7ts`.  This is consistent with pods, but
 does not give the user much information.
 
-Alternatively, we can use time as a uniqifier.  For example, the same scheduledJob could
+Alternatively, we can use time as a uniquifier.  For example, the same scheduledJob could
 create a job called `nightly-earnings-report-2016-May-19`.
 However, for Jobs that run more than once per day, we would need to represent
 time as well as date.  Standard date formats (e.g. RFC 3339) use colons for time.

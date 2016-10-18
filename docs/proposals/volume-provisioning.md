@@ -140,7 +140,7 @@ We propose that:
         controller attempts to delete the provisioned volume and creates an event
         on the claim
 
-Existing behavior is un-changed for claims that do not specify
+Existing behavior is unchanged for claims that do not specify
 `claim.Spec.Class`.
 
 * **Out of tree provisioning**

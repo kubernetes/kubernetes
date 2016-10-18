@@ -46,12 +46,12 @@ For a large enterprise where computing power is the king, one may imagine the fo
  - `linux/ppc64le`: For running highly-optimized software; especially massive compute tasks
  - `windows/amd64`: For running services that are only compatible on windows; e.g. business applications written in C# .NET
 
-For a mid-sized business where efficency is most important, these could be combinations:
+For a mid-sized business where efficiency is most important, these could be combinations:
  - `linux/amd64`: For running most of the general-purpose computing tasks, plus tasks that require very high single-core performance.
  - `linux/arm64`: For running webservices and high-density tasks => the cluster could autoscale in a way that `linux/amd64` machines could hibernate at night in order to minimize power usage.
 
-For a small business or university, arm is often sufficent:
- - `linux/arm`: Draws very little power, and can run web sites and app backends efficently on Scaleway for example.
+For a small business or university, arm is often sufficient:
+ - `linux/arm`: Draws very little power, and can run web sites and app backends efficiently on Scaleway for example.
 
 And last but not least; Raspberry Pi's should be used for [education at universities](http://kubecloud.io/) and are great for **demoing Kubernetes' features at conferences.**
 
@@ -514,14 +514,14 @@ Linux 0a7da80f1665 4.2.0-25-generic #30-Ubuntu SMP Mon Jan 18 12:31:50 UTC 2016 
 
 Here a linux module called `binfmt_misc` registered the "magic numbers" in the kernel, so the kernel may detect which architecture a binary is, and prepend the call with `/usr/bin/qemu-(arm|aarch64|ppc64le)-static`. For example, `/usr/bin/qemu-arm-static` is a statically linked `amd64` binary that translates all ARM syscalls to `amd64` syscalls.
 
-The multiarch guys have done a great job here, you may find the source for this and other images at [Github](https://github.com/multiarch)
+The multiarch guys have done a great job here, you may find the source for this and other images at [GitHub](https://github.com/multiarch)
 
 
 ## Implementation
 
 ## History
 
-32-bit ARM (`linux/arm`) was the first platform Kubernetes was ported to, and luxas' project [`Kubernetes on ARM`](https://github.com/luxas/kubernetes-on-arm) (released on Github the 31st of September 2015)
+32-bit ARM (`linux/arm`) was the first platform Kubernetes was ported to, and luxas' project [`Kubernetes on ARM`](https://github.com/luxas/kubernetes-on-arm) (released on GitHub the 31st of September 2015)
 served as a way of running Kubernetes on ARM devices easily.
 The 30th of November 2015, a tracking issue about making Kubernetes run on ARM was opened: [#17981](https://github.com/kubernetes/kubernetes/issues/17981). It later shifted focus to how to make Kubernetes a more platform-independent system.
 
