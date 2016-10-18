@@ -169,6 +169,10 @@ type ObjectMeta struct {
 	// This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request.
 	// +optional
 	ClusterName string `json:"clusterName,omitempty"`
+
+	// Description is an optional field that allows user to give a description of the resource.
+	// This is set by the creator of the resource to better identify to other users what the resource is used for.
+	Description string `json:"description,omitempty"`
 }
 
 const (
