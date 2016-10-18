@@ -52,6 +52,9 @@ API_HOST=${API_HOST:-127.0.0.1}
 
 kube::etcd::start
 
+echo "admin,admin,admin" > $TMP_DIR/basicauth.csv
+echo "dummy_token,admin,admin" > $TMP_DIR/tokenauth.csv
+
 # Start kube-apiserver
 kube::log::status "Starting kube-apiserver"
 "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
@@ -61,6 +64,8 @@ kube::log::status "Starting kube-apiserver"
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --advertise-address="10.10.10.10" \
   --cert-dir="${TMP_DIR}/certs" \
+  --basic-auth-file=$TMP_DIR/basicauth.csv \
+  --token-auth-file=$TMP_DIR/tokenauth.csv \
   --service-cluster-ip-range="10.0.0.0/24" >/tmp/openapi-api-server.log 2>&1 &
 APISERVER_PID=$!
 
