@@ -197,7 +197,10 @@ func (s *StoreToReplicationControllerLister) GetPodControllers(pod *v1.Pod) (con
 		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
 			continue
 		}
-		controllers = append(controllers, rc)
+		// Do not take in consideration controllers that are being deleted
+		if rc.DeletionTimestamp == nil {
+			controllers = append(controllers, rc)
+		}
 	}
 	if len(controllers) == 0 {
 		err = fmt.Errorf("could not find controller for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
