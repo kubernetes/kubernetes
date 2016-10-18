@@ -14,7 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script downloads and installs the Kubernetes client and server binaries.
+# This script downloads and installs the Kubernetes client and server
+# (and optionally test) binaries,
 # It is intended to be called from an extracted Kubernetes release tarball.
 #
 # We automatically choose the correct client binaries to download.
@@ -30,6 +31,8 @@
 #  Set KUBERNETES_SKIP_CONFIRM to skip the installation confirmation prompt.
 #  Set KUBERNETES_RELEASE_URL to choose where to download binaries from.
 #    (Defaults to https://storage.googleapis.com/kubernetes-release/release).
+#  Set KUBERNETES_DOWNLOAD_TESTS to additionally download and extract the test
+#    binaries tarball.
 
 set -o errexit
 set -o nounset
@@ -130,7 +133,7 @@ function download_tarball() {
   # TODO: add actual verification
 }
 
-function extract_tarball() {
+function extract_arch_tarball() {
   local -r tarfile="$1"
   local -r platform="$2"
   local -r arch="$3"
@@ -175,7 +178,16 @@ if [[ ! -x "${KUBE_ROOT}/platforms/${CLIENT_PLATFORM}/${CLIENT_ARCH}/kubectl" ]]
   echo "Will download and extract ${CLIENT_TAR} from ${DOWNLOAD_URL_PREFIX}"
 fi
 
-if [[ "${DOWNLOAD_CLIENT_TAR}" == false && "${DOWNLOAD_SERVER_TAR}" == false ]]; then
+TESTS_TAR="kubernetes-test.tar.gz"
+DOWNLOAD_TESTS_TAR=false
+if [[ -n "${KUBERNETES_DOWNLOAD_TESTS-}" ]]; then
+  DOWNLOAD_TESTS_TAR=true
+  echo "Will download and extract ${TESTS_TAR} from ${DOWNLOAD_URL_PREFIX}"
+fi
+
+if [[ "${DOWNLOAD_CLIENT_TAR}" == false && \
+      "${DOWNLOAD_SERVER_TAR}" == false && \
+      "${DOWNLOAD_TESTS_TAR}" == false ]]; then
   echo "Nothing additional to download."
   exit 0
 fi
@@ -190,10 +202,17 @@ if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
 fi
 
 if "${DOWNLOAD_SERVER_TAR}"; then
-download_tarball "${KUBE_ROOT}/server" "${SERVER_TAR}"
+  download_tarball "${KUBE_ROOT}/server" "${SERVER_TAR}"
 fi
 
 if "${DOWNLOAD_CLIENT_TAR}"; then
   download_tarball "${KUBE_ROOT}/client" "${CLIENT_TAR}"
-  extract_tarball "${KUBE_ROOT}/client/${CLIENT_TAR}" "${CLIENT_PLATFORM}" "${CLIENT_ARCH}"
+  extract_arch_tarball "${KUBE_ROOT}/client/${CLIENT_TAR}" "${CLIENT_PLATFORM}" "${CLIENT_ARCH}"
+fi
+
+if "${DOWNLOAD_TESTS_TAR}"; then
+  download_tarball "${KUBE_ROOT}/test" "${TESTS_TAR}"
+  echo "Extracting ${TESTS_TAR} into ${KUBE_ROOT}"
+  # Strip leading "kubernetes/"
+  tar -xzf "${KUBE_ROOT}/test/${TESTS_TAR}" --strip-components 1 -C "${KUBE_ROOT}"
 fi
