@@ -46,6 +46,7 @@ type watchCacheEvent struct {
 	Type            watch.EventType
 	Object          runtime.Object
 	PrevObject      runtime.Object
+	Key             string
 	ResourceVersion uint64
 }
 
@@ -215,6 +216,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 		Type:            event.Type,
 		Object:          event.Object,
 		PrevObject:      prevObject,
+		Key:             key,
 		ResourceVersion: resourceVersion,
 	}
 	if w.onEvent != nil {
@@ -376,6 +378,7 @@ func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]wa
 			result[i] = watchCacheEvent{
 				Type:            watch.Added,
 				Object:          elem.Object,
+				Key:             elem.Key,
 				ResourceVersion: w.resourceVersion,
 			}
 		}
