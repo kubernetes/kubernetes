@@ -20,6 +20,7 @@ import (
 	v1beta1 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/typed/federation/v1beta1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
+	fake "k8s.io/kubernetes/pkg/client/unversioned/fake"
 )
 
 type FakeFederation struct {
@@ -30,8 +31,8 @@ func (c *FakeFederation) Clusters() v1beta1.ClusterInterface {
 	return &FakeClusters{c}
 }
 
-// GetRESTClient returns a RESTClient that is used to communicate
+// RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeFederation) GetRESTClient() *restclient.RESTClient {
-	return nil
+func (c *FakeFederation) RESTClient() restclient.Interface {
+	return &fake.RESTClient{}
 }

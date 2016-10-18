@@ -20,6 +20,7 @@ import (
 	unversioned "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/unversioned"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
+	fake "k8s.io/kubernetes/pkg/client/unversioned/fake"
 )
 
 type FakeBatch struct {
@@ -34,8 +35,8 @@ func (c *FakeBatch) ScheduledJobs(namespace string) unversioned.ScheduledJobInte
 	return &FakeScheduledJobs{c, namespace}
 }
 
-// GetRESTClient returns a RESTClient that is used to communicate
+// RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeBatch) GetRESTClient() *restclient.RESTClient {
-	return nil
+func (c *FakeBatch) RESTClient() restclient.Interface {
+	return &fake.RESTClient{}
 }

@@ -20,6 +20,7 @@ import (
 	unversioned "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/unversioned"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
+	fake "k8s.io/kubernetes/pkg/client/unversioned/fake"
 )
 
 type FakeRbac struct {
@@ -42,8 +43,8 @@ func (c *FakeRbac) RoleBindings(namespace string) unversioned.RoleBindingInterfa
 	return &FakeRoleBindings{c, namespace}
 }
 
-// GetRESTClient returns a RESTClient that is used to communicate
+// RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeRbac) GetRESTClient() *restclient.RESTClient {
-	return nil
+func (c *FakeRbac) RESTClient() restclient.Interface {
+	return &fake.RESTClient{}
 }

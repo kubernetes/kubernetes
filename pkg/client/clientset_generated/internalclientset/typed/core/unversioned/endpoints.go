@@ -18,6 +18,7 @@ package unversioned
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -42,14 +43,14 @@ type EndpointsInterface interface {
 
 // endpoints implements EndpointsInterface
 type endpoints struct {
-	client *CoreClient
+	client restclient.Interface
 	ns     string
 }
 
 // newEndpoints returns a Endpoints
 func newEndpoints(c *CoreClient, namespace string) *endpoints {
 	return &endpoints{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

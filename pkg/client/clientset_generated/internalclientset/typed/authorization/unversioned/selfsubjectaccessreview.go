@@ -16,6 +16,10 @@ limitations under the License.
 
 package unversioned
 
+import (
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
+)
+
 // SelfSubjectAccessReviewsGetter has a method to return a SelfSubjectAccessReviewInterface.
 // A group's client should implement this interface.
 type SelfSubjectAccessReviewsGetter interface {
@@ -29,12 +33,12 @@ type SelfSubjectAccessReviewInterface interface {
 
 // selfSubjectAccessReviews implements SelfSubjectAccessReviewInterface
 type selfSubjectAccessReviews struct {
-	client *AuthorizationClient
+	client restclient.Interface
 }
 
 // newSelfSubjectAccessReviews returns a SelfSubjectAccessReviews
 func newSelfSubjectAccessReviews(c *AuthorizationClient) *selfSubjectAccessReviews {
 	return &selfSubjectAccessReviews{
-		client: c,
+		client: c.RESTClient(),
 	}
 }

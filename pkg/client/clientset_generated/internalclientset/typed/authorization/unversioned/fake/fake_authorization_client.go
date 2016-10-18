@@ -20,6 +20,7 @@ import (
 	unversioned "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authorization/unversioned"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
+	fake "k8s.io/kubernetes/pkg/client/unversioned/fake"
 )
 
 type FakeAuthorization struct {
@@ -38,8 +39,8 @@ func (c *FakeAuthorization) SubjectAccessReviews() unversioned.SubjectAccessRevi
 	return &FakeSubjectAccessReviews{c}
 }
 
-// GetRESTClient returns a RESTClient that is used to communicate
+// RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeAuthorization) GetRESTClient() *restclient.RESTClient {
-	return nil
+func (c *FakeAuthorization) RESTClient() restclient.Interface {
+	return &fake.RESTClient{}
 }

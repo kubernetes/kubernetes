@@ -20,6 +20,7 @@ import (
 	unversioned "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
+	fake "k8s.io/kubernetes/pkg/client/unversioned/fake"
 )
 
 type FakeExtensions struct {
@@ -58,8 +59,8 @@ func (c *FakeExtensions) ThirdPartyResources() unversioned.ThirdPartyResourceInt
 	return &FakeThirdPartyResources{c}
 }
 
-// GetRESTClient returns a RESTClient that is used to communicate
+// RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeExtensions) GetRESTClient() *restclient.RESTClient {
-	return nil
+func (c *FakeExtensions) RESTClient() restclient.Interface {
+	return &fake.RESTClient{}
 }
