@@ -24,6 +24,9 @@
        "schema": {
         "$ref": "#/definitions/version.Info"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -73,5 +76,34 @@
      }
     }
    }
-  }
+  },
+  "securityDefinitions": {
+   "HTTPBasic": {
+    "description": "HTTP Basic authentication",
+    "type": "basic"
+   },
+   "LoopbackTokenBearer": {
+    "description": "LoopbackToken Bearer authentication",
+    "type": "apiKey",
+    "name": "authorization",
+    "in": "header"
+   },
+   "TokenBearer": {
+    "description": "Token Bearer authentication",
+    "type": "apiKey",
+    "name": "authorization",
+    "in": "header"
+   }
+  },
+  "security": [
+   {
+    "HTTPBasic": []
+   },
+   {
+    "LoopbackTokenBearer": []
+   },
+   {
+    "TokenBearer": []
+   }
+  ]
  }
