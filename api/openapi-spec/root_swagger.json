@@ -24434,6 +24434,33 @@
      }
     ]
    },
+   "/apis/policy/v1beta1/": {
+    "get": {
+     "description": "get available resources",
+     "consumes": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "operationId": "getPolicyV1beta1APIResources",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/unversioned.APIResourceList"
+       }
+      }
+     }
+    }
+   },
    "/apis/rbac.authorization.k8s.io/": {
     "get": {
      "description": "get information of a group",

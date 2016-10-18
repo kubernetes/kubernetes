@@ -216,25 +216,17 @@ func Convert_policy_PodDisruptionBudgetSpec_To_v1alpha1_PodDisruptionBudgetSpec(
 }
 
 func autoConvert_v1alpha1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudgetStatus(in *PodDisruptionBudgetStatus, out *policy.PodDisruptionBudgetStatus, s conversion.Scope) error {
-	out.PodDisruptionAllowed = in.PodDisruptionAllowed
+	// WARNING: in.PodDisruptionAllowed requires manual conversion: does not exist in peer-type
 	out.CurrentHealthy = in.CurrentHealthy
 	out.DesiredHealthy = in.DesiredHealthy
 	out.ExpectedPods = in.ExpectedPods
 	return nil
-}
-
-func Convert_v1alpha1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudgetStatus(in *PodDisruptionBudgetStatus, out *policy.PodDisruptionBudgetStatus, s conversion.Scope) error {
-	return autoConvert_v1alpha1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudgetStatus(in, out, s)
 }
 
 func autoConvert_policy_PodDisruptionBudgetStatus_To_v1alpha1_PodDisruptionBudgetStatus(in *policy.PodDisruptionBudgetStatus, out *PodDisruptionBudgetStatus, s conversion.Scope) error {
-	out.PodDisruptionAllowed = in.PodDisruptionAllowed
+	// WARNING: in.PodDisruptionsAllowed requires manual conversion: does not exist in peer-type
 	out.CurrentHealthy = in.CurrentHealthy
 	out.DesiredHealthy = in.DesiredHealthy
 	out.ExpectedPods = in.ExpectedPods
 	return nil
-}
-
-func Convert_policy_PodDisruptionBudgetStatus_To_v1alpha1_PodDisruptionBudgetStatus(in *policy.PodDisruptionBudgetStatus, out *PodDisruptionBudgetStatus, s conversion.Scope) error {
-	return autoConvert_policy_PodDisruptionBudgetStatus_To_v1alpha1_PodDisruptionBudgetStatus(in, out, s)
 }
