@@ -36,6 +36,7 @@ type SharedInformerFactory interface {
 	Namespaces() NamespaceInformer
 	PersistentVolumeClaims() PVCInformer
 	PersistentVolumes() PVInformer
+	ServiceAccounts() ServiceAccountInformer
 
 	DaemonSets() DaemonSetInformer
 	Deployments() DeploymentInformer
@@ -106,6 +107,11 @@ func (f *sharedInformerFactory) PersistentVolumeClaims() PVCInformer {
 // PersistentVolumes returns a SharedIndexInformer that lists and watches all persistent volumes
 func (f *sharedInformerFactory) PersistentVolumes() PVInformer {
 	return &pvInformer{sharedInformerFactory: f}
+}
+
+// ServiceAccounts returns a SharedIndexInformer that lists and watches all service accounts.
+func (f *sharedInformerFactory) ServiceAccounts() ServiceAccountInformer {
+	return &serviceAccountInformer{sharedInformerFactory: f}
 }
 
 // DaemonSets returns a SharedIndexInformer that lists and watches all daemon sets.
