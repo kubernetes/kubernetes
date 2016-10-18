@@ -125,6 +125,8 @@ func (i *indexedWatchers) terminateAll(objectType reflect.Type) {
 	}
 }
 
+type filterObjectFunc func(string, runtime.Object) bool
+
 // Cacher is responsible for serving WATCH and LIST requests for a given
 // resource from its internal cache and updating its cache in the background
 // based on the underlying storage contents.
@@ -160,9 +162,6 @@ type Cacher struct {
 
 	// Versioner is used to handle resource versions.
 	versioner Versioner
-
-	// keyFunc is used to get a key in the underyling storage for a given object.
-	keyFunc func(runtime.Object) (string, error)
 
 	// triggerFunc is used for optimizing amount of watchers that needs to process
 	// an incoming event.
@@ -201,7 +200,6 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 		watchCache:  watchCache,
 		reflector:   cache.NewReflector(listerWatcher, config.Type, watchCache, 0),
 		versioner:   config.Versioner,
-		keyFunc:     config.KeyFunc,
 		triggerFunc: config.TriggerPublisherFunc,
 		watcherIdx:  0,
 		watchers: indexedWatchers{
@@ -328,7 +326,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 	c.Lock()
 	defer c.Unlock()
 	forget := forgetWatcher(c, c.watcherIdx, triggerValue, triggerSupported)
-	watcher := newCacheWatcher(watchRV, chanSize, initEvents, filterFunction(key, c.keyFunc, pred), forget)
+	watcher := newCacheWatcher(watchRV, chanSize, initEvents, filterFunction(key, pred), forget)
 
 	c.watchers.addWatcher(watcher, c.watcherIdx, triggerValue, triggerSupported)
 	c.watcherIdx++
@@ -382,7 +380,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 	if err != nil || listVal.Kind() != reflect.Slice {
 		return fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
 	}
-	filter := filterFunction(key, c.keyFunc, pred)
+	filter := filterFunction(key, pred)
 
 	objs, readResourceVersion, err := c.watchCache.WaitUntilFreshAndList(listRV, trace)
 	if err != nil {
@@ -394,7 +392,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 		if !ok {
 			return fmt.Errorf("non *storeElement returned from storage: %v", obj)
 		}
-		if filter(elem.Object) {
+		if filter(elem.Key, elem.Object) {
 			listVal.Set(reflect.Append(listVal, reflect.ValueOf(elem.Object).Elem()))
 		}
 	}
@@ -524,14 +522,9 @@ func forgetWatcher(c *Cacher, index int, triggerValue string, triggerSupported b
 	}
 }
 
-func filterFunction(key string, keyFunc func(runtime.Object) (string, error), p SelectionPredicate) FilterFunc {
+func filterFunction(key string, p SelectionPredicate) filterObjectFunc {
 	f := SimpleFilter(p)
-	filterFunc := func(obj runtime.Object) bool {
-		objKey, err := keyFunc(obj)
-		if err != nil {
-			glog.Errorf("invalid object for filter. Obj: %v. Err: %v", obj, err)
-			return false
-		}
+	filterFunc := func(objKey string, obj runtime.Object) bool {
 		if !hasPathPrefix(objKey, key) {
 			return false
 		}
@@ -626,12 +619,12 @@ type cacheWatcher struct {
 	sync.Mutex
 	input   chan watchCacheEvent
 	result  chan watch.Event
-	filter  FilterFunc
+	filter  filterObjectFunc
 	stopped bool
 	forget  func(bool)
 }
 
-func newCacheWatcher(resourceVersion uint64, chanSize int, initEvents []watchCacheEvent, filter FilterFunc, forget func(bool)) *cacheWatcher {
+func newCacheWatcher(resourceVersion uint64, chanSize int, initEvents []watchCacheEvent, filter filterObjectFunc, forget func(bool)) *cacheWatcher {
 	watcher := &cacheWatcher{
 		input:   make(chan watchCacheEvent, chanSize),
 		result:  make(chan watch.Event, chanSize),
@@ -709,10 +702,10 @@ func (c *cacheWatcher) add(event *watchCacheEvent) {
 
 // NOTE: sendWatchCacheEvent is assumed to not modify <event> !!!
 func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
-	curObjPasses := event.Type != watch.Deleted && c.filter(event.Object)
+	curObjPasses := event.Type != watch.Deleted && c.filter(event.Key, event.Object)
 	oldObjPasses := false
 	if event.PrevObject != nil {
-		oldObjPasses = c.filter(event.PrevObject)
+		oldObjPasses = c.filter(event.Key, event.PrevObject)
 	}
 	if !curObjPasses && !oldObjPasses {
 		// Watcher is not interested in that object.
