@@ -52,6 +52,8 @@ import (
 func testNewReplicaSetControllerFromClient(client clientset.Interface, stopCh chan struct{}, burstReplicas int, lookupCacheSize int) *ReplicaSetController {
 	informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	ret := NewReplicaSetController(informers.ReplicaSets(), informers.Pods(), client, burstReplicas, lookupCacheSize, false)
+	ret.podLister = &cache.StoreToPodLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
+	ret.rsLister = &cache.StoreToReplicaSetLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
 	informers.Start(stopCh)
 	return ret
 }
@@ -299,8 +301,6 @@ func TestStatusUpdatesWithoutReplicasChange(t *testing.T) {
 	defer close(stopCh)
 	manager := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas, 0)
 	manager.podListerSynced = alwaysReady
-	manager.podLister = &cache.StoreToPodLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
-	manager.rsLister = &cache.StoreToReplicaSetLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
 
 	// Steady state for the ReplicaSet, no Status.Replicas updates expected
 	activePods := 5
@@ -347,8 +347,6 @@ func TestControllerUpdateReplicas(t *testing.T) {
 	defer close(stopCh)
 	manager := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas, 0)
 	manager.podListerSynced = alwaysReady
-	manager.podLister = &cache.StoreToPodLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
-	manager.rsLister = &cache.StoreToReplicaSetLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
 
 	// Insufficient number of pods in the system, and Status.Replicas is wrong;
 	// Status.Replica should update to match number of pods in system, 1 new pod should be created.
@@ -398,8 +396,7 @@ func TestSyncReplicaSetDormancy(t *testing.T) {
 	defer close(stopCh)
 	manager := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas, 0)
 	manager.podListerSynced = alwaysReady
-	manager.podLister = &cache.StoreToPodLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
-	manager.rsLister = &cache.StoreToReplicaSetLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
+
 	manager.podControl = &fakePodControl
 
 	labelMap := map[string]string{"foo": "bar"}
@@ -524,7 +521,9 @@ func TestWatchControllers(t *testing.T) {
 	client.AddWatchReactor("replicasets", core.DefaultWatchReactor(fakeWatch, nil))
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	manager := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas, 0)
+	informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	manager := NewReplicaSetController(informers.ReplicaSets(), informers.Pods(), client, BurstReplicas, 0, false)
+	informers.Start(stopCh)
 	manager.podListerSynced = alwaysReady
 
 	var testRSSpec extensions.ReplicaSet
@@ -567,8 +566,6 @@ func TestWatchPods(t *testing.T) {
 	defer close(stopCh)
 	manager := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas, 0)
 	manager.podListerSynced = alwaysReady
-	manager.podLister = &cache.StoreToPodLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
-	manager.rsLister = &cache.StoreToReplicaSetLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
 
 	// Put one ReplicaSet and one pod into the controller's stores
 	labelMap := map[string]string{"foo": "bar"}
@@ -691,8 +688,6 @@ func TestControllerUpdateRequeue(t *testing.T) {
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
 	manager := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas, 0)
 	manager.podListerSynced = alwaysReady
-	manager.podLister = &cache.StoreToPodLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
-	manager.rsLister = &cache.StoreToReplicaSetLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
 
 	labelMap := map[string]string{"foo": "bar"}
 	rs := newReplicaSet(1, labelMap)
@@ -1131,8 +1126,7 @@ func setupManagerWithGCEnabled(stopCh chan struct{}, objs ...runtime.Object) (ma
 	manager = testNewReplicaSetControllerFromClient(c, stopCh, BurstReplicas, 0)
 	manager.garbageCollectorEnabled = true
 	manager.podListerSynced = alwaysReady
-	manager.podLister = &cache.StoreToPodLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
-	manager.rsLister = &cache.StoreToReplicaSetLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
+
 	manager.podControl = fakePodControl
 	return manager, fakePodControl
 }
@@ -1357,8 +1351,6 @@ func TestReadyReplicas(t *testing.T) {
 	defer close(stopCh)
 	manager := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas, 0)
 	manager.podListerSynced = alwaysReady
-	manager.podLister = &cache.StoreToPodLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
-	manager.rsLister = &cache.StoreToReplicaSetLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
 
 	// Status.Replica should update to match number of pods in system, 1 new pod should be created.
 	labelMap := map[string]string{"foo": "bar"}
@@ -1402,8 +1394,6 @@ func TestAvailableReplicas(t *testing.T) {
 	defer close(stopCh)
 	manager := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas, 0)
 	manager.podListerSynced = alwaysReady
-	manager.podLister = &cache.StoreToPodLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
-	manager.rsLister = &cache.StoreToReplicaSetLister{Indexer: cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})}
 
 	// Status.Replica should update to match number of pods in system, 1 new pod should be created.
 	labelMap := map[string]string{"foo": "bar"}
