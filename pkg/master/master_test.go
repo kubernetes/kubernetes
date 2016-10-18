@@ -99,14 +99,6 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs}}
 	config.EnableCoreControllers = false
 
-	// TODO: this is kind of hacky.  The trouble is that the sync loop
-	// runs in a go-routine and there is no way to validate in the test
-	// that the sync routine has actually run.  The right answer here
-	// is probably to add some sort of callback that we can register
-	// to validate that it's actually been run, but for now we don't
-	// run the sync routine and register types manually.
-	config.disableThirdPartyControllerForTesting = true
-
 	master, err := config.Complete().New()
 	if err != nil {
 		t.Fatal(err)
