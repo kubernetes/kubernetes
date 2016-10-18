@@ -28,6 +28,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIGroupList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -115,5 +118,25 @@
      }
     }
    }
-  }
+  },
+  "securityDefinitions": {
+   "HTTPBasic": {
+    "description": "HTTP Basic authentication",
+    "type": "basic"
+   },
+   "TokenBearer": {
+    "description": "Token Bearer authentication",
+    "type": "apiKey",
+    "name": "authorization",
+    "in": "header"
+   }
+  },
+  "security": [
+   {
+    "HTTPBasic": []
+   },
+   {
+    "TokenBearer": []
+   }
+  ]
  }
