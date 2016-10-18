@@ -63,7 +63,10 @@ var (
 		kubectl delete pod 1234-56-7890-234234-456456
 
 		# Delete all pods
-		kubectl delete pods --all`)
+		kubectl delete pods --all
+
+		For more info, please visit: http://kubernetes.io/docs/user-guide/kubectl/kubectl_delete/
+		`)
 )
 
 func NewCmdDelete(f cmdutil.Factory, out io.Writer) *cobra.Command {

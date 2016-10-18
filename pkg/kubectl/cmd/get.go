@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -76,7 +76,10 @@ var (
 		kubectl get rc,services
 
 		# List one or more resources by their type and names.
-		kubectl get rc/web service/frontend pods/web-pod-13je7`)
+		kubectl get rc/web service/frontend pods/web-pod-13je7
+
+		For more info, please visit: http://kubernetes.io/docs/user-guide/kubectl/kubectl_get/
+		`)
 )
 
 // NewCmdGet creates a command object for the generic "get" action, which

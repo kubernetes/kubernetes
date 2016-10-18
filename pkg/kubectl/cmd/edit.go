@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -76,7 +76,10 @@ var (
 		  KUBE_EDITOR="nano" kubectl edit svc/docker-registry
 
 		  # Edit the service 'docker-registry' in JSON using the v1 API format:
-		  kubectl edit svc/docker-registry --output-version=v1 -o json`)
+		  kubectl edit svc/docker-registry --output-version=v1 -o json
+
+		  For more info, please visit: http://kubernetes.io/docs/user-guide/kubectl/kubectl_edit/
+		  `)
 )
 
 func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {

@@ -70,7 +70,9 @@ var (
 		kubectl expose rs nginx --port=80 --target-port=8000
 
 		# Create a service for an nginx deployment, which serves on port 80 and connects to the containers on port 8000.
-		kubectl expose deployment nginx --port=80 --target-port=8000`)
+		kubectl expose deployment nginx --port=80 --target-port=8000
+
+		For more info, please visit: http://kubernetes.io/docs/user-guide/kubectl/kubectl_expose/`)
 )
 
 func NewCmdExposeService(f cmdutil.Factory, out io.Writer) *cobra.Command {

@@ -40,7 +40,9 @@ var (
 		kubectl create -f ./pod.json
 
 		# Create a pod based on the JSON passed into stdin.
-		cat pod.json | kubectl create -f -`)
+		cat pod.json | kubectl create -f -
+
+		For more info, please visit: http://kubernetes.io/docs/user-guide/kubectl/kubectl_create/`)
 )
 
 func NewCmdCreate(f cmdutil.Factory, out io.Writer) *cobra.Command {
