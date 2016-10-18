@@ -203,7 +203,7 @@ type DeploymentRollback struct {
 }
 
 type RollbackConfig struct {
-	// The revision to rollback to. If set to 0, rollbck to the last revision.
+	// The revision to rollback to. If set to 0, rollback to the last revision.
 	Revision int64 `json:"revision,omitempty"`
 }
 
