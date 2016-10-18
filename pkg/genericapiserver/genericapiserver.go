@@ -514,7 +514,7 @@ func (s *GenericAPIServer) DynamicApisDiscovery(prefix string) *restful.WebServi
 		}
 		sort.Strings(groupNames)
 		for _, groupName := range groupNames {
-			sortedGroups = append(sortedGroups, s.apiGroupsForDiscovery[groupName])
+			sortedGroups = append(sortedGroups, s.apiGroupsForDiscovery[prefix+"/"+groupName])
 		}
 
 		serverCIDR := s.getServerAddressByClientCIDRs(req.Request)
