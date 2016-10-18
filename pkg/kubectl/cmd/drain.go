@@ -52,6 +52,7 @@ type DrainOptions struct {
 	nodeInfo           *resource.Info
 	out                io.Writer
 	typer              runtime.ObjectTyper
+	ifPrint            bool
 }
 
 // Takes a pod and returns a bool indicating whether or not to operate on the
@@ -193,6 +194,8 @@ func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+
+	o.ifPrint = true
 
 	r := o.factory.NewBuilder(cmdutil.GetIncludeThirdPartyAPIs(cmd)).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -393,26 +396,42 @@ func (o *DrainOptions) deletePods(pods []api.Pod) error {
 		cmdutil.PrintSuccess(o.mapper, false, o.out, "pod", pod.Name, "deleted")
 	}
 
-	return wait.PollImmediate(kubectl.Interval, o.Timeout, func() (bool, error) {
-		pendingPodCnt := 0
+	getPodFn := func(namespace, name string) (*api.Pod, error) {
+		return o.client.Core().Pods(namespace).Get(name)
+	}
+	pendingPods, err := o.waitForDelete(pods, kubectl.Interval, o.Timeout, getPodFn)
+	if err != nil {
+		fmt.Fprintf(o.out, "There are pending pods when an error occured:\n")
+		for _, pendindPod := range pendingPods {
+			cmdutil.PrintSuccess(o.mapper, true, o.out, "pod", pendindPod.Name, false, "")
+		}
+	}
+	return err
+}
+
+func (o *DrainOptions) waitForDelete(pods []api.Pod, interval, timeout time.Duration, getPodFn func(namespace, name string) (*api.Pod, error)) ([]api.Pod, error) {
+	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+		pendingPods := []api.Pod{}
 		for i, pod := range pods {
-			p, err := o.client.Core().Pods(pod.Namespace).Get(pod.Name)
+			p, err := getPodFn(pod.Namespace, pod.Name)
 			if apierrors.IsNotFound(err) || (p != nil && p.ObjectMeta.UID != pod.ObjectMeta.UID) {
-				cmdutil.PrintSuccess(o.mapper, false, o.out, "pod", pod.Name, false, "deleted")
+				if o.ifPrint {
+					cmdutil.PrintSuccess(o.mapper, false, o.out, "pod", pod.Name, false, "deleted")
+				}
 				continue
 			} else if err != nil {
 				return false, err
 			} else {
-				pods[pendingPodCnt] = pods[i]
-				pendingPodCnt++
+				pendingPods = append(pendingPods, pods[i])
 			}
 		}
-		if pendingPodCnt > 0 {
-			pods = pods[:pendingPodCnt]
+		pods = pendingPods
+		if len(pendingPods) > 0 {
 			return false, nil
 		}
 		return true, nil
 	})
+	return pods, err
 }
 
 // RunCordonOrUncordon runs either Cordon or Uncordon.  The desired value for
