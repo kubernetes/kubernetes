@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
@@ -32,9 +32,10 @@ type CurrentContextOptions struct {
 }
 
 var (
-	current_context_long = dedent.Dedent(`
+	current_context_long = templates.LongDesc(`
 		Displays the current-context`)
-	current_context_example = dedent.Dedent(`
+
+	current_context_example = templates.Examples(`
 		# Display the current-context
 		kubectl config current-context`)
 )

@@ -20,27 +20,27 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 var (
-	explainExamples = dedent.Dedent(`
+	explainLong = templates.LongDesc(`
+		Documentation of resources.
+
+		` + valid_resources)
+
+	explainExamples = templates.Examples(`
 		# Get the documentation of the resource and its fields
 		kubectl explain pods
 
 		# Get the documentation of a specific field of a resource
 		kubectl explain pods.spec.containers`)
-
-	explainLong = dedent.Dedent(`
-		Documentation of resources.
-
-		`) + valid_resources
 )
 
 // NewCmdExplain returns a cobra command for swagger docs
