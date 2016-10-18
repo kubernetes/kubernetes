@@ -27,12 +27,12 @@ import (
 	gruntime "runtime"
 	"strings"
 
-	"github.com/renstrom/dedent"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -47,7 +47,7 @@ import (
 )
 
 var (
-	editLong = dedent.Dedent(`
+	editLong = templates.LongDesc(`
 		Edit a resource from the default editor.
 
 		The edit command allows you to directly edit any API resource you can retrieve via the
@@ -68,15 +68,15 @@ var (
 		to apply your changes to the newer version of the resource, or update your temporary
 		saved copy to include the latest resource version.`)
 
-	editExample = dedent.Dedent(`
-		  # Edit the service named 'docker-registry':
-		  kubectl edit svc/docker-registry
+	editExample = templates.Examples(`
+		# Edit the service named 'docker-registry':
+		kubectl edit svc/docker-registry
 
-		  # Use an alternative editor
-		  KUBE_EDITOR="nano" kubectl edit svc/docker-registry
+		# Use an alternative editor
+		KUBE_EDITOR="nano" kubectl edit svc/docker-registry
 
-		  # Edit the service 'docker-registry' in JSON using the v1 API format:
-		  kubectl edit svc/docker-registry --output-version=v1 -o json`)
+		# Edit the service 'docker-registry' in JSON using the v1 API format:
+		kubectl edit svc/docker-registry --output-version=v1 -o json`)
 )
 
 func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {

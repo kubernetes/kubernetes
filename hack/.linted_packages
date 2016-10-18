@@ -1,6 +1,7 @@
 cluster/addons/fluentd-elasticsearch/es-image
 cluster/images/etcd/attachlease
 cluster/images/etcd/rollback
+cmd/clicheck
 cmd/gendocs
 cmd/genkubedocs
 cmd/genman

@@ -21,19 +21,19 @@ import (
 	"io"
 	"time"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
 var (
-	delete_long = dedent.Dedent(`
+	delete_long = templates.LongDesc(`
 		Delete resources by filenames, stdin, resources and names, or by resources and label selector.
 
 		JSON and YAML formats are accepted.
@@ -43,7 +43,8 @@ var (
 		Note that the delete command does NOT do resource version checks, so if someone
 		submits an update to a resource right when you submit a delete, their update
 		will be lost along with the rest of the resource.`)
-	delete_example = dedent.Dedent(`
+
+	delete_example = templates.Examples(`
 		# Delete a pod using the type and name specified in pod.json.
 		kubectl delete -f ./pod.json
 

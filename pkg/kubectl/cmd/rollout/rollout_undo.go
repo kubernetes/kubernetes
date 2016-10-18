@@ -19,9 +19,9 @@ package rollout
 import (
 	"io"
 
-	"github.com/renstrom/dedent"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -46,9 +46,10 @@ type UndoOptions struct {
 }
 
 var (
-	undo_long = dedent.Dedent(`
+	undo_long = templates.LongDesc(`
 		Rollback to a previous rollout.`)
-	undo_example = dedent.Dedent(`
+
+	undo_example = templates.Examples(`
 		# Rollback to the previous deployment
 		kubectl rollout undo deployment/abc
 
