@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
+	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
 func TestLog(t *testing.T) {
@@ -47,7 +48,7 @@ func TestLog(t *testing.T) {
 	}
 	for _, test := range tests {
 		logContent := "test log content"
-		f, tf, codec, ns := NewAPIFactory()
+		f, tf, codec, ns := cmdtesting.NewAPIFactory()
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -95,7 +96,7 @@ func testPod() *api.Pod {
 }
 
 func TestValidateLogFlags(t *testing.T) {
-	f, _, _, _ := NewAPIFactory()
+	f, _, _, _ := cmdtesting.NewAPIFactory()
 
 	tests := []struct {
 		name     string

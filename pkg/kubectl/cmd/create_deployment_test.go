@@ -21,11 +21,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
 func TestCreateDeployment(t *testing.T) {
 	depName := "jonny-dep"
-	f, tf, _, _ := NewAPIFactory()
+	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
@@ -42,7 +44,7 @@ func TestCreateDeployment(t *testing.T) {
 
 func TestCreateDeploymentNoImage(t *testing.T) {
 	depName := "jonny-dep"
-	f, tf, _, _ := NewAPIFactory()
+	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})

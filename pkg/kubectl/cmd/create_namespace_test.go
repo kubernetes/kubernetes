@@ -23,12 +23,13 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
+	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
 func TestCreateNamespace(t *testing.T) {
 	namespaceObject := &api.Namespace{}
 	namespaceObject.Name = "my-namespace"
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
