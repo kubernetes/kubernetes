@@ -159,7 +159,7 @@ func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 func (o *ResourcesOptions) Validate() error {
 	var err error
 	if len(o.Limits) == 0 && len(o.Requests) == 0 {
-		return fmt.Errorf("you must specify an update to requests or limits or  (in the form of --requests/--limits)")
+		return fmt.Errorf("you must specify an update to requests or limits (in the form of --requests/--limits)")
 	}
 
 	o.ResourceRequirements, err = kubectl.HandleResourceRequirements(map[string]string{"limits": o.Limits, "requests": o.Requests})
@@ -178,7 +178,19 @@ func (o *ResourcesOptions) Run() error {
 			containers, _ := selectContainers(spec.Containers, o.ContainerSelector)
 			if len(containers) != 0 {
 				for i := range containers {
-					containers[i].Resources = o.ResourceRequirements
+					if len(o.Limits) != 0 && len(containers[i].Resources.Limits) == 0 {
+						containers[i].Resources.Limits = make(api.ResourceList)
+					}
+					for key, value := range o.ResourceRequirements.Limits {
+						containers[i].Resources.Limits[key] = value
+					}
+
+					if len(o.Requests) != 0 && len(containers[i].Resources.Requests) == 0 {
+						containers[i].Resources.Requests = make(api.ResourceList)
+					}
+					for key, value := range o.ResourceRequirements.Requests {
+						containers[i].Resources.Requests[key] = value
+					}
 					transformed = true
 				}
 			} else {
