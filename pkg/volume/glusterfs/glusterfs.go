@@ -53,6 +53,9 @@ var _ volume.ProvisionableVolumePlugin = &glusterfsPlugin{}
 var _ volume.Provisioner = &glusterfsVolumeProvisioner{}
 var _ volume.Deleter = &glusterfsVolumeDeleter{}
 
+// Dependecy injection - can be replaced in unit tests
+var secretReader = parseSecret
+
 const (
 	glusterfsPluginName       = "kubernetes.io/glusterfs"
 	volprefix                 = "vol_"
@@ -558,7 +561,7 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 	if len(cfg.secretName) != 0 || len(cfg.secretNamespace) != 0 {
 		// secretName + Namespace has precedence over userKey
 		if len(cfg.secretName) != 0 && len(cfg.secretNamespace) != 0 {
-			cfg.secretValue, err = parseSecret(cfg.secretNamespace, cfg.secretName, kubeClient)
+			cfg.secretValue, err = secretReader(cfg.secretNamespace, cfg.secretName, kubeClient)
 			if err != nil {
 				return nil, err
 			}
