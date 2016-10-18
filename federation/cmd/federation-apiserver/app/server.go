@@ -117,7 +117,7 @@ func Run(s *options.ServerRunOptions) error {
 		storageFactory.SetEtcdLocation(groupResource, servers)
 	}
 
-	apiAuthenticator, err := authenticator.New(authenticator.AuthenticatorConfig{
+	apiAuthenticator, securityDefinitions, err := authenticator.New(authenticator.AuthenticatorConfig{
 		Anonymous:         s.AnonymousAuth,
 		AnyToken:          s.EnableAnyToken,
 		BasicAuthFile:     s.BasicAuthFile,
@@ -200,6 +200,7 @@ func Run(s *options.ServerRunOptions) error {
 	// this method does not provide good operation IDs for federation, we should create federation's own GetOperationID.
 	genericConfig.OpenAPIConfig.GetOperationID = apiserveropenapi.GetOperationID
 	genericConfig.EnableOpenAPISupport = true
+	genericConfig.OpenAPIConfig.SecurityDefinitions = securityDefinitions
 
 	// TODO: Move this to generic api server (Need to move the command line flag).
 	if s.EnableWatchCache {
