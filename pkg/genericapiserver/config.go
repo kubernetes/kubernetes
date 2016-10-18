@@ -122,10 +122,6 @@ type Config struct {
 	// If nil or 0.0.0.0, the host's default interface will be used.
 	PublicAddress net.IP
 
-	// Control the interval that pod, node IP, and node heath status caches
-	// expire.
-	CacheTimeout time.Duration
-
 	// The range of IPs to be assigned to services with type=ClusterIP or greater
 	ServiceClusterIPRange *net.IPNet
 
@@ -206,7 +202,6 @@ func NewConfig() *Config {
 		MasterCount:            1,
 		ReadWritePort:          6443,
 		ServiceReadWritePort:   443,
-		CacheTimeout:           5 * time.Second,
 		RequestContextMapper:   api.NewRequestContextMapper(),
 		BuildHandlerChainsFunc: DefaultBuildHandlerChain,
 		LegacyAPIGroupPrefixes: sets.NewString(LegacyAPIPrefix),
