@@ -1776,6 +1776,27 @@ testCases:
               other: b
         - name: 2
           other: b
+  - description: defined null values should propagate overwrite current fields (with conflict) (ignore two-way application)
+    original:
+      name: 2
+    twoWay:
+      name: 1
+      value: 1
+      other: null
+    modified:
+      name: 1
+      value: 1
+      other: null
+    current:
+      name: a
+      other: a
+    threeWay:
+      name: 1
+      value: 1
+      other: null
+    result:
+      name: 1
+      value: 1
 `)
 
 func TestStrategicMergePatch(t *testing.T) {
@@ -1827,7 +1848,9 @@ func testTwoWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
 	}
 
 	testPatchCreation(t, expected, actual, c.Description)
-	testPatchApplication(t, original, actual, modified, c.Description)
+	if !strings.Contains(c.Description, "ignore two-way application") {
+		testPatchApplication(t, original, actual, modified, c.Description)
+	}
 }
 
 func twoWayTestCaseToJSONOrFail(t *testing.T, c StrategicMergePatchTestCase) ([]byte, []byte, []byte) {
