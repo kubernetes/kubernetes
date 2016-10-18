@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/kubenet"
 	"k8s.io/kubernetes/pkg/kubelet/network/mock_network"
-	"k8s.io/kubernetes/pkg/kubelet/rkt/mock_os"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	kubetypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/errors"
@@ -813,7 +812,7 @@ func TestGetPodStatus(t *testing.T) {
 			if !ok {
 				t.Errorf("osStat called with %v, but only knew about %#v", name, podTimes)
 			}
-			mockFI := mock_os.NewMockFileInfo(ctrl)
+			mockFI := containertesting.NewMockFileInfo(ctrl)
 			mockFI.EXPECT().ModTime().Return(podTime)
 			return mockFI, nil
 		}
@@ -1781,7 +1780,7 @@ func TestGarbageCollect(t *testing.T) {
 			var fileInfos []os.FileInfo
 
 			for _, name := range serviceFileNames {
-				mockFI := mock_os.NewMockFileInfo(ctrl)
+				mockFI := containertesting.NewMockFileInfo(ctrl)
 				mockFI.EXPECT().Name().Return(name)
 				fileInfos = append(fileInfos, mockFI)
 			}
