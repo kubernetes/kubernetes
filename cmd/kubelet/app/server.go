@@ -647,14 +647,10 @@ func RunKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet
 	credentialprovider.SetPreferredDockercfgPath(kubeCfg.RootDirectory)
 	glog.V(2).Infof("Using root directory: %v", kubeCfg.RootDirectory)
 
-	builder := kubeDeps.Builder
-	if builder == nil {
-		builder = CreateAndInitKubelet
-	}
 	if kubeDeps.OSInterface == nil {
 		kubeDeps.OSInterface = kubecontainer.RealOS{}
 	}
-	k, err := builder(kubeCfg, kubeDeps, standaloneMode)
+	k, err := CreateAndInitKubelet(kubeCfg, kubeDeps, standaloneMode)
 	if err != nil {
 		return fmt.Errorf("failed to create kubelet: %v", err)
 	}

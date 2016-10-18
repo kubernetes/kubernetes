@@ -170,22 +170,10 @@ type KubeletBootstrap interface {
 	RunOnce(<-chan kubetypes.PodUpdate) ([]RunPodResult, error)
 }
 
-// create and initialize a Kubelet instance
-type KubeletBuilder func(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *KubeletDeps, standaloneMode bool) (KubeletBootstrap, error)
-
 // KubeletDeps is a bin for things we might consider "injected dependencies" -- objects constructed
 // at runtime that are necessary for running the Kubelet. This is a temporary solution for grouping
 // these objects while we figure out a more comprehensive dependency injection story for the Kubelet.
 type KubeletDeps struct {
-	// TODO(mtaufen): KubeletBuilder:
-	//                Mesos currently uses this as a hook to let them make their own call to
-	//                let them wrap the KubeletBootstrap that CreateAndInitKubelet returns with
-	//                their own KubeletBootstrap. It's a useful hook. I need to think about what
-	//                a nice home for it would be. There seems to be a trend, between this and
-	//                the Options fields below, of providing hooks where you can add extra functionality
-	//                to the Kubelet for your solution. Maybe we should centralize these sorts of things?
-	Builder KubeletBuilder
-
 	// TODO(mtaufen): ContainerRuntimeOptions and Options:
 	//                Arrays of functions that can do arbitrary things to the Kubelet and the Runtime
 	//                seem like a difficult path to trace when it's time to debug something.
