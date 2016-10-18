@@ -183,7 +183,7 @@ type Cacher struct {
 // internal cache and updating its cache in the background based on the given
 // configuration.
 func NewCacherFromConfig(config CacherConfig) *Cacher {
-	watchCache := newWatchCache(config.CacheCapacity)
+	watchCache := newWatchCache(config.CacheCapacity, config.KeyFunc)
 	listerWatcher := newCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
 
 	// Give this error when it is constructed rather than when you get the
@@ -390,12 +390,12 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 	}
 	trace.Step(fmt.Sprintf("Listed %d items from cache", len(objs)))
 	for _, obj := range objs {
-		object, ok := obj.(runtime.Object)
+		elem, ok := obj.(*storeElement)
 		if !ok {
-			return fmt.Errorf("non runtime.Object returned from storage: %v", obj)
+			return fmt.Errorf("non *storeElement returned from storage: %v", obj)
 		}
-		if filter(object) {
-			listVal.Set(reflect.Append(listVal, reflect.ValueOf(object).Elem()))
+		if filter(elem.Object) {
+			listVal.Set(reflect.Append(listVal, reflect.ValueOf(elem.Object).Elem()))
 		}
 	}
 	trace.Step(fmt.Sprintf("Filtered %d items", listVal.Len()))
