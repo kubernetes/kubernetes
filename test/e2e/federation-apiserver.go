@@ -36,7 +36,7 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 
 	Describe("Cluster objects", func() {
 		AfterEach(func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 
 			// Delete registered clusters.
 			// This is if a test failed, it should not affect other tests.
@@ -49,7 +49,7 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 		})
 
 		It("should be created and deleted successfully", func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 
 			contexts := f.GetUnderlyingFederatedContexts()
 
@@ -85,11 +85,11 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 	})
 	Describe("Admission control", func() {
 		AfterEach(func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 		})
 
 		It("should not be able to create resources if namespace does not exist", func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 
 			// Creating a service in a non-existing namespace should fail.
 			svcNamespace := "federation-admission-test-ns"

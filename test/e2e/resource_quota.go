@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -43,13 +43,13 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		By("Creating a ResourceQuota")
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
-		resourceQuota, err := createResourceQuota(f.Client, f.Namespace.Name, resourceQuota)
+		resourceQuota, err := createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status is calculated")
 		usedResources := api.ResourceList{}
 		usedResources[api.ResourceQuotas] = resource.MustParse("1")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -57,40 +57,40 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		By("Creating a ResourceQuota")
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
-		resourceQuota, err := createResourceQuota(f.Client, f.Namespace.Name, resourceQuota)
+		resourceQuota, err := createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status is calculated")
 		usedResources := api.ResourceList{}
 		usedResources[api.ResourceQuotas] = resource.MustParse("1")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating a Service")
 		service := newTestServiceForQuota("test-service", api.ServiceTypeClusterIP)
-		service, err = f.Client.Services(f.Namespace.Name).Create(service)
+		service, err = f.ClientSet.Core().Services(f.Namespace.Name).Create(service)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status captures service creation")
 		usedResources = api.ResourceList{}
 		usedResources[api.ResourceQuotas] = resource.MustParse("1")
 		usedResources[api.ResourceServices] = resource.MustParse("1")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Deleting a Service")
-		err = f.Client.Services(f.Namespace.Name).Delete(service.Name)
+		err = f.ClientSet.Core().Services(f.Namespace.Name).Delete(service.Name, nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status released usage")
 		usedResources[api.ResourceServices] = resource.MustParse("0")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("should create a ResourceQuota and capture the life of a secret.", func() {
 		By("Discovering how many secrets are in namespace by default")
-		secrets, err := f.Client.Secrets(f.Namespace.Name).List(api.ListOptions{})
+		secrets, err := f.ClientSet.Core().Secrets(f.Namespace.Name).List(api.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		defaultSecrets := fmt.Sprintf("%d", len(secrets.Items))
 		hardSecrets := fmt.Sprintf("%d", len(secrets.Items)+1)
@@ -99,19 +99,19 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
 		resourceQuota.Spec.Hard[api.ResourceSecrets] = resource.MustParse(hardSecrets)
-		resourceQuota, err = createResourceQuota(f.Client, f.Namespace.Name, resourceQuota)
+		resourceQuota, err = createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status is calculated")
 		usedResources := api.ResourceList{}
 		usedResources[api.ResourceQuotas] = resource.MustParse("1")
 		usedResources[api.ResourceSecrets] = resource.MustParse(defaultSecrets)
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating a Secret")
 		secret := newTestSecretForQuota("test-secret")
-		secret, err = f.Client.Secrets(f.Namespace.Name).Create(secret)
+		secret, err = f.ClientSet.Core().Secrets(f.Namespace.Name).Create(secret)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status captures secret creation")
@@ -119,16 +119,16 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		usedResources[api.ResourceSecrets] = resource.MustParse(hardSecrets)
 		// we expect there to be two secrets because each namespace will receive
 		// a service account token secret by default
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Deleting a secret")
-		err = f.Client.Secrets(f.Namespace.Name).Delete(secret.Name)
+		err = f.ClientSet.Core().Secrets(f.Namespace.Name).Delete(secret.Name, nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status released usage")
 		usedResources[api.ResourceSecrets] = resource.MustParse(defaultSecrets)
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -136,13 +136,13 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		By("Creating a ResourceQuota")
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
-		resourceQuota, err := createResourceQuota(f.Client, f.Namespace.Name, resourceQuota)
+		resourceQuota, err := createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status is calculated")
 		usedResources := api.ResourceList{}
 		usedResources[api.ResourceQuotas] = resource.MustParse("1")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating a Pod that fits quota")
@@ -151,7 +151,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		requests[api.ResourceCPU] = resource.MustParse("500m")
 		requests[api.ResourceMemory] = resource.MustParse("252Mi")
 		pod := newTestPodForQuota(f, podName, requests, api.ResourceList{})
-		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
+		pod, err = f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
 		Expect(err).NotTo(HaveOccurred())
 		podToUpdate := pod
 
@@ -160,7 +160,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		usedResources[api.ResourcePods] = resource.MustParse("1")
 		usedResources[api.ResourceCPU] = requests[api.ResourceCPU]
 		usedResources[api.ResourceMemory] = requests[api.ResourceMemory]
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Not allowing a pod to be created that exceeds remaining quota")
@@ -168,7 +168,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		requests[api.ResourceCPU] = resource.MustParse("600m")
 		requests[api.ResourceMemory] = resource.MustParse("100Mi")
 		pod = newTestPodForQuota(f, "fail-pod", requests, api.ResourceList{})
-		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
+		pod, err = f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
 		Expect(err).To(HaveOccurred())
 
 		By("Ensuring a pod cannot update its resource requirements")
@@ -177,15 +177,15 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		requests[api.ResourceCPU] = resource.MustParse("100m")
 		requests[api.ResourceMemory] = resource.MustParse("100Mi")
 		podToUpdate.Spec.Containers[0].Resources.Requests = requests
-		_, err = f.Client.Pods(f.Namespace.Name).Update(podToUpdate)
+		_, err = f.ClientSet.Core().Pods(f.Namespace.Name).Update(podToUpdate)
 		Expect(err).To(HaveOccurred())
 
 		By("Ensuring attempts to update pod resource requirements did not change quota usage")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Deleting the pod")
-		err = f.Client.Pods(f.Namespace.Name).Delete(podName, api.NewDeleteOptions(0))
+		err = f.ClientSet.Core().Pods(f.Namespace.Name).Delete(podName, api.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status released the pod usage")
@@ -193,7 +193,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		usedResources[api.ResourcePods] = resource.MustParse("0")
 		usedResources[api.ResourceCPU] = resource.MustParse("0")
 		usedResources[api.ResourceMemory] = resource.MustParse("0")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -201,34 +201,34 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		By("Creating a ResourceQuota")
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
-		resourceQuota, err := createResourceQuota(f.Client, f.Namespace.Name, resourceQuota)
+		resourceQuota, err := createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status is calculated")
 		usedResources := api.ResourceList{}
 		usedResources[api.ResourceQuotas] = resource.MustParse("1")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating a ConfigMap")
 		configMap := newTestConfigMapForQuota("test-configmap")
-		configMap, err = f.Client.ConfigMaps(f.Namespace.Name).Create(configMap)
+		configMap, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(configMap)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status captures configMap creation")
 		usedResources = api.ResourceList{}
 		usedResources[api.ResourceQuotas] = resource.MustParse("1")
 		usedResources[api.ResourceConfigMaps] = resource.MustParse("1")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Deleting a ConfigMap")
-		err = f.Client.ConfigMaps(f.Namespace.Name).Delete(configMap.Name)
+		err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Delete(configMap.Name, nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status released usage")
 		usedResources[api.ResourceConfigMaps] = resource.MustParse("0")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -236,34 +236,34 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		By("Creating a ResourceQuota")
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
-		resourceQuota, err := createResourceQuota(f.Client, f.Namespace.Name, resourceQuota)
+		resourceQuota, err := createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status is calculated")
 		usedResources := api.ResourceList{}
 		usedResources[api.ResourceQuotas] = resource.MustParse("1")
 		usedResources[api.ResourceReplicationControllers] = resource.MustParse("0")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating a ReplicationController")
 		replicationController := newTestReplicationControllerForQuota("test-rc", "nginx", 0)
-		replicationController, err = f.Client.ReplicationControllers(f.Namespace.Name).Create(replicationController)
+		replicationController, err = f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Create(replicationController)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status captures replication controller creation")
 		usedResources = api.ResourceList{}
 		usedResources[api.ResourceReplicationControllers] = resource.MustParse("1")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Deleting a ReplicationController")
-		err = f.Client.ReplicationControllers(f.Namespace.Name).Delete(replicationController.Name, nil)
+		err = f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Delete(replicationController.Name, nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status released usage")
 		usedResources[api.ResourceReplicationControllers] = resource.MustParse("0")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -271,7 +271,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		By("Creating a ResourceQuota")
 		quotaName := "test-quota"
 		resourceQuota := newTestResourceQuota(quotaName)
-		resourceQuota, err := createResourceQuota(f.Client, f.Namespace.Name, resourceQuota)
+		resourceQuota, err := createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status is calculated")
@@ -279,51 +279,51 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		usedResources[api.ResourceQuotas] = resource.MustParse("1")
 		usedResources[api.ResourcePersistentVolumeClaims] = resource.MustParse("0")
 		usedResources[api.ResourceRequestsStorage] = resource.MustParse("0")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating a PersistentVolumeClaim")
 		pvc := newTestPersistentVolumeClaimForQuota("test-claim")
-		pvc, err = f.Client.PersistentVolumeClaims(f.Namespace.Name).Create(pvc)
+		pvc, err = f.ClientSet.Core().PersistentVolumeClaims(f.Namespace.Name).Create(pvc)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status captures persistent volume claimcreation")
 		usedResources = api.ResourceList{}
 		usedResources[api.ResourcePersistentVolumeClaims] = resource.MustParse("1")
 		usedResources[api.ResourceRequestsStorage] = resource.MustParse("1Gi")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Deleting a PersistentVolumeClaim")
-		err = f.Client.PersistentVolumeClaims(f.Namespace.Name).Delete(pvc.Name)
+		err = f.ClientSet.Core().PersistentVolumeClaims(f.Namespace.Name).Delete(pvc.Name, nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status released usage")
 		usedResources[api.ResourcePersistentVolumeClaims] = resource.MustParse("0")
 		usedResources[api.ResourceRequestsStorage] = resource.MustParse("0")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("should verify ResourceQuota with terminating scopes.", func() {
 		By("Creating a ResourceQuota with terminating scope")
 		quotaTerminatingName := "quota-terminating"
-		resourceQuotaTerminating, err := createResourceQuota(f.Client, f.Namespace.Name, newTestResourceQuotaWithScope(quotaTerminatingName, api.ResourceQuotaScopeTerminating))
+		resourceQuotaTerminating, err := createResourceQuota(f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScope(quotaTerminatingName, api.ResourceQuotaScopeTerminating))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring ResourceQuota status is calculated")
 		usedResources := api.ResourceList{}
 		usedResources[api.ResourcePods] = resource.MustParse("0")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, resourceQuotaTerminating.Name, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaTerminating.Name, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating a ResourceQuota with not terminating scope")
 		quotaNotTerminatingName := "quota-not-terminating"
-		resourceQuotaNotTerminating, err := createResourceQuota(f.Client, f.Namespace.Name, newTestResourceQuotaWithScope(quotaNotTerminatingName, api.ResourceQuotaScopeNotTerminating))
+		resourceQuotaNotTerminating, err := createResourceQuota(f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScope(quotaNotTerminatingName, api.ResourceQuotaScopeNotTerminating))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring ResourceQuota status is calculated")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, resourceQuotaNotTerminating.Name, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaNotTerminating.Name, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating a long running pod")
@@ -335,7 +335,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		limits[api.ResourceCPU] = resource.MustParse("1")
 		limits[api.ResourceMemory] = resource.MustParse("400Mi")
 		pod := newTestPodForQuota(f, podName, requests, limits)
-		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
+		pod, err = f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota with not terminating scope captures the pod usage")
@@ -344,7 +344,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		usedResources[api.ResourceRequestsMemory] = requests[api.ResourceMemory]
 		usedResources[api.ResourceLimitsCPU] = limits[api.ResourceCPU]
 		usedResources[api.ResourceLimitsMemory] = limits[api.ResourceMemory]
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, resourceQuotaNotTerminating.Name, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaNotTerminating.Name, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota with terminating scope ignored the pod usage")
@@ -353,11 +353,11 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		usedResources[api.ResourceRequestsMemory] = resource.MustParse("0")
 		usedResources[api.ResourceLimitsCPU] = resource.MustParse("0")
 		usedResources[api.ResourceLimitsMemory] = resource.MustParse("0")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, resourceQuotaTerminating.Name, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaTerminating.Name, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Deleting the pod")
-		err = f.Client.Pods(f.Namespace.Name).Delete(podName, api.NewDeleteOptions(0))
+		err = f.ClientSet.Core().Pods(f.Namespace.Name).Delete(podName, api.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status released the pod usage")
@@ -366,7 +366,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		usedResources[api.ResourceRequestsMemory] = resource.MustParse("0")
 		usedResources[api.ResourceLimitsCPU] = resource.MustParse("0")
 		usedResources[api.ResourceLimitsMemory] = resource.MustParse("0")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, resourceQuotaNotTerminating.Name, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaNotTerminating.Name, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating a terminating pod")
@@ -374,7 +374,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		pod = newTestPodForQuota(f, podName, requests, limits)
 		activeDeadlineSeconds := int64(3600)
 		pod.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
-		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
+		pod, err = f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota with terminating scope captures the pod usage")
@@ -383,7 +383,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		usedResources[api.ResourceRequestsMemory] = requests[api.ResourceMemory]
 		usedResources[api.ResourceLimitsCPU] = limits[api.ResourceCPU]
 		usedResources[api.ResourceLimitsMemory] = limits[api.ResourceMemory]
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, resourceQuotaTerminating.Name, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaTerminating.Name, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota with not terminating scope ignored the pod usage")
@@ -392,11 +392,11 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		usedResources[api.ResourceRequestsMemory] = resource.MustParse("0")
 		usedResources[api.ResourceLimitsCPU] = resource.MustParse("0")
 		usedResources[api.ResourceLimitsMemory] = resource.MustParse("0")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, resourceQuotaNotTerminating.Name, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaNotTerminating.Name, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Deleting the pod")
-		err = f.Client.Pods(f.Namespace.Name).Delete(podName, api.NewDeleteOptions(0))
+		err = f.ClientSet.Core().Pods(f.Namespace.Name).Delete(podName, api.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status released the pod usage")
@@ -405,51 +405,51 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		usedResources[api.ResourceRequestsMemory] = resource.MustParse("0")
 		usedResources[api.ResourceLimitsCPU] = resource.MustParse("0")
 		usedResources[api.ResourceLimitsMemory] = resource.MustParse("0")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, resourceQuotaTerminating.Name, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaTerminating.Name, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("should verify ResourceQuota with best effort scope.", func() {
 		By("Creating a ResourceQuota with best effort scope")
-		resourceQuotaBestEffort, err := createResourceQuota(f.Client, f.Namespace.Name, newTestResourceQuotaWithScope("quota-besteffort", api.ResourceQuotaScopeBestEffort))
+		resourceQuotaBestEffort, err := createResourceQuota(f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScope("quota-besteffort", api.ResourceQuotaScopeBestEffort))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring ResourceQuota status is calculated")
 		usedResources := api.ResourceList{}
 		usedResources[api.ResourcePods] = resource.MustParse("0")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, resourceQuotaBestEffort.Name, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaBestEffort.Name, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating a ResourceQuota with not best effort scope")
-		resourceQuotaNotBestEffort, err := createResourceQuota(f.Client, f.Namespace.Name, newTestResourceQuotaWithScope("quota-not-besteffort", api.ResourceQuotaScopeNotBestEffort))
+		resourceQuotaNotBestEffort, err := createResourceQuota(f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScope("quota-not-besteffort", api.ResourceQuotaScopeNotBestEffort))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring ResourceQuota status is calculated")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, resourceQuotaNotBestEffort.Name, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaNotBestEffort.Name, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating a best-effort pod")
 		pod := newTestPodForQuota(f, podName, api.ResourceList{}, api.ResourceList{})
-		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
+		pod, err = f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota with best effort scope captures the pod usage")
 		usedResources[api.ResourcePods] = resource.MustParse("1")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, resourceQuotaBestEffort.Name, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaBestEffort.Name, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota with not best effort ignored the pod usage")
 		usedResources[api.ResourcePods] = resource.MustParse("0")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, resourceQuotaNotBestEffort.Name, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaNotBestEffort.Name, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Deleting the pod")
-		err = f.Client.Pods(f.Namespace.Name).Delete(pod.Name, api.NewDeleteOptions(0))
+		err = f.ClientSet.Core().Pods(f.Namespace.Name).Delete(pod.Name, api.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status released the pod usage")
 		usedResources[api.ResourcePods] = resource.MustParse("0")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, resourceQuotaBestEffort.Name, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaBestEffort.Name, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating a not best-effort pod")
@@ -460,26 +460,26 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		limits[api.ResourceCPU] = resource.MustParse("1")
 		limits[api.ResourceMemory] = resource.MustParse("400Mi")
 		pod = newTestPodForQuota(f, "burstable-pod", requests, limits)
-		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
+		pod, err = f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota with not best effort scope captures the pod usage")
 		usedResources[api.ResourcePods] = resource.MustParse("1")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, resourceQuotaNotBestEffort.Name, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaNotBestEffort.Name, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota with best effort scope ignored the pod usage")
 		usedResources[api.ResourcePods] = resource.MustParse("0")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, resourceQuotaBestEffort.Name, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaBestEffort.Name, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Deleting the pod")
-		err = f.Client.Pods(f.Namespace.Name).Delete(pod.Name, api.NewDeleteOptions(0))
+		err = f.ClientSet.Core().Pods(f.Namespace.Name).Delete(pod.Name, api.NewDeleteOptions(0))
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status released the pod usage")
 		usedResources[api.ResourcePods] = resource.MustParse("0")
-		err = waitForResourceQuota(f.Client, f.Namespace.Name, resourceQuotaNotBestEffort.Name, usedResources)
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaNotBestEffort.Name, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 	})
 })
@@ -532,7 +532,7 @@ func newTestPodForQuota(f *framework.Framework, name string, requests api.Resour
 			Containers: []api.Container{
 				{
 					Name:  "pause",
-					Image: framework.GetPauseImageName(f.Client),
+					Image: framework.GetPauseImageName(f.ClientSet),
 					Resources: api.ResourceRequirements{
 						Requests: requests,
 						Limits:   limits,
@@ -633,19 +633,19 @@ func newTestSecretForQuota(name string) *api.Secret {
 }
 
 // createResourceQuota in the specified namespace
-func createResourceQuota(c *client.Client, namespace string, resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error) {
-	return c.ResourceQuotas(namespace).Create(resourceQuota)
+func createResourceQuota(c clientset.Interface, namespace string, resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error) {
+	return c.Core().ResourceQuotas(namespace).Create(resourceQuota)
 }
 
 // deleteResourceQuota with the specified name
-func deleteResourceQuota(c *client.Client, namespace, name string) error {
-	return c.ResourceQuotas(namespace).Delete(name)
+func deleteResourceQuota(c clientset.Interface, namespace, name string) error {
+	return c.Core().ResourceQuotas(namespace).Delete(name, nil)
 }
 
 // wait for resource quota status to show the expected used resources value
-func waitForResourceQuota(c *client.Client, ns, quotaName string, used api.ResourceList) error {
+func waitForResourceQuota(c clientset.Interface, ns, quotaName string, used api.ResourceList) error {
 	return wait.Poll(framework.Poll, resourceQuotaTimeout, func() (bool, error) {
-		resourceQuota, err := c.ResourceQuotas(ns).Get(quotaName)
+		resourceQuota, err := c.Core().ResourceQuotas(ns).Get(quotaName)
 		if err != nil {
 			return false, err
 		}

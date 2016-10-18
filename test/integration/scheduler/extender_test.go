@@ -37,7 +37,6 @@ import (
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
@@ -197,7 +196,6 @@ func TestSchedulerExtender(t *testing.T) {
 	ns := framework.CreateTestingNamespace("scheduler-extender", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	restClient := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
 	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
 
 	extender1 := &Extender{
@@ -252,13 +250,13 @@ func TestSchedulerExtender(t *testing.T) {
 
 	defer close(schedulerConfig.StopEverything)
 
-	DoTestPodScheduling(ns, t, restClient)
+	DoTestPodScheduling(ns, t, clientSet)
 }
 
-func DoTestPodScheduling(ns *api.Namespace, t *testing.T, restClient *client.Client) {
+func DoTestPodScheduling(ns *api.Namespace, t *testing.T, cs clientset.Interface) {
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (Nodes).
-	defer restClient.Nodes().DeleteCollection(nil, api.ListOptions{})
+	defer cs.Core().Nodes().DeleteCollection(nil, api.ListOptions{})
 
 	goodCondition := api.NodeCondition{
 		Type:              api.NodeReady,
@@ -278,7 +276,7 @@ func DoTestPodScheduling(ns *api.Namespace, t *testing.T, restClient *client.Cli
 
 	for ii := 0; ii < 5; ii++ {
 		node.Name = fmt.Sprintf("machine%d", ii+1)
-		if _, err := restClient.Nodes().Create(node); err != nil {
+		if _, err := cs.Core().Nodes().Create(node); err != nil {
 			t.Fatalf("Failed to create nodes: %v", err)
 		}
 	}
@@ -286,21 +284,21 @@ func DoTestPodScheduling(ns *api.Namespace, t *testing.T, restClient *client.Cli
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "extender-test-pod"},
 		Spec: api.PodSpec{
-			Containers: []api.Container{{Name: "container", Image: e2e.GetPauseImageName(restClient)}},
+			Containers: []api.Container{{Name: "container", Image: e2e.GetPauseImageName(cs)}},
 		},
 	}
 
-	myPod, err := restClient.Pods(ns.Name).Create(pod)
+	myPod, err := cs.Core().Pods(ns.Name).Create(pod)
 	if err != nil {
 		t.Fatalf("Failed to create pod: %v", err)
 	}
 
-	err = wait.Poll(time.Second, wait.ForeverTestTimeout, podScheduled(restClient, myPod.Namespace, myPod.Name))
+	err = wait.Poll(time.Second, wait.ForeverTestTimeout, podScheduled(cs, myPod.Namespace, myPod.Name))
 	if err != nil {
 		t.Fatalf("Failed to schedule pod: %v", err)
 	}
 
-	if myPod, err := restClient.Pods(ns.Name).Get(myPod.Name); err != nil {
+	if myPod, err := cs.Core().Pods(ns.Name).Get(myPod.Name); err != nil {
 		t.Fatalf("Failed to get pod: %v", err)
 	} else if myPod.Spec.NodeName != "machine3" {
 		t.Fatalf("Failed to schedule using extender, expected machine3, got %v", myPod.Spec.NodeName)

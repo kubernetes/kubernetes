@@ -36,7 +36,7 @@ func parseApiServerMetrics(data string) (ApiServerMetrics, error) {
 }
 
 func (g *MetricsGrabber) getMetricsFromApiServer() (string, error) {
-	rawOutput, err := g.client.Get().RequestURI("/metrics").Do().Raw()
+	rawOutput, err := g.client.Core().RESTClient().Get().RequestURI("/metrics").Do().Raw()
 	if err != nil {
 		return "", err
 	}

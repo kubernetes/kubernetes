@@ -30,8 +30,9 @@ import (
 
 	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
 	"k8s.io/kubernetes/pkg/api"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
-	kubeclient "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/proxy"
@@ -56,7 +57,7 @@ import (
 )
 
 type ProxyServer struct {
-	Client       *kubeclient.Client
+	Client       clientset.Interface
 	Config       *options.ProxyServerConfig
 	IptInterface utiliptables.Interface
 	Proxier      proxy.ProxyProvider
@@ -82,7 +83,7 @@ func checkKnownProxyMode(proxyMode string) bool {
 }
 
 func NewProxyServer(
-	client *kubeclient.Client,
+	client clientset.Interface,
 	config *options.ProxyServerConfig,
 	iptInterface utiliptables.Interface,
 	proxier proxy.ProxyProvider,
@@ -185,7 +186,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 	kubeconfig.QPS = config.KubeAPIQPS
 	kubeconfig.Burst = int(config.KubeAPIBurst)
 
-	client, err := kubeclient.New(kubeconfig)
+	client, err := clientset.NewForConfig(kubeconfig)
 	if err != nil {
 		glog.Fatalf("Invalid API configuration: %v", err)
 	}
@@ -198,7 +199,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 	var proxier proxy.ProxyProvider
 	var endpointsHandler proxyconfig.EndpointsConfigHandler
 
-	proxyMode := getProxyMode(string(config.Mode), client.Nodes(), hostname, iptInterface, iptables.LinuxKernelCompatTester{})
+	proxyMode := getProxyMode(string(config.Mode), client.Core().Nodes(), hostname, iptInterface, iptables.LinuxKernelCompatTester{})
 	if proxyMode == proxyModeIPTables {
 		glog.V(0).Info("Using iptables Proxier.")
 		if config.IPTablesMasqueradeBit == nil {
@@ -251,7 +252,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 	endpointsConfig.RegisterHandler(endpointsHandler)
 
 	proxyconfig.NewSourceAPI(
-		client,
+		client.Core().RESTClient(),
 		config.ConfigSyncPeriod,
 		serviceConfig.Channel("api"),
 		endpointsConfig.Channel("api"),
@@ -281,7 +282,7 @@ func (s *ProxyServer) Run() error {
 		return nil
 	}
 
-	s.Broadcaster.StartRecordingToSink(s.Client.Events(""))
+	s.Broadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: s.Client.Core().Events("")})
 
 	// Start up a webserver if requested
 	if s.Config.HealthzPort > 0 {
@@ -418,9 +419,9 @@ func (s *ProxyServer) birthCry() {
 	s.Recorder.Eventf(s.Config.NodeRef, api.EventTypeNormal, "Starting", "Starting kube-proxy.")
 }
 
-func getNodeIP(client *kubeclient.Client, hostname string) net.IP {
+func getNodeIP(client clientset.Interface, hostname string) net.IP {
 	var nodeIP net.IP
-	node, err := client.Nodes().Get(hostname)
+	node, err := client.Core().Nodes().Get(hostname)
 	if err != nil {
 		glog.Warningf("Failed to retrieve node info: %v", err)
 		return nil

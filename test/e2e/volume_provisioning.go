@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -39,17 +39,17 @@ const (
 	expectedSize = "2Gi"
 )
 
-func testDynamicProvisioning(client *client.Client, claim *api.PersistentVolumeClaim) {
+func testDynamicProvisioning(client clientset.Interface, claim *api.PersistentVolumeClaim) {
 	err := framework.WaitForPersistentVolumeClaimPhase(api.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("checking the claim")
 	// Get new copy of the claim
-	claim, err = client.PersistentVolumeClaims(claim.Namespace).Get(claim.Name)
+	claim, err = client.Core().PersistentVolumeClaims(claim.Namespace).Get(claim.Name)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Get the bound PV
-	pv, err := client.PersistentVolumes().Get(claim.Spec.VolumeName)
+	pv, err := client.Core().PersistentVolumes().Get(claim.Spec.VolumeName)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Check sizes
@@ -96,7 +96,7 @@ func testDynamicProvisioning(client *client.Client, claim *api.PersistentVolumeC
 	time.Sleep(3 * time.Minute)
 
 	By("deleting the claim")
-	framework.ExpectNoError(client.PersistentVolumeClaims(claim.Namespace).Delete(claim.Name))
+	framework.ExpectNoError(client.Core().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil))
 
 	// Wait for the PV to get deleted too.
 	framework.ExpectNoError(framework.WaitForPersistentVolumeDeleted(client, pv.Name, 5*time.Second, 20*time.Minute))
@@ -106,11 +106,11 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 	f := framework.NewDefaultFramework("volume-provisioning")
 
 	// filled in BeforeEach
-	var c *client.Client
+	var c clientset.Interface
 	var ns string
 
 	BeforeEach(func() {
-		c = f.Client
+		c = f.ClientSet
 		ns = f.Namespace.Name
 	})
 
@@ -121,15 +121,15 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 			By("creating a StorageClass")
 			class := newStorageClass()
 			_, err := c.Storage().StorageClasses().Create(class)
-			defer c.Storage().StorageClasses().Delete(class.Name)
+			defer c.Storage().StorageClasses().Delete(class.Name, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("creating a claim with a dynamic provisioning annotation")
 			claim := newClaim(ns, false)
 			defer func() {
-				c.PersistentVolumeClaims(ns).Delete(claim.Name)
+				c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
 			}()
-			claim, err = c.PersistentVolumeClaims(ns).Create(claim)
+			claim, err = c.Core().PersistentVolumeClaims(ns).Create(claim)
 			Expect(err).NotTo(HaveOccurred())
 
 			testDynamicProvisioning(c, claim)
@@ -143,9 +143,9 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 			By("creating a claim with an alpha dynamic provisioning annotation")
 			claim := newClaim(ns, true)
 			defer func() {
-				c.PersistentVolumeClaims(ns).Delete(claim.Name)
+				c.Core().PersistentVolumeClaims(ns).Delete(claim.Name, nil)
 			}()
-			claim, err := c.PersistentVolumeClaims(ns).Create(claim)
+			claim, err := c.Core().PersistentVolumeClaims(ns).Create(claim)
 			Expect(err).NotTo(HaveOccurred())
 
 			testDynamicProvisioning(c, claim)
@@ -186,7 +186,7 @@ func newClaim(ns string, alpha bool) *api.PersistentVolumeClaim {
 }
 
 // runInPodWithVolume runs a command in a pod with given claim mounted to /mnt directory.
-func runInPodWithVolume(c *client.Client, ns, claimName, command string) {
+func runInPodWithVolume(c clientset.Interface, ns, claimName, command string) {
 	pod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
@@ -224,9 +224,9 @@ func runInPodWithVolume(c *client.Client, ns, claimName, command string) {
 			},
 		},
 	}
-	pod, err := c.Pods(ns).Create(pod)
+	pod, err := c.Core().Pods(ns).Create(pod)
 	defer func() {
-		framework.ExpectNoError(c.Pods(ns).Delete(pod.Name, nil))
+		framework.ExpectNoError(c.Core().Pods(ns).Delete(pod.Name, nil))
 	}()
 	framework.ExpectNoError(err, "Failed to create pod: %v", err)
 	framework.ExpectNoError(framework.WaitForPodSuccessInNamespaceSlow(c, pod.Name, pod.Namespace))

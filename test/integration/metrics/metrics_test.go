@@ -27,8 +27,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/test/integration/framework"
 
 	"github.com/golang/glog"
@@ -108,8 +108,8 @@ func TestApiserverMetrics(t *testing.T) {
 
 	// Make a request to the apiserver to ensure there's at least one data point
 	// for the metrics we're expecting -- otherwise, they won't be exported.
-	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
-	if _, err := client.Pods(api.NamespaceDefault).List(api.ListOptions{}); err != nil {
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	if _, err := client.Core().Pods(api.NamespaceDefault).List(api.ListOptions{}); err != nil {
 		t.Fatalf("unexpected error getting pods: %v", err)
 	}
 

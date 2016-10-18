@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -45,9 +45,9 @@ except:
 var _ = framework.KubeDescribe("ClusterDns [Feature:Example]", func() {
 	f := framework.NewDefaultFramework("cluster-dns")
 
-	var c *client.Client
+	var c clientset.Interface
 	BeforeEach(func() {
-		c = f.Client
+		c = f.ClientSet
 	})
 
 	It("should create pod that uses dns", func() {
@@ -98,7 +98,7 @@ var _ = framework.KubeDescribe("ClusterDns [Feature:Example]", func() {
 		for _, ns := range namespaces {
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": backendRcName}))
 			options := api.ListOptions{LabelSelector: label}
-			pods, err := c.Pods(ns.Name).List(options)
+			pods, err := c.Core().Pods(ns.Name).List(options)
 			Expect(err).NotTo(HaveOccurred())
 			err = framework.PodsResponding(c, ns.Name, backendPodName, false, pods)
 			Expect(err).NotTo(HaveOccurred(), "waiting for all pods to respond")
@@ -118,7 +118,7 @@ var _ = framework.KubeDescribe("ClusterDns [Feature:Example]", func() {
 		// This code is probably unnecessary, but let's stay on the safe side.
 		label := labels.SelectorFromSet(labels.Set(map[string]string{"name": backendPodName}))
 		options := api.ListOptions{LabelSelector: label}
-		pods, err := c.Pods(namespaces[0].Name).List(options)
+		pods, err := c.Core().Pods(namespaces[0].Name).List(options)
 
 		if err != nil || pods == nil || len(pods.Items) == 0 {
 			framework.Failf("no running pods found")

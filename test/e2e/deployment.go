@@ -320,9 +320,6 @@ func testDeleteDeployment(f *framework.Framework) {
 
 func testRollingUpdateDeployment(f *framework.Framework) {
 	ns := f.Namespace.Name
-	// TODO: remove unversionedClient when the refactoring is done. Currently some
-	// functions like verifyPod still expects a unversioned#Client.
-	unversionedClient := f.Client
 	c := f.ClientSet
 	// Create nginx pods.
 	deploymentPodLabels := map[string]string{"name": "sample-pod"}
@@ -336,7 +333,7 @@ func testRollingUpdateDeployment(f *framework.Framework) {
 	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, replicas, rsPodLabels, nginxImageName, nginxImage))
 	Expect(err).NotTo(HaveOccurred())
 	// Verify that the required pods have come up.
-	err = framework.VerifyPods(unversionedClient, ns, "sample-pod", false, 3)
+	err = framework.VerifyPods(c, ns, "sample-pod", false, 3)
 	if err != nil {
 		framework.Logf("error in waiting for pods to come up: %s", err)
 		Expect(err).NotTo(HaveOccurred())
@@ -369,9 +366,6 @@ func testRollingUpdateDeployment(f *framework.Framework) {
 
 func testRollingUpdateDeploymentEvents(f *framework.Framework) {
 	ns := f.Namespace.Name
-	// TODO: remove unversionedClient when the refactoring is done. Currently some
-	// functions like verifyPod still expects a unversioned#Client.
-	unversionedClient := f.Client
 	c := f.ClientSet
 	// Create nginx pods.
 	deploymentPodLabels := map[string]string{"name": "sample-pod-2"}
@@ -391,7 +385,7 @@ func testRollingUpdateDeploymentEvents(f *framework.Framework) {
 	_, err := c.Extensions().ReplicaSets(ns).Create(rs)
 	Expect(err).NotTo(HaveOccurred())
 	// Verify that the required pods have come up.
-	err = framework.VerifyPods(unversionedClient, ns, "sample-pod-2", false, 1)
+	err = framework.VerifyPods(c, ns, "sample-pod-2", false, 1)
 	if err != nil {
 		framework.Logf("error in waiting for pods to come up: %s", err)
 		Expect(err).NotTo(HaveOccurred())
@@ -412,7 +406,7 @@ func testRollingUpdateDeploymentEvents(f *framework.Framework) {
 	// Verify that the pods were scaled up and down as expected. We use events to verify that.
 	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
-	framework.WaitForEvents(unversionedClient, ns, deployment, 2)
+	framework.WaitForEvents(c, ns, deployment, 2)
 	events, err := c.Core().Events(ns).Search(deployment)
 	if err != nil {
 		framework.Logf("error in listing events: %s", err)
@@ -430,9 +424,6 @@ func testRollingUpdateDeploymentEvents(f *framework.Framework) {
 
 func testRecreateDeployment(f *framework.Framework) {
 	ns := f.Namespace.Name
-	// TODO: remove unversionedClient when the refactoring is done. Currently some
-	// functions like verifyPod still expects a unversioned#Client.
-	unversionedClient := f.Client
 	c := f.ClientSet
 	// Create nginx pods.
 	deploymentPodLabels := map[string]string{"name": "sample-pod-3"}
@@ -446,7 +437,7 @@ func testRecreateDeployment(f *framework.Framework) {
 	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, replicas, rsPodLabels, nginxImageName, nginxImage))
 	Expect(err).NotTo(HaveOccurred())
 	// Verify that the required pods have come up.
-	err = framework.VerifyPods(unversionedClient, ns, "sample-pod-3", false, 3)
+	err = framework.VerifyPods(c, ns, "sample-pod-3", false, 3)
 	if err != nil {
 		framework.Logf("error in waiting for pods to come up: %s", err)
 		Expect(err).NotTo(HaveOccurred())
@@ -468,7 +459,7 @@ func testRecreateDeployment(f *framework.Framework) {
 	// Verify that the pods were scaled up and down as expected. We use events to verify that.
 	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
-	framework.WaitForEvents(unversionedClient, ns, deployment, 2)
+	framework.WaitForEvents(c, ns, deployment, 2)
 	events, err := c.Core().Events(ns).Search(deployment)
 	if err != nil {
 		framework.Logf("error in listing events: %s", err)
@@ -486,7 +477,6 @@ func testRecreateDeployment(f *framework.Framework) {
 // testDeploymentCleanUpPolicy tests that deployment supports cleanup policy
 func testDeploymentCleanUpPolicy(f *framework.Framework) {
 	ns := f.Namespace.Name
-	unversionedClient := f.Client
 	c := f.ClientSet
 	// Create nginx pods.
 	deploymentPodLabels := map[string]string{"name": "cleanup-pod"}
@@ -501,7 +491,7 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Verify that the required pods have come up.
-	err = framework.VerifyPods(unversionedClient, ns, "cleanup-pod", false, 1)
+	err = framework.VerifyPods(c, ns, "cleanup-pod", false, 1)
 	if err != nil {
 		framework.Logf("error in waiting for pods to come up: %s", err)
 		Expect(err).NotTo(HaveOccurred())
@@ -558,9 +548,6 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 // i.e. we can change desired state and kick off rolling update, then change desired state again before it finishes.
 func testRolloverDeployment(f *framework.Framework) {
 	ns := f.Namespace.Name
-	// TODO: remove unversionedClient when the refactoring is done. Currently some
-	// functions like verifyPod still expects a unversioned#Client.
-	unversionedClient := f.Client
 	c := f.ClientSet
 	podName := "rollover-pod"
 	deploymentPodLabels := map[string]string{"name": podName}
@@ -574,7 +561,7 @@ func testRolloverDeployment(f *framework.Framework) {
 	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, rsReplicas, rsPodLabels, nginxImageName, nginxImage))
 	Expect(err).NotTo(HaveOccurred())
 	// Verify that the required pods have come up.
-	err = framework.VerifyPods(unversionedClient, ns, podName, false, rsReplicas)
+	err = framework.VerifyPods(c, ns, podName, false, rsReplicas)
 	if err != nil {
 		framework.Logf("error in waiting for pods to come up: %s", err)
 		Expect(err).NotTo(HaveOccurred())
@@ -962,9 +949,6 @@ func testRollbackDeploymentRSNoRevision(f *framework.Framework) {
 
 func testDeploymentLabelAdopted(f *framework.Framework) {
 	ns := f.Namespace.Name
-	// TODO: remove unversionedClient when the refactoring is done. Currently some
-	// functions like verifyPod still expects a unversioned#Client.
-	unversionedClient := f.Client
 	c := f.ClientSet
 	// Create nginx pods.
 	podName := "nginx"
@@ -976,7 +960,7 @@ func testDeploymentLabelAdopted(f *framework.Framework) {
 	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, replicas, podLabels, podName, image))
 	Expect(err).NotTo(HaveOccurred())
 	// Verify that the required pods have come up.
-	err = framework.VerifyPods(unversionedClient, ns, podName, false, 3)
+	err = framework.VerifyPods(c, ns, podName, false, 3)
 	if err != nil {
 		framework.Logf("error in waiting for pods to come up: %s", err)
 		Expect(err).NotTo(HaveOccurred())
@@ -1097,7 +1081,7 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 
 	// Verify that the required pods have come up.
 	By("Waiting for all required pods to come up")
-	err = framework.VerifyPods(f.Client, ns, nginxImageName, false, deployment.Spec.Replicas)
+	err = framework.VerifyPods(f.ClientSet, ns, nginxImageName, false, deployment.Spec.Replicas)
 	if err != nil {
 		framework.Logf("error in waiting for pods to come up: %s", err)
 		Expect(err).NotTo(HaveOccurred())

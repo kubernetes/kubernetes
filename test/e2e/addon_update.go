@@ -26,7 +26,7 @@ import (
 
 	"golang.org/x/crypto/ssh"
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -275,8 +275,8 @@ var _ = framework.KubeDescribe("Addon update", func() {
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, rcv1, destinationDir, rcv1))
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, svcv1, destinationDir, svcv1))
 
-		waitForServiceInAddonTest(f.Client, f.Namespace.Name, "addon-test", true)
-		waitForReplicationControllerInAddonTest(f.Client, defaultNsName, "addon-test-v1", true)
+		waitForServiceInAddonTest(f.ClientSet, f.Namespace.Name, "addon-test", true)
+		waitForReplicationControllerInAddonTest(f.ClientSet, defaultNsName, "addon-test-v1", true)
 
 		By("update manifests")
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, rcv2, destinationDir, rcv2))
@@ -289,38 +289,38 @@ var _ = framework.KubeDescribe("Addon update", func() {
 		 * But it is ok - as long as we don't have rolling update, the result will be the same
 		 */
 
-		waitForServiceInAddonTest(f.Client, f.Namespace.Name, "addon-test-updated", true)
-		waitForReplicationControllerInAddonTest(f.Client, f.Namespace.Name, "addon-test-v2", true)
+		waitForServiceInAddonTest(f.ClientSet, f.Namespace.Name, "addon-test-updated", true)
+		waitForReplicationControllerInAddonTest(f.ClientSet, f.Namespace.Name, "addon-test-v2", true)
 
-		waitForServiceInAddonTest(f.Client, f.Namespace.Name, "addon-test", false)
-		waitForReplicationControllerInAddonTest(f.Client, defaultNsName, "addon-test-v1", false)
+		waitForServiceInAddonTest(f.ClientSet, f.Namespace.Name, "addon-test", false)
+		waitForReplicationControllerInAddonTest(f.ClientSet, defaultNsName, "addon-test-v1", false)
 
 		By("remove manifests")
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo rm %s/%s", destinationDir, rcv2))
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo rm %s/%s", destinationDir, svcv2))
 
-		waitForServiceInAddonTest(f.Client, f.Namespace.Name, "addon-test-updated", false)
-		waitForReplicationControllerInAddonTest(f.Client, f.Namespace.Name, "addon-test-v2", false)
+		waitForServiceInAddonTest(f.ClientSet, f.Namespace.Name, "addon-test-updated", false)
+		waitForReplicationControllerInAddonTest(f.ClientSet, f.Namespace.Name, "addon-test-v2", false)
 
 		By("verify invalid API addons weren't created")
-		_, err = f.Client.ReplicationControllers(f.Namespace.Name).Get("invalid-addon-test-v1")
+		_, err = f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Get("invalid-addon-test-v1")
 		Expect(err).To(HaveOccurred())
-		_, err = f.Client.ReplicationControllers(defaultNsName).Get("invalid-addon-test-v1")
+		_, err = f.ClientSet.Core().ReplicationControllers(defaultNsName).Get("invalid-addon-test-v1")
 		Expect(err).To(HaveOccurred())
-		_, err = f.Client.Services(f.Namespace.Name).Get("ivalid-addon-test")
+		_, err = f.ClientSet.Core().Services(f.Namespace.Name).Get("ivalid-addon-test")
 		Expect(err).To(HaveOccurred())
-		_, err = f.Client.Services(defaultNsName).Get("ivalid-addon-test")
+		_, err = f.ClientSet.Core().Services(defaultNsName).Get("ivalid-addon-test")
 		Expect(err).To(HaveOccurred())
 
 		// invalid addons will be deleted by the deferred function
 	})
 })
 
-func waitForServiceInAddonTest(c *client.Client, addonNamespace, name string, exist bool) {
+func waitForServiceInAddonTest(c clientset.Interface, addonNamespace, name string, exist bool) {
 	framework.ExpectNoError(framework.WaitForService(c, addonNamespace, name, exist, addonTestPollInterval, addonTestPollTimeout))
 }
 
-func waitForReplicationControllerInAddonTest(c *client.Client, addonNamespace, name string, exist bool) {
+func waitForReplicationControllerInAddonTest(c clientset.Interface, addonNamespace, name string, exist bool) {
 	framework.ExpectNoError(framework.WaitForReplicationController(c, addonNamespace, name, exist, addonTestPollInterval, addonTestPollTimeout))
 }
 

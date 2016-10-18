@@ -18,14 +18,15 @@ package e2e
 
 import (
 	"fmt"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/test/e2e/framework"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 var _ = framework.KubeDescribe("Logging soak [Performance] [Slow] [Disruptive]", func() {

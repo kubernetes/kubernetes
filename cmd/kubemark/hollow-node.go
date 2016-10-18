@@ -24,7 +24,6 @@ import (
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -94,10 +93,7 @@ func main() {
 	if err != nil {
 		glog.Fatalf("Failed to create a ClientConfig: %v. Exiting.", err)
 	}
-	cl, err := client.New(clientConfig)
-	if err != nil {
-		glog.Fatalf("Failed to create a Client: %v. Exiting.", err)
-	}
+
 	clientset, err := internalclientset.NewForConfig(clientConfig)
 	if err != nil {
 		glog.Fatalf("Failed to create a ClientSet: %v. Exiting.", err)
@@ -136,7 +132,7 @@ func main() {
 		endpointsConfig := proxyconfig.NewEndpointsConfig()
 		endpointsConfig.RegisterHandler(&kubemark.FakeProxyHandler{})
 
-		hollowProxy := kubemark.NewHollowProxyOrDie(config.NodeName, cl, endpointsConfig, serviceConfig, iptInterface, eventBroadcaster, recorder)
+		hollowProxy := kubemark.NewHollowProxyOrDie(config.NodeName, clientset, endpointsConfig, serviceConfig, iptInterface, eventBroadcaster, recorder)
 		hollowProxy.Run()
 	}
 }

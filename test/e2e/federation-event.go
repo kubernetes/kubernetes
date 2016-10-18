@@ -37,7 +37,7 @@ var _ = framework.KubeDescribe("Federation events [Feature:Federation]", func() 
 
 	Describe("Event objects", func() {
 		AfterEach(func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 
 			nsName := f.FederationNamespace.Name
 			// Delete registered events.
@@ -50,7 +50,7 @@ var _ = framework.KubeDescribe("Federation events [Feature:Federation]", func() 
 		})
 
 		It("should be created and deleted successfully", func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 
 			nsName := f.FederationNamespace.Name
 			event := createEventOrFail(f.FederationClientset_1_5, nsName)

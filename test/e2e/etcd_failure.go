@@ -42,10 +42,10 @@ var _ = framework.KubeDescribe("Etcd failure [Disruptive]", func() {
 		framework.SkipUnlessProviderIs("gce")
 
 		Expect(framework.RunRC(testutils.RCConfig{
-			Client:    f.Client,
+			Client:    f.ClientSet,
 			Name:      "baz",
 			Namespace: f.Namespace.Name,
-			Image:     framework.GetPauseImageName(f.Client),
+			Image:     framework.GetPauseImageName(f.ClientSet),
 			Replicas:  1,
 		})).NotTo(HaveOccurred())
 	})
@@ -101,7 +101,7 @@ func masterExec(cmd string) {
 
 func checkExistingRCRecovers(f *framework.Framework) {
 	By("assert that the pre-existing replication controller recovers")
-	podClient := f.Client.Pods(f.Namespace.Name)
+	podClient := f.ClientSet.Core().Pods(f.Namespace.Name)
 	rcSelector := labels.Set{"name": "baz"}.AsSelector()
 
 	By("deleting pods from existing replication controller")

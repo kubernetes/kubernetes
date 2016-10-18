@@ -19,7 +19,7 @@ package utils
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -33,17 +33,18 @@ type PodStore struct {
 	Reflector *cache.Reflector
 }
 
-func NewPodStore(c *client.Client, namespace string, label labels.Selector, field fields.Selector) *PodStore {
+func NewPodStore(c clientset.Interface, namespace string, label labels.Selector, field fields.Selector) *PodStore {
 	lw := &cache.ListWatch{
 		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 			options.LabelSelector = label
 			options.FieldSelector = field
-			return c.Pods(namespace).List(options)
+			obj, err := c.Core().Pods(namespace).List(options)
+			return runtime.Object(obj), err
 		},
 		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 			options.LabelSelector = label
 			options.FieldSelector = field
-			return c.Pods(namespace).Watch(options)
+			return c.Core().Pods(namespace).Watch(options)
 		},
 	}
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
