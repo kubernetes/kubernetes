@@ -28,6 +28,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIVersions"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -55,6 +58,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIResourceList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -80,6 +86,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ComponentStatusList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -149,6 +158,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ComponentStatus"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -191,6 +203,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ConfigMapList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -260,6 +275,9 @@
        "schema": {
         "$ref": "#/definitions/v1.EndpointsList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -329,6 +347,9 @@
        "schema": {
         "$ref": "#/definitions/v1.EventList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -398,6 +419,9 @@
        "schema": {
         "$ref": "#/definitions/v1.LimitRangeList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -504,6 +528,9 @@
        "schema": {
         "$ref": "#/definitions/v1.NamespaceList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -537,6 +564,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Namespace"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -597,6 +627,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -631,6 +664,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Binding"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -718,6 +754,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ConfigMapList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -751,6 +790,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ConfigMap"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -811,6 +853,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -869,6 +914,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ConfigMap"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -902,6 +950,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ConfigMap"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -935,6 +986,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -970,6 +1024,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ConfigMap"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1057,6 +1114,9 @@
        "schema": {
         "$ref": "#/definitions/v1.EndpointsList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1090,6 +1150,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Endpoints"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1150,6 +1213,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1208,6 +1274,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Endpoints"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1241,6 +1310,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Endpoints"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1274,6 +1346,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1309,6 +1384,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Endpoints"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1396,6 +1474,9 @@
        "schema": {
         "$ref": "#/definitions/v1.EventList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1429,6 +1510,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1489,6 +1573,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1547,6 +1634,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1580,6 +1670,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1613,6 +1706,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1648,6 +1744,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1735,6 +1834,9 @@
        "schema": {
         "$ref": "#/definitions/v1.LimitRangeList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1768,6 +1870,9 @@
        "schema": {
         "$ref": "#/definitions/v1.LimitRange"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1828,6 +1933,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1886,6 +1994,9 @@
        "schema": {
         "$ref": "#/definitions/v1.LimitRange"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1919,6 +2030,9 @@
        "schema": {
         "$ref": "#/definitions/v1.LimitRange"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1952,6 +2066,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1987,6 +2104,9 @@
        "schema": {
         "$ref": "#/definitions/v1.LimitRange"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2074,6 +2194,9 @@
        "schema": {
         "$ref": "#/definitions/v1.PersistentVolumeClaimList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2107,6 +2230,9 @@
        "schema": {
         "$ref": "#/definitions/v1.PersistentVolumeClaim"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2167,6 +2293,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2225,6 +2354,9 @@
        "schema": {
         "$ref": "#/definitions/v1.PersistentVolumeClaim"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2258,6 +2390,9 @@
        "schema": {
         "$ref": "#/definitions/v1.PersistentVolumeClaim"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2291,6 +2426,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2326,6 +2464,9 @@
        "schema": {
         "$ref": "#/definitions/v1.PersistentVolumeClaim"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2376,6 +2517,9 @@
        "schema": {
         "$ref": "#/definitions/v1.PersistentVolumeClaim"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2409,6 +2553,9 @@
        "schema": {
         "$ref": "#/definitions/v1.PersistentVolumeClaim"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2444,6 +2591,9 @@
        "schema": {
         "$ref": "#/definitions/v1.PersistentVolumeClaim"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2531,6 +2681,9 @@
        "schema": {
         "$ref": "#/definitions/v1.PodList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2564,6 +2717,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Pod"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2624,6 +2780,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2682,6 +2841,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Pod"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2715,6 +2877,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Pod"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2748,6 +2913,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2783,6 +2951,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Pod"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2831,6 +3002,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2852,6 +3026,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2930,6 +3107,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Binding"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -2988,6 +3168,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.Eviction"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3044,6 +3227,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3065,6 +3251,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3151,6 +3340,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Pod"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3255,6 +3447,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3276,6 +3471,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3317,6 +3515,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3338,6 +3539,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3359,6 +3563,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3380,6 +3587,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3401,6 +3611,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3422,6 +3635,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3470,6 +3686,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3491,6 +3710,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3512,6 +3734,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3533,6 +3758,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3554,6 +3782,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3575,6 +3806,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3633,6 +3867,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Pod"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3666,6 +3903,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Pod"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3701,6 +3941,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Pod"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3788,6 +4031,9 @@
        "schema": {
         "$ref": "#/definitions/v1.PodTemplateList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3821,6 +4067,9 @@
        "schema": {
         "$ref": "#/definitions/v1.PodTemplate"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3881,6 +4130,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3939,6 +4191,9 @@
        "schema": {
         "$ref": "#/definitions/v1.PodTemplate"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -3972,6 +4227,9 @@
        "schema": {
         "$ref": "#/definitions/v1.PodTemplate"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4005,6 +4263,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4040,6 +4301,9 @@
        "schema": {
         "$ref": "#/definitions/v1.PodTemplate"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4127,6 +4391,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ReplicationControllerList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4160,6 +4427,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ReplicationController"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4220,6 +4490,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4278,6 +4551,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ReplicationController"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4311,6 +4587,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ReplicationController"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4344,6 +4623,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4379,6 +4661,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ReplicationController"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4429,6 +4714,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Scale"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4462,6 +4750,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Scale"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4497,6 +4788,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Scale"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4547,6 +4841,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ReplicationController"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4580,6 +4877,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ReplicationController"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4615,6 +4915,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ReplicationController"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4702,6 +5005,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ResourceQuotaList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4735,6 +5041,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ResourceQuota"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4795,6 +5104,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4853,6 +5165,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ResourceQuota"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4886,6 +5201,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ResourceQuota"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4919,6 +5237,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -4954,6 +5275,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ResourceQuota"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -5004,6 +5328,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ResourceQuota"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -5037,6 +5364,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ResourceQuota"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -5072,6 +5402,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ResourceQuota"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -5159,6 +5492,9 @@
        "schema": {
         "$ref": "#/definitions/v1.SecretList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -5192,6 +5528,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Secret"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -5252,6 +5591,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -5310,6 +5652,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Secret"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -5343,6 +5688,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Secret"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -5376,6 +5724,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -5411,6 +5762,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Secret"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -5498,6 +5852,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ServiceAccountList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -5531,6 +5888,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ServiceAccount"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -5591,6 +5951,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -5649,6 +6012,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ServiceAccount"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -5682,6 +6048,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ServiceAccount"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -5715,6 +6084,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -5750,6 +6122,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ServiceAccount"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -5837,6 +6212,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ServiceList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -5870,6 +6248,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Service"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -5928,6 +6309,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Service"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -5961,6 +6345,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Service"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -5984,6 +6371,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -6019,6 +6409,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Service"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -6067,6 +6460,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -6088,6 +6484,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -6109,6 +6508,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -6130,6 +6532,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -6151,6 +6556,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -6172,6 +6580,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -6220,6 +6631,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -6241,6 +6655,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -6262,6 +6679,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -6283,6 +6703,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -6304,6 +6727,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -6325,6 +6751,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -6383,6 +6812,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Service"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -6416,6 +6848,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Service"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -6451,6 +6886,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Service"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -6517,6 +6955,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Namespace"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -6550,6 +6991,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Namespace"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -6583,6 +7027,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -6618,6 +7065,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Namespace"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -6660,6 +7110,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Namespace"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -6710,6 +7163,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Namespace"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -6743,6 +7199,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Namespace"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -6778,6 +7237,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Namespace"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -6857,6 +7319,9 @@
        "schema": {
         "$ref": "#/definitions/v1.NodeList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -6890,6 +7355,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Node"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -6950,6 +7418,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -7000,6 +7471,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Node"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -7033,6 +7507,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Node"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -7066,6 +7543,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -7101,6 +7581,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Node"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -7141,6 +7624,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -7162,6 +7648,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -7183,6 +7672,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -7204,6 +7696,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -7225,6 +7720,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -7246,6 +7744,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -7286,6 +7787,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -7307,6 +7811,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -7328,6 +7835,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -7349,6 +7859,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -7370,6 +7883,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -7391,6 +7907,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -7441,6 +7960,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Node"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -7474,6 +7996,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Node"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -7509,6 +8034,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Node"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -7551,6 +8079,9 @@
        "schema": {
         "$ref": "#/definitions/v1.PersistentVolumeClaimList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -7657,6 +8188,9 @@
        "schema": {
         "$ref": "#/definitions/v1.PersistentVolumeList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -7690,6 +8224,9 @@
        "schema": {
         "$ref": "#/definitions/v1.PersistentVolume"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -7750,6 +8287,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -7800,6 +8340,9 @@
        "schema": {
         "$ref": "#/definitions/v1.PersistentVolume"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -7833,6 +8376,9 @@
        "schema": {
         "$ref": "#/definitions/v1.PersistentVolume"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -7866,6 +8412,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -7901,6 +8450,9 @@
        "schema": {
         "$ref": "#/definitions/v1.PersistentVolume"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -7943,6 +8495,9 @@
        "schema": {
         "$ref": "#/definitions/v1.PersistentVolume"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -7976,6 +8531,9 @@
        "schema": {
         "$ref": "#/definitions/v1.PersistentVolume"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8011,6 +8569,9 @@
        "schema": {
         "$ref": "#/definitions/v1.PersistentVolume"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8053,6 +8614,9 @@
        "schema": {
         "$ref": "#/definitions/v1.PodList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8122,6 +8686,9 @@
        "schema": {
         "$ref": "#/definitions/v1.PodTemplateList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8189,6 +8756,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8210,6 +8780,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8231,6 +8804,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8252,6 +8828,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8273,6 +8852,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8294,6 +8876,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8335,6 +8920,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8356,6 +8944,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8377,6 +8968,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8398,6 +8992,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8419,6 +9016,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8440,6 +9040,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8489,6 +9092,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8510,6 +9116,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8531,6 +9140,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8552,6 +9164,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8573,6 +9188,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8594,6 +9212,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8635,6 +9256,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8656,6 +9280,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8677,6 +9304,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8698,6 +9328,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8719,6 +9352,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8740,6 +9376,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8789,6 +9428,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8810,6 +9452,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8831,6 +9476,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8852,6 +9500,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8873,6 +9524,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8894,6 +9548,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8927,6 +9584,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8948,6 +9608,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8969,6 +9632,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -8990,6 +9656,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -9011,6 +9680,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -9032,6 +9704,9 @@
        "schema": {
         "type": "string"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -9075,6 +9750,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ReplicationControllerList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -9144,6 +9822,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ResourceQuotaList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -9213,6 +9894,9 @@
        "schema": {
         "$ref": "#/definitions/v1.SecretList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -9282,6 +9966,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ServiceAccountList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -9351,6 +10038,9 @@
        "schema": {
         "$ref": "#/definitions/v1.ServiceList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -9421,6 +10111,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -9491,6 +10184,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -9561,6 +10257,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -9631,6 +10330,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -9701,6 +10403,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -9771,6 +10476,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -9849,6 +10557,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -9935,6 +10646,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -10013,6 +10727,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -10099,6 +10816,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -10177,6 +10897,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -10263,6 +10986,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -10341,6 +11067,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -10427,6 +11156,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -10505,6 +11237,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -10591,6 +11326,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -10669,6 +11407,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -10755,6 +11496,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -10833,6 +11577,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -10919,6 +11666,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -10997,6 +11747,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -11083,6 +11836,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -11161,6 +11917,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -11247,6 +12006,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -11325,6 +12087,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -11411,6 +12176,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -11489,6 +12257,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -11575,6 +12346,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -11653,6 +12427,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -11739,6 +12516,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -11817,6 +12597,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -11887,6 +12670,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -11965,6 +12751,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -12035,6 +12824,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -12105,6 +12897,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -12183,6 +12978,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -12253,6 +13051,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -12323,6 +13124,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -12393,6 +13197,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -12463,6 +13270,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -12533,6 +13343,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -12603,6 +13416,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -12674,6 +13490,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIGroupList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -12701,6 +13520,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIGroup"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -12728,6 +13550,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIResourceList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -12790,6 +13615,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.PetSetList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -12823,6 +13651,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.PetSet"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -12883,6 +13714,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -12941,6 +13775,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.PetSet"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -12974,6 +13811,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.PetSet"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -13007,6 +13847,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -13042,6 +13885,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.PetSet"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -13092,6 +13938,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.PetSet"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -13125,6 +13974,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.PetSet"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -13160,6 +14012,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.PetSet"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -13210,6 +14065,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.PetSetList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -13280,6 +14138,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -13358,6 +14219,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -13444,6 +14308,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -13515,6 +14382,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIGroup"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -13542,6 +14412,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIResourceList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -13567,6 +14440,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.TokenReview"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -13611,6 +14487,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIGroup"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -13638,6 +14517,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIResourceList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -13663,6 +14545,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.LocalSubjectAccessReview"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -13713,6 +14598,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.SelfSubjectAccessReview"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -13755,6 +14643,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.SubjectAccessReview"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -13799,6 +14690,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIGroup"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -13826,6 +14720,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIResourceList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -13851,6 +14748,9 @@
        "schema": {
         "$ref": "#/definitions/v1.HorizontalPodAutoscalerList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -13957,6 +14857,9 @@
        "schema": {
         "$ref": "#/definitions/v1.HorizontalPodAutoscalerList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -13990,6 +14893,9 @@
        "schema": {
         "$ref": "#/definitions/v1.HorizontalPodAutoscaler"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -14050,6 +14956,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -14108,6 +15017,9 @@
        "schema": {
         "$ref": "#/definitions/v1.HorizontalPodAutoscaler"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -14141,6 +15053,9 @@
        "schema": {
         "$ref": "#/definitions/v1.HorizontalPodAutoscaler"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -14174,6 +15089,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -14209,6 +15127,9 @@
        "schema": {
         "$ref": "#/definitions/v1.HorizontalPodAutoscaler"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -14259,6 +15180,9 @@
        "schema": {
         "$ref": "#/definitions/v1.HorizontalPodAutoscaler"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -14292,6 +15216,9 @@
        "schema": {
         "$ref": "#/definitions/v1.HorizontalPodAutoscaler"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -14327,6 +15254,9 @@
        "schema": {
         "$ref": "#/definitions/v1.HorizontalPodAutoscaler"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -14378,6 +15308,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -14448,6 +15381,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -14526,6 +15462,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -14613,6 +15552,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIGroup"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -14640,6 +15582,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIResourceList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -14665,6 +15610,9 @@
        "schema": {
         "$ref": "#/definitions/v1.JobList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -14771,6 +15719,9 @@
        "schema": {
         "$ref": "#/definitions/v1.JobList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -14804,6 +15755,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Job"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -14864,6 +15818,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -14922,6 +15879,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Job"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -14955,6 +15915,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Job"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -14988,6 +15951,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -15023,6 +15989,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Job"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -15073,6 +16042,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Job"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -15106,6 +16078,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Job"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -15141,6 +16116,9 @@
        "schema": {
         "$ref": "#/definitions/v1.Job"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -15192,6 +16170,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -15262,6 +16243,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -15340,6 +16324,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -15427,6 +16414,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIResourceList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -15454,6 +16444,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIGroup"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -15481,6 +16474,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIResourceList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -15543,6 +16539,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.CertificateSigningRequestList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -15576,6 +16575,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.CertificateSigningRequest"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -15636,6 +16638,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -15686,6 +16691,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.CertificateSigningRequest"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -15719,6 +16727,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.CertificateSigningRequest"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -15752,6 +16763,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -15787,6 +16801,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.CertificateSigningRequest"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -15829,6 +16846,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.CertificateSigningRequest"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -15879,6 +16899,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.CertificateSigningRequest"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -15930,6 +16953,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -16000,6 +17026,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -16079,6 +17108,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIGroup"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -16106,6 +17138,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIResourceList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -16131,6 +17166,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.DaemonSetList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -16200,6 +17238,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.DeploymentList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -16269,6 +17310,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.HorizontalPodAutoscalerList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -16338,6 +17382,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.IngressList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -16407,6 +17454,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.JobList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -16513,6 +17563,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.DaemonSetList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -16546,6 +17599,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.DaemonSet"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -16606,6 +17662,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -16664,6 +17723,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.DaemonSet"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -16697,6 +17759,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.DaemonSet"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -16730,6 +17795,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -16765,6 +17833,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.DaemonSet"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -16815,6 +17886,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.DaemonSet"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -16848,6 +17922,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.DaemonSet"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -16883,6 +17960,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.DaemonSet"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -16970,6 +18050,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.DeploymentList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -17003,6 +18086,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Deployment"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -17063,6 +18149,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -17121,6 +18210,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Deployment"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -17154,6 +18246,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Deployment"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -17187,6 +18282,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -17222,6 +18320,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Deployment"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -17272,6 +18373,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.DeploymentRollback"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -17330,6 +18434,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Scale"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -17363,6 +18470,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Scale"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -17398,6 +18508,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Scale"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -17448,6 +18561,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Deployment"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -17481,6 +18597,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Deployment"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -17516,6 +18635,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Deployment"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -17603,6 +18725,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.HorizontalPodAutoscalerList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -17636,6 +18761,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.HorizontalPodAutoscaler"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -17696,6 +18824,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -17754,6 +18885,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.HorizontalPodAutoscaler"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -17787,6 +18921,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.HorizontalPodAutoscaler"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -17820,6 +18957,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -17855,6 +18995,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.HorizontalPodAutoscaler"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -17905,6 +19048,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.HorizontalPodAutoscaler"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -17938,6 +19084,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.HorizontalPodAutoscaler"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -17973,6 +19122,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.HorizontalPodAutoscaler"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -18060,6 +19212,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.IngressList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -18093,6 +19248,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Ingress"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -18153,6 +19311,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -18211,6 +19372,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Ingress"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -18244,6 +19408,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Ingress"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -18277,6 +19444,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -18312,6 +19482,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Ingress"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -18362,6 +19535,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Ingress"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -18395,6 +19571,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Ingress"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -18430,6 +19609,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Ingress"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -18517,6 +19699,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.JobList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -18550,6 +19735,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Job"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -18610,6 +19798,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -18668,6 +19859,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Job"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -18701,6 +19895,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Job"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -18734,6 +19931,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -18769,6 +19969,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Job"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -18819,6 +20022,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Job"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -18852,6 +20058,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Job"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -18887,6 +20096,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Job"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -18974,6 +20186,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.NetworkPolicyList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -19007,6 +20222,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.NetworkPolicy"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -19067,6 +20285,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -19125,6 +20346,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.NetworkPolicy"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -19158,6 +20382,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.NetworkPolicy"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -19191,6 +20418,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -19226,6 +20456,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.NetworkPolicy"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -19313,6 +20546,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.ReplicaSetList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -19346,6 +20582,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.ReplicaSet"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -19406,6 +20645,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -19464,6 +20706,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.ReplicaSet"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -19497,6 +20742,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.ReplicaSet"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -19530,6 +20778,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -19565,6 +20816,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.ReplicaSet"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -19615,6 +20869,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Scale"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -19648,6 +20905,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Scale"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -19683,6 +20943,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Scale"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -19733,6 +20996,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.ReplicaSet"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -19766,6 +21032,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.ReplicaSet"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -19801,6 +21070,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.ReplicaSet"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -19851,6 +21123,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Scale"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -19884,6 +21159,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Scale"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -19919,6 +21197,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.Scale"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -19969,6 +21250,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.NetworkPolicyList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -20038,6 +21322,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.ReplicaSetList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -20144,6 +21431,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.ThirdPartyResourceList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -20177,6 +21467,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.ThirdPartyResource"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -20237,6 +21530,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -20287,6 +21583,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.ThirdPartyResource"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -20320,6 +21619,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.ThirdPartyResource"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -20353,6 +21655,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -20388,6 +21693,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.ThirdPartyResource"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -20431,6 +21739,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -20501,6 +21812,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -20571,6 +21885,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -20641,6 +21958,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -20711,6 +22031,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -20781,6 +22104,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -20859,6 +22185,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -20945,6 +22274,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -21023,6 +22355,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -21109,6 +22444,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -21187,6 +22525,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -21273,6 +22614,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -21351,6 +22695,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -21437,6 +22784,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -21515,6 +22865,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -21601,6 +22954,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -21679,6 +23035,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -21765,6 +23124,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -21843,6 +23205,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -21929,6 +23294,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -21999,6 +23367,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -22069,6 +23440,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -22139,6 +23513,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -22218,6 +23595,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIGroup"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -22245,6 +23625,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIResourceList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -22307,6 +23690,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.PodDisruptionBudgetList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -22340,6 +23726,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.PodDisruptionBudget"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -22400,6 +23789,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -22458,6 +23850,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.PodDisruptionBudget"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -22491,6 +23886,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.PodDisruptionBudget"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -22524,6 +23922,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -22559,6 +23960,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.PodDisruptionBudget"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -22609,6 +24013,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.PodDisruptionBudget"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -22642,6 +24049,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.PodDisruptionBudget"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -22677,6 +24087,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.PodDisruptionBudget"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -22727,6 +24140,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.PodDisruptionBudgetList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -22797,6 +24213,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -22875,6 +24294,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -22961,6 +24383,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -23032,6 +24457,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIGroup"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -23059,6 +24487,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIResourceList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -23121,6 +24552,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.ClusterRoleBindingList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -23154,6 +24588,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.ClusterRoleBinding"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -23214,6 +24651,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -23248,6 +24688,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.ClusterRoleBinding"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -23281,6 +24724,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.ClusterRoleBinding"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -23314,6 +24760,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -23349,6 +24798,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.ClusterRoleBinding"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -23428,6 +24880,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.ClusterRoleList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -23461,6 +24916,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.ClusterRole"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -23521,6 +24979,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -23555,6 +25016,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.ClusterRole"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -23588,6 +25052,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.ClusterRole"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -23621,6 +25088,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -23656,6 +25126,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.ClusterRole"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -23735,6 +25208,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.RoleBindingList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -23768,6 +25244,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.RoleBinding"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -23828,6 +25307,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -23870,6 +25352,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.RoleBinding"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -23903,6 +25388,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.RoleBinding"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -23936,6 +25424,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -23971,6 +25462,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.RoleBinding"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -24058,6 +25552,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.RoleList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -24091,6 +25588,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.Role"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -24151,6 +25651,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -24193,6 +25696,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.Role"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -24226,6 +25732,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.Role"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -24259,6 +25768,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -24294,6 +25806,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.Role"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -24344,6 +25859,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.RoleBindingList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -24413,6 +25931,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.RoleList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -24483,6 +26004,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -24553,6 +26077,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -24631,6 +26158,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -24701,6 +26231,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -24779,6 +26312,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -24857,6 +26393,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -24943,6 +26482,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -25021,6 +26563,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -25107,6 +26652,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -25177,6 +26725,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -25248,6 +26799,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIGroup"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -25275,6 +26829,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIResourceList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -25337,6 +26894,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.StorageClassList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -25370,6 +26930,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.StorageClass"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -25430,6 +26993,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -25480,6 +27046,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.StorageClass"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -25513,6 +27082,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.StorageClass"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -25546,6 +27118,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -25581,6 +27156,9 @@
        "schema": {
         "$ref": "#/definitions/v1beta1.StorageClass"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -25624,6 +27202,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -25694,6 +27275,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -25757,8 +27341,8 @@
      ],
      "operationId": "logFileListHandler",
      "responses": {
-      "default": {
-       "description": "Default Response."
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -25770,8 +27354,8 @@
      ],
      "operationId": "logFileHandler",
      "responses": {
-      "default": {
-       "description": "Default Response."
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -25805,6 +27389,9 @@
        "schema": {
         "$ref": "#/definitions/version.Info"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -30744,5 +32331,18 @@
      }
     }
    }
-  }
+  },
+  "securityDefinitions": {
+   "BearerToken": {
+    "description": "Bearer Token authentication",
+    "type": "apiKey",
+    "name": "authorization",
+    "in": "header"
+   }
+  },
+  "security": [
+   {
+    "BearerToken": []
+   }
+  ]
  }
