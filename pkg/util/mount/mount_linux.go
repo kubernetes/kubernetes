@@ -101,15 +101,15 @@ func isBind(options []string) (bool, []string) {
 
 // doMount runs the mount command.
 func doMount(mountCmd string, source string, target string, fstype string, options []string) error {
-	glog.V(5).Infof("Mounting %s %s %s %v", source, target, fstype, options)
+	glog.V(5).Infof("Mounting %s %s %s %v with command: %q", source, target, fstype, options, mountCmd)
 	mountArgs := makeMountArgs(source, target, fstype, options)
 
 	command := exec.Command(mountCmd, mountArgs...)
 	output, err := command.CombinedOutput()
 	if err != nil {
-		glog.Errorf("Mount failed: %v\nMounting arguments: %s %s %s %v\nOutput: %s\n", err, source, target, fstype, options, string(output))
-		return fmt.Errorf("mount failed: %v\nMounting arguments: %s %s %s %v\nOutput: %s\n",
-			err, source, target, fstype, options, string(output))
+		glog.Errorf("Mount failed: %v\nMounting command: %s\nMounting arguments: %s %s %s %v\nOutput: %s\n", err, mountCmd, source, target, fstype, options, string(output))
+		return fmt.Errorf("mount failed: %v\nMounting command: %s\nMounting arguments: %s %s %s %v\nOutput: %s\n",
+			err, mountCmd, source, target, fstype, options, string(output))
 	}
 	return err
 }
