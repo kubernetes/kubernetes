@@ -101,9 +101,6 @@ type GenericAPIServer struct {
 	// TODO eventually we should be able to factor this out to take place during initialization.
 	enableSwaggerSupport bool
 
-	// apiPrefix is the prefix where API groups live, usually /apis
-	apiPrefix string
-
 	// legacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
 	// to InstallLegacyAPIGroup
 	legacyAPIGroupPrefixes sets.String
@@ -331,7 +328,7 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 		return fmt.Errorf("cannot register handler with an empty version for %#v", *apiGroupInfo)
 	}
 
-	if err := s.installAPIResources(s.apiPrefix, apiGroupInfo); err != nil {
+	if err := s.installAPIResources(APIGroupPrefix, apiGroupInfo); err != nil {
 		return err
 	}
 
@@ -360,7 +357,7 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 	}
 
 	s.AddAPIGroupForDiscovery(apiGroup)
-	s.HandlerContainer.Add(apiserver.NewGroupWebService(s.Serializer, s.apiPrefix+"/"+apiGroup.Name, apiGroup))
+	s.HandlerContainer.Add(apiserver.NewGroupWebService(s.Serializer, APIGroupPrefix+"/"+apiGroup.Name, apiGroup))
 
 	return nil
 }
@@ -487,7 +484,7 @@ func (s *GenericAPIServer) InstallOpenAPI() {
 // DynamicApisDiscovery returns a webservice serving api group discovery.
 // Note: during the server runtime apiGroupsForDiscovery might change.
 func (s *GenericAPIServer) DynamicApisDiscovery() *restful.WebService {
-	return apiserver.NewApisWebService(s.Serializer, s.apiPrefix, func(req *restful.Request) []unversioned.APIGroup {
+	return apiserver.NewApisWebService(s.Serializer, APIGroupPrefix, func(req *restful.Request) []unversioned.APIGroup {
 		s.apiGroupsForDiscoveryLock.RLock()
 		defer s.apiGroupsForDiscoveryLock.RUnlock()
 
