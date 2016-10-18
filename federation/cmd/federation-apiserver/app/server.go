@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/version"
 	authenticatorunion "k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
 )
 
@@ -183,6 +184,9 @@ func Run(s *options.ServerRunOptions) error {
 	if err != nil {
 		glog.Fatalf("Failed to initialize plugins: %v", err)
 	}
+
+	kubeVersion := version.Get()
+	genericConfig.Version = &kubeVersion
 	genericConfig.LoopbackClientConfig = selfClientConfig
 	genericConfig.Authenticator = apiAuthenticator
 	genericConfig.SupportsBasicAuth = len(s.BasicAuthFile) > 0

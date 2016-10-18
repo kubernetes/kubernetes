@@ -83,6 +83,8 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	resourceEncoding.SetVersionEncoding(certificates.GroupName, *testapi.Certificates.GroupVersion(), unversioned.GroupVersion{Group: certificates.GroupName, Version: runtime.APIVersionInternal})
 	storageFactory := genericapiserver.NewDefaultStorageFactory(*storageConfig, testapi.StorageMediaType(), api.Codecs, resourceEncoding, DefaultAPIResourceConfigSource())
 
+	kubeVersion := version.Get()
+	config.GenericConfig.Version = &kubeVersion
 	config.StorageFactory = storageFactory
 	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs}}
 	config.GenericConfig.APIResourceConfigSource = DefaultAPIResourceConfigSource()
@@ -94,7 +96,6 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	config.GenericConfig.ProxyDialer = func(network, addr string) (net.Conn, error) { return nil, nil }
 	config.GenericConfig.ProxyTLSClientConfig = &tls.Config{}
 	config.GenericConfig.RequestContextMapper = api.NewRequestContextMapper()
-	config.GenericConfig.EnableVersion = true
 	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs}}
 	config.EnableCoreControllers = false
 
