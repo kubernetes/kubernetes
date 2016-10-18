@@ -132,6 +132,10 @@ type CloudConfig struct {
 var TestContext TestContextType
 var federatedKubeContext string
 
+func init() {
+	ViperizeFlags()
+}
+
 // Register flags common to all e2e test suites.
 func RegisterCommonFlags() {
 	// Turn on verbose by default to get spec names
