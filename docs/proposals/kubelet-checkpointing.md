@@ -75,7 +75,9 @@ If the database file does exist:
 
 * Add `Checkpointing=true|false (ALPHA - default=false)` to `--feature-gates`
 * Store file will be at <root_dir>/checkpoint-store.db
-* Secrets will be encrypted on disk using the kubelet's private key. (This preserves the current assumption that secrets are not accessible on a node when it's powered off)
+* Secrets will be encrypted on disk using the kubelet's private key.
+* * This preserves the current assumption that secrets are not accessible on a node when it's powered off
+* * If this key was compromised the kubelet could just ask the apiserver for the keys anyway, so we're in the same situation
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
