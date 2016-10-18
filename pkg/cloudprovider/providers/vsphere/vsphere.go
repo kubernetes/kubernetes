@@ -215,7 +215,7 @@ func readInstance(cfg *VSphereConfig) (string, string, error) {
 		var rp mo.ResourcePool
 		err = s.Properties(ctx, *vm.ResourcePool, []string{"parent"}, &rp)
 		if err == nil {
-			var ccr mo.ClusterComputeResource
+			var ccr mo.ComputeResource
 			err = s.Properties(ctx, *rp.Parent, []string{"name"}, &ccr)
 			if err == nil {
 				cluster = ccr.Name
