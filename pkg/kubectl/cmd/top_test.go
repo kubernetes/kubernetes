@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"testing"
 )
 
@@ -40,7 +41,7 @@ const (
 func TestTopSubcommandsExist(t *testing.T) {
 	initTestErrorHandler(t)
 
-	f, _, _, _ := NewAPIFactory()
+	f, _, _, _ := cmdtesting.NewAPIFactory()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTop(f, buf)

@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/kubectl"
+	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
@@ -431,7 +432,7 @@ func TestRunExposeService(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		f, tf, codec, ns := NewAPIFactory()
+		f, tf, codec, ns := cmdtesting.NewAPIFactory()
 		tf.Printer = &kubectl.JSONPrinter{}
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: ns,
