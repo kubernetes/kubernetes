@@ -329,7 +329,7 @@ DEFAULTER_FILES := $(addsuffix /$(DEFAULTER_FILENAME), $(DEFAULTER_DIRS))
 gen_defaulter: $(DEFAULTER_FILES)
 	if [[ -f $(META_DIR)/$(DEFAULTER_GEN).todo ]]; then                  \
 	    ./hack/run-in-gopath.sh $(DEFAULTER_GEN)                         \
-	        --v $(KUBE_VERBOSE)                                          \
+	        --v 5                                          \
 	        --logtostderr                                                \
 	        -i $$(cat $(META_DIR)/$(DEFAULTER_GEN).todo | paste -sd, -)  \
 	        --extra-peer-dirs $$(echo '$(DEFAULTER_DIRS)' | xargs -I {} -n1 echo '$(PRJ_SRC_PATH)/{}' | paste -sd, -) \

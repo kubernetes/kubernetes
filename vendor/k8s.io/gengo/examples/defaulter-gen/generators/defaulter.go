@@ -232,6 +232,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		}
 		// Make sure our peer-packages are added and fully parsed.
 		for _, pp := range peerPkgs {
+			glog.V(5).Infof("  including pkg %q", pp)
 			context.AddDir(pp)
 			getManualDefaultingFunctions(context, context.Universe[pp], existingDefaulters)
 		}
