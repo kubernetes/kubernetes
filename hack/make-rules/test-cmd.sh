@@ -2884,6 +2884,44 @@ __EOF__
   # Post-condition: valid-pod doesn't exist
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
+  ################
+  # Certificates #
+  ################
+
+  # approve
+  kubectl create -f hack/testdata/csr.yml "${kube_flags[@]}"
+  kube::test::get_object_assert 'csr/foo' '{{range.status.conditions}}{{.type}}{{end}}' ''
+  kubectl certificate approve foo "${kube_flags[@]}"
+  kubectl get csr "${kube_flags[@]}" -o json
+  kube::test::get_object_assert 'csr/foo' '{{range.status.conditions}}{{.type}}{{end}}' 'Approved'
+  kubectl delete -f hack/testdata/csr.yml "${kube_flags[@]}"
+  kube::test::get_object_assert csr "{{range.items}}{{$id_field}}{{end}}" ''
+
+  kubectl create -f hack/testdata/csr.yml "${kube_flags[@]}"
+  kube::test::get_object_assert 'csr/foo' '{{range.status.conditions}}{{.type}}{{end}}' ''
+  kubectl certificate approve -f hack/testdata/csr.yml "${kube_flags[@]}"
+  kubectl get csr "${kube_flags[@]}" -o json
+  kube::test::get_object_assert 'csr/foo' '{{range.status.conditions}}{{.type}}{{end}}' 'Approved'
+  kubectl delete -f hack/testdata/csr.yml "${kube_flags[@]}"
+  kube::test::get_object_assert csr "{{range.items}}{{$id_field}}{{end}}" ''
+
+  # deny
+  kubectl create -f hack/testdata/csr.yml "${kube_flags[@]}"
+  kube::test::get_object_assert 'csr/foo' '{{range.status.conditions}}{{.type}}{{end}}' ''
+  kubectl certificate deny foo "${kube_flags[@]}"
+  kubectl get csr "${kube_flags[@]}" -o json
+  kube::test::get_object_assert 'csr/foo' '{{range.status.conditions}}{{.type}}{{end}}' 'Denied'
+  kubectl delete -f hack/testdata/csr.yml "${kube_flags[@]}"
+  kube::test::get_object_assert csr "{{range.items}}{{$id_field}}{{end}}" ''
+
+  kubectl create -f hack/testdata/csr.yml "${kube_flags[@]}"
+  kube::test::get_object_assert 'csr/foo' '{{range.status.conditions}}{{.type}}{{end}}' ''
+  kubectl certificate deny -f hack/testdata/csr.yml "${kube_flags[@]}"
+  kubectl get csr "${kube_flags[@]}" -o json
+  kube::test::get_object_assert 'csr/foo' '{{range.status.conditions}}{{.type}}{{end}}' 'Denied'
+  kubectl delete -f hack/testdata/csr.yml "${kube_flags[@]}"
+  kube::test::get_object_assert csr "{{range.items}}{{$id_field}}{{end}}" ''
+
   kube::test::clear_all
 }
 
