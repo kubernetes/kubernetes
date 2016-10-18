@@ -1,2 +1,21 @@
 approvers:
 - rootfs
+reviewers:
+- bugroger
+- caesarxuchao
+- chakri-nelluri
+- david-mcmahon
+- dims
+- fabioy
+- fgrzadkowski
+- jijun2
+- jingxu97
+- markturansky
+- pmorie
+- pwittrock
+- resouer
+- rootfs
+- saad-ali
+- swagiaal
+- thockin
+- timstclair
