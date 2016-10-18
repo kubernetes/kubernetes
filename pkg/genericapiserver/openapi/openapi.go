@@ -78,9 +78,16 @@ func (o *openAPI) init(webServices []*restful.WebService) error {
 			return r.Operation, nil
 		}
 	}
+	if o.config.CommonResponses == nil {
+		o.config.CommonResponses = map[int]spec.Response{}
+	}
 	err := o.buildPaths(webServices)
 	if err != nil {
 		return err
+	}
+	if o.config.SecurityDefinitions != nil {
+		o.swagger.SecurityDefinitions = *o.config.SecurityDefinitions
+		o.swagger.Security = o.config.DefaultSecurity
 	}
 	return nil
 }
@@ -225,6 +232,11 @@ func (o *openAPI) buildOperations(route restful.Route, inPathCommonParamsMap map
 		ret.Responses.StatusCodeResponses[http.StatusOK], err = o.buildResponse(route.WriteSample, "OK")
 		if err != nil {
 			return ret, err
+		}
+	}
+	for code, resp := range o.config.CommonResponses {
+		if _, exists := ret.Responses.StatusCodeResponses[code]; !exists {
+			ret.Responses.StatusCodeResponses[code] = resp
 		}
 	}
 	// If there is still no response, use default response provided.
