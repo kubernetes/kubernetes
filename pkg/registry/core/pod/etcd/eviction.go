@@ -103,7 +103,7 @@ func (r *EvictionREST) Create(ctx api.Context, obj runtime.Object) (runtime.Obje
 }
 
 func (r *EvictionREST) checkAndDecrement(namespace string, pdb policy.PodDisruptionBudget) (ok bool, err error) {
-	if !pdb.Status.PodDisruptionAllowed {
+	if pdb.Status.PodDisruptionsAllowed <= 0 {
 		return false, nil
 	}
 
@@ -112,7 +112,7 @@ func (r *EvictionREST) checkAndDecrement(namespace string, pdb policy.PodDisrupt
 		return false, err
 	}
 	newPDB := copied.(policy.PodDisruptionBudget)
-	newPDB.Status.PodDisruptionAllowed = false
+	newPDB.Status.PodDisruptionsAllowed--
 
 	if _, err := r.podDisruptionBudgetClient.PodDisruptionBudgets(namespace).Update(&newPDB); err != nil {
 		return false, err
