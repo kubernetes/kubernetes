@@ -6,6 +6,7 @@ cmd/gendocs
 cmd/genkubedocs
 cmd/genman
 cmd/genswaggertypedocs
+cmd/genyaml
 cmd/integration
 cmd/kube-apiserver
 cmd/kube-apiserver/app
@@ -185,6 +186,7 @@ pkg/util/json
 pkg/util/limitwriter
 pkg/util/logs
 pkg/util/maps
+pkg/util/metrics
 pkg/util/replicaset
 pkg/util/validation/field
 pkg/util/workqueue
@@ -215,6 +217,7 @@ plugin/pkg/auth/authenticator/password
 plugin/pkg/auth/authenticator/password/allow
 plugin/pkg/auth/authenticator/request/basicauth
 plugin/pkg/auth/authenticator/request/union
+plugin/pkg/auth/authenticator/request/x509
 plugin/pkg/auth/authorizer
 plugin/pkg/auth/authorizer/rbac/bootstrappolicy
 plugin/pkg/client/auth

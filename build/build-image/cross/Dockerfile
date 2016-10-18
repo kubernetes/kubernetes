@@ -15,7 +15,7 @@
 # This file creates a standard build environment for building cross
 # platform go binary for the architecture kubernetes cares about.
 
-FROM golang:1.6.3
+FROM golang:1.7.1
 
 ENV GOARM 6
 ENV KUBE_DYNAMIC_CROSSPLATFORMS \
@@ -85,10 +85,9 @@ RUN mkdir -p ${K8S_PATCHED_GOROOT} \
   && curl -sSL https://github.com/golang/go/archive/go${K8S_PATCHED_GOLANG_VERSION}.tar.gz | tar -xz -C ${K8S_PATCHED_GOROOT} --strip-components=1
 
 # We need a patched go1.7.1 for linux/arm (https://github.com/kubernetes/kubernetes/issues/29904)
-# We need go1.7.1 for all darwin builds (https://github.com/kubernetes/kubernetes/issues/32999)
 COPY golang-patches/CL28857-go1.7.1-luxas.patch ${K8S_PATCHED_GOROOT}/
 RUN cd ${K8S_PATCHED_GOROOT} \
   && patch -p1 < CL28857-go1.7.1-luxas.patch \
   && cd src \
   && GOROOT_FINAL=${K8S_PATCHED_GOROOT} GOROOT_BOOTSTRAP=/usr/local/go ./make.bash \
-  && for platform in linux/arm darwin/386 darwin/amd64; do GOOS=${platform%/*} GOARCH=${platform##*/} GOROOT=${K8S_PATCHED_GOROOT} go install std; done
+  && for platform in linux/arm; do GOOS=${platform%/*} GOARCH=${platform##*/} GOROOT=${K8S_PATCHED_GOROOT} go install std; done
