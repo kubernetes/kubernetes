@@ -6391,7 +6391,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					},
 					"devicePath": {
 						SchemaProps: spec.SchemaProps{
-							Description: "DevicePath represents the device path where the volume should be avilable",
+							Description: "DevicePath represents the device path where the volume should be available",
 							Type:        []string{"string"},
 							Format:      "",
 						},
