@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	awscloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/types"
@@ -53,8 +53,8 @@ const (
 
 var _ = framework.KubeDescribe("Pod Disks", func() {
 	var (
-		podClient  client.PodInterface
-		nodeClient client.NodeInterface
+		podClient  unversionedcore.PodInterface
+		nodeClient unversionedcore.NodeInterface
 		host0Name  types.NodeName
 		host1Name  types.NodeName
 	)
@@ -63,9 +63,9 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 	BeforeEach(func() {
 		framework.SkipUnlessNodeCountIsAtLeast(2)
 
-		podClient = f.Client.Pods(f.Namespace.Name)
-		nodeClient = f.Client.Nodes()
-		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
+		podClient = f.ClientSet.Core().Pods(f.Namespace.Name)
+		nodeClient = f.ClientSet.Core().Nodes()
+		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 
 		Expect(len(nodes.Items)).To(BeNumerically(">=", 2), "Requires at least 2 nodes")
 
@@ -702,7 +702,7 @@ func detachAndDeletePDs(diskName string, hosts []types.NodeName) {
 }
 
 func waitForPDInVolumesInUse(
-	nodeClient client.NodeInterface,
+	nodeClient unversionedcore.NodeInterface,
 	diskName string,
 	nodeName types.NodeName,
 	timeout time.Duration,

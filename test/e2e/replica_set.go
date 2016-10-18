@@ -57,7 +57,7 @@ func ReplicaSetServeImageOrFail(f *framework.Framework, test string, image strin
 	// The source for the Docker containter kubernetes/serve_hostname is
 	// in contrib/for-demos/serve_hostname
 	By(fmt.Sprintf("Creating ReplicaSet %s", name))
-	rs, err := f.Client.Extensions().ReplicaSets(f.Namespace.Name).Create(&extensions.ReplicaSet{
+	rs, err := f.ClientSet.Extensions().ReplicaSets(f.Namespace.Name).Create(&extensions.ReplicaSet{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
 		},
@@ -86,7 +86,7 @@ func ReplicaSetServeImageOrFail(f *framework.Framework, test string, image strin
 	// Cleanup the ReplicaSet when we are done.
 	defer func() {
 		// Resize the ReplicaSet to zero to get rid of pods.
-		if err := framework.DeleteReplicaSet(f.Client, f.ClientSet, f.Namespace.Name, rs.Name); err != nil {
+		if err := framework.DeleteReplicaSet(f.ClientSet, f.Namespace.Name, rs.Name); err != nil {
 			framework.Logf("Failed to cleanup ReplicaSet %v: %v.", rs.Name, err)
 		}
 	}()
@@ -94,7 +94,7 @@ func ReplicaSetServeImageOrFail(f *framework.Framework, test string, image strin
 	// List the pods, making sure we observe all the replicas.
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 
-	pods, err := framework.PodsCreated(f.Client, f.Namespace.Name, name, replicas)
+	pods, err := framework.PodsCreated(f.ClientSet, f.Namespace.Name, name, replicas)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Ensuring each pod is running")
@@ -113,7 +113,7 @@ func ReplicaSetServeImageOrFail(f *framework.Framework, test string, image strin
 	By("Trying to dial each unique pod")
 	retryTimeout := 2 * time.Minute
 	retryInterval := 5 * time.Second
-	err = wait.Poll(retryInterval, retryTimeout, framework.PodProxyResponseChecker(f.Client, f.Namespace.Name, label, name, true, pods).CheckAllResponses)
+	err = wait.Poll(retryInterval, retryTimeout, framework.PodProxyResponseChecker(f.ClientSet, f.Namespace.Name, label, name, true, pods).CheckAllResponses)
 	if err != nil {
 		framework.Failf("Did not get expected responses within the timeout period of %.2f seconds.", retryTimeout.Seconds())
 	}

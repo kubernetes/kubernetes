@@ -44,7 +44,7 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 		var clusters map[string]*cluster // All clusters, keyed by cluster name
 
 		BeforeEach(func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 
 			// TODO: Federation API server should be able to answer this.
 			if federationName = os.Getenv("FEDERATION_NAME"); federationName == "" {
@@ -56,7 +56,7 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 		})
 
 		AfterEach(func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 			deleteAllTestNamespaces(
 				f.FederationClientset_1_5.Core().Namespaces().List,
 				f.FederationClientset_1_5.Core().Namespaces().Delete)
@@ -69,7 +69,7 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 		})
 
 		It("should be created and deleted successfully", func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 
 			ns := api_v1.Namespace{
 				ObjectMeta: api_v1.ObjectMeta{

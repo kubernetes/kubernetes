@@ -46,18 +46,18 @@ var _ = framework.KubeDescribe("Federation secrets [Feature:Federation12]", func
 	Describe("Secret objects", func() {
 
 		BeforeEach(func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 			clusters = map[string]*cluster{}
 			registerClusters(clusters, UserAgentName, "", f)
 		})
 
 		AfterEach(func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 			unregisterClusters(clusters, f)
 		})
 
 		It("should be created and deleted successfully", func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 			nsName := f.FederationNamespace.Name
 			secret := createSecretOrFail(f.FederationClientset_1_5, nsName)
 			defer func() { // Cleanup

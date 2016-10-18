@@ -27,9 +27,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
-	uclient "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -47,7 +47,7 @@ func TestDynamicClient(t *testing.T) {
 		ContentConfig: restclient.ContentConfig{GroupVersion: gv},
 	}
 
-	client := uclient.NewOrDie(config)
+	client := clientset.NewForConfigOrDie(config)
 	dynamicClient, err := dynamic.NewClient(config)
 	_ = dynamicClient
 	if err != nil {
@@ -87,7 +87,7 @@ func TestDynamicClient(t *testing.T) {
 		},
 	}
 
-	actual, err := client.Pods(ns.Name).Create(pod)
+	actual, err := client.Core().Pods(ns.Name).Create(pod)
 	if err != nil {
 		t.Fatalf("unexpected error when creating pod: %v", err)
 	}
@@ -136,7 +136,7 @@ func TestDynamicClient(t *testing.T) {
 		t.Fatalf("unexpected error when deleting pod: %v", err)
 	}
 
-	list, err := client.Pods(ns.Name).List(api.ListOptions{})
+	list, err := client.Core().Pods(ns.Name).List(api.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error when listing pods: %v", err)
 	}

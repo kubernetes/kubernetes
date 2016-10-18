@@ -27,7 +27,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
 
 const (
@@ -49,11 +49,11 @@ const (
 var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("kubelet-eviction-manager")
 	var podClient *framework.PodClient
-	var c *client.Client
+	var c clientset.Interface
 
 	BeforeEach(func() {
 		podClient = f.PodClient()
-		c = f.Client
+		c = f.ClientSet
 	})
 
 	Describe("hard eviction test", func() {
@@ -152,7 +152,7 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 
 					// The node should have disk pressure condition after the pods are evicted.
 					if !nodeDiskPressureCondition {
-						if !nodeHasDiskPressure(f.Client) {
+						if !nodeHasDiskPressure(f.ClientSet) {
 							return fmt.Errorf("expected disk pressure condition is not set")
 						}
 						nodeDiskPressureCondition = true
@@ -161,7 +161,7 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 
 					// After eviction happens the pod is evicted so eventually the node disk pressure should be relieved.
 					if !podRescheduleable {
-						if nodeHasDiskPressure(f.Client) {
+						if nodeHasDiskPressure(f.ClientSet) {
 							return fmt.Errorf("expected disk pressure condition relief has not happened")
 						}
 						createIdlePod(verifyPodName, podClient)
@@ -212,7 +212,7 @@ func verifyPodEviction(podData *api.Pod) error {
 	return nil
 }
 
-func nodeHasDiskPressure(c *client.Client) bool {
+func nodeHasDiskPressure(c clientset.Interface) bool {
 	nodeList := framework.GetReadySchedulableNodesOrDie(c)
 	for _, condition := range nodeList.Items[0].Status.Conditions {
 		if condition.Type == api.NodeDiskPressure {

@@ -63,7 +63,7 @@ var _ = framework.KubeDescribe("Restart [Disruptive]", func() {
 		// check must be identical to that call.
 		framework.SkipUnlessProviderIs("gce", "gke")
 
-		ps = testutils.NewPodStore(f.Client, api.NamespaceSystem, labels.Everything(), fields.Everything())
+		ps = testutils.NewPodStore(f.ClientSet, api.NamespaceSystem, labels.Everything(), fields.Everything())
 	})
 
 	AfterEach(func() {
@@ -76,7 +76,7 @@ var _ = framework.KubeDescribe("Restart [Disruptive]", func() {
 		nn := framework.TestContext.CloudConfig.NumNodes
 
 		By("ensuring all nodes are ready")
-		nodeNamesBefore, err := framework.CheckNodesReady(f.Client, framework.NodeReadyInitialTimeout, nn)
+		nodeNamesBefore, err := framework.CheckNodesReady(f.ClientSet, framework.NodeReadyInitialTimeout, nn)
 		Expect(err).NotTo(HaveOccurred())
 		framework.Logf("Got the following nodes before restart: %v", nodeNamesBefore)
 
@@ -89,7 +89,7 @@ var _ = framework.KubeDescribe("Restart [Disruptive]", func() {
 			podNamesBefore[i] = p.ObjectMeta.Name
 		}
 		ns := api.NamespaceSystem
-		if !framework.CheckPodsRunningReadyOrSucceeded(f.Client, ns, podNamesBefore, framework.PodReadyBeforeTimeout) {
+		if !framework.CheckPodsRunningReadyOrSucceeded(f.ClientSet, ns, podNamesBefore, framework.PodReadyBeforeTimeout) {
 			framework.Failf("At least one pod wasn't running and ready or succeeded at test start.")
 		}
 
@@ -98,7 +98,7 @@ var _ = framework.KubeDescribe("Restart [Disruptive]", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("ensuring all nodes are ready after the restart")
-		nodeNamesAfter, err := framework.CheckNodesReady(f.Client, framework.RestartNodeReadyAgainTimeout, nn)
+		nodeNamesAfter, err := framework.CheckNodesReady(f.ClientSet, framework.RestartNodeReadyAgainTimeout, nn)
 		Expect(err).NotTo(HaveOccurred())
 		framework.Logf("Got the following nodes after restart: %v", nodeNamesAfter)
 
@@ -118,7 +118,7 @@ var _ = framework.KubeDescribe("Restart [Disruptive]", func() {
 		podNamesAfter, err := waitForNPods(ps, len(podNamesBefore), framework.RestartPodReadyAgainTimeout)
 		Expect(err).NotTo(HaveOccurred())
 		remaining := framework.RestartPodReadyAgainTimeout - time.Since(podCheckStart)
-		if !framework.CheckPodsRunningReadyOrSucceeded(f.Client, ns, podNamesAfter, remaining) {
+		if !framework.CheckPodsRunningReadyOrSucceeded(f.ClientSet, ns, podNamesAfter, remaining) {
 			framework.Failf("At least one pod wasn't running and ready after the restart.")
 		}
 	})
@@ -156,7 +156,7 @@ func restartNodes(f *framework.Framework, nodeNames []string) error {
 	// List old boot IDs.
 	oldBootIDs := make(map[string]string)
 	for _, name := range nodeNames {
-		node, err := f.Client.Nodes().Get(name)
+		node, err := f.ClientSet.Core().Nodes().Get(name)
 		if err != nil {
 			return fmt.Errorf("error getting node info before reboot: %s", err)
 		}
@@ -178,7 +178,7 @@ func restartNodes(f *framework.Framework, nodeNames []string) error {
 	// Wait for their boot IDs to change.
 	for _, name := range nodeNames {
 		if err := wait.Poll(30*time.Second, 5*time.Minute, func() (bool, error) {
-			node, err := f.Client.Nodes().Get(name)
+			node, err := f.ClientSet.Core().Nodes().Get(name)
 			if err != nil {
 				return false, fmt.Errorf("error getting node info after reboot: %s", err)
 			}

@@ -43,18 +43,18 @@ var _ = framework.KubeDescribe("Kubernetes Dashboard", func() {
 
 	It("should check that the kubernetes-dashboard instance is alive", func() {
 		By("Checking whether the kubernetes-dashboard service exists.")
-		err := framework.WaitForService(f.Client, uiNamespace, uiServiceName, true, framework.Poll, framework.ServiceStartTimeout)
+		err := framework.WaitForService(f.ClientSet, uiNamespace, uiServiceName, true, framework.Poll, framework.ServiceStartTimeout)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Checking to make sure the kubernetes-dashboard pods are running")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": uiAppName}))
-		err = testutils.WaitForPodsWithLabelRunning(f.Client, uiNamespace, selector)
+		err = testutils.WaitForPodsWithLabelRunning(f.ClientSet, uiNamespace, selector)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Checking to make sure we get a response from the kubernetes-dashboard.")
 		err = wait.Poll(framework.Poll, serverStartTimeout, func() (bool, error) {
 			var status int
-			proxyRequest, errProxy := framework.GetServicesProxyRequest(f.Client, f.Client.Get())
+			proxyRequest, errProxy := framework.GetServicesProxyRequest(f.ClientSet, f.ClientSet.Core().RESTClient().Get())
 			if errProxy != nil {
 				framework.Logf("Get services proxy request failed: %v", errProxy)
 			}
@@ -77,7 +77,7 @@ var _ = framework.KubeDescribe("Kubernetes Dashboard", func() {
 
 		By("Checking that the ApiServer /ui endpoint redirects to a valid server.")
 		var status int
-		err = f.Client.Get().
+		err = f.ClientSet.Core().RESTClient().Get().
 			AbsPath("/ui").
 			Timeout(framework.SingleCallTimeout).
 			Do().

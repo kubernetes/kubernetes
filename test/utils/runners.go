@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -41,7 +41,7 @@ const (
 )
 
 type RCConfig struct {
-	Client         *client.Client
+	Client         clientset.Interface
 	Image          string
 	Command        []string
 	Name           string
@@ -89,8 +89,8 @@ type RCConfig struct {
 	LogFunc func(fmt string, args ...interface{})
 	// If set those functions will be used to gather data from Nodes - in integration tests where no
 	// kubelets are running those variables should be nil.
-	NodeDumpFunc      func(c *client.Client, nodeNames []string, logFunc func(fmt string, args ...interface{}))
-	ContainerDumpFunc func(c *client.Client, ns string, logFunc func(ftm string, args ...interface{}))
+	NodeDumpFunc      func(c clientset.Interface, nodeNames []string, logFunc func(fmt string, args ...interface{}))
+	ContainerDumpFunc func(c clientset.Interface, ns string, logFunc func(ftm string, args ...interface{}))
 }
 
 func (rc *RCConfig) RCConfigLog(fmt string, args ...interface{}) {
@@ -219,7 +219,7 @@ func (config *DeploymentConfig) create() error {
 
 	config.applyTo(&deployment.Spec.Template)
 
-	_, err := config.Client.Deployments(config.Namespace).Create(deployment)
+	_, err := config.Client.Extensions().Deployments(config.Namespace).Create(deployment)
 	if err != nil {
 		return fmt.Errorf("Error creating deployment: %v", err)
 	}
@@ -271,7 +271,7 @@ func (config *ReplicaSetConfig) create() error {
 
 	config.applyTo(&rs.Spec.Template)
 
-	_, err := config.Client.ReplicaSets(config.Namespace).Create(rs)
+	_, err := config.Client.Extensions().ReplicaSets(config.Namespace).Create(rs)
 	if err != nil {
 		return fmt.Errorf("Error creating replica set: %v", err)
 	}
@@ -328,7 +328,7 @@ func (config *RCConfig) create() error {
 
 	config.applyTo(rc.Spec.Template)
 
-	_, err := config.Client.ReplicationControllers(config.Namespace).Create(rc)
+	_, err := config.Client.Core().ReplicationControllers(config.Namespace).Create(rc)
 	if err != nil {
 		return fmt.Errorf("Error creating replication controller: %v", err)
 	}
@@ -535,7 +535,7 @@ func (config *RCConfig) start() error {
 	if oldRunning != config.Replicas {
 		// List only pods from a given replication controller.
 		options := api.ListOptions{LabelSelector: label}
-		if pods, err := config.Client.Pods(api.NamespaceAll).List(options); err == nil {
+		if pods, err := config.Client.Core().Pods(api.NamespaceAll).List(options); err == nil {
 
 			for _, pod := range pods.Items {
 				config.RCConfigLog("Pod %s\t%s\t%s\t%s", pod.Name, pod.Spec.NodeName, pod.Status.Phase, pod.DeletionTimestamp)
@@ -551,7 +551,7 @@ func (config *RCConfig) start() error {
 // Simplified version of RunRC, that does not create RC, but creates plain Pods.
 // Optionally waits for pods to start running (if waitForRunning == true).
 // The number of replicas must be non-zero.
-func StartPods(c *client.Client, replicas int, namespace string, podNamePrefix string,
+func StartPods(c clientset.Interface, replicas int, namespace string, podNamePrefix string,
 	pod api.Pod, waitForRunning bool, logFunc func(fmt string, args ...interface{})) error {
 	// no pod to start
 	if replicas < 1 {
@@ -564,7 +564,7 @@ func StartPods(c *client.Client, replicas int, namespace string, podNamePrefix s
 		pod.ObjectMeta.Labels["name"] = podName
 		pod.ObjectMeta.Labels["startPodsID"] = startPodsID
 		pod.Spec.Containers[0].Name = podName
-		_, err := c.Pods(namespace).Create(&pod)
+		_, err := c.Core().Pods(namespace).Create(&pod)
 		return err
 	}
 	logFunc("Waiting for running...")
@@ -578,7 +578,7 @@ func StartPods(c *client.Client, replicas int, namespace string, podNamePrefix s
 
 // Wait up to 10 minutes for all matching pods to become Running and at least one
 // matching pod exists.
-func WaitForPodsWithLabelRunning(c *client.Client, ns string, label labels.Selector) error {
+func WaitForPodsWithLabelRunning(c clientset.Interface, ns string, label labels.Selector) error {
 	running := false
 	PodStore := NewPodStore(c, ns, label, fields.Everything())
 	defer PodStore.Stop()

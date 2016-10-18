@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
@@ -73,16 +72,16 @@ var ServiceNodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
 var _ = framework.KubeDescribe("Services", func() {
 	f := framework.NewDefaultFramework("services")
 
-	var c *client.Client
+	var cs internalclientset.Interface
 
 	BeforeEach(func() {
-		c = f.Client
+		cs = f.ClientSet
 	})
 
 	// TODO: We get coverage of TCP/UDP and multi-port services through the DNS test. We should have a simpler test for multi-port TCP here.
 
 	It("should provide secure master service [Conformance]", func() {
-		_, err := c.Services(api.NamespaceDefault).Get("kubernetes")
+		_, err := cs.Core().Services(api.NamespaceDefault).Get("kubernetes")
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -97,7 +96,7 @@ var _ = framework.KubeDescribe("Services", func() {
 
 		By("creating service " + serviceName + " in namespace " + ns)
 		defer func() {
-			err := c.Services(ns).Delete(serviceName)
+			err := cs.Core().Services(ns).Delete(serviceName, nil)
 			Expect(err).NotTo(HaveOccurred())
 		}()
 
@@ -113,15 +112,15 @@ var _ = framework.KubeDescribe("Services", func() {
 				}},
 			},
 		}
-		_, err := c.Services(ns).Create(service)
+		_, err := cs.Core().Services(ns).Create(service)
 		Expect(err).NotTo(HaveOccurred())
 
-		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{})
+		validateEndpointsOrFail(cs, ns, serviceName, PortsByPodName{})
 
 		names := map[string]bool{}
 		defer func() {
 			for name := range names {
-				err := c.Pods(ns).Delete(name, nil)
+				err := cs.Core().Pods(ns).Delete(name, nil)
 				Expect(err).NotTo(HaveOccurred())
 			}
 		}()
@@ -129,21 +128,21 @@ var _ = framework.KubeDescribe("Services", func() {
 		name1 := "pod1"
 		name2 := "pod2"
 
-		createPodOrFail(c, ns, name1, labels, []api.ContainerPort{{ContainerPort: 80}})
+		createPodOrFail(cs, ns, name1, labels, []api.ContainerPort{{ContainerPort: 80}})
 		names[name1] = true
-		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{name1: {80}})
+		validateEndpointsOrFail(cs, ns, serviceName, PortsByPodName{name1: {80}})
 
-		createPodOrFail(c, ns, name2, labels, []api.ContainerPort{{ContainerPort: 80}})
+		createPodOrFail(cs, ns, name2, labels, []api.ContainerPort{{ContainerPort: 80}})
 		names[name2] = true
-		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{name1: {80}, name2: {80}})
+		validateEndpointsOrFail(cs, ns, serviceName, PortsByPodName{name1: {80}, name2: {80}})
 
-		deletePodOrFail(c, ns, name1)
+		deletePodOrFail(cs, ns, name1)
 		delete(names, name1)
-		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{name2: {80}})
+		validateEndpointsOrFail(cs, ns, serviceName, PortsByPodName{name2: {80}})
 
-		deletePodOrFail(c, ns, name2)
+		deletePodOrFail(cs, ns, name2)
 		delete(names, name2)
-		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{})
+		validateEndpointsOrFail(cs, ns, serviceName, PortsByPodName{})
 	})
 
 	It("should serve multiport endpoints from pods [Conformance]", func() {
@@ -153,7 +152,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		ns := f.Namespace.Name
 
 		defer func() {
-			err := c.Services(ns).Delete(serviceName)
+			err := cs.Core().Services(ns).Delete(serviceName, nil)
 			Expect(err).NotTo(HaveOccurred())
 		}()
 
@@ -183,16 +182,16 @@ var _ = framework.KubeDescribe("Services", func() {
 				},
 			},
 		}
-		_, err := c.Services(ns).Create(service)
+		_, err := cs.Core().Services(ns).Create(service)
 		Expect(err).NotTo(HaveOccurred())
 		port1 := 100
 		port2 := 101
-		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{})
+		validateEndpointsOrFail(cs, ns, serviceName, PortsByPodName{})
 
 		names := map[string]bool{}
 		defer func() {
 			for name := range names {
-				err := c.Pods(ns).Delete(name, nil)
+				err := cs.Core().Pods(ns).Delete(name, nil)
 				Expect(err).NotTo(HaveOccurred())
 			}
 		}()
@@ -213,21 +212,21 @@ var _ = framework.KubeDescribe("Services", func() {
 		podname1 := "pod1"
 		podname2 := "pod2"
 
-		createPodOrFail(c, ns, podname1, labels, containerPorts1)
+		createPodOrFail(cs, ns, podname1, labels, containerPorts1)
 		names[podname1] = true
-		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{podname1: {port1}})
+		validateEndpointsOrFail(cs, ns, serviceName, PortsByPodName{podname1: {port1}})
 
-		createPodOrFail(c, ns, podname2, labels, containerPorts2)
+		createPodOrFail(cs, ns, podname2, labels, containerPorts2)
 		names[podname2] = true
-		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{podname1: {port1}, podname2: {port2}})
+		validateEndpointsOrFail(cs, ns, serviceName, PortsByPodName{podname1: {port1}, podname2: {port2}})
 
-		deletePodOrFail(c, ns, podname1)
+		deletePodOrFail(cs, ns, podname1)
 		delete(names, podname1)
-		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{podname2: {port2}})
+		validateEndpointsOrFail(cs, ns, serviceName, PortsByPodName{podname2: {port2}})
 
-		deletePodOrFail(c, ns, podname2)
+		deletePodOrFail(cs, ns, podname2)
 		delete(names, podname2)
-		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{})
+		validateEndpointsOrFail(cs, ns, serviceName, PortsByPodName{})
 	})
 
 	// TODO: verify source IP preservation for LoadBalancer type services when applicable
@@ -237,20 +236,20 @@ var _ = framework.KubeDescribe("Services", func() {
 		ns := f.Namespace.Name
 
 		By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns)
-		jig := NewServiceTestJig(c, serviceName)
+		jig := NewServiceTestJig(cs, serviceName)
 		servicePort := 8080
 		tcpService := jig.CreateTCPServiceWithPort(ns, nil, int32(servicePort))
 		jig.SanityCheckService(tcpService, api.ServiceTypeClusterIP)
 		defer func() {
 			framework.Logf("Cleaning up the sourceip test service")
-			err := c.Services(ns).Delete(serviceName)
+			err := cs.Core().Services(ns).Delete(serviceName, nil)
 			Expect(err).NotTo(HaveOccurred())
 		}()
 		serviceIp := tcpService.Spec.ClusterIP
 		framework.Logf("sourceip-test cluster ip: %s", serviceIp)
 
 		By("Picking multiple nodes")
-		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
+		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 
 		if len(nodes.Items) == 1 {
 			framework.Skipf("The test requires two Ready nodes on %s, but found just one.", framework.TestContext.Provider)
@@ -264,20 +263,20 @@ var _ = framework.KubeDescribe("Services", func() {
 		jig.launchEchoserverPodOnNode(f, node1.Name, serverPodName)
 		defer func() {
 			framework.Logf("Cleaning up the echo server pod")
-			err := c.Pods(ns).Delete(serverPodName, nil)
+			err := cs.Core().Pods(ns).Delete(serverPodName, nil)
 			Expect(err).NotTo(HaveOccurred())
 		}()
 
 		// Waiting for service to expose endpoint.
-		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{serverPodName: {servicePort}})
+		validateEndpointsOrFail(cs, ns, serviceName, PortsByPodName{serverPodName: {servicePort}})
 
 		By("Retrieve sourceip from a pod on the same node")
-		sourceIp1, execPodIp1 := execSourceipTest(f, c, ns, node1.Name, serviceIp, servicePort)
+		sourceIp1, execPodIp1 := execSourceipTest(f, cs, ns, node1.Name, serviceIp, servicePort)
 		By("Verifying the preserved source ip")
 		Expect(sourceIp1).To(Equal(execPodIp1))
 
 		By("Retrieve sourceip from a pod on a different node")
-		sourceIp2, execPodIp2 := execSourceipTest(f, c, ns, node2.Name, serviceIp, servicePort)
+		sourceIp2, execPodIp2 := execSourceipTest(f, cs, ns, node2.Name, serviceIp, servicePort)
 		By("Verifying the preserved source ip")
 		Expect(sourceIp2).To(Equal(execPodIp2))
 	})
@@ -290,13 +289,13 @@ var _ = framework.KubeDescribe("Services", func() {
 		numPods, servicePort := 3, 80
 
 		By("creating service1 in namespace " + ns)
-		podNames1, svc1IP, err := startServeHostnameService(c, ns, "service1", servicePort, numPods)
+		podNames1, svc1IP, err := startServeHostnameService(cs, ns, "service1", servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 		By("creating service2 in namespace " + ns)
-		podNames2, svc2IP, err := startServeHostnameService(c, ns, "service2", servicePort, numPods)
+		podNames2, svc2IP, err := startServeHostnameService(cs, ns, "service2", servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
-		hosts, err := framework.NodeSSHHosts(c)
+		hosts, err := framework.NodeSSHHosts(cs)
 		Expect(err).NotTo(HaveOccurred())
 		if len(hosts) == 0 {
 			framework.Failf("No ssh-able nodes")
@@ -304,23 +303,23 @@ var _ = framework.KubeDescribe("Services", func() {
 		host := hosts[0]
 
 		By("verifying service1 is up")
-		framework.ExpectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames1, svc1IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podNames1, svc1IP, servicePort))
 
 		By("verifying service2 is up")
-		framework.ExpectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames2, svc2IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podNames2, svc2IP, servicePort))
 
 		// Stop service 1 and make sure it is gone.
 		By("stopping service1")
-		framework.ExpectNoError(stopServeHostnameService(c, f.ClientSet, ns, "service1"))
+		framework.ExpectNoError(stopServeHostnameService(f.ClientSet, ns, "service1"))
 
 		By("verifying service1 is not up")
-		framework.ExpectNoError(verifyServeHostnameServiceDown(c, host, svc1IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceDown(cs, host, svc1IP, servicePort))
 		By("verifying service2 is still up")
-		framework.ExpectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames2, svc2IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podNames2, svc2IP, servicePort))
 
 		// Start another service and verify both are up.
 		By("creating service3 in namespace " + ns)
-		podNames3, svc3IP, err := startServeHostnameService(c, ns, "service3", servicePort, numPods)
+		podNames3, svc3IP, err := startServeHostnameService(cs, ns, "service3", servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
 		if svc2IP == svc3IP {
@@ -328,10 +327,10 @@ var _ = framework.KubeDescribe("Services", func() {
 		}
 
 		By("verifying service2 is still up")
-		framework.ExpectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames2, svc2IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podNames2, svc2IP, servicePort))
 
 		By("verifying service3 is up")
-		framework.ExpectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames3, svc3IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podNames3, svc3IP, servicePort))
 	})
 
 	It("should work after restarting kube-proxy [Disruptive]", func() {
@@ -344,34 +343,34 @@ var _ = framework.KubeDescribe("Services", func() {
 		svc1 := "service1"
 		svc2 := "service2"
 
-		defer func() { framework.ExpectNoError(stopServeHostnameService(c, f.ClientSet, ns, svc1)) }()
-		podNames1, svc1IP, err := startServeHostnameService(c, ns, svc1, servicePort, numPods)
+		defer func() { framework.ExpectNoError(stopServeHostnameService(f.ClientSet, ns, svc1)) }()
+		podNames1, svc1IP, err := startServeHostnameService(cs, ns, svc1, servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
-		defer func() { framework.ExpectNoError(stopServeHostnameService(c, f.ClientSet, ns, svc2)) }()
-		podNames2, svc2IP, err := startServeHostnameService(c, ns, svc2, servicePort, numPods)
+		defer func() { framework.ExpectNoError(stopServeHostnameService(f.ClientSet, ns, svc2)) }()
+		podNames2, svc2IP, err := startServeHostnameService(cs, ns, svc2, servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
 		if svc1IP == svc2IP {
 			framework.Failf("VIPs conflict: %v", svc1IP)
 		}
 
-		hosts, err := framework.NodeSSHHosts(c)
+		hosts, err := framework.NodeSSHHosts(cs)
 		Expect(err).NotTo(HaveOccurred())
 		if len(hosts) == 0 {
 			framework.Failf("No ssh-able nodes")
 		}
 		host := hosts[0]
 
-		framework.ExpectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames1, svc1IP, servicePort))
-		framework.ExpectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames2, svc2IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podNames1, svc1IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podNames2, svc2IP, servicePort))
 
 		By(fmt.Sprintf("Restarting kube-proxy on %v", host))
 		if err := framework.RestartKubeProxy(host); err != nil {
 			framework.Failf("error restarting kube-proxy: %v", err)
 		}
-		framework.ExpectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames1, svc1IP, servicePort))
-		framework.ExpectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames2, svc2IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podNames1, svc1IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podNames2, svc2IP, servicePort))
 
 		By("Removing iptable rules")
 		result, err := framework.SSH(`
@@ -382,8 +381,8 @@ var _ = framework.KubeDescribe("Services", func() {
 			framework.LogSSHResult(result)
 			framework.Failf("couldn't remove iptable rules: %v", err)
 		}
-		framework.ExpectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames1, svc1IP, servicePort))
-		framework.ExpectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames2, svc2IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podNames1, svc1IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podNames2, svc2IP, servicePort))
 	})
 
 	It("should work after restarting apiserver [Disruptive]", func() {
@@ -393,40 +392,40 @@ var _ = framework.KubeDescribe("Services", func() {
 		ns := f.Namespace.Name
 		numPods, servicePort := 3, 80
 
-		defer func() { framework.ExpectNoError(stopServeHostnameService(c, f.ClientSet, ns, "service1")) }()
-		podNames1, svc1IP, err := startServeHostnameService(c, ns, "service1", servicePort, numPods)
+		defer func() { framework.ExpectNoError(stopServeHostnameService(f.ClientSet, ns, "service1")) }()
+		podNames1, svc1IP, err := startServeHostnameService(cs, ns, "service1", servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
-		hosts, err := framework.NodeSSHHosts(c)
+		hosts, err := framework.NodeSSHHosts(cs)
 		Expect(err).NotTo(HaveOccurred())
 		if len(hosts) == 0 {
 			framework.Failf("No ssh-able nodes")
 		}
 		host := hosts[0]
 
-		framework.ExpectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames1, svc1IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podNames1, svc1IP, servicePort))
 
 		// Restart apiserver
 		By("Restarting apiserver")
-		if err := framework.RestartApiserver(c); err != nil {
+		if err := framework.RestartApiserver(cs.Discovery()); err != nil {
 			framework.Failf("error restarting apiserver: %v", err)
 		}
 		By("Waiting for apiserver to come up by polling /healthz")
-		if err := framework.WaitForApiserverUp(c); err != nil {
+		if err := framework.WaitForApiserverUp(cs); err != nil {
 			framework.Failf("error while waiting for apiserver up: %v", err)
 		}
-		framework.ExpectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames1, svc1IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podNames1, svc1IP, servicePort))
 
 		// Create a new service and check if it's not reusing IP.
-		defer func() { framework.ExpectNoError(stopServeHostnameService(c, f.ClientSet, ns, "service2")) }()
-		podNames2, svc2IP, err := startServeHostnameService(c, ns, "service2", servicePort, numPods)
+		defer func() { framework.ExpectNoError(stopServeHostnameService(f.ClientSet, ns, "service2")) }()
+		podNames2, svc2IP, err := startServeHostnameService(cs, ns, "service2", servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
 		if svc1IP == svc2IP {
 			framework.Failf("VIPs conflict: %v", svc1IP)
 		}
-		framework.ExpectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames1, svc1IP, servicePort))
-		framework.ExpectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames2, svc2IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podNames1, svc1IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podNames2, svc2IP, servicePort))
 	})
 
 	// TODO: Run this test against the userspace proxy and nodes
@@ -436,7 +435,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		serviceName := "nodeport-test"
 		ns := f.Namespace.Name
 
-		jig := NewServiceTestJig(c, serviceName)
+		jig := NewServiceTestJig(cs, serviceName)
 		nodeIP := pickNodeIP(jig.Client) // for later
 
 		By("creating service " + serviceName + " with type=NodePort in namespace " + ns)
@@ -453,7 +452,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		jig.TestReachableHTTP(nodeIP, nodePort, kubeProxyLagTimeout)
 
 		By("verifying the node port is locked")
-		hostExec := framework.LaunchHostExecPod(f.Client, f.Namespace.Name, "hostexec")
+		hostExec := framework.LaunchHostExecPod(f.ClientSet, f.Namespace.Name, "hostexec")
 		// Even if the node-ip:node-port check above passed, this hostexec pod
 		// might fall on a node with a laggy kube-proxy.
 		cmd := fmt.Sprintf(`for i in $(seq 1 300); do if ss -ant46 'sport = :%d' | grep ^LISTEN; then exit 0; fi; sleep 1; done; exit 1`, nodePort)
@@ -475,7 +474,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		}
 		loadBalancerCreateTimeout := loadBalancerCreateTimeoutDefault
 		largeClusterMinNodesNumber := 100
-		if nodes := framework.GetReadySchedulableNodesOrDie(c); len(nodes.Items) > largeClusterMinNodesNumber {
+		if nodes := framework.GetReadySchedulableNodesOrDie(cs); len(nodes.Items) > largeClusterMinNodesNumber {
 			loadBalancerCreateTimeout = loadBalancerCreateTimeoutLarge
 		}
 
@@ -492,7 +491,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		ns2 := namespacePtr.Name // LB2 in ns2 on UDP
 		framework.Logf("namespace for UDP test: %s", ns2)
 
-		jig := NewServiceTestJig(c, serviceName)
+		jig := NewServiceTestJig(cs, serviceName)
 		nodeIP := pickNodeIP(jig.Client) // for later
 
 		// Test TCP and UDP Services.  Services with the same name in different
@@ -786,7 +785,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		serviceName := "nodeports"
 		ns := f.Namespace.Name
 
-		t := NewServerTest(c, ns, serviceName)
+		t := NewServerTest(cs, ns, serviceName)
 		defer func() {
 			defer GinkgoRecover()
 			errs := t.Cleanup()
@@ -836,7 +835,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		serviceName2 := baseName + "2"
 		ns := f.Namespace.Name
 
-		t := NewServerTest(c, ns, serviceName1)
+		t := NewServerTest(cs, ns, serviceName1)
 		defer func() {
 			defer GinkgoRecover()
 			errs := t.Cleanup()
@@ -888,7 +887,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		serviceName := "nodeport-range-test"
 		ns := f.Namespace.Name
 
-		t := NewServerTest(c, ns, serviceName)
+		t := NewServerTest(cs, ns, serviceName)
 		defer func() {
 			defer GinkgoRecover()
 			errs := t.Cleanup()
@@ -927,7 +926,7 @@ var _ = framework.KubeDescribe("Services", func() {
 			}
 		}
 		By(fmt.Sprintf("changing service "+serviceName+" to out-of-range NodePort %d", outOfRangeNodePort))
-		result, err := updateService(c, ns, serviceName, func(s *api.Service) {
+		result, err := updateService(cs, ns, serviceName, func(s *api.Service) {
 			s.Spec.Ports[0].NodePort = int32(outOfRangeNodePort)
 		})
 		if err == nil {
@@ -956,7 +955,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		serviceName := "nodeport-reuse"
 		ns := f.Namespace.Name
 
-		t := NewServerTest(c, ns, serviceName)
+		t := NewServerTest(cs, ns, serviceName)
 		defer func() {
 			defer GinkgoRecover()
 			errs := t.Cleanup()
@@ -991,7 +990,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		err = t.DeleteService(serviceName)
 		Expect(err).NotTo(HaveOccurred())
 
-		hostExec := framework.LaunchHostExecPod(f.Client, f.Namespace.Name, "hostexec")
+		hostExec := framework.LaunchHostExecPod(f.ClientSet, f.Namespace.Name, "hostexec")
 		cmd := fmt.Sprintf(`! ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN`, nodePort)
 		var stdout string
 		if pollErr := wait.PollImmediate(framework.Poll, kubeProxyLagTimeout, func() (bool, error) {
@@ -1018,7 +1017,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		serviceName := "never-ready"
 		ns := f.Namespace.Name
 
-		t := NewServerTest(c, ns, serviceName)
+		t := NewServerTest(cs, ns, serviceName)
 		defer func() {
 			defer GinkgoRecover()
 			errs := t.Cleanup()
@@ -1056,7 +1055,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		svcName := fmt.Sprintf("%v.%v", serviceName, f.Namespace.Name)
 		By("waiting for endpoints of Service with DNS name " + svcName)
 
-		execPodName := createExecPodOrFail(f.Client, f.Namespace.Name, "execpod-")
+		execPodName := createExecPodOrFail(f.ClientSet, f.Namespace.Name, "execpod-")
 		cmd := fmt.Sprintf("wget -qO- %v", svcName)
 		var stdout string
 		if pollErr := wait.PollImmediate(framework.Poll, kubeProxyLagTimeout, func() (bool, error) {
@@ -1078,12 +1077,12 @@ var _ = framework.KubeDescribe("Services", func() {
 		loadBalancerCreateTimeout := loadBalancerCreateTimeoutDefault
 
 		largeClusterMinNodesNumber := 100
-		if nodes := framework.GetReadySchedulableNodesOrDie(c); len(nodes.Items) > largeClusterMinNodesNumber {
+		if nodes := framework.GetReadySchedulableNodesOrDie(cs); len(nodes.Items) > largeClusterMinNodesNumber {
 			loadBalancerCreateTimeout = loadBalancerCreateTimeoutLarge
 		}
 		namespace := f.Namespace.Name
 		serviceName := "external-local"
-		jig := NewServiceTestJig(c, serviceName)
+		jig := NewServiceTestJig(cs, serviceName)
 		By("creating a service " + namespace + "/" + namespace + " with type=LoadBalancer and annotation for local-traffic-only")
 		svc := jig.CreateTCPServiceOrFail(namespace, func(svc *api.Service) {
 			svc.Spec.Type = api.ServiceTypeLoadBalancer
@@ -1121,7 +1120,7 @@ var _ = framework.KubeDescribe("Services", func() {
 			framework.Failf("Source IP was NOT preserved")
 		}
 		By("finding nodes for all service endpoints")
-		endpoints, err := c.Endpoints(namespace).Get(serviceName)
+		endpoints, err := cs.Core().Endpoints(namespace).Get(serviceName)
 		if err != nil {
 			framework.Failf("Get endpoints for service %s/%s failed (%s)", namespace, serviceName, err)
 		}
@@ -1151,18 +1150,18 @@ var _ = framework.KubeDescribe("Services", func() {
 // updateService fetches a service, calls the update function on it,
 // and then attempts to send the updated service. It retries up to 2
 // times in the face of timeouts and conflicts.
-func updateService(c *client.Client, namespace, serviceName string, update func(*api.Service)) (*api.Service, error) {
+func updateService(c internalclientset.Interface, namespace, serviceName string, update func(*api.Service)) (*api.Service, error) {
 	var service *api.Service
 	var err error
 	for i := 0; i < 3; i++ {
-		service, err = c.Services(namespace).Get(serviceName)
+		service, err = c.Core().Services(namespace).Get(serviceName)
 		if err != nil {
 			return service, err
 		}
 
 		update(service)
 
-		service, err = c.Services(namespace).Update(service)
+		service, err = c.Core().Services(namespace).Update(service)
 
 		if !errors.IsConflict(err) && !errors.IsServerTimeout(err) {
 			return service, err
@@ -1206,11 +1205,11 @@ func getContainerPortsByPodUID(endpoints *api.Endpoints) PortsByPodUID {
 type PortsByPodName map[string][]int
 type PortsByPodUID map[types.UID][]int
 
-func translatePodNameToUIDOrFail(c *client.Client, ns string, expectedEndpoints PortsByPodName) PortsByPodUID {
+func translatePodNameToUIDOrFail(c internalclientset.Interface, ns string, expectedEndpoints PortsByPodName) PortsByPodUID {
 	portsByUID := make(PortsByPodUID)
 
 	for name, portList := range expectedEndpoints {
-		pod, err := c.Pods(ns).Get(name)
+		pod, err := c.Core().Pods(ns).Get(name)
 		if err != nil {
 			framework.Failf("failed to get pod %s, that's pretty weird. validation failed: %s", name, err)
 		}
@@ -1242,11 +1241,11 @@ func validatePortsOrFail(endpoints PortsByPodUID, expectedEndpoints PortsByPodUI
 	}
 }
 
-func validateEndpointsOrFail(c *client.Client, namespace, serviceName string, expectedEndpoints PortsByPodName) {
+func validateEndpointsOrFail(c internalclientset.Interface, namespace, serviceName string, expectedEndpoints PortsByPodName) {
 	By(fmt.Sprintf("waiting up to %v for service %s in namespace %s to expose endpoints %v", framework.ServiceStartTimeout, serviceName, namespace, expectedEndpoints))
 	i := 1
 	for start := time.Now(); time.Since(start) < framework.ServiceStartTimeout; time.Sleep(1 * time.Second) {
-		endpoints, err := c.Endpoints(namespace).Get(serviceName)
+		endpoints, err := c.Core().Endpoints(namespace).Get(serviceName)
 		if err != nil {
 			framework.Logf("Get endpoints failed (%v elapsed, ignoring for 5s): %v", time.Since(start), err)
 			continue
@@ -1270,7 +1269,7 @@ func validateEndpointsOrFail(c *client.Client, namespace, serviceName string, ex
 		i++
 	}
 
-	if pods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{}); err == nil {
+	if pods, err := c.Core().Pods(api.NamespaceAll).List(api.ListOptions{}); err == nil {
 		for _, pod := range pods.Items {
 			framework.Logf("Pod %s\t%s\t%s\t%s", pod.Namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
 		}
@@ -1305,13 +1304,13 @@ func newExecPodSpec(ns, generateName string) *api.Pod {
 // createExecPodOrFail creates a simple busybox pod in a sleep loop used as a
 // vessel for kubectl exec commands.
 // Returns the name of the created pod.
-func createExecPodOrFail(client *client.Client, ns, generateName string) string {
+func createExecPodOrFail(client internalclientset.Interface, ns, generateName string) string {
 	framework.Logf("Creating new exec pod")
 	execPod := newExecPodSpec(ns, generateName)
-	created, err := client.Pods(ns).Create(execPod)
+	created, err := client.Core().Pods(ns).Create(execPod)
 	Expect(err).NotTo(HaveOccurred())
 	err = wait.PollImmediate(framework.Poll, 5*time.Minute, func() (bool, error) {
-		retrievedPod, err := client.Pods(execPod.Namespace).Get(created.Name)
+		retrievedPod, err := client.Core().Pods(execPod.Namespace).Get(created.Name)
 		if err != nil {
 			return false, nil
 		}
@@ -1323,14 +1322,14 @@ func createExecPodOrFail(client *client.Client, ns, generateName string) string 
 
 // createExecPodOnNode launches a exec pod in the given namespace and node
 // waits until it's Running, created pod name would be returned
-func createExecPodOnNode(client *client.Client, ns, nodeName, generateName string) string {
+func createExecPodOnNode(client internalclientset.Interface, ns, nodeName, generateName string) string {
 	framework.Logf("Creating exec pod %q in namespace %q", generateName, ns)
 	execPod := newExecPodSpec(ns, generateName)
 	execPod.Spec.NodeName = nodeName
-	created, err := client.Pods(ns).Create(execPod)
+	created, err := client.Core().Pods(ns).Create(execPod)
 	Expect(err).NotTo(HaveOccurred())
 	err = wait.PollImmediate(framework.Poll, 5*time.Minute, func() (bool, error) {
-		retrievedPod, err := client.Pods(execPod.Namespace).Get(created.Name)
+		retrievedPod, err := client.Core().Pods(execPod.Namespace).Get(created.Name)
 		if err != nil {
 			return false, nil
 		}
@@ -1340,7 +1339,7 @@ func createExecPodOnNode(client *client.Client, ns, nodeName, generateName strin
 	return created.Name
 }
 
-func createPodOrFail(c *client.Client, ns, name string, labels map[string]string, containerPorts []api.ContainerPort) {
+func createPodOrFail(c internalclientset.Interface, ns, name string, labels map[string]string, containerPorts []api.ContainerPort) {
 	By(fmt.Sprintf("creating pod %s in namespace %s", name, ns))
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -1360,13 +1359,13 @@ func createPodOrFail(c *client.Client, ns, name string, labels map[string]string
 			},
 		},
 	}
-	_, err := c.Pods(ns).Create(pod)
+	_, err := c.Core().Pods(ns).Create(pod)
 	Expect(err).NotTo(HaveOccurred())
 }
 
-func deletePodOrFail(c *client.Client, ns, name string) {
+func deletePodOrFail(c internalclientset.Interface, ns, name string) {
 	By(fmt.Sprintf("deleting pod %s in namespace %s", name, ns))
-	err := c.Pods(ns).Delete(name, nil)
+	err := c.Core().Pods(ns).Delete(name, nil)
 	Expect(err).NotTo(HaveOccurred())
 }
 
@@ -1384,7 +1383,7 @@ func collectAddresses(nodes *api.NodeList, addressType api.NodeAddressType) []st
 	return ips
 }
 
-func getNodePublicIps(c *client.Client) ([]string, error) {
+func getNodePublicIps(c internalclientset.Interface) ([]string, error) {
 	nodes := framework.GetReadySchedulableNodesOrDie(c)
 
 	ips := collectAddresses(nodes, api.NodeExternalIP)
@@ -1394,7 +1393,7 @@ func getNodePublicIps(c *client.Client) ([]string, error) {
 	return ips, nil
 }
 
-func pickNodeIP(c *client.Client) string {
+func pickNodeIP(c internalclientset.Interface) string {
 	publicIps, err := getNodePublicIps(c)
 	Expect(err).NotTo(HaveOccurred())
 	if len(publicIps) == 0 {
@@ -1580,11 +1579,11 @@ func testNotReachableUDP(ip string, port int, request string) (bool, error) {
 }
 
 // Creates a replication controller that serves its hostname and a service on top of it.
-func startServeHostnameService(c *client.Client, ns, name string, port, replicas int) ([]string, string, error) {
+func startServeHostnameService(c internalclientset.Interface, ns, name string, port, replicas int) ([]string, string, error) {
 	podNames := make([]string, replicas)
 
 	By("creating service " + name + " in namespace " + ns)
-	_, err := c.Services(ns).Create(&api.Service{
+	_, err := c.Core().Services(ns).Create(&api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
 		},
@@ -1630,7 +1629,7 @@ func startServeHostnameService(c *client.Client, ns, name string, port, replicas
 	}
 	sort.StringSlice(podNames).Sort()
 
-	service, err := c.Services(ns).Get(name)
+	service, err := c.Core().Services(ns).Get(name)
 	if err != nil {
 		return podNames, "", err
 	}
@@ -1641,11 +1640,11 @@ func startServeHostnameService(c *client.Client, ns, name string, port, replicas
 	return podNames, serviceIP, nil
 }
 
-func stopServeHostnameService(c *client.Client, clientset internalclientset.Interface, ns, name string) error {
-	if err := framework.DeleteRCAndPods(c, clientset, ns, name); err != nil {
+func stopServeHostnameService(clientset internalclientset.Interface, ns, name string) error {
+	if err := framework.DeleteRCAndPods(clientset, ns, name); err != nil {
 		return err
 	}
-	if err := c.Services(ns).Delete(name); err != nil {
+	if err := clientset.Core().Services(ns).Delete(name, nil); err != nil {
 		return err
 	}
 	return nil
@@ -1655,7 +1654,7 @@ func stopServeHostnameService(c *client.Client, clientset internalclientset.Inte
 // given host and from within a pod. The host is expected to be an SSH-able node
 // in the cluster. Each pod in the service is expected to echo its name. These
 // names are compared with the given expectedPods list after a sort | uniq.
-func verifyServeHostnameServiceUp(c *client.Client, ns, host string, expectedPods []string, serviceIP string, servicePort int) error {
+func verifyServeHostnameServiceUp(c internalclientset.Interface, ns, host string, expectedPods []string, serviceIP string, servicePort int) error {
 	execPodName := createExecPodOrFail(c, ns, "execpod-")
 	defer func() {
 		deletePodOrFail(c, ns, execPodName)
@@ -1731,7 +1730,7 @@ func verifyServeHostnameServiceUp(c *client.Client, ns, host string, expectedPod
 	return nil
 }
 
-func verifyServeHostnameServiceDown(c *client.Client, host string, serviceIP string, servicePort int) error {
+func verifyServeHostnameServiceDown(c internalclientset.Interface, host string, serviceIP string, servicePort int) error {
 	command := fmt.Sprintf(
 		"curl -s --connect-timeout 2 http://%s:%d && exit 99", serviceIP, servicePort)
 
@@ -1768,12 +1767,12 @@ func httpGetNoConnectionPool(url string) (*http.Response, error) {
 type ServiceTestJig struct {
 	ID     string
 	Name   string
-	Client *client.Client
+	Client internalclientset.Interface
 	Labels map[string]string
 }
 
 // NewServiceTestJig allocates and inits a new ServiceTestJig.
-func NewServiceTestJig(client *client.Client, name string) *ServiceTestJig {
+func NewServiceTestJig(client internalclientset.Interface, name string) *ServiceTestJig {
 	j := &ServiceTestJig{}
 	j.Client = client
 	j.Name = name
@@ -1814,7 +1813,7 @@ func (j *ServiceTestJig) CreateTCPServiceWithPort(namespace string, tweak func(s
 	if tweak != nil {
 		tweak(svc)
 	}
-	result, err := j.Client.Services(namespace).Create(svc)
+	result, err := j.Client.Core().Services(namespace).Create(svc)
 	if err != nil {
 		framework.Failf("Failed to create TCP Service %q: %v", svc.Name, err)
 	}
@@ -1829,7 +1828,7 @@ func (j *ServiceTestJig) CreateTCPServiceOrFail(namespace string, tweak func(svc
 	if tweak != nil {
 		tweak(svc)
 	}
-	result, err := j.Client.Services(namespace).Create(svc)
+	result, err := j.Client.Core().Services(namespace).Create(svc)
 	if err != nil {
 		framework.Failf("Failed to create TCP Service %q: %v", svc.Name, err)
 	}
@@ -1844,7 +1843,7 @@ func (j *ServiceTestJig) CreateUDPServiceOrFail(namespace string, tweak func(svc
 	if tweak != nil {
 		tweak(svc)
 	}
-	result, err := j.Client.Services(namespace).Create(svc)
+	result, err := j.Client.Core().Services(namespace).Create(svc)
 	if err != nil {
 		framework.Failf("Failed to create UDP Service %q: %v", svc.Name, err)
 	}
@@ -1892,13 +1891,13 @@ func (j *ServiceTestJig) SanityCheckService(svc *api.Service, svcType api.Servic
 // face of timeouts and conflicts.
 func (j *ServiceTestJig) UpdateService(namespace, name string, update func(*api.Service)) (*api.Service, error) {
 	for i := 0; i < 3; i++ {
-		service, err := j.Client.Services(namespace).Get(name)
+		service, err := j.Client.Core().Services(namespace).Get(name)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to get Service %q: %v", name, err)
 		}
 
 		update(service)
-		service, err = j.Client.Services(namespace).Update(service)
+		service, err = j.Client.Core().Services(namespace).Update(service)
 		if err == nil {
 			return service, nil
 		}
@@ -1947,7 +1946,7 @@ func (j *ServiceTestJig) WaitForLoadBalancerOrFail(namespace, name string, timeo
 	var service *api.Service
 	framework.Logf("Waiting up to %v for service %q to have a LoadBalancer", timeout, name)
 	pollFunc := func() (bool, error) {
-		svc, err := j.Client.Services(namespace).Get(name)
+		svc, err := j.Client.Core().Services(namespace).Get(name)
 		if err != nil {
 			return false, err
 		}
@@ -1974,7 +1973,7 @@ func (j *ServiceTestJig) WaitForLoadBalancerDestroyOrFail(namespace, name string
 	var service *api.Service
 	framework.Logf("Waiting up to %v for service %q to have no LoadBalancer", timeout, name)
 	pollFunc := func() (bool, error) {
-		svc, err := j.Client.Services(namespace).Get(name)
+		svc, err := j.Client.Core().Services(namespace).Get(name)
 		if err != nil {
 			return false, err
 		}
@@ -2095,7 +2094,7 @@ func (j *ServiceTestJig) RunOrFail(namespace string, tweak func(rc *api.Replicat
 	if tweak != nil {
 		tweak(rc)
 	}
-	result, err := j.Client.ReplicationControllers(namespace).Create(rc)
+	result, err := j.Client.Core().ReplicationControllers(namespace).Create(rc)
 	if err != nil {
 		framework.Failf("Failed to created RC %q: %v", rc.Name, err)
 	}
@@ -2116,7 +2115,7 @@ func (j *ServiceTestJig) waitForPodsCreated(namespace string, replicas int) ([]s
 	framework.Logf("Waiting up to %v for %d pods to be created", timeout, replicas)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
 		options := api.ListOptions{LabelSelector: label}
-		pods, err := j.Client.Pods(namespace).List(options)
+		pods, err := j.Client.Core().Pods(namespace).List(options)
 		if err != nil {
 			return nil, err
 		}
@@ -2149,7 +2148,7 @@ func (j *ServiceTestJig) waitForPodsReady(namespace string, pods []string) error
 type ServiceTestFixture struct {
 	ServiceName string
 	Namespace   string
-	Client      *client.Client
+	Client      internalclientset.Interface
 
 	TestId string
 	Labels map[string]string
@@ -2160,7 +2159,7 @@ type ServiceTestFixture struct {
 	image    string
 }
 
-func NewServerTest(client *client.Client, namespace string, serviceName string) *ServiceTestFixture {
+func NewServerTest(client internalclientset.Interface, namespace string, serviceName string) *ServiceTestFixture {
 	t := &ServiceTestFixture{}
 	t.Client = client
 	t.Namespace = namespace
@@ -2213,7 +2212,7 @@ func (t *ServiceTestFixture) CreateWebserverRC(replicas int32) *api.ReplicationC
 
 // createRC creates a replication controller and records it for cleanup.
 func (t *ServiceTestFixture) createRC(rc *api.ReplicationController) (*api.ReplicationController, error) {
-	rc, err := t.Client.ReplicationControllers(t.Namespace).Create(rc)
+	rc, err := t.Client.Core().ReplicationControllers(t.Namespace).Create(rc)
 	if err == nil {
 		t.rcs[rc.Name] = true
 	}
@@ -2222,7 +2221,7 @@ func (t *ServiceTestFixture) createRC(rc *api.ReplicationController) (*api.Repli
 
 // Create a service, and record it for cleanup
 func (t *ServiceTestFixture) CreateService(service *api.Service) (*api.Service, error) {
-	result, err := t.Client.Services(t.Namespace).Create(service)
+	result, err := t.Client.Core().Services(t.Namespace).Create(service)
 	if err == nil {
 		t.services[service.Name] = true
 	}
@@ -2231,7 +2230,7 @@ func (t *ServiceTestFixture) CreateService(service *api.Service) (*api.Service, 
 
 // Delete a service, and remove it from the cleanup list
 func (t *ServiceTestFixture) DeleteService(serviceName string) error {
-	err := t.Client.Services(t.Namespace).Delete(serviceName)
+	err := t.Client.Core().Services(t.Namespace).Delete(serviceName, nil)
 	if err == nil {
 		delete(t.services, serviceName)
 	}
@@ -2243,25 +2242,25 @@ func (t *ServiceTestFixture) Cleanup() []error {
 	for rcName := range t.rcs {
 		By("stopping RC " + rcName + " in namespace " + t.Namespace)
 		// First, resize the RC to 0.
-		old, err := t.Client.ReplicationControllers(t.Namespace).Get(rcName)
+		old, err := t.Client.Core().ReplicationControllers(t.Namespace).Get(rcName)
 		if err != nil {
 			errs = append(errs, err)
 		}
 		old.Spec.Replicas = 0
-		if _, err := t.Client.ReplicationControllers(t.Namespace).Update(old); err != nil {
+		if _, err := t.Client.Core().ReplicationControllers(t.Namespace).Update(old); err != nil {
 			errs = append(errs, err)
 		}
 		// TODO(mikedanese): Wait.
 
 		// Then, delete the RC altogether.
-		if err := t.Client.ReplicationControllers(t.Namespace).Delete(rcName, nil); err != nil {
+		if err := t.Client.Core().ReplicationControllers(t.Namespace).Delete(rcName, nil); err != nil {
 			errs = append(errs, err)
 		}
 	}
 
 	for serviceName := range t.services {
 		By("deleting service " + serviceName + " in namespace " + t.Namespace)
-		err := t.Client.Services(t.Namespace).Delete(serviceName)
+		err := t.Client.Core().Services(t.Namespace).Delete(serviceName, nil)
 		if err != nil {
 			errs = append(errs, err)
 		}
@@ -2299,22 +2298,22 @@ func (j *ServiceTestJig) launchEchoserverPodOnNode(f *framework.Framework, nodeN
 	pod := newEchoServerPodSpec(podName)
 	pod.Spec.NodeName = nodeName
 	pod.ObjectMeta.Labels = j.Labels
-	podClient := f.Client.Pods(f.Namespace.Name)
+	podClient := f.ClientSet.Core().Pods(f.Namespace.Name)
 	_, err := podClient.Create(pod)
 	framework.ExpectNoError(err)
 	framework.ExpectNoError(f.WaitForPodRunning(podName))
 	framework.Logf("Echo server pod %q in namespace %q running", pod.Name, f.Namespace.Name)
 }
 
-func execSourceipTest(f *framework.Framework, c *client.Client, ns, nodeName, serviceIp string, servicePort int) (string, string) {
+func execSourceipTest(f *framework.Framework, c internalclientset.Interface, ns, nodeName, serviceIp string, servicePort int) (string, string) {
 	framework.Logf("Creating an exec pod on the same node")
-	execPodName := createExecPodOnNode(f.Client, ns, nodeName, fmt.Sprintf("execpod-sourceip-%s", nodeName))
+	execPodName := createExecPodOnNode(f.ClientSet, ns, nodeName, fmt.Sprintf("execpod-sourceip-%s", nodeName))
 	defer func() {
 		framework.Logf("Cleaning up the exec pod")
-		err := c.Pods(ns).Delete(execPodName, nil)
+		err := c.Core().Pods(ns).Delete(execPodName, nil)
 		Expect(err).NotTo(HaveOccurred())
 	}()
-	podClient := f.Client.Pods(ns)
+	podClient := f.ClientSet.Core().Pods(ns)
 	execPod, err := podClient.Get(execPodName)
 	ExpectNoError(err)
 	execPodIp := execPod.Status.PodIP

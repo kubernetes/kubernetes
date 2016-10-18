@@ -18,14 +18,15 @@ package e2e
 
 import (
 	"fmt"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/test/e2e/framework"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 var _ = framework.KubeDescribe("Logging soak [Performance] [Slow] [Disruptive]", func() {
@@ -85,7 +86,7 @@ var _ = framework.KubeDescribe("Logging soak [Performance] [Slow] [Disruptive]",
 // was produced in each and every pod at least once.  The final arg is the timeout for the test to verify all the pods got logs.
 func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname string, timeout time.Duration) {
 
-	nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
+	nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 	totalPods := len(nodes.Items)
 	Expect(totalPods).NotTo(Equal(0))
 

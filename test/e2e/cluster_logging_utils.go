@@ -73,12 +73,12 @@ func reportLogsFromFluentdPod(f *framework.Framework) error {
 
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": "fluentd-logging"}))
 	options := api.ListOptions{LabelSelector: label}
-	fluentdPods, err := f.Client.Pods(api.NamespaceSystem).List(options)
+	fluentdPods, err := f.ClientSet.Core().Pods(api.NamespaceSystem).List(options)
 
 	for _, fluentdPod := range fluentdPods.Items {
 		if fluentdPod.Spec.NodeName == synthLoggerNodeName {
 			containerName := fluentdPod.Spec.Containers[0].Name
-			logs, err := framework.GetPodLogs(f.Client, api.NamespaceSystem, fluentdPod.Name, containerName)
+			logs, err := framework.GetPodLogs(f.ClientSet, api.NamespaceSystem, fluentdPod.Name, containerName)
 			if err != nil {
 				return fmt.Errorf("Failed to get logs from fluentd pod %s due to %v", fluentdPod.Name, err)
 			}
