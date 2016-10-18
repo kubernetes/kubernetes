@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
 	"strconv"
@@ -128,6 +129,12 @@ func TestServeWSPortForward(t *testing.T) {
 
 		defer ws.Close()
 
+		p, err := strconv.ParseUint(test.port, 10, 16)
+		if err != nil {
+			t.Fatalf("%d: error parsing port string '%s': %v", i, test.port, err)
+		}
+		p16 := uint16(p)
+
 		channel, data, err := wsRead(ws)
 		if err != nil {
 			t.Fatalf("%d: read failed: expected no error: got %v", i, err)
@@ -135,8 +142,11 @@ func TestServeWSPortForward(t *testing.T) {
 		if channel != dataChannel {
 			t.Fatalf("%d: wrong channel: got %q: expected %q", i, channel, dataChannel)
 		}
-		if len(data) != 0 {
-			t.Fatalf("%d: wrong data: got %q: expected nothing", i, data)
+		if len(data) != binary.Size(p16) {
+			t.Fatalf("%d: wrong data size: got %q: expected %d", i, data, binary.Size(p16))
+		}
+		if e, a := p16, binary.LittleEndian.Uint16(data); e != a {
+			t.Fatalf("%d: wrong data: got %q: expected %s", i, data, test.port)
 		}
 
 		channel, data, err = wsRead(ws)
@@ -146,8 +156,11 @@ func TestServeWSPortForward(t *testing.T) {
 		if channel != errorChannel {
 			t.Fatalf("%d: wrong channel: got %q: expected %q", i, channel, errorChannel)
 		}
-		if len(data) != 0 {
-			t.Fatalf("%d: wrong data: got %q: expected nothing", i, data)
+		if len(data) != binary.Size(p16) {
+			t.Fatalf("%d: wrong data size: got %q: expected %d", i, data, binary.Size(p16))
+		}
+		if e, a := p16, binary.LittleEndian.Uint16(data); e != a {
+			t.Fatalf("%d: wrong data: got %q: expected %s", i, data, test.port)
 		}
 
 		if test.clientData != "" {
@@ -234,24 +247,30 @@ func TestServeWSMultiplePortForward(t *testing.T) {
 	for i, port := range ports {
 		channel, data, err := wsRead(ws)
 		if err != nil {
-			t.Fatalf("%d: read failed: expected no error: got %v", port, err)
+			t.Fatalf("%d: read failed: expected no error: got %v", i, err)
 		}
 		if int(channel) != i*2+dataChannel {
-			t.Fatalf("%d: wrong channel: got %q: expected %q", port, channel, i*2+dataChannel)
+			t.Fatalf("%d: wrong channel: got %q: expected %q", i, channel, i*2+dataChannel)
 		}
-		if len(data) != 0 {
-			t.Fatalf("%d: wrong data: got %q: expected nothing", port, data)
+		if len(data) != binary.Size(port) {
+			t.Fatalf("%d: wrong data size: got %q: expected %d", i, data, binary.Size(port))
+		}
+		if e, a := port, binary.LittleEndian.Uint16(data); e != a {
+			t.Fatalf("%d: wrong data: got %q: expected %d", i, data, port)
 		}
 
 		channel, data, err = wsRead(ws)
 		if err != nil {
-			t.Fatalf("%d: read succeeded: expected no error: got %v", port, err)
+			t.Fatalf("%d: read succeeded: expected no error: got %v", i, err)
 		}
 		if int(channel) != i*2+errorChannel {
-			t.Fatalf("%d: wrong channel: got %q: expected %q", port, channel, i*2+errorChannel)
+			t.Fatalf("%d: wrong channel: got %q: expected %q", i, channel, i*2+errorChannel)
 		}
-		if len(data) != 0 {
-			t.Fatalf("%d: wrong data: got %q: expected nothing", port, data)
+		if len(data) != binary.Size(port) {
+			t.Fatalf("%d: wrong data size: got %q: expected %d", i, data, binary.Size(port))
+		}
+		if e, a := port, binary.LittleEndian.Uint16(data); e != a {
+			t.Fatalf("%d: wrong data: got %q: expected %d", i, data, port)
 		}
 	}
 

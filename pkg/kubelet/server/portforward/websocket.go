@@ -17,6 +17,7 @@ limitations under the License.
 package portforward
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
 	"net/http"
@@ -116,8 +117,10 @@ func handleWebSocketStreams(req *http.Request, w http.ResponseWriter, portForwar
 		}
 		streamPairs[i] = &streamPair
 
-		streamPair.dataStream.Write([]byte{})
-		streamPair.errorStream.Write([]byte{})
+		portBytes := make([]byte, 2)
+		binary.LittleEndian.PutUint16(portBytes, streamPair.port)
+		streamPair.dataStream.Write(portBytes)
+		streamPair.errorStream.Write(portBytes)
 	}
 	h := &websocketStreamHandler{
 		conn:        conn,
