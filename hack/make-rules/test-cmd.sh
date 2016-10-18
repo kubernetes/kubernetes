@@ -720,6 +720,24 @@ runTests() {
   # Pre-condition: no POD exists
   create_and_use_new_namespace
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  ## kubectl edit can update the image field of a POD. tmp-editor.sh is a fake editor
+  echo -e "#!/bin/bash\n$SED -i \"s/gcr.io\/google_containers\/serve_hostname/nginx/g\" \$1" > /tmp/tmp-editor.sh
+  chmod +x /tmp/tmp-editor.sh
+  # Command
+  EDITOR=/tmp/tmp-editor.sh kubectl create --edit -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml -o yaml "${kube_flags[@]}"
+  # Post-condition: valid-pod POD is created and has image gcr.io/google_containers/serve_hostname
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
+  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'nginx:'
+  # Clean up
+  rm /tmp/tmp-editor.sh
+  kubectl delete pods/valid-pod "${kube_flags[@]}"
+
+  ## kubectl create --edit won't create anything if user makes no changes
+  [ "$(EDITOR=cat kubectl create --edit -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml -o yaml 2>&1 | grep 'Edit cancelled')" ]
+
+  ## Create valid-pod POD
+  # Pre-condition: no POD exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   kubectl create -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml "${kube_flags[@]}"
   # Post-condition: valid-pod POD is created

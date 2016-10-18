@@ -70,10 +70,8 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
 	cmd.MarkFlagRequired("filename")
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddPrinterFlags(cmd) ////////////
+	cmdutil.AddPrinterFlags(cmd)
 	cmd.Flags().Bool("edit", false, "Edit the API resource before creating")
-	// cmd.Flags().StringP("output", "o", "yaml", "Output format. If --edit is false, use -o name for shorter output (resource/name); Other usage will be ignored. If --edit is true, use one of: yaml|json. The default format is YAML.")
-	// cmd.Flags().String("output-version", "", "Only relevant if --edit=true. Output the formatted object with the given group version (for ex: 'extensions/v1beta1').")
 	cmd.Flags().Bool("windows-line-endings", gruntime.GOOS == "windows", "Only relevant if --edit=true. Use Windows line-endings (default Unix line-endings)")
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
@@ -100,7 +98,7 @@ func ValidateArgs(cmd *cobra.Command, args []string) error {
 
 func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, options *resource.FilenameOptions) error {
 	if cmdutil.GetFlagBool(cmd, "edit") {
-		return runEdit(f, out, errOut, cmd, []string{}, options, false)
+		return RunEditOnCreate(f, out, errOut, cmd, options)
 	}
 	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
 	if err != nil {
@@ -167,6 +165,14 @@ func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opt
 		return fmt.Errorf("no objects passed to create")
 	}
 	return nil
+}
+
+func RunEditOnCreate(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, options *resource.FilenameOptions) error {
+	outputFlag := cmdutil.GetFlagString(cmd, "output")
+	if outputFlag != "json" && outputFlag != "yaml" {
+		return cmdutil.UsageError(cmd, "--output must be one of json|yaml, when --edit is true")
+	}
+	return runEdit(f, out, errOut, cmd, []string{}, options, EditBeforeCreateMode)
 }
 
 // createAndRefresh creates an object from input info and refreshes info with that object

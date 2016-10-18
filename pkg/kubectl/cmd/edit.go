@@ -118,16 +118,16 @@ func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 }
 
 func RunEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
-	return runEdit(f, out, errOut, cmd, args, options, true)
+	return runEdit(f, out, errOut, cmd, args, options, NormalEditMode)
 }
 
-func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions, isUsedByEditCmd bool) error {
+func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions, editMode string) error {
 	o, err := getPrinter(cmd)
 	if err != nil {
 		return err
 	}
 
-	mapper, resourceMapper, r, cmdNamespace, err := getMapperAndResult(f, args, options, isUsedByEditCmd)
+	mapper, resourceMapper, r, cmdNamespace, err := getMapperAndResult(f, args, options, editMode)
 	if err != nil {
 		return err
 	}
@@ -196,7 +196,7 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 			if err != nil {
 				return preservedFile(err, results.file, errOut)
 			}
-			if isUsedByEditCmd || containsError {
+			if editMode == NormalEditMode || containsError {
 				if bytes.Equal(stripComments(editedDiff), stripComments(edited)) {
 					// Ugly hack right here. We will hit this either (1) when we try to
 					// save the same changes we tried to save in the previous iteration
@@ -228,13 +228,11 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 				continue
 			}
 
-			if isUsedByEditCmd {
-				// Compare content without comments
-				if bytes.Equal(stripComments(original), stripComments(edited)) {
-					os.Remove(file)
-					fmt.Fprintln(errOut, "Edit cancelled, no changes made.")
-					return nil
-				}
+			// Compare content without comments
+			if bytes.Equal(stripComments(original), stripComments(edited)) {
+				os.Remove(file)
+				fmt.Fprintln(errOut, "Edit cancelled, no changes made.")
+				return nil
 			}
 
 			lines, err := hasLines(bytes.NewBuffer(edited))
@@ -279,10 +277,13 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 				meta.SetList(updates.Object, mutatedObjects)
 			}
 
-			if isUsedByEditCmd {
+			switch editMode {
+			case NormalEditMode:
 				err = visitToPatch(originalObj, updates, mapper, resourceMapper, encoder, out, errOut, defaultVersion, &results, file)
-			} else {
+			case EditBeforeCreateMode:
 				err = visitToCreate(updates, mapper, resourceMapper, out, errOut, defaultVersion, &results, file)
+			default:
+				err = fmt.Errorf("Not supported edit mode %q", editMode)
 			}
 			if err != nil {
 				return preservedFile(err, results.file, errOut)
@@ -338,17 +339,20 @@ func getPrinter(cmd *cobra.Command) (*editPrinterOptions, error) {
 	}
 }
 
-func getMapperAndResult(f cmdutil.Factory, args []string, options *resource.FilenameOptions, isUsedByEditCmd bool) (meta.RESTMapper, *resource.Mapper, *resource.Result, string, error) {
+func getMapperAndResult(f cmdutil.Factory, args []string, options *resource.FilenameOptions, editMode string) (meta.RESTMapper, *resource.Mapper, *resource.Result, string, error) {
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return nil, nil, nil, "", err
 	}
 	var mapper meta.RESTMapper
 	var typer runtime.ObjectTyper
-	if isUsedByEditCmd {
+	switch editMode {
+	case NormalEditMode:
 		mapper, typer = f.Object()
-	} else {
+	case EditBeforeCreateMode:
 		mapper, typer, err = f.UnstructuredObject()
+	default:
+		return nil, nil, nil, "", fmt.Errorf("Not supported edit mode %q", editMode)
 	}
 	if err != nil {
 		return nil, nil, nil, "", err
@@ -366,12 +370,15 @@ func getMapperAndResult(f cmdutil.Factory, args []string, options *resource.File
 		Decoder: f.Decoder(false),
 	}
 	var b *resource.Builder
-	if isUsedByEditCmd {
+	switch editMode {
+	case NormalEditMode:
 		b = resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 			ResourceTypeOrNameArgs(true, args...).
 			Latest()
-	} else {
+	case EditBeforeCreateMode:
 		b = resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), runtime.UnstructuredJSONScheme)
+	default:
+		return nil, nil, nil, "", fmt.Errorf("Not supported edit mode %q", editMode)
 	}
 	r := b.NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options).
@@ -452,7 +459,7 @@ func visitToPatch(originalObj runtime.Object, updates *resource.Info, mapper met
 		if err != nil {
 			glog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
 			if strategicpatch.IsPreconditionFailed(err) {
-				return preservedFile(fmt.Errorf("%s", "At least one of apiVersion, kind and name was changed"), file, errOut)
+				return fmt.Errorf("%s", "At least one of apiVersion, kind and name was changed")
 			}
 			return err
 		}
@@ -475,7 +482,7 @@ func visitToCreate(updates *resource.Info, mapper meta.RESTMapper, resourceMappe
 	err := createVisitor.Visit(func(info *resource.Info, incomingErr error) error {
 		results.version = defaultVersion
 		if err := createAndRefresh(info); err != nil {
-			return preservedFile(err, file, errOut)
+			return err
 		}
 		cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, false, "created")
 		return nil
@@ -504,6 +511,11 @@ func visitAnnotation(cmd *cobra.Command, f cmdutil.Factory, updates *resource.In
 	})
 	return mutatedObjects, err
 }
+
+const (
+	NormalEditMode       = "normal_mode"
+	EditBeforeCreateMode = "edit_before_create_mode"
+)
 
 // editReason preserves a message about the reason this file must be edited again
 type editReason struct {
