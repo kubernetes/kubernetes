@@ -292,20 +292,21 @@ func (cgc *containerGC) evictPodLogsDirectories(allSourcesReady bool) error {
 			return fmt.Errorf("failed to read podLogsRootDirectory %q: %v", podLogsRootDirectory, err)
 		}
 		for _, dir := range dirs {
-			podUID := types.UID(dir.Name())
+			name := dir.Name()
+			podUID := types.UID(name)
 			if !cgc.isPodDeleted(podUID) {
 				continue
 			}
-			err := osInterface.RemoveAll(filepath.Join(podLogsRootDirectory, dir.Name()))
+			err := osInterface.RemoveAll(filepath.Join(podLogsRootDirectory, name))
 			if err != nil {
-				glog.Errorf("Failed to remove pod logs directory %q: %v", dir.Name(), err)
+				glog.Errorf("Failed to remove pod logs directory %q: %v", name, err)
 			}
 		}
 	}
 
 	// Remove dead container log symlinks.
 	// TODO(random-liu): Remove this after cluster logging supports CRI container log path.
-	logSymlinks, _ := filepath.Glob(filepath.Join(legacyContainerLogsDir, fmt.Sprintf("*.%s", legacyLogSuffix)))
+	logSymlinks, _ := osInterface.Glob(filepath.Join(legacyContainerLogsDir, fmt.Sprintf("*.%s", legacyLogSuffix)))
 	for _, logSymlink := range logSymlinks {
 		if _, err := osInterface.Stat(logSymlink); os.IsNotExist(err) {
 			err := osInterface.Remove(logSymlink)

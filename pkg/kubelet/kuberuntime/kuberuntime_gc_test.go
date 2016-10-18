@@ -17,13 +17,17 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 )
 
 func TestSandboxGC(t *testing.T) {
@@ -289,4 +293,42 @@ func TestContainerGC(t *testing.T) {
 			assert.Equal(t, &fakeContainers[remain].ContainerStatus, status)
 		}
 	}
+}
+
+// Notice that legacy container symlink is not tested since it may be deprecated soon.
+func TestPodLogDirectoryGC(t *testing.T) {
+	_, _, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+	fakeOS := m.osInterface.(*containertest.FakeOS)
+	fakePodGetter := m.containerGC.podGetter.(*fakePodGetter)
+
+	// pod log directories without corresponding pods should be removed.
+	fakePodGetter.pods["123"] = makeTestPod("foo1", "new", "123", nil)
+	fakePodGetter.pods["456"] = makeTestPod("foo2", "new", "456", nil)
+	files := []string{"123", "456", "789", "012"}
+	removed := []string{filepath.Join(podLogsRootDirectory, "789"), filepath.Join(podLogsRootDirectory, "012")}
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	fakeOS.ReadDirFn = func(string) ([]os.FileInfo, error) {
+		var fileInfos []os.FileInfo
+		for _, file := range files {
+			mockFI := containertest.NewMockFileInfo(ctrl)
+			mockFI.EXPECT().Name().Return(file)
+			fileInfos = append(fileInfos, mockFI)
+		}
+		return fileInfos, nil
+	}
+
+	// allSourcesReady == true, pod log directories without corresponding pod should be removed.
+	err = m.containerGC.evictPodLogsDirectories(true)
+	assert.NoError(t, err)
+	assert.Equal(t, removed, fakeOS.Removes)
+
+	// allSourcesReady == false, pod log directories should not be removed.
+	fakeOS.Removes = []string{}
+	err = m.containerGC.evictPodLogsDirectories(false)
+	assert.NoError(t, err)
+	assert.Empty(t, fakeOS.Removes)
 }
