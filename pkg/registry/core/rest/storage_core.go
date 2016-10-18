@@ -64,9 +64,9 @@ import (
 type LegacyRESTStorageProvider struct {
 	StorageFactory genericapiserver.StorageFactory
 	// Used for custom proxy dialing, and proxy TLS options
-	ProxyTransport http.RoundTripper
-	KubeletClient  kubeletclient.KubeletClient
-	EventTTL       time.Duration
+	ProxyTransport      http.RoundTripper
+	KubeletClientConfig kubeletclient.KubeletClientConfig
+	EventTTL            time.Duration
 
 	// ServiceClusterIPRange is used to build cluster IPs for discovery.
 	ServiceClusterIPRange *net.IPNet
@@ -135,12 +135,15 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	endpointsStorage := endpointsetcd.NewREST(restOptionsGetter(api.Resource("endpoints")))
 	restStorage.EndpointRegistry = endpoint.NewRegistry(endpointsStorage)
 
-	nodeStorage := nodeetcd.NewStorage(restOptionsGetter(api.Resource("nodes")), c.KubeletClient, c.ProxyTransport)
+	nodeStorage, err := nodeetcd.NewStorage(restOptionsGetter(api.Resource("nodes")), c.KubeletClientConfig, c.ProxyTransport)
+	if err != nil {
+		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+	}
 	restStorage.NodeRegistry = node.NewRegistry(nodeStorage.Node)
 
 	podStorage := podetcd.NewStorage(
 		restOptionsGetter(api.Resource("pods")),
-		kubeletclient.ConnectionInfoGetter(nodeStorage.Node),
+		nodeStorage.KubeletConnectionInfo,
 		c.ProxyTransport,
 		podDisruptionClient,
 	)

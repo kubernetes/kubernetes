@@ -307,7 +307,7 @@ func LogLocation(
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, nil
 	}
-	nodeScheme, nodeHost, nodePort, nodeTransport, err := connInfo.GetConnectionInfo(ctx, nodeName)
+	nodeInfo, err := connInfo.GetConnectionInfo(ctx, nodeName)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -334,12 +334,12 @@ func LogLocation(
 		params.Add("limitBytes", strconv.FormatInt(*opts.LimitBytes, 10))
 	}
 	loc := &url.URL{
-		Scheme:   nodeScheme,
-		Host:     fmt.Sprintf("%s:%d", nodeHost, nodePort),
+		Scheme:   nodeInfo.Scheme,
+		Host:     net.JoinHostPort(nodeInfo.Hostname, nodeInfo.Port),
 		Path:     fmt.Sprintf("/containerLogs/%s/%s/%s", pod.Namespace, pod.Name, container),
 		RawQuery: params.Encode(),
 	}
-	return loc, nodeTransport, nil
+	return loc, nodeInfo.Transport, nil
 }
 
 func podHasContainerWithName(pod *api.Pod, containerName string) bool {
@@ -458,7 +458,7 @@ func streamLocation(
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("pod %s does not have a host assigned", name))
 	}
-	nodeScheme, nodeHost, nodePort, nodeTransport, err := connInfo.GetConnectionInfo(ctx, nodeName)
+	nodeInfo, err := connInfo.GetConnectionInfo(ctx, nodeName)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -467,12 +467,12 @@ func streamLocation(
 		return nil, nil, err
 	}
 	loc := &url.URL{
-		Scheme:   nodeScheme,
-		Host:     fmt.Sprintf("%s:%d", nodeHost, nodePort),
+		Scheme:   nodeInfo.Scheme,
+		Host:     net.JoinHostPort(nodeInfo.Hostname, nodeInfo.Port),
 		Path:     fmt.Sprintf("/%s/%s/%s/%s", path, pod.Namespace, pod.Name, container),
 		RawQuery: params.Encode(),
 	}
-	return loc, nodeTransport, nil
+	return loc, nodeInfo.Transport, nil
 }
 
 // PortForwardLocation returns the port-forward URL for a pod.
@@ -492,14 +492,14 @@ func PortForwardLocation(
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("pod %s does not have a host assigned", name))
 	}
-	nodeScheme, nodeHost, nodePort, nodeTransport, err := connInfo.GetConnectionInfo(ctx, nodeName)
+	nodeInfo, err := connInfo.GetConnectionInfo(ctx, nodeName)
 	if err != nil {
 		return nil, nil, err
 	}
 	loc := &url.URL{
-		Scheme: nodeScheme,
-		Host:   fmt.Sprintf("%s:%d", nodeHost, nodePort),
+		Scheme: nodeInfo.Scheme,
+		Host:   net.JoinHostPort(nodeInfo.Hostname, nodeInfo.Port),
 		Path:   fmt.Sprintf("/portForward/%s/%s", pod.Namespace, pod.Name),
 	}
-	return loc, nodeTransport, nil
+	return loc, nodeInfo.Transport, nil
 }
