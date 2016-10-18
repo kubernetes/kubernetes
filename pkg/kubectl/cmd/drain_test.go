@@ -18,8 +18,11 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
@@ -31,6 +34,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -39,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/conversion"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 var node *api.Node
@@ -548,6 +553,97 @@ func TestDrain(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestDeletePods(t *testing.T) {
+	tests := []struct {
+		description       string
+		interval          time.Duration
+		timeout           time.Duration
+		expectPendingPods bool
+		expectError       bool
+		getPodFn          func(namespace, name string) (*api.Pod, error)
+	}{
+		{
+			description:       "Wait for deleting to complete",
+			interval:          100 * time.Millisecond,
+			timeout:           10 * time.Second,
+			expectPendingPods: false,
+			expectError:       false,
+			getPodFn: func(namespace, name string) (*api.Pod, error) {
+				oldPodMap, _ := createPods(false)
+				newPodMap, _ := createPods(true)
+				if newPod, found := newPodMap[name]; found {
+					// randomly return old pod
+					if rand.Float32() < 0.6 {
+						oldPod := oldPodMap[name]
+						return &oldPod, nil
+					} else {
+						// randomly return a new pod or a NotFound error
+						if rand.Float32() < 0.5 {
+							return &newPod, nil
+						} else {
+							return &api.Pod{}, apierrors.NewNotFound(unversioned.GroupResource{Resource: "pods"}, name)
+						}
+					}
+				}
+				return &api.Pod{}, apierrors.NewNotFound(unversioned.GroupResource{Resource: "pods"}, name)
+			},
+		},
+		{
+			description:       "Deleting could timeout",
+			interval:          200 * time.Millisecond,
+			timeout:           3 * time.Second,
+			expectPendingPods: true,
+			expectError:       true,
+			getPodFn: func(namespace, name string) (*api.Pod, error) {
+				oldPodMap, _ := createPods(false)
+				if oldPod, found := oldPodMap[name]; found {
+					return &oldPod, nil
+				}
+				return &api.Pod{}, errors.New(fmt.Sprintf("%q: not found", name))
+			},
+		},
+	}
+
+	o := DrainOptions{}
+	o.ifPrint = false
+	for _, test := range tests {
+		_, pods := createPods(false)
+		pendingPods, err := o.waitForDelete(pods, test.interval, test.timeout, test.getPodFn)
+
+		if test.expectError && err == nil && test.expectPendingPods && len(pendingPods) > 0 {
+			t.Fatalf("%s: unexpected non-error", test.description)
+		}
+		if !test.expectError && err != nil && !test.expectPendingPods && len(pendingPods) == 0 {
+			t.Fatalf("%s: unexpected error", test.description)
+		}
+
+	}
+
+}
+
+func createPods(ifCreateNewPods bool) (map[string]api.Pod, []api.Pod) {
+	podMap := make(map[string]api.Pod)
+	podSlice := []api.Pod{}
+	for i := 0; i < 8; i++ {
+		var uid types.UID
+		if ifCreateNewPods {
+			uid = types.UID(i)
+		} else {
+			uid = types.UID(string(i) + string(i))
+		}
+		pod := api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "pod" + string(i),
+				Namespace: "default",
+				UID:       uid,
+			},
+		}
+		podMap[pod.Name] = pod
+		podSlice = append(podSlice, pod)
+	}
+	return podMap, podSlice
 }
 
 type MyReq struct {
