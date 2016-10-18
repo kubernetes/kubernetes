@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/fields"
@@ -537,6 +538,10 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 
 			// Set the bytes field on the RawExtension
 			r.Raw = bytes
+		},
+		func(s *policy.PodDisruptionBudgetStatus, c fuzz.Continue) {
+			c.FuzzNoCustom(s) // fuzz self without calling this function again
+			s.PodDisruptionsAllowed = c.Rand.Intn(2)
 		},
 	)
 	return f
