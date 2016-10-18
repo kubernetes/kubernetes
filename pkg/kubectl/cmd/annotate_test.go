@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
+	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -390,7 +391,7 @@ func TestAnnotateErrors(t *testing.T) {
 	}
 
 	for k, testCase := range testCases {
-		f, tf, _, _ := NewAPIFactory()
+		f, tf, _, _ := cmdtesting.NewAPIFactory()
 		tf.Printer = &testPrinter{}
 		tf.Namespace = "test"
 		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}}
@@ -423,7 +424,7 @@ func TestAnnotateErrors(t *testing.T) {
 func TestAnnotateObject(t *testing.T) {
 	pods, _, _ := testData()
 
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -473,7 +474,7 @@ func TestAnnotateObject(t *testing.T) {
 func TestAnnotateObjectFromFile(t *testing.T) {
 	pods, _, _ := testData()
 
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -522,7 +523,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 }
 
 func TestAnnotateLocal(t *testing.T) {
-	f, tf, _, ns := NewAPIFactory()
+	f, tf, _, ns := cmdtesting.NewAPIFactory()
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -553,7 +554,7 @@ func TestAnnotateLocal(t *testing.T) {
 func TestAnnotateMultipleObjects(t *testing.T) {
 	pods, _, _ := testData()
 
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
