@@ -29,10 +29,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/transport"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -64,7 +62,7 @@ const (
 // To run this suite you must explicitly ask for it by setting the
 // -t/--test flag or ginkgo.focus flag.
 var _ = framework.KubeDescribe("Load capacity", func() {
-	var c *client.Client
+	var clientset internalclientset.Interface
 	var nodeCount int
 	var ns string
 	var configs []*testutils.RCConfig
@@ -74,7 +72,7 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 	// TODO add flag that allows to skip cleanup on failure
 	AfterEach(func() {
 		// Verify latency metrics
-		highLatencyRequests, err := framework.HighLatencyRequests(c)
+		highLatencyRequests, err := framework.HighLatencyRequests(clientset)
 		framework.ExpectNoError(err, "Too many instances metrics above the threshold")
 		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
 	})
@@ -99,25 +97,25 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 	f.NamespaceDeletionTimeout = time.Hour
 
 	BeforeEach(func() {
-		c = f.Client
+		clientset = f.ClientSet
 
 		// In large clusters we may get to this point but still have a bunch
 		// of nodes without Routes created. Since this would make a node
 		// unschedulable, we need to wait until all of them are schedulable.
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c))
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(clientset))
 
 		ns = f.Namespace.Name
-		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+		nodes := framework.GetReadySchedulableNodesOrDie(clientset)
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
 
 		// Terminating a namespace (deleting the remaining objects from it - which
 		// generally means events) can affect the current run. Thus we wait for all
 		// terminating namespace to be finally deleted before starting this test.
-		err := framework.CheckTestingNSDeletedExcept(c, ns)
+		err := framework.CheckTestingNSDeletedExcept(clientset, ns)
 		framework.ExpectNoError(err)
 
-		framework.ExpectNoError(framework.ResetMetrics(c))
+		framework.ExpectNoError(framework.ResetMetrics(clientset))
 	})
 
 	type Load struct {
@@ -153,7 +151,7 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 				framework.Logf("Creating services")
 				services := generateServicesForConfigs(configs)
 				for _, service := range services {
-					_, err := c.Services(service.Namespace).Create(service)
+					_, err := clientset.Core().Services(service.Namespace).Create(service)
 					framework.ExpectNoError(err)
 				}
 				framework.Logf("%v Services created.", len(services))
@@ -203,7 +201,7 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 			if createServices == "true" {
 				framework.Logf("Starting to delete services...")
 				for _, service := range services {
-					err := c.Services(ns).Delete(service.Name)
+					err := clientset.Core().Services(ns).Delete(service.Name, nil)
 					framework.ExpectNoError(err)
 				}
 				framework.Logf("Services deleted")
@@ -223,8 +221,8 @@ func createNamespaces(f *framework.Framework, nodeCount, podsPerNode int) []*api
 	return namespaces
 }
 
-func createClients(numberOfClients int) ([]*client.Client, error) {
-	clients := make([]*client.Client, numberOfClients)
+func createClients(numberOfClients int) ([]*internalclientset.Clientset, error) {
+	clients := make([]*internalclientset.Clientset, numberOfClients)
 	for i := 0; i < numberOfClients; i++ {
 		config, err := framework.LoadConfig()
 		Expect(err).NotTo(HaveOccurred())
@@ -260,7 +258,7 @@ func createClients(numberOfClients int) ([]*client.Client, error) {
 		// Transport field.
 		config.TLSClientConfig = restclient.TLSClientConfig{}
 
-		c, err := client.New(config)
+		c, err := internalclientset.NewForConfig(config)
 		if err != nil {
 			return nil, err
 		}
@@ -385,14 +383,14 @@ func scaleRC(wg *sync.WaitGroup, config *testutils.RCConfig, scalingTime time.Du
 
 	sleepUpTo(scalingTime)
 	newSize := uint(rand.Intn(config.Replicas) + config.Replicas/2)
-	framework.ExpectNoError(framework.ScaleRC(config.Client, coreClientSetFromUnversioned(config.Client), config.Namespace, config.Name, newSize, true),
+	framework.ExpectNoError(framework.ScaleRC(config.Client, config.Namespace, config.Name, newSize, true),
 		fmt.Sprintf("scaling rc %s for the first time", config.Name))
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": config.Name}))
 	options := api.ListOptions{
 		LabelSelector:   selector,
 		ResourceVersion: "0",
 	}
-	_, err := config.Client.Pods(config.Namespace).List(options)
+	_, err := config.Client.Core().Pods(config.Namespace).List(options)
 	framework.ExpectNoError(err, fmt.Sprintf("listing pods from rc %v", config.Name))
 }
 
@@ -413,17 +411,6 @@ func deleteRC(wg *sync.WaitGroup, config *testutils.RCConfig, deletingTime time.
 	if framework.TestContext.GarbageCollectorEnabled {
 		framework.ExpectNoError(framework.DeleteRCAndWaitForGC(config.Client, config.Namespace, config.Name), fmt.Sprintf("deleting rc %s", config.Name))
 	} else {
-		framework.ExpectNoError(framework.DeleteRCAndPods(config.Client, coreClientSetFromUnversioned(config.Client), config.Namespace, config.Name), fmt.Sprintf("deleting rc %s", config.Name))
+		framework.ExpectNoError(framework.DeleteRCAndPods(config.Client, config.Namespace, config.Name), fmt.Sprintf("deleting rc %s", config.Name))
 	}
-}
-
-// coreClientSetFromUnversioned adapts just enough of a a unversioned.Client to work with the scale RC function
-func coreClientSetFromUnversioned(c *client.Client) internalclientset.Interface {
-	var clientset internalclientset.Clientset
-	if c != nil {
-		clientset.CoreClient = unversionedcore.New(c.RESTClient)
-	} else {
-		clientset.CoreClient = unversionedcore.New(nil)
-	}
-	return &clientset
 }

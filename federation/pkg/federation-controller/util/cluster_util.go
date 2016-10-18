@@ -26,8 +26,8 @@ import (
 	federation_v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	"k8s.io/kubernetes/pkg/api"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -102,14 +102,18 @@ var KubeconfigGetterForSecret = func(secretName string) clientcmd.KubeconfigGett
 				return nil, fmt.Errorf("unexpected: POD_NAMESPACE env var returned empty string")
 			}
 			// Get a client to talk to the k8s apiserver, to fetch secrets from it.
-			client, err := client.NewInCluster()
+			cc, err := restclient.InClusterConfig()
+			if err != nil {
+				return nil, fmt.Errorf("error in creating in-cluster client: %s", err)
+			}
+			client, err := clientset.NewForConfig(cc)
 			if err != nil {
 				return nil, fmt.Errorf("error in creating in-cluster client: %s", err)
 			}
 			data = []byte{}
 			var secret *api.Secret
 			err = wait.PollImmediate(1*time.Second, getSecretTimeout, func() (bool, error) {
-				secret, err = client.Secrets(namespace).Get(secretName)
+				secret, err = client.Core().Secrets(namespace).Get(secretName)
 				if err == nil {
 					return true, nil
 				}

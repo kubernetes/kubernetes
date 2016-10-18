@@ -49,7 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"github.com/golang/glog"
@@ -78,8 +78,8 @@ type VolumeTestConfig struct {
 // Starts a container specified by config.serverImage and exports all
 // config.serverPorts from it. The returned pod should be used to get the server
 // IP address and create appropriate VolumeSource.
-func startVolumeServer(client *client.Client, config VolumeTestConfig) *api.Pod {
-	podClient := client.Pods(config.namespace)
+func startVolumeServer(client clientset.Interface, config VolumeTestConfig) *api.Pod {
+	podClient := client.Core().Pods(config.namespace)
 
 	portCount := len(config.serverPorts)
 	serverPodPorts := make([]api.ContainerPort, portCount)
@@ -164,8 +164,8 @@ func volumeTestCleanup(f *framework.Framework, config VolumeTestConfig) {
 
 	defer GinkgoRecover()
 
-	client := f.Client
-	podClient := client.Pods(config.namespace)
+	client := f.ClientSet
+	podClient := client.Core().Pods(config.namespace)
 
 	err := podClient.Delete(config.prefix+"-client", nil)
 	if err != nil {
@@ -194,7 +194,7 @@ func volumeTestCleanup(f *framework.Framework, config VolumeTestConfig) {
 
 // Start a client pod using given VolumeSource (exported by startVolumeServer())
 // and check that the pod sees the data from the server pod.
-func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api.VolumeSource, fsGroup *int64, expectedContent string) {
+func testVolumeClient(client clientset.Interface, config VolumeTestConfig, volume api.VolumeSource, fsGroup *int64, expectedContent string) {
 	By(fmt.Sprint("starting ", config.prefix, " client"))
 	clientPod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
@@ -242,7 +242,7 @@ func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api
 			},
 		},
 	}
-	podsNamespacer := client.Pods(config.namespace)
+	podsNamespacer := client.Core().Pods(config.namespace)
 
 	if fsGroup != nil {
 		clientPod.Spec.SecurityContext.FSGroup = fsGroup
@@ -268,9 +268,9 @@ func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api
 // Insert index.html with given content into given volume. It does so by
 // starting and auxiliary pod which writes the file there.
 // The volume must be writable.
-func injectHtml(client *client.Client, config VolumeTestConfig, volume api.VolumeSource, content string) {
+func injectHtml(client clientset.Interface, config VolumeTestConfig, volume api.VolumeSource, content string) {
 	By(fmt.Sprint("starting ", config.prefix, " injector"))
-	podClient := client.Pods(config.namespace)
+	podClient := client.Core().Pods(config.namespace)
 
 	injectPod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
@@ -353,11 +353,11 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 	// note that namespace deletion is handled by delete-namespace flag
 	clean := true
 	// filled in BeforeEach
-	var c *client.Client
+	var cs clientset.Interface
 	var namespace *api.Namespace
 
 	BeforeEach(func() {
-		c = f.Client
+		cs = f.ClientSet
 		namespace = f.Namespace
 	})
 
@@ -379,7 +379,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 					volumeTestCleanup(f, config)
 				}
 			}()
-			pod := startVolumeServer(c, config)
+			pod := startVolumeServer(cs, config)
 			serverIP := pod.Status.PodIP
 			framework.Logf("NFS server IP address: %v", serverIP)
 
@@ -391,7 +391,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 				},
 			}
 			// Must match content of test/images/volumes-tester/nfs/index.html
-			testVolumeClient(c, config, volume, nil, "Hello from NFS!")
+			testVolumeClient(cs, config, volume, nil, "Hello from NFS!")
 		})
 	})
 
@@ -413,7 +413,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 					volumeTestCleanup(f, config)
 				}
 			}()
-			pod := startVolumeServer(c, config)
+			pod := startVolumeServer(cs, config)
 			serverIP := pod.Status.PodIP
 			framework.Logf("Gluster server IP address: %v", serverIP)
 
@@ -444,11 +444,11 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 				},
 			}
 
-			endClient := c.Endpoints(config.namespace)
+			endClient := cs.Core().Endpoints(config.namespace)
 
 			defer func() {
 				if clean {
-					endClient.Delete(config.prefix + "-server")
+					endClient.Delete(config.prefix+"-server", nil)
 				}
 			}()
 
@@ -465,7 +465,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 				},
 			}
 			// Must match content of test/images/volumes-tester/gluster/index.html
-			testVolumeClient(c, config, volume, nil, "Hello from GlusterFS!")
+			testVolumeClient(cs, config, volume, nil, "Hello from GlusterFS!")
 		})
 	})
 
@@ -496,7 +496,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 					volumeTestCleanup(f, config)
 				}
 			}()
-			pod := startVolumeServer(c, config)
+			pod := startVolumeServer(cs, config)
 			serverIP := pod.Status.PodIP
 			framework.Logf("iSCSI server IP address: %v", serverIP)
 
@@ -512,7 +512,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 
 			fsGroup := int64(1234)
 			// Must match content of test/images/volumes-tester/iscsi/block.tar.gz
-			testVolumeClient(c, config, volume, &fsGroup, "Hello from iSCSI")
+			testVolumeClient(cs, config, volume, &fsGroup, "Hello from iSCSI")
 		})
 	})
 
@@ -539,7 +539,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 					volumeTestCleanup(f, config)
 				}
 			}()
-			pod := startVolumeServer(c, config)
+			pod := startVolumeServer(cs, config)
 			serverIP := pod.Status.PodIP
 			framework.Logf("Ceph server IP address: %v", serverIP)
 
@@ -558,11 +558,11 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 				},
 			}
 
-			secClient := c.Secrets(config.namespace)
+			secClient := cs.Core().Secrets(config.namespace)
 
 			defer func() {
 				if clean {
-					secClient.Delete(config.prefix + "-secret")
+					secClient.Delete(config.prefix+"-secret", nil)
 				}
 			}()
 
@@ -585,7 +585,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			fsGroup := int64(1234)
 
 			// Must match content of test/images/volumes-tester/gluster/index.html
-			testVolumeClient(c, config, volume, &fsGroup, "Hello from RBD")
+			testVolumeClient(cs, config, volume, &fsGroup, "Hello from RBD")
 
 		})
 	})
@@ -607,7 +607,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 					volumeTestCleanup(f, config)
 				}
 			}()
-			pod := startVolumeServer(c, config)
+			pod := startVolumeServer(cs, config)
 			serverIP := pod.Status.PodIP
 			framework.Logf("Ceph server IP address: %v", serverIP)
 			By("sleeping a bit to give ceph server time to initialize")
@@ -631,14 +631,14 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 
 			defer func() {
 				if clean {
-					if err := c.Secrets(namespace.Name).Delete(secret.Name); err != nil {
+					if err := cs.Core().Secrets(namespace.Name).Delete(secret.Name, nil); err != nil {
 						framework.Failf("unable to delete secret %v: %v", secret.Name, err)
 					}
 				}
 			}()
 
 			var err error
-			if secret, err = c.Secrets(namespace.Name).Create(secret); err != nil {
+			if secret, err = cs.Core().Secrets(namespace.Name).Create(secret); err != nil {
 				framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 			}
 
@@ -651,7 +651,7 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 				},
 			}
 			// Must match content of contrib/for-tests/volumes-ceph/ceph/index.html
-			testVolumeClient(c, config, volume, nil, "Hello Ceph!")
+			testVolumeClient(cs, config, volume, nil, "Hello Ceph!")
 		})
 	})
 
@@ -723,10 +723,10 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			// Insert index.html into the test volume with some random content
 			// to make sure we don't see the content from previous test runs.
 			content := "Hello from Cinder from namespace " + volumeName
-			injectHtml(c, config, volume, content)
+			injectHtml(cs, config, volume, content)
 
 			fsGroup := int64(1234)
-			testVolumeClient(c, config, volume, &fsGroup, content)
+			testVolumeClient(cs, config, volume, &fsGroup, content)
 		})
 	})
 
@@ -767,10 +767,10 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			// Insert index.html into the test volume with some random content
 			// to make sure we don't see the content from previous test runs.
 			content := "Hello from GCE PD from namespace " + volumeName
-			injectHtml(c, config, volume, content)
+			injectHtml(cs, config, volume, content)
 
 			fsGroup := int64(1234)
-			testVolumeClient(c, config, volume, &fsGroup, content)
+			testVolumeClient(cs, config, volume, &fsGroup, content)
 		})
 	})
 })

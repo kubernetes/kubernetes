@@ -100,7 +100,7 @@ func verifyRemainingObjects(f *framework.Framework, clientSet clientset.Interfac
 func gatherMetrics(f *framework.Framework) {
 	By("Gathering metrics")
 	var summary framework.TestDataSummary
-	grabber, err := metrics.NewMetricsGrabber(f.Client, false, false, true, false)
+	grabber, err := metrics.NewMetricsGrabber(f.ClientSet, false, false, true, false)
 	if err != nil {
 		framework.Logf("Failed to create MetricsGrabber. Skipping metrics gathering.")
 	} else {

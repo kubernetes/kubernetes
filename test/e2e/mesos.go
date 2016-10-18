@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -32,17 +32,17 @@ import (
 
 var _ = framework.KubeDescribe("Mesos", func() {
 	f := framework.NewDefaultFramework("pods")
-	var c *client.Client
+	var c clientset.Interface
 	var ns string
 
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("mesos/docker")
-		c = f.Client
+		c = f.ClientSet
 		ns = f.Namespace.Name
 	})
 
 	It("applies slave attributes as labels", func() {
-		nodeClient := f.Client.Nodes()
+		nodeClient := f.ClientSet.Core().Nodes()
 
 		rackA := labels.SelectorFromSet(map[string]string{"k8s.mesosphere.io/attribute-rack": "1"})
 		options := api.ListOptions{LabelSelector: rackA}
@@ -62,11 +62,10 @@ var _ = framework.KubeDescribe("Mesos", func() {
 	})
 
 	It("starts static pods on every node in the mesos cluster", func() {
-		client := f.Client
+		client := f.ClientSet
 		framework.ExpectNoError(framework.AllNodesReady(client, wait.ForeverTestTimeout), "all nodes ready")
 
-		nodelist := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-
+		nodelist := framework.GetReadySchedulableNodesOrDie(client)
 		const ns = "static-pods"
 		numpods := int32(len(nodelist.Items))
 		framework.ExpectNoError(framework.WaitForPodsRunningReady(client, ns, numpods, wait.ForeverTestTimeout, map[string]string{}),
@@ -80,7 +79,7 @@ var _ = framework.KubeDescribe("Mesos", func() {
 		// scheduled onto it.
 		By("Trying to launch a pod with a label to get a node which can launch it.")
 		podName := "with-label"
-		_, err := c.Pods(ns).Create(&api.Pod{
+		_, err := c.Core().Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
@@ -94,7 +93,7 @@ var _ = framework.KubeDescribe("Mesos", func() {
 				Containers: []api.Container{
 					{
 						Name:  podName,
-						Image: framework.GetPauseImageName(f.Client),
+						Image: framework.GetPauseImageName(f.ClientSet),
 					},
 				},
 			},
@@ -102,10 +101,10 @@ var _ = framework.KubeDescribe("Mesos", func() {
 		framework.ExpectNoError(err)
 
 		framework.ExpectNoError(framework.WaitForPodNameRunningInNamespace(c, podName, ns))
-		pod, err := c.Pods(ns).Get(podName)
+		pod, err := c.Core().Pods(ns).Get(podName)
 		framework.ExpectNoError(err)
 
-		nodeClient := f.Client.Nodes()
+		nodeClient := f.ClientSet.Core().Nodes()
 
 		// schedule onto node with rack=2 being assigned to the "public" role
 		rack2 := labels.SelectorFromSet(map[string]string{

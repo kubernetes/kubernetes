@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -45,7 +45,7 @@ var _ = framework.KubeDescribe("Resource-usage [Serial] [Slow]", func() {
 	f := framework.NewDefaultFramework("resource-usage")
 
 	BeforeEach(func() {
-		om = framework.NewRuntimeOperationMonitor(f.Client)
+		om = framework.NewRuntimeOperationMonitor(f.ClientSet)
 		// The test collects resource usage from a standalone Cadvisor pod.
 		// The Cadvsior of Kubelet has a housekeeping interval of 10s, which is too long to
 		// show the resource usage spikes. But changing its interval increases the overhead
@@ -174,11 +174,11 @@ func runResourceUsageTest(f *framework.Framework, rc *ResourceCollector, testArg
 		} else {
 			time.Sleep(reportingPeriod)
 		}
-		logPods(f.Client)
+		logPods(f.ClientSet)
 	}
 
 	By("Reporting overall resource usage")
-	logPods(f.Client)
+	logPods(f.ClientSet)
 }
 
 // logAndVerifyResource prints the resource usage as perf data and verifies whether resource usage satisfies the limit.
@@ -207,12 +207,12 @@ func logAndVerifyResource(f *framework.Framework, rc *ResourceCollector, cpuLimi
 
 	// Verify resource usage
 	if isVerify {
-		verifyMemoryLimits(f.Client, memLimits, usagePerNode)
+		verifyMemoryLimits(f.ClientSet, memLimits, usagePerNode)
 		verifyCPULimits(cpuLimits, cpuSummaryPerNode)
 	}
 }
 
-func verifyMemoryLimits(c *client.Client, expected framework.ResourceUsagePerContainer, actual framework.ResourceUsagePerNode) {
+func verifyMemoryLimits(c clientset.Interface, expected framework.ResourceUsagePerContainer, actual framework.ResourceUsagePerNode) {
 	if expected == nil {
 		return
 	}
@@ -282,7 +282,7 @@ func verifyCPULimits(expected framework.ContainersCPUSummary, actual framework.N
 	}
 }
 
-func logPods(c *client.Client) {
+func logPods(c clientset.Interface) {
 	nodeName := framework.TestContext.NodeName
 	podList, err := framework.GetKubeletRunningPods(c, nodeName)
 	if err != nil {

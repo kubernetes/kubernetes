@@ -27,16 +27,16 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 // Delete the nfs-server pod.
-func nfsServerPodCleanup(c *client.Client, config VolumeTestConfig) {
+func nfsServerPodCleanup(c clientset.Interface, config VolumeTestConfig) {
 	defer GinkgoRecover()
 
-	podClient := c.Pods(config.namespace)
+	podClient := c.Core().Pods(config.namespace)
 
 	if config.serverImage != "" {
 		podName := config.prefix + "-server"
@@ -49,14 +49,14 @@ func nfsServerPodCleanup(c *client.Client, config VolumeTestConfig) {
 
 // Delete the PV. Fail test if delete fails. If success the returned PV should
 // be nil, which prevents the AfterEach from attempting to delete it.
-func deletePersistentVolume(c *client.Client, pv *api.PersistentVolume) (*api.PersistentVolume, error) {
+func deletePersistentVolume(c clientset.Interface, pv *api.PersistentVolume) (*api.PersistentVolume, error) {
 
 	if pv == nil {
 		return nil, fmt.Errorf("PV to be deleted is nil")
 	}
 
 	framework.Logf("Deleting PersistentVolume %v", pv.Name)
-	err := c.PersistentVolumes().Delete(pv.Name)
+	err := c.Core().PersistentVolumes().Delete(pv.Name, nil)
 	if err != nil {
 		return pv, fmt.Errorf("Delete() PersistentVolume %v failed: %v", pv.Name, err)
 	}
@@ -77,16 +77,16 @@ func deletePersistentVolume(c *client.Client, pv *api.PersistentVolume) (*api.Pe
 // delete is successful the returned pvc should be nil and the pv non-nil.
 // Note: the pv and pvc are returned back to the It() caller so that the
 //   AfterEach func can delete these objects if they are not nil.
-func deletePVCandValidatePV(c *client.Client, ns string, pvc *api.PersistentVolumeClaim, pv *api.PersistentVolume) (*api.PersistentVolume, *api.PersistentVolumeClaim, error) {
+func deletePVCandValidatePV(c clientset.Interface, ns string, pvc *api.PersistentVolumeClaim, pv *api.PersistentVolume) (*api.PersistentVolume, *api.PersistentVolumeClaim, error) {
 
 	framework.Logf("Deleting PersistentVolumeClaim %v to trigger PV Recycling", pvc.Name)
-	err := c.PersistentVolumeClaims(ns).Delete(pvc.Name)
+	err := c.Core().PersistentVolumeClaims(ns).Delete(pvc.Name, nil)
 	if err != nil {
 		return pv, pvc, fmt.Errorf("Delete of PVC %v failed: %v", pvc.Name, err)
 	}
 
 	// Check that the PVC is really deleted.
-	pvc, err = c.PersistentVolumeClaims(ns).Get(pvc.Name)
+	pvc, err = c.Core().PersistentVolumeClaims(ns).Get(pvc.Name)
 	if err == nil {
 		return pv, pvc, fmt.Errorf("PVC %v deleted yet still exists", pvc.Name)
 	}
@@ -102,7 +102,7 @@ func deletePVCandValidatePV(c *client.Client, ns string, pvc *api.PersistentVolu
 	}
 
 	// Examine the pv.ClaimRef and UID. Expect nil values.
-	pv, err = c.PersistentVolumes().Get(pv.Name)
+	pv, err = c.Core().PersistentVolumes().Get(pv.Name)
 	if err != nil {
 		return pv, pvc, fmt.Errorf("Cannot re-get PersistentVolume %v:", pv.Name)
 	}
@@ -115,9 +115,9 @@ func deletePVCandValidatePV(c *client.Client, ns string, pvc *api.PersistentVolu
 }
 
 // create the PV resource. Fails test on error.
-func createPV(c *client.Client, pv *api.PersistentVolume) (*api.PersistentVolume, error) {
+func createPV(c clientset.Interface, pv *api.PersistentVolume) (*api.PersistentVolume, error) {
 
-	pv, err := c.PersistentVolumes().Create(pv)
+	pv, err := c.Core().PersistentVolumes().Create(pv)
 	if err != nil {
 		return pv, fmt.Errorf("Create PersistentVolume %v failed: %v", pv.Name, err)
 	}
@@ -126,9 +126,9 @@ func createPV(c *client.Client, pv *api.PersistentVolume) (*api.PersistentVolume
 }
 
 // create the PVC resource. Fails test on error.
-func createPVC(c *client.Client, ns string, pvc *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error) {
+func createPVC(c clientset.Interface, ns string, pvc *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error) {
 
-	pvc, err := c.PersistentVolumeClaims(ns).Create(pvc)
+	pvc, err := c.Core().PersistentVolumeClaims(ns).Create(pvc)
 	if err != nil {
 		return pvc, fmt.Errorf("Create PersistentVolumeClaim %v failed: %v", pvc.Name, err)
 	}
@@ -144,7 +144,7 @@ func createPVC(c *client.Client, ns string, pvc *api.PersistentVolumeClaim) (*ap
 // Note: in the pre-bind case the real PVC name, which is generated, is not
 //   known until after the PVC is instantiated. This is why the pvc is created
 //   before the pv.
-func createPVCPV(c *client.Client, serverIP, ns string, preBind bool) (*api.PersistentVolume, *api.PersistentVolumeClaim, error) {
+func createPVCPV(c clientset.Interface, serverIP, ns string, preBind bool) (*api.PersistentVolume, *api.PersistentVolumeClaim, error) {
 
 	var bindTo *api.PersistentVolumeClaim
 	var preBindMsg string
@@ -187,7 +187,7 @@ func createPVCPV(c *client.Client, serverIP, ns string, preBind bool) (*api.Pers
 // Note: in the pre-bind case the real PV name, which is generated, is not
 //   known until after the PV is instantiated. This is why the pv is created
 //   before the pvc.
-func createPVPVC(c *client.Client, serverIP, ns string, preBind bool) (*api.PersistentVolume, *api.PersistentVolumeClaim, error) {
+func createPVPVC(c clientset.Interface, serverIP, ns string, preBind bool) (*api.PersistentVolume, *api.PersistentVolumeClaim, error) {
 
 	preBindMsg := ""
 	if preBind {
@@ -219,7 +219,7 @@ func createPVPVC(c *client.Client, serverIP, ns string, preBind bool) (*api.Pers
 }
 
 // Wait for the pv and pvc to bind to each other. Fail test on errors.
-func waitOnPVandPVC(c *client.Client, ns string, pv *api.PersistentVolume, pvc *api.PersistentVolumeClaim) error {
+func waitOnPVandPVC(c clientset.Interface, ns string, pv *api.PersistentVolume, pvc *api.PersistentVolumeClaim) error {
 
 	// Wait for newly created PVC to bind to the PV
 	framework.Logf("Waiting for PV %v to bind to PVC %v", pv.Name, pvc.Name)
@@ -243,7 +243,7 @@ func waitOnPVandPVC(c *client.Client, ns string, pv *api.PersistentVolume, pvc *
 // reflect that these resources have been retrieved again (Get).
 // Note: the pv and pvc are returned back to the It() caller so that the
 //   AfterEach func can delete these objects if they are not nil.
-func waitAndValidatePVandPVC(c *client.Client, ns string, pv *api.PersistentVolume, pvc *api.PersistentVolumeClaim) (*api.PersistentVolume, *api.PersistentVolumeClaim, error) {
+func waitAndValidatePVandPVC(c clientset.Interface, ns string, pv *api.PersistentVolume, pvc *api.PersistentVolumeClaim) (*api.PersistentVolume, *api.PersistentVolumeClaim, error) {
 
 	var err error
 
@@ -254,12 +254,12 @@ func waitAndValidatePVandPVC(c *client.Client, ns string, pv *api.PersistentVolu
 
 	// Check that the PersistentVolume.ClaimRef is valid and matches the PVC
 	framework.Logf("Checking PersistentVolume ClaimRef is non-nil")
-	pv, err = c.PersistentVolumes().Get(pv.Name)
+	pv, err = c.Core().PersistentVolumes().Get(pv.Name)
 	if err != nil {
 		return pv, pvc, fmt.Errorf("Cannot re-get PersistentVolume %v:", pv.Name)
 	}
 
-	pvc, err = c.PersistentVolumeClaims(ns).Get(pvc.Name)
+	pvc, err = c.Core().PersistentVolumeClaims(ns).Get(pvc.Name)
 	if err != nil {
 		return pv, pvc, fmt.Errorf("Cannot re-get PersistentVolumeClaim %v:", pvc.Name)
 	}
@@ -273,7 +273,7 @@ func waitAndValidatePVandPVC(c *client.Client, ns string, pv *api.PersistentVolu
 }
 
 // Test the pod's exitcode to be zero.
-func testPodSuccessOrFail(f *framework.Framework, c *client.Client, ns string, pod *api.Pod) error {
+func testPodSuccessOrFail(f *framework.Framework, c clientset.Interface, ns string, pod *api.Pod) error {
 
 	By("Pod should terminate with exitcode 0 (success)")
 
@@ -287,10 +287,10 @@ func testPodSuccessOrFail(f *framework.Framework, c *client.Client, ns string, p
 }
 
 // Delete the passed in pod.
-func deletePod(f *framework.Framework, c *client.Client, ns string, pod *api.Pod) error {
+func deletePod(f *framework.Framework, c clientset.Interface, ns string, pod *api.Pod) error {
 
 	framework.Logf("Deleting pod %v", pod.Name)
-	err := c.Pods(ns).Delete(pod.Name, nil)
+	err := c.Core().Pods(ns).Delete(pod.Name, nil)
 	if err != nil {
 		return fmt.Errorf("Pod %v encountered a delete error: %v", pod.Name, err)
 	}
@@ -303,7 +303,7 @@ func deletePod(f *framework.Framework, c *client.Client, ns string, pod *api.Pod
 
 	// Re-get the pod to double check that it has been deleted; expect err
 	// Note: Get() writes a log error if the pod is not found
-	_, err = c.Pods(ns).Get(pod.Name)
+	_, err = c.Core().Pods(ns).Get(pod.Name)
 	if err == nil {
 		return fmt.Errorf("Pod %v has been deleted but able to re-Get the deleted pod", pod.Name)
 	}
@@ -316,7 +316,7 @@ func deletePod(f *framework.Framework, c *client.Client, ns string, pod *api.Pod
 }
 
 // Create the test pod, wait for (hopefully) success, and then delete the pod.
-func createWaitAndDeletePod(f *framework.Framework, c *client.Client, ns string, claimName string) error {
+func createWaitAndDeletePod(f *framework.Framework, c clientset.Interface, ns string, claimName string) error {
 
 	var errmsg string
 
@@ -326,7 +326,7 @@ func createWaitAndDeletePod(f *framework.Framework, c *client.Client, ns string,
 	pod := makeWritePod(ns, claimName)
 
 	// Instantiate pod (Create)
-	runPod, err := c.Pods(ns).Create(pod)
+	runPod, err := c.Core().Pods(ns).Create(pod)
 	if err != nil || runPod == nil {
 		name := ""
 		if runPod != nil {
@@ -366,7 +366,7 @@ func createWaitAndDeletePod(f *framework.Framework, c *client.Client, ns string,
 // these resources have been retrieved again (Get).
 // Note: the pv and pvc are returned back to the It() caller so that the
 //   AfterEach func can delete these objects if they are not nil.
-func completeTest(f *framework.Framework, c *client.Client, ns string, pv *api.PersistentVolume, pvc *api.PersistentVolumeClaim) (*api.PersistentVolume, *api.PersistentVolumeClaim, error) {
+func completeTest(f *framework.Framework, c clientset.Interface, ns string, pv *api.PersistentVolume, pvc *api.PersistentVolumeClaim) (*api.PersistentVolume, *api.PersistentVolumeClaim, error) {
 
 	// 1. verify that the PV and PVC have binded correctly
 	By("Validating the PV-PVC binding")
@@ -402,7 +402,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 
 	// global vars for the It() tests below
 	f := framework.NewDefaultFramework("pv")
-	var c *client.Client
+	var c clientset.Interface
 	var ns string
 	var NFSconfig VolumeTestConfig
 	var serverIP string
@@ -421,7 +421,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 	}
 
 	BeforeEach(func() {
-		c = f.Client
+		c = f.ClientSet
 		ns = f.Namespace.Name
 
 		// If it doesn't exist, create the nfs server pod in "default" ns
@@ -439,7 +439,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			if pvc != nil && len(pvc.Name) > 0 {
 				// Delete the PersistentVolumeClaim
 				framework.Logf("AfterEach: PVC %v is non-nil, deleting claim", pvc.Name)
-				err := c.PersistentVolumeClaims(ns).Delete(pvc.Name)
+				err := c.Core().PersistentVolumeClaims(ns).Delete(pvc.Name, nil)
 				if err != nil && !apierrs.IsNotFound(err) {
 					framework.Logf("AfterEach: delete of PersistentVolumeClaim %v error: %v", pvc.Name, err)
 				}
@@ -447,7 +447,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			}
 			if pv != nil && len(pv.Name) > 0 {
 				framework.Logf("AfterEach: PV %v is non-nil, deleting pv", pv.Name)
-				err := c.PersistentVolumes().Delete(pv.Name)
+				err := c.Core().PersistentVolumes().Delete(pv.Name, nil)
 				if err != nil && !apierrs.IsNotFound(err) {
 					framework.Logf("AfterEach: delete of PersistentVolume %v error: %v", pv.Name, err)
 				}

@@ -66,7 +66,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7 [Feature:Ingress]", func() {
 
 	BeforeEach(func() {
 		f.BeforeEach()
-		jig = newTestJig(f.Client)
+		jig = newTestJig(f.ClientSet)
 		ns = f.Namespace.Name
 	})
 
