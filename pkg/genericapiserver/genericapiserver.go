@@ -101,8 +101,8 @@ type GenericAPIServer struct {
 	// TODO eventually we should be able to factor this out to take place during initialization.
 	enableSwaggerSupport bool
 
-	// apiPrefix is the prefix where API groups live, usually /apis
-	apiPrefix string
+	// apiPrefixes are the prefixes where API groups live, usually only /apis
+	apiPrefixes []string
 
 	// legacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
 	// to InstallLegacyAPIGroup
@@ -139,7 +139,7 @@ type GenericAPIServer struct {
 	ProxyTransport http.RoundTripper
 
 	// Map storing information about all groups to be exposed in discovery response.
-	// The map is from name to the group.
+	// The map is from prefix/name to the group.
 	apiGroupsForDiscoveryLock sync.RWMutex
 	apiGroupsForDiscovery     map[string]unversioned.APIGroup
 
@@ -321,7 +321,7 @@ func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo 
 }
 
 // Exposes the given api group in the API.
-func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
+func (s *GenericAPIServer) InstallAPIGroup(prefix string, apiGroupInfo *APIGroupInfo) error {
 	// Do not register empty group or empty version.  Doing so claims /apis/ for the wrong entity to be returned.
 	// Catching these here places the error  much closer to its origin
 	if len(apiGroupInfo.GroupMeta.GroupVersion.Group) == 0 {
@@ -331,7 +331,18 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 		return fmt.Errorf("cannot register handler with an empty version for %#v", *apiGroupInfo)
 	}
 
-	if err := s.installAPIResources(s.apiPrefix, apiGroupInfo); err != nil {
+	foundPrefix := false
+	for _, p := range s.apiPrefixes {
+		if p == prefix {
+			foundPrefix = true
+			break
+		}
+	}
+	if !foundPrefix {
+		return fmt.Errorf("cannot register handler with an unknown API prefix %q, known are %+v", prefix, s.apiPrefixes)
+	}
+
+	if err := s.installAPIResources(prefix, apiGroupInfo); err != nil {
 		return err
 	}
 
@@ -359,24 +370,24 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 		PreferredVersion: preferedVersionForDiscovery,
 	}
 
-	s.AddAPIGroupForDiscovery(apiGroup)
-	s.HandlerContainer.Add(apiserver.NewGroupWebService(s.Serializer, s.apiPrefix+"/"+apiGroup.Name, apiGroup))
+	s.AddAPIGroupForDiscovery(prefix, apiGroup)
+	s.HandlerContainer.Add(apiserver.NewGroupWebService(s.Serializer, prefix+"/"+apiGroup.Name, apiGroup))
 
 	return nil
 }
 
-func (s *GenericAPIServer) AddAPIGroupForDiscovery(apiGroup unversioned.APIGroup) {
+func (s *GenericAPIServer) AddAPIGroupForDiscovery(prefix string, apiGroup unversioned.APIGroup) {
 	s.apiGroupsForDiscoveryLock.Lock()
 	defer s.apiGroupsForDiscoveryLock.Unlock()
 
-	s.apiGroupsForDiscovery[apiGroup.Name] = apiGroup
+	s.apiGroupsForDiscovery[prefix+"/"+apiGroup.Name] = apiGroup
 }
 
-func (s *GenericAPIServer) RemoveAPIGroupForDiscovery(groupName string) {
+func (s *GenericAPIServer) RemoveAPIGroupForDiscovery(prefix, groupName string) {
 	s.apiGroupsForDiscoveryLock.Lock()
 	defer s.apiGroupsForDiscoveryLock.Unlock()
 
-	delete(s.apiGroupsForDiscovery, groupName)
+	delete(s.apiGroupsForDiscovery, prefix+"/"+groupName)
 }
 
 func (s *GenericAPIServer) getServerAddressByClientCIDRs(req *http.Request) []unversioned.ServerAddressByClientCIDR {
@@ -484,22 +495,26 @@ func (s *GenericAPIServer) InstallOpenAPI() {
 	}
 }
 
-// DynamicApisDiscovery returns a webservice serving api group discovery.
+// DynamicApisDiscovery returns a webservice serving api group discovery for a given API prefix.
 // Note: during the server runtime apiGroupsForDiscovery might change.
-func (s *GenericAPIServer) DynamicApisDiscovery() *restful.WebService {
-	return apiserver.NewApisWebService(s.Serializer, s.apiPrefix, func(req *restful.Request) []unversioned.APIGroup {
+func (s *GenericAPIServer) DynamicApisDiscovery(prefix string) *restful.WebService {
+	return apiserver.NewApisWebService(s.Serializer, prefix, func(req *restful.Request) []unversioned.APIGroup {
 		s.apiGroupsForDiscoveryLock.RLock()
 		defer s.apiGroupsForDiscoveryLock.RUnlock()
 
 		// sort to have a deterministic order
 		sortedGroups := []unversioned.APIGroup{}
 		groupNames := make([]string, 0, len(s.apiGroupsForDiscovery))
-		for groupName := range s.apiGroupsForDiscovery {
+		for key := range s.apiGroupsForDiscovery {
+			if !strings.HasPrefix(key, prefix+"/") {
+				continue
+			}
+			groupName := key[len(prefix)+1:]
 			groupNames = append(groupNames, groupName)
 		}
 		sort.Strings(groupNames)
 		for _, groupName := range groupNames {
-			sortedGroups = append(sortedGroups, s.apiGroupsForDiscovery[groupName])
+			sortedGroups = append(sortedGroups, s.apiGroupsForDiscovery[prefix+"/"+groupName])
 		}
 
 		serverCIDR := s.getServerAddressByClientCIDRs(req.Request)
