@@ -88,6 +88,9 @@ type Join struct {
 }
 
 func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, skipPreFlight bool) (*Join, error) {
+	// Drop any proxy environment settings
+	kubeadmutil.UnsetProxyEnvironmentVariables()
+
 	if cfgPath != "" {
 		b, err := ioutil.ReadFile(cfgPath)
 		if err != nil {

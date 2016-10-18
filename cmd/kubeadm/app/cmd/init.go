@@ -145,6 +145,9 @@ type Init struct {
 }
 
 func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight bool) (*Init, error) {
+	// Drop any proxy environment settings
+	kubeadmutil.UnsetProxyEnvironmentVariables()
+
 	if cfgPath != "" {
 		b, err := ioutil.ReadFile(cfgPath)
 		if err != nil {
