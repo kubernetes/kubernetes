@@ -144,7 +144,7 @@ func cleanupKubectlInputs(fileContents string, ns string, selectors ...string) {
 	}
 	// support backward compatibility : file paths or raw json - since we are removing file path
 	// dependencies from this test.
-	framework.RunKubectlOrDieInput(fileContents, "delete", "--grace-period=0", "-f", "-", nsArg)
+	runKubectlInputRetryOrDie(fileContents, "delete", "--grace-period=0", "-f", "-", nsArg)
 	framework.AssertCleanup(ns, selectors...)
 }
 
@@ -157,6 +157,23 @@ func runKubectlRetryOrDie(args ...string) string {
 	var output string
 	for i := 0; i < 3; i++ {
 		output, err = framework.RunKubectl(args...)
+		if err == nil || !strings.Contains(err.Error(), registry.OptimisticLockErrorMsg) {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+	// Expect no errors to be present after retries are finished
+	// Copied from framework #ExecOrDie
+	framework.Logf("stdout: %q", output)
+	Expect(err).NotTo(HaveOccurred())
+	return output
+}
+
+func runKubectlInputRetryOrDie(data string, args ...string) string {
+	var err error
+	var output string
+	for i := 0; i < 3; i++ {
+		output, err = framework.NewKubectlCommand(args...).WithStdinData(data).Exec()
 		if err == nil || !strings.Contains(err.Error(), registry.OptimisticLockErrorMsg) {
 			break
 		}
