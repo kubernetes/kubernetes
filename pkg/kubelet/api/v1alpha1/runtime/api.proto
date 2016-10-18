@@ -38,8 +38,12 @@ service RuntimeService {
     // ContainerStatus returns status of the container.
     rpc ContainerStatus(ContainerStatusRequest) returns (ContainerStatusResponse) {}
 
-    // Exec executes the command in the container.
-    rpc Exec(stream ExecRequest) returns (stream ExecResponse) {}
+    // Exec prepares a streaming endpoint to execute a command in the container.
+    rpc Exec(ExecRequest) returns (ExecResponse) {}
+    // Attach prepares a streaming endpoint to attach to a running container.
+    rpc Attach(AttachRequest) returns (AttachResponse) {}
+    // PortForward prepares a streaming endpoint to forward ports from a PodSandbox.
+    rpc PortForward(PortForwardRequest) returns (PortForwardResponse) {}
 
     // UpdateRuntimeConfig updates the runtime configuration based on request
     rpc UpdateRuntimeConfig(UpdateRuntimeConfigRequest) returns (UpdateRuntimeConfigResponse) {}
@@ -607,10 +611,32 @@ message ExecRequest {
 }
 
 message ExecResponse {
-    // Streaming stdout
-    optional bytes stdout = 1;
-    // Streaming stderr
-    optional bytes stderr = 2;
+    // The fully qualified URL of the exec streaming server
+    optional string url = 1;
+}
+
+message AttachRequest {
+    // The id of the container
+    optional string container_id = 1;
+    // Streaming stdin
+    optional bytes stdin = 2;
+}
+
+message AttachResponse {
+    // The fully qualified URL of the attach streaming server
+    optional string url = 1;
+}
+
+message PortForwardRequest {
+    // The id of the container
+    optional string pod_sandbox_id = 1;
+    // The port to forward
+    repeated int32 port = 2;
+}
+
+message PortForwardResponse {
+    // The fully qualified URL of the port-forward streaming server
+    optional string url = 1;
 }
 
 message ImageFilter {
