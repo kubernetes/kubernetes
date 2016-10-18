@@ -21,7 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 )
 
-// ObjectMetaFieldsSet returns a fields that represents the ObjectMeta.
+// ObjectMetaFieldsSet returns a fields that represent the ObjectMeta.
 func ObjectMetaFieldsSet(objectMeta *api.ObjectMeta, hasNamespaceField bool) fields.Set {
 	if !hasNamespaceField {
 		return fields.Set{
@@ -32,6 +32,15 @@ func ObjectMetaFieldsSet(objectMeta *api.ObjectMeta, hasNamespaceField bool) fie
 		"metadata.name":      objectMeta.Name,
 		"metadata.namespace": objectMeta.Namespace,
 	}
+}
+
+// AdObjectMetaField add fields that represent the ObjectMeta to source.
+func AddObjectMetaFieldsSet(source fields.Set, objectMeta *api.ObjectMeta, hasNamespaceField bool) fields.Set {
+	source["metadata.name"] = objectMeta.Name
+	if hasNamespaceField {
+		source["metadata.namespace"] = objectMeta.Namespace
+	}
+	return source
 }
 
 // MergeFieldsSets merges a fields'set from fragment into the source.
