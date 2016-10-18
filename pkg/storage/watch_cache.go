@@ -181,23 +181,28 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 	if exists {
 		prevObject = previous.(runtime.Object)
 	}
-	watchCacheEvent := watchCacheEvent{event.Type, event.Object, prevObject, resourceVersion}
+	watchCacheEvent := watchCacheEvent{
+		Type:            event.Type,
+		Object:          event.Object,
+		PrevObject:      prevObject,
+		ResourceVersion: resourceVersion,
+	}
 	if w.onEvent != nil {
 		w.onEvent(watchCacheEvent)
 	}
-	w.updateCache(resourceVersion, watchCacheEvent)
+	w.updateCache(resourceVersion, &watchCacheEvent)
 	w.resourceVersion = resourceVersion
 	w.cond.Broadcast()
 	return updateFunc(event.Object)
 }
 
 // Assumes that lock is already held for write.
-func (w *watchCache) updateCache(resourceVersion uint64, event watchCacheEvent) {
+func (w *watchCache) updateCache(resourceVersion uint64, event *watchCacheEvent) {
 	if w.endIndex == w.startIndex+w.capacity {
 		// Cache is full - remove the oldest element.
 		w.startIndex++
 	}
-	w.cache[w.endIndex%w.capacity] = watchCacheElement{resourceVersion, event}
+	w.cache[w.endIndex%w.capacity] = watchCacheElement{resourceVersion, *event}
 	w.endIndex++
 }
 

@@ -707,7 +707,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent) {
 	}
 }
 
-func (c *cacheWatcher) sendWatchCacheEvent(event watchCacheEvent) {
+func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 	curObjPasses := event.Type != watch.Deleted && c.filter(event.Object)
 	oldObjPasses := false
 	if event.PrevObject != nil {
@@ -752,7 +752,7 @@ func (c *cacheWatcher) process(initEvents []watchCacheEvent, resourceVersion uin
 	const initProcessThreshold = 500 * time.Millisecond
 	startTime := time.Now()
 	for _, event := range initEvents {
-		c.sendWatchCacheEvent(event)
+		c.sendWatchCacheEvent(&event)
 	}
 	processingTime := time.Since(startTime)
 	if processingTime > initProcessThreshold {
@@ -772,7 +772,7 @@ func (c *cacheWatcher) process(initEvents []watchCacheEvent, resourceVersion uin
 		}
 		// only send events newer than resourceVersion
 		if event.ResourceVersion > resourceVersion {
-			c.sendWatchCacheEvent(event)
+			c.sendWatchCacheEvent(&event)
 		}
 	}
 }
