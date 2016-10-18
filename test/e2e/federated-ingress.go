@@ -65,7 +65,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 
 		It("should be created and deleted successfully", func() {
 			framework.SkipUnlessFederated(f.Client)
-
+			framework.SkipUnlessProviderIs("gce", "gke") // TODO: Federated ingress is not yet supported on non-GCP platforms.
 			nsName := f.FederationNamespace.Name
 			ingress := createIngressOrFail(f.FederationClientset_1_4, nsName)
 			By(fmt.Sprintf("Creation of ingress %q in namespace %q succeeded.  Deleting ingress.", ingress.Name, nsName))
@@ -87,6 +87,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 		// register clusters in federation apiserver
 		BeforeEach(func() {
 			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessProviderIs("gce", "gke") // TODO: Federated ingress is not yet supported on non-GCP platforms.
 			if federationName = os.Getenv("FEDERATION_NAME"); federationName == "" {
 				federationName = DefaultFederationName
 			}
@@ -105,7 +106,11 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 			defer func() { // Cleanup
 				By(fmt.Sprintf("Deleting ingress %q in namespace %q", ingress.Name, ns))
 				err := f.FederationClientset_1_4.Ingresses(ns).Delete(ingress.Name, &api.DeleteOptions{})
-				framework.ExpectNoError(err, "Error deleting ingress %q in namespace %q", ingress.Name, ns)
+				framework.ExpectNoError(err, "Error deleting ingress %q/%q in federation", ns, ingress.Name)
+				for clusterName, cluster := range clusters {
+					err := cluster.Ingresses(ns).Delete(ingress.Name, &api.DeleteOptions{})
+					framework.ExpectNoError(err, "Error deleting ingress %q/%q in cluster %q", ns, ingress.Name, clusterName)
+				}
 			}()
 			// wait for ingress shards being created
 			waitForIngressShardsOrFail(ns, ingress, clusters)
@@ -143,6 +148,9 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 				}
 				if jig.ing != nil {
 					deleteIngressOrFail(f.FederationClientset_1_4, ns, jig.ing.Name)
+					for clusterName, cluster := range clusters {
+						deleteClusterIngressOrFail(clusterName, cluster.Clientset, ns, jig.ing.Name)
+					}
 					jig.ing = nil
 				} else {
 					By("No ingress to delete. Ingress is nil")
@@ -264,6 +272,15 @@ func deleteIngressOrFail(clientset *federation_release_1_4.Clientset, namespace 
 	}
 	err := clientset.Ingresses(namespace).Delete(ingressName, api.NewDeleteOptions(0))
 	framework.ExpectNoError(err, "Error deleting ingress %q from namespace %q", ingressName, namespace)
+}
+
+// TODO: quinton: This is largely a cut 'n paste of the above.  Yuck! Refactor as soon as we have a common interface implmented by both fedclientset.Clientset and kubeclientset.Clientset
+func deleteClusterIngressOrFail(clusterName string, clientset *release_1_3.Clientset, namespace string, ingressName string) {
+	if clientset == nil || len(namespace) == 0 || len(ingressName) == 0 {
+		Fail(fmt.Sprintf("Internal error: invalid parameters passed to deleteClusterIngressOrFail: cluster: %q, clientset: %v, namespace: %v, ingress: %v", clusterName, clientset, namespace, ingressName))
+	}
+	err := clientset.Ingresses(namespace).Delete(ingressName, api.NewDeleteOptions(0))
+	framework.ExpectNoError(err, "Error deleting cluster ingress %q/%q from cluster %q", namespace, ingressName, clusterName)
 }
 
 func createIngressOrFail(clientset *federation_release_1_4.Clientset, namespace string) *v1beta1.Ingress {
