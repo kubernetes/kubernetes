@@ -78,6 +78,10 @@ type ConfigFactory struct {
 
 	scheduledPodPopulator *cache.Controller
 	nodePopulator         *cache.Controller
+	pvPopulator           *cache.Controller
+	pvcPopulator          *cache.Controller
+	servicePopulator      *cache.Controller
+	controllerPopulator   *cache.Controller
 
 	schedulerCache schedulercache.Cache
 
@@ -93,6 +97,9 @@ type ConfigFactory struct {
 
 	// Indicate the "all topologies" set for empty topologyKey when it's used for PreferredDuringScheduling pod anti-affinity.
 	FailureDomains string
+
+	// Equivalence class cache
+	EquivalencePodCache *scheduler.EquivalenceCache
 }
 
 // Initializes the factory.
@@ -147,15 +154,48 @@ func NewConfigFactory(client clientset.Interface, schedulerName string, hardPodA
 		},
 	)
 
+	// TODO(harryz) need to fill all the handlers here and below for equivalence cache
+	c.PVLister.Store, c.pvPopulator = cache.NewInformer(
+		c.createPersistentVolumeLW(),
+		&api.PersistentVolume{},
+		0,
+		cache.ResourceEventHandlerFuncs{},
+	)
+
+	c.PVCLister.Store, c.pvcPopulator = cache.NewInformer(
+		c.createPersistentVolumeClaimLW(),
+		&api.PersistentVolumeClaim{},
+		0,
+		cache.ResourceEventHandlerFuncs{},
+	)
+
+	c.ServiceLister.Indexer, c.servicePopulator = cache.NewIndexerInformer(
+		c.createServiceLW(),
+		&api.Service{},
+		0,
+		cache.ResourceEventHandlerFuncs{},
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+	)
+
+	c.ControllerLister.Indexer, c.controllerPopulator = cache.NewIndexerInformer(
+		c.createControllerLW(),
+		&api.ReplicationController{},
+		0,
+		cache.ResourceEventHandlerFuncs{},
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+	)
+
 	return c
 }
 
+// TODO(harryz) need to update all the handlers here and below for equivalence cache
 func (c *ConfigFactory) addPodToCache(obj interface{}) {
 	pod, ok := obj.(*api.Pod)
 	if !ok {
 		glog.Errorf("cannot convert to *api.Pod: %v", obj)
 		return
 	}
+
 	if err := c.schedulerCache.AddPod(pod); err != nil {
 		glog.Errorf("scheduler cache AddPod failed: %v", err)
 	}
@@ -172,6 +212,7 @@ func (c *ConfigFactory) updatePodInCache(oldObj, newObj interface{}) {
 		glog.Errorf("cannot convert newObj to *api.Pod: %v", newObj)
 		return
 	}
+
 	if err := c.schedulerCache.UpdatePod(oldPod, newPod); err != nil {
 		glog.Errorf("scheduler cache UpdatePod failed: %v", err)
 	}
@@ -204,6 +245,7 @@ func (c *ConfigFactory) addNodeToCache(obj interface{}) {
 		glog.Errorf("cannot convert to *api.Node: %v", obj)
 		return
 	}
+
 	if err := c.schedulerCache.AddNode(node); err != nil {
 		glog.Errorf("scheduler cache AddNode failed: %v", err)
 	}
@@ -220,6 +262,7 @@ func (c *ConfigFactory) updateNodeInCache(oldObj, newObj interface{}) {
 		glog.Errorf("cannot convert newObj to *api.Node: %v", newObj)
 		return
 	}
+
 	if err := c.schedulerCache.UpdateNode(oldNode, newNode); err != nil {
 		glog.Errorf("scheduler cache UpdateNode failed: %v", err)
 	}
@@ -407,20 +450,15 @@ func (f *ConfigFactory) Run() {
 	// Begin populating nodes.
 	go f.nodePopulator.Run(f.StopEverything)
 
-	// Watch PVs & PVCs
-	// They may be listed frequently for scheduling constraints, so provide a local up-to-date cache.
-	cache.NewReflector(f.createPersistentVolumeLW(), &api.PersistentVolume{}, f.PVLister.Store, 0).RunUntil(f.StopEverything)
-	cache.NewReflector(f.createPersistentVolumeClaimLW(), &api.PersistentVolumeClaim{}, f.PVCLister.Store, 0).RunUntil(f.StopEverything)
+	// Begin populating pv & pvc
+	go f.pvPopulator.Run(f.StopEverything)
+	go f.pvcPopulator.Run(f.StopEverything)
 
-	// Watch and cache all service objects. Scheduler needs to find all pods
-	// created by the same services or ReplicationControllers/ReplicaSets, so that it can spread them correctly.
-	// Cache this locally.
-	cache.NewReflector(f.createServiceLW(), &api.Service{}, f.ServiceLister.Indexer, 0).RunUntil(f.StopEverything)
+	// Begin populating services
+	go f.servicePopulator.Run(f.StopEverything)
 
-	// Watch and cache all ReplicationController objects. Scheduler needs to find all pods
-	// created by the same services or ReplicationControllers/ReplicaSets, so that it can spread them correctly.
-	// Cache this locally.
-	cache.NewReflector(f.createControllerLW(), &api.ReplicationController{}, f.ControllerLister.Indexer, 0).RunUntil(f.StopEverything)
+	// Begin populating controllers
+	go f.controllerPopulator.Run(f.StopEverything)
 
 	// Watch and cache all ReplicaSet objects. Scheduler needs to find all pods
 	// created by the same services or ReplicationControllers/ReplicaSets, so that it can spread them correctly.
