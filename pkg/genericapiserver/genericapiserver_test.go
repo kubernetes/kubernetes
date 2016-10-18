@@ -38,7 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver/openapi"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
-	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
+	openapicommon "k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -61,7 +61,7 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	config.APIGroupPrefix = "/apis"
 	config.EnableOpenAPISupport = true
 	config.EnableSwaggerSupport = true
-	config.OpenAPIConfig.Definitions = openapigen.OpenAPIDefinitions
+	config.OpenAPIConfig.Definitions = &openapicommon.OpenAPIDefinitions{}
 	config.OpenAPIConfig.Info = &spec.Info{
 		InfoProps: spec.InfoProps{
 			Title:   "Kubernetes",
