@@ -20,14 +20,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
 func TestUsingEmptyTokenFails(t *testing.T) {
 	// Simulates what happens when you omit --token on the CLI
-	config := newConfigWithToken("")
+	s := newSecretsWithToken("")
 
-	ok, err := UseGivenTokenIfValid(config)
+	ok, err := UseGivenTokenIfValid(s)
 	assert.False(t, ok)
 	assert.NoError(t, err)
 }
@@ -41,8 +41,8 @@ func TestTokenValidationFailures(t *testing.T) {
 	}
 
 	for _, token := range(invalidTokens) {
-		config := newConfigWithToken(token)
-		ok, err := UseGivenTokenIfValid(config)
+		s := newSecretsWithToken(token)
+		ok, err := UseGivenTokenIfValid(s)
 
 		assert.False(t, ok, "expected invalid token to return ok = false: [%s]", token)
 		assert.Error(t, err, "expected invalid token to return an error: [%s]", token)
@@ -51,19 +51,19 @@ func TestTokenValidationFailures(t *testing.T) {
 }
 
 func TestValidTokenPopulatesSecrets(t *testing.T) {
-	config := newConfigWithToken("123456.0123456789AbCdEf")
+	s := newSecretsWithToken("123456.0123456789AbCdEf")
 
-	ok, err := UseGivenTokenIfValid(config)
+	ok, err := UseGivenTokenIfValid(s)
 	assert.True(t, ok)
 	assert.NoError(t, err)
 
-	assert.Equal(t, "123456", config.Secrets.TokenID)
-	assert.Equal(t, "0123456789abcdef", config.Secrets.BearerToken)
-	assert.Equal(t, []byte("0123456789abcdef"), config.Secrets.Token)
+	assert.Equal(t, "123456", s.TokenID)
+	assert.Equal(t, "0123456789abcdef", s.BearerToken)
+	assert.Equal(t, []byte("0123456789abcdef"), s.Token)
 }
 
-func newConfigWithToken(token string) *kubeadmapi.KubeadmConfig {
-	config := new(kubeadmapi.KubeadmConfig)
-	config.Secrets.GivenToken = token
-	return config
+func newSecretsWithToken(token string) *kubeadmapi.Secrets {
+	s := new(kubeadmapi.Secrets)
+	s.GivenToken = token
+	return s
 }
