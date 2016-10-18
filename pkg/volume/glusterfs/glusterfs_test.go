@@ -21,7 +21,10 @@ import (
 	"os"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"k8s.io/kubernetes/pkg/api"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
@@ -237,62 +240,58 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	}
 }
 
-func TestAnnotations(t *testing.T) {
-	// Pass a provisioningConfigs through paramToAnnotations and back through
-	// annotationsToParam and check it did not change in the process.
-	tests := []provisioningConfig{
-		{
-		// Everything empty
+func TestParseClassParameters(t *testing.T) {
+	pv := &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			Name: "pvA",
 		},
-		{
-			// Everything with a value
-			url:             "http://localhost",
-			user:            "admin",
-			secretNamespace: "default",
-			secretName:      "gluster-secret",
-			userKey:         "mykey",
-		},
-		{
-			// No secret
-			url:             "http://localhost",
-			user:            "admin",
-			secretNamespace: "",
-			secretName:      "",
-			userKey:         "",
-		},
-	}
-
-	for i, test := range tests {
-		provisioner := &glusterfsVolumeProvisioner{
-			provisioningConfig: test,
-		}
-		deleter := &glusterfsVolumeDeleter{}
-
-		pv := &api.PersistentVolume{
-			ObjectMeta: api.ObjectMeta{
-				Name: "pv",
+		Spec: api.PersistentVolumeSpec{
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				Glusterfs: &api.GlusterfsVolumeSource{EndpointsName: "ep", Path: "vol", ReadOnly: false},
 			},
-		}
-
-		provisioner.paramToAnnotations(pv)
-		err := deleter.annotationsToParam(pv)
-		if err != nil {
-			t.Errorf("test %d failed: %v", i, err)
-		}
-		if test.url != deleter.url {
-			t.Errorf("test %d failed: expected url %q, got %q", i, test.url, deleter.url)
-		}
-		if test.user != deleter.user {
-			t.Errorf("test %d failed: expected user %q, got %q", i, test.user, deleter.user)
-		}
-		if test.userKey != deleter.userKey {
-			t.Errorf("test %d failed: expected userKey %q, got %q", i, test.userKey, deleter.userKey)
-		}
-		if test.secretNamespace != deleter.secretNamespace {
-			t.Errorf("test %d failed: expected secretNamespace %q, got %q", i, test.secretNamespace, deleter.secretNamespace)
-		}
-		if test.secretName != deleter.secretName {
-			t.Errorf("test %d failed: expected secretName %q, got %q", i, test.secretName, deleter.secretName)
-		}
+			ClaimRef: &api.ObjectReference{
+				Name: "claimA",
+			},
+		},
 	}
+	client := fake.NewSimpleClientset(pv)
+	fakeStorageParams := map[string]string{
+		"endpoint":        "http://localhost:1800/gluster",
+		"resturl":         "http://localhost:1800/gluster",
+		"restuser":        "user_with_answers",
+		"restuserkey":     "key_of_user",
+		"secretname":      "secrets_are_here",
+		"secretnamespace": "secret_land",
+		"restauthenabled": "true",
+	}
+	oldSecretReader := secretReader
+	defer func() {
+		secretReader = oldSecretReader
+	}()
+	secretReader = func(namespace, secretName string, kubeClient clientset.Interface) (string, error) {
+		return "secret_work", nil
+	}
+
+	config, err := parseClassParameters(fakeStorageParams, client)
+	assert.Nil(t, err)
+	assert.Equal(t, "http://localhost:1800/gluster", config.endpoint)
+	assert.Equal(t, "http://localhost:1800/gluster", config.url)
+	assert.Equal(t, "secret_work", config.secretValue)
+	assert.Equal(t, "user_with_answers", config.user)
+
+	noAuthParams := map[string]string{
+		"endpoint":        "http://localhost:1800/gluster",
+		"resturl":         "http://localhost:1800/gluster",
+		"restuser":        "",
+		"restuserkey":     "",
+		"secretname":      "",
+		"secretnamespace": "",
+		"restauthenabled": "false",
+	}
+	config2, err2 := parseClassParameters(noAuthParams, client)
+	assert.Nil(t, err2)
+	assert.Equal(t, "http://localhost:1800/gluster", config2.endpoint)
+	assert.Equal(t, "http://localhost:1800/gluster", config2.url)
+	assert.Equal(t, "", config2.secretValue)
+	assert.Equal(t, "", config2.user)
 }
