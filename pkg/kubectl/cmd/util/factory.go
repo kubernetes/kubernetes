@@ -940,14 +940,35 @@ func GetFirstPod(client coreclient.PodsGetter, namespace string, selector labels
 	return pod, 1, nil
 }
 
-// TODO: We need to filter out stuff like secrets.
 func (f *factory) Command() string {
 	if len(os.Args) == 0 {
 		return ""
 	}
 	base := filepath.Base(os.Args[0])
 	args := append([]string{base}, os.Args[1:]...)
+
+	if len(f.flags.Lookup("token").Value.String()) > 0 {
+		FilterOutSecrets(args, "--token=")
+	}
+	if len(f.flags.Lookup("username").Value.String()) > 0 {
+		FilterOutSecrets(args, "--username=")
+	}
+	if len(f.flags.Lookup("password").Value.String()) > 0 {
+		FilterOutSecrets(args, "--password=")
+	}
 	return strings.Join(args, " ")
+}
+
+// Hide sensitive data
+func FilterOutSecrets(args []string, name string) {
+	secretValue := "******"
+	for i := 0; i < len(args); i++ {
+		if strings.HasPrefix(args[i], name) {
+			args[i] = name + secretValue
+			return
+		}
+	}
+	return
 }
 
 func (f *factory) BindFlags(flags *pflag.FlagSet) {
