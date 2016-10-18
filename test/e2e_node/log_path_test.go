@@ -17,93 +17,103 @@ limitations under the License.
 package e2e_node
 
 import (
-	"bufio"
-	"os"
-	"strings"
-
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubelet"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
+
+const logString = "This is the expected log content of this node e2e test"
 
 var _ = framework.KubeDescribe("ContainerLogPath", func() {
 	f := framework.NewDefaultFramework("kubelet-container-log-path")
-	Describe("Pod containers", func() {
-		Context("with log printed to stdout", func() {
-			var ns, logDir string
-			var podClient *framework.PodClient
-			BeforeEach(func() {
-				podClient = f.PodClient()
-				ns = f.Namespace.Name
-				// logDir is the same with kubelet.containerLogsDir
-				logDir = "/var/log/containers/"
-			})
-			// NOTE: We can not do this check within a pod because container will try to find the source file of a symlink.
+	Describe("Pod with a container", func() {
+		Context("printed log to stdout", func() {
 			It("should print log to correct log path", func() {
-				podName := "log-pod" + string(uuid.NewUUID())
-				logContName := "log-container" + string(uuid.NewUUID())
+				podClient := f.PodClient()
+				ns := f.Namespace.Name
 
-				podObject := &api.Pod{
+				rootfsDirVolumeName := "docker-dir-vol"
+
+				rootfsDir := "/root"
+				rootDir := "/"
+				logDir := kubelet.ContainerLogsDir
+
+				logPodName := "logger-" + string(uuid.NewUUID())
+				logContName := "logger-c-" + string(uuid.NewUUID())
+				checkPodName := "checker" + string(uuid.NewUUID())
+				checkContName := "checker-c-" + string(uuid.NewUUID())
+
+				logPod := &api.Pod{
 					ObjectMeta: api.ObjectMeta{
-						Name:      podName,
-						Namespace: ns,
+						Name: logPodName,
 					},
 					Spec: api.PodSpec{
+						// this pod is expected to exit successfully
 						RestartPolicy: api.RestartPolicyNever,
 						Containers: []api.Container{
 							{
 								Image:   "gcr.io/google_containers/busybox:1.24",
 								Name:    logContName,
-								Command: []string{"sh", "-c", "for var in 1 2 3 4; do echo \"$(hostname)\"; sleep 1; done"},
+								Command: []string{"sh", "-c", "echo " + logString},
 							},
 						},
 					},
 				}
 
-				podClient.Create(podObject)
-				err := framework.WaitForPodSuccessInNamespace(f.Client, podName, ns)
-				Expect(err).NotTo(HaveOccurred(), "Failed waiting for pod %s to enter success state", podName)
+				podClient.Create(logPod)
+				err := framework.WaitForPodSuccessInNamespace(f.Client, logPodName, ns)
+				framework.ExpectNoError(err, "Failed waiting for pod: %s to enter success state", logPodName)
 
-				// Get the newly created pod
-				pod, err := podClient.Get(podName)
-				Expect(err).NotTo(HaveOccurred(), "Failed to get newly created pod %s : %v", podName, err)
+				// get containerID from created Pod
+				createdLogPod, err := podClient.Get(logPodName)
+				logConID := kubecontainer.ParseContainerID(createdLogPod.Status.ContainerStatuses[0].ContainerID)
+				framework.ExpectNoError(err, "Failed to get pod: %s", logPodName)
 
-				// Get container id of log container
-				var containerID string
-				for _, cStatus := range pod.Status.ContainerStatuses {
-					if cStatus.Name == logContName {
-						if cStatus.ContainerID != "" {
-							if idParts := strings.Split(cStatus.ContainerID, "://"); len(idParts) != 0 {
-								// remove the docker:// prefix
-								containerID = idParts[1]
-							}
-							break
-						}
-					}
+				expectedlogFile := logDir + "/" + logPodName + "_" + ns + "_" + logContName + "-" + logConID.ID + ".log"
+
+				checkPod := &api.Pod{
+					ObjectMeta: api.ObjectMeta{
+						Name: checkPodName,
+					},
+					Spec: api.PodSpec{
+						// this pod is expected to exit successfully
+						RestartPolicy: api.RestartPolicyNever,
+						Containers: []api.Container{
+							{
+								Image: "gcr.io/google_containers/busybox:1.24",
+								Name:  checkContName,
+								// if we find expected log file and contains right content, exit 0
+								// else, keep checking until test timeout
+								Command: []string{"sh", "-c", "chroot " + rootfsDir + " while true; do if [ -e " + expectedlogFile + " ] && grep -q " + logString + " " + expectedlogFile + "; then exit 0; fi; sleep 1; done"},
+								VolumeMounts: []api.VolumeMount{
+									{
+										Name:      rootfsDirVolumeName,
+										MountPath: rootfsDir,
+										ReadOnly:  true,
+									},
+								},
+							},
+						},
+						Volumes: []api.Volume{
+							{
+								Name: rootfsDirVolumeName,
+								VolumeSource: api.VolumeSource{
+									HostPath: &api.HostPathVolumeSource{
+										Path: rootDir,
+									},
+								},
+							},
+						},
+					},
 				}
-				// Should be able to get container ID
-				Expect(containerID == "").NotTo(Equal(true), "Failed get container ID from statues: %v", pod.Status.ContainerStatuses)
 
-				// Read expected log file, which name is: <pod_name>_<pod_namespace>_<container_name>-<container_id>.log
-				var logLines []string
-				containerLogFile := logDir + podName + "_" + ns + "_" + logContName + "-" + containerID + ".log"
-				inFile, err := os.Open(containerLogFile)
-				defer inFile.Close()
-				Expect(err).NotTo(HaveOccurred(), "Failed read expected log file %s : %v", containerLogFile, err)
-
-				scanner := bufio.NewScanner(inFile)
-				scanner.Split(bufio.ScanLines)
-
-				for scanner.Scan() {
-					// Should contain the right log content
-					Expect(strings.Contains(scanner.Text(), pod.Spec.Hostname)).To(Equal(true))
-					logLines = append(logLines, scanner.Text())
-				}
-				// Should only contain right number of log lines
-				Expect(len(logLines)).To(Equal(4), "Unexpected number of lines in log file")
+				podClient.Create(checkPod)
+				err = framework.WaitForPodSuccessInNamespace(f.Client, checkPodName, ns)
+				framework.ExpectNoError(err, "Failed waiting for pod: %s to enter success state", checkPodName)
 			})
 		})
 	})
