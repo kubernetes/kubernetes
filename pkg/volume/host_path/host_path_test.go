@@ -161,7 +161,11 @@ func TestProvisioner(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	creater, err := plug.NewProvisioner(volume.VolumeOptions{Capacity: resource.MustParse("1Gi"), PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete})
+	options := volume.VolumeOptions{
+		PVC: volumetest.CreateTestPVC("1Gi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
+		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
+	}
+	creater, err := plug.NewProvisioner(options)
 	if err != nil {
 		t.Errorf("Failed to make a new Provisioner: %v", err)
 	}
