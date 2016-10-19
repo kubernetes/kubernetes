@@ -40,11 +40,17 @@ const (
 // be loaded or the initial listen call fails. The actual server loop (stoppable by closing
 // stopCh) runs in a go routine, i.e. serveSecurely does not block.
 func (s *GenericAPIServer) serveSecurely(stopCh <-chan struct{}) error {
+	namedCerts, err := getNamedCertificateMap(s.SecureServingInfo.SNICerts)
+	if err != nil {
+		return fmt.Errorf("unable to load SNI certificates: %v", err)
+	}
+
 	secureServer := &http.Server{
 		Addr:           s.SecureServingInfo.BindAddress,
 		Handler:        s.Handler,
 		MaxHeaderBytes: 1 << 20,
 		TLSConfig: &tls.Config{
+			NameToCertificate: namedCerts,
 			// Can't use SSLv3 because of POODLE and BEAST
 			// Can't use TLSv1.0 because of POODLE and BEAST using CBC cipher
 			// Can't use TLSv1.1 because of RC4 cipher usage
@@ -54,13 +60,20 @@ func (s *GenericAPIServer) serveSecurely(stopCh <-chan struct{}) error {
 		},
 	}
 
-	var err error
 	if len(s.SecureServingInfo.ServerCert.CertFile) != 0 || len(s.SecureServingInfo.ServerCert.KeyFile) != 0 {
 		secureServer.TLSConfig.Certificates = make([]tls.Certificate, 1)
 		secureServer.TLSConfig.Certificates[0], err = tls.LoadX509KeyPair(s.SecureServingInfo.ServerCert.CertFile, s.SecureServingInfo.ServerCert.KeyFile)
 		if err != nil {
 			return fmt.Errorf("unable to load server certificate: %v", err)
 		}
+	}
+
+	// append all named certs. Otherwise, the go tls stack will think no SNI processing
+	// is necessary because there is only one cert anyway.
+	// Moreover, if ServerCert.CertFile/ServerCert.KeyFile are not set, the first SNI
+	// cert will become the default cert. That's what we expect anyway.
+	for _, c := range namedCerts {
+		secureServer.TLSConfig.Certificates = append(secureServer.TLSConfig.Certificates, *c)
 	}
 
 	if len(s.SecureServingInfo.ClientCA) > 0 {

@@ -109,7 +109,7 @@ type GenericAPIServer struct {
 	// The registered APIs
 	HandlerContainer *genericmux.APIContainer
 
-	SecureServingInfo   *ServingInfo
+	SecureServingInfo   *SecureServingInfo
 	InsecureServingInfo *ServingInfo
 
 	// numerical ports, set after listening
