@@ -23,9 +23,11 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -604,4 +606,64 @@ waitLoop:
 		return fmt.Errorf("Timeout while waiting for pods with labels %q to be running", label.String())
 	}
 	return nil
+}
+
+type TestNodePreparer interface {
+	PrepareNodes() error
+	CleanupNodes() error
+}
+
+type PrepareNodeStrategy interface {
+	PreparePatch(node *api.Node) []byte
+	CleanupNode(node *api.Node) *api.Node
+}
+
+type TrivialNodePrepareStrategy struct{}
+
+func (*TrivialNodePrepareStrategy) PreparePatch(*api.Node) []byte {
+	return []byte{}
+}
+
+func (*TrivialNodePrepareStrategy) CleanupNode(node *api.Node) *api.Node {
+	nodeCopy := *node
+	return &nodeCopy
+}
+
+func DoPrepareNode(client clientset.Interface, node *api.Node, strategy PrepareNodeStrategy) error {
+	var err error
+	patch := strategy.PreparePatch(node)
+	if len(patch) == 0 {
+		return nil
+	}
+	for attempt := 0; attempt < retries; attempt++ {
+		if _, err = client.Core().Nodes().Patch(node.Name, api.MergePatchType, []byte(patch)); err == nil {
+			return nil
+		}
+		if !apierrs.IsConflict(err) {
+			return fmt.Errorf("Error while applying patch %v to Node %v: %v", string(patch), node.Name, err)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	return fmt.Errorf("To many conflicts when applying patch %v to Node %v", string(patch), node.Name)
+}
+
+func DoCleanupNode(client clientset.Interface, nodeName string, strategy PrepareNodeStrategy) error {
+	for attempt := 0; attempt < retries; attempt++ {
+		node, err := client.Core().Nodes().Get(nodeName)
+		if err != nil {
+			return fmt.Errorf("Skipping cleanup of Node: failed to get Node %v: %v", nodeName, err)
+		}
+		updatedNode := strategy.CleanupNode(node)
+		if api.Semantic.DeepEqual(node, updatedNode) {
+			return nil
+		}
+		if _, err = client.Core().Nodes().Update(updatedNode); err == nil {
+			return nil
+		}
+		if !apierrs.IsConflict(err) {
+			return fmt.Errorf("Error when updating Node %v: %v", nodeName, err)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	return fmt.Errorf("To many conflicts when trying to cleanup Node %v", nodeName)
 }
