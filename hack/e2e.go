@@ -25,6 +25,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/signal"
 	"os/user"
 	"path/filepath"
 	"strconv"
@@ -159,6 +160,21 @@ func main() {
 		log.Fatalf("Error creating deployer: %v", err)
 	}
 
+	if *down {
+		// listen for signals such as ^C and gracefully attempt to clean up
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt)
+		go func() {
+			for range c {
+				log.Print("Captured ^C, gracefully attempting to cleanup resources..")
+				if err := deploy.Down(); err != nil {
+					log.Printf("Tearing down deployment failed: %v", err)
+					os.Exit(1)
+				}
+			}
+		}()
+	}
+
 	if err := run(deploy); err != nil {
 		log.Fatalf("Something went wrong: %s", err)
 	}
@@ -207,9 +223,32 @@ func run(deploy deployer) error {
 	}
 
 	if *up {
+		// If we tried to bring the cluster up, make a courtesy
+		// attempt to bring it down so we're not leaving resources around.
+		//
+		// TODO: We should try calling deploy.Down exactly once. Though to
+		// stop the leaking resources for now, we want to be on the safe side
+		// and call it explictly in defer if the other one is not called.
+		if *down {
+			defer xmlWrap("Deferred TearDown", deploy.Down)
+		}
 		// Start the cluster using this version.
 		if err := xmlWrap("Up", deploy.Up); err != nil {
 			return fmt.Errorf("starting e2e cluster: %s", err)
+		}
+		if *dump != "" {
+			cmd := exec.Command("./cluster/kubectl.sh", "--match-server-version=false", "get", "nodes", "-oyaml")
+			b, err := cmd.CombinedOutput()
+			if *verbose {
+				log.Printf("kubectl get nodes:\n%s", string(b))
+			}
+			if err == nil {
+				if err := ioutil.WriteFile(filepath.Join(*dump, "nodes.yaml"), b, 0644); err != nil {
+					errs = appendError(errs, fmt.Errorf("error writing nodes.yaml: %v", err))
+				}
+			} else {
+				errs = appendError(errs, fmt.Errorf("error running get nodes: %v", err))
+			}
 		}
 	}
 
@@ -563,6 +602,15 @@ func KubemarkTest() error {
 	if err != nil {
 		return err
 	}
+	// If we tried to bring the Kubemark cluster up, make a courtesy
+	// attempt to bring it down so we're not leaving resources around.
+	//
+	// TODO: We should try calling stop-kubemark exactly once. Though to
+	// stop the leaking resources for now, we want to be on the safe side
+	// and call it explictly in defer if the other one is not called.
+	defer xmlWrap("Deferred Stop kubemark", func() error {
+		return finishRunning("Stop kubemark", exec.Command("./test/kubemark/stop-kubemark.sh"))
+	})
 
 	// Start new run
 	backups := []string{"NUM_NODES", "MASTER_SIZE"}
@@ -576,7 +624,9 @@ func KubemarkTest() error {
 	}
 	os.Setenv("NUM_NODES", os.Getenv("KUBEMARK_NUM_NODES"))
 	os.Setenv("MASTER_SIZE", os.Getenv("KUBEMARK_MASTER_SIZE"))
-	err = finishRunning("Start Kubemark", exec.Command("./test/kubemark/start-kubemark.sh"))
+	err = xmlWrap("Start kubemark", func() error {
+		return finishRunning("Start kubemark", exec.Command("./test/kubemark/start-kubemark.sh"))
+	})
 	if err != nil {
 		return err
 	}
@@ -593,7 +643,9 @@ func KubemarkTest() error {
 		return err
 	}
 
-	err = finishRunning("Stop kubemark", exec.Command("./test/kubemark/stop-kubemark.sh"))
+	err = xmlWrap("Stop kubemark", func() error {
+		return finishRunning("Stop kubemark", exec.Command("./test/kubemark/stop-kubemark.sh"))
+	})
 	if err != nil {
 		return err
 	}

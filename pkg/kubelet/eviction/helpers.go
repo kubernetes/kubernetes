@@ -256,20 +256,39 @@ func parseGracePeriods(expr string) (map[Signal]time.Duration, error) {
 }
 
 // parseMinimumReclaims parses the minimum reclaim statements
-func parseMinimumReclaims(expr string) (map[Signal]resource.Quantity, error) {
+func parseMinimumReclaims(expr string) (map[Signal]ThresholdValue, error) {
 	if len(expr) == 0 {
 		return nil, nil
 	}
-	results := map[Signal]resource.Quantity{}
+	results := map[Signal]ThresholdValue{}
 	statements := strings.Split(expr, ",")
 	for _, statement := range statements {
 		parts := strings.Split(statement, "=")
 		if len(parts) != 2 {
-			return nil, fmt.Errorf("invalid eviction minimum reclaim syntax: %v, expected <signal>=<quantity>", statement)
+			return nil, fmt.Errorf("invalid eviction minimum reclaim syntax: %v, expected <signal>=<value>", statement)
 		}
 		signal := Signal(parts[0])
 		if !validSignal(signal) {
 			return nil, fmt.Errorf(unsupportedEvictionSignal, signal)
+		}
+
+		quantityValue := parts[1]
+		if strings.HasSuffix(quantityValue, "%") {
+			percentage, err := parsePercentage(quantityValue)
+			if err != nil {
+				return nil, err
+			}
+			if percentage <= 0 {
+				return nil, fmt.Errorf("eviction percentage minimum reclaim %v must be positive: %s", signal, quantityValue)
+			}
+			// check against duplicate statements
+			if _, found := results[signal]; found {
+				return nil, fmt.Errorf("duplicate eviction minimum reclaim specified for %v", signal)
+			}
+			results[signal] = ThresholdValue{
+				Percentage: percentage,
+			}
+			continue
 		}
 		// check against duplicate statements
 		if _, found := results[signal]; found {
@@ -282,7 +301,9 @@ func parseMinimumReclaims(expr string) (map[Signal]resource.Quantity, error) {
 		if err != nil {
 			return nil, err
 		}
-		results[signal] = quantity
+		results[signal] = ThresholdValue{
+			Quantity: &quantity,
+		}
 	}
 	return results, nil
 }
@@ -600,6 +621,7 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider) (signalObserv
 		result[SignalMemoryAvailable] = signalObservation{
 			available: resource.NewQuantity(int64(*memory.AvailableBytes), resource.BinarySI),
 			capacity:  resource.NewQuantity(int64(*memory.AvailableBytes+*memory.WorkingSetBytes), resource.BinarySI),
+			time:      memory.Time,
 		}
 	}
 	if nodeFs := summary.Node.Fs; nodeFs != nil {
@@ -607,12 +629,14 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider) (signalObserv
 			result[SignalNodeFsAvailable] = signalObservation{
 				available: resource.NewQuantity(int64(*nodeFs.AvailableBytes), resource.BinarySI),
 				capacity:  resource.NewQuantity(int64(*nodeFs.CapacityBytes), resource.BinarySI),
+				// TODO: add timestamp to stat (see memory stat)
 			}
 		}
 		if nodeFs.InodesFree != nil && nodeFs.Inodes != nil {
 			result[SignalNodeFsInodesFree] = signalObservation{
 				available: resource.NewQuantity(int64(*nodeFs.InodesFree), resource.BinarySI),
 				capacity:  resource.NewQuantity(int64(*nodeFs.Inodes), resource.BinarySI),
+				// TODO: add timestamp to stat (see memory stat)
 			}
 		}
 	}
@@ -622,11 +646,13 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider) (signalObserv
 				result[SignalImageFsAvailable] = signalObservation{
 					available: resource.NewQuantity(int64(*imageFs.AvailableBytes), resource.BinarySI),
 					capacity:  resource.NewQuantity(int64(*imageFs.CapacityBytes), resource.BinarySI),
+					// TODO: add timestamp to stat (see memory stat)
 				}
 				if imageFs.InodesFree != nil && imageFs.Inodes != nil {
 					result[SignalImageFsInodesFree] = signalObservation{
 						available: resource.NewQuantity(int64(*imageFs.InodesFree), resource.BinarySI),
 						capacity:  resource.NewQuantity(int64(*imageFs.Inodes), resource.BinarySI),
+						// TODO: add timestamp to stat (see memory stat)
 					}
 				}
 			}
@@ -650,7 +676,7 @@ func thresholdsMet(thresholds []Threshold, observations signalObservations, enfo
 		quantity := getThresholdQuantity(threshold.Value, observed.capacity)
 		// if enforceMinReclaim is specified, we compare relative to value - minreclaim
 		if enforceMinReclaim && threshold.MinReclaim != nil {
-			quantity.Add(*threshold.MinReclaim)
+			quantity.Add(*getThresholdQuantity(*threshold.MinReclaim, observed.capacity))
 		}
 		thresholdResult := quantity.Cmp(*observed.available)
 		switch threshold.Operator {
@@ -658,6 +684,23 @@ func thresholdsMet(thresholds []Threshold, observations signalObservations, enfo
 			thresholdMet = thresholdResult > 0
 		}
 		if thresholdMet {
+			results = append(results, threshold)
+		}
+	}
+	return results
+}
+
+func thresholdsUpdatedStats(thresholds []Threshold, observations, lastObservations signalObservations) []Threshold {
+	results := []Threshold{}
+	for i := range thresholds {
+		threshold := thresholds[i]
+		observed, found := observations[threshold.Signal]
+		if !found {
+			glog.Warningf("eviction manager: no observation found for eviction signal %v", threshold.Signal)
+			continue
+		}
+		last, found := lastObservations[threshold.Signal]
+		if !found || observed.time.IsZero() || observed.time.After(last.time.Time) {
 			results = append(results, threshold)
 		}
 	}

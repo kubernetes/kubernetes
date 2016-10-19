@@ -370,13 +370,26 @@ function test-teardown() {
   # instances, but we can safely delete the cluster before the firewall.
   #
   # NOTE: Keep in sync with names above in test-setup.
-  "${GCLOUD}" compute firewall-rules delete "${CLUSTER_NAME}-http-alt" \
-    --project="${PROJECT}" &
-  "${GCLOUD}" compute firewall-rules delete "${CLUSTER_NAME}-nodeports" \
-    --project="${PROJECT}" &
+  for fw in "${CLUSTER_NAME}-http-alt" "${CLUSTER_NAME}-nodeports" "${FIREWALL_SSH}"; do
+    if [[ -n $("${GCLOUD}" compute firewall-rules --project "${PROJECT}" describe "${fw}" --format='value(name)' 2>/dev/null || true) ]]; then
+      "${GCLOUD}" compute firewall-rules delete "${fw}" --project="${PROJECT}" --quiet &
+    fi
+  done
 
   # Wait for firewall rule teardown.
   kube::util::wait-for-jobs || true
+
+  # It's unfortunate that the $FIREWALL_SSH rule and network are created in
+  # kube-up, but we can only really delete them in test-teardown. So much for
+  # symmetry.
+  if [[ "${KUBE_DELETE_NETWORK}" == "true" ]]; then
+    if [[ -n $("${GCLOUD}" compute networks --project "${PROJECT}" describe "${NETWORK}" --format='value(name)' 2>/dev/null || true) ]]; then
+      if ! "${GCLOUD}" compute networks delete --project "${PROJECT}" --quiet "${NETWORK}"; then
+        echo "Failed to delete network '${NETWORK}'. Listing firewall-rules:"
+        "${GCLOUD}" compute firewall-rules --project "${PROJECT}" list --filter="network=${NETWORK}"
+      fi
+    fi
+  fi
 }
 
 # Actually take down the cluster. This is called from test-teardown.

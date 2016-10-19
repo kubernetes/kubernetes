@@ -31,9 +31,9 @@ import (
 	systemd "github.com/coreos/go-systemd/daemon"
 	"github.com/emicklei/go-restful"
 	"github.com/emicklei/go-restful/swagger"
-	"github.com/go-openapi/spec"
 	"github.com/golang/glog"
 
+	"github.com/go-openapi/spec"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -49,6 +49,7 @@ import (
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // Info about an API group.
@@ -56,8 +57,6 @@ type APIGroupInfo struct {
 	GroupMeta apimachinery.GroupMeta
 	// Info about the resources in this group. Its a map from version to resource to the storage.
 	VersionedResourcesStorageMap map[string]map[string]rest.Storage
-	// True, if this is the legacy group ("/v1").
-	IsLegacyGroup bool
 	// OptionsExternalVersion controls the APIVersion used for common objects in the
 	// schema like api.Status, api.DeleteOptions, and api.ListOptions. Other implementors may
 	// define a version "v1beta1" but want to use the Kubernetes "v1" internal objects.
@@ -90,10 +89,6 @@ type GenericAPIServer struct {
 	// truth for its value.
 	ServiceClusterIPRange *net.IPNet
 
-	// ServiceNodePortRange is only used for `master.go` to construct its RESTStorage for the legacy API group
-	// TODO refactor this closer to the point of use.
-	ServiceNodePortRange utilnet.PortRange
-
 	// LoopbackClientConfig is a config for a privileged loopback connection to the API server
 	LoopbackClientConfig *restclient.Config
 
@@ -106,12 +101,12 @@ type GenericAPIServer struct {
 	// TODO eventually we should be able to factor this out to take place during initialization.
 	enableSwaggerSupport bool
 
-	// legacyAPIPrefix is the prefix used for legacy API groups that existed before we had API groups
-	// usuallly /api
-	legacyAPIPrefix string
-
 	// apiPrefix is the prefix where API groups live, usually /apis
 	apiPrefix string
+
+	// legacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
+	// to InstallLegacyAPIGroup
+	legacyAPIGroupPrefixes sets.String
 
 	// admissionControl is used to build the RESTStorage that backs an API Group.
 	admissionControl admission.Interface
@@ -128,9 +123,6 @@ type GenericAPIServer struct {
 	// ExternalAddress is the address (hostname or IP and port) that should be used in
 	// external (public internet) URLs for this GenericAPIServer.
 	ExternalAddress string
-
-	// ClusterIP is the IP address of the GenericAPIServer within the cluster.
-	ClusterIP net.IP
 
 	// storage contains the RESTful endpoints exposed by this GenericAPIServer
 	storage map[string]rest.Storage
@@ -151,6 +143,11 @@ type GenericAPIServer struct {
 	apiGroupsForDiscoveryLock sync.RWMutex
 	apiGroupsForDiscovery     map[string]unversioned.APIGroup
 
+	// See Config.$name for documentation of these flags
+
+	enableOpenAPISupport bool
+	openAPIConfig        *common.Config
+
 	// PostStartHooks are each called after the server has started listening, in a separate go func for each
 	// with no guaranteee of ordering between them.  The map key is a name used for error reporting.
 	// It may kill the process with a panic if it wishes to by returning an error
@@ -160,17 +157,13 @@ type GenericAPIServer struct {
 
 	// See Config.$name for documentation of these flags:
 
-	enableOpenAPISupport      bool
 	openAPIInfo               spec.Info
 	openAPIDefaultResponse    spec.Response
 	openAPIDefinitions        *common.OpenAPIDefinitions
 	MasterCount               int
 	KubernetesServiceNodePort int // TODO(sttts): move into master
-	PublicReadWritePort       int
 	ServiceReadWriteIP        net.IP
 	ServiceReadWritePort      int
-	ExtraServicePorts         []api.ServicePort
-	ExtraEndpointPorts        []api.EndpointPort
 }
 
 func init() {
@@ -229,20 +222,6 @@ func (s *GenericAPIServer) Run() {
 
 		}
 
-		// It would be nice to set a fqdn subject alt name, but only the kubelets know, the apiserver is clueless
-		// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
-		if s.SecureServingInfo.ServerCert.Generate && !certutil.CanReadCertOrKey(s.SecureServingInfo.ServerCert.CertFile, s.SecureServingInfo.ServerCert.KeyFile) {
-			// TODO (cjcullen): Is ClusterIP the right address to sign a cert with?
-			alternateIPs := []net.IP{s.ServiceReadWriteIP}
-			alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes", "localhost"}
-
-			if err := certutil.GenerateSelfSignedCert(s.ClusterIP.String(), s.SecureServingInfo.ServerCert.CertFile, s.SecureServingInfo.ServerCert.KeyFile, alternateIPs, alternateDNS); err != nil {
-				glog.Errorf("Unable to generate self signed cert: %v", err)
-			} else {
-				glog.Infof("Using self-signed cert (%s, %s)", s.SecureServingInfo.ServerCert.CertFile, s.SecureServingInfo.ServerCert.KeyFile)
-			}
-		}
-
 		glog.Infof("Serving securely on %s", s.SecureServingInfo.BindAddress)
 		go func() {
 			defer utilruntime.HandleCrash()
@@ -297,18 +276,9 @@ func (s *GenericAPIServer) Run() {
 	select {}
 }
 
-// Exposes the given api group in the API.
-func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
-	apiPrefix := s.apiPrefix
-	if apiGroupInfo.IsLegacyGroup {
-		apiPrefix = s.legacyAPIPrefix
-	}
-
-	// Install REST handlers for all the versions in this group.
-	apiVersions := []string{}
+// installAPIResources is a private method for installing the REST storage backing each api groupversionresource
+func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *APIGroupInfo) error {
 	for _, groupVersion := range apiGroupInfo.GroupMeta.GroupVersions {
-		apiVersions = append(apiVersions, groupVersion.Version)
-
 		apiGroupVersion, err := s.getAPIGroupVersion(apiGroupInfo, groupVersion, apiPrefix)
 		if err != nil {
 			return err
@@ -321,51 +291,77 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 			return fmt.Errorf("Unable to setup API %v: %v", apiGroupInfo, err)
 		}
 	}
-	// Install the version handler.
-	if apiGroupInfo.IsLegacyGroup {
-		// Add a handler at /api to enumerate the supported api versions.
-		apiserver.AddApiWebService(s.Serializer, s.HandlerContainer.Container, apiPrefix, func(req *restful.Request) *unversioned.APIVersions {
-			apiVersionsForDiscovery := unversioned.APIVersions{
-				ServerAddressByClientCIDRs: s.getServerAddressByClientCIDRs(req.Request),
-				Versions:                   apiVersions,
-			}
-			return &apiVersionsForDiscovery
-		})
-	} else {
-		// Do not register empty group or empty version.  Doing so claims /apis/ for the wrong entity to be returned.
-		// Catching these here places the error  much closer to its origin
-		if len(apiGroupInfo.GroupMeta.GroupVersion.Group) == 0 {
-			return fmt.Errorf("cannot register handler with an empty group for %#v", *apiGroupInfo)
-		}
-		if len(apiGroupInfo.GroupMeta.GroupVersion.Version) == 0 {
-			return fmt.Errorf("cannot register handler with an empty version for %#v", *apiGroupInfo)
-		}
 
-		// Add a handler at /apis/<groupName> to enumerate all versions supported by this group.
-		apiVersionsForDiscovery := []unversioned.GroupVersionForDiscovery{}
-		for _, groupVersion := range apiGroupInfo.GroupMeta.GroupVersions {
-			// Check the config to make sure that we elide versions that don't have any resources
-			if len(apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version]) == 0 {
-				continue
-			}
-			apiVersionsForDiscovery = append(apiVersionsForDiscovery, unversioned.GroupVersionForDiscovery{
-				GroupVersion: groupVersion.String(),
-				Version:      groupVersion.Version,
-			})
-		}
-		preferedVersionForDiscovery := unversioned.GroupVersionForDiscovery{
-			GroupVersion: apiGroupInfo.GroupMeta.GroupVersion.String(),
-			Version:      apiGroupInfo.GroupMeta.GroupVersion.Version,
-		}
-		apiGroup := unversioned.APIGroup{
-			Name:             apiGroupInfo.GroupMeta.GroupVersion.Group,
-			Versions:         apiVersionsForDiscovery,
-			PreferredVersion: preferedVersionForDiscovery,
-		}
+	return nil
+}
 
-		s.AddAPIGroupForDiscovery(apiGroup)
-		s.HandlerContainer.Add(apiserver.NewGroupWebService(s.Serializer, apiPrefix+"/"+apiGroup.Name, apiGroup))
+func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo *APIGroupInfo) error {
+	if !s.legacyAPIGroupPrefixes.Has(apiPrefix) {
+		return fmt.Errorf("%q is not in the allowed legacy API prefixes: %v", apiPrefix, s.legacyAPIGroupPrefixes.List())
 	}
+	if err := s.installAPIResources(apiPrefix, apiGroupInfo); err != nil {
+		return err
+	}
+
+	// setup discovery
+	apiVersions := []string{}
+	for _, groupVersion := range apiGroupInfo.GroupMeta.GroupVersions {
+		apiVersions = append(apiVersions, groupVersion.Version)
+	}
+	// Install the version handler.
+	// Add a handler at /<apiPrefix> to enumerate the supported api versions.
+	apiserver.AddApiWebService(s.Serializer, s.HandlerContainer.Container, apiPrefix, func(req *restful.Request) *unversioned.APIVersions {
+		apiVersionsForDiscovery := unversioned.APIVersions{
+			ServerAddressByClientCIDRs: s.getServerAddressByClientCIDRs(req.Request),
+			Versions:                   apiVersions,
+		}
+		return &apiVersionsForDiscovery
+	})
+	return nil
+}
+
+// Exposes the given api group in the API.
+func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
+	// Do not register empty group or empty version.  Doing so claims /apis/ for the wrong entity to be returned.
+	// Catching these here places the error  much closer to its origin
+	if len(apiGroupInfo.GroupMeta.GroupVersion.Group) == 0 {
+		return fmt.Errorf("cannot register handler with an empty group for %#v", *apiGroupInfo)
+	}
+	if len(apiGroupInfo.GroupMeta.GroupVersion.Version) == 0 {
+		return fmt.Errorf("cannot register handler with an empty version for %#v", *apiGroupInfo)
+	}
+
+	if err := s.installAPIResources(s.apiPrefix, apiGroupInfo); err != nil {
+		return err
+	}
+
+	// setup discovery
+	// Install the version handler.
+	// Add a handler at /apis/<groupName> to enumerate all versions supported by this group.
+	apiVersionsForDiscovery := []unversioned.GroupVersionForDiscovery{}
+	for _, groupVersion := range apiGroupInfo.GroupMeta.GroupVersions {
+		// Check the config to make sure that we elide versions that don't have any resources
+		if len(apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version]) == 0 {
+			continue
+		}
+		apiVersionsForDiscovery = append(apiVersionsForDiscovery, unversioned.GroupVersionForDiscovery{
+			GroupVersion: groupVersion.String(),
+			Version:      groupVersion.Version,
+		})
+	}
+	preferedVersionForDiscovery := unversioned.GroupVersionForDiscovery{
+		GroupVersion: apiGroupInfo.GroupMeta.GroupVersion.String(),
+		Version:      apiGroupInfo.GroupMeta.GroupVersion.Version,
+	}
+	apiGroup := unversioned.APIGroup{
+		Name:             apiGroupInfo.GroupMeta.GroupVersion.Group,
+		Versions:         apiVersionsForDiscovery,
+		PreferredVersion: preferedVersionForDiscovery,
+	}
+
+	s.AddAPIGroupForDiscovery(apiGroup)
+	s.HandlerContainer.Add(apiserver.NewGroupWebService(s.Serializer, s.apiPrefix+"/"+apiGroup.Name, apiGroup))
+
 	return nil
 }
 
@@ -469,33 +465,20 @@ func (s *GenericAPIServer) InstallOpenAPI() {
 	// Install one spec per web service, an ideal client will have a ClientSet containing one client
 	// per each of these specs.
 	for _, w := range s.HandlerContainer.RegisteredWebServices() {
-		if w.RootPath() == "/swaggerapi" {
+		if strings.HasPrefix(w.RootPath(), "/swaggerapi") {
 			continue
 		}
-		info := s.openAPIInfo
-		info.Title = info.Title + " " + w.RootPath()
-		err := openapi.RegisterOpenAPIService(&openapi.Config{
-			OpenAPIServePath:   w.RootPath() + "/swagger.json",
-			WebServices:        []*restful.WebService{w},
-			ProtocolList:       []string{"https"},
-			IgnorePrefixes:     []string{"/swaggerapi"},
-			Info:               &info,
-			DefaultResponse:    &s.openAPIDefaultResponse,
-			OpenAPIDefinitions: s.openAPIDefinitions,
-		}, s.HandlerContainer.Container)
+		config := *s.openAPIConfig
+		config.Info = new(spec.Info)
+		*config.Info = *s.openAPIConfig.Info
+		config.Info.Title = config.Info.Title + " " + w.RootPath()
+		err := openapi.RegisterOpenAPIService(w.RootPath()+"/swagger.json", []*restful.WebService{w}, &config, s.HandlerContainer.Container)
 		if err != nil {
 			glog.Fatalf("Failed to register open api spec for %v: %v", w.RootPath(), err)
 		}
 	}
-	err := openapi.RegisterOpenAPIService(&openapi.Config{
-		OpenAPIServePath:   "/swagger.json",
-		WebServices:        s.HandlerContainer.RegisteredWebServices(),
-		ProtocolList:       []string{"https"},
-		IgnorePrefixes:     []string{"/swaggerapi"},
-		Info:               &s.openAPIInfo,
-		DefaultResponse:    &s.openAPIDefaultResponse,
-		OpenAPIDefinitions: s.openAPIDefinitions,
-	}, s.HandlerContainer.Container)
+	err := openapi.RegisterOpenAPIService("/swagger.json", s.HandlerContainer.RegisteredWebServices(), s.openAPIConfig, s.HandlerContainer.Container)
+
 	if err != nil {
 		glog.Fatalf("Failed to register open api spec for root: %v", err)
 	}

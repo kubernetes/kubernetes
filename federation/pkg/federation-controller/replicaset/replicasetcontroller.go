@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"sort"
 	"time"
 
@@ -29,9 +28,10 @@ import (
 	fed "k8s.io/kubernetes/federation/apis/federation"
 	fedv1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
-	planner "k8s.io/kubernetes/federation/pkg/federation-controller/replicaset/planner"
 	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util/planner"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util/podanalyzer"
 	"k8s.io/kubernetes/pkg/api"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -228,14 +228,7 @@ func (frsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
 		go wait.Until(frsc.worker, time.Second, stopCh)
 	}
 
-	go func() {
-		select {
-		case <-time.After(time.Minute):
-			frsc.replicaSetBackoff.GC()
-		case <-stopCh:
-			return
-		}
-	}()
+	fedutil.StartBackoffGC(frsc.replicaSetBackoff, stopCh)
 
 	<-stopCh
 	glog.Infof("Shutting down ReplicaSetController")
@@ -440,7 +433,7 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 	if err != nil {
 		return statusError, err
 	}
-	podStatus, err := AnalysePods(frs, allPods, time.Now())
+	podStatus, err := podanalyzer.AnalysePods(frs.Spec.Selector, allPods, time.Now())
 	current := make(map[string]int64)
 	estimatedCapacity := make(map[string]int64)
 	for _, cluster := range clusters {
@@ -492,8 +485,7 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 		} else {
 			currentLrs := lrsObj.(*extensionsv1.ReplicaSet)
 			// Update existing replica set, if needed.
-			if !fedutil.ObjectMetaEquivalent(lrs.ObjectMeta, currentLrs.ObjectMeta) ||
-				!reflect.DeepEqual(lrs.Spec, currentLrs.Spec) {
+			if !fedutil.ObjectMetaAndSpecEquivalent(lrs, currentLrs) {
 				frsc.eventRecorder.Eventf(frs, api.EventTypeNormal, "UpdateInCluster",
 					"Updating replicaset in cluster %s", clusterName)
 

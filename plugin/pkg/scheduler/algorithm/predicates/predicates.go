@@ -91,8 +91,8 @@ func PredicateMetadata(pod *api.Pod, nodeInfoMap map[string]*schedulercache.Node
 	}
 	return &predicateMetadata{
 		podBestEffort:             isPodBestEffort(pod),
-		podRequest:                getResourceRequest(pod),
-		podPorts:                  getUsedPorts(pod),
+		podRequest:                GetResourceRequest(pod),
+		podPorts:                  GetUsedPorts(pod),
 		matchingAntiAffinityTerms: matchingTerms,
 	}
 }
@@ -417,7 +417,7 @@ func (c *VolumeZoneChecker) predicate(pod *api.Pod, meta interface{}, nodeInfo *
 	return true, nil, nil
 }
 
-func getResourceRequest(pod *api.Pod) *schedulercache.Resource {
+func GetResourceRequest(pod *api.Pod) *schedulercache.Resource {
 	result := schedulercache.Resource{}
 	for _, container := range pod.Spec.Containers {
 		requests := container.Resources.Requests
@@ -459,7 +459,7 @@ func PodFitsResources(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.N
 		podRequest = predicateMeta.podRequest
 	} else {
 		// We couldn't parse metadata - fallback to computing it.
-		podRequest = getResourceRequest(pod)
+		podRequest = GetResourceRequest(pod)
 	}
 	if podRequest.MilliCPU == 0 && podRequest.Memory == 0 && podRequest.NvidiaGPU == 0 {
 		return len(predicateFails) == 0, predicateFails, nil
@@ -637,38 +637,36 @@ func NewServiceAffinityPredicate(podLister algorithm.PodLister, serviceLister al
 	return affinity.CheckServiceAffinity
 }
 
-// CheckServiceAffinity ensures that only the nodes that match the specified labels are considered for scheduling.
-// The set of labels to be considered are provided to the struct (ServiceAffinity).
-// The pod is checked for the labels and any missing labels are then checked in the node
-// that hosts the service pods (peers) for the given pod.
+// The checkServiceAffinity predicate matches nodes in such a way to force that
+// ServiceAffinity.labels are homogenous for pods added to a node.
+// (i.e. it returns true IFF this pod can be added to this node, such
+// that all other pods in the same service are running on nodes w/
+// the exact same ServiceAffinity.label values).
 //
-// We add an implicit selector requiring some particular value V for label L to a pod, if:
-// - L is listed in the ServiceAffinity object that is passed into the function
-// - the pod does not have any NodeSelector for L
-// - some other pod from the same service is already scheduled onto a node that has value V for label L
+// Details:
+//
+// If (the svc affinity labels are not a subset of pod's label selectors )
+// 	The pod has all information necessary to check affinity, the pod's label selector is sufficient to calculate
+// 	the match.
+// Otherwise:
+// 	Create an "implicit selector" which gaurantees pods will land on nodes with similar values
+//	for the affinity labels.
+// 	To do this, we "reverse engineer" a selector by introspecting existing pods running under the same service+namespace.
+//	These backfilled labels in the selector "L" are defined like so:
+// 		- L is a label that the ServiceAffinity object needs as a matching constraints.
+// 		- L is not defined in the pod itself already.
+// 		- and SOME pod, from a service, in the same namespace, ALREADY scheduled onto a node, has a matching value.
 func (s *ServiceAffinity) CheckServiceAffinity(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	node := nodeInfo.Node()
 	if node == nil {
 		return false, nil, fmt.Errorf("node not found")
 	}
 
-	var affinitySelector labels.Selector
-
 	// check if the pod being scheduled has the affinity labels specified in its NodeSelector
-	affinityLabels := map[string]string{}
-	nodeSelector := labels.Set(pod.Spec.NodeSelector)
-	labelsExist := true
-	for _, l := range s.labels {
-		if nodeSelector.Has(l) {
-			affinityLabels[l] = nodeSelector.Get(l)
-		} else {
-			// the current pod does not specify all the labels, look in the existing service pods
-			labelsExist = false
-		}
-	}
+	affinityLabels := FindLabelsInSet(s.labels, labels.Set(pod.Spec.NodeSelector))
 
-	// skip looking at other pods in the service if the current pod defines all the required affinity labels
-	if !labelsExist {
+	// Introspect services IFF we didn't predefine all the affinity labels in the pod itself.
+	if len(s.labels) > len(affinityLabels) {
 		services, err := s.serviceLister.GetPodServices(pod)
 		if err == nil && len(services) > 0 {
 			// just use the first service and get the other pods within the service
@@ -679,40 +677,20 @@ func (s *ServiceAffinity) CheckServiceAffinity(pod *api.Pod, meta interface{}, n
 				return false, nil, err
 			}
 			// consider only the pods that belong to the same namespace
-			nsServicePods := []*api.Pod{}
-			for _, nsPod := range servicePods {
-				if nsPod.Namespace == pod.Namespace {
-					nsServicePods = append(nsServicePods, nsPod)
-				}
-			}
+			nsServicePods := FilterPodsByNamespace(servicePods, pod.Namespace)
 			if len(nsServicePods) > 0 {
 				// consider any service pod and fetch the node its hosted on
 				otherNode, err := s.nodeInfo.GetNodeInfo(nsServicePods[0].Spec.NodeName)
 				if err != nil {
 					return false, nil, err
 				}
-				for _, l := range s.labels {
-					// If the pod being scheduled has the label value specified, do not override it
-					if _, exists := affinityLabels[l]; exists {
-						continue
-					}
-					if labels.Set(otherNode.Labels).Has(l) {
-						affinityLabels[l] = labels.Set(otherNode.Labels).Get(l)
-					}
-				}
+				AddUnsetLabelsToMap(affinityLabels, s.labels, labels.Set(otherNode.Labels))
 			}
 		}
 	}
 
-	// if there are no existing pods in the service, consider all nodes
-	if len(affinityLabels) == 0 {
-		affinitySelector = labels.Everything()
-	} else {
-		affinitySelector = labels.Set(affinityLabels).AsSelector()
-	}
-
 	// check if the node matches the selector
-	if affinitySelector.Matches(labels.Set(node.Labels)) {
+	if CreateSelectorFromLabels(affinityLabels).Matches(labels.Set(node.Labels)) {
 		return true, nil, nil
 	}
 	return false, []algorithm.PredicateFailureReason{ErrServiceAffinityViolated}, nil
@@ -724,14 +702,14 @@ func PodFitsHostPorts(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.N
 		wantPorts = predicateMeta.podPorts
 	} else {
 		// We couldn't parse metadata - fallback to computing it.
-		wantPorts = getUsedPorts(pod)
+		wantPorts = GetUsedPorts(pod)
 	}
 	if len(wantPorts) == 0 {
 		return true, nil, nil
 	}
 
 	// TODO: Aggregate it at the NodeInfo level.
-	existingPorts := getUsedPorts(nodeInfo.Pods()...)
+	existingPorts := GetUsedPorts(nodeInfo.Pods()...)
 	for wport := range wantPorts {
 		if wport != 0 && existingPorts[wport] {
 			return false, []algorithm.PredicateFailureReason{ErrPodNotFitsHostPorts}, nil
@@ -740,7 +718,7 @@ func PodFitsHostPorts(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.N
 	return true, nil, nil
 }
 
-func getUsedPorts(pods ...*api.Pod) map[int]bool {
+func GetUsedPorts(pods ...*api.Pod) map[int]bool {
 	ports := make(map[int]bool)
 	for _, pod := range pods {
 		for j := range pod.Spec.Containers {

@@ -169,69 +169,44 @@ __custom_func() {
 	// and add a short forms entry in expandResourceShortcut() when appropriate.
 	// TODO: This should be populated using the discovery information from apiserver.
 	valid_resources = `Valid resource types include:
-   * clusters (valid only for federation apiservers)
-   * componentstatuses (aka 'cs')
-   * configmaps (aka 'cm')
-   * daemonsets (aka 'ds')
-   * deployments (aka 'deploy')
-   * events (aka 'ev')
-   * endpoints (aka 'ep')
-   * horizontalpodautoscalers (aka 'hpa')
-   * ingress (aka 'ing')
-   * jobs
-   * limitranges (aka 'limits')
-   * nodes (aka 'no')
-   * namespaces (aka 'ns')
-   * petsets (alpha feature, may be unstable)
-   * pods (aka 'po')
-   * persistentvolumes (aka 'pv')
-   * persistentvolumeclaims (aka 'pvc')
-   * quota
-   * resourcequotas (aka 'quota')
-   * replicasets (aka 'rs')
-   * replicationcontrollers (aka 'rc')
-   * secrets
-   * serviceaccounts (aka 'sa')
-   * services (aka 'svc')
-`
-	usage_template = `{{if gt .Aliases 0}}
 
-Aliases:
-  {{.NameAndAliases}}{{end}}{{if .HasExample}}
-
-Examples:
-{{ .Example }}{{end}}{{ if .HasAvailableSubCommands}}
-
-Available Sub-commands:{{range .Commands}}{{if .IsAvailableCommand}}
-  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}{{ if .HasLocalFlags}}
-
-Flags:
-{{.LocalFlags.FlagUsages | trimRightSpace}}{{end}}{{ if .HasInheritedFlags}}
-
-Global Flags:
-{{.InheritedFlags.FlagUsages | trimRightSpace}}{{end}}{{if .HasHelpSubCommands}}
-
-Additional help topics:{{range .Commands}}{{if .IsHelpCommand}}
-  {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}{{end}}
-
-Usage:{{if .Runnable}}
-  {{if .HasFlags}}{{appendIfNotPresent .UseLine "[flags]"}}{{else}}{{.UseLine}}{{end}}{{end}}{{ if .HasSubCommands }}
-  {{ .CommandPath}} [command]
-
-Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
-`
-	help_template = `{{with or .Long .Short }}{{. | trim}}{{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}`
+    * clusters (valid only for federation apiservers)
+    * componentstatuses (aka 'cs')
+    * configmaps (aka 'cm')
+    * daemonsets (aka 'ds')
+    * deployments (aka 'deploy')
+    * events (aka 'ev')
+    * endpoints (aka 'ep')
+    * horizontalpodautoscalers (aka 'hpa')
+    * ingress (aka 'ing')
+    * jobs
+    * limitranges (aka 'limits')
+    * nodes (aka 'no')
+    * namespaces (aka 'ns')
+    * petsets (alpha feature, may be unstable)
+    * pods (aka 'po')
+    * persistentvolumes (aka 'pv')
+    * persistentvolumeclaims (aka 'pvc')
+    * quota
+    * resourcequotas (aka 'quota')
+    * replicasets (aka 'rs')
+    * replicationcontrollers (aka 'rc')
+    * secrets
+    * serviceaccounts (aka 'sa')
+    * services (aka 'svc')
+    `
 )
 
 // NewKubectlCommand creates the `kubectl` command and its nested children.
-func NewKubectlCommand(f *cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
+func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
 	// Parent command to which all subcommands are added.
 	cmds := &cobra.Command{
 		Use:   "kubectl",
 		Short: "kubectl controls the Kubernetes cluster manager",
-		Long: `kubectl controls the Kubernetes cluster manager.
+		Long: templates.LongDesc(`
+      kubectl controls the Kubernetes cluster manager.
 
-Find more information at https://github.com/kubernetes/kubernetes.`,
+      Find more information at https://github.com/kubernetes/kubernetes.`),
 		Run: runHelp,
 		BashCompletionFunction: bash_completion_func,
 	}
@@ -249,7 +224,7 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 				NewCmdCreate(f, out),
 				NewCmdExposeService(f, out),
 				NewCmdRun(f, in, out, err),
-				set.NewCmdSet(f, out),
+				set.NewCmdSet(f, out, err),
 			},
 		},
 		{

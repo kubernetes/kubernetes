@@ -37,7 +37,7 @@ type Manager interface {
 	// restore the object later.
 	GetPaths() map[string]string
 
-	// Set the cgroup as configured.
+	// Sets the cgroup as configured.
 	Set(container *configs.Config) error
 }
 

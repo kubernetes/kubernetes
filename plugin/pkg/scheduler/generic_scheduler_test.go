@@ -300,6 +300,7 @@ func TestGenericScheduler(t *testing.T) {
 		for _, name := range test.nodes {
 			cache.AddNode(&api.Node{ObjectMeta: api.ObjectMeta{Name: name}})
 		}
+
 		scheduler := NewGenericScheduler(
 			cache, test.predicates, algorithm.EmptyMetadataProducer,
 			test.prioritizers, []algorithm.SchedulerExtender{})

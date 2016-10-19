@@ -85,7 +85,7 @@ func TestValidate(t *testing.T) {
 		testDisallowed := func(key string, category string) {
 			for _, s := range v.disallowed {
 				pod.Annotations = map[string]string{
-					key: api.PodAnnotationsFromSysctls([]api.Sysctl{{s, "dummy"}}),
+					key: api.PodAnnotationsFromSysctls([]api.Sysctl{{Name: s, Value: "dummy"}}),
 				}
 				errs = strategy.Validate(pod)
 				if len(errs) == 0 {

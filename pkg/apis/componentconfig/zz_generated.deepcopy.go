@@ -268,6 +268,7 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.CloudConfigFile = in.CloudConfigFile
 		out.KubeletCgroups = in.KubeletCgroups
 		out.CgroupsPerQOS = in.CgroupsPerQOS
+		out.CgroupDriver = in.CgroupDriver
 		out.RuntimeCgroups = in.RuntimeCgroups
 		out.SystemCgroups = in.SystemCgroups
 		out.CgroupRoot = in.CgroupRoot
@@ -280,7 +281,6 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.RktStage1Image = in.RktStage1Image
 		out.LockFilePath = in.LockFilePath
 		out.ExitOnLockContention = in.ExitOnLockContention
-		out.ConfigureCBR0 = in.ConfigureCBR0
 		out.HairpinMode = in.HairpinMode
 		out.BabysitDaemons = in.BabysitDaemons
 		out.MaxPods = in.MaxPods

@@ -2119,7 +2119,7 @@ func ValidateTolerationsInPodAnnotations(annotations map[string]string, fldPath 
 	return allErrs
 }
 
-func validateSeccompProfile(p string, fldPath *field.Path) field.ErrorList {
+func ValidateSeccompProfile(p string, fldPath *field.Path) field.ErrorList {
 	if p == "docker/default" {
 		return nil
 	}
@@ -2135,11 +2135,11 @@ func validateSeccompProfile(p string, fldPath *field.Path) field.ErrorList {
 func ValidateSeccompPodAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if p, exists := annotations[api.SeccompPodAnnotationKey]; exists {
-		allErrs = append(allErrs, validateSeccompProfile(p, fldPath.Child(api.SeccompPodAnnotationKey))...)
+		allErrs = append(allErrs, ValidateSeccompProfile(p, fldPath.Child(api.SeccompPodAnnotationKey))...)
 	}
 	for k, p := range annotations {
 		if strings.HasPrefix(k, api.SeccompContainerAnnotationKeyPrefix) {
-			allErrs = append(allErrs, validateSeccompProfile(p, fldPath.Child(k))...)
+			allErrs = append(allErrs, ValidateSeccompProfile(p, fldPath.Child(k))...)
 		}
 	}
 
@@ -2939,6 +2939,17 @@ func ValidateLimitRange(limitRange *api.LimitRange) field.ErrorList {
 				allErrs = append(allErrs, validateLimitRangeResourceName(limit.Type, string(k), idxPath.Child("defaultRequest").Key(string(k)))...)
 				keys.Insert(string(k))
 				defaultRequests[string(k)] = q
+			}
+		}
+
+		if limit.Type == api.LimitTypePersistentVolumeClaim {
+			_, minQuantityFound := limit.Min[api.ResourceStorage]
+			_, maxQuantityFound := limit.Max[api.ResourceStorage]
+			if !minQuantityFound {
+				allErrs = append(allErrs, field.Required(idxPath.Child("min"), "minimum storage value is required"))
+			}
+			if !maxQuantityFound {
+				allErrs = append(allErrs, field.Required(idxPath.Child("max"), "maximum storage value is required"))
 			}
 		}
 

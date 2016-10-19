@@ -32,7 +32,7 @@ import (
 type AuthorizationRuleResolver interface {
 	// GetRoleReferenceRules attempts to resolve the role reference of a RoleBinding or ClusterRoleBinding.  The passed namespace should be the namepsace
 	// of the role binding, the empty string if a cluster role binding.
-	GetRoleReferenceRules(ctx api.Context, roleRef rbac.RoleRef, namespace string) ([]rbac.PolicyRule, error)
+	GetRoleReferenceRules(roleRef rbac.RoleRef, namespace string) ([]rbac.PolicyRule, error)
 
 	// RulesFor returns the list of rules that apply to a given user in a given namespace and error.  If an error is returned, the slice of
 	// PolicyRules may not be complete, but it contains all retrievable rules.  This is done because policy rules are purely additive and policy determinations
@@ -77,35 +77,34 @@ func NewDefaultRuleResolver(roleGetter RoleGetter, roleBindingLister RoleBinding
 }
 
 type RoleGetter interface {
-	GetRole(ctx api.Context, id string) (*rbac.Role, error)
+	GetRole(namespace, name string) (*rbac.Role, error)
 }
 
 type RoleBindingLister interface {
-	ListRoleBindings(ctx api.Context, options *api.ListOptions) (*rbac.RoleBindingList, error)
+	ListRoleBindings(namespace string) ([]*rbac.RoleBinding, error)
 }
 
 type ClusterRoleGetter interface {
-	GetClusterRole(ctx api.Context, id string) (*rbac.ClusterRole, error)
+	GetClusterRole(name string) (*rbac.ClusterRole, error)
 }
 
 type ClusterRoleBindingLister interface {
-	ListClusterRoleBindings(ctx api.Context, options *api.ListOptions) (*rbac.ClusterRoleBindingList, error)
+	ListClusterRoleBindings() ([]*rbac.ClusterRoleBinding, error)
 }
 
 func (r *DefaultRuleResolver) RulesFor(user user.Info, namespace string) ([]rbac.PolicyRule, error) {
 	policyRules := []rbac.PolicyRule{}
 	errorlist := []error{}
 
-	ctx := api.NewContext()
-	if clusterRoleBindings, err := r.clusterRoleBindingLister.ListClusterRoleBindings(ctx, &api.ListOptions{}); err != nil {
+	if clusterRoleBindings, err := r.clusterRoleBindingLister.ListClusterRoleBindings(); err != nil {
 		errorlist = append(errorlist, err)
 
 	} else {
-		for _, clusterRoleBinding := range clusterRoleBindings.Items {
+		for _, clusterRoleBinding := range clusterRoleBindings {
 			if !appliesTo(user, clusterRoleBinding.Subjects, "") {
 				continue
 			}
-			rules, err := r.GetRoleReferenceRules(ctx, clusterRoleBinding.RoleRef, "")
+			rules, err := r.GetRoleReferenceRules(clusterRoleBinding.RoleRef, "")
 			if err != nil {
 				errorlist = append(errorlist, err)
 				continue
@@ -115,17 +114,15 @@ func (r *DefaultRuleResolver) RulesFor(user user.Info, namespace string) ([]rbac
 	}
 
 	if len(namespace) > 0 {
-		ctx := api.WithNamespace(api.NewContext(), namespace)
-
-		if roleBindings, err := r.roleBindingLister.ListRoleBindings(ctx, &api.ListOptions{}); err != nil {
+		if roleBindings, err := r.roleBindingLister.ListRoleBindings(namespace); err != nil {
 			errorlist = append(errorlist, err)
 
 		} else {
-			for _, roleBinding := range roleBindings.Items {
+			for _, roleBinding := range roleBindings {
 				if !appliesTo(user, roleBinding.Subjects, namespace) {
 					continue
 				}
-				rules, err := r.GetRoleReferenceRules(ctx, roleBinding.RoleRef, namespace)
+				rules, err := r.GetRoleReferenceRules(roleBinding.RoleRef, namespace)
 				if err != nil {
 					errorlist = append(errorlist, err)
 					continue
@@ -139,17 +136,17 @@ func (r *DefaultRuleResolver) RulesFor(user user.Info, namespace string) ([]rbac
 }
 
 // GetRoleReferenceRules attempts to resolve the RoleBinding or ClusterRoleBinding.
-func (r *DefaultRuleResolver) GetRoleReferenceRules(ctx api.Context, roleRef rbac.RoleRef, bindingNamespace string) ([]rbac.PolicyRule, error) {
+func (r *DefaultRuleResolver) GetRoleReferenceRules(roleRef rbac.RoleRef, bindingNamespace string) ([]rbac.PolicyRule, error) {
 	switch kind := rbac.RoleRefGroupKind(roleRef); kind {
 	case rbac.Kind("Role"):
-		role, err := r.roleGetter.GetRole(api.WithNamespace(ctx, bindingNamespace), roleRef.Name)
+		role, err := r.roleGetter.GetRole(bindingNamespace, roleRef.Name)
 		if err != nil {
 			return nil, err
 		}
 		return role.Rules, nil
 
 	case rbac.Kind("ClusterRole"):
-		clusterRole, err := r.clusterRoleGetter.GetClusterRole(api.WithNamespace(ctx, ""), roleRef.Name)
+		clusterRole, err := r.clusterRoleGetter.GetClusterRole(roleRef.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -193,7 +190,7 @@ func appliesToUser(user user.Info, subject rbac.Subject, namespace string) bool 
 }
 
 // NewTestRuleResolver returns a rule resolver from lists of role objects.
-func NewTestRuleResolver(roles []rbac.Role, roleBindings []rbac.RoleBinding, clusterRoles []rbac.ClusterRole, clusterRoleBindings []rbac.ClusterRoleBinding) AuthorizationRuleResolver {
+func NewTestRuleResolver(roles []*rbac.Role, roleBindings []*rbac.RoleBinding, clusterRoles []*rbac.ClusterRole, clusterRoleBindings []*rbac.ClusterRoleBinding) AuthorizationRuleResolver {
 	r := staticRoles{
 		roles:               roles,
 		roleBindings:        roleBindings,
@@ -208,62 +205,49 @@ func newMockRuleResolver(r *staticRoles) AuthorizationRuleResolver {
 }
 
 type staticRoles struct {
-	roles               []rbac.Role
-	roleBindings        []rbac.RoleBinding
-	clusterRoles        []rbac.ClusterRole
-	clusterRoleBindings []rbac.ClusterRoleBinding
+	roles               []*rbac.Role
+	roleBindings        []*rbac.RoleBinding
+	clusterRoles        []*rbac.ClusterRole
+	clusterRoleBindings []*rbac.ClusterRoleBinding
 }
 
-func (r *staticRoles) GetRole(ctx api.Context, id string) (*rbac.Role, error) {
-	namespace, ok := api.NamespaceFrom(ctx)
-	if !ok || namespace == "" {
+func (r *staticRoles) GetRole(namespace, name string) (*rbac.Role, error) {
+	if len(namespace) == 0 {
 		return nil, errors.New("must provide namespace when getting role")
 	}
 	for _, role := range r.roles {
-		if role.Namespace == namespace && role.Name == id {
-			return &role, nil
+		if role.Namespace == namespace && role.Name == name {
+			return role, nil
 		}
 	}
 	return nil, errors.New("role not found")
 }
 
-func (r *staticRoles) GetClusterRole(ctx api.Context, id string) (*rbac.ClusterRole, error) {
-	namespace, ok := api.NamespaceFrom(ctx)
-	if ok && namespace != "" {
-		return nil, errors.New("cannot provide namespace when getting cluster role")
-	}
+func (r *staticRoles) GetClusterRole(name string) (*rbac.ClusterRole, error) {
 	for _, clusterRole := range r.clusterRoles {
-		if clusterRole.Namespace == namespace && clusterRole.Name == id {
-			return &clusterRole, nil
+		if clusterRole.Name == name {
+			return clusterRole, nil
 		}
 	}
 	return nil, errors.New("role not found")
 }
 
-func (r *staticRoles) ListRoleBindings(ctx api.Context, options *api.ListOptions) (*rbac.RoleBindingList, error) {
-	namespace, ok := api.NamespaceFrom(ctx)
-	if !ok || namespace == "" {
+func (r *staticRoles) ListRoleBindings(namespace string) ([]*rbac.RoleBinding, error) {
+	if len(namespace) == 0 {
 		return nil, errors.New("must provide namespace when listing role bindings")
 	}
 
-	roleBindingList := new(rbac.RoleBindingList)
+	roleBindingList := []*rbac.RoleBinding{}
 	for _, roleBinding := range r.roleBindings {
 		if roleBinding.Namespace != namespace {
 			continue
 		}
 		// TODO(ericchiang): need to implement label selectors?
-		roleBindingList.Items = append(roleBindingList.Items, roleBinding)
+		roleBindingList = append(roleBindingList, roleBinding)
 	}
 	return roleBindingList, nil
 }
 
-func (r *staticRoles) ListClusterRoleBindings(ctx api.Context, options *api.ListOptions) (*rbac.ClusterRoleBindingList, error) {
-	namespace, ok := api.NamespaceFrom(ctx)
-	if ok && namespace != "" {
-		return nil, errors.New("cannot list cluster role bindings from within a namespace")
-	}
-	clusterRoleBindings := new(rbac.ClusterRoleBindingList)
-	clusterRoleBindings.Items = make([]rbac.ClusterRoleBinding, len(r.clusterRoleBindings))
-	copy(clusterRoleBindings.Items, r.clusterRoleBindings)
-	return clusterRoleBindings, nil
+func (r *staticRoles) ListClusterRoleBindings() ([]*rbac.ClusterRoleBinding, error) {
+	return r.clusterRoleBindings, nil
 }

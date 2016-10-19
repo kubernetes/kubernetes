@@ -1,10 +1,12 @@
 cluster/addons/fluentd-elasticsearch/es-image
 cluster/images/etcd/attachlease
 cluster/images/etcd/rollback
+cmd/clicheck
 cmd/gendocs
 cmd/genkubedocs
 cmd/genman
 cmd/genswaggertypedocs
+cmd/genyaml
 cmd/integration
 cmd/kube-apiserver
 cmd/kube-apiserver/app
@@ -16,6 +18,7 @@ cmd/kube-dns
 cmd/kube-proxy
 cmd/kubeadm
 cmd/kubeadm
+cmd/kubeadm/app/apis/kubeadm/install
 cmd/kubectl
 cmd/kubelet
 cmd/kubernetes-discovery
@@ -24,6 +27,7 @@ cmd/libs/go2idl/client-gen/test_apis/testgroup.k8s.io/install
 cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup.k8s.io/unversioned
 cmd/libs/go2idl/conversion-gen
 cmd/libs/go2idl/deepcopy-gen
+cmd/libs/go2idl/defaulter-gen
 cmd/libs/go2idl/generator
 cmd/libs/go2idl/go-to-protobuf
 cmd/libs/go2idl/go-to-protobuf/protoc-gen-gogo
@@ -76,6 +80,7 @@ pkg/apis/rbac/install
 pkg/apis/storage/install
 pkg/apis/storage/validation
 pkg/apiserver/audit
+pkg/apiserver/openapi
 pkg/auth/authenticator
 pkg/auth/authorizer/union
 pkg/client/metrics
@@ -182,6 +187,7 @@ pkg/util/json
 pkg/util/limitwriter
 pkg/util/logs
 pkg/util/maps
+pkg/util/metrics
 pkg/util/replicaset
 pkg/util/validation/field
 pkg/util/workqueue
@@ -201,6 +207,7 @@ plugin/pkg/admission/admit
 plugin/pkg/admission/alwayspullimages
 plugin/pkg/admission/deny
 plugin/pkg/admission/exec
+plugin/pkg/admission/gc
 plugin/pkg/admission/imagepolicy
 plugin/pkg/admission/namespace/autoprovision
 plugin/pkg/admission/namespace/exists
@@ -211,6 +218,7 @@ plugin/pkg/auth/authenticator/password
 plugin/pkg/auth/authenticator/password/allow
 plugin/pkg/auth/authenticator/request/basicauth
 plugin/pkg/auth/authenticator/request/union
+plugin/pkg/auth/authenticator/request/x509
 plugin/pkg/auth/authorizer
 plugin/pkg/auth/authorizer/rbac/bootstrappolicy
 plugin/pkg/client/auth
@@ -223,6 +231,7 @@ test/images/clusterapi-tester
 test/images/entrypoint-tester
 test/images/fakegitserver
 test/images/goproxy
+test/images/logs-generator
 test/images/mount-tester
 test/images/n-way-http
 test/images/port-forward-tester

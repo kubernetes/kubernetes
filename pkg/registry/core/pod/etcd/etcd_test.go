@@ -40,7 +40,7 @@ import (
 func newStorage(t *testing.T) (*REST, *BindingREST, *StatusREST, *etcdtesting.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 3}
-	storage := NewStorage(restOptions, nil, nil)
+	storage := NewStorage(restOptions, nil, nil, nil)
 	return storage.Pod, storage.Binding, storage.Status, server
 }
 
@@ -148,7 +148,7 @@ func (f FailDeletionStorage) Delete(ctx context.Context, key string, out runtime
 func newFailDeleteStorage(t *testing.T, called *bool) (*REST, *etcdtesting.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 3}
-	storage := NewStorage(restOptions, nil, nil)
+	storage := NewStorage(restOptions, nil, nil, nil)
 	storage.Pod.Store.Storage = FailDeletionStorage{storage.Pod.Store.Storage, called}
 	return storage.Pod, server
 }

@@ -19,8 +19,8 @@ package master
 import (
 	"fmt"
 	"net"
-	"net/http"
 	"net/url"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageapiv1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/apiserver"
+	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/healthz"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
@@ -81,7 +82,6 @@ import (
 	storagerest "k8s.io/kubernetes/pkg/registry/storage/rest"
 
 	// direct etcd registry dependencies
-	podetcd "k8s.io/kubernetes/pkg/registry/core/pod/etcd"
 	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
 	thirdpartyresourcedataetcd "k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata/etcd"
 )
@@ -101,15 +101,13 @@ type Config struct {
 	EndpointReconcilerConfig EndpointReconcilerConfig
 	DeleteCollectionWorkers  int
 	EventTTL                 time.Duration
-	KubeletClient            kubeletclient.KubeletClient
+	KubeletClientConfig      kubeletclient.KubeletClientConfig
 	// genericapiserver.RESTStorageProviders provides RESTStorage building methods keyed by groupName
 	RESTStorageProviders map[string]genericapiserver.RESTStorageProvider
 	// Used to start and monitor tunneling
 	Tunneler          genericapiserver.Tunneler
 	EnableUISupport   bool
 	EnableLogsSupport bool
-
-	disableThirdPartyControllerForTesting bool
 }
 
 // EndpointReconcilerConfig holds the endpoint reconciler and endpoint reconciliation interval to be
@@ -121,12 +119,8 @@ type EndpointReconcilerConfig struct {
 
 // Master contains state for a Kubernetes cluster master/api server.
 type Master struct {
-	*genericapiserver.GenericAPIServer
+	GenericAPIServer *genericapiserver.GenericAPIServer
 
-	legacyRESTStorageProvider corerest.LegacyRESTStorageProvider
-	legacyRESTStorage         corerest.LegacyRESTStorage
-
-	enableCoreControllers   bool
 	deleteCollectionWorkers int
 
 	// storage for third party objects
@@ -135,13 +129,9 @@ type Master struct {
 	thirdPartyResources map[string]*thirdPartyEntry
 	// protects the map
 	thirdPartyResourcesLock sync.RWMutex
-	// Useful for reliable testing.  Shouldn't be used otherwise.
-	disableThirdPartyControllerForTesting bool
 
-	// Used to start and monitor tunneling
-	tunneler genericapiserver.Tunneler
-
-	restOptionsFactory restOptionsFactory
+	// nodeClient is used to back the tunneler
+	nodeClient coreclient.NodeInterface
 }
 
 // thirdPartyEntry combines objects storage and API group into one struct
@@ -169,6 +159,16 @@ func (c *Config) Complete() completedConfig {
 	// enable swagger UI only if general UI support is on
 	c.GenericConfig.EnableSwaggerUI = c.GenericConfig.EnableSwaggerUI && c.EnableUISupport
 
+	if c.EndpointReconcilerConfig.Interval == 0 {
+		c.EndpointReconcilerConfig.Interval = DefaultEndpointReconcilerInterval
+	}
+
+	if c.EndpointReconcilerConfig.Reconciler == nil {
+		// use a default endpoint reconciler if nothing is set
+		endpointClient := coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+		c.EndpointReconcilerConfig.Reconciler = NewMasterCountEndpointReconciler(c.GenericConfig.MasterCount, endpointClient)
+	}
+
 	return completedConfig{c}
 }
 
@@ -180,10 +180,10 @@ func (c *Config) SkipComplete() completedConfig {
 // New returns a new instance of Master from the given config.
 // Certain config fields will be set to a default value if unset.
 // Certain config fields must be specified, including:
-//   KubeletClient
+//   KubeletClientConfig
 func (c completedConfig) New() (*Master, error) {
-	if c.KubeletClient == nil {
-		return nil, fmt.Errorf("Master.New() called with config.KubeletClient == nil")
+	if reflect.DeepEqual(c.KubeletClientConfig, kubeletclient.KubeletClientConfig{}) {
+		return nil, fmt.Errorf("Master.New() called with empty config.KubeletClientConfig")
 	}
 
 	s, err := c.Config.GenericConfig.SkipComplete().New() // completion is done in Complete, no need for a second time
@@ -200,33 +200,35 @@ func (c completedConfig) New() (*Master, error) {
 
 	m := &Master{
 		GenericAPIServer:        s,
-		enableCoreControllers:   c.EnableCoreControllers,
 		deleteCollectionWorkers: c.DeleteCollectionWorkers,
-		tunneler:                c.Tunneler,
+		nodeClient:              coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes(),
+	}
 
-		disableThirdPartyControllerForTesting: c.disableThirdPartyControllerForTesting,
+	restOptionsFactory := restOptionsFactory{
+		deleteCollectionWorkers: c.DeleteCollectionWorkers,
+		enableGarbageCollection: c.GenericConfig.EnableGarbageCollection,
+		storageFactory:          c.StorageFactory,
+	}
 
-		restOptionsFactory: restOptionsFactory{
-			deleteCollectionWorkers: c.DeleteCollectionWorkers,
-			enableGarbageCollection: c.GenericConfig.EnableGarbageCollection,
-			storageFactory:          c.StorageFactory,
-		},
+	if c.EnableWatchCache {
+		restOptionsFactory.storageDecorator = registry.StorageWithCacher
+	} else {
+		restOptionsFactory.storageDecorator = generic.UndecoratedStorage
+	}
 
-		legacyRESTStorageProvider: corerest.LegacyRESTStorageProvider{
+	// install legacy rest storage
+	if c.GenericConfig.APIResourceConfigSource.AnyResourcesForVersionEnabled(apiv1.SchemeGroupVersion) {
+		legacyRESTStorageProvider := corerest.LegacyRESTStorageProvider{
 			StorageFactory:            c.StorageFactory,
 			ProxyTransport:            s.ProxyTransport,
-			KubeletClient:             c.KubeletClient,
+			KubeletClientConfig:       c.KubeletClientConfig,
 			EventTTL:                  c.EventTTL,
 			ServiceClusterIPRange:     c.GenericConfig.ServiceClusterIPRange,
 			ServiceNodePortRange:      c.GenericConfig.ServiceNodePortRange,
 			ComponentStatusServerFunc: func() map[string]apiserver.Server { return getServersToValidate(c.StorageFactory) },
-		},
-	}
-
-	if c.EnableWatchCache {
-		m.restOptionsFactory.storageDecorator = registry.StorageWithCacher
-	} else {
-		m.restOptionsFactory.storageDecorator = generic.UndecoratedStorage
+			LoopbackClientConfig:      c.GenericConfig.LoopbackClientConfig,
+		}
+		m.InstallLegacyAPI(c.Config, restOptionsFactory.NewFor, legacyRESTStorageProvider)
 	}
 
 	// Add some hardcoded storage for now.  Append to the map.
@@ -239,58 +241,60 @@ func (c completedConfig) New() (*Master, error) {
 	c.RESTStorageProviders[autoscaling.GroupName] = autoscalingrest.RESTStorageProvider{}
 	c.RESTStorageProviders[batch.GroupName] = batchrest.RESTStorageProvider{}
 	c.RESTStorageProviders[certificates.GroupName] = certificatesrest.RESTStorageProvider{}
-	c.RESTStorageProviders[extensions.GroupName] = extensionsrest.RESTStorageProvider{
-		ResourceInterface:                     m,
-		DisableThirdPartyControllerForTesting: m.disableThirdPartyControllerForTesting,
-	}
+	c.RESTStorageProviders[extensions.GroupName] = extensionsrest.RESTStorageProvider{ResourceInterface: m}
 	c.RESTStorageProviders[policy.GroupName] = policyrest.RESTStorageProvider{}
 	c.RESTStorageProviders[rbac.GroupName] = &rbacrest.RESTStorageProvider{AuthorizerRBACSuperUser: c.GenericConfig.AuthorizerRBACSuperUser}
 	c.RESTStorageProviders[storage.GroupName] = storagerest.RESTStorageProvider{}
-	m.InstallAPIs(c.Config)
+	m.InstallAPIs(c.Config, restOptionsFactory.NewFor)
 
-	// TODO: Attempt clean shutdown?
-	if m.enableCoreControllers {
-		m.NewBootstrapController(c.EndpointReconcilerConfig).Start()
-	}
+	m.InstallGeneralEndpoints(c.Config)
 
 	return m, nil
 }
 
-func (m *Master) InstallAPIs(c *Config) {
-	restOptionsGetter := func(resource unversioned.GroupResource) generic.RESTOptions {
-		return m.restOptionsFactory.NewFor(resource)
+func (m *Master) InstallLegacyAPI(c *Config, restOptionsGetter genericapiserver.RESTOptionsGetter, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider) {
+	legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(restOptionsGetter)
+	if err != nil {
+		glog.Fatalf("Error building core storage: %v", err)
 	}
 
-	apiGroupsInfo := []genericapiserver.APIGroupInfo{}
-
-	// Install v1 unless disabled.
-	if c.GenericConfig.APIResourceConfigSource.AnyResourcesForVersionEnabled(apiv1.SchemeGroupVersion) {
-		legacyRESTStorage, apiGroupInfo, err := m.legacyRESTStorageProvider.NewLegacyRESTStorage(restOptionsGetter)
-		if err != nil {
-			glog.Fatalf("Error building core storage: %v", err)
+	if c.EnableCoreControllers {
+		bootstrapController := c.NewBootstrapController(legacyRESTStorage)
+		if err := m.GenericAPIServer.AddPostStartHook("bootstrap-controller", bootstrapController.PostStartHook); err != nil {
+			glog.Fatalf("Error registering PostStartHook %q: %v", "bootstrap-controller", err)
 		}
-		m.legacyRESTStorage = legacyRESTStorage
-
-		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
 	}
 
+	if err := m.GenericAPIServer.InstallLegacyAPIGroup(genericapiserver.LegacyAPIPrefix, &apiGroupInfo); err != nil {
+		glog.Fatalf("Error in registering group versions: %v", err)
+	}
+}
+
+// TODO this needs to be refactored so we have a way to add general health checks to genericapiserver
+// TODO profiling should be generic
+func (m *Master) InstallGeneralEndpoints(c *Config) {
 	// Run the tunneler.
 	healthzChecks := []healthz.HealthzChecker{}
-	if m.tunneler != nil {
-		m.tunneler.Run(m.getNodeAddresses)
-		healthzChecks = append(healthzChecks, healthz.NamedCheck("SSH Tunnel Check", m.IsTunnelSyncHealthy))
+	if c.Tunneler != nil {
+		c.Tunneler.Run(m.getNodeAddresses)
+		healthzChecks = append(healthzChecks, healthz.NamedCheck("SSH Tunnel Check", genericapiserver.TunnelSyncHealthChecker(c.Tunneler)))
 		prometheus.NewGaugeFunc(prometheus.GaugeOpts{
 			Name: "apiserver_proxy_tunnel_sync_latency_secs",
 			Help: "The time since the last successful synchronization of the SSH tunnels for proxy requests.",
-		}, func() float64 { return float64(m.tunneler.SecondsSinceSync()) })
+		}, func() float64 { return float64(c.Tunneler.SecondsSinceSync()) })
 	}
-	healthz.InstallHandler(&m.HandlerContainer.NonSwaggerRoutes, healthzChecks...)
+	healthz.InstallHandler(&m.GenericAPIServer.HandlerContainer.NonSwaggerRoutes, healthzChecks...)
 
 	if c.GenericConfig.EnableProfiling {
-		routes.MetricsWithReset{}.Install(m.HandlerContainer)
+		routes.MetricsWithReset{}.Install(m.GenericAPIServer.HandlerContainer)
 	} else {
-		routes.DefaultMetrics{}.Install(m.HandlerContainer)
+		routes.DefaultMetrics{}.Install(m.GenericAPIServer.HandlerContainer)
 	}
+
+}
+
+func (m *Master) InstallAPIs(c *Config, restOptionsGetter genericapiserver.RESTOptionsGetter) {
+	apiGroupsInfo := []genericapiserver.APIGroupInfo{}
 
 	// Install third party resource support if requested
 	// TODO seems like this bit ought to be unconditional and the REST API is controlled by the config
@@ -328,71 +332,13 @@ func (m *Master) InstallAPIs(c *Config) {
 			}
 		}
 
-		// This is here so that, if the policy group is present, the eviction
-		// subresource handler wil be able to find poddisruptionbudgets
-		// TODO(lavalamp) find a better way for groups to discover and interact
-		// with each other
-		if group == "policy" {
-			storage := apiGroupsInfo[0].VersionedResourcesStorageMap["v1"]["pods/eviction"]
-			evictionStorage := storage.(*podetcd.EvictionREST)
-
-			storage = apiGroupInfo.VersionedResourcesStorageMap["v1alpha1"]["poddisruptionbudgets"]
-			evictionStorage.PodDisruptionBudgetLister = storage.(rest.Lister)
-			evictionStorage.PodDisruptionBudgetUpdater = storage.(rest.Updater)
-		}
-
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
 	}
 
 	for i := range apiGroupsInfo {
-		if err := m.InstallAPIGroup(&apiGroupsInfo[i]); err != nil {
+		if err := m.GenericAPIServer.InstallAPIGroup(&apiGroupsInfo[i]); err != nil {
 			glog.Fatalf("Error in registering group versions: %v", err)
 		}
-	}
-}
-
-// NewBootstrapController returns a controller for watching the core capabilities of the master.  If
-// endpointReconcilerConfig.Interval is 0, the default value of DefaultEndpointReconcilerInterval
-// will be used instead.  If endpointReconcilerConfig.Reconciler is nil, the default
-// MasterCountEndpointReconciler will be used.
-// TODO this should be kicked off as a server PostHook
-func (m *Master) NewBootstrapController(endpointReconcilerConfig EndpointReconcilerConfig) *Controller {
-	if endpointReconcilerConfig.Interval == 0 {
-		endpointReconcilerConfig.Interval = DefaultEndpointReconcilerInterval
-	}
-
-	if endpointReconcilerConfig.Reconciler == nil {
-		// use a default endpoint	reconciler if nothing is set
-		// m.endpointRegistry is set via m.InstallAPIs -> m.initV1ResourcesStorage
-		endpointReconcilerConfig.Reconciler = NewMasterCountEndpointReconciler(m.MasterCount, m.legacyRESTStorage.EndpointRegistry)
-	}
-
-	return &Controller{
-		NamespaceRegistry: m.legacyRESTStorage.NamespaceRegistry,
-		ServiceRegistry:   m.legacyRESTStorage.ServiceRegistry,
-
-		EndpointReconciler: endpointReconcilerConfig.Reconciler,
-		EndpointInterval:   endpointReconcilerConfig.Interval,
-
-		SystemNamespaces:         []string{api.NamespaceSystem},
-		SystemNamespacesInterval: 1 * time.Minute,
-
-		ServiceClusterIPRegistry: m.legacyRESTStorage.ServiceClusterIPAllocator,
-		ServiceClusterIPRange:    m.legacyRESTStorageProvider.ServiceClusterIPRange,
-		ServiceClusterIPInterval: 3 * time.Minute,
-
-		ServiceNodePortRegistry: m.legacyRESTStorage.ServiceNodePortAllocator,
-		ServiceNodePortRange:    m.legacyRESTStorageProvider.ServiceNodePortRange,
-		ServiceNodePortInterval: 3 * time.Minute,
-
-		PublicIP: m.ClusterIP,
-
-		ServiceIP:                 m.ServiceReadWriteIP,
-		ServicePort:               m.ServiceReadWritePort,
-		ExtraServicePorts:         m.ExtraServicePorts,
-		ExtraEndpointPorts:        m.ExtraEndpointPorts,
-		PublicServicePort:         m.PublicReadWritePort,
-		KubernetesServiceNodePort: m.KubernetesServiceNodePort,
 	}
 }
 
@@ -473,7 +419,7 @@ func (m *Master) removeThirdPartyStorage(path, resource string) error {
 	delete(entry.storage, resource)
 	if len(entry.storage) == 0 {
 		delete(m.thirdPartyResources, path)
-		m.RemoveAPIGroupForDiscovery(extensionsrest.GetThirdPartyGroupName(path))
+		m.GenericAPIServer.RemoveAPIGroupForDiscovery(extensionsrest.GetThirdPartyGroupName(path))
 	} else {
 		m.thirdPartyResources[path] = entry
 	}
@@ -493,11 +439,11 @@ func (m *Master) RemoveThirdPartyResource(path string) error {
 		return err
 	}
 
-	services := m.HandlerContainer.RegisteredWebServices()
+	services := m.GenericAPIServer.HandlerContainer.RegisteredWebServices()
 	for ix := range services {
 		root := services[ix].RootPath()
 		if root == path || strings.HasPrefix(root, path+"/") {
-			m.HandlerContainer.Remove(services[ix])
+			m.GenericAPIServer.HandlerContainer.Remove(services[ix])
 		}
 	}
 	return nil
@@ -573,7 +519,7 @@ func (m *Master) addThirdPartyResourceStorage(path, resource string, storage *th
 	}
 	entry.storage[resource] = storage
 	if !found {
-		m.AddAPIGroupForDiscovery(apiGroup)
+		m.GenericAPIServer.AddAPIGroupForDiscovery(apiGroup)
 	}
 }
 
@@ -612,13 +558,13 @@ func (m *Master) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) 
 	// the group with the new API
 	if m.hasThirdPartyGroupStorage(path) {
 		m.addThirdPartyResourceStorage(path, plural.Resource, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedataetcd.REST), apiGroup)
-		return thirdparty.UpdateREST(m.HandlerContainer.Container)
+		return thirdparty.UpdateREST(m.GenericAPIServer.HandlerContainer.Container)
 	}
 
-	if err := thirdparty.InstallREST(m.HandlerContainer.Container); err != nil {
+	if err := thirdparty.InstallREST(m.GenericAPIServer.HandlerContainer.Container); err != nil {
 		glog.Errorf("Unable to setup thirdparty api: %v", err)
 	}
-	m.HandlerContainer.Add(apiserver.NewGroupWebService(api.Codecs, path, apiGroup))
+	m.GenericAPIServer.HandlerContainer.Add(apiserver.NewGroupWebService(api.Codecs, path, apiGroup))
 
 	m.addThirdPartyResourceStorage(path, plural.Resource, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedataetcd.REST), apiGroup)
 	return nil
@@ -661,9 +607,9 @@ func (m *Master) thirdpartyapi(group, kind, version, pluralResource string) *api
 		Serializer:     thirdpartyresourcedata.NewNegotiatedSerializer(api.Codecs, kind, externalVersion, internalVersion),
 		ParameterCodec: thirdpartyresourcedata.NewThirdPartyParameterCodec(api.ParameterCodec),
 
-		Context: m.RequestContextMapper(),
+		Context: m.GenericAPIServer.RequestContextMapper(),
 
-		MinRequestTimeout: m.MinRequestTimeout(),
+		MinRequestTimeout: m.GenericAPIServer.MinRequestTimeout(),
 
 		ResourceLister: dynamicLister{m, extensionsrest.MakeThirdPartyPath(group)},
 	}
@@ -710,7 +656,7 @@ func findExternalAddress(node *api.Node) (string, error) {
 }
 
 func (m *Master) getNodeAddresses() ([]string, error) {
-	nodes, err := m.legacyRESTStorage.NodeRegistry.ListNodes(api.NewDefaultContext(), nil)
+	nodes, err := m.nodeClient.List(api.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -724,21 +670,6 @@ func (m *Master) getNodeAddresses() ([]string, error) {
 		addrs = append(addrs, addr)
 	}
 	return addrs, nil
-}
-
-func (m *Master) IsTunnelSyncHealthy(req *http.Request) error {
-	if m.tunneler == nil {
-		return nil
-	}
-	lag := m.tunneler.SecondsSinceSync()
-	if lag > 600 {
-		return fmt.Errorf("Tunnel sync is taking to long: %d", lag)
-	}
-	sshKeyLag := m.tunneler.SecondsSinceSSHKeySync()
-	if sshKeyLag > 600 {
-		return fmt.Errorf("SSHKey sync is taking to long: %d", sshKeyLag)
-	}
-	return nil
 }
 
 func DefaultAPIResourceConfigSource() *genericapiserver.ResourceConfig {

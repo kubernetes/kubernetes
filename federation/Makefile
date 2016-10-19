@@ -21,6 +21,50 @@ else
     MAKEFLAGS += -s
 endif
 
+.PHONY: all
+all: init build push deploy
+
+.PHONY: init
+init:
+	./develop/develop.sh init
+
 .PHONY: build
-build:
-	./build.sh $(do)
+build: build_binaries build_image
+
+.PHONY: push
+push:
+	./develop/develop.sh push
+
+.PHONY: deploy
+deploy: deploy_clusters deploy_federation
+
+.PHONY: destroy
+destroy: destroy_federation destroy_clusters
+
+.PHONY: build_binaries
+build_binaries:
+	./develop/develop.sh build_binaries
+
+.PHONY: build_image
+build_image:
+	./develop/develop.sh build_image
+
+.PHONY: deploy_clusters
+deploy_clusters:
+	./develop/develop.sh deploy_clusters
+
+.PHONY: deploy_federation
+deploy_federation:
+	./develop/develop.sh deploy_federation
+
+.PHONY: destroy_federation
+destroy_federation:
+	./develop/develop.sh destroy_federation
+
+.PHONY: destroy_clusters
+destroy_clusters:
+	./develop/develop.sh destroy_clusters
+
+.PHONY: redeploy_federation
+redeploy_federation:
+	./develop/develop.sh redeploy_federation

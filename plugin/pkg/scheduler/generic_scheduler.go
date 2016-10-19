@@ -71,6 +71,8 @@ type genericScheduler struct {
 	lastNodeIndex        uint64
 
 	cachedNodeInfoMap map[string]*schedulercache.NodeInfo
+
+	equivalenceCache *EquivalenceCache
 }
 
 // Schedule tries to schedule the given pod to one of node in the node list.
@@ -83,7 +85,7 @@ func (g *genericScheduler) Schedule(pod *api.Pod, nodeLister algorithm.NodeListe
 	} else {
 		trace = util.NewTrace("Scheduling <nil> pod")
 	}
-	defer trace.LogIfLong(20 * time.Millisecond)
+	defer trace.LogIfLong(100 * time.Millisecond)
 
 	nodes, err := nodeLister.List()
 	if err != nil {
@@ -99,6 +101,8 @@ func (g *genericScheduler) Schedule(pod *api.Pod, nodeLister algorithm.NodeListe
 		return "", err
 	}
 
+	// TODO(harryz) Check if equivalenceCache is enabled and call scheduleWithEquivalenceClass here
+
 	trace.Step("Computing predicates")
 	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, g.cachedNodeInfoMap, nodes, g.predicates, g.extenders)
 	if err != nil {
@@ -113,8 +117,8 @@ func (g *genericScheduler) Schedule(pod *api.Pod, nodeLister algorithm.NodeListe
 	}
 
 	trace.Step("Prioritizing")
-	meta := g.priorityMetaProducer(pod)
-	priorityList, err := PrioritizeNodes(pod, g.cachedNodeInfoMap, meta, g.prioritizers, filteredNodes, g.extenders)
+	metaPrioritiesInterface := g.priorityMetaProducer(pod, g.cachedNodeInfoMap)
+	priorityList, err := PrioritizeNodes(pod, g.cachedNodeInfoMap, metaPrioritiesInterface, g.prioritizers, filteredNodes, g.extenders)
 	if err != nil {
 		return "", err
 	}

@@ -9185,7 +9185,8 @@
     "required": [
      "currentNumberScheduled",
      "numberMisscheduled",
-     "desiredNumberScheduled"
+     "desiredNumberScheduled",
+     "numberReady"
     ],
     "properties": {
      "currentNumberScheduled": {
@@ -9202,6 +9203,11 @@
       "type": "integer",
       "format": "int32",
       "description": "DesiredNumberScheduled is the total number of nodes that should be running the daemon pod (including nodes correctly running the daemon pod). More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md"
+     },
+     "numberReady": {
+      "type": "integer",
+      "format": "int32",
+      "description": "NumberReady is the number of nodes that should be running the daemon pod and have one or more of the daemon pod running and ready."
      }
     }
    },
@@ -10348,6 +10354,49 @@
       "type": "integer",
       "format": "int64",
       "description": "ObservedGeneration reflects the generation of the most recently observed ReplicaSet."
+     },
+     "conditions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.ReplicaSetCondition"
+      },
+      "description": "Represents the latest available observations of a replica set's current state."
+     }
+    }
+   },
+   "v1beta1.ReplicaSetCondition": {
+    "id": "v1beta1.ReplicaSetCondition",
+    "description": "ReplicaSetCondition describes the state of a replica set at a certain point.",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "type": {
+      "type": "string",
+      "description": "Type of replica set condition."
+     },
+     "status": {
+      "type": "string",
+      "description": "Status of the condition, one of True, False, Unknown."
+     },
+     "lastProbeTime": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last time we probed the condition."
+     },
+     "lastTransitionTime": {
+      "type": "string",
+      "format": "date-time",
+      "description": "The last time the condition transitioned from one status to another."
+     },
+     "reason": {
+      "type": "string",
+      "description": "The reason for the condition's last transition."
+     },
+     "message": {
+      "type": "string",
+      "description": "A human readable message indicating details about the transition."
      }
     }
    },

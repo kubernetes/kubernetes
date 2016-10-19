@@ -26,6 +26,10 @@ type FakeCore struct {
 	*core.Fake
 }
 
+func (c *FakeCore) ConfigMaps(namespace string) v1.ConfigMapInterface {
+	return &FakeConfigMaps{c, namespace}
+}
+
 func (c *FakeCore) Events(namespace string) v1.EventInterface {
 	return &FakeEvents{c, namespace}
 }

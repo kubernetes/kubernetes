@@ -29,8 +29,8 @@ cluster/juju/layers/kubernetes/reactive/k8s.py:    cluster_name = 'kubernetes'
 cluster/juju/layers/kubernetes/reactive/k8s.py:    tlslib.client_key(None, client_key, user='ubuntu', group='ubuntu')
 cluster/lib/logging.sh:      local source_file=${BASH_SOURCE[$frame_no]}
 cluster/lib/logging.sh:    local source_file=${BASH_SOURCE[$stack_skip]}
-cluster/log-dump.sh:    for node_name in "${NODE_NAMES[@]}"; do
 cluster/log-dump.sh:    local -r node_name="${1}"
+cluster/log-dump.sh:  for node_name in "${node_names[@]}"; do
 cluster/log-dump.sh:readonly report_dir="${1:-_artifacts}"
 cluster/mesos/docker/km/build.sh:  km_path=$(find-binary km darwin/amd64)
 cluster/photon-controller/templates/salt-master.sh:  api_servers: $MASTER_NAME
@@ -70,7 +70,6 @@ cluster/vagrant/provision-utils.sh:  node_ip: '$(echo "$MASTER_IP" | sed -e "s/'
 cluster/vagrant/provision-utils.sh:  runtime_config: '$(echo "$RUNTIME_CONFIG" | sed -e "s/'/''/g")'
 cluster/vsphere/templates/salt-master.sh:  cloud_config: $CLOUD_CONFIG
 cluster/vsphere/templates/salt-minion.sh:  cloud_config: $CLOUD_CONFIG
-cluster/vsphere/templates/salt-minion.sh:  hostname_override: $(ip route get 1.1.1.1 | awk '{print $7}')
 examples/cluster-dns/images/frontend/client.py:  service_address = socket.gethostbyname(hostname)
 examples/storage/cassandra/image/files/run.sh:  cluster_name \
 examples/storage/vitess/env.sh:    node_ip=$(get_node_ip)
@@ -101,8 +100,12 @@ hack/test-update-storage-objects.sh:  source_file=${test_data[0]}
 hack/test-update-storage-objects.sh:# source_file,resource,namespace,name,old_version,new_version
 pkg/kubelet/api/v1alpha1/runtime/api.pb.go:	ContainerPort *int32 `protobuf:"varint,2,opt,name=container_port,json=containerPort" json:"container_port,omitempty"`
 pkg/kubelet/api/v1alpha1/runtime/api.pb.go:	OomScoreAdj      *int64 `protobuf:"varint,5,opt,name=oom_score_adj,json=oomScoreAdj" json:"oom_score_adj,omitempty"`
+pkg/kubelet/api/v1alpha1/runtime/api.pb.go:	PodCidr          *string `protobuf:"bytes,1,opt,name=pod_cidr,json=podCidr" json:"pod_cidr,omitempty"`
+pkg/kubelet/api/v1alpha1/runtime/api.pb.go:	RuntimeConfig    *RuntimeConfig `protobuf:"bytes,1,opt,name=runtime_config,json=runtimeConfig" json:"runtime_config,omitempty"`
+pkg/kubelet/api/v1alpha1/runtime/api.proto:    optional RuntimeConfig runtime_config = 1;
 pkg/kubelet/api/v1alpha1/runtime/api.proto:    optional int32 container_port = 2;
 pkg/kubelet/api/v1alpha1/runtime/api.proto:    optional int64 oom_score_adj = 5;
+pkg/kubelet/api/v1alpha1/runtime/api.proto:    optional string pod_cidr = 1;
 pkg/kubelet/cm/container_manager_linux.go:		glog.V(3).Infof("Failed to apply oom_score_adj %d for pid %d: %v", oomScoreAdj, pid, err)
 pkg/kubelet/cm/container_manager_linux.go:	glog.V(5).Infof("attempting to apply oom_score_adj of %d to pid %d", oomScoreAdj, pid)
 pkg/kubelet/network/hairpin/hairpin.go:	hairpinModeRelativePath = "hairpin_mode"
@@ -119,9 +122,9 @@ test/e2e/common/host_path.go:			fmt.Sprintf("--file_content_in_loop=%v", filePat
 test/e2e/common/host_path.go:			fmt.Sprintf("--file_content_in_loop=%v", filePathInReader),
 test/e2e/common/host_path.go:			fmt.Sprintf("--retry_time=%d", retryDuration),
 test/e2e/common/host_path.go:			fmt.Sprintf("--retry_time=%d", retryDuration),
-test/e2e/es_cluster_logging.go:		framework.Failf("No cluster_name field in Elasticsearch response: %v", esResponse)
-test/e2e/es_cluster_logging.go:	// Check to see if have a cluster_name field.
-test/e2e/es_cluster_logging.go:	clusterName, ok := esResponse["cluster_name"]
+test/e2e/cluster_logging_es.go:		return fmt.Errorf("No cluster_name field in Elasticsearch response: %v", esResponse)
+test/e2e/cluster_logging_es.go:	// Check to see if have a cluster_name field.
+test/e2e/cluster_logging_es.go:	clusterName, ok := esResponse["cluster_name"]
 test/e2e_node/container_manager_test.go:		return fmt.Errorf("expected pid %d's oom_score_adj to be %d; found %d", pid, expectedOOMScoreAdj, oomScore)
 test/e2e_node/container_manager_test.go:		return fmt.Errorf("expected pid %d's oom_score_adj to be < %d; found %d", pid, expectedMaxOOMScoreAdj, oomScore)
 test/e2e_node/container_manager_test.go:		return fmt.Errorf("expected pid %d's oom_score_adj to be >= %d; found %d", pid, expectedMinOOMScoreAdj, oomScore)

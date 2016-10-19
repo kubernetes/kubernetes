@@ -123,7 +123,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	podStartupTimeout := framework.TestContext.SystemPodsStartupTimeout
 	if err := framework.WaitForPodsRunningReady(c, api.NamespaceSystem, int32(framework.TestContext.MinStartupPods), podStartupTimeout, framework.ImagePullerLabels); err != nil {
 		framework.DumpAllNamespaceInfo(c, clientset, api.NamespaceSystem)
-		framework.LogFailedContainers(c, api.NamespaceSystem)
+		framework.LogFailedContainers(c, api.NamespaceSystem, framework.Logf)
 		framework.RunKubernetesServiceTestContainer(c, api.NamespaceDefault)
 		framework.Failf("Error waiting for all pods to be running and ready: %v", err)
 	}
@@ -139,7 +139,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Dump the output of the nethealth containers only once per run
 	if framework.TestContext.DumpLogsOnFailure {
 		framework.Logf("Dumping network health container logs from all nodes")
-		framework.LogContainersInPodsWithLabels(c, api.NamespaceSystem, framework.ImagePullerLabels, "nethealth")
+		framework.LogContainersInPodsWithLabels(c, api.NamespaceSystem, framework.ImagePullerLabels, "nethealth", framework.Logf)
 	}
 
 	// Reference common test to make the import valid.

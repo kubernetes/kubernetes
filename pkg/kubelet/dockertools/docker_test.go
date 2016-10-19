@@ -315,6 +315,85 @@ func TestMatchImageTagOrSHA(t *testing.T) {
 	}
 }
 
+func TestMatchImageIDOnly(t *testing.T) {
+	for i, testCase := range []struct {
+		Inspected dockertypes.ImageInspect
+		Image     string
+		Output    bool
+	}{
+		// shouldn't match names or tagged names
+		{
+			Inspected: dockertypes.ImageInspect{RepoTags: []string{"ubuntu:latest"}},
+			Image:     "ubuntu",
+			Output:    false,
+		},
+		{
+			Inspected: dockertypes.ImageInspect{RepoTags: []string{"colemickens/hyperkube-amd64:217.9beff63"}},
+			Image:     "colemickens/hyperkube-amd64:217.9beff63",
+			Output:    false,
+		},
+		// should match name@digest refs if they refer to the image ID (but only the full ID)
+		{
+			Inspected: dockertypes.ImageInspect{
+				ID: "sha256:2208f7a29005d226d1ee33a63e33af1f47af6156c740d7d23c7948e8d282d53d",
+			},
+			Image:  "myimage@sha256:2208f7a29005d226d1ee33a63e33af1f47af6156c740d7d23c7948e8d282d53d",
+			Output: true,
+		},
+		{
+			Inspected: dockertypes.ImageInspect{
+				ID: "sha256:2208f7a29005d226d1ee33a63e33af1f47af6156c740d7d23c7948e8d282d53d",
+			},
+			Image:  "myimage@sha256:2208f7a29005",
+			Output: false,
+		},
+		{
+			Inspected: dockertypes.ImageInspect{
+				ID: "sha256:2208f7a29005d226d1ee33a63e33af1f47af6156c740d7d23c7948e8d282d53d",
+			},
+			Image:  "myimage@sha256:2208",
+			Output: false,
+		},
+		// should match when the IDs are literally the same
+		{
+			Inspected: dockertypes.ImageInspect{
+				ID: "foobar",
+			},
+			Image:  "foobar",
+			Output: true,
+		},
+		// shouldn't match mismatched IDs
+		{
+			Inspected: dockertypes.ImageInspect{
+				ID: "sha256:2208f7a29005d226d1ee33a63e33af1f47af6156c740d7d23c7948e8d282d53d",
+			},
+			Image:  "myimage@sha256:0000f7a29005d226d1ee33a63e33af1f47af6156c740d7d23c7948e8d282d53d",
+			Output: false,
+		},
+		// shouldn't match invalid IDs or refs
+		{
+			Inspected: dockertypes.ImageInspect{
+				ID: "sha256:unparseable",
+			},
+			Image:  "myimage@sha256:unparseable",
+			Output: false,
+		},
+		// shouldn't match against repo digests
+		{
+			Inspected: dockertypes.ImageInspect{
+				ID:          "sha256:9bbdf247c91345f0789c10f50a57e36a667af1189687ad1de88a6243d05a2227",
+				RepoDigests: []string{"centos/ruby-23-centos7@sha256:940584acbbfb0347272112d2eb95574625c0c60b4e2fdadb139de5859cf754bf"},
+			},
+			Image:  "centos/ruby-23-centos7@sha256:940584acbbfb0347272112d2eb95574625c0c60b4e2fdadb139de5859cf754bf",
+			Output: false,
+		},
+	} {
+		match := matchImageIDOnly(testCase.Inspected, testCase.Image)
+		assert.Equal(t, testCase.Output, match, fmt.Sprintf("%s is not a match (%d)", testCase.Image, i))
+	}
+
+}
+
 func TestPullWithNoSecrets(t *testing.T) {
 	tests := []struct {
 		imageName     string
@@ -614,8 +693,14 @@ type imageTrackingDockerClient struct {
 	imageName string
 }
 
-func (f *imageTrackingDockerClient) InspectImage(name string) (image *dockertypes.ImageInspect, err error) {
-	image, err = f.FakeDockerClient.InspectImage(name)
+func (f *imageTrackingDockerClient) InspectImageByID(name string) (image *dockertypes.ImageInspect, err error) {
+	image, err = f.FakeDockerClient.InspectImageByID(name)
+	f.imageName = name
+	return
+}
+
+func (f *imageTrackingDockerClient) InspectImageByRef(name string) (image *dockertypes.ImageInspect, err error) {
+	image, err = f.FakeDockerClient.InspectImageByRef(name)
 	f.imageName = name
 	return
 }

@@ -40,18 +40,24 @@ func TestAuthenticateRequest(t *testing.T) {
 			if user == nil || !ok {
 				t.Errorf("no user stored in context: %#v", ctx)
 			}
+			if req.Header.Get("Authorization") != "" {
+				t.Errorf("Authorization header should be removed from request on success: %#v", req)
+			}
 			close(success)
 		}),
 		contextMapper,
 		authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
-			return &user.DefaultInfo{Name: "user"}, true, nil
+			if req.Header.Get("Authorization") == "Something" {
+				return &user.DefaultInfo{Name: "user"}, true, nil
+			}
+			return nil, false, errors.New("Authorization header is missing.")
 		}),
 		http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 			t.Errorf("unexpected call to failed")
 		}),
 	)
 
-	auth.ServeHTTP(httptest.NewRecorder(), &http.Request{})
+	auth.ServeHTTP(httptest.NewRecorder(), &http.Request{Header: map[string][]string{"Authorization": {"Something"}}})
 
 	<-success
 	empty, err := api.IsEmpty(contextMapper)

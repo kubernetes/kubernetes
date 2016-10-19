@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -84,7 +85,7 @@ func (c *Client) Setup(t *testing.T) *Client {
 	if c.Client == nil {
 		c.Client = client.NewOrDie(&restclient.Config{
 			Host:          c.server.URL,
-			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()},
+			ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion},
 		})
 
 		// TODO: caesarxuchao: hacky way to specify version of Experimental client.
@@ -170,9 +171,9 @@ func (c *Client) ValidateCommon(t *testing.T, err error) {
 		validator, ok := c.QueryValidator[key]
 		if !ok {
 			switch key {
-			case unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String()):
+			case unversioned.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String()):
 				validator = ValidateLabels
-			case unversioned.FieldSelectorQueryParam(testapi.Default.GroupVersion().String()):
+			case unversioned.FieldSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String()):
 				validator = validateFields
 			default:
 				validator = func(a, b string) bool { return a == b }

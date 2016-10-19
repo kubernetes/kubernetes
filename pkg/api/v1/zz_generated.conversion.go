@@ -280,6 +280,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_RangeAllocation_To_v1_RangeAllocation,
 		Convert_v1_ReplicationController_To_api_ReplicationController,
 		Convert_api_ReplicationController_To_v1_ReplicationController,
+		Convert_v1_ReplicationControllerCondition_To_api_ReplicationControllerCondition,
+		Convert_api_ReplicationControllerCondition_To_v1_ReplicationControllerCondition,
 		Convert_v1_ReplicationControllerList_To_api_ReplicationControllerList,
 		Convert_api_ReplicationControllerList_To_v1_ReplicationControllerList,
 		Convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec,
@@ -500,7 +502,6 @@ func Convert_api_AvoidPods_To_v1_AvoidPods(in *api.AvoidPods, out *AvoidPods, s 
 }
 
 func autoConvert_v1_AzureDiskVolumeSource_To_api_AzureDiskVolumeSource(in *AzureDiskVolumeSource, out *api.AzureDiskVolumeSource, s conversion.Scope) error {
-	SetDefaults_AzureDiskVolumeSource(in)
 	out.DiskName = in.DiskName
 	out.DataDiskURI = in.DataDiskURI
 	if in.CachingMode != nil {
@@ -837,7 +838,6 @@ func Convert_api_ComponentStatusList_To_v1_ComponentStatusList(in *api.Component
 }
 
 func autoConvert_v1_ConfigMap_To_api_ConfigMap(in *ConfigMap, out *api.ConfigMap, s conversion.Scope) error {
-	SetDefaults_ConfigMap(in)
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -942,7 +942,6 @@ func Convert_api_ConfigMapList_To_v1_ConfigMapList(in *api.ConfigMapList, out *C
 }
 
 func autoConvert_v1_ConfigMapVolumeSource_To_api_ConfigMapVolumeSource(in *ConfigMapVolumeSource, out *api.ConfigMapVolumeSource, s conversion.Scope) error {
-	SetDefaults_ConfigMapVolumeSource(in)
 	if err := Convert_v1_LocalObjectReference_To_api_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
 		return err
 	}
@@ -989,7 +988,6 @@ func Convert_api_ConfigMapVolumeSource_To_v1_ConfigMapVolumeSource(in *api.Confi
 }
 
 func autoConvert_v1_Container_To_api_Container(in *Container, out *api.Container, s conversion.Scope) error {
-	SetDefaults_Container(in)
 	out.Name = in.Name
 	out.Image = in.Image
 	out.Command = in.Command
@@ -1190,7 +1188,6 @@ func Convert_api_ContainerImage_To_v1_ContainerImage(in *api.ContainerImage, out
 }
 
 func autoConvert_v1_ContainerPort_To_api_ContainerPort(in *ContainerPort, out *api.ContainerPort, s conversion.Scope) error {
-	SetDefaults_ContainerPort(in)
 	out.Name = in.Name
 	out.HostPort = in.HostPort
 	out.ContainerPort = in.ContainerPort
@@ -1525,7 +1522,6 @@ func Convert_api_DownwardAPIVolumeFile_To_v1_DownwardAPIVolumeFile(in *api.Downw
 }
 
 func autoConvert_v1_DownwardAPIVolumeSource_To_api_DownwardAPIVolumeSource(in *DownwardAPIVolumeSource, out *api.DownwardAPIVolumeSource, s conversion.Scope) error {
-	SetDefaults_DownwardAPIVolumeSource(in)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]api.DownwardAPIVolumeFile, len(*in))
@@ -1728,7 +1724,6 @@ func Convert_api_EndpointSubset_To_v1_EndpointSubset(in *api.EndpointSubset, out
 }
 
 func autoConvert_v1_Endpoints_To_api_Endpoints(in *Endpoints, out *api.Endpoints, s conversion.Scope) error {
-	SetDefaults_Endpoints(in)
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -2283,7 +2278,6 @@ func Convert_api_GlusterfsVolumeSource_To_v1_GlusterfsVolumeSource(in *api.Glust
 }
 
 func autoConvert_v1_HTTPGetAction_To_api_HTTPGetAction(in *HTTPGetAction, out *api.HTTPGetAction, s conversion.Scope) error {
-	SetDefaults_HTTPGetAction(in)
 	out.Path = in.Path
 	if err := api.Convert_intstr_IntOrString_To_intstr_IntOrString(&in.Port, &out.Port, s); err != nil {
 		return err
@@ -2442,7 +2436,6 @@ func Convert_api_HostPathVolumeSource_To_v1_HostPathVolumeSource(in *api.HostPat
 }
 
 func autoConvert_v1_ISCSIVolumeSource_To_api_ISCSIVolumeSource(in *ISCSIVolumeSource, out *api.ISCSIVolumeSource, s conversion.Scope) error {
-	SetDefaults_ISCSIVolumeSource(in)
 	out.TargetPortal = in.TargetPortal
 	out.IQN = in.IQN
 	out.Lun = in.Lun
@@ -2579,7 +2572,6 @@ func Convert_api_LimitRange_To_v1_LimitRange(in *api.LimitRange, out *LimitRange
 }
 
 func autoConvert_v1_LimitRangeItem_To_api_LimitRangeItem(in *LimitRangeItem, out *api.LimitRangeItem, s conversion.Scope) error {
-	SetDefaults_LimitRangeItem(in)
 	out.Type = api.LimitType(in.Type)
 	if err := Convert_v1_ResourceList_To_api_ResourceList(&in.Max, &out.Max, s); err != nil {
 		return err
@@ -3078,7 +3070,6 @@ func Convert_api_NamespaceSpec_To_v1_NamespaceSpec(in *api.NamespaceSpec, out *N
 }
 
 func autoConvert_v1_NamespaceStatus_To_api_NamespaceStatus(in *NamespaceStatus, out *api.NamespaceStatus, s conversion.Scope) error {
-	SetDefaults_NamespaceStatus(in)
 	out.Phase = api.NamespacePhase(in.Phase)
 	return nil
 }
@@ -3097,7 +3088,6 @@ func Convert_api_NamespaceStatus_To_v1_NamespaceStatus(in *api.NamespaceStatus, 
 }
 
 func autoConvert_v1_Node_To_api_Node(in *Node, out *api.Node, s conversion.Scope) error {
-	SetDefaults_Node(in)
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -3468,7 +3458,6 @@ func Convert_api_NodeSpec_To_v1_NodeSpec(in *api.NodeSpec, out *NodeSpec, s conv
 }
 
 func autoConvert_v1_NodeStatus_To_api_NodeStatus(in *NodeStatus, out *api.NodeStatus, s conversion.Scope) error {
-	SetDefaults_NodeStatus(in)
 	if err := Convert_v1_ResourceList_To_api_ResourceList(&in.Capacity, &out.Capacity, s); err != nil {
 		return err
 	}
@@ -3673,7 +3662,6 @@ func Convert_api_NodeSystemInfo_To_v1_NodeSystemInfo(in *api.NodeSystemInfo, out
 }
 
 func autoConvert_v1_ObjectFieldSelector_To_api_ObjectFieldSelector(in *ObjectFieldSelector, out *api.ObjectFieldSelector, s conversion.Scope) error {
-	SetDefaults_ObjectFieldSelector(in)
 	out.APIVersion = in.APIVersion
 	out.FieldPath = in.FieldPath
 	return nil
@@ -3820,7 +3808,6 @@ func Convert_api_OwnerReference_To_v1_OwnerReference(in *api.OwnerReference, out
 }
 
 func autoConvert_v1_PersistentVolume_To_api_PersistentVolume(in *PersistentVolume, out *api.PersistentVolume, s conversion.Scope) error {
-	SetDefaults_PersistentVolume(in)
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -3861,7 +3848,6 @@ func Convert_api_PersistentVolume_To_v1_PersistentVolume(in *api.PersistentVolum
 }
 
 func autoConvert_v1_PersistentVolumeClaim_To_api_PersistentVolumeClaim(in *PersistentVolumeClaim, out *api.PersistentVolumeClaim, s conversion.Scope) error {
-	SetDefaults_PersistentVolumeClaim(in)
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -4520,7 +4506,6 @@ func Convert_api_PersistentVolumeStatus_To_v1_PersistentVolumeStatus(in *api.Per
 }
 
 func autoConvert_v1_Pod_To_api_Pod(in *Pod, out *api.Pod, s conversion.Scope) error {
-	SetDefaults_Pod(in)
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -4695,7 +4680,6 @@ func Convert_api_PodAntiAffinity_To_v1_PodAntiAffinity(in *api.PodAntiAffinity, 
 }
 
 func autoConvert_v1_PodAttachOptions_To_api_PodAttachOptions(in *PodAttachOptions, out *api.PodAttachOptions, s conversion.Scope) error {
-	SetDefaults_PodAttachOptions(in)
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -4764,7 +4748,6 @@ func Convert_api_PodCondition_To_v1_PodCondition(in *api.PodCondition, out *PodC
 }
 
 func autoConvert_v1_PodExecOptions_To_api_PodExecOptions(in *PodExecOptions, out *api.PodExecOptions, s conversion.Scope) error {
-	SetDefaults_PodExecOptions(in)
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -4982,7 +4965,6 @@ func Convert_api_PodSignature_To_v1_PodSignature(in *api.PodSignature, out *PodS
 }
 
 func autoConvert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conversion.Scope) error {
-	SetDefaults_PodSpec(in)
 	if in.Volumes != nil {
 		in, out := &in.Volumes, &out.Volumes
 		*out = make([]api.Volume, len(*in))
@@ -5417,7 +5399,6 @@ func Convert_api_PreferredSchedulingTerm_To_v1_PreferredSchedulingTerm(in *api.P
 }
 
 func autoConvert_v1_Probe_To_api_Probe(in *Probe, out *api.Probe, s conversion.Scope) error {
-	SetDefaults_Probe(in)
 	if err := Convert_v1_Handler_To_api_Handler(&in.Handler, &out.Handler, s); err != nil {
 		return err
 	}
@@ -5476,7 +5457,6 @@ func Convert_api_QuobyteVolumeSource_To_v1_QuobyteVolumeSource(in *api.QuobyteVo
 }
 
 func autoConvert_v1_RBDVolumeSource_To_api_RBDVolumeSource(in *RBDVolumeSource, out *api.RBDVolumeSource, s conversion.Scope) error {
-	SetDefaults_RBDVolumeSource(in)
 	out.CephMonitors = in.CephMonitors
 	out.RBDImage = in.RBDImage
 	out.FSType = in.FSType
@@ -5561,7 +5541,6 @@ func Convert_api_RangeAllocation_To_v1_RangeAllocation(in *api.RangeAllocation, 
 }
 
 func autoConvert_v1_ReplicationController_To_api_ReplicationController(in *ReplicationController, out *api.ReplicationController, s conversion.Scope) error {
-	SetDefaults_ReplicationController(in)
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -5599,6 +5578,42 @@ func autoConvert_api_ReplicationController_To_v1_ReplicationController(in *api.R
 
 func Convert_api_ReplicationController_To_v1_ReplicationController(in *api.ReplicationController, out *ReplicationController, s conversion.Scope) error {
 	return autoConvert_api_ReplicationController_To_v1_ReplicationController(in, out, s)
+}
+
+func autoConvert_v1_ReplicationControllerCondition_To_api_ReplicationControllerCondition(in *ReplicationControllerCondition, out *api.ReplicationControllerCondition, s conversion.Scope) error {
+	out.Type = api.ReplicationControllerConditionType(in.Type)
+	out.Status = api.ConditionStatus(in.Status)
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastProbeTime, &out.LastProbeTime, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastTransitionTime, &out.LastTransitionTime, s); err != nil {
+		return err
+	}
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return nil
+}
+
+func Convert_v1_ReplicationControllerCondition_To_api_ReplicationControllerCondition(in *ReplicationControllerCondition, out *api.ReplicationControllerCondition, s conversion.Scope) error {
+	return autoConvert_v1_ReplicationControllerCondition_To_api_ReplicationControllerCondition(in, out, s)
+}
+
+func autoConvert_api_ReplicationControllerCondition_To_v1_ReplicationControllerCondition(in *api.ReplicationControllerCondition, out *ReplicationControllerCondition, s conversion.Scope) error {
+	out.Type = ReplicationControllerConditionType(in.Type)
+	out.Status = ConditionStatus(in.Status)
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastProbeTime, &out.LastProbeTime, s); err != nil {
+		return err
+	}
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastTransitionTime, &out.LastTransitionTime, s); err != nil {
+		return err
+	}
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return nil
+}
+
+func Convert_api_ReplicationControllerCondition_To_v1_ReplicationControllerCondition(in *api.ReplicationControllerCondition, out *ReplicationControllerCondition, s conversion.Scope) error {
+	return autoConvert_api_ReplicationControllerCondition_To_v1_ReplicationControllerCondition(in, out, s)
 }
 
 func autoConvert_v1_ReplicationControllerList_To_api_ReplicationControllerList(in *ReplicationControllerList, out *api.ReplicationControllerList, s conversion.Scope) error {
@@ -5693,6 +5708,17 @@ func autoConvert_v1_ReplicationControllerStatus_To_api_ReplicationControllerStat
 	out.ReadyReplicas = in.ReadyReplicas
 	out.AvailableReplicas = in.AvailableReplicas
 	out.ObservedGeneration = in.ObservedGeneration
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]api.ReplicationControllerCondition, len(*in))
+		for i := range *in {
+			if err := Convert_v1_ReplicationControllerCondition_To_api_ReplicationControllerCondition(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
+	}
 	return nil
 }
 
@@ -5706,6 +5732,17 @@ func autoConvert_api_ReplicationControllerStatus_To_v1_ReplicationControllerStat
 	out.ReadyReplicas = in.ReadyReplicas
 	out.AvailableReplicas = in.AvailableReplicas
 	out.ObservedGeneration = in.ObservedGeneration
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]ReplicationControllerCondition, len(*in))
+		for i := range *in {
+			if err := Convert_api_ReplicationControllerCondition_To_v1_ReplicationControllerCondition(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
+	}
 	return nil
 }
 
@@ -6000,7 +6037,6 @@ func Convert_api_SELinuxOptions_To_v1_SELinuxOptions(in *api.SELinuxOptions, out
 }
 
 func autoConvert_v1_Secret_To_api_Secret(in *Secret, out *api.Secret, s conversion.Scope) error {
-	SetDefaults_Secret(in)
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -6104,7 +6140,6 @@ func Convert_api_SecretList_To_v1_SecretList(in *api.SecretList, out *SecretList
 }
 
 func autoConvert_v1_SecretVolumeSource_To_api_SecretVolumeSource(in *SecretVolumeSource, out *api.SecretVolumeSource, s conversion.Scope) error {
-	SetDefaults_SecretVolumeSource(in)
 	out.SecretName = in.SecretName
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -6501,7 +6536,6 @@ func Convert_api_ServiceProxyOptions_To_v1_ServiceProxyOptions(in *api.ServicePr
 }
 
 func autoConvert_v1_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *api.ServiceSpec, s conversion.Scope) error {
-	SetDefaults_ServiceSpec(in)
 	if in.Ports != nil {
 		in, out := &in.Ports, &out.Ports
 		*out = make([]api.ServicePort, len(*in))
@@ -6639,7 +6673,6 @@ func Convert_api_Toleration_To_v1_Toleration(in *api.Toleration, out *Toleration
 }
 
 func autoConvert_v1_Volume_To_api_Volume(in *Volume, out *api.Volume, s conversion.Scope) error {
-	SetDefaults_Volume(in)
 	out.Name = in.Name
 	if err := Convert_v1_VolumeSource_To_api_VolumeSource(&in.VolumeSource, &out.VolumeSource, s); err != nil {
 		return err

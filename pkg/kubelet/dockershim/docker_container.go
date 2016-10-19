@@ -229,6 +229,13 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 		return nil, fmt.Errorf("failed to parse timestamp for container %q: %v", containerID, err)
 	}
 
+	// Convert the image id to pullable id.
+	ir, err := ds.client.InspectImageByID(r.Image)
+	if err != nil {
+		return nil, fmt.Errorf("unable to inspect docker image %q while inspecting docker container %q: %v", r.Image, containerID, err)
+	}
+	imageID := toPullableImageID(r.Image, ir)
+
 	// Convert the mounts.
 	mounts := []*runtimeApi.Mount{}
 	for i := range r.Mounts {
@@ -280,7 +287,7 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 	}
 
 	// Convert to unix timestamps.
-	ct, st, ft := createdAt.Unix(), startedAt.Unix(), finishedAt.Unix()
+	ct, st, ft := createdAt.UnixNano(), startedAt.UnixNano(), finishedAt.UnixNano()
 	exitCode := int32(r.State.ExitCode)
 
 	metadata, err := parseContainerName(r.Name)
@@ -293,7 +300,7 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 		Id:          &r.ID,
 		Metadata:    metadata,
 		Image:       &runtimeApi.ImageSpec{Image: &r.Config.Image},
-		ImageRef:    &r.Image,
+		ImageRef:    &imageID,
 		Mounts:      mounts,
 		ExitCode:    &exitCode,
 		State:       &state,

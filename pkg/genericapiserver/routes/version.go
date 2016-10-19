@@ -27,16 +27,22 @@ import (
 )
 
 // Version provides a webservice with version information.
-type Version struct{}
+type Version struct {
+	Version *version.Info
+}
 
 // Install registers the APIServer's `/version` handler.
 func (v Version) Install(c *mux.APIContainer) {
+	if v.Version == nil {
+		return
+	}
+
 	// Set up a service to return the git code version.
 	versionWS := new(restful.WebService)
 	versionWS.Path("/version")
 	versionWS.Doc("git code version from which this is built")
 	versionWS.Route(
-		versionWS.GET("/").To(handleVersion).
+		versionWS.GET("/").To(v.handleVersion).
 			Doc("get the code version").
 			Operation("getCodeVersion").
 			Produces(restful.MIME_JSON).
@@ -47,6 +53,6 @@ func (v Version) Install(c *mux.APIContainer) {
 }
 
 // handleVersion writes the server's version information.
-func handleVersion(req *restful.Request, resp *restful.Response) {
-	apiserver.WriteRawJSON(http.StatusOK, version.Get(), resp.ResponseWriter)
+func (v Version) handleVersion(req *restful.Request, resp *restful.Response) {
+	apiserver.WriteRawJSON(http.StatusOK, *v.Version, resp.ResponseWriter)
 }

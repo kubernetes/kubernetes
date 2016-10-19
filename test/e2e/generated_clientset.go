@@ -20,8 +20,7 @@ import (
 	"strconv"
 	"time"
 
-	clientapi "k8s.io/client-go/1.5/pkg/api"
-	clientv1 "k8s.io/client-go/1.5/pkg/api/v1"
+	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -149,10 +148,6 @@ var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 		if err != nil {
 			framework.Failf("Failed to create pod: %v", err)
 		}
-		// We call defer here in case there is a problem with
-		// the test so we can ensure that we clean up after
-		// ourselves
-		defer podClient.Delete(pod.Name, v1.NewDeleteOptions(0))
 
 		By("verifying the pod is in kubernetes")
 		options = v1.ListOptions{
@@ -202,7 +197,7 @@ var _ = framework.KubeDescribe("Staging client repo client", func() {
 		podCopy := stagingClientPod(name, value)
 		pod := &podCopy
 		By("verifying no pod exists before the test")
-		pods, err := podClient.List(clientapi.ListOptions{})
+		pods, err := podClient.List(clientv1.ListOptions{})
 		if err != nil {
 			framework.Failf("Failed to query for pods: %v", err)
 		}
@@ -212,15 +207,11 @@ var _ = framework.KubeDescribe("Staging client repo client", func() {
 		if err != nil {
 			framework.Failf("Failed to create pod: %v", err)
 		}
-		// We call defer here in case there is a problem with
-		// the test so we can ensure that we clean up after
-		// ourselves
-		defer podClient.Delete(pod.Name, clientapi.NewDeleteOptions(0))
 
 		By("verifying the pod is in kubernetes")
 		timeout := 1 * time.Minute
 		if err := wait.PollImmediate(time.Second, timeout, func() (bool, error) {
-			pods, err = podClient.List(clientapi.ListOptions{})
+			pods, err = podClient.List(clientv1.ListOptions{})
 			if err != nil {
 				return false, err
 			}

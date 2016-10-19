@@ -252,3 +252,7 @@ func (r *RemoteRuntimeService) ContainerStatus(containerID string) (*runtimeApi.
 func (r *RemoteRuntimeService) Exec(containerID string, cmd []string, tty bool, stdin io.Reader, stdout, stderr io.WriteCloser) error {
 	return fmt.Errorf("Not implemented")
 }
+
+func (r *RemoteRuntimeService) UpdateRuntimeConfig(runtimeConfig *runtimeApi.RuntimeConfig) error {
+	return nil
+}

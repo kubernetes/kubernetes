@@ -397,11 +397,26 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 		parseTimestampError("FinishedAt", iResult.State.FinishedAt)
 	}
 
+	// default to the image ID, but try and inspect for the RepoDigests
+	imageID := DockerPrefix + iResult.Image
+	imgInspectResult, err := dm.client.InspectImageByID(iResult.Image)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("unable to inspect docker image %q while inspecting docker container %q: %v", iResult.Image, containerName, err))
+	} else {
+		if len(imgInspectResult.RepoDigests) > 1 {
+			glog.V(4).Infof("Container %q had more than one associated RepoDigest (%v), only using the first", containerName, imgInspectResult.RepoDigests)
+		}
+
+		if len(imgInspectResult.RepoDigests) > 0 {
+			imageID = DockerPullablePrefix + imgInspectResult.RepoDigests[0]
+		}
+	}
+
 	status := kubecontainer.ContainerStatus{
 		Name:         containerName,
 		RestartCount: containerInfo.RestartCount,
 		Image:        iResult.Config.Image,
-		ImageID:      DockerPrefix + iResult.Image,
+		ImageID:      imageID,
 		ID:           kubecontainer.DockerID(id).ContainerID(),
 		ExitCode:     iResult.State.ExitCode,
 		CreatedAt:    createdAt,
@@ -913,7 +928,7 @@ func (dm *DockerManager) IsImagePresent(image kubecontainer.ImageSpec) (bool, er
 // Removes the specified image.
 func (dm *DockerManager) RemoveImage(image kubecontainer.ImageSpec) error {
 	// If the image has multiple tags, we need to remove all the tags
-	if inspectImage, err := dm.client.InspectImage(image.Image); err == nil && len(inspectImage.RepoTags) > 1 {
+	if inspectImage, err := dm.client.InspectImageByID(image.Image); err == nil && len(inspectImage.RepoTags) > 1 {
 		for _, tag := range inspectImage.RepoTags {
 			if _, err := dm.client.RemoveImage(tag, dockertypes.ImageRemoveOptions{PruneChildren: true}); err != nil {
 				return err
@@ -1529,6 +1544,8 @@ func (dm *DockerManager) killContainer(containerID kubecontainer.ContainerID, co
 		select {
 		case <-time.After(time.Duration(gracePeriod) * time.Second):
 			glog.Warningf("preStop hook for container %q did not complete in %d seconds", name, gracePeriod)
+			message := fmt.Sprintf("preStop hook for container %q did not complete in %d seconds", name, gracePeriod)
+			dm.generateFailedContainerEvent(containerID, pod.Name, events.UnfinishedPreStopHook, message)
 		case <-done:
 			glog.V(4).Infof("preStop hook for container %q completed", name)
 		}
@@ -2414,7 +2431,7 @@ func (dm *DockerManager) verifyNonRoot(container *api.Container) error {
 // or the user is set to root.  If there is an error inspecting the image this method will return
 // false and return the error.
 func (dm *DockerManager) isImageRoot(image string) (bool, error) {
-	img, err := dm.client.InspectImage(image)
+	img, err := dm.client.InspectImageByRef(image)
 	if err != nil {
 		return false, err
 	}

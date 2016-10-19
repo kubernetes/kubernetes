@@ -248,7 +248,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 		store.Add(makeTestPod("bar", 5))
 	}()
 
-	list, resourceVersion, err := store.WaitUntilFreshAndList(5)
+	list, resourceVersion, err := store.WaitUntilFreshAndList(5, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -278,7 +278,7 @@ func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 		store.Add(makeTestPod("bar", 5))
 	}()
 
-	_, _, err := store.WaitUntilFreshAndList(5)
+	_, _, err := store.WaitUntilFreshAndList(5, nil)
 	if err == nil {
 		t.Fatalf("unexpected lack of timeout error")
 	}
@@ -300,7 +300,7 @@ func TestReflectorForWatchCache(t *testing.T) {
 	store := newTestWatchCache(5)
 
 	{
-		_, version, err := store.WaitUntilFreshAndList(0)
+		_, version, err := store.WaitUntilFreshAndList(0, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -323,7 +323,7 @@ func TestReflectorForWatchCache(t *testing.T) {
 	r.ListAndWatch(wait.NeverStop)
 
 	{
-		_, version, err := store.WaitUntilFreshAndList(10)
+		_, version, err := store.WaitUntilFreshAndList(10, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

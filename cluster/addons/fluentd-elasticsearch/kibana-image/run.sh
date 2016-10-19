@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -16,4 +16,5 @@
 
 export ELASTICSEARCH_URL=${ELASTICSEARCH_URL:-"http://localhost:9200"}
 echo ELASTICSEARCH_URL=${ELASTICSEARCH_URL}
-/kibana-4.0.2-linux-x64/bin/kibana -e ${ELASTICSEARCH_URL}
+
+/kibana/bin/kibana -e ${ELASTICSEARCH_URL}

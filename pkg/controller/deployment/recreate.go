@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	unversionedclient "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/retry"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -42,7 +42,7 @@ func (dc *DeploymentController) rolloutRecreate(deployment *extensions.Deploymen
 	}
 	if scaledDown {
 		// Update DeploymentStatus
-		return dc.updateDeploymentStatus(allRSs, newRS, deployment)
+		return dc.syncDeploymentStatus(allRSs, newRS, deployment)
 	}
 
 	// Wait for all old replica set to scale down to zero.
@@ -67,7 +67,7 @@ func (dc *DeploymentController) rolloutRecreate(deployment *extensions.Deploymen
 	}
 	if scaledUp {
 		// Update DeploymentStatus
-		return dc.updateDeploymentStatus(allRSs, newRS, deployment)
+		return dc.syncDeploymentStatus(allRSs, newRS, deployment)
 	}
 
 	dc.cleanupDeployment(oldRSs, deployment)
@@ -107,7 +107,7 @@ func (dc *DeploymentController) waitForInactiveReplicaSets(oldRSs []*extensions.
 		specReplicas := rs.Spec.Replicas
 		statusReplicas := rs.Status.Replicas
 
-		if err := wait.ExponentialBackoff(unversionedclient.DefaultRetry, func() (bool, error) {
+		if err := wait.ExponentialBackoff(retry.DefaultRetry, func() (bool, error) {
 			replicaSet, err := dc.rsLister.ReplicaSets(rs.Namespace).Get(rs.Name)
 			if err != nil {
 				return false, err

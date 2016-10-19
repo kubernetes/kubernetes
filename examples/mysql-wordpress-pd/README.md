@@ -55,7 +55,7 @@ Demonstrated Kubernetes Concepts:
 * [Secrets](http://kubernetes.io/docs/user-guide/secrets/) to store sensitive
   passwords.
 
-## tl;dr Quickstart
+## Quickstart
 
 Put your desired mysql password in a file called `password.txt` with
 no trailing newline. The first `tr` command will remove the newline if
@@ -76,7 +76,7 @@ kubectl create -f https://raw.githubusercontent.com/kubernetes/kubernetes/master
 <!-- BEGIN MUNGE: GENERATED_TOC -->
 
 - [Persistent Installation of MySQL and WordPress on Kubernetes](#persistent-installation-of-mysql-and-wordpress-on-kubernetes)
-  - [tl;dr Quickstart](#tldr-quickstart)
+  - [Quickstart](#quickstart)
   - [Table of Contents](#table-of-contents)
   - [Cluster Requirements](#cluster-requirements)
   - [Decide where you will store your data](#decide-where-you-will-store-your-data)

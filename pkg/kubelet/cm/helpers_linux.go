@@ -25,7 +25,7 @@ import (
 // GetCgroupSubsystems returns information about the mounted cgroup subsystems
 func GetCgroupSubsystems() (*CgroupSubsystems, error) {
 	// get all cgroup mounts.
-	allCgroups, err := libcontainercgroups.GetCgroupMounts()
+	allCgroups, err := libcontainercgroups.GetCgroupMounts(true)
 	if err != nil {
 		return &CgroupSubsystems{}, err
 	}

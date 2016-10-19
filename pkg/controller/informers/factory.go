@@ -36,10 +36,18 @@ type SharedInformerFactory interface {
 	Namespaces() NamespaceInformer
 	PersistentVolumeClaims() PVCInformer
 	PersistentVolumes() PVInformer
+	ServiceAccounts() ServiceAccountInformer
 
 	DaemonSets() DaemonSetInformer
 	Deployments() DeploymentInformer
 	ReplicaSets() ReplicaSetInformer
+
+	ClusterRoles() ClusterRoleInformer
+	ClusterRoleBindings() ClusterRoleBindingInformer
+	Roles() RoleInformer
+	RoleBindings() RoleBindingInformer
+
+	LimitRanges() LimitRangeInformer
 }
 
 type sharedInformerFactory struct {
@@ -101,6 +109,12 @@ func (f *sharedInformerFactory) PersistentVolumes() PVInformer {
 	return &pvInformer{sharedInformerFactory: f}
 }
 
+// ServiceAccounts returns a SharedIndexInformer that lists and watches all service accounts.
+func (f *sharedInformerFactory) ServiceAccounts() ServiceAccountInformer {
+	return &serviceAccountInformer{sharedInformerFactory: f}
+}
+
+// DaemonSets returns a SharedIndexInformer that lists and watches all daemon sets.
 func (f *sharedInformerFactory) DaemonSets() DaemonSetInformer {
 	return &daemonSetInformer{sharedInformerFactory: f}
 }
@@ -111,4 +125,25 @@ func (f *sharedInformerFactory) Deployments() DeploymentInformer {
 
 func (f *sharedInformerFactory) ReplicaSets() ReplicaSetInformer {
 	return &replicaSetInformer{sharedInformerFactory: f}
+}
+
+func (f *sharedInformerFactory) ClusterRoles() ClusterRoleInformer {
+	return &clusterRoleInformer{sharedInformerFactory: f}
+}
+
+func (f *sharedInformerFactory) ClusterRoleBindings() ClusterRoleBindingInformer {
+	return &clusterRoleBindingInformer{sharedInformerFactory: f}
+}
+
+func (f *sharedInformerFactory) Roles() RoleInformer {
+	return &roleInformer{sharedInformerFactory: f}
+}
+
+func (f *sharedInformerFactory) RoleBindings() RoleBindingInformer {
+	return &roleBindingInformer{sharedInformerFactory: f}
+}
+
+// LimitRanges returns a SharedIndexInformer that lists and watches all limit ranges.
+func (f *sharedInformerFactory) LimitRanges() LimitRangeInformer {
+	return &limitRangeInformer{sharedInformerFactory: f}
 }

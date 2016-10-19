@@ -69,7 +69,7 @@ func TestCordon(t *testing.T) {
 		description string
 		node        *api.Node
 		expected    *api.Node
-		cmd         func(*cmdutil.Factory, io.Writer) *cobra.Command
+		cmd         func(cmdutil.Factory, io.Writer) *cobra.Command
 		arg         string
 		expectFatal bool
 	}{
@@ -177,7 +177,10 @@ func TestCordon(t *testing.T) {
 				// Restore cmdutil behavior
 				cmdutil.DefaultBehaviorOnFatal()
 			}()
-			cmdutil.BehaviorOnFatal(func(e string, code int) { saw_fatal = true; panic(e) })
+			cmdutil.BehaviorOnFatal(func(e string, code int) {
+				saw_fatal = true
+				panic(e)
+			})
 			cmd.SetArgs([]string{test.arg})
 			cmd.Execute()
 		}()

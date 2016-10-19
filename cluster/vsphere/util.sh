@@ -322,7 +322,7 @@ function setup-pod-routes {
   done
 
 
-  # identify the subnet assigned to the node by the kubernertes controller manager.
+  # identify the subnet assigned to the node by the kubernetes controller manager.
   KUBE_NODE_BRIDGE_NETWORK=()
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
      printf " finding network of cbr0 bridge on node  ${NODE_NAMES[$i]}\n"

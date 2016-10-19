@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -43,17 +43,18 @@ type GetOptions struct {
 }
 
 var (
-	get_long = dedent.Dedent(`
+	get_long = templates.LongDesc(`
 		Display one or many resources.
 
-		`) + valid_resources + dedent.Dedent(`
+		` + valid_resources + `
 
 		This command will hide resources that have completed. For instance, pods that are in the Succeeded or Failed phases.
 		You can see the full results for any resource by providing the '--show-all' flag.
 
 		By specifying the output as 'template' and providing a Go template as the value
 		of the --template flag, you can filter the attributes of the fetched resource(s).`)
-	get_example = dedent.Dedent(`
+
+	get_example = templates.Examples(`
 		# List all pods in ps output format.
 		kubectl get pods
 
@@ -81,7 +82,7 @@ var (
 
 // NewCmdGet creates a command object for the generic "get" action, which
 // retrieves one or more resources from a server.
-func NewCmdGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
+func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
 	options := &GetOptions{}
 
 	// retrieve a list of handled resources from printer as valid args
@@ -125,7 +126,7 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comma
 
 // RunGet implements the generic Get command
 // TODO: convert all direct flag accessors to a struct and pass that instead of cmd
-func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Command, args []string, options *GetOptions) error {
+func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args []string, options *GetOptions) error {
 	if len(options.Raw) > 0 {
 		restClient, err := f.RESTClient()
 		if err != nil {
@@ -138,19 +139,11 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 		}
 		defer stream.Close()
 
-		for {
-			buffer := make([]byte, 1024, 1024)
-			bytesRead, err := stream.Read(buffer)
-			if bytesRead > 0 {
-				fmt.Printf("%s", string(buffer[:bytesRead]))
-			}
-			if err == io.EOF {
-				return nil
-			}
-			if err != nil {
-				return err
-			}
+		_, err = io.Copy(out, stream)
+		if err != nil && err != io.EOF {
+			return err
 		}
+		return nil
 	}
 
 	selector := cmdutil.GetFlagString(cmd, "selector")
@@ -256,7 +249,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 				return fmt.Errorf("unable to output the provided object: %v", err)
 			}
 			filteredResourceCount++
-			cmdutil.PrintFilterCount(filteredResourceCount, mapping.Resource, errOut, filterOpts)
+			cmdutil.PrintFilterCount(filteredResourceCount, mapping.Resource, filterOpts)
 		}
 
 		// print watched changes
@@ -280,7 +273,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 					return false, err
 				}
 				filteredResourceCount++
-				cmdutil.PrintFilterCount(filteredResourceCount, mapping.Resource, errOut, filterOpts)
+				cmdutil.PrintFilterCount(filteredResourceCount, mapping.Resource, filterOpts)
 				return false, nil
 			})
 			return err
@@ -330,6 +323,9 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 			}
 			errs = append(errs, err)
 		}
+		if len(infos) == 0 {
+			outputEmptyListWarning(errOut)
+		}
 
 		res := ""
 		if len(infos) > 0 {
@@ -355,7 +351,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 				errs = append(errs, err)
 			}
 
-			cmdutil.PrintFilterCount(filteredResourceCount, res, errOut, filterOpts)
+			cmdutil.PrintFilterCount(filteredResourceCount, res, filterOpts)
 			return utilerrors.Reduce(utilerrors.Flatten(utilerrors.NewAggregate(errs)))
 		}
 
@@ -370,7 +366,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 			filteredResourceCount++
 		}
 
-		cmdutil.PrintFilterCount(filteredResourceCount, res, errOut, filterOpts)
+		cmdutil.PrintFilterCount(filteredResourceCount, res, filterOpts)
 		return utilerrors.Reduce(utilerrors.Flatten(utilerrors.NewAggregate(errs)))
 	}
 
@@ -378,6 +374,9 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 	infos, err := r.Infos()
 	if err != nil {
 		allErrs = append(allErrs, err)
+	}
+	if len(infos) == 0 {
+		outputEmptyListWarning(errOut)
 	}
 
 	objs := make([]runtime.Object, len(infos))
@@ -438,7 +437,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 		if printer == nil || lastMapping == nil || mapping == nil || mapping.Resource != lastMapping.Resource {
 			if printer != nil {
 				w.Flush()
-				cmdutil.PrintFilterCount(filteredResourceCount, lastMapping.Resource, errOut, filterOpts)
+				cmdutil.PrintFilterCount(filteredResourceCount, lastMapping.Resource, filterOpts)
 			}
 			printer, err = f.PrinterForMapping(cmd, mapping, allNamespaces)
 			if err != nil {
@@ -496,7 +495,13 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 	}
 	w.Flush()
 	if printer != nil && lastMapping != nil {
-		cmdutil.PrintFilterCount(filteredResourceCount, lastMapping.Resource, errOut, filterOpts)
+		cmdutil.PrintFilterCount(filteredResourceCount, lastMapping.Resource, filterOpts)
 	}
 	return utilerrors.NewAggregate(allErrs)
+}
+
+// outputEmptyListWarning outputs a warning indicating that no items are available to display
+func outputEmptyListWarning(out io.Writer) error {
+	_, err := fmt.Fprintf(out, "%s\n", "No resources found.")
+	return err
 }

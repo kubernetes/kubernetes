@@ -25,6 +25,7 @@ import (
 	"path"
 	gruntime "runtime"
 	"strings"
+	"time"
 
 	"github.com/golang/glog"
 
@@ -109,6 +110,9 @@ type Config struct {
 	// Rate limiter for limiting connections to the master from this client. If present overwrites QPS/Burst
 	RateLimiter flowcontrol.RateLimiter
 
+	// The maximum length of time to wait before giving up on a server request. A value of zero means no timeout.
+	Timeout time.Duration
+
 	// Version forces a specific version to be used (if registered)
 	// Do we need this?
 	// Version string
@@ -185,6 +189,9 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 	var httpClient *http.Client
 	if transport != http.DefaultTransport {
 		httpClient = &http.Client{Transport: transport}
+		if config.Timeout > 0 {
+			httpClient.Timeout = config.Timeout
+		}
 	}
 
 	return NewRESTClient(baseURL, versionedAPIPath, config.ContentConfig, qps, burst, config.RateLimiter, httpClient)
@@ -210,6 +217,9 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 	var httpClient *http.Client
 	if transport != http.DefaultTransport {
 		httpClient = &http.Client{Transport: transport}
+		if config.Timeout > 0 {
+			httpClient.Timeout = config.Timeout
+		}
 	}
 
 	versionConfig := config.ContentConfig
@@ -353,5 +363,6 @@ func AnonymousClientConfig(config *Config) *Config {
 		WrapTransport: config.WrapTransport,
 		QPS:           config.QPS,
 		Burst:         config.Burst,
+		Timeout:       config.Timeout,
 	}
 }

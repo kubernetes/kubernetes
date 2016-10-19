@@ -58,7 +58,7 @@ func (c *flockerVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 		return nil, fmt.Errorf("Provisioning failed: Specified at least one unsupported parameter")
 	}
 
-	if c.options.Selector != nil {
+	if c.options.PVC.Spec.Selector != nil {
 		return nil, fmt.Errorf("Provisioning failed: Specified unsupported selector")
 	}
 
@@ -77,7 +77,7 @@ func (c *flockerVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 		},
 		Spec: api.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: c.options.PersistentVolumeReclaimPolicy,
-			AccessModes:                   c.options.AccessModes,
+			AccessModes:                   c.options.PVC.Spec.AccessModes,
 			Capacity: api.ResourceList{
 				api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
 			},
@@ -87,6 +87,9 @@ func (c *flockerVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 				},
 			},
 		},
+	}
+	if len(c.options.PVC.Spec.AccessModes) == 0 {
+		pv.Spec.AccessModes = c.plugin.GetAccessModes()
 	}
 
 	if len(labels) != 0 {

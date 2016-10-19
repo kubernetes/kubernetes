@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
@@ -309,10 +310,25 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 		triggerValue, triggerSupported = matchValues[0].Value, true
 	}
 
+	// If there is triggerFunc defined, but triggerSupported is false,
+	// we can't narrow the amount of events significantly at this point.
+	//
+	// That said, currently triggerFunc is defined only for Pods and Nodes,
+	// and there is only constant number of watchers for which triggerSupported
+	// is false (excluding those issues explicitly by users).
+	// Thus, to reduce the risk of those watchers blocking all watchers of a
+	// given resource in the system, we increase the sizes of buffers for them.
+	chanSize := 10
+	if c.triggerFunc != nil && !triggerSupported {
+		// TODO: We should tune this value and ideally make it dependent on the
+		// number of objects of a given type and/or their churn.
+		chanSize = 1000
+	}
+
 	c.Lock()
 	defer c.Unlock()
 	forget := forgetWatcher(c, c.watcherIdx, triggerValue, triggerSupported)
-	watcher := newCacheWatcher(watchRV, initEvents, filterFunction(key, c.keyFunc, pred), forget)
+	watcher := newCacheWatcher(watchRV, chanSize, initEvents, filterFunction(key, c.keyFunc, pred), forget)
 
 	c.watchers.addWatcher(watcher, c.watcherIdx, triggerValue, triggerSupported)
 	c.watcherIdx++
@@ -351,7 +367,11 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 		return err
 	}
 
+	trace := util.NewTrace(fmt.Sprintf("cacher %v: List", c.objectType.String()))
+	defer trace.LogIfLong(500 * time.Millisecond)
+
 	c.ready.wait()
+	trace.Step("Ready")
 
 	// List elements from cache, with at least 'listRV'.
 	listPtr, err := meta.GetItemsPtr(listObj)
@@ -364,10 +384,11 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 	}
 	filter := filterFunction(key, c.keyFunc, pred)
 
-	objs, readResourceVersion, err := c.watchCache.WaitUntilFreshAndList(listRV)
+	objs, readResourceVersion, err := c.watchCache.WaitUntilFreshAndList(listRV, trace)
 	if err != nil {
 		return fmt.Errorf("failed to wait for fresh list: %v", err)
 	}
+	trace.Step(fmt.Sprintf("Listed %d items from cache", len(objs)))
 	for _, obj := range objs {
 		object, ok := obj.(runtime.Object)
 		if !ok {
@@ -377,6 +398,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 			listVal.Set(reflect.Append(listVal, reflect.ValueOf(object).Elem()))
 		}
 	}
+	trace.Step(fmt.Sprintf("Filtered %d items", listVal.Len()))
 	if c.versioner != nil {
 		if err := c.versioner.UpdateList(listObj, readResourceVersion); err != nil {
 			return err
@@ -609,10 +631,10 @@ type cacheWatcher struct {
 	forget  func(bool)
 }
 
-func newCacheWatcher(resourceVersion uint64, initEvents []watchCacheEvent, filter FilterFunc, forget func(bool)) *cacheWatcher {
+func newCacheWatcher(resourceVersion uint64, chanSize int, initEvents []watchCacheEvent, filter FilterFunc, forget func(bool)) *cacheWatcher {
 	watcher := &cacheWatcher{
-		input:   make(chan watchCacheEvent, 10),
-		result:  make(chan watch.Event, 10),
+		input:   make(chan watchCacheEvent, chanSize),
+		result:  make(chan watch.Event, chanSize),
 		filter:  filter,
 		stopped: false,
 		forget:  forget,
@@ -651,11 +673,14 @@ func (c *cacheWatcher) add(event *watchCacheEvent) {
 	default:
 	}
 
-	resultLen := len(c.result)
 	// OK, block sending, but only for up to 5 seconds.
 	// cacheWatcher.add is called very often, so arrange
 	// to reuse timers instead of constantly allocating.
-	startTime := time.Now()
+	trace := util.NewTrace(
+		fmt.Sprintf("cacheWatcher %v: waiting for add (initial result size %v)",
+			reflect.TypeOf(event.Object).String(), len(c.result)))
+	defer trace.LogIfLong(5 * time.Millisecond)
+
 	const timeout = 5 * time.Second
 	t, ok := timerPool.Get().(*time.Timer)
 	if ok {
@@ -680,8 +705,6 @@ func (c *cacheWatcher) add(event *watchCacheEvent) {
 		c.forget(false)
 		c.stop()
 	}
-	glog.V(2).Infof("cacheWatcher add function blocked processing of %v for %v (initial result size %v)",
-		reflect.TypeOf(event.Object).String(), time.Since(startTime), resultLen)
 }
 
 func (c *cacheWatcher) sendWatchCacheEvent(event watchCacheEvent) {
@@ -717,17 +740,27 @@ func (c *cacheWatcher) process(initEvents []watchCacheEvent, resourceVersion uin
 	// As long as these are not processed, we are not processing
 	// any incoming events, so if it takes long, we may actually
 	// block all watchers for some time.
-	// TODO: If it appears to be long in some cases, we may consider
-	// - longer result buffers if there are a lot of initEvents
-	// - try some parallelization
-	const initProcessThreshold = 5 * time.Millisecond
+	// TODO: From the logs it seems that there happens processing
+	// times even up to 1s which is very long. However, this doesn't
+	// depend that much on the number of initEvents. E.g. from the
+	// 2000-node Kubemark run we have logs like this, e.g.:
+	// ... processing 13862 initEvents took 66.808689ms
+	// ... processing 14040 initEvents took 993.532539ms
+	// We should understand what is blocking us in those cases (e.g.
+	// is it lack of CPU, network, or sth else) and potentially
+	// consider increase size of result buffer in those cases.
+	const initProcessThreshold = 500 * time.Millisecond
 	startTime := time.Now()
 	for _, event := range initEvents {
 		c.sendWatchCacheEvent(event)
 	}
 	processingTime := time.Since(startTime)
 	if processingTime > initProcessThreshold {
-		glog.V(2).Infof("processing %d initEvents took %v", len(initEvents), processingTime)
+		objType := "<null>"
+		if len(initEvents) > 0 {
+			objType = reflect.TypeOf(initEvents[0].Object).String()
+		}
+		glog.V(2).Infof("processing %d initEvents of %s took %v", len(initEvents), objType, processingTime)
 	}
 
 	defer close(c.result)

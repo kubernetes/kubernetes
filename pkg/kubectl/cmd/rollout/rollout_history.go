@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/renstrom/dedent"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 
@@ -29,9 +29,10 @@ import (
 )
 
 var (
-	history_long = dedent.Dedent(`
+	history_long = templates.LongDesc(`
 		View previous rollout revisions and configurations.`)
-	history_example = dedent.Dedent(`
+
+	history_example = templates.Examples(`
 		# View the rollout history of a deployment
 		kubectl rollout history deployment/abc
 
@@ -39,7 +40,7 @@ var (
 		kubectl rollout history deployment/abc --revision=3`)
 )
 
-func NewCmdRolloutHistory(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdRolloutHistory(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 
 	validArgs := []string{"deployment"}
@@ -63,11 +64,14 @@ func NewCmdRolloutHistory(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunHistory(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string, options *resource.FilenameOptions) error {
+func RunHistory(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string, options *resource.FilenameOptions) error {
 	if len(args) == 0 && cmdutil.IsFilenameEmpty(options.Filenames) {
 		return cmdutil.UsageError(cmd, "Required resource not specified.")
 	}
 	revision := cmdutil.GetFlagInt64(cmd, "revision")
+	if revision < 0 {
+		return fmt.Errorf("revision must be a positive integer: %v", revision)
+	}
 
 	mapper, typer := f.Object()
 

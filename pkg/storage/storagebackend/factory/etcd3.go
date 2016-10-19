@@ -55,5 +55,8 @@ func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, e
 		cancel()
 		client.Close()
 	}
-	return etcd3.New(client, c.Codec, c.Prefix), destroyFunc, nil
+	if c.Quorum {
+		return etcd3.New(client, c.Codec, c.Prefix), destroyFunc, nil
+	}
+	return etcd3.NewWithNoQuorumRead(client, c.Codec, c.Prefix), destroyFunc, nil
 }

@@ -51,7 +51,7 @@ type watchChan struct {
 	key               string
 	initialRev        int64
 	recursive         bool
-	filter            storage.FilterFunc
+	internalFilter    storage.FilterFunc
 	ctx               context.Context
 	cancel            context.CancelFunc
 	incomingEventChan chan *event
@@ -73,26 +73,30 @@ func newWatcher(client *clientv3.Client, codec runtime.Codec, versioner storage.
 // If rev is non-zero, it will watch events happened after given revision.
 // If recursive is false, it watches on given key.
 // If recursive is true, it watches any children and directories under the key, excluding the root key itself.
-// filter must be non-nil. Only if filter returns true will the changes be returned.
-func (w *watcher) Watch(ctx context.Context, key string, rev int64, recursive bool, filter storage.FilterFunc) (watch.Interface, error) {
+// pred must be non-nil. Only if pred matches the change, it will be returned.
+func (w *watcher) Watch(ctx context.Context, key string, rev int64, recursive bool, pred storage.SelectionPredicate) (watch.Interface, error) {
 	if recursive && !strings.HasSuffix(key, "/") {
 		key += "/"
 	}
-	wc := w.createWatchChan(ctx, key, rev, recursive, filter)
+	wc := w.createWatchChan(ctx, key, rev, recursive, pred)
 	go wc.run()
 	return wc, nil
 }
 
-func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive bool, filter storage.FilterFunc) *watchChan {
+func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive bool, pred storage.SelectionPredicate) *watchChan {
 	wc := &watchChan{
 		watcher:           w,
 		key:               key,
 		initialRev:        rev,
 		recursive:         recursive,
-		filter:            filter,
+		internalFilter:    storage.SimpleFilter(pred),
 		incomingEventChan: make(chan *event, incomingBufSize),
 		resultChan:        make(chan watch.Event, outgoingBufSize),
 		errChan:           make(chan error, 1),
+	}
+	if pred.Label.Empty() && pred.Field.Empty() {
+		// The filter doesn't filter out any object.
+		wc.internalFilter = nil
 	}
 	wc.ctx, wc.cancel = context.WithCancel(ctx)
 	return wc
@@ -154,7 +158,15 @@ func (wc *watchChan) sync() error {
 	wc.initialRev = getResp.Header.Revision
 
 	for _, kv := range getResp.Kvs {
-		wc.sendEvent(parseKV(kv))
+		prevResp, err := wc.watcher.client.Get(wc.ctx, string(kv.Key), clientv3.WithRev(kv.ModRevision-1), clientv3.WithSerializable())
+		if err != nil {
+			return err
+		}
+		var prevVal []byte
+		if len(prevResp.Kvs) > 0 {
+			prevVal = prevResp.Kvs[0].Value
+		}
+		wc.sendEvent(parseKV(kv, prevVal))
 	}
 	return nil
 }
@@ -170,7 +182,7 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}) {
 			return
 		}
 	}
-	opts := []clientv3.OpOption{clientv3.WithRev(wc.initialRev + 1)}
+	opts := []clientv3.OpOption{clientv3.WithRev(wc.initialRev + 1), clientv3.WithPrevKV()}
 	if wc.recursive {
 		opts = append(opts, clientv3.WithPrefix())
 	}
@@ -223,16 +235,20 @@ func (wc *watchChan) processEvent(wg *sync.WaitGroup) {
 	}
 }
 
+func (wc *watchChan) filter(obj runtime.Object) bool {
+	if wc.internalFilter == nil {
+		return true
+	}
+	return wc.internalFilter(obj)
+}
+
+func (wc *watchChan) acceptAll() bool {
+	return wc.internalFilter == nil
+}
+
 // transform transforms an event into a result for user if not filtered.
-// TODO (Optimization):
-// - Save remote round-trip.
-//   Currently, DELETE and PUT event don't contain the previous value.
-//   We need to do another Get() in order to get previous object and have logic upon it.
-//   We could potentially do some optimizations:
-//   - For PUT, we can save current and previous objects into the value.
-//   - For DELETE, See https://github.com/coreos/etcd/issues/4620
 func (wc *watchChan) transform(e *event) (res *watch.Event) {
-	curObj, oldObj, err := prepareObjs(wc.ctx, e, wc.watcher.client, wc.watcher.codec, wc.watcher.versioner)
+	curObj, oldObj, err := wc.prepareObjs(e)
 	if err != nil {
 		glog.Errorf("failed to prepare current and previous objects: %v", err)
 		wc.sendError(err)
@@ -257,6 +273,13 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 			Object: curObj,
 		}
 	default:
+		if wc.acceptAll() {
+			res = &watch.Event{
+				Type:   watch.Modified,
+				Object: curObj,
+			}
+			return res
+		}
 		curObjPasses := wc.filter(curObj)
 		oldObjPasses := wc.filter(oldObj)
 		switch {
@@ -324,23 +347,22 @@ func (wc *watchChan) sendEvent(e *event) {
 	}
 }
 
-func prepareObjs(ctx context.Context, e *event, client *clientv3.Client, codec runtime.Codec, versioner storage.Versioner) (curObj runtime.Object, oldObj runtime.Object, err error) {
+func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtime.Object, err error) {
 	if !e.isDeleted {
-		curObj, err = decodeObj(codec, versioner, e.value, e.rev)
+		curObj, err = decodeObj(wc.watcher.codec, wc.watcher.versioner, e.value, e.rev)
 		if err != nil {
 			return nil, nil, err
 		}
 	}
-	if e.isDeleted || !e.isCreated {
-		getResp, err := client.Get(ctx, e.key, clientv3.WithRev(e.rev-1), clientv3.WithSerializable())
-		if err != nil {
-			return nil, nil, err
-		}
+	// We need to decode prevValue, only if this is deletion event or
+	// the underlying filter doesn't accept all objects (otherwise we
+	// know that the filter for previous object will return true and
+	// we need the object only to compute whether it was filtered out
+	// before).
+	if len(e.prevValue) > 0 && (e.isDeleted || !wc.acceptAll()) {
 		// Note that this sends the *old* object with the etcd revision for the time at
 		// which it gets deleted.
-		// We assume old object is returned only in Deleted event. Users (e.g. cacher) need
-		// to have larger than previous rev to tell the ordering.
-		oldObj, err = decodeObj(codec, versioner, getResp.Kvs[0].Value, e.rev)
+		oldObj, err = decodeObj(wc.watcher.codec, wc.watcher.versioner, e.prevValue, e.rev)
 		if err != nil {
 			return nil, nil, err
 		}

@@ -22,12 +22,14 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
+
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
 )
 
 // updateReplicaCount attempts to update the Status.Replicas of the given ReplicaSet, with a single GET/PUT retry.
-func updateReplicaCount(rsClient client.ReplicaSetInterface, rs extensions.ReplicaSet, numReplicas, numFullyLabeledReplicas, numReadyReplicas, numAvailableReplicas int) (updateErr error) {
+func updateReplicaCount(rsClient unversionedextensions.ReplicaSetInterface, rs extensions.ReplicaSet, numReplicas, numFullyLabeledReplicas, numReadyReplicas, numAvailableReplicas int) (updateErr error) {
 	// This is the steady state. It happens when the ReplicaSet doesn't have any expectations, since
 	// we do a periodic relist every 30s. If the generations differ but the replicas are
 	// the same, a caller might've resized to the same replica count.
@@ -38,6 +40,15 @@ func updateReplicaCount(rsClient client.ReplicaSetInterface, rs extensions.Repli
 		rs.Generation == rs.Status.ObservedGeneration {
 		return nil
 	}
+
+	// deep copy to avoid mutation now.
+	// TODO this method need some work.  Retry on conflict probably, though I suspect this is stomping status to something it probably shouldn't
+	copyObj, err := api.Scheme.DeepCopy(rs)
+	if err != nil {
+		return err
+	}
+	rs = copyObj.(extensions.ReplicaSet)
+
 	// Save the generation number we acted on, otherwise we might wrongfully indicate
 	// that we've seen a spec update when we retry.
 	// TODO: This can clobber an update if we allow multiple agents to write to the

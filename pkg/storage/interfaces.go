@@ -82,6 +82,7 @@ type UpdateFunc func(input runtime.Object, res ResponseMeta) (output runtime.Obj
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
 type Preconditions struct {
 	// Specifies the target UID.
+	// +optional
 	UID *types.UID `json:"uid,omitempty"`
 }
 

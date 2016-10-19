@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"runtime"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
 const (
@@ -34,6 +34,7 @@ const (
 	KubeDNSImage         = "kube-dns"
 	KubeDNSmasqImage     = "dnsmasq"
 	KubeExechealthzImage = "exechealthz"
+	Pause                = "pause"
 
 	gcrPrefix   = "gcr.io/google_containers"
 	etcdVersion = "2.2.5"
@@ -41,6 +42,7 @@ const (
 	kubeDNSVersion     = "1.7"
 	dnsmasqVersion     = "1.3"
 	exechealthzVersion = "1.1"
+	pauseVersion       = "3.0"
 )
 
 func GetCoreImage(image string, cfg *kubeadmapi.MasterConfiguration, overrideImage string) string {
@@ -62,5 +64,6 @@ func GetAddonImage(image string) string {
 		KubeDNSImage:         fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kubedns", runtime.GOARCH, kubeDNSVersion),
 		KubeDNSmasqImage:     fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "kube-dnsmasq", runtime.GOARCH, dnsmasqVersion),
 		KubeExechealthzImage: fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "exechealthz", runtime.GOARCH, exechealthzVersion),
+		Pause:                fmt.Sprintf("%s/%s-%s:%s", gcrPrefix, "pause", runtime.GOARCH, pauseVersion),
 	}[image]
 }

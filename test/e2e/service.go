@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 const (
@@ -1101,8 +1102,6 @@ var _ = framework.KubeDescribe("Services", func() {
 		jig.SanityCheckService(svc, api.ServiceTypeLoadBalancer)
 		svcTcpPort := int(svc.Spec.Ports[0].Port)
 		framework.Logf("service port : %d", svcTcpPort)
-		tcpNodePort := int(svc.Spec.Ports[0].NodePort)
-		framework.Logf("TCP node port: %d", tcpNodePort)
 		ingressIP := getIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 		framework.Logf("TCP load balancer: %s", ingressIP)
 		healthCheckNodePort := int(service.GetServiceHealthCheckNodePort(svc))
@@ -1110,18 +1109,12 @@ var _ = framework.KubeDescribe("Services", func() {
 		if healthCheckNodePort == 0 {
 			framework.Failf("Service HealthCheck NodePort was not allocated")
 		}
-		nodeIP := pickNodeIP(jig.Client)
-		By("hitting the TCP service's NodePort on " + nodeIP + ":" + fmt.Sprintf("%d", tcpNodePort))
-		jig.TestReachableHTTP(nodeIP, tcpNodePort, kubeProxyLagTimeout)
+		// TODO(33957): test localOnly nodePort Services.
 		By("hitting the TCP service's service port, via its external VIP " + ingressIP + ":" + fmt.Sprintf("%d", svcTcpPort))
 		jig.TestReachableHTTP(ingressIP, svcTcpPort, kubeProxyLagTimeout)
-		By("reading clientIP using the TCP service's NodePort")
-		content := jig.GetHTTPContent(nodeIP, tcpNodePort, kubeProxyLagTimeout, "/clientip")
-		clientIP := content.String()
-		framework.Logf("ClientIP detected by target pod using NodePort is %s", clientIP)
 		By("reading clientIP using the TCP service's service port via its external VIP")
-		content = jig.GetHTTPContent(ingressIP, svcTcpPort, kubeProxyLagTimeout, "/clientip")
-		clientIP = content.String()
+		content := jig.GetHTTPContent(ingressIP, svcTcpPort, kubeProxyLagTimeout, "/clientip")
+		clientIP := content.String()
 		framework.Logf("ClientIP detected by target pod using VIP:SvcPort is %s", clientIP)
 		By("checking if Source IP is preserved")
 		if strings.HasPrefix(clientIP, "10.") {
@@ -1612,7 +1605,7 @@ func startServeHostnameService(c *client.Client, ns, name string, port, replicas
 
 	var createdPods []*api.Pod
 	maxContainerFailures := 0
-	config := framework.RCConfig{
+	config := testutils.RCConfig{
 		Client:               c,
 		Image:                "gcr.io/google_containers/serve_hostname:v1.4",
 		Name:                 name,

@@ -344,7 +344,7 @@ func (scaler *PetSetScaler) ScaleSimple(namespace, name string, preconditions *S
 			return "", err
 		}
 	}
-	ps.Spec.Replicas = int(newSize)
+	ps.Spec.Replicas = int32(newSize)
 	updatedPetSet, err := scaler.c.PetSets(namespace).Update(ps)
 	if err != nil {
 		if errors.IsConflict(err) {

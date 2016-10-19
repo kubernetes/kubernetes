@@ -43,6 +43,11 @@ CLOUD_PROVIDER=${CLOUD_PROVIDER:-""}
 CLOUD_CONFIG=${CLOUD_CONFIG:-""}
 FEATURE_GATES=${FEATURE_GATES:-"AllAlpha=true"}
 
+# start the cache mutation detector by default so that cache mutators will be found
+KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
+export KUBE_CACHE_MUTATION_DETECTOR
+
+
 
 # START_MODE can be 'all', 'kubeletonly', or 'nokubelet'
 START_MODE=${START_MODE:-"all"}
@@ -71,21 +76,35 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 function usage {
             echo "This script starts a local kube cluster. "
             echo "Example 1: hack/local-up-cluster.sh -o _output/dockerized/bin/linux/amd64/ (run from docker output)"
-            echo "Example 2: hack/local-up-cluster.sh (build a local copy of the source)"
+            echo "Example 2: hack/local-up-cluster.sh -O (auto-guess the bin path for your platform)"
+            echo "Example 3: hack/local-up-cluster.sh (build a local copy of the source)"
+}
+
+# This function guesses where the existing cached binary build is for the `-O`
+# flag
+function guess_built_binary_path {
+  local hyperkube_path=$(kube::util::find-binary "hyperkube")
+  if [[ -z "${hyperkube_path}" ]]; then
+    return
+  fi
+  echo -n "$(dirname "${hyperkube_path}")"
 }
 
 ### Allow user to supply the source directory.
 GO_OUT=""
-while getopts "o:" OPTION
+while getopts "o:O" OPTION
 do
     case $OPTION in
         o)
             echo "skipping build"
-            echo "using source $OPTARG"
             GO_OUT="$OPTARG"
+            echo "using source $GO_OUT"
+            ;;
+        O)
+            GO_OUT=$(guess_built_binary_path)
             if [ $GO_OUT == "" ]; then
-                echo "You provided an invalid value for the build output directory."
-                exit
+                echo "Could not guess the correct output directory to use."
+                exit 1
             fi
             ;;
         ?)
@@ -123,7 +142,7 @@ set +e
 API_PORT=${API_PORT:-8080}
 API_HOST=${API_HOST:-127.0.0.1}
 API_HOST_IP=${API_HOST_IP:-${API_HOST}}
-API_BIND_ADDR=${API_HOST_IP:-"0.0.0.0"}
+API_BIND_ADDR=${API_BIND_ADDR:-"0.0.0.0"}
 KUBELET_HOST=${KUBELET_HOST:-"127.0.0.1"}
 # By default only allow CORS for requests on localhost
 API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-"/127.0.0.1(:[0-9]+)?$,/localhost(:[0-9]+)?$"}
@@ -285,6 +304,10 @@ function start_apiserver {
     if [[ -n "${ALLOW_ANY_TOKEN:-}" ]]; then
       anytoken_arg="--insecure-allow-any-token "
     fi
+    authorizer_arg=""
+    if [[ -n "${ENABLE_RBAC:-}" ]]; then
+      authorizer_arg="--authorization-mode=RBAC "
+    fi
     priv_arg=""
     if [[ -n "${ALLOW_PRIVILEGED}" ]]; then
       priv_arg="--allow-privileged "
@@ -302,7 +325,7 @@ function start_apiserver {
     fi
 
     APISERVER_LOG=/tmp/kube-apiserver.log
-    sudo -E "${GO_OUT}/hyperkube" apiserver ${anytoken_arg} ${priv_arg} ${runtime_config}\
+    sudo -E "${GO_OUT}/hyperkube" apiserver ${anytoken_arg} ${authorizer_arg} ${priv_arg} ${runtime_config}\
       ${advertise_address} \
       --v=${LOG_LEVEL} \
       --cert-dir="${CERT_DIR}" \

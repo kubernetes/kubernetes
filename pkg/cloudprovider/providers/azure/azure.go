@@ -33,15 +33,16 @@ const CloudProviderName = "azure"
 
 // Config holds the configuration parsed from the --cloud-config flag
 type Config struct {
-	Cloud             string `json:"cloud" yaml:"cloud"`
-	TenantID          string `json:"tenantId" yaml:"tenantId"`
-	SubscriptionID    string `json:"subscriptionId" yaml:"subscriptionId"`
-	ResourceGroup     string `json:"resourceGroup" yaml:"resourceGroup"`
-	Location          string `json:"location" yaml:"location"`
-	VnetName          string `json:"vnetName" yaml:"vnetName"`
-	SubnetName        string `json:"subnetName" yaml:"subnetName"`
-	SecurityGroupName string `json:"securityGroupName" yaml:"securityGroupName"`
-	RouteTableName    string `json:"routeTableName" yaml:"routeTableName"`
+	Cloud                      string `json:"cloud" yaml:"cloud"`
+	TenantID                   string `json:"tenantId" yaml:"tenantId"`
+	SubscriptionID             string `json:"subscriptionId" yaml:"subscriptionId"`
+	ResourceGroup              string `json:"resourceGroup" yaml:"resourceGroup"`
+	Location                   string `json:"location" yaml:"location"`
+	VnetName                   string `json:"vnetName" yaml:"vnetName"`
+	SubnetName                 string `json:"subnetName" yaml:"subnetName"`
+	SecurityGroupName          string `json:"securityGroupName" yaml:"securityGroupName"`
+	RouteTableName             string `json:"routeTableName" yaml:"routeTableName"`
+	PrimaryAvailabilitySetName string `json:"primaryAvailabilitySetName" yaml:"primaryAvailabilitySetName"`
 
 	AADClientID     string `json:"aadClientId" yaml:"aadClientId"`
 	AADClientSecret string `json:"aadClientSecret" yaml:"aadClientSecret"`

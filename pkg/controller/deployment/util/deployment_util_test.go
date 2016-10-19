@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
@@ -51,7 +50,7 @@ func addListPodsReactor(fakeClient *fake.Clientset, obj runtime.Object) *fake.Cl
 func addGetRSReactor(fakeClient *fake.Clientset, obj runtime.Object) *fake.Clientset {
 	rsList, ok := obj.(*extensions.ReplicaSetList)
 	fakeClient.AddReactor("get", "replicasets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		name := action.(testclient.GetAction).GetName()
+		name := action.(core.GetAction).GetName()
 		if ok {
 			for _, rs := range rsList.Items {
 				if rs.Name == name {
@@ -67,7 +66,7 @@ func addGetRSReactor(fakeClient *fake.Clientset, obj runtime.Object) *fake.Clien
 
 func addUpdateRSReactor(fakeClient *fake.Clientset) *fake.Clientset {
 	fakeClient.AddReactor("update", "replicasets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		obj := action.(testclient.UpdateAction).GetObject().(*extensions.ReplicaSet)
+		obj := action.(core.UpdateAction).GetObject().(*extensions.ReplicaSet)
 		return true, obj, nil
 	})
 	return fakeClient
@@ -75,7 +74,7 @@ func addUpdateRSReactor(fakeClient *fake.Clientset) *fake.Clientset {
 
 func addUpdatePodsReactor(fakeClient *fake.Clientset) *fake.Clientset {
 	fakeClient.AddReactor("update", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		obj := action.(testclient.UpdateAction).GetObject().(*api.Pod)
+		obj := action.(core.UpdateAction).GetObject().(*api.Pod)
 		return true, obj, nil
 	})
 	return fakeClient
@@ -96,40 +95,6 @@ func newPod(now time.Time, ready bool, beforeSec int) api.Pod {
 				},
 			},
 		},
-	}
-}
-
-func TestCountAvailablePods(t *testing.T) {
-	now := time.Now()
-	tests := []struct {
-		pods            []api.Pod
-		minReadySeconds int
-		expected        int
-	}{
-		{
-			[]api.Pod{
-				newPod(now, true, 0),
-				newPod(now, true, 2),
-				newPod(now, false, 1),
-			},
-			1,
-			1,
-		},
-		{
-			[]api.Pod{
-				newPod(now, true, 2),
-				newPod(now, true, 11),
-				newPod(now, true, 5),
-			},
-			10,
-			1,
-		},
-	}
-
-	for _, test := range tests {
-		if count := countAvailablePods(test.pods, int32(test.minReadySeconds)); int(count) != test.expected {
-			t.Errorf("Pods = %#v, minReadySeconds = %d, expected %d, got %d", test.pods, test.minReadySeconds, test.expected, count)
-		}
 	}
 }
 

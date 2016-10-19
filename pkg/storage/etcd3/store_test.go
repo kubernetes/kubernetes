@@ -451,7 +451,7 @@ func TestGuaranteedUpdateWithConflict(t *testing.T) {
 func TestList(t *testing.T) {
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
 	defer cluster.Terminate(t)
-	store := newStore(cluster.RandClient(), testapi.Default.Codec(), "")
+	store := newStore(cluster.RandClient(), false, testapi.Default.Codec(), "")
 	ctx := context.Background()
 
 	// Setup storage with the following structure:
@@ -538,7 +538,7 @@ func TestList(t *testing.T) {
 
 func testSetup(t *testing.T) (context.Context, *store, *integration.ClusterV3) {
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
-	store := newStore(cluster.RandClient(), testapi.Default.Codec(), "")
+	store := newStore(cluster.RandClient(), false, testapi.Default.Codec(), "")
 	ctx := context.Background()
 	return ctx, store, cluster
 }

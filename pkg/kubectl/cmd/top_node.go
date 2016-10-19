@@ -20,11 +20,11 @@ import (
 	"errors"
 	"io"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/metricsutil"
 	"k8s.io/kubernetes/pkg/labels"
@@ -40,12 +40,12 @@ type TopNodeOptions struct {
 }
 
 var (
-	topNodeLong = dedent.Dedent(`
+	topNodeLong = templates.LongDesc(`
 		Display Resource (CPU/Memory/Storage) usage of nodes.
 
 		The top-node command allows you to see the resource consumption of nodes.`)
 
-	topNodeExample = dedent.Dedent(`
+	topNodeExample = templates.Examples(`
 		  # Show metrics for all nodes
 		  kubectl top node
 
@@ -53,7 +53,7 @@ var (
 		  kubectl top node NODE_NAME`)
 )
 
-func NewCmdTopNode(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdTopNode(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &TopNodeOptions{}
 
 	cmd := &cobra.Command{
@@ -78,7 +78,7 @@ func NewCmdTopNode(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func (o *TopNodeOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, args []string, out io.Writer) error {
+func (o *TopNodeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string, out io.Writer) error {
 	var err error
 	if len(args) == 1 {
 		o.ResourceName = args[0]

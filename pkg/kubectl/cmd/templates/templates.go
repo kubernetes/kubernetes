@@ -16,84 +16,87 @@ limitations under the License.
 
 package templates
 
-import "strings"
-
-func MainHelpTemplate() string {
-	return decorate(mainHelpTemplate, false)
-}
-
-func MainUsageTemplate() string {
-	return decorate(mainUsageTemplate, true) + "\n"
-}
-
-func OptionsHelpTemplate() string {
-	return decorate(optionsHelpTemplate, false)
-}
-
-func OptionsUsageTemplate() string {
-	return decorate(optionsUsageTemplate, false)
-}
-
-func decorate(template string, trim bool) string {
-	if trim && len(strings.Trim(template, " ")) > 0 {
-		template = strings.Trim(template, "\n")
-	}
-	return template
-}
+import (
+	"strings"
+	"unicode"
+)
 
 const (
-	vars = `{{$isRootCmd := isRootCmd .}}` +
+	// SectionVars is the help template section that declares variables to be used in the template.
+	SectionVars = `{{$isRootCmd := isRootCmd .}}` +
 		`{{$rootCmd := rootCmd .}}` +
 		`{{$visibleFlags := visibleFlags (flagsNotIntersected .LocalFlags .PersistentFlags)}}` +
 		`{{$explicitlyExposedFlags := exposed .}}` +
 		`{{$optionsCmdFor := optionsCmdFor .}}` +
 		`{{$usageLine := usageLine .}}`
 
-	mainHelpTemplate = `{{with or .Long .Short }}{{. | trim}}{{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}`
+	// SectionAliases is the help template section that displays command aliases.
+	SectionAliases = `{{if gt .Aliases 0}}Aliases:
+{{.NameAndAliases}}
 
-	mainUsageTemplate = vars +
-		// ALIASES
-		`{{if gt .Aliases 0}}
+{{end}}`
 
-Aliases:
-{{.NameAndAliases}}{{end}}` +
+	// SectionExamples is the help template section that displays command examples.
+	SectionExamples = `{{if .HasExample}}Examples:
+{{trimRight .Example}}
 
-		// EXAMPLES
-		`{{if .HasExample}}
+{{end}}`
 
-Examples:
-{{ indentLines (.Example | trimLeft) 2 }}{{end}}` +
+	// SectionSubcommands is the help template section that displays the command's subcommands.
+	SectionSubcommands = `{{if .HasAvailableSubCommands}}{{cmdGroupsString .}}
 
-		// SUBCOMMANDS
-		`{{ if .HasAvailableSubCommands}}
-{{range cmdGroups . .Commands}}
-{{.Message}}
-{{range .Commands}}{{if .Runnable}}  {{rpad .Name .NamePadding }} {{.Short}}
-{{end}}{{end}}{{end}}{{end}}` +
+{{end}}`
 
-		// VISIBLE FLAGS
-		`{{ if or $visibleFlags.HasFlags $explicitlyExposedFlags.HasFlags}}
+	// SectionFlags is the help template section that displays the command's flags.
+	SectionFlags = `{{ if or $visibleFlags.HasFlags $explicitlyExposedFlags.HasFlags}}Options:
+{{ if $visibleFlags.HasFlags}}{{trimRight (flagsUsages $visibleFlags)}}{{end}}{{ if $explicitlyExposedFlags.HasFlags}}{{trimRight (flagsUsages $explicitlyExposedFlags)}}{{end}}
 
-Options:
-{{ if $visibleFlags.HasFlags}}{{flagsUsages $visibleFlags}}{{end}}{{ if $explicitlyExposedFlags.HasFlags}}{{flagsUsages $explicitlyExposedFlags}}{{end}}{{end}}` +
+{{end}}`
 
-		// USAGE LINE
-		`{{if and .Runnable (ne .UseLine "") (ne .UseLine $rootCmd)}}
-Usage:
+	// SectionUsage is the help template section that displays the command's usage.
+	SectionUsage = `{{if and .Runnable (ne .UseLine "") (ne .UseLine $rootCmd)}}Usage:
   {{$usageLine}}
-{{end}}` +
 
-		// TIPS: --help
-		`{{ if .HasSubCommands }}
-Use "{{$rootCmd}} <command> --help" for more information about a given command.{{end}}` +
+{{end}}`
 
-		// TIPS: global options
-		`{{ if $optionsCmdFor}}
-Use "{{$optionsCmdFor}}" for a list of global command-line options (applies to all commands).{{end}}`
+	// SectionTipsHelp is the help template section that displays the '--help' hint.
+	SectionTipsHelp = `{{if .HasSubCommands}}Use "{{$rootCmd}} <command> --help" for more information about a given command.
+{{end}}`
 
-	optionsHelpTemplate = ``
+	// SectionTipsGlobalOptions is the help template section that displays the 'options' hint for displaying global flags.
+	SectionTipsGlobalOptions = `{{if $optionsCmdFor}}Use "{{$optionsCmdFor}}" for a list of global command-line options (applies to all commands).
+{{end}}`
+)
 
-	optionsUsageTemplate = `{{ if .HasInheritedFlags}}The following options can be passed to any command:
+// MainHelpTemplate if the template for 'help' used by most commands.
+func MainHelpTemplate() string {
+	return `{{with or .Long .Short }}{{. | trim}}{{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}`
+}
+
+// MainUsageTemplate if the template for 'usage' used by most commands.
+func MainUsageTemplate() string {
+	sections := []string{
+		"\n\n",
+		SectionVars,
+		SectionAliases,
+		SectionExamples,
+		SectionSubcommands,
+		SectionFlags,
+		SectionUsage,
+		SectionTipsHelp,
+		SectionTipsGlobalOptions,
+	}
+	return strings.TrimRightFunc(strings.Join(sections, ""), unicode.IsSpace)
+}
+
+// OptionsHelpTemplate if the template for 'help' used by the 'options' command.
+func OptionsHelpTemplate() string {
+	return ""
+}
+
+// OptionsUsageTemplate if the template for 'usage' used by the 'options' command.
+func OptionsUsageTemplate() string {
+	return `{{ if .HasInheritedFlags}}The following options can be passed to any command:
 
 {{flagsUsages .InheritedFlags}}{{end}}`
-)
+}

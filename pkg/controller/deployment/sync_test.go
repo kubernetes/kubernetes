@@ -21,206 +21,229 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	exp "k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
+
+func maxSurge(val int) *intstr.IntOrString {
+	surge := intstr.FromInt(val)
+	return &surge
+}
 
 func TestScale(t *testing.T) {
 	newTimestamp := unversioned.Date(2016, 5, 20, 2, 0, 0, 0, time.UTC)
 	oldTimestamp := unversioned.Date(2016, 5, 20, 1, 0, 0, 0, time.UTC)
 	olderTimestamp := unversioned.Date(2016, 5, 20, 0, 0, 0, 0, time.UTC)
 
+	var updatedTemplate = func(replicas int) *extensions.Deployment {
+		d := newDeployment("foo", replicas, nil, nil, nil, map[string]string{"foo": "bar"})
+		d.Spec.Template.Labels["another"] = "label"
+		return d
+	}
+
 	tests := []struct {
 		name          string
-		deployment    *exp.Deployment
-		oldDeployment *exp.Deployment
+		deployment    *extensions.Deployment
+		oldDeployment *extensions.Deployment
 
-		newRS  *exp.ReplicaSet
-		oldRSs []*exp.ReplicaSet
+		newRS  *extensions.ReplicaSet
+		oldRSs []*extensions.ReplicaSet
 
-		expectedNew *exp.ReplicaSet
-		expectedOld []*exp.ReplicaSet
+		expectedNew *extensions.ReplicaSet
+		expectedOld []*extensions.ReplicaSet
 
 		desiredReplicasAnnotations map[string]int32
 	}{
 		{
 			name:          "normal scaling event: 10 -> 12",
-			deployment:    newDeployment(12, nil),
-			oldDeployment: newDeployment(10, nil),
+			deployment:    newDeployment("foo", 12, nil, nil, nil, nil),
+			oldDeployment: newDeployment("foo", 10, nil, nil, nil, nil),
 
 			newRS:  rs("foo-v1", 10, nil, newTimestamp),
-			oldRSs: []*exp.ReplicaSet{},
+			oldRSs: []*extensions.ReplicaSet{},
 
 			expectedNew: rs("foo-v1", 12, nil, newTimestamp),
-			expectedOld: []*exp.ReplicaSet{},
+			expectedOld: []*extensions.ReplicaSet{},
 		},
 		{
 			name:          "normal scaling event: 10 -> 5",
-			deployment:    newDeployment(5, nil),
-			oldDeployment: newDeployment(10, nil),
+			deployment:    newDeployment("foo", 5, nil, nil, nil, nil),
+			oldDeployment: newDeployment("foo", 10, nil, nil, nil, nil),
 
 			newRS:  rs("foo-v1", 10, nil, newTimestamp),
-			oldRSs: []*exp.ReplicaSet{},
+			oldRSs: []*extensions.ReplicaSet{},
 
 			expectedNew: rs("foo-v1", 5, nil, newTimestamp),
-			expectedOld: []*exp.ReplicaSet{},
+			expectedOld: []*extensions.ReplicaSet{},
 		},
 		{
 			name:          "proportional scaling: 5 -> 10",
-			deployment:    newDeployment(10, nil),
-			oldDeployment: newDeployment(5, nil),
+			deployment:    newDeployment("foo", 10, nil, nil, nil, nil),
+			oldDeployment: newDeployment("foo", 5, nil, nil, nil, nil),
 
 			newRS:  rs("foo-v2", 2, nil, newTimestamp),
-			oldRSs: []*exp.ReplicaSet{rs("foo-v1", 3, nil, oldTimestamp)},
+			oldRSs: []*extensions.ReplicaSet{rs("foo-v1", 3, nil, oldTimestamp)},
 
 			expectedNew: rs("foo-v2", 4, nil, newTimestamp),
-			expectedOld: []*exp.ReplicaSet{rs("foo-v1", 6, nil, oldTimestamp)},
+			expectedOld: []*extensions.ReplicaSet{rs("foo-v1", 6, nil, oldTimestamp)},
 		},
 		{
 			name:          "proportional scaling: 5 -> 3",
-			deployment:    newDeployment(3, nil),
-			oldDeployment: newDeployment(5, nil),
+			deployment:    newDeployment("foo", 3, nil, nil, nil, nil),
+			oldDeployment: newDeployment("foo", 5, nil, nil, nil, nil),
 
 			newRS:  rs("foo-v2", 2, nil, newTimestamp),
-			oldRSs: []*exp.ReplicaSet{rs("foo-v1", 3, nil, oldTimestamp)},
+			oldRSs: []*extensions.ReplicaSet{rs("foo-v1", 3, nil, oldTimestamp)},
 
 			expectedNew: rs("foo-v2", 1, nil, newTimestamp),
-			expectedOld: []*exp.ReplicaSet{rs("foo-v1", 2, nil, oldTimestamp)},
+			expectedOld: []*extensions.ReplicaSet{rs("foo-v1", 2, nil, oldTimestamp)},
 		},
 		{
 			name:          "proportional scaling: 9 -> 4",
-			deployment:    newDeployment(4, nil),
-			oldDeployment: newDeployment(9, nil),
+			deployment:    newDeployment("foo", 4, nil, nil, nil, nil),
+			oldDeployment: newDeployment("foo", 9, nil, nil, nil, nil),
 
 			newRS:  rs("foo-v2", 8, nil, newTimestamp),
-			oldRSs: []*exp.ReplicaSet{rs("foo-v1", 1, nil, oldTimestamp)},
+			oldRSs: []*extensions.ReplicaSet{rs("foo-v1", 1, nil, oldTimestamp)},
 
 			expectedNew: rs("foo-v2", 4, nil, newTimestamp),
-			expectedOld: []*exp.ReplicaSet{rs("foo-v1", 0, nil, oldTimestamp)},
+			expectedOld: []*extensions.ReplicaSet{rs("foo-v1", 0, nil, oldTimestamp)},
 		},
 		{
 			name:          "proportional scaling: 7 -> 10",
-			deployment:    newDeployment(10, nil),
-			oldDeployment: newDeployment(7, nil),
+			deployment:    newDeployment("foo", 10, nil, nil, nil, nil),
+			oldDeployment: newDeployment("foo", 7, nil, nil, nil, nil),
 
 			newRS:  rs("foo-v3", 2, nil, newTimestamp),
-			oldRSs: []*exp.ReplicaSet{rs("foo-v2", 3, nil, oldTimestamp), rs("foo-v1", 2, nil, olderTimestamp)},
+			oldRSs: []*extensions.ReplicaSet{rs("foo-v2", 3, nil, oldTimestamp), rs("foo-v1", 2, nil, olderTimestamp)},
 
 			expectedNew: rs("foo-v3", 3, nil, newTimestamp),
-			expectedOld: []*exp.ReplicaSet{rs("foo-v2", 4, nil, oldTimestamp), rs("foo-v1", 3, nil, olderTimestamp)},
+			expectedOld: []*extensions.ReplicaSet{rs("foo-v2", 4, nil, oldTimestamp), rs("foo-v1", 3, nil, olderTimestamp)},
 		},
 		{
 			name:          "proportional scaling: 13 -> 8",
-			deployment:    newDeployment(8, nil),
-			oldDeployment: newDeployment(13, nil),
+			deployment:    newDeployment("foo", 8, nil, nil, nil, nil),
+			oldDeployment: newDeployment("foo", 13, nil, nil, nil, nil),
 
 			newRS:  rs("foo-v3", 2, nil, newTimestamp),
-			oldRSs: []*exp.ReplicaSet{rs("foo-v2", 8, nil, oldTimestamp), rs("foo-v1", 3, nil, olderTimestamp)},
+			oldRSs: []*extensions.ReplicaSet{rs("foo-v2", 8, nil, oldTimestamp), rs("foo-v1", 3, nil, olderTimestamp)},
 
 			expectedNew: rs("foo-v3", 1, nil, newTimestamp),
-			expectedOld: []*exp.ReplicaSet{rs("foo-v2", 5, nil, oldTimestamp), rs("foo-v1", 2, nil, olderTimestamp)},
+			expectedOld: []*extensions.ReplicaSet{rs("foo-v2", 5, nil, oldTimestamp), rs("foo-v1", 2, nil, olderTimestamp)},
 		},
 		// Scales up the new replica set.
 		{
 			name:          "leftover distribution: 3 -> 4",
-			deployment:    newDeployment(4, nil),
-			oldDeployment: newDeployment(3, nil),
+			deployment:    newDeployment("foo", 4, nil, nil, nil, nil),
+			oldDeployment: newDeployment("foo", 3, nil, nil, nil, nil),
 
 			newRS:  rs("foo-v3", 1, nil, newTimestamp),
-			oldRSs: []*exp.ReplicaSet{rs("foo-v2", 1, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
+			oldRSs: []*extensions.ReplicaSet{rs("foo-v2", 1, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
 
 			expectedNew: rs("foo-v3", 2, nil, newTimestamp),
-			expectedOld: []*exp.ReplicaSet{rs("foo-v2", 1, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
+			expectedOld: []*extensions.ReplicaSet{rs("foo-v2", 1, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
 		},
 		// Scales down the older replica set.
 		{
 			name:          "leftover distribution: 3 -> 2",
-			deployment:    newDeployment(2, nil),
-			oldDeployment: newDeployment(3, nil),
+			deployment:    newDeployment("foo", 2, nil, nil, nil, nil),
+			oldDeployment: newDeployment("foo", 3, nil, nil, nil, nil),
 
 			newRS:  rs("foo-v3", 1, nil, newTimestamp),
-			oldRSs: []*exp.ReplicaSet{rs("foo-v2", 1, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
+			oldRSs: []*extensions.ReplicaSet{rs("foo-v2", 1, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
 
 			expectedNew: rs("foo-v3", 1, nil, newTimestamp),
-			expectedOld: []*exp.ReplicaSet{rs("foo-v2", 1, nil, oldTimestamp), rs("foo-v1", 0, nil, olderTimestamp)},
+			expectedOld: []*extensions.ReplicaSet{rs("foo-v2", 1, nil, oldTimestamp), rs("foo-v1", 0, nil, olderTimestamp)},
 		},
 		// Scales up the latest replica set first.
 		{
 			name:          "proportional scaling (no new rs): 4 -> 5",
-			deployment:    newDeployment(5, nil),
-			oldDeployment: newDeployment(4, nil),
+			deployment:    newDeployment("foo", 5, nil, nil, nil, nil),
+			oldDeployment: newDeployment("foo", 4, nil, nil, nil, nil),
 
 			newRS:  nil,
-			oldRSs: []*exp.ReplicaSet{rs("foo-v2", 2, nil, oldTimestamp), rs("foo-v1", 2, nil, olderTimestamp)},
+			oldRSs: []*extensions.ReplicaSet{rs("foo-v2", 2, nil, oldTimestamp), rs("foo-v1", 2, nil, olderTimestamp)},
 
 			expectedNew: nil,
-			expectedOld: []*exp.ReplicaSet{rs("foo-v2", 3, nil, oldTimestamp), rs("foo-v1", 2, nil, olderTimestamp)},
+			expectedOld: []*extensions.ReplicaSet{rs("foo-v2", 3, nil, oldTimestamp), rs("foo-v1", 2, nil, olderTimestamp)},
 		},
 		// Scales down to zero
 		{
 			name:          "proportional scaling: 6 -> 0",
-			deployment:    newDeployment(0, nil),
-			oldDeployment: newDeployment(6, nil),
+			deployment:    newDeployment("foo", 0, nil, nil, nil, nil),
+			oldDeployment: newDeployment("foo", 6, nil, nil, nil, nil),
 
 			newRS:  rs("foo-v3", 3, nil, newTimestamp),
-			oldRSs: []*exp.ReplicaSet{rs("foo-v2", 2, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
+			oldRSs: []*extensions.ReplicaSet{rs("foo-v2", 2, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
 
 			expectedNew: rs("foo-v3", 0, nil, newTimestamp),
-			expectedOld: []*exp.ReplicaSet{rs("foo-v2", 0, nil, oldTimestamp), rs("foo-v1", 0, nil, olderTimestamp)},
+			expectedOld: []*extensions.ReplicaSet{rs("foo-v2", 0, nil, oldTimestamp), rs("foo-v1", 0, nil, olderTimestamp)},
 		},
 		// Scales up from zero
 		{
 			name:          "proportional scaling: 0 -> 6",
-			deployment:    newDeployment(6, nil),
-			oldDeployment: newDeployment(0, nil),
+			deployment:    newDeployment("foo", 6, nil, nil, nil, nil),
+			oldDeployment: newDeployment("foo", 6, nil, nil, nil, nil),
 
 			newRS:  rs("foo-v3", 0, nil, newTimestamp),
-			oldRSs: []*exp.ReplicaSet{rs("foo-v2", 0, nil, oldTimestamp), rs("foo-v1", 0, nil, olderTimestamp)},
+			oldRSs: []*extensions.ReplicaSet{rs("foo-v2", 0, nil, oldTimestamp), rs("foo-v1", 0, nil, olderTimestamp)},
 
 			expectedNew: rs("foo-v3", 6, nil, newTimestamp),
-			expectedOld: []*exp.ReplicaSet{rs("foo-v2", 0, nil, oldTimestamp), rs("foo-v1", 0, nil, olderTimestamp)},
+			expectedOld: []*extensions.ReplicaSet{rs("foo-v2", 0, nil, oldTimestamp), rs("foo-v1", 0, nil, olderTimestamp)},
 		},
 		// Scenario: deployment.spec.replicas == 3 ( foo-v1.spec.replicas == foo-v2.spec.replicas == foo-v3.spec.replicas == 1 )
 		// Deployment is scaled to 5. foo-v3.spec.replicas and foo-v2.spec.replicas should increment by 1 but foo-v2 fails to
 		// update.
 		{
 			name:          "failed rs update",
-			deployment:    newDeployment(5, nil),
-			oldDeployment: newDeployment(5, nil),
+			deployment:    newDeployment("foo", 5, nil, nil, nil, nil),
+			oldDeployment: newDeployment("foo", 5, nil, nil, nil, nil),
 
 			newRS:  rs("foo-v3", 2, nil, newTimestamp),
-			oldRSs: []*exp.ReplicaSet{rs("foo-v2", 1, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
+			oldRSs: []*extensions.ReplicaSet{rs("foo-v2", 1, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
 
 			expectedNew: rs("foo-v3", 2, nil, newTimestamp),
-			expectedOld: []*exp.ReplicaSet{rs("foo-v2", 2, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
+			expectedOld: []*extensions.ReplicaSet{rs("foo-v2", 2, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
 
 			desiredReplicasAnnotations: map[string]int32{"foo-v2": int32(3)},
 		},
 		{
 			name:          "deployment with surge pods",
-			deployment:    newDeploymentEnhanced(20, intstr.FromInt(2)),
-			oldDeployment: newDeploymentEnhanced(10, intstr.FromInt(2)),
+			deployment:    newDeployment("foo", 20, nil, maxSurge(2), nil, nil),
+			oldDeployment: newDeployment("foo", 10, nil, maxSurge(2), nil, nil),
 
 			newRS:  rs("foo-v2", 6, nil, newTimestamp),
-			oldRSs: []*exp.ReplicaSet{rs("foo-v1", 6, nil, oldTimestamp)},
+			oldRSs: []*extensions.ReplicaSet{rs("foo-v1", 6, nil, oldTimestamp)},
 
 			expectedNew: rs("foo-v2", 11, nil, newTimestamp),
-			expectedOld: []*exp.ReplicaSet{rs("foo-v1", 11, nil, oldTimestamp)},
+			expectedOld: []*extensions.ReplicaSet{rs("foo-v1", 11, nil, oldTimestamp)},
 		},
 		{
 			name:          "change both surge and size",
-			deployment:    newDeploymentEnhanced(50, intstr.FromInt(6)),
-			oldDeployment: newDeploymentEnhanced(10, intstr.FromInt(3)),
+			deployment:    newDeployment("foo", 50, nil, maxSurge(6), nil, nil),
+			oldDeployment: newDeployment("foo", 10, nil, maxSurge(3), nil, nil),
 
 			newRS:  rs("foo-v2", 5, nil, newTimestamp),
-			oldRSs: []*exp.ReplicaSet{rs("foo-v1", 8, nil, oldTimestamp)},
+			oldRSs: []*extensions.ReplicaSet{rs("foo-v1", 8, nil, oldTimestamp)},
 
 			expectedNew: rs("foo-v2", 22, nil, newTimestamp),
-			expectedOld: []*exp.ReplicaSet{rs("foo-v1", 34, nil, oldTimestamp)},
+			expectedOld: []*extensions.ReplicaSet{rs("foo-v1", 34, nil, oldTimestamp)},
+		},
+		{
+			name:          "change both size and template",
+			deployment:    updatedTemplate(14),
+			oldDeployment: newDeployment("foo", 10, nil, nil, nil, map[string]string{"foo": "bar"}),
+
+			newRS:  nil,
+			oldRSs: []*extensions.ReplicaSet{rs("foo-v2", 7, nil, newTimestamp), rs("foo-v1", 3, nil, oldTimestamp)},
+
+			expectedNew: nil,
+			expectedOld: []*extensions.ReplicaSet{rs("foo-v2", 10, nil, newTimestamp), rs("foo-v1", 4, nil, oldTimestamp)},
 		},
 	}
 
@@ -266,9 +289,9 @@ func TestScale(t *testing.T) {
 		}
 		for n := range test.oldRSs {
 			rs := test.oldRSs[n]
-			exp := test.expectedOld[n]
-			if exp.Spec.Replicas != rs.Spec.Replicas {
-				t.Errorf("%s: expected old (%s) replicas: %d, got: %d", test.name, rs.Name, exp.Spec.Replicas, rs.Spec.Replicas)
+			expected := test.expectedOld[n]
+			if expected.Spec.Replicas != rs.Spec.Replicas {
+				t.Errorf("%s: expected old (%s) replicas: %d, got: %d", test.name, rs.Name, expected.Spec.Replicas, rs.Spec.Replicas)
 			}
 		}
 	}
@@ -278,12 +301,12 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 	selector := map[string]string{"foo": "bar"}
 
 	tests := []struct {
-		oldRSs               []*exp.ReplicaSet
-		revisionHistoryLimit int
+		oldRSs               []*extensions.ReplicaSet
+		revisionHistoryLimit int32
 		expectedDeletions    int
 	}{
 		{
-			oldRSs: []*exp.ReplicaSet{
+			oldRSs: []*extensions.ReplicaSet{
 				newRSWithStatus("foo-1", 0, 0, selector),
 				newRSWithStatus("foo-2", 0, 0, selector),
 				newRSWithStatus("foo-3", 0, 0, selector),
@@ -293,7 +316,7 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 		},
 		{
 			// Only delete the replica set with Spec.Replicas = Status.Replicas = 0.
-			oldRSs: []*exp.ReplicaSet{
+			oldRSs: []*extensions.ReplicaSet{
 				newRSWithStatus("foo-1", 0, 0, selector),
 				newRSWithStatus("foo-2", 0, 1, selector),
 				newRSWithStatus("foo-3", 1, 0, selector),
@@ -304,7 +327,7 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 		},
 
 		{
-			oldRSs: []*exp.ReplicaSet{
+			oldRSs: []*extensions.ReplicaSet{
 				newRSWithStatus("foo-1", 0, 0, selector),
 				newRSWithStatus("foo-2", 0, 0, selector),
 			},
@@ -312,7 +335,7 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 			expectedDeletions:    2,
 		},
 		{
-			oldRSs: []*exp.ReplicaSet{
+			oldRSs: []*extensions.ReplicaSet{
 				newRSWithStatus("foo-1", 1, 1, selector),
 				newRSWithStatus("foo-2", 1, 1, selector),
 			},
@@ -321,18 +344,25 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 		},
 	}
 
-	for i, test := range tests {
+	for i := range tests {
+		test := tests[i]
 		fake := &fake.Clientset{}
-		controller := NewDeploymentController(fake, controller.NoResyncPeriodFunc)
+		informers := informers.NewSharedInformerFactory(fake, controller.NoResyncPeriodFunc())
+		controller := NewDeploymentController(informers.Deployments(), informers.ReplicaSets(), informers.Pods(), fake)
 
 		controller.eventRecorder = &record.FakeRecorder{}
+		controller.dListerSynced = alwaysReady
 		controller.rsListerSynced = alwaysReady
 		controller.podListerSynced = alwaysReady
 		for _, rs := range test.oldRSs {
 			controller.rsLister.Indexer.Add(rs)
 		}
 
-		d := newDeployment(1, &tests[i].revisionHistoryLimit)
+		stopCh := make(chan struct{})
+		defer close(stopCh)
+		informers.Start(stopCh)
+
+		d := newDeployment("foo", 1, &test.revisionHistoryLimit, nil, nil, map[string]string{"foo": "bar"})
 		controller.cleanupDeployment(test.oldRSs, d)
 
 		gotDeletions := 0

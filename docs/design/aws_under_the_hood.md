@@ -94,6 +94,9 @@ often faster, and historically more reliable. Unless you can make do with
 whatever space is left on your root partition, you must choose an instance type
 that provides you with sufficient instance storage for your needs.
 
+To configure Kubernetes to use EBS storage, pass the environment variable
+`KUBE_AWS_STORAGE=ebs` to kube-up.
+
 Note: The master uses a persistent volume ([etcd](architecture.md#etcd)) to
 track its state. Similar to nodes, containers are mostly run against instance
 storage, except that we repoint some important data onto the persistent volume.

@@ -23,7 +23,6 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -31,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/portforward"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
@@ -48,7 +48,7 @@ type PortForwardOptions struct {
 }
 
 var (
-	portforward_example = dedent.Dedent(`
+	portforward_example = templates.Examples(`
 		# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in the pod
 		kubectl port-forward mypod 5000 6000
 
@@ -62,7 +62,7 @@ var (
 		kubectl port-forward  mypod 0:5000`)
 )
 
-func NewCmdPortForward(f *cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Command {
+func NewCmdPortForward(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Command {
 	opts := &PortForwardOptions{
 		PortForwarder: &defaultPortForwarder{
 			cmdOut: cmdOut,
@@ -112,7 +112,7 @@ func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts Po
 }
 
 // Complete completes all the required options for port-forward cmd.
-func (o *PortForwardOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, args []string, cmdOut io.Writer, cmdErr io.Writer) error {
+func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string, cmdOut io.Writer, cmdErr io.Writer) error {
 	var err error
 	o.PodName = cmdutil.GetFlagString(cmd, "pod")
 	if len(o.PodName) == 0 && len(args) == 0 {

@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 )
 
@@ -91,7 +92,7 @@ type Threshold struct {
 	// GracePeriod represents the amount of time that a threshold must be met before eviction is triggered.
 	GracePeriod time.Duration
 	// MinReclaim represents the minimum amount of resource to reclaim if the threshold is met.
-	MinReclaim *resource.Quantity
+	MinReclaim *ThresholdValue
 }
 
 // Manager evaluates when an eviction threshold for node stability has been met on the node.
@@ -145,6 +146,8 @@ type signalObservation struct {
 	capacity *resource.Quantity
 	// The available resource
 	available *resource.Quantity
+	// Time at which the observation was taken
+	time unversioned.Time
 }
 
 // signalObservations maps a signal to an observed quantity

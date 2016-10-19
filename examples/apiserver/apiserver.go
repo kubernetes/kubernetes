@@ -67,10 +67,14 @@ func Run(serverOptions *genericoptions.ServerRunOptions) error {
 	serverOptions.StorageConfig.ServerList = []string{"http://127.0.0.1:2379"}
 	genericvalidation.ValidateRunOptions(serverOptions)
 	genericvalidation.VerifyEtcdServersList(serverOptions)
-	config := genericapiserver.NewConfig(serverOptions)
+	config := genericapiserver.NewConfig().ApplyOptions(serverOptions).Complete()
+	if err := config.MaybeGenerateServingCerts(); err != nil {
+		// this wasn't treated as fatal for this process before
+		fmt.Printf("Error creating cert: %v", err)
+	}
+
 	config.Authorizer = authorizer.NewAlwaysAllowAuthorizer()
-	config.Serializer = api.Codecs
-	s, err := config.Complete().New()
+	s, err := config.New()
 	if err != nil {
 		return fmt.Errorf("Error in bringing up the server: %v", err)
 	}

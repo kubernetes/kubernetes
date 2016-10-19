@@ -35,25 +35,31 @@ option go_package = "v1alpha1";
 // created by POSTing to .../pods/<pod name>/evictions.
 message Eviction {
   // ObjectMeta describes the pod that is being evicted.
+  // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
   // DeleteOptions may be provided
+  // +optional
   optional k8s.io.kubernetes.pkg.api.v1.DeleteOptions deleteOptions = 2;
 }
 
 // PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
 message PodDisruptionBudget {
+  // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior of the PodDisruptionBudget.
+  // +optional
   optional PodDisruptionBudgetSpec spec = 2;
 
   // Most recently observed status of the PodDisruptionBudget.
+  // +optional
   optional PodDisruptionBudgetStatus status = 3;
 }
 
 // PodDisruptionBudgetList is a collection of PodDisruptionBudgets.
 message PodDisruptionBudgetList {
+  // +optional
   optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
 
   repeated PodDisruptionBudget items = 2;
@@ -61,12 +67,16 @@ message PodDisruptionBudgetList {
 
 // PodDisruptionBudgetSpec is a description of a PodDisruptionBudget.
 message PodDisruptionBudgetSpec {
-  // The minimum number of pods that must be available simultaneously.  This
-  // can be either an integer or a string specifying a percentage, e.g. "28%".
+  // An eviction is allowed if at least "minAvailable" pods selected by
+  // "selector" will still be available after the eviction, i.e. even in the
+  // absence of the evicted pod.  So for example you can prevent all voluntary
+  // evictions by specifying "100%".
+  // +optional
   optional k8s.io.kubernetes.pkg.util.intstr.IntOrString minAvailable = 1;
 
   // Label query over pods whose evictions are managed by the disruption
   // budget.
+  // +optional
   optional k8s.io.kubernetes.pkg.api.unversioned.LabelSelector selector = 2;
 }
 

@@ -38,18 +38,22 @@ option go_package = "v1alpha1";
 // map to the same storage identity. PetSet is currently in alpha
 // and subject to change without notice.
 message PetSet {
+  // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
   // Spec defines the desired identities of pets in this set.
+  // +optional
   optional PetSetSpec spec = 2;
 
   // Status is the current status of Pets in this PetSet. This data
   // may be out of date by some window of time.
+  // +optional
   optional PetSetStatus status = 3;
 }
 
 // PetSetList is a collection of PetSets.
 message PetSetList {
+  // +optional
   optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
 
   repeated PetSet items = 2;
@@ -62,11 +66,13 @@ message PetSetSpec {
   // same Template, but individual replicas also have a consistent identity.
   // If unspecified, defaults to 1.
   // TODO: Consider a rename of this field.
+  // +optional
   optional int32 replicas = 1;
 
   // Selector is a label query over pods that should match the replica count.
   // If empty, defaulted to labels on the pod template.
   // More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
+  // +optional
   optional k8s.io.kubernetes.pkg.api.unversioned.LabelSelector selector = 2;
 
   // Template is the object that describes the pod that will be created if
@@ -82,6 +88,7 @@ message PetSetSpec {
   // container in the template. A claim in this list takes precedence over
   // any volumes in the template, with the same name.
   // TODO: Define the behavior if a claim already exists with the same name.
+  // +optional
   repeated k8s.io.kubernetes.pkg.api.v1.PersistentVolumeClaim volumeClaimTemplates = 4;
 
   // ServiceName is the name of the service that governs this PetSet.
@@ -95,6 +102,7 @@ message PetSetSpec {
 // PetSetStatus represents the current state of a PetSet.
 message PetSetStatus {
   // most recent generation observed by this autoscaler.
+  // +optional
   optional int64 observedGeneration = 1;
 
   // Replicas is the number of actual replicas.

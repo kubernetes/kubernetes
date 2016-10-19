@@ -23,8 +23,8 @@ import (
 	"net/url"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -74,19 +74,19 @@ func (c *RESTClient) Delete() *restclient.Request {
 func (c *RESTClient) request(verb string) *restclient.Request {
 	config := restclient.ContentConfig{
 		ContentType:          runtime.ContentTypeJSON,
-		GroupVersion:         testapi.Default.GroupVersion(),
+		GroupVersion:         &registered.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: c.NegotiatedSerializer,
 	}
 	ns := c.NegotiatedSerializer
 	serializer, _ := ns.SerializerForMediaType(runtime.ContentTypeJSON, nil)
 	streamingSerializer, _ := ns.StreamingSerializerForMediaType(runtime.ContentTypeJSON, nil)
 	internalVersion := unversioned.GroupVersion{
-		Group:   testapi.Default.GroupVersion().Group,
+		Group:   registered.GroupOrDie(api.GroupName).GroupVersion.Group,
 		Version: runtime.APIVersionInternal,
 	}
 	internalVersion.Version = runtime.APIVersionInternal
 	serializers := restclient.Serializers{
-		Encoder:             ns.EncoderForVersion(serializer, *testapi.Default.GroupVersion()),
+		Encoder:             ns.EncoderForVersion(serializer, registered.GroupOrDie(api.GroupName).GroupVersion),
 		Decoder:             ns.DecoderToVersion(serializer, internalVersion),
 		StreamingSerializer: streamingSerializer,
 		Framer:              streamingSerializer.Framer,

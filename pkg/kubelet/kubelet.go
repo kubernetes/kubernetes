@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	kubeExternal "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
+	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -389,13 +389,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 
 	oomWatcher := NewOOMWatcher(kubeDeps.CAdvisorInterface, kubeDeps.Recorder)
 
-	// TODO(mtaufen): remove when internal cbr0 implementation gets removed in favor
-	//                of the kubenet network plugin
-	var myConfigureCBR0 bool = kubeCfg.ConfigureCBR0
-	if kubeCfg.NetworkPluginName == "kubenet" {
-		myConfigureCBR0 = false
-	}
-
 	klet := &Kubelet{
 		hostname:                       hostname,
 		nodeName:                       nodeName,
@@ -420,7 +413,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		cadvisor:                       kubeDeps.CAdvisorInterface,
 		diskSpaceManager:               diskSpaceManager,
 		cloud:                          kubeDeps.Cloud,
-		autoDetectCloudProvider:   (kubeExternal.AutoDetectCloudProvider == kubeCfg.CloudProvider),
+		autoDetectCloudProvider:   (componentconfigv1alpha1.AutoDetectCloudProvider == kubeCfg.CloudProvider),
 		nodeRef:                   nodeRef,
 		nodeLabels:                kubeCfg.NodeLabels,
 		nodeStatusUpdateFrequency: kubeCfg.NodeStatusUpdateFrequency.Duration,
@@ -430,7 +423,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		cgroupRoot:        kubeCfg.CgroupRoot,
 		mounter:           kubeDeps.Mounter,
 		writer:            kubeDeps.Writer,
-		configureCBR0:     myConfigureCBR0,
 		nonMasqueradeCIDR: kubeCfg.NonMasqueradeCIDR,
 		reconcileCIDR:     kubeCfg.ReconcileCIDR,
 		maxPods:           int(kubeCfg.MaxPods),
@@ -454,7 +446,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		iptablesDropBit:              int(kubeCfg.IPTablesDropBit),
 	}
 
-	if mode, err := effectiveHairpinMode(componentconfig.HairpinMode(kubeCfg.HairpinMode), kubeCfg.ContainerRuntime, kubeCfg.ConfigureCBR0, kubeCfg.NetworkPluginName); err != nil {
+	if mode, err := effectiveHairpinMode(componentconfig.HairpinMode(kubeCfg.HairpinMode), kubeCfg.ContainerRuntime, kubeCfg.NetworkPluginName); err != nil {
 		// This is a non-recoverable error. Returning it up the callstack will just
 		// lead to retries of the same failure, so just fail hard.
 		glog.Fatalf("Invalid hairpin mode: %v", err)
@@ -914,7 +906,6 @@ type Kubelet struct {
 
 	// Whether or not kubelet should take responsibility for keeping cbr0 in
 	// the correct state.
-	configureCBR0 bool
 	reconcileCIDR bool
 
 	// Traffic to IPs outside this range will use IP masquerade.
@@ -1045,6 +1036,7 @@ func (kl *Kubelet) StartGarbageCollection() {
 	go wait.Until(func() {
 		if err := kl.containerGC.GarbageCollect(kl.sourcesReady.AllReady()); err != nil {
 			glog.Errorf("Container garbage collection failed: %v", err)
+			kl.recorder.Eventf(kl.nodeRef, api.EventTypeWarning, events.ContainerGCFailed, err.Error())
 			loggedContainerGCFailure = true
 		} else {
 			var vLevel glog.Level = 4
@@ -1061,6 +1053,7 @@ func (kl *Kubelet) StartGarbageCollection() {
 	go wait.Until(func() {
 		if err := kl.imageManager.GarbageCollect(); err != nil {
 			glog.Errorf("Image garbage collection failed: %v", err)
+			kl.recorder.Eventf(kl.nodeRef, api.EventTypeWarning, events.ImageGCFailed, err.Error())
 			loggedImageGCFailure = true
 		} else {
 			var vLevel glog.Level = 4

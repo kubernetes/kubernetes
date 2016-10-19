@@ -364,3 +364,7 @@ func (r *FakeRuntimeService) Exec(containerID string, cmd []string, tty bool, st
 	r.Called = append(r.Called, "Exec")
 	return nil
 }
+
+func (r *FakeRuntimeService) UpdateRuntimeConfig(runtimeCOnfig *runtimeApi.RuntimeConfig) error {
+	return nil
+}
