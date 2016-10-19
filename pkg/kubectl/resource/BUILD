@@ -48,8 +48,15 @@ go_test(
         "helper_test.go",
         "visitor_test.go",
     ],
+    data = [
+        "//examples:config",
+        "//test/fixtures",
+    ],
     library = "go_default_library",
-    tags = ["automanaged"],
+    tags = [
+        "automanaged",
+        "skip",
+    ],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/meta:go_default_library",

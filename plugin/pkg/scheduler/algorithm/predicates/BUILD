@@ -41,7 +41,10 @@ go_test(
         "utils_test.go",
     ],
     library = "go_default_library",
-    tags = ["automanaged"],
+    tags = [
+        "automanaged",
+        "skip",
+    ],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/resource:go_default_library",

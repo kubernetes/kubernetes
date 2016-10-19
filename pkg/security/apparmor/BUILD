@@ -27,6 +27,9 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["validate_test.go"],
+    data = [
+        "testdata/profiles",
+    ],
     library = "go_default_library",
     tags = ["automanaged"],
     deps = [
