@@ -116,7 +116,7 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 	}
 
 	// Fill the HostConfig.
-	podHasSELinuxLabel := config.Linux != nil && config.Linux.SecurityContext != nil && config.Linux.SecurityContext.SelinuxOptions != nil
+	podHasSELinuxLabel := sandboxConfig.Linux != nil && sandboxConfig.Linux.SecurityContext != nil && sandboxConfig.Linux.SecurityContext.SelinuxOptions != nil
 	hc := &dockercontainer.HostConfig{
 		Binds: generateMountBindings(config.GetMounts(), podHasSELinuxLabel),
 	}
@@ -192,11 +192,11 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 	applyContainerSecurityContext(sandboxConfig.GetLinux(), config.GetLinux(), createConfig.Config, hc)
 
 	// Apply appArmor and seccomp options.
-	var err error
-	hc.SecurityOpt, err = getContainerSecurityOpts(config.Metadata.GetName(), sandboxConfig, ds.seccompProfileRoot)
+	securityOpts, err := getContainerSecurityOpts(config.Metadata.GetName(), sandboxConfig, ds.seccompProfileRoot)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate container security options for container %q: %v", config.Metadata.GetName(), err)
 	}
+	hc.SecurityOpt = append(hc.SecurityOpt, securityOpts...)
 
 	createConfig.HostConfig = hc
 	createResp, err := ds.client.CreateContainer(createConfig)
