@@ -61,7 +61,7 @@ mkdir -p $(dirname "${CACHE}")
 if $("${NEED_FIND}"); then
     kfind -type f -name \*.go  \
         | xargs -n1 dirname    \
-        | sort -u              \
+        | LC_ALL=C sort -u     \
         | sed 's|^./||'        \
         > "${CACHE}"
 fi
