@@ -704,12 +704,10 @@ func FilterResourceList(obj runtime.Object, filterFuncs kubectl.Filters, filterO
 	return filterCount, list, nil
 }
 
-func PrintFilterCount(hiddenObjNum int, resource string, out io.Writer, options *kubectl.PrintOptions) error {
+func PrintFilterCount(hiddenObjNum int, resource string, options *kubectl.PrintOptions) {
 	if !options.NoHeaders && !options.ShowAll && hiddenObjNum > 0 {
-		_, err := fmt.Fprintf(out, "  info: %d completed object(s) was(were) not shown in %s list. Pass --show-all to see all objects.\n\n", hiddenObjNum, resource)
-		return err
+		glog.V(2).Infof("  info: %d completed object(s) was(were) not shown in %s list. Pass --show-all to see all objects.\n\n", hiddenObjNum, resource)
 	}
-	return nil
 }
 
 // ObjectListToVersionedObject receives a list of api objects and a group version
