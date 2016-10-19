@@ -89,6 +89,7 @@ go_test(
         "fake_test.go",
         "testclient_test.go",
     ],
+    data = ["//examples:config"],
     library = "go_default_library",
     tags = ["automanaged"],
     deps = [
