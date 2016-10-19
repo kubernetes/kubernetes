@@ -38,7 +38,7 @@ var buildTargets = []string{
 
 func BuildGo() error {
 	glog.Infof("Building k8s binaries...")
-	k8sRoot, err := getK8sRootDir()
+	k8sRoot, err := GetK8sRootDir()
 	if err != nil {
 		return fmt.Errorf("failed to locate kubernetes root directory %v.", err)
 	}
@@ -87,7 +87,7 @@ func getK8sBin(bin string) (string, error) {
 }
 
 // TODO: Dedup / merge this with comparable utilities in e2e/util.go
-func getK8sRootDir() (string, error) {
+func GetK8sRootDir() (string, error) {
 	// Get the directory of the current executable
 	_, testExec, _, _ := runtime.Caller(0)
 	path := filepath.Dir(testExec)
@@ -102,7 +102,7 @@ func getK8sRootDir() (string, error) {
 }
 
 func GetK8sBuildOutputDir() (string, error) {
-	k8sRoot, err := getK8sRootDir()
+	k8sRoot, err := GetK8sRootDir()
 	if err != nil {
 		return "", err
 	}

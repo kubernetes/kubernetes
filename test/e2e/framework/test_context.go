@@ -114,6 +114,8 @@ type NodeTestContextType struct {
 	PrepullImages bool
 	// RuntimeIntegrationType indicates how runtime is integrated with Kubelet. This is mainly used for CRI validation test.
 	RuntimeIntegrationType string
+	// MounterPath is the path to the program to run to perform a mount
+	MounterPath string
 }
 
 type CloudConfig struct {
@@ -209,6 +211,7 @@ func RegisterNodeFlags() {
 	flag.StringVar(&TestContext.ManifestPath, "manifest-path", "", "The path to the static pod manifest file.")
 	flag.BoolVar(&TestContext.PrepullImages, "prepull-images", true, "If true, prepull images so image pull failures do not cause test failures.")
 	flag.StringVar(&TestContext.RuntimeIntegrationType, "runtime-integration-type", "", "Choose the integration path for the container runtime, mainly used for CRI validation.")
+	flag.StringVar(&TestContext.MounterPath, "mounter-path", "", "Path of mounter binary. Leave empty to use the default mount.")
 }
 
 // overwriteFlagsWithViperConfig finds and writes values to flags using viper as input.

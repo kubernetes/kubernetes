@@ -211,7 +211,9 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		"--eviction-pressure-transition-period", "30s",
 		"--feature-gates", framework.TestContext.FeatureGates,
 		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
+		"--mounter-path", framework.TestContext.MounterPath,
 	)
+
 	if framework.TestContext.RuntimeIntegrationType != "" {
 		cmdArgs = append(cmdArgs, "--experimental-runtime-integration-type",
 			framework.TestContext.RuntimeIntegrationType) // Whether to use experimental cri integration.
