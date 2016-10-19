@@ -309,3 +309,118 @@ func TestTypeAny(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateDuplicateLabelsFailCases(t *testing.T) {
+	strs := []string{
+		`{
+	"metadata": {
+		"labels": {
+			"foo": "bar",
+			"foo": "baz"
+		}
+	}
+}`,
+		`{
+	"metadata": {
+		"annotations": {
+			"foo": "bar",
+			"foo": "baz"
+		}
+	}
+}`,
+		`{
+	"metadata": {
+		"labels": {
+			"foo": "blah"
+		},
+		"annotations": {
+			"foo": "bar",
+			"foo": "baz"
+		}
+	}
+}`,
+	}
+	schema := NoDoubleKeySchema{}
+	for _, str := range strs {
+		err := schema.ValidateBytes([]byte(str))
+		if err == nil {
+			t.Errorf("Unexpected non-error %s", str)
+		}
+	}
+}
+
+func TestValidateDuplicateLabelsPassCases(t *testing.T) {
+	strs := []string{
+		`{
+	"metadata": {
+		"labels": {
+			"foo": "bar"
+		},
+		"annotations": {
+			"foo": "baz"
+		}
+	}
+}`,
+		`{
+	"metadata": {}
+}`,
+		`{
+	"metadata": {
+		"labels": {}
+	}
+}`,
+	}
+	schema := NoDoubleKeySchema{}
+	for _, str := range strs {
+		err := schema.ValidateBytes([]byte(str))
+		if err != nil {
+			t.Errorf("Unexpected error: %v %s", err, str)
+		}
+	}
+}
+
+type AlwaysInvalidSchema struct{}
+
+func (AlwaysInvalidSchema) ValidateBytes([]byte) error {
+	return fmt.Errorf("Always invalid!")
+}
+
+func TestConjunctiveSchema(t *testing.T) {
+	tests := []struct {
+		schemas    []Schema
+		shouldPass bool
+		name       string
+	}{
+		{
+			schemas:    []Schema{NullSchema{}, NullSchema{}},
+			shouldPass: true,
+			name:       "all pass",
+		},
+		{
+			schemas:    []Schema{NullSchema{}, AlwaysInvalidSchema{}},
+			shouldPass: false,
+			name:       "one fail",
+		},
+		{
+			schemas:    []Schema{AlwaysInvalidSchema{}, AlwaysInvalidSchema{}},
+			shouldPass: false,
+			name:       "all fail",
+		},
+		{
+			schemas:    []Schema{},
+			shouldPass: true,
+			name:       "empty",
+		},
+	}
+
+	for _, test := range tests {
+		schema := ConjunctiveSchema(test.schemas)
+		err := schema.ValidateBytes([]byte{})
+		if err != nil && test.shouldPass {
+			t.Errorf("Unexpected error: %v in %s", err, test.name)
+		}
+		if err == nil && !test.shouldPass {
+			t.Errorf("Unexpected non-error: %s", test.name)
+		}
+	}
+}
