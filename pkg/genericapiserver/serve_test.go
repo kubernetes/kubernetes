@@ -41,45 +41,51 @@ type NamedTestCertSpec struct {
 	explicitNames []string // as --tls-sni-cert-key explicit names
 }
 
-func createTestCerts(spec TestCertSpec) (certFilePath, keyFilePath string, err error) {
+func createTestCerts(dir string, spec TestCertSpec) (caFilePath, certFilePath, keyFilePath string, err error) {
 	var ips []net.IP
 	for _, ip := range spec.ips {
 		ips = append(ips, net.ParseIP(ip))
 	}
 
-	certPem, keyPem, err := utilcert.GenerateSelfSignedCertKey(spec.host, ips, spec.names)
+	caCertPem, _, certPem, keyPem, err := utilcert.GenerateSelfSignedCertKey(spec.host, ips, spec.names)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
-	certFile, err := ioutil.TempFile(os.TempDir(), "cert")
+	caCertFile, err := ioutil.TempFile(dir, "ca-cert")
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
-	keyFile, err := ioutil.TempFile(os.TempDir(), "key")
+	certFile, err := ioutil.TempFile(dir, "cert")
 	if err != nil {
-		os.Remove(certFile.Name())
-		return "", "", err
+		return "", "", "", err
 	}
+
+	keyFile, err := ioutil.TempFile(dir, "key")
+	if err != nil {
+		return "", "", "", err
+	}
+
+	_, err = caCertFile.Write(caCertPem)
+	if err != nil {
+		return "", "", "", err
+	}
+	caCertFile.Close()
 
 	_, err = certFile.Write(certPem)
 	if err != nil {
-		os.Remove(certFile.Name())
-		os.Remove(keyFile.Name())
-		return "", "", err
+		return "", "", "", err
 	}
 	certFile.Close()
 
 	_, err = keyFile.Write(keyPem)
 	if err != nil {
-		os.Remove(certFile.Name())
-		os.Remove(keyFile.Name())
-		return "", "", err
+		return "", "", "", err
 	}
 	keyFile.Close()
 
-	return certFile.Name(), keyFile.Name(), nil
+	return caCertFile.Name(), certFile.Name(), keyFile.Name(), nil
 }
 
 func TestGetNamedCertificateMap(t *testing.T) {
@@ -223,18 +229,22 @@ func TestGetNamedCertificateMap(t *testing.T) {
 		},
 	}
 
+	tempDir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+
 NextTest:
 	for i, test := range tests {
 		var namedCertKeys []NamedCertKey
 		bySignature := map[string]int{} // index in test.certs by cert signature
 		for j, c := range test.certs {
-			certFile, keyFile, err := createTestCerts(c.TestCertSpec)
+			_, certFile, keyFile, err := createTestCerts(tempDir, c.TestCertSpec)
 			if err != nil {
 				t.Errorf("%d - failed to create cert %d: %v", i, j, err)
 				continue NextTest
 			}
-			defer os.Remove(certFile)
-			defer os.Remove(keyFile)
 
 			namedCertKeys = append(namedCertKeys, NamedCertKey{
 				CertKey: CertKey{
@@ -363,18 +373,23 @@ func TestServerRunWithSNI(t *testing.T) {
 		},
 	}
 
+	tempDir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+
 NextTest:
 	for i, test := range tests {
 		// create server cert
-		serverCertFile, serverKeyFile, err := createTestCerts(test.Cert)
+		caCertFile, serverCertFile, serverKeyFile, err := createTestCerts(tempDir, test.Cert)
 		if err != nil {
 			t.Errorf("%d - failed to create server cert: %v", i, err)
 		}
-		defer os.Remove(serverCertFile)
-		defer os.Remove(serverKeyFile)
 
 		// create SNI certs
 		var namedCertKeys []NamedCertKey
+		caCertFiles := []string{caCertFile}
 		serverSig, err := certFileSignature(serverCertFile, serverKeyFile)
 		if err != nil {
 			t.Errorf("%d - failed to get server cert signature: %v", i, err)
@@ -384,13 +399,11 @@ NextTest:
 			serverSig: -1,
 		}
 		for j, c := range test.SNICerts {
-			certFile, keyFile, err := createTestCerts(c.TestCertSpec)
+			caCertFile, certFile, keyFile, err := createTestCerts(tempDir, c.TestCertSpec)
 			if err != nil {
 				t.Errorf("%d - failed to create SNI cert %d: %v", i, j, err)
 				continue NextTest
 			}
-			defer os.Remove(certFile)
-			defer os.Remove(keyFile)
 
 			namedCertKeys = append(namedCertKeys, NamedCertKey{
 				CertKey: CertKey{
@@ -399,6 +412,7 @@ NextTest:
 				},
 				Names: c.explicitNames,
 			})
+			caCertFiles = append(caCertFiles, caCertFile)
 
 			// store index in namedCertKeys with the signature as the key
 			sig, err := certFileSignature(certFile, keyFile)
@@ -441,20 +455,16 @@ NextTest:
 			continue NextTest
 		}
 
-		// load certificates into a pool
+		// load ca certificates into a pool
 		roots := x509.NewCertPool()
-		certFiles := []string{serverCertFile}
-		for _, c := range namedCertKeys {
-			certFiles = append(certFiles, c.CertFile)
-		}
-		for _, certFile := range certFiles {
-			bs, err := ioutil.ReadFile(certFile)
+		for _, caCertFile := range caCertFiles {
+			bs, err := ioutil.ReadFile(caCertFile)
 			if err != nil {
-				t.Errorf("%d - error reading %q: %v", i, certFile, err)
+				t.Errorf("%d - error reading %q: %v", i, caCertFile, err)
 				continue NextTest
 			}
 			if ok := roots.AppendCertsFromPEM(bs); !ok {
-				t.Errorf("%d - error adding cert %q to the pool", i, certFile)
+				t.Errorf("%d - error adding ca cert %q to the pool", i, caCertFile)
 				continue NextTest
 			}
 		}

@@ -190,6 +190,8 @@ type SecureServingInfo struct {
 	ServerCert GeneratableKeyCert
 	// SNICerts are named CertKeys for serving secure traffic with SNI support.
 	SNICerts []NamedCertKey
+	// ServerCA is the certificate bundle needed to verify the ServerCert
+	ServerCA string
 	// ClientCA is the certificate bundle for all the signers that you'll recognize for incoming client certificates
 	ClientCA string
 }
@@ -282,6 +284,7 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 				},
 			},
 			SNICerts: []NamedCertKey{},
+			ServerCA: options.TLSCAFile,
 			ClientCA: options.ClientCAFile,
 		}
 		if options.TLSCertFile == "" && options.TLSPrivateKeyFile == "" {
@@ -299,6 +302,10 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 				},
 				Names: nkc.Names,
 			})
+		}
+
+		if secureServingInfo.ServerCert.Generate && secureServingInfo.ServerCA == "" {
+			secureServingInfo.ServerCA = path.Join(path.Dir(secureServingInfo.ServerCert.CertFile), "ca-"+path.Base(secureServingInfo.ServerCert.CertFile))
 		}
 
 		c.SecureServingInfo = secureServingInfo
@@ -475,9 +482,13 @@ func (c completedConfig) MaybeGenerateServingCerts() error {
 		alternateIPs := []net.IP{c.ServiceReadWriteIP}
 		alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes", "localhost"}
 
-		if cert, key, err := certutil.GenerateSelfSignedCertKey(c.PublicAddress.String(), alternateIPs, alternateDNS); err != nil {
+		if caCert, _, cert, key, err := certutil.GenerateSelfSignedCertKey(c.PublicAddress.String(), alternateIPs, alternateDNS); err != nil {
 			return fmt.Errorf("unable to generate self signed cert: %v", err)
 		} else {
+			if err := certutil.WriteCert(c.SecureServingInfo.ServerCA, caCert); err != nil {
+				return err
+			}
+
 			if err := certutil.WriteCert(c.SecureServingInfo.ServerCert.CertFile, cert); err != nil {
 				return err
 			}
