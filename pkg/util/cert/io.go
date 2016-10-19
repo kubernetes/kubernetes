@@ -48,13 +48,17 @@ func canReadFile(path string) bool {
 	return true
 }
 
-// WriteCert writes the pem-encoded certificate data to certPath.
+// WriteCert writes the pem-encoded certificates to certPath.
 // The certificate file will be created with file mode 0644.
 // If the certificate file already exists, it will be overwritten.
 // The parent directory of the certPath will be created as needed with file mode 0755.
-func WriteCert(certPath string, data []byte) error {
+func WriteCert(certPath string, certs ...[]byte) error {
 	if err := os.MkdirAll(filepath.Dir(certPath), os.FileMode(0755)); err != nil {
 		return err
+	}
+	data := make([]byte, 0)
+	for _, c := range certs {
+		data = append(data, c...)
 	}
 	if err := ioutil.WriteFile(certPath, data, os.FileMode(0644)); err != nil {
 		return err
