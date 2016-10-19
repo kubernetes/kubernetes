@@ -38,7 +38,7 @@ Install Ceph on the Kubernetes host. For example, on Fedora 21
 
     # yum -y install ceph
 
-If you don't have a Ceph cluster, you can set up a [containerized Ceph cluster](https://github.com/rootfs/ceph_docker)
+If you don't have a Ceph cluster, you can set up a [containerized Ceph cluster](https://github.com/ceph/ceph-docker/tree/master/examples/kubernetes)
 
 Then get the keyring from the Ceph cluster and copy it to */etc/ceph/keyring*.
 
