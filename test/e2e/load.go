@@ -107,7 +107,7 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c))
 
 		ns = f.Namespace.Name
-		nodes := framework.GetReadySchedulableNodesOrDie(c)
+		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
 

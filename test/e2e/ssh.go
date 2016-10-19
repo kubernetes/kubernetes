@@ -39,7 +39,7 @@ var _ = framework.KubeDescribe("SSH", func() {
 	It("should SSH to all nodes and run commands", func() {
 		// Get all nodes' external IPs.
 		By("Getting all nodes' SSH-able IP addresses")
-		hosts, err := framework.NodeSSHHosts(f.Client)
+		hosts, err := framework.NodeSSHHosts(f.ClientSet)
 		if err != nil {
 			framework.Failf("Error getting node hostnames: %v", err)
 		}

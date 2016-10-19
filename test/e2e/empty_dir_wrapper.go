@@ -309,7 +309,7 @@ func makeConfigMapVolumes(configMapNames []string) (volumes []api.Volume, volume
 
 func testNoWrappedVolumeRace(f *framework.Framework, volumes []api.Volume, volumeMounts []api.VolumeMount, podCount int32) {
 	rcName := wrappedVolumeRaceRCNamePrefix + string(uuid.NewUUID())
-	nodeList := framework.GetReadySchedulableNodesOrDie(f.Client)
+	nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 	Expect(len(nodeList.Items)).To(BeNumerically(">", 0))
 	targetNode := nodeList.Items[0]
 

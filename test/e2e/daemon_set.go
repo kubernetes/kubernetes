@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/labels"
@@ -68,7 +69,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		} else {
 			framework.Logf("unable to dump pods: %v", err)
 		}
-		err := clearDaemonSetNodeLabels(f.Client)
+		err := clearDaemonSetNodeLabels(f.Client, f.ClientSet)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -83,7 +84,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 	BeforeEach(func() {
 		ns = f.Namespace.Name
 		c = f.Client
-		err := clearDaemonSetNodeLabels(c)
+		err := clearDaemonSetNodeLabels(c, f.ClientSet)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -180,7 +181,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pods to be running on no nodes")
 
 		By("Change label of node, check that daemon pod is launched.")
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.Client)
+		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		Expect(len(nodeList.Items)).To(BeNumerically(">", 0))
 		newNode, err := setDaemonSetNodeLabels(c, nodeList.Items[0].Name, nodeSelector)
 		Expect(err).NotTo(HaveOccurred(), "error setting labels on node")
@@ -248,7 +249,7 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pods to be running on no nodes")
 
 		By("Change label of node, check that daemon pod is launched.")
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.Client)
+		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		Expect(len(nodeList.Items)).To(BeNumerically(">", 0))
 		newNode, err := setDaemonSetNodeLabels(c, nodeList.Items[0].Name, nodeSelector)
 		Expect(err).NotTo(HaveOccurred(), "error setting labels on node")
@@ -284,8 +285,8 @@ func separateDaemonSetNodeLabels(labels map[string]string) (map[string]string, m
 	return daemonSetLabels, otherLabels
 }
 
-func clearDaemonSetNodeLabels(c *client.Client) error {
-	nodeList := framework.GetReadySchedulableNodesOrDie(c)
+func clearDaemonSetNodeLabels(c *client.Client, cs clientset.Interface) error {
+	nodeList := framework.GetReadySchedulableNodesOrDie(cs)
 	for _, node := range nodeList.Items {
 		_, err := setDaemonSetNodeLabels(c, node.Name, map[string]string{})
 		if err != nil {

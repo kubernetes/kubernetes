@@ -49,7 +49,7 @@ var _ = framework.KubeDescribe("Networking IPerf [Experimental] [Slow] [Feature:
 	maxBandwidthBits := gceBandwidthBitsEstimate
 
 	It(fmt.Sprintf("should transfer ~ 1GB onto the service endpoint %v servers (maximum of %v clients)", numServer, numClient), func() {
-		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
+		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		totalPods := len(nodes.Items)
 		// for a single service, we expect to divide bandwidth between the network.  Very crude estimate.
 		expectedBandwidth := int(float64(maxBandwidthBits) / float64(totalPods))
@@ -110,7 +110,7 @@ var _ = framework.KubeDescribe("Networking IPerf [Experimental] [Slow] [Feature:
 
 		// Calculate expected number of clients based on total nodes.
 		expectedCli := func() int {
-			nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
+			nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 			return int(math.Min(float64(len(nodes.Items)), float64(numClient)))
 		}()
 
