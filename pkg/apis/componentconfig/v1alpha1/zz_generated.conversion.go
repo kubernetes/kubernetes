@@ -257,9 +257,6 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 		return err
 	}
 	out.ExitOnLockContention = in.ExitOnLockContention
-	if err := api.Convert_Pointer_bool_To_bool(&in.ConfigureCBR0, &out.ConfigureCBR0, s); err != nil {
-		return err
-	}
 	out.HairpinMode = in.HairpinMode
 	out.BabysitDaemons = in.BabysitDaemons
 	out.MaxPods = in.MaxPods
@@ -438,9 +435,6 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 		return err
 	}
 	out.ExitOnLockContention = in.ExitOnLockContention
-	if err := api.Convert_bool_To_Pointer_bool(&in.ConfigureCBR0, &out.ConfigureCBR0, s); err != nil {
-		return err
-	}
 	out.HairpinMode = in.HairpinMode
 	out.BabysitDaemons = in.BabysitDaemons
 	out.MaxPods = in.MaxPods

@@ -92,7 +92,6 @@ concurrent-resource-quota-syncs
 concurrent-service-syncs
 concurrent-serviceaccount-token-syncs
 config-sync-period
-configure-cbr0
 configure-cloud-routes
 conntrack-max
 conntrack-max-per-core
