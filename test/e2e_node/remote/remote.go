@@ -113,6 +113,30 @@ func CreateTestArchive() (string, error) {
 		}
 	}
 
+	// Include the GCI mounter in the deployed tarball, but only if it exists
+	k8sDir, err := build.GetK8sRootDir()
+	if err != nil {
+		return "", fmt.Errorf("Could not find K8s root dir! Err: %v", err)
+	}
+	localSource := "cluster/gce/gci/mounter"
+	source := filepath.Join(k8sDir, localSource)
+	if _, err := os.Stat(source); err == nil {
+		bindir := "cluster/gce/gci"
+		bin := "mounter"
+		destdir := filepath.Join(tardir, bindir)
+		dest := filepath.Join(destdir, bin)
+		out, err := exec.Command("mkdir", "-p", filepath.Join(tardir, bindir)).CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("failed to create directory %q for GCI mounter script. Err: %v. Output:\n%s", destdir, err, out)
+		}
+		out, err = exec.Command("cp", source, dest).CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("failed to copy GCI mounter script to the archive bin. Err: %v. Output:\n%s", err, out)
+		}
+	} else {
+		glog.Infof("Did not find %q locally, it will not be included in the test tarball (only relevant for tests on GCI)", localSource)
+	}
+
 	// Build the tar
 	out, err := exec.Command("tar", "-zcvf", archiveName, "-C", tardir, ".").CombinedOutput()
 	if err != nil {
@@ -213,6 +237,42 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 		// Exit failure with the error
 		return "", false, err
 	}
+
+	// If we are testing on a GCI node, and the mounter script exists locally (and will thus be
+	// in the tarball), we chmod 544 the mounter and specify a different mounter path in the test args.
+	// We do this here because the local var `tmp` tells us which /tmp/gcloud-e2e-%d is
+	// relevant to the current test run.
+
+	// Determine if the GCI mounter script exists locally.
+	k8sDir, err := build.GetK8sRootDir()
+	if err != nil {
+		return "", false, fmt.Errorf("Could not find K8s root dir! Err: %v", err)
+	}
+	localSource := "cluster/gce/gci/mounter"
+	source := filepath.Join(k8sDir, localSource)
+	if _, err := os.Stat(source); err == nil {
+		// Determine if tests will run on a GCI node.
+		output, err = RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sh", "-c", "'cat /etc/os-release'")
+		if err != nil {
+			glog.Errorf("Issue detecting node's OS via node's /etc/os-release. Err: %v, Output:\n%s", err, output)
+			return "", false, fmt.Errorf("Issue detecting node's OS via node's /etc/os-release. Err: %v, Output:\n%s", err, output)
+		}
+		if strings.Contains(output, "ID=gci") {
+			glog.Infof("GCI node and GCI mounter both detected, modifying --mounter-path accordingly")
+
+			// Insert args at beginning of testArgs, so any values from command line take precedence
+			mounterPath := filepath.Join(tmp, "cluster/gce/gci/mounter")
+			output, err = RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sh", "-c", fmt.Sprintf("'chmod 544 %s'", mounterPath))
+			if err != nil {
+				glog.Errorf("Unable to chmod 544 GCI mounter script. Err: %v, Output:\n%s", err, output)
+				return "", false, err
+			}
+			testArgs = fmt.Sprintf("--mounter-path=%s ", mounterPath) + testArgs
+		}
+	} else {
+		glog.Infof("Did not find %q locally, it will not be available to the test (only relevant for tests on GCI)", localSource)
+	}
+
 	// Run the tests
 	cmd = getSshCommand(" && ",
 		fmt.Sprintf("cd %s", tmp),
