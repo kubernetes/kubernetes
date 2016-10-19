@@ -2572,6 +2572,8 @@ const (
 	NodeNetworkUnavailable NodeConditionType = "NetworkUnavailable"
 	// NodeInodePressure means the kublet is under pressure due to insufficient available inodes.
 	NodeInodePressure NodeConditionType = "InodePressure"
+	// NodeCordoned means the node is cordoned or uncordoned.
+	NodeCordoned NodeConditionType = "Cordoned"
 )
 
 type NodeCondition struct {

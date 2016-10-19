@@ -506,6 +506,7 @@ service-overrides
 service-sync-period
 session-affinity
 setup-node
+set-message
 show-all
 show-events
 show-kind

@@ -24,11 +24,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/fields"
@@ -39,6 +41,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
+	nodename "k8s.io/kubernetes/pkg/types"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
 type DrainOptions struct {
@@ -50,6 +54,7 @@ type DrainOptions struct {
 	IgnoreDaemonsets   bool
 	Timeout            time.Duration
 	DeleteLocalData    bool
+	Message            string
 	mapper             meta.RESTMapper
 	nodeInfo           *resource.Info
 	out                io.Writer
@@ -74,6 +79,9 @@ const (
 	kLocalStorageWarning = "Deleting pods with local storage"
 	kUnmanagedFatal      = "pods not managed by ReplicationController, ReplicaSet, Job, or DaemonSet (use --force to override)"
 	kUnmanagedWarning    = "Deleting pods not managed by ReplicationController, ReplicaSet, Job, or DaemonSet"
+	setMessageDesc       = "Set message for node condition to describe why this node was cordoned"
+
+	updateNodeStatusMaxRetries int = 3
 )
 
 var (
@@ -82,7 +90,11 @@ var (
 
 	cordon_example = templates.Examples(`
 		# Mark node "foo" as unschedulable.
-		kubectl cordon foo`)
+		kubectl cordon foo
+
+		# Mark node "foo" as unschedulable and set message for node condition.
+		kubectl cordon foo --set-message="foo"
+		`)
 )
 
 func NewCmdCordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -98,6 +110,8 @@ func NewCmdCordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
 			cmdutil.CheckErr(options.RunCordonOrUncordon(true))
 		},
 	}
+	cmd.Flags().StringVar(&options.Message, "set-message", "", setMessageDesc)
+
 	return cmd
 }
 
@@ -171,6 +185,8 @@ func NewCmdDrain(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVar(&options.DeleteLocalData, "delete-local-data", false, "Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).")
 	cmd.Flags().IntVar(&options.GracePeriodSeconds, "grace-period", -1, "Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.")
 	cmd.Flags().DurationVar(&options.Timeout, "timeout", 0, "The length of time to wait before giving up on a delete, zero means determine a timeout from the size of the object")
+	cmd.Flags().StringVar(&options.Message, "set-message", "", setMessageDesc)
+
 	return cmd
 }
 
@@ -460,6 +476,10 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 			if err != nil {
 				return err
 			}
+			err = o.updateNodeCondition(desired)
+			if err != nil {
+				return err
+			}
 			cmdutil.PrintSuccess(o.mapper, false, o.out, o.nodeInfo.Mapping.Resource, o.nodeInfo.Name, false, changed(desired))
 		}
 	} else {
@@ -483,4 +503,41 @@ func changed(desired bool) string {
 		return "cordoned"
 	}
 	return "uncordoned"
+}
+
+func (o *DrainOptions) updateNodeCondition(desired bool) error {
+	var err error
+	nodeName := nodename.NodeName(o.nodeInfo.Name)
+	status := api.ConditionFalse
+	reason := "SchedulingEnabled"
+	message := "scheduling enabled"
+
+	if desired {
+		status = api.ConditionTrue
+		reason = "SchedulingDisabled"
+		message = o.Message
+	}
+
+	for i := 0; i < updateNodeStatusMaxRetries; i++ {
+		// Patch could also fail, even though the chance is very slim. So we still do
+		// patch in the retry loop.
+		currentTime := unversioned.Now()
+		err = nodeutil.SetNodeCondition(o.client, nodeName, api.NodeCondition{
+			Type:               api.NodeCordoned,
+			Status:             status,
+			Reason:             reason,
+			Message:            message,
+			LastTransitionTime: currentTime,
+		})
+
+		if err == nil {
+			return nil
+		}
+		if i == updateNodeStatusMaxRetries || !apierrors.IsConflict(err) {
+			glog.Errorf("Error updating node %s: %v", nodeName, err)
+			return err
+		}
+		glog.Errorf("Error updating node %s, retrying: %v", nodeName, err)
+	}
+	return err
 }

@@ -146,7 +146,8 @@ func TestCordon(t *testing.T) {
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				m := &MyReq{req}
 				switch {
-				case m.isFor("GET", "/nodes/node"):
+				case m.isFor("GET", "/nodes/node") ||
+					m.isFor("PATCH", "/api/v1/nodes/node/status"):
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, test.node)}, nil
 				case m.isFor("GET", "/nodes/bar"):
 					return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: stringBody("nope")}, nil
@@ -472,7 +473,7 @@ func TestDrain(t *testing.T) {
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				m := &MyReq{req}
 				switch {
-				case m.isFor("GET", "/nodes/node"):
+				case m.isFor("GET", "/nodes/node") || m.isFor("PATCH", "/api/v1/nodes/node/status"):
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, test.node)}, nil
 				case m.isFor("GET", "/namespaces/default/replicationcontrollers/rc"):
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &test.rcs[0])}, nil
