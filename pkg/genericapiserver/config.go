@@ -166,6 +166,8 @@ type SecureServingInfo struct {
 	ServerCert GeneratableKeyCert
 	// SNICerts are named CertKeys for serving secure traffic with SNI support.
 	SNICerts []NamedCertKey
+	// ServerCA is the certificate bundle needed to verify the ServerCert
+	ServerCA string
 	// ClientCA is the certificate bundle for all the signers that you'll recognize for incoming client certificates
 	ClientCA string
 }
@@ -455,9 +457,13 @@ func (c *Config) MaybeGenerateServingCerts(alternateIPs ...net.IP) error {
 		// TODO (cjcullen): Is ClusterIP the right address to sign a cert with?
 		alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes", "localhost"}
 
-		if cert, key, err := certutil.GenerateSelfSignedCertKey(c.PublicAddress.String(), alternateIPs, alternateDNS); err != nil {
+		if caCert, _, cert, key, err := certutil.GenerateSelfSignedCertKey(c.PublicAddress.String(), alternateIPs, alternateDNS); err != nil {
 			return fmt.Errorf("unable to generate self signed cert: %v", err)
 		} else {
+			if err := certutil.WriteCert(c.SecureServingInfo.ServerCA, caCert); err != nil {
+				return err
+			}
+
 			if err := certutil.WriteCert(c.SecureServingInfo.ServerCert.CertFile, cert); err != nil {
 				return err
 			}
