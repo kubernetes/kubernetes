@@ -566,7 +566,35 @@ type PodSandboxConfig struct {
 	// Labels are key value pairs that may be used to scope and select individual resources.
 	Labels map[string]string `protobuf:"bytes,6,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Annotations is an unstructured key value map that may be set by external
-	// tools to store and retrieve arbitrary metadata.
+	// tools to store and retrieve arbitrary metadata. There are a few features are
+	// driven by annotations, Runtimes could support them optionally:
+	//
+	// 1. AppArmor
+	//
+	//    key: container.apparmor.security.beta.kubernetes.io/<container_name>
+	//    description: apparmor profile for the container.
+	//    value:
+	//      * runtime/default: equivalent to not specifying a profile.
+	//      * localhost/<profile_name>: profile loaded on the node
+	//        (localhost) by name. The possible profile names are detailed at
+	//        http://wiki.apparmor.net/index.php/AppArmor_Core_Policy_Reference
+	//
+	// 2. Seccomp
+	//
+	//      key: security.alpha.kubernetes.io/seccomp/pod
+	//      description: the seccomp profile for the containers of an entire pod.
+	//      value: see below.
+	//
+	//      key: security.alpha.kubernetes.io/seccomp/container/<container name>
+	//      description: the seccomp profile for the container (overides pod).
+	//      values: see below
+	//
+	//      The value of seccomp is runtime agnostic:
+	//      * runtime/default: the default profile for the container runtime
+	//      * unconfined: unconfined profile, ie, no seccomp sandboxing
+	//      * localhost/<profile-name>: the profile installed to the node's
+	//        local seccomp profile root
+	//
 	Annotations map[string]string `protobuf:"bytes,7,rep,name=annotations" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Optional configurations specific to Linux hosts.
 	Linux            *LinuxPodSandboxConfig `protobuf:"bytes,8,opt,name=linux" json:"linux,omitempty"`
