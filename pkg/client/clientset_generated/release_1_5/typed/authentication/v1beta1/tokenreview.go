@@ -16,6 +16,10 @@ limitations under the License.
 
 package v1beta1
 
+import (
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
+)
+
 // TokenReviewsGetter has a method to return a TokenReviewInterface.
 // A group's client should implement this interface.
 type TokenReviewsGetter interface {
@@ -29,12 +33,12 @@ type TokenReviewInterface interface {
 
 // tokenReviews implements TokenReviewInterface
 type tokenReviews struct {
-	client *AuthenticationClient
+	client restclient.Interface
 }
 
 // newTokenReviews returns a TokenReviews
 func newTokenReviews(c *AuthenticationClient) *tokenReviews {
 	return &tokenReviews{
-		client: c,
+		client: c.RESTClient(),
 	}
 }

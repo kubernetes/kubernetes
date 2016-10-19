@@ -19,6 +19,7 @@ package v1
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -44,14 +45,14 @@ type ReplicationControllerInterface interface {
 
 // replicationControllers implements ReplicationControllerInterface
 type replicationControllers struct {
-	client *CoreClient
+	client restclient.Interface
 	ns     string
 }
 
 // newReplicationControllers returns a ReplicationControllers
 func newReplicationControllers(c *CoreClient, namespace string) *replicationControllers {
 	return &replicationControllers{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

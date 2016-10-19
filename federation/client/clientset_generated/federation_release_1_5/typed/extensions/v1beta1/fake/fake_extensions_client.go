@@ -20,6 +20,7 @@ import (
 	v1beta1 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/typed/extensions/v1beta1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
+	fake "k8s.io/kubernetes/pkg/client/unversioned/fake"
 )
 
 type FakeExtensions struct {
@@ -42,8 +43,8 @@ func (c *FakeExtensions) ReplicaSets(namespace string) v1beta1.ReplicaSetInterfa
 	return &FakeReplicaSets{c, namespace}
 }
 
-// GetRESTClient returns a RESTClient that is used to communicate
+// RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeExtensions) GetRESTClient() *restclient.RESTClient {
-	return nil
+func (c *FakeExtensions) RESTClient() restclient.Interface {
+	return &fake.RESTClient{}
 }

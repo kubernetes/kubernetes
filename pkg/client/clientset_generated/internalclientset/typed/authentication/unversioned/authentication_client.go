@@ -23,13 +23,13 @@ import (
 )
 
 type AuthenticationInterface interface {
-	GetRESTClient() *restclient.RESTClient
+	RESTClient() restclient.Interface
 	TokenReviewsGetter
 }
 
 // AuthenticationClient is used to interact with features provided by the Authentication group.
 type AuthenticationClient struct {
-	*restclient.RESTClient
+	restClient restclient.Interface
 }
 
 func (c *AuthenticationClient) TokenReviews() TokenReviewInterface {
@@ -60,7 +60,7 @@ func NewForConfigOrDie(c *restclient.Config) *AuthenticationClient {
 }
 
 // New creates a new AuthenticationClient for the given RESTClient.
-func New(c *restclient.RESTClient) *AuthenticationClient {
+func New(c restclient.Interface) *AuthenticationClient {
 	return &AuthenticationClient{c}
 }
 
@@ -89,11 +89,11 @@ func setConfigDefaults(config *restclient.Config) error {
 	return nil
 }
 
-// GetRESTClient returns a RESTClient that is used to communicate
+// RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *AuthenticationClient) GetRESTClient() *restclient.RESTClient {
+func (c *AuthenticationClient) RESTClient() restclient.Interface {
 	if c == nil {
 		return nil
 	}
-	return c.RESTClient
+	return c.restClient
 }

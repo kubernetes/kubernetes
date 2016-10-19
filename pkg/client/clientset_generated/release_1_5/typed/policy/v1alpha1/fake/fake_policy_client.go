@@ -20,6 +20,7 @@ import (
 	v1alpha1 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/policy/v1alpha1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
+	fake "k8s.io/kubernetes/pkg/client/unversioned/fake"
 )
 
 type FakePolicy struct {
@@ -30,8 +31,8 @@ func (c *FakePolicy) PodDisruptionBudgets(namespace string) v1alpha1.PodDisrupti
 	return &FakePodDisruptionBudgets{c, namespace}
 }
 
-// GetRESTClient returns a RESTClient that is used to communicate
+// RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakePolicy) GetRESTClient() *restclient.RESTClient {
-	return nil
+func (c *FakePolicy) RESTClient() restclient.Interface {
+	return &fake.RESTClient{}
 }
