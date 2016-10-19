@@ -16,7 +16,7 @@ limitations under the License.
 
 /* This test check that SecurityContext parameters specified at the
  * pod or the container level work as intended. These tests cannot be
- * run when the 'SecurityContextDeny' addmissioin controller is not used
+ * run when the 'SecurityContextDeny' admission controller is not used
  * so they are skipped by default.
  */
 
