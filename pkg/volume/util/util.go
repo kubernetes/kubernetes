@@ -23,6 +23,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/storage"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/util/mount"
 )
@@ -156,4 +157,18 @@ func ParseVolumeAnnotations(pv *api.PersistentVolume, parseAnnotations []string)
 	}
 
 	return result, nil
+}
+
+func GetClassForVolume(kubeClient clientset.Interface, pv *api.PersistentVolume) (*storage.StorageClass, error) {
+	// TODO: replace with a real attribute after beta
+	className, found := pv.Annotations["volume.beta.kubernetes.io/storage-class"]
+	if !found {
+		return nil, fmt.Errorf("Volume has no class annotation")
+	}
+
+	class, err := kubeClient.Storage().StorageClasses().Get(className)
+	if err != nil {
+		return nil, err
+	}
+	return class, nil
 }

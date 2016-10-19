@@ -403,21 +403,16 @@ func (d *glusterfsVolumeDeleter) Delete() error {
 	volumeName := d.glusterfsMounter.path
 	volumeId := dstrings.TrimPrefix(volumeName, volprefix)
 
-	err = d.annotationsToParam(d.spec)
+	class, err := volutil.GetClassForVolume(d.plugin.host.GetKubeClient(), d.spec)
 	if err != nil {
 		return err
 	}
-	if len(d.secretName) > 0 {
-		d.secretValue, err = parseSecret(d.secretNamespace, d.secretName, d.plugin.host.GetKubeClient())
-		if err != nil {
-			glog.Errorf("glusterfs: failed to read secret: %v", err)
-			return err
-		}
-	} else if len(d.userKey) > 0 {
-		d.secretValue = d.userKey
-	} else {
-		d.secretValue = ""
+
+	cfg, err := parseClassParameters(class.Parameters, d.plugin.host.GetKubeClient())
+	if err != nil {
+		return err
 	}
+	d.provisioningConfig = *cfg
 
 	glog.V(4).Infof("glusterfs: deleting volume %q with configuration %+v", volumeId, d.provisioningConfig)
 
@@ -444,56 +439,11 @@ func (r *glusterfsVolumeProvisioner) Provision() (*api.PersistentVolume, error) 
 	}
 	glog.V(4).Infof("glusterfs: Provison VolumeOptions %v", r.options)
 
-	authEnabled := true
-	for k, v := range r.options.Parameters {
-		switch dstrings.ToLower(k) {
-		case "endpoint":
-			r.endpoint = v
-		case "resturl":
-			r.url = v
-		case "restuser":
-			r.user = v
-		case "restuserkey":
-			r.userKey = v
-		case "secretname":
-			r.secretName = v
-		case "secretnamespace":
-			r.secretNamespace = v
-		case "restauthenabled":
-			authEnabled = dstrings.ToLower(v) == "true"
-		default:
-			return nil, fmt.Errorf("glusterfs: invalid option %q for volume plugin %s", k, r.plugin.GetPluginName())
-		}
+	cfg, err := parseClassParameters(r.options.Parameters, r.plugin.host.GetKubeClient())
+	if err != nil {
+		return nil, err
 	}
-
-	if len(r.url) == 0 {
-		return nil, fmt.Errorf("StorageClass for provisioner %q must contain 'resturl' parameter", r.plugin.GetPluginName())
-	}
-	if len(r.endpoint) == 0 {
-		return nil, fmt.Errorf("StorageClass for provisioner %q must contain 'endpoint' parameter", r.plugin.GetPluginName())
-	}
-
-	if !authEnabled {
-		r.user = ""
-		r.secretName = ""
-		r.secretNamespace = ""
-		r.userKey = ""
-		r.secretValue = ""
-	}
-
-	if len(r.secretName) != 0 || len(r.secretNamespace) != 0 {
-		// secretName + Namespace has precedence over userKey
-		if len(r.secretName) != 0 && len(r.secretNamespace) != 0 {
-			r.secretValue, err = parseSecret(r.secretNamespace, r.secretName, r.plugin.host.GetKubeClient())
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			return nil, fmt.Errorf("StorageClass for provisioner %q must have secretNamespace and secretName either both set or both empty", r.plugin.GetPluginName())
-		}
-	} else {
-		r.secretValue = r.userKey
-	}
+	r.provisioningConfig = *cfg
 
 	glog.V(4).Infof("glusterfs: creating volume with configuration %+v", r.provisioningConfig)
 	glusterfs, sizeGB, err := r.CreateVolume()
@@ -511,7 +461,6 @@ func (r *glusterfsVolumeProvisioner) Provision() (*api.PersistentVolume, error) 
 	pv.Spec.Capacity = api.ResourceList{
 		api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
 	}
-	r.paramToAnnotations(pv)
 	return pv, nil
 }
 
@@ -564,37 +513,60 @@ func parseSecret(namespace, secretName string, kubeClient clientset.Interface) (
 	return secret, nil
 }
 
-// paramToAnnotations stores parameters needed to delete the volume in the PV
-// annotations.
-func (p *glusterfsVolumeProvisioner) paramToAnnotations(pv *api.PersistentVolume) {
-	ann := map[string]string{
-		annGlusterURL:             p.url,
-		annGlusterUser:            p.user,
-		annGlusterSecretName:      p.secretName,
-		annGlusterSecretNamespace: p.secretNamespace,
-		annGlusterUserKey:         p.userKey,
-	}
-	volutil.AddVolumeAnnotations(pv, ann)
-}
+// parseClassParameters parses StorageClass.Parameters
+func parseClassParameters(params map[string]string, kubeClient clientset.Interface) (*provisioningConfig, error) {
+	var cfg provisioningConfig
+	var err error
 
-// annotationsToParam parses annotations stored by paramToAnnotations
-func (d *glusterfsVolumeDeleter) annotationsToParam(pv *api.PersistentVolume) error {
-	annKeys := []string{
-		annGlusterSecretName,
-		annGlusterSecretNamespace,
-		annGlusterURL,
-		annGlusterUser,
-		annGlusterUserKey,
-	}
-	params, err := volutil.ParseVolumeAnnotations(pv, annKeys)
-	if err != nil {
-		return err
+	authEnabled := true
+	for k, v := range params {
+		switch dstrings.ToLower(k) {
+		case "endpoint":
+			cfg.endpoint = v
+		case "resturl":
+			cfg.url = v
+		case "restuser":
+			cfg.user = v
+		case "restuserkey":
+			cfg.userKey = v
+		case "secretname":
+			cfg.secretName = v
+		case "secretnamespace":
+			cfg.secretNamespace = v
+		case "restauthenabled":
+			authEnabled = dstrings.ToLower(v) == "true"
+		default:
+			return nil, fmt.Errorf("glusterfs: invalid option %q for volume plugin %s", k, glusterfsPluginName)
+		}
 	}
 
-	d.url = params[annGlusterURL]
-	d.user = params[annGlusterUser]
-	d.userKey = params[annGlusterUserKey]
-	d.secretName = params[annGlusterSecretName]
-	d.secretNamespace = params[annGlusterSecretNamespace]
-	return nil
+	if len(cfg.url) == 0 {
+		return nil, fmt.Errorf("StorageClass for provisioner %s must contain 'resturl' parameter", glusterfsPluginName)
+	}
+	if len(cfg.endpoint) == 0 {
+		return nil, fmt.Errorf("StorageClass for provisioner %s must contain 'endpoint' parameter", glusterfsPluginName)
+	}
+
+	if !authEnabled {
+		cfg.user = ""
+		cfg.secretName = ""
+		cfg.secretNamespace = ""
+		cfg.userKey = ""
+		cfg.secretValue = ""
+	}
+
+	if len(cfg.secretName) != 0 || len(cfg.secretNamespace) != 0 {
+		// secretName + Namespace has precedence over userKey
+		if len(cfg.secretName) != 0 && len(cfg.secretNamespace) != 0 {
+			cfg.secretValue, err = parseSecret(cfg.secretNamespace, cfg.secretName, kubeClient)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, fmt.Errorf("StorageClass for provisioner %q must have secretNamespace and secretName either both set or both empty", glusterfsPluginName)
+		}
+	} else {
+		cfg.secretValue = cfg.userKey
+	}
+	return &cfg, nil
 }
