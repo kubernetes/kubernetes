@@ -1095,7 +1095,7 @@ var _ = framework.KubeDescribe("ESIPP [Slow][Feature:ExternalTrafficLocalOnly]",
 
 		c = f.Client
 		cs = f.ClientSet
-		if nodes := framework.GetReadySchedulableNodesOrDie(c); len(nodes.Items) > largeClusterMinNodesNumber {
+		if nodes := framework.GetReadySchedulableNodesOrDie(cs); len(nodes.Items) > largeClusterMinNodesNumber {
 			loadBalancerCreateTimeout = loadBalancerCreateTimeoutLarge
 		}
 	})
@@ -2104,7 +2104,7 @@ func (j *ServiceTestJig) createOnlyLocalNodePortService(namespace, serviceName s
 	svc := j.CreateTCPServiceOrFail(namespace, func(svc *api.Service) {
 		svc.Spec.Type = api.ServiceTypeNodePort
 		svc.ObjectMeta.Annotations = map[string]string{
-			service.AlphaAnnotationExternalTraffic: service.AnnotationValueExternalTrafficLocal}
+			service.BetaAnnotationExternalTraffic: service.AnnotationValueExternalTrafficLocal}
 		svc.Spec.Ports = []api.ServicePort{{Protocol: "TCP", Port: 80}}
 	})
 
@@ -2126,7 +2126,7 @@ func (j *ServiceTestJig) createOnlyLocalLoadBalancerService(namespace, serviceNa
 		// We need to turn affinity off for our LB distribution tests
 		svc.Spec.SessionAffinity = api.ServiceAffinityNone
 		svc.ObjectMeta.Annotations = map[string]string{
-			service.AlphaAnnotationExternalTraffic: service.AnnotationValueExternalTrafficLocal}
+			service.BetaAnnotationExternalTraffic: service.AnnotationValueExternalTrafficLocal}
 		svc.Spec.Ports = []api.ServicePort{{Protocol: "TCP", Port: 80}}
 	})
 
@@ -2171,7 +2171,7 @@ func (j *ServiceTestJig) getEndpointNodes(svc *api.Service) map[string][]string 
 // getNodes returns the first maxNodesForTest nodes. Useful in large clusters
 // where we don't eg: want to create an endpoint per node.
 func (j *ServiceTestJig) getNodes(maxNodesForTest int) (nodes *api.NodeList) {
-	nodes = framework.GetReadySchedulableNodesOrDie(j.Client)
+	nodes = framework.GetReadySchedulableNodesOrDie(j.ClientSet)
 	if len(nodes.Items) <= maxNodesForTest {
 		maxNodesForTest = len(nodes.Items)
 	}

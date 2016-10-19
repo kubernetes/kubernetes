@@ -352,14 +352,11 @@ func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service) (boo
 		}
 
 	case oldServiceHasHealthCheckNodePort && assignHealthCheckNodePort:
-		for _, annotation := range []string{
-			apiservice.AlphaAnnotationHealthCheckNodePort, apiservice.BetaAnnotationHealthCheckNodePort} {
-			if _, ok := service.Annotations[annotation]; !ok {
-				glog.Warningf("Attempt to delete health check node port annotation DENIED")
-				el := field.ErrorList{field.Invalid(field.NewPath("metadata", "annotations"),
-					annotation, "Cannot delete healthcheck nodePort annotation")}
-				return false, errors.NewInvalid(api.Kind("Service"), service.Name, el)
-			}
+		if _, ok := service.Annotations[apiservice.BetaAnnotationHealthCheckNodePort]; !ok {
+			glog.Warningf("Attempt to delete health check node port annotation DENIED")
+			el := field.ErrorList{field.Invalid(field.NewPath("metadata", "annotations"),
+				apiservice.BetaAnnotationHealthCheckNodePort, "Cannot delete healthcheck nodePort annotation")}
+			return false, errors.NewInvalid(api.Kind("Service"), service.Name, el)
 		}
 		if oldHealthCheckNodePort != requestedHealthCheckNodePort {
 			glog.Warningf("Attempt to change value of health check node port annotation DENIED")
