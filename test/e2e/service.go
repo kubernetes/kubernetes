@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/service"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/labels"
@@ -74,9 +74,11 @@ var _ = framework.KubeDescribe("Services", func() {
 	f := framework.NewDefaultFramework("services")
 
 	var c *client.Client
+	var cs clientset.Interface
 
 	BeforeEach(func() {
 		c = f.Client
+		cs = f.ClientSet
 	})
 
 	// TODO: We get coverage of TCP/UDP and multi-port services through the DNS test. We should have a simpler test for multi-port TCP here.
@@ -237,7 +239,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		ns := f.Namespace.Name
 
 		By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns)
-		jig := NewServiceTestJig(c, serviceName)
+		jig := NewServiceTestJig(c, cs, serviceName)
 		servicePort := 8080
 		tcpService := jig.CreateTCPServiceWithPort(ns, nil, int32(servicePort))
 		jig.SanityCheckService(tcpService, api.ServiceTypeClusterIP)
@@ -250,7 +252,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		framework.Logf("sourceip-test cluster ip: %s", serviceIp)
 
 		By("Picking multiple nodes")
-		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
+		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 
 		if len(nodes.Items) == 1 {
 			framework.Skipf("The test requires two Ready nodes on %s, but found just one.", framework.TestContext.Provider)
@@ -296,7 +298,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		podNames2, svc2IP, err := startServeHostnameService(c, ns, "service2", servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
-		hosts, err := framework.NodeSSHHosts(c)
+		hosts, err := framework.NodeSSHHosts(f.ClientSet)
 		Expect(err).NotTo(HaveOccurred())
 		if len(hosts) == 0 {
 			framework.Failf("No ssh-able nodes")
@@ -356,7 +358,7 @@ var _ = framework.KubeDescribe("Services", func() {
 			framework.Failf("VIPs conflict: %v", svc1IP)
 		}
 
-		hosts, err := framework.NodeSSHHosts(c)
+		hosts, err := framework.NodeSSHHosts(f.ClientSet)
 		Expect(err).NotTo(HaveOccurred())
 		if len(hosts) == 0 {
 			framework.Failf("No ssh-able nodes")
@@ -397,7 +399,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		podNames1, svc1IP, err := startServeHostnameService(c, ns, "service1", servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
-		hosts, err := framework.NodeSSHHosts(c)
+		hosts, err := framework.NodeSSHHosts(f.ClientSet)
 		Expect(err).NotTo(HaveOccurred())
 		if len(hosts) == 0 {
 			framework.Failf("No ssh-able nodes")
@@ -436,8 +438,8 @@ var _ = framework.KubeDescribe("Services", func() {
 		serviceName := "nodeport-test"
 		ns := f.Namespace.Name
 
-		jig := NewServiceTestJig(c, serviceName)
-		nodeIP := pickNodeIP(jig.Client) // for later
+		jig := NewServiceTestJig(c, cs, serviceName)
+		nodeIP := pickNodeIP(jig.ClientSet) // for later
 
 		By("creating service " + serviceName + " with type=NodePort in namespace " + ns)
 		service := jig.CreateTCPServiceOrFail(ns, func(svc *api.Service) {
@@ -475,7 +477,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		}
 		loadBalancerCreateTimeout := loadBalancerCreateTimeoutDefault
 		largeClusterMinNodesNumber := 100
-		if nodes := framework.GetReadySchedulableNodesOrDie(c); len(nodes.Items) > largeClusterMinNodesNumber {
+		if nodes := framework.GetReadySchedulableNodesOrDie(cs); len(nodes.Items) > largeClusterMinNodesNumber {
 			loadBalancerCreateTimeout = loadBalancerCreateTimeoutLarge
 		}
 
@@ -492,8 +494,8 @@ var _ = framework.KubeDescribe("Services", func() {
 		ns2 := namespacePtr.Name // LB2 in ns2 on UDP
 		framework.Logf("namespace for UDP test: %s", ns2)
 
-		jig := NewServiceTestJig(c, serviceName)
-		nodeIP := pickNodeIP(jig.Client) // for later
+		jig := NewServiceTestJig(c, cs, serviceName)
+		nodeIP := pickNodeIP(jig.ClientSet) // for later
 
 		// Test TCP and UDP Services.  Services with the same name in different
 		// namespaces should get different node ports and load balancers.
@@ -1078,12 +1080,12 @@ var _ = framework.KubeDescribe("Services", func() {
 		loadBalancerCreateTimeout := loadBalancerCreateTimeoutDefault
 
 		largeClusterMinNodesNumber := 100
-		if nodes := framework.GetReadySchedulableNodesOrDie(c); len(nodes.Items) > largeClusterMinNodesNumber {
+		if nodes := framework.GetReadySchedulableNodesOrDie(cs); len(nodes.Items) > largeClusterMinNodesNumber {
 			loadBalancerCreateTimeout = loadBalancerCreateTimeoutLarge
 		}
 		namespace := f.Namespace.Name
 		serviceName := "external-local"
-		jig := NewServiceTestJig(c, serviceName)
+		jig := NewServiceTestJig(c, cs, serviceName)
 		By("creating a service " + namespace + "/" + namespace + " with type=LoadBalancer and annotation for local-traffic-only")
 		svc := jig.CreateTCPServiceOrFail(namespace, func(svc *api.Service) {
 			svc.Spec.Type = api.ServiceTypeLoadBalancer
@@ -1132,7 +1134,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		framework.Logf("Pod for service %s/%s is on node %s", namespace, serviceName, readyHostName)
 		// HealthCheck responder validation - iterate over all node IPs and check their HC responses
 		// Collect all node names and their public IPs - the nodes and ips slices parallel each other
-		nodes := framework.GetReadySchedulableNodesOrDie(jig.Client)
+		nodes := framework.GetReadySchedulableNodesOrDie(jig.ClientSet)
 		ips := collectAddresses(nodes, api.NodeExternalIP)
 		if len(ips) == 0 {
 			ips = collectAddresses(nodes, api.NodeLegacyHostIP)
@@ -1384,8 +1386,8 @@ func collectAddresses(nodes *api.NodeList, addressType api.NodeAddressType) []st
 	return ips
 }
 
-func getNodePublicIps(c *client.Client) ([]string, error) {
-	nodes := framework.GetReadySchedulableNodesOrDie(c)
+func getNodePublicIps(cs clientset.Interface) ([]string, error) {
+	nodes := framework.GetReadySchedulableNodesOrDie(cs)
 
 	ips := collectAddresses(nodes, api.NodeExternalIP)
 	if len(ips) == 0 {
@@ -1394,8 +1396,8 @@ func getNodePublicIps(c *client.Client) ([]string, error) {
 	return ips, nil
 }
 
-func pickNodeIP(c *client.Client) string {
-	publicIps, err := getNodePublicIps(c)
+func pickNodeIP(cs clientset.Interface) string {
+	publicIps, err := getNodePublicIps(cs)
 	Expect(err).NotTo(HaveOccurred())
 	if len(publicIps) == 0 {
 		framework.Failf("got unexpected number (%d) of public IPs", len(publicIps))
@@ -1641,7 +1643,7 @@ func startServeHostnameService(c *client.Client, ns, name string, port, replicas
 	return podNames, serviceIP, nil
 }
 
-func stopServeHostnameService(c *client.Client, clientset internalclientset.Interface, ns, name string) error {
+func stopServeHostnameService(c *client.Client, clientset clientset.Interface, ns, name string) error {
 	if err := framework.DeleteRCAndPods(c, clientset, ns, name); err != nil {
 		return err
 	}
@@ -1766,16 +1768,18 @@ func httpGetNoConnectionPool(url string) (*http.Response, error) {
 
 // A test jig to help testing.
 type ServiceTestJig struct {
-	ID     string
-	Name   string
-	Client *client.Client
-	Labels map[string]string
+	ID        string
+	Name      string
+	Client    *client.Client
+	ClientSet clientset.Interface
+	Labels    map[string]string
 }
 
 // NewServiceTestJig allocates and inits a new ServiceTestJig.
-func NewServiceTestJig(client *client.Client, name string) *ServiceTestJig {
+func NewServiceTestJig(client *client.Client, cs clientset.Interface, name string) *ServiceTestJig {
 	j := &ServiceTestJig{}
 	j.Client = client
+	j.ClientSet = cs
 	j.Name = name
 	j.ID = j.Name + "-" + string(uuid.NewUUID())
 	j.Labels = map[string]string{"testid": j.ID}

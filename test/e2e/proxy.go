@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -300,9 +300,9 @@ func truncate(b []byte, maxLen int) []byte {
 	return b2
 }
 
-func pickNode(c *client.Client) (string, error) {
+func pickNode(cs clientset.Interface) (string, error) {
 	// TODO: investigate why it doesn't work on master Node.
-	nodes := framework.GetReadySchedulableNodesOrDie(c)
+	nodes := framework.GetReadySchedulableNodesOrDie(cs)
 	if len(nodes.Items) == 0 {
 		return "", fmt.Errorf("no nodes exist, can't test node proxy")
 	}
@@ -310,7 +310,7 @@ func pickNode(c *client.Client) (string, error) {
 }
 
 func nodeProxyTest(f *framework.Framework, prefix, nodeDest string) {
-	node, err := pickNode(f.Client)
+	node, err := pickNode(f.ClientSet)
 	Expect(err).NotTo(HaveOccurred())
 	// TODO: Change it to test whether all requests succeeded when requests
 	// not reaching Kubelet issue is debugged.

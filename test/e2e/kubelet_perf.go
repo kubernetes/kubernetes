@@ -203,7 +203,7 @@ var _ = framework.KubeDescribe("Kubelet [Serial] [Slow]", func() {
 		if err := framework.WaitForPodsSuccess(f.Client, api.NamespaceSystem, framework.ImagePullerLabels, imagePrePullingLongTimeout); err != nil {
 			framework.Failf("Image puller didn't complete in %v, not running resource usage test since the metrics might be adulterated", imagePrePullingLongTimeout)
 		}
-		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
+		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		nodeNames = sets.NewString()
 		for _, node := range nodes.Items {
 			nodeNames.Insert(node.Name)
