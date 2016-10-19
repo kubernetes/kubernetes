@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -72,7 +73,7 @@ func DoTestStorageClasses(t *testing.T, client *client.Client, ns *api.Namespace
 			Name:      "XXX",
 			Namespace: ns.Name,
 			Annotations: map[string]string{
-				"volume.beta.kubernetes.io/storage-class": "gold",
+				storageutil.StorageClassAnnotation: "gold",
 			},
 		},
 		Spec: api.PersistentVolumeClaimSpec{
