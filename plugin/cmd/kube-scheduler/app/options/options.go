@@ -42,8 +42,10 @@ type SchedulerServer struct {
 
 // NewSchedulerServer creates a new SchedulerServer with default parameters
 func NewSchedulerServer() *SchedulerServer {
+	versioned := &v1alpha1.KubeSchedulerConfiguration{}
+	api.Scheme.Default(versioned)
 	cfg := componentconfig.KubeSchedulerConfiguration{}
-	api.Scheme.Convert(&v1alpha1.KubeSchedulerConfiguration{}, &cfg, nil)
+	api.Scheme.Convert(versioned, &cfg, nil)
 	cfg.LeaderElection.LeaderElect = true
 	s := SchedulerServer{
 		KubeSchedulerConfiguration: cfg,

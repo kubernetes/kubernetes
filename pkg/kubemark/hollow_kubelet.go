@@ -103,6 +103,7 @@ func GetHollowKubeletConfig(
 	// Do the external -> internal conversion to make sure that defaults
 	// are set for fields not overridden in NewHollowKubelet.
 	tmp := &v1alpha1.KubeletConfiguration{}
+	api.Scheme.Default(tmp)
 	c := &componentconfig.KubeletConfiguration{}
 	api.Scheme.Convert(tmp, c, nil)
 

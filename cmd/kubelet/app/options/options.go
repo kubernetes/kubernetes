@@ -64,8 +64,10 @@ type KubeletServer struct {
 
 // NewKubeletServer will create a new KubeletServer with default values.
 func NewKubeletServer() *KubeletServer {
+	versioned := &v1alpha1.KubeletConfiguration{}
+	api.Scheme.Default(versioned)
 	config := componentconfig.KubeletConfiguration{}
-	api.Scheme.Convert(&v1alpha1.KubeletConfiguration{}, &config, nil)
+	api.Scheme.Convert(versioned, &config, nil)
 	return &KubeletServer{
 		KubeConfig:           flag.NewStringFlag("/var/lib/kubelet/kubeconfig"),
 		RequireKubeConfig:    false, // in 1.5, default to true
