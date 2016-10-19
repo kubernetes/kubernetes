@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -172,11 +173,11 @@ func newClaim(ns string, alpha bool) *api.PersistentVolumeClaim {
 
 	if alpha {
 		claim.Annotations = map[string]string{
-			"volume.alpha.kubernetes.io/storage-class": "",
+			storageutil.AlphaStorageClassAnnotation: "",
 		}
 	} else {
 		claim.Annotations = map[string]string{
-			"volume.beta.kubernetes.io/storage-class": "fast",
+			storageutil.StorageClassAnnotation: "fast",
 		}
 
 	}
