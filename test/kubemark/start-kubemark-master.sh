@@ -48,16 +48,12 @@ function mount-master-pd() {
 	# persistent data, and link them to where they're used.
 	mkdir -p "${mount_point}"
 
-	device=$1
-	mountpoint=$2
-
 	# Format only if the disk is not already formatted.
 	if ! tune2fs -l "${pd_path}" ; then
 		echo "Formatting '${pd_path}'"
 		mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0,discard "${pd_path}"
 	fi
 
-	mkdir -p "${mount_point}"
 	echo "Mounting '${pd_path}' at '${mount_point}'"
 	mount -o discard,defaults "${pd_path}" "${mount_point}"
 	echo "Mounted master-pd '${pd_path}' at '${mount_point}'"
@@ -77,6 +73,8 @@ function mount-master-pd() {
 		useradd -s /sbin/nologin -d /var/etcd etcd
 	fi
 }
+
+mount-master-pd
 
 if [ "${EVENT_STORE_IP}" == "127.0.0.1" ]; then
 	# Retry starting etcd to avoid pulling image errors.
@@ -100,8 +98,6 @@ retry sudo docker run --net=host \
 
 # Increase the allowed number of open file descriptors
 ulimit -n 65536
-
-mount-master-pd
 
 tar xzf kubernetes-server-linux-amd64.tar.gz
 
