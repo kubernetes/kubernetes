@@ -31,9 +31,9 @@ import (
 	systemd "github.com/coreos/go-systemd/daemon"
 	"github.com/emicklei/go-restful"
 	"github.com/emicklei/go-restful/swagger"
+	"github.com/go-openapi/spec"
 	"github.com/golang/glog"
 
-	"github.com/go-openapi/spec"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -114,7 +114,7 @@ type GenericAPIServer struct {
 	// The registered APIs
 	HandlerContainer *genericmux.APIContainer
 
-	SecureServingInfo   *ServingInfo
+	SecureServingInfo   *SecureServingInfo
 	InsecureServingInfo *ServingInfo
 
 	// ExternalAddress is the address (hostname or IP and port) that should be used in
@@ -189,6 +189,11 @@ func (s *GenericAPIServer) Run() {
 	}
 
 	if s.SecureServingInfo != nil && s.Handler != nil {
+		namedCerts, err := getNamedCertificateMap(s.SecureServingInfo.SNICerts)
+		if err != nil {
+			glog.Fatalf("Unable to load SNI certificates: %v", err)
+		}
+
 		secureServer := &http.Server{
 			Addr:           s.SecureServingInfo.BindAddress,
 			Handler:        s.Handler,
@@ -197,7 +202,8 @@ func (s *GenericAPIServer) Run() {
 				// Can't use SSLv3 because of POODLE and BEAST
 				// Can't use TLSv1.0 because of POODLE and BEAST using CBC cipher
 				// Can't use TLSv1.1 because of RC4 cipher usage
-				MinVersion: tls.VersionTLS12,
+				MinVersion:        tls.VersionTLS12,
+				NameToCertificate: namedCerts,
 			},
 		}
 
@@ -213,7 +219,6 @@ func (s *GenericAPIServer) Run() {
 			secureServer.TLSConfig.ClientCAs = clientCAs
 			// "h2" NextProtos is necessary for enabling HTTP2 for go's 1.7 HTTP Server
 			secureServer.TLSConfig.NextProtos = []string{"h2"}
-
 		}
 
 		glog.Infof("Serving securely on %s", s.SecureServingInfo.BindAddress)
@@ -544,3 +549,4 @@ func waitForSuccessfulDial(https bool, network, address string, timeout, interva
 	}
 	return err
 }
+
