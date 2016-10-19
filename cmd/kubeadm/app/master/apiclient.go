@@ -19,6 +19,7 @@ package master
 import (
 	"encoding/json"
 	"fmt"
+	"runtime"
 	"time"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
@@ -206,14 +207,10 @@ func SetMasterTaintTolerations(meta *api.ObjectMeta) {
 	meta.Annotations[api.TolerationsAnnotationKey] = string(tolerationsAnnotation)
 }
 
-func SetMasterNodeAffinity(meta *api.ObjectMeta) {
+func SetNodeAffinity(meta *api.ObjectMeta, expr ...api.NodeSelectorRequirement) {
 	nodeAffinity := &api.NodeAffinity{
 		RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
-			NodeSelectorTerms: []api.NodeSelectorTerm{{
-				MatchExpressions: []api.NodeSelectorRequirement{{
-					Key: "kubeadm.alpha.kubernetes.io/role", Operator: api.NodeSelectorOpIn, Values: []string{"master"},
-				}},
-			}},
+			NodeSelectorTerms: []api.NodeSelectorTerm{{MatchExpressions: expr}},
 		},
 	}
 	affinityAnnotation, _ := json.Marshal(api.Affinity{NodeAffinity: nodeAffinity})
@@ -221,6 +218,18 @@ func SetMasterNodeAffinity(meta *api.ObjectMeta) {
 		meta.Annotations = map[string]string{}
 	}
 	meta.Annotations[api.AffinityAnnotationKey] = string(affinityAnnotation)
+}
+
+func MasterNodeAffinity() api.NodeSelectorRequirement {
+	return api.NodeSelectorRequirement{
+		Key: "kubeadm.alpha.kubernetes.io/role", Operator: api.NodeSelectorOpIn, Values: []string{"master"},
+	}
+}
+
+func MonoArchitectureNodeAffinity() api.NodeSelectorRequirement {
+	return api.NodeSelectorRequirement{
+		Key: "beta.kubernetes.io/arch", Operator: api.NodeSelectorOpIn, Values: []string{runtime.GOARCH},
+	}
 }
 
 func createDummyDeployment(client *clientset.Clientset) {
