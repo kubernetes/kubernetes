@@ -286,11 +286,11 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig,
 	setSandboxResources(hc)
 
 	// Set security options.
-	var err error
-	hc.SecurityOpt, err = getSandboxSecurityOpts(c, ds.seccompProfileRoot)
+	securityOpts, err := getSandboxSecurityOpts(c, ds.seccompProfileRoot)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate sandbox security options for sandbox %q: %v", c.Metadata.GetName(), err)
 	}
+	hc.SecurityOpt = append(hc.SecurityOpt, securityOpts...)
 	return createConfig, nil
 }
 
