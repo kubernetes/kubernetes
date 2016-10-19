@@ -300,7 +300,7 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 
 	It("Kubelet should not restart containers across restart", func() {
 
-		nodeIPs, err := getNodePublicIps(f.Client)
+		nodeIPs, err := getNodePublicIps(f.ClientSet)
 		framework.ExpectNoError(err)
 		preRestarts, badNodes := getContainerRestarts(f.Client, ns, labelSelector)
 		if preRestarts != 0 {

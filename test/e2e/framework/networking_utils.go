@@ -432,7 +432,7 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 
 	By("Getting node addresses")
 	ExpectNoError(WaitForAllNodesSchedulable(config.f.Client))
-	nodeList := GetReadySchedulableNodesOrDie(config.f.Client)
+	nodeList := GetReadySchedulableNodesOrDie(config.f.ClientSet)
 	config.ExternalAddrs = NodeAddresses(nodeList, api.NodeExternalIP)
 	if len(config.ExternalAddrs) < 2 {
 		// fall back to legacy IPs
@@ -483,7 +483,7 @@ func shuffleNodes(nodes []api.Node) []api.Node {
 
 func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector map[string]string) []*api.Pod {
 	ExpectNoError(WaitForAllNodesSchedulable(config.f.Client))
-	nodeList := GetReadySchedulableNodesOrDie(config.f.Client)
+	nodeList := GetReadySchedulableNodesOrDie(config.f.ClientSet)
 
 	// To make this test work reasonably fast in large clusters,
 	// we limit the number of NetProxyPods to no more than 100 ones
