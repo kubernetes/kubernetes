@@ -48,7 +48,6 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha1_PetSet_To_apps_PetSet(in *PetSet, out *apps.PetSet, s conversion.Scope) error {
-	SetDefaults_PetSet(in)
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
