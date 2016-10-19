@@ -60,6 +60,9 @@ func NewCSV(path string) (*PasswordAuthenticator, error) {
 			info:     &user.DefaultInfo{Name: record[1], UID: record[2]},
 			password: record[0],
 		}
+                if _, exist := users[obj.info.Name]; exist {
+                        return nil, fmt.Errorf("duplicate user name has been found in password file '%s'", path)
+                }
 		users[obj.info.Name] = obj
 	}
 

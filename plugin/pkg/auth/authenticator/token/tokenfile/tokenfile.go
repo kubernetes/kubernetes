@@ -64,6 +64,9 @@ func NewCSV(path string) (*TokenAuthenticator, error) {
 			Name: record[1],
 			UID:  record[2],
 		}
+                if _, exist := tokens[record[0]]; exist {
+                        return nil, fmt.Errorf("duplicate token has been found in token file '%s'", path)
+                }
 		tokens[record[0]] = obj
 
 		if len(record) >= 4 {
