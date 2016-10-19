@@ -77,7 +77,7 @@ function download_kube_binaries {
 }
 
 function create_cluster {
-  if [[ -n "${KUBERNETES_SKIP_CREATE_CLUSTER}" ]]; then
+  if [[ -n "${KUBERNETES_SKIP_CREATE_CLUSTER-}" ]]; then
     exit 0
   fi
   echo "Creating a kubernetes on ${KUBERNETES_PROVIDER:-gce}..."
