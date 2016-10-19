@@ -189,12 +189,6 @@ func doSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32) {
 	)
 
 	By(fmt.Sprintf("Creating secret with name %s", secret.Name))
-	defer func() {
-		By("Cleaning up the secret")
-		if err := f.Client.Secrets(f.Namespace.Name).Delete(secret.Name); err != nil {
-			framework.Failf("unable to delete secret %v: %v", secret.Name, err)
-		}
-	}()
 	var err error
 	if secret, err = f.Client.Secrets(f.Namespace.Name).Create(secret); err != nil {
 		framework.Failf("unable to create test secret %s: %v", secret.Name, err)
