@@ -64,6 +64,20 @@ type Metrics struct {
 	// emptydir, hostpath), this is the available space on the underlying
 	// storage, and is shared with host processes and other Volumes.
 	Available *resource.Quantity
+
+	// InodesUsed represents the total inodes used by the Volume.
+	InodesUsed *resource.Quantity
+
+	// Inodes represents the total number of inodes availible in the volume.
+	// For volumes that share a filesystem with the host (e.g. emptydir, hostpath),
+	// this is the inodes available in the underlying storage,
+	// and will not equal InodesUsed + InodesFree as the fs is shared.
+	Inodes *resource.Quantity
+
+	// InodesFree represent the inodes available for the volume.  For Volues that share
+	// a filesystem with the host (e.g. emptydir, hostpath), this is the free inodes
+	// on the underlying sporage, and is shared with host processes and other volumes
+	InodesFree *resource.Quantity
 }
 
 // Attributes represents the attributes of this mounter.
