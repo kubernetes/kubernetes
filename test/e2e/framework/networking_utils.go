@@ -52,7 +52,7 @@ const (
 	// because we verify iptables statistical rr loadbalancing.
 	testTries = 30
 	// Maximum number of pods in a test, to make test work in large clusters.
-	maxNetProxyPodsCount = 20
+	maxNetProxyPodsCount = 10
 )
 
 // NewNetworkingTestConfig creates and sets up a new test config helper.
@@ -218,8 +218,9 @@ func (config *NetworkingTestConfig) DialFromContainer(protocol, containerIP, tar
 // pod and confirm it doesn't show up as an endpoint.
 func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.String) {
 	var cmd string
+	// Make the command timeout after 1s (no matter what protocol it is).
 	if protocol == "udp" {
-		cmd = fmt.Sprintf("echo 'hostName' | timeout -t 3 nc -w 1 -u %s %d", targetIP, targetPort)
+		cmd = fmt.Sprintf("echo 'hostName' | timeout -t 1 nc -w 1 -u %s %d", targetIP, targetPort)
 	} else {
 		cmd = fmt.Sprintf("curl -q -s --connect-timeout 1 http://%s:%d/hostName", targetIP, targetPort)
 	}
@@ -232,7 +233,7 @@ func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targ
 	filterCmd := fmt.Sprintf("%s | grep -v '^\\s*$'", cmd)
 	for i := 0; i < maxTries; i++ {
 		stdout, stderr, err := config.f.ExecShellInPodWithFullOutput(config.HostTestContainerPod.Name, filterCmd)
-		if err != nil || len(stderr) > 0 {
+		if err != nil || (len(stderr) > 0 && stderr != "Terminated") {
 			// A failure to exec command counts as a try, not a hard fail.
 			// Also note that we will keep failing for maxTries in tests where
 			// we confirm unreachability.
@@ -486,8 +487,8 @@ func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector 
 	nodeList := GetReadySchedulableNodesOrDie(config.f.Client)
 
 	// To make this test work reasonably fast in large clusters,
-	// we limit the number of NetProxyPods to no more than 100 ones
-	// on random nodes.
+	// we limit the number of NetProxyPods to no more than
+	// maxNetProxyPodsCount on random nodes.
 	nodes := shuffleNodes(nodeList.Items)
 	if len(nodes) > maxNetProxyPodsCount {
 		nodes = nodes[:maxNetProxyPodsCount]
