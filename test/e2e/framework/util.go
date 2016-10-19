@@ -4514,3 +4514,99 @@ func ListNamespaceEvents(c *client.Client, ns string) error {
 	}
 	return nil
 }
+
+type E2ETestNodePreparer struct {
+	client                clientset.Interface
+	countToStrategy       map[int]testutils.PrepareNodeStrategy
+	nodeToAppliedStrategy map[string]testutils.PrepareNodeStrategy
+}
+
+func NewE2ETestNodePreparer(client clientset.Interface, countToStrategy map[int]testutils.PrepareNodeStrategy) testutils.TestNodePreparer {
+	return &E2ETestNodePreparer{
+		client:                client,
+		countToStrategy:       countToStrategy,
+		nodeToAppliedStrategy: make(map[string]testutils.PrepareNodeStrategy),
+	}
+}
+
+func (p *E2ETestNodePreparer) PrepareNodes() error {
+	nodes := GetReadySchedulableNodesOrDie(p.client)
+	numTemplates := 0
+	for k := range p.countToStrategy {
+		numTemplates += k
+	}
+	if numTemplates > len(nodes.Items) {
+		return fmt.Errorf("Can't prepare Nodes. Got more templates than existing Nodes.")
+	}
+	index := 0
+	sum := 0
+	for k, strategy := range p.countToStrategy {
+		sum += k
+		for ; index < sum; index++ {
+			var err error
+			patch := strategy.PreparePatch(&nodes.Items[index])
+			if len(patch) == 0 {
+				continue
+			}
+			for attempt := 0; attempt < UpdateRetries; attempt++ {
+				_, err = p.client.Core().Nodes().Patch(nodes.Items[index].Name, api.MergePatchType, []byte(patch))
+				if err != nil {
+					if !apierrs.IsConflict(err) {
+						break
+					}
+				} else {
+					break
+				}
+				time.Sleep(100 * time.Millisecond)
+			}
+			if err != nil {
+				glog.Errorf("Can't apply patch %v to Node %v: %v", string(patch), nodes.Items[index].Name, err)
+				return err
+			}
+			p.nodeToAppliedStrategy[nodes.Items[index].Name] = strategy
+		}
+	}
+	return nil
+}
+
+func (p *E2ETestNodePreparer) CleanupNodes() error {
+	encounteredError := false
+	nodes := GetReadySchedulableNodesOrDie(p.client)
+nodeloop:
+	for i := range nodes.Items {
+		var err error
+		name := nodes.Items[i].Name
+		strategy, found := p.nodeToAppliedStrategy[name]
+		if found {
+			for attempt := 0; attempt < UpdateRetries; attempt++ {
+				node, err := p.client.Core().Nodes().Get(name)
+				if err != nil {
+					glog.Errorf("Skipping cleanup of Node: failed to get Node %v: %v", name, err)
+					encounteredError = true
+					continue nodeloop
+				}
+				updatedNode := strategy.CleanupNode(node)
+				if api.Semantic.DeepEqual(node, updatedNode) {
+					continue nodeloop
+				}
+				_, err = p.client.Core().Nodes().Update(updatedNode)
+				if err != nil {
+					if !apierrs.IsConflict(err) {
+						break
+					}
+				} else {
+					break
+				}
+				time.Sleep(100 * time.Millisecond)
+			}
+			if err != nil {
+				glog.Errorf("Skipping cleanup of Node: failed update of %v: %v", name, err)
+				encounteredError = true
+			}
+		}
+	}
+	if encounteredError {
+		return fmt.Errorf("Encountered error while cleaning up pods.")
+	}
+	return nil
+}

@@ -605,3 +605,24 @@ waitLoop:
 	}
 	return nil
 }
+
+type TestNodePreparer interface {
+	PrepareNodes() error
+	CleanupNodes() error
+}
+
+type PrepareNodeStrategy interface {
+	PreparePatch(node *api.Node) []byte
+	CleanupNode(node *api.Node) *api.Node
+}
+
+type TrivialNodePrepareStrategy struct{}
+
+func (*TrivialNodePrepareStrategy) PreparePatch(*api.Node) []byte {
+	return []byte{}
+}
+
+func (*TrivialNodePrepareStrategy) CleanupNode(node *api.Node) *api.Node {
+	nodeCopy := *node
+	return &nodeCopy
+}

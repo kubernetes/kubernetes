@@ -21,6 +21,9 @@ import (
 	"math"
 	"testing"
 	"time"
+
+	"k8s.io/kubernetes/test/integration/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 const (
@@ -76,7 +79,16 @@ func schedulePods(numNodes, numPods int) int32 {
 	defer destroyFunc()
 	c := schedulerConfigFactory.Client
 
-	makeNodes(c, numNodes)
+	nodePreparer := framework.NewIntegrationTestNodePreparer(
+		c,
+		map[int]testutils.PrepareNodeStrategy{numNodes: &testutils.TrivialNodePrepareStrategy{}},
+		"scheduler-perf-",
+	)
+	err := nodePreparer.PrepareNodes()
+	if err != nil {
+		panic(err)
+	}
+	defer nodePreparer.CleanupNodes()
 	makePodsFromRC(c, "rc1", numPods)
 
 	prev := 0
