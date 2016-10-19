@@ -565,13 +565,17 @@ func StartPods(c *client.Client, replicas int, namespace string, podNamePrefix s
 		pod.ObjectMeta.Labels["startPodsID"] = startPodsID
 		pod.Spec.Containers[0].Name = podName
 		_, err := c.Pods(namespace).Create(&pod)
-		return err
+		if err != nil {
+			return err
+		}
 	}
 	logFunc("Waiting for running...")
 	if waitForRunning {
 		label := labels.SelectorFromSet(labels.Set(map[string]string{"startPodsID": startPodsID}))
 		err := WaitForPodsWithLabelRunning(c, namespace, label)
-		return fmt.Errorf("Error waiting for %d pods to be running - probably a timeout: %v", replicas, err)
+		if err != nil {
+			return fmt.Errorf("Error waiting for %d pods to be running - probably a timeout: %v", replicas, err)
+		}
 	}
 	return nil
 }
