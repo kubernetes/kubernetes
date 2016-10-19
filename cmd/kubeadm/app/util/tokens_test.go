@@ -17,9 +17,9 @@ limitations under the License.
 package util
 
 import (
+	"bytes"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
@@ -27,9 +27,13 @@ func TestUsingEmptyTokenFails(t *testing.T) {
 	// Simulates what happens when you omit --token on the CLI
 	s := newSecretsWithToken("")
 
-	ok, err := UseGivenTokenIfValid(s)
-	assert.False(t, ok)
-	assert.NoError(t, err)
+	given, err := UseGivenTokenIfValid(s)
+	if err != nil {
+		t.Errorf("UseGivenTokenIfValid returned an error when the token was omitted: %v", err)
+	}
+	if given {
+		t.Errorf("UseGivenTokenIfValid returned given = true when the token was omitted; expected false")
+	}
 }
 
 func TestTokenValidationFailures(t *testing.T) {
@@ -42,24 +46,36 @@ func TestTokenValidationFailures(t *testing.T) {
 
 	for _, token := range(invalidTokens) {
 		s := newSecretsWithToken(token)
-		ok, err := UseGivenTokenIfValid(s)
+		_, err := UseGivenTokenIfValid(s)
 
-		assert.False(t, ok, "expected invalid token to return ok = false: [%s]", token)
-		assert.Error(t, err, "expected invalid token to return an error: [%s]", token)
-		assert.Contains(t, err.Error(), "<6 characters>.<16 characters>", "expected better validation failure message")
+		if err == nil {
+			t.Errorf("UseGivenTokenIfValid did not return an error for this invalid token: [%s]", token)
+		}
 	}
 }
 
 func TestValidTokenPopulatesSecrets(t *testing.T) {
 	s := newSecretsWithToken("123456.0123456789AbCdEf")
+	expectedToken := []byte("0123456789abcdef")
+	expectedTokenID := "123456"
+	expectedBearerToken := "0123456789abcdef"
 
-	ok, err := UseGivenTokenIfValid(s)
-	assert.True(t, ok)
-	assert.NoError(t, err)
-
-	assert.Equal(t, "123456", s.TokenID)
-	assert.Equal(t, "0123456789abcdef", s.BearerToken)
-	assert.Equal(t, []byte("0123456789abcdef"), s.Token)
+	given, err := UseGivenTokenIfValid(s)
+	if err != nil {
+		t.Errorf("UseGivenTokenIfValid gave an error for a valid token: %v", err)
+	}
+	if !given {
+		t.Error("UseGivenTokenIfValid returned given = false when given a valid token")
+	}
+	if s.TokenID != expectedTokenID {
+		t.Errorf("UseGivenTokenIfValid did not populate the TokenID correctly; expected [%s] but got [%s]", expectedTokenID, s.TokenID)
+	}
+	if s.BearerToken != expectedBearerToken {
+		t.Errorf("UseGivenTokenIfValid did not populate the BearerToken correctly; expected [%s] but got [%s]", expectedBearerToken, s.BearerToken)
+	}
+	if !bytes.Equal(s.Token, expectedToken) {
+		t.Errorf("UseGivenTokenIfValid did not populate the Token correctly; expected %v but got %v", expectedToken, s.Token)
+	}
 }
 
 func newSecretsWithToken(token string) *kubeadmapi.Secrets {
