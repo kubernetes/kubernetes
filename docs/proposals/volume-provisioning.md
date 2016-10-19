@@ -64,10 +64,7 @@ types of volumes within a single cloud.
 
 One of our goals is to enable administrators to create out-of-tree
 provisioners, that is, provisioners whose code does not live in the Kubernetes
-project.  Our experience since the 1.2 release with dynamic provisioning has
-shown that it is impossible to anticipate every aspect and manner of
-provisioning that administrators will want to perform.  The proposed design
-should not prevent future work to allow out-of-tree provisioners.
+project.
 
 ## Design
 
@@ -75,7 +72,7 @@ This design represents the minimally viable changes required to provision based 
 
 We propose that:
 
-1.  For the base impelementation storage class and volume selectors are mutually exclusive.
+1.  For the base implementation storage class and volume selectors are mutually exclusive for now.
 
 2.  An api object will be incubated in storage.k8s.io/v1beta1 to hold the a `StorageClass`
     API resource. Each StorageClass object contains parameters required by the provisioner to provision volumes of that class.  These parameters are opaque to the user.
@@ -106,6 +103,12 @@ We propose that:
 
 ### Controller workflow for provisioning volumes
 
+0. Kubernetes administator can configure name of a default StorageClass. This
+   StorageClass instance is then used when user requests a dynamically
+   provisioned volume, but does not specify a StorageClass. In other words,
+   `claim.Spec.Class == ""`
+   (or annotation `volume.beta.kubernetes.io/storage-class == ""`).
+
 1.  When a new claim is submitted, the controller attempts to find an existing
     volume that will fulfill the claim.
 
@@ -125,30 +128,250 @@ We propose that:
     periodically retries finding a matching volume or storage class again until
     a match is found. The claim is `Pending` during this period.
 
-4.  With StorageClass instance, the controller finds volume plugin specified by
-    StorageClass.Provisioner.
+4.  With StorageClass instance, the controller updates the claim:
+       * `claim.Annotations["volume.beta.kubernetes.io/storage-provisioner"] = storageClass.Provisioner`
 
-5.  All provisioners are in-tree; they implement an interface called
-    `ProvisionableVolumePlugin`, which has a method called `NewProvisioner`
-    that returns a new provisioner.
+* **In-tree provisioning**
 
-6.  The controller calls volume plugin `Provision` with Parameters from the `StorageClass` configuration object.
+   The controller tries to find an internal volume plugin referenced by
+   `storageClass.Provisioner`. If it is found:
 
-7.  If `Provision` returns an error, the controller generates an event on the
-    claim and goes back to step 1., i.e. it will retry provisioning periodically
+  5.  The internal provisioner implements interface`ProvisionableVolumePlugin`,
+      which has a method called `NewProvisioner` that returns a new provisioner.
 
-8.  If `Provision` returns no error, the controller creates the returned
-    `api.PersistentVolume`, fills its `Class` attribute with `claim.Spec.Class`
-    and makes it already bound to the claim
+  6.  The controller calls volume plugin `Provision` with Parameters
+      from the `StorageClass` configuration object.
 
-  1.  If the create operation for the `api.PersistentVolume` fails, it is
-      retried
+  7.  If `Provision` returns an error, the controller generates an event on the
+      claim and goes back to step 1., i.e. it will retry provisioning
+      periodically.
 
-  2.  If the create operation does not succeed in reasonable time, the
-      controller attempts to delete the provisioned volume and creates an event
-      on the claim
+  8.  If `Provision` returns no error, the controller creates the returned
+      `api.PersistentVolume`, fills its `Class` attribute with `claim.Spec.Class`
+      and makes it already bound to the claim
 
-Existing behavior is un-changed for claims that do not specify `claim.Spec.Class`.
+    1.  If the create operation for the `api.PersistentVolume` fails, it is
+        retried
+
+    2.  If the create operation does not succeed in reasonable time, the
+        controller attempts to delete the provisioned volume and creates an event
+        on the claim
+
+Existing behavior is un-changed for claims that do not specify
+`claim.Spec.Class`.
+
+* **Out of tree provisioning**
+
+  Following step 4. above, the controller tries to find internal plugin for the
+  `StorageClass`. If it is not found, it does not do anything, it just
+  periodically goes to step 1., i.e. tries to find available matching PV.
+
+  The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD",
+  "SHOULD NOT", "RECOMMENDED",  "MAY", and "OPTIONAL" in this document are to be
+  interpreted as described in RFC 2119.
+
+  External provisioner must have these features:
+
+  * It MUST have a distinct name, following Kubernetenes plugin naming scheme
+    `<vendor name>/<provisioner name>`, e.g. `gluster.org/gluster-volume`.
+
+  * The provisioner SHOULD send events on a claim to report any errors
+    related to provisioning a volume for the claim. This way, users get the same
+    experience as with internal provisioners.
+
+  * The provisioner MUST implement also a deleter. It must be able to delete
+    storage assets it created. It MUST NOT assume that any other internal or
+    external plugin is present.
+
+  The external provisioner runs in a separate process which watches claims, be
+  it an external storage appliance, a daemon or a Kubernetes pod. For every
+  claim creation or update, it implements these steps:
+
+  1. The provisioner inspects if
+     `claim.Annotations["volume.beta.kubernetes.io/storage-provisioner"] == <provisioner name>`.
+     All other claims MUST be ignored.
+
+  2. The provisioner MUST check that the claim is unbound, i.e. its
+     `claim.Spec.VolumeName` is empty. Bound volumes MUST be ignored.
+
+     *Race condition when the provisioner provisions a new PV for a claim and
+     at the same time Kubernetes binds the same claim to another PV that was
+     just created by admin is discussed below.*
+
+  3. It tries to find a StorageClass instance referenced by annotation
+     `claim.Annotations["volume.beta.kubernetes.io/storage-class"]`. If not
+     found, it SHOULD report an error (by sending an event to the claim) and it
+     SHOULD retry periodically with step i.
+
+  4. The provisioner MUST parse arguments in the `StorageClass` and
+     `claim.Spec.Selector` and provisions appropriate storage asset that matches
+     both the parameters and the selector.
+     When it encounters unknown parameters in `storageClass.Parameters` or
+     `claim.Spec.Selector` or the combination of these parameters is impossible
+     to achieve, it SHOULD report an error and it MUST NOT provision a volume.
+     All errors found during parsing or provisioning SHOULD be send as events
+     on the claim and the provisioner SHOULD retry periodically with step i.
+
+  5. When the volume is provisioned, the provisioner MUST create a new PV
+     representing  the storage asset and save it in Kubernetes. When this fails,
+     it SHOULD retry creating the PV again few times. If all attempts fail, it
+     MUST delete the storage asset. All errors SHOULD be sent as events to the
+     claim.
+
+     The created PV MUST have these properties:
+
+     * `pv.Spec.ClaimRef` MUST point to the claim that led to its creation
+       (including the claim UID).
+
+       *This way, the PV will be bound to the claim.*
+
+     * `pv.Annotations["pv.kubernetes.io/provisioned-by"]` MUST be set to name
+       of the external provisioner. This provisioner will be used to delete the
+       volume.
+
+       *The provisioner/delete should not assume there is any other
+       provisioner/deleter available that would delete the volume.*
+
+     * `pv.Annotations["volume.beta.kubernetes.io/storage-class"]` MUST be set
+       to name of the storage class requested by the claim.
+
+       *So the created PV matches the claim.*
+
+     * The provisioner MAY store any other information to the created PV as
+       annotations. It SHOULD save any information that is needed to delete the
+       storage asset there, as appropriate StorageClass instance may not exist
+       when the volume will be deleted.
+
+     * `pv.Labels` MUST be set to match `claim.spec.selector`. The provisioner
+       MAY add additional labels.
+
+       *So the created PV matches the claim.*
+
+     * `pv.Spec` MUST be set to match requirements in `claim.Spec`, especially
+       access mode and PV size. The provisioned volume size MUST NOT be smaller
+       than size requested in the claim, however it MAY be larger.
+
+       *So the created PV matches the claim.*
+
+     * `pv.Spec.PersistentVolumeSource` MUST be set to point to the created
+       storage asset.
+
+     * `pv.Spec.PersistentVolumeReclaimPolicy` SHOULD be set to `Delete` unless
+       user manually configures other reclaim policy.
+
+     * `pv.Name` MUST be unique. Internal provisioners use name based on
+       `claim.UID` to produce conflicts when two provisioners accidentally
+       provision a PV for the same claim, however external provisioners can use
+       any mechanism to generate an unique PV name.
+
+  Example of a claim that is to be provisioned by an external provisioner for
+  `foo.org/foo-volume`:
+
+  ```yaml
+  apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    annotations:
+      volume.beta.kubernetes.io/storage-class: myClass
+      volume.beta.kubernetes.io/storage-provisioner: foo.org/foo-volume
+    name: fooclaim
+    namespace: default
+    resourceVersion: "53"
+    uid: 5a294561-7e5b-11e6-a20e-0eb6048532a3
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: 4Gi
+  #  volumeName: must be empty!
+  ```
+
+  Example of the created PV:
+
+  ```yaml
+  apiVersion: v1
+  kind: PersistentVolume
+  metadata:
+    annotations:
+      pv.kubernetes.io/provisioned-by: foo.org/foo-volume
+      volume.beta.kubernetes.io/storage-class: myClass
+      foo.org/provisioner: "any other annotations as needed"
+    labels:
+        foo.org/my-label: "any labels as needed"
+    generateName: "foo-volume-"
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    awsElasticBlockStore:
+      fsType: ext4
+      volumeID: aws://us-east-1d/vol-de401a79
+    capacity:
+      storage: 4Gi
+    claimRef:
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      name: fooclaim
+      namespace: default
+      resourceVersion: "53"
+      uid: 5a294561-7e5b-11e6-a20e-0eb6048532a3
+    persistentVolumeReclaimPolicy: Delete
+  ```
+
+  As result, Kubernetes has a PV that represents the storage asset and is bound
+  to the claim. When everything went well, Kubernetes completed binding of the
+  claim to the PV.
+
+  Kubernetes was not blocked in any way during the provisioning and could
+  either bound the claim to another PV that was created by user or even the
+  claim may have been deleted by the user. In both cases, Kubernetes will mark
+  the PV to be delete using the protocol below.
+
+  The external provisioner MAY save any annotations to the claim that is
+  provisioned, however the claim may be modified or even deleted by the user at
+  any time.
+
+
+### Controller workflow for deleting volumes
+
+When the controller decides that a volume should be deleted it performs these
+steps:
+
+1. The controller changes `pv.Status.Phase` to `Released`.
+
+2. The controller looks for `pv.Annotations["pv.kubernetes.io/provisioned-by"]`.
+   If found, it uses this provisioner/deleter to delete the volume.
+
+3. If the volume is not annotated by `pv.kubernetes.io/provisioned-by`, the
+   controller inspects `pv.Spec` and finds in-tree deleter for the volume.
+
+4. If the deleter found by steps 2. or 3. is internal, it calls it and deletes
+   the storage asset together with the PV that represents it.
+
+5. If the deleter is not known to Kubernetes, it does not do anything.
+
+6. External deleters MUST watch for PV changes. When
+   `pv.Status.Phase == Released && pv.Annotations['pv.kubernetes.io/provisioned-by'] == <deleter name>`,
+   the deleter:
+
+   * It MUST check reclaim policy of the PV and ignore all PVs whose
+     `Spec.PersistentVolumeReclaimPolicy` is not `Delete`.
+
+   * It MUST delete the storage asset.
+
+   * Only after the storage asset was successfully deleted, it MUST delete the
+     PV object in Kubernetes.
+
+   * Any error SHOULD be sent as an event on the PV being deleted and the
+     deleter SHOULD retry to delete the volume periodically.
+
+   * The deleter SHOULD NOT use any information from StorageClass instance
+     referenced by the PV.
+
+   Note that watching `pv.Status` has been frowned upon in the past, however in
+   this particular case we could use it quite reliably to trigger deletion.
+   It's not trivial to find out if a PV is not needed and should be deleted.
+   *Alternatively, an annotation could be used.*
 
 ### `StorageClass` API
 
