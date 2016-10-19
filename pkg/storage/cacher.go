@@ -389,6 +389,12 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 		return fmt.Errorf("failed to wait for fresh list: %v", err)
 	}
 	trace.Step(fmt.Sprintf("Listed %d items from cache", len(objs)))
+	if len(objs) > listVal.Cap() && pred.Label.Empty() && pred.Field.Empty() {
+		// Resize the slice appropriately, since we already know that none
+		// of the elements will be filtered out.
+		listVal.Set(reflect.MakeSlice(reflect.SliceOf(c.objectType.Elem()), 0, len(objs)))
+		trace.Step("Resized result")
+	}
 	for _, obj := range objs {
 		object, ok := obj.(runtime.Object)
 		if !ok {
