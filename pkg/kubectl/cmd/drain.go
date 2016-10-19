@@ -30,6 +30,8 @@ import (
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	unversioned_core "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -50,10 +52,13 @@ type DrainOptions struct {
 	IgnoreDaemonsets   bool
 	Timeout            time.Duration
 	DeleteLocalData    bool
+	Message            string
 	mapper             meta.RESTMapper
 	nodeInfo           *resource.Info
 	out                io.Writer
 	typer              runtime.ObjectTyper
+	eventBroadcaster   record.EventBroadcaster
+	eventRecorder      record.EventRecorder
 }
 
 // Takes a pod and returns a bool indicating whether or not to operate on the
@@ -73,6 +78,7 @@ const (
 	kLocalStorageWarning = "Deleting pods with local storage"
 	kUnmanagedFatal      = "pods not managed by ReplicationController, ReplicaSet, Job, or DaemonSet (use --force to override)"
 	kUnmanagedWarning    = "Deleting pods not managed by ReplicationController, ReplicaSet, Job, or DaemonSet"
+	setMessageDesc       = "Set event message to describe why this node was cordoned"
 )
 
 var (
@@ -81,7 +87,11 @@ var (
 
 	cordon_example = templates.Examples(`
 		# Mark node "foo" as unschedulable.
-		kubectl cordon foo`)
+		kubectl cordon foo
+
+		# Mark node "foo" as unschedulable and set event message.
+		kubectl cordon foo --message="foo"
+		`)
 )
 
 func NewCmdCordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -97,6 +107,8 @@ func NewCmdCordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
 			cmdutil.CheckErr(options.RunCordonOrUncordon(true))
 		},
 	}
+	cmd.Flags().StringVar(&options.Message, "message", "", setMessageDesc)
+
 	return cmd
 }
 
@@ -106,7 +118,10 @@ var (
 
 	uncordon_example = templates.Examples(`
 		# Mark node "foo" as schedulable.
-		$ kubectl uncordon foo`)
+		$ kubectl uncordon foo
+
+		# Mark node "foo" as schedulable and set event message.
+		kubectl cordon foo --message="foo"`)
 )
 
 func NewCmdUncordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -122,6 +137,7 @@ func NewCmdUncordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
 			cmdutil.CheckErr(options.RunCordonOrUncordon(false))
 		},
 	}
+	cmd.Flags().StringVar(&options.Message, "message", "", "Set event message to describe why this node was uncordoned")
 	return cmd
 }
 
@@ -170,6 +186,8 @@ func NewCmdDrain(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVar(&options.DeleteLocalData, "delete-local-data", false, "Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).")
 	cmd.Flags().IntVar(&options.GracePeriodSeconds, "grace-period", -1, "Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.")
 	cmd.Flags().DurationVar(&options.Timeout, "timeout", 0, "The length of time to wait before giving up on a delete, zero means determine a timeout from the size of the object")
+	cmd.Flags().StringVar(&options.Message, "message", "", setMessageDesc)
+
 	return cmd
 }
 
@@ -205,6 +223,10 @@ func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
 	if err = r.Err(); err != nil {
 		return err
 	}
+
+	o.eventBroadcaster = record.NewBroadcaster()
+	o.eventBroadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{Interface: o.client.Core().Events("")})
+	o.eventRecorder = o.eventBroadcaster.NewRecorder(api.EventSource{Component: "kubectl"})
 
 	return r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
@@ -455,6 +477,7 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 			if err != nil {
 				return err
 			}
+			o.sendEventWithMessage(desired)
 			cmdutil.PrintSuccess(o.mapper, false, o.out, o.nodeInfo.Mapping.Resource, o.nodeInfo.Name, false, changed(desired))
 		}
 	} else {
@@ -478,4 +501,13 @@ func changed(desired bool) string {
 		return "cordoned"
 	}
 	return "uncordoned"
+}
+
+func (o *DrainOptions) sendEventWithMessage(desired bool) {
+	reason := "NodeUncordoned"
+	if desired {
+		reason = "NodeCordoned"
+	}
+
+	o.eventRecorder.Eventf(o.nodeInfo.Object, api.EventTypeNormal, reason, "Node %s: %s", o.nodeInfo.Name, o.Message)
 }
