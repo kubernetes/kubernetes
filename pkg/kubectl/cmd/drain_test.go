@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
@@ -44,6 +43,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 var node *api.Node
@@ -556,12 +556,14 @@ func TestDrain(t *testing.T) {
 }
 
 func TestDeletePods(t *testing.T) {
+	ifHasBeenCalled := map[string]bool{}
 	tests := []struct {
 		description       string
 		interval          time.Duration
 		timeout           time.Duration
 		expectPendingPods bool
 		expectError       bool
+		expectedError     *error
 		getPodFn          func(namespace, name string) (*api.Pod, error)
 	}{
 		{
@@ -570,24 +572,24 @@ func TestDeletePods(t *testing.T) {
 			timeout:           10 * time.Second,
 			expectPendingPods: false,
 			expectError:       false,
+			expectedError:     nil,
 			getPodFn: func(namespace, name string) (*api.Pod, error) {
 				oldPodMap, _ := createPods(false)
 				newPodMap, _ := createPods(true)
-				if newPod, found := newPodMap[name]; found {
-					// randomly return old pod
-					if rand.Float32() < 0.6 {
-						oldPod := oldPodMap[name]
+				if oldPod, found := oldPodMap[name]; found {
+					if _, ok := ifHasBeenCalled[name]; !ok {
+						ifHasBeenCalled[name] = true
 						return &oldPod, nil
 					} else {
-						// randomly return a new pod or a NotFound error
-						if rand.Float32() < 0.5 {
+						if oldPod.ObjectMeta.Generation < 4 {
+							newPod := newPodMap[name]
 							return &newPod, nil
 						} else {
-							return &api.Pod{}, apierrors.NewNotFound(unversioned.GroupResource{Resource: "pods"}, name)
+							return nil, apierrors.NewNotFound(unversioned.GroupResource{Resource: "pods"}, name)
 						}
 					}
 				}
-				return &api.Pod{}, apierrors.NewNotFound(unversioned.GroupResource{Resource: "pods"}, name)
+				return nil, apierrors.NewNotFound(unversioned.GroupResource{Resource: "pods"}, name)
 			},
 		},
 		{
@@ -596,12 +598,24 @@ func TestDeletePods(t *testing.T) {
 			timeout:           3 * time.Second,
 			expectPendingPods: true,
 			expectError:       true,
+			expectedError:     &wait.ErrWaitTimeout,
 			getPodFn: func(namespace, name string) (*api.Pod, error) {
 				oldPodMap, _ := createPods(false)
 				if oldPod, found := oldPodMap[name]; found {
 					return &oldPod, nil
 				}
-				return &api.Pod{}, errors.New(fmt.Sprintf("%q: not found", name))
+				return nil, errors.New(fmt.Sprintf("%q: not found", name))
+			},
+		},
+		{
+			description:       "Client error could be passed out",
+			interval:          200 * time.Millisecond,
+			timeout:           5 * time.Second,
+			expectPendingPods: true,
+			expectError:       true,
+			expectedError:     nil,
+			getPodFn: func(namespace, name string) (*api.Pod, error) {
+				return nil, errors.New("This is a random error for testing")
 			},
 		},
 	}
@@ -612,15 +626,25 @@ func TestDeletePods(t *testing.T) {
 		_, pods := createPods(false)
 		pendingPods, err := o.waitForDelete(pods, test.interval, test.timeout, test.getPodFn)
 
-		if test.expectError && err == nil && test.expectPendingPods && len(pendingPods) > 0 {
-			t.Fatalf("%s: unexpected non-error", test.description)
+		if test.expectError {
+			if err == nil {
+				t.Fatalf("%s: unexpected non-error", test.description)
+			} else if test.expectedError != nil {
+				if *test.expectedError != err {
+					t.Fatalf("%s: the error does not match expected error", test.description)
+				}
+			}
 		}
-		if !test.expectError && err != nil && !test.expectPendingPods && len(pendingPods) == 0 {
+		if !test.expectError && err != nil {
 			t.Fatalf("%s: unexpected error", test.description)
 		}
-
+		if test.expectPendingPods && len(pendingPods) == 0 {
+			t.Fatalf("%s: unexpected empty pods", test.description)
+		}
+		if !test.expectPendingPods && len(pendingPods) > 0 {
+			t.Fatalf("%s: unexpected pending pods", test.description)
+		}
 	}
-
 }
 
 func createPods(ifCreateNewPods bool) (map[string]api.Pod, []api.Pod) {
@@ -635,9 +659,10 @@ func createPods(ifCreateNewPods bool) (map[string]api.Pod, []api.Pod) {
 		}
 		pod := api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				Name:      "pod" + string(i),
-				Namespace: "default",
-				UID:       uid,
+				Name:       "pod" + string(i),
+				Namespace:  "default",
+				UID:        uid,
+				Generation: int64(i),
 			},
 		}
 		podMap[pod.Name] = pod
