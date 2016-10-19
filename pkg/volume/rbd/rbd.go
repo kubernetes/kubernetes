@@ -49,11 +49,8 @@ var _ volume.DeletableVolumePlugin = &rbdPlugin{}
 var _ volume.ProvisionableVolumePlugin = &rbdPlugin{}
 
 const (
-	rbdPluginName               = "kubernetes.io/rbd"
-	annCephAdminID              = "rbd.kubernetes.io/admin"
-	annCephAdminSecretName      = "rbd.kubernetes.io/adminsecretname"
-	annCephAdminSecretNameSpace = "rbd.kubernetes.io/adminsecretnamespace"
-	secretKeyName               = "key" // key name used in secret
+	rbdPluginName = "kubernetes.io/rbd"
+	secretKeyName = "key" // key name used in secret
 )
 
 func (plugin *rbdPlugin) Init(host volume.VolumeHost) error {
@@ -183,9 +180,23 @@ func (plugin *rbdPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.RBD == nil {
 		return nil, fmt.Errorf("spec.PersistentVolumeSource.Spec.RBD is nil")
 	}
-	admin, adminSecretName, adminSecretNamespace, err := annotationsToParam(spec.PersistentVolume)
+	class, err := volutil.GetClassForVolume(plugin.host.GetKubeClient(), spec.PersistentVolume)
 	if err != nil {
-		return nil, fmt.Errorf("cannot find Ceph credentials to delete rbd PV: %v", err)
+		return nil, err
+	}
+	adminSecretName := ""
+	adminSecretNamespace := "default"
+	admin := ""
+
+	for k, v := range class.Parameters {
+		switch dstrings.ToLower(k) {
+		case "adminid":
+			admin = v
+		case "adminsecretname":
+			adminSecretName = v
+		case "adminsecretnamespace":
+			adminSecretNamespace = v
+		}
 	}
 
 	secret, err := parseSecret(adminSecretNamespace, adminSecretName, plugin.host.GetKubeClient())
@@ -313,8 +324,6 @@ func (r *rbdVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 	pv.Spec.Capacity = api.ResourceList{
 		api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dMi", sizeMB)),
 	}
-	// place parameters in pv selector
-	paramToAnnotations(r.adminId, adminSecretNamespace, adminSecretName, pv)
 	return pv, nil
 }
 
@@ -329,36 +338,6 @@ func (r *rbdVolumeDeleter) GetPath() string {
 
 func (r *rbdVolumeDeleter) Delete() error {
 	return r.manager.DeleteImage(r)
-}
-
-func paramToAnnotations(admin, adminSecretNamespace, adminSecretName string, pv *api.PersistentVolume) {
-	if pv.Annotations == nil {
-		pv.Annotations = make(map[string]string)
-	}
-	pv.Annotations[annCephAdminID] = admin
-	pv.Annotations[annCephAdminSecretName] = adminSecretName
-	pv.Annotations[annCephAdminSecretNameSpace] = adminSecretNamespace
-}
-
-func annotationsToParam(pv *api.PersistentVolume) (string, string, string, error) {
-	if pv.Annotations == nil {
-		return "", "", "", fmt.Errorf("PV has no annotation, cannot get Ceph admin credentials")
-	}
-	var admin, adminSecretName, adminSecretNamespace string
-	found := false
-	admin, found = pv.Annotations[annCephAdminID]
-	if !found {
-		return "", "", "", fmt.Errorf("Cannot get Ceph admin id from PV annotations")
-	}
-	adminSecretName, found = pv.Annotations[annCephAdminSecretName]
-	if !found {
-		return "", "", "", fmt.Errorf("Cannot get Ceph admin secret from PV annotations")
-	}
-	adminSecretNamespace, found = pv.Annotations[annCephAdminSecretNameSpace]
-	if !found {
-		return "", "", "", fmt.Errorf("Cannot get Ceph admin secret namespace from PV annotations")
-	}
-	return admin, adminSecretName, adminSecretNamespace, nil
 }
 
 type rbd struct {
