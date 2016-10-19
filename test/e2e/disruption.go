@@ -61,6 +61,7 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 		createPodDisruptionBudgetOrDie(cs, ns, intstr.FromInt(2))
 
 		createPodsOrDie(cs, ns, 3)
+		waitForPodsOrDie(cs, ns, 3)
 
 		// Since disruptionAllowed starts out false, if we see it ever become true,
 		// that means the controller is working.
@@ -216,6 +217,35 @@ func createPodsOrDie(cs *kubernetes.Clientset, ns string, n int) {
 		_, err := cs.Pods(ns).Create(pod)
 		framework.ExpectNoError(err, "Creating pod %q in namespace %q", pod.Name, ns)
 	}
+}
+
+func waitForPodsOrDie(cs *kubernetes.Clientset, ns string, n int) {
+	By("Waiting for all pods to be running")
+	err := wait.PollImmediate(framework.Poll, schedulingTimeout, func() (bool, error) {
+		pods, err := cs.Core().Pods(ns).List(api.ListOptions{LabelSelector: "foo=bar"})
+		if err != nil {
+			return false, err
+		}
+		if pods == nil {
+			return false, fmt.Errorf("pods is nil")
+		}
+		if len(pods.Items) < n {
+			framework.Logf("pods: %v < %v", len(pods.Items), n)
+			return false, nil
+		}
+		ready := 0
+		for i := 0; i < n; i++ {
+			if pods.Items[i].Status.Phase == api.PodRunning {
+				ready++
+			}
+		}
+		if ready < n {
+			framework.Logf("running pods: %v < %v", ready, n)
+			return false, nil
+		}
+		return true, nil
+	})
+	framework.ExpectNoError(err, "Waiting for pods in namespace %q to be ready", ns)
 }
 
 func createReplicaSetOrDie(cs *kubernetes.Clientset, ns string, size int32, exclusive bool) {
