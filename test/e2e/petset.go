@@ -285,7 +285,7 @@ var _ = framework.KubeDescribe("Pet set recreate [Slow] [Feature:PetSet]", func(
 
 	It("should recreate evicted petset", func() {
 		By("looking for a node to schedule pet set and pod")
-		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
+		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		node := nodes.Items[0]
 
 		By("creating pod with conflicting port in namespace " + f.Namespace.Name)

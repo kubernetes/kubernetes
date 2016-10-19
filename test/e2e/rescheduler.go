@@ -38,7 +38,7 @@ var _ = framework.KubeDescribe("Rescheduler [Serial]", func() {
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 		ns = f.Namespace.Name
-		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
+		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		nodeCount := len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
 
