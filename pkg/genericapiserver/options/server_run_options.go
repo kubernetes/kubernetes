@@ -223,8 +223,14 @@ func (s *ServerRunOptions) NewSelfClientConfig(token string) (*restclient.Config
 		QPS:   50,
 		Burst: 100,
 	}
+
+	// Use secure port if the TLSCAFile is specified
 	if s.SecurePort > 0 && len(s.TLSCAFile) > 0 {
-		clientConfig.Host = "https://" + net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.SecurePort))
+		host := s.BindAddress.String()
+		if host == "0.0.0.0" {
+			host = "localhost"
+		}
+		clientConfig.Host = "https://" + net.JoinHostPort(host, strconv.Itoa(s.SecurePort))
 		clientConfig.CAFile = s.TLSCAFile
 		clientConfig.BearerToken = token
 	} else if s.InsecurePort > 0 {
