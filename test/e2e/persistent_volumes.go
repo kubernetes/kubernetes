@@ -649,6 +649,7 @@ func makeWritePod(ns string, pvcName string) *api.Pod {
 					},
 				},
 			},
+			RestartPolicy: api.RestartPolicyOnFailure,
 			Volumes: []api.Volume{
 				{
 					Name: "nfs-pvc",
