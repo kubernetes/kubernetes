@@ -109,7 +109,7 @@ func (dc *DeploymentController) getAllReplicaSetsAndSyncRevision(deployment *ext
 	// List the deployment's RSes & Pods and apply pod-template-hash info to deployment's adopted RSes/Pods
 	rsList, podList, err := dc.rsAndPodsWithHashKeySynced(deployment)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error labeling replica sets and pods with pod-template-hash: %v", err)
+		return nil, nil, fmt.Errorf("error labeling ReplicaSets and pods with pod-template-hash: %v", err)
 	}
 	_, allOldRSs, err := deploymentutil.FindOldReplicaSets(deployment, rsList, podList)
 	if err != nil {
@@ -199,7 +199,7 @@ func (dc *DeploymentController) addHashKeyToRSAndPods(rs *extensions.ReplicaSet)
 	// 2. Update all pods managed by the rs to have the new hash label, so they will be correctly adopted.
 	selector, err := unversioned.LabelSelectorAsSelector(updatedRS.Spec.Selector)
 	if err != nil {
-		return nil, fmt.Errorf("error in converting selector to label selector for replica set %s: %s", updatedRS.Name, err)
+		return nil, fmt.Errorf("error in converting selector to label selector for ReplicaSet %s: %s", updatedRS.Name, err)
 	}
 	options := api.ListOptions{LabelSelector: selector}
 	pods, err := dc.podLister.Pods(namespace).List(options.LabelSelector)
@@ -379,7 +379,7 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 		return nil, err
 	}
 	if newReplicasCount > 0 {
-		dc.eventRecorder.Eventf(deployment, api.EventTypeNormal, "ScalingReplicaSet", "Scaled up replica set %s to %d", createdRS.Name, newReplicasCount)
+		dc.eventRecorder.Eventf(deployment, api.EventTypeNormal, "ScalingReplicaSet", "Scaled up ReplicaSet %s to %d", createdRS.Name, newReplicasCount)
 	}
 
 	deploymentutil.SetDeploymentRevision(deployment, newRevision)
@@ -553,7 +553,7 @@ func (dc *DeploymentController) cleanupDeployment(oldRSs []*extensions.ReplicaSe
 			continue
 		}
 		if err := dc.client.Extensions().ReplicaSets(rs.Namespace).Delete(rs.Name, nil); err != nil && !errors.IsNotFound(err) {
-			glog.V(2).Infof("Failed deleting old replica set %v for deployment %v: %v", rs.Name, deployment.Name, err)
+			glog.V(2).Infof("Failed deleting old ReplicaSet %v for deployment %v: %v", rs.Name, deployment.Name, err)
 			errList = append(errList, err)
 		}
 	}

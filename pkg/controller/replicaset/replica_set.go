@@ -293,7 +293,7 @@ func (rsc *ReplicaSetController) addPod(obj interface{}) {
 	}
 	rsKey, err := controller.KeyFunc(rs)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for replica set %#v: %v", rs, err))
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for ReplicaSet %#v: %v", rs, err))
 		return
 	}
 	if pod.DeletionTimestamp != nil {
