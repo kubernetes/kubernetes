@@ -40,6 +40,8 @@ service RuntimeService {
 
     // Exec prepares a streaming endpoint to execute a command in the container.
     rpc Exec(ExecRequest) returns (ExecResponse) {}
+    // ExecSync runs a command in a container synchonously.
+    rpc ExecSync(ExecSyncRequest) returns (ExecSyncResponse) {}
     // Attach prepares a streaming endpoint to attach to a running container.
     rpc Attach(AttachRequest) returns (AttachResponse) {}
     // PortForward prepares a streaming endpoint to forward ports from a PodSandbox.
@@ -613,6 +615,24 @@ message ExecRequest {
 message ExecResponse {
     // The fully qualified URL of the exec streaming server
     optional string url = 1;
+}
+
+message ExecSyncRequest {
+    // The id of the container
+    optional string container_id = 1;
+    // The cmd to execute
+    repeated string cmd = 2;
+    // Timeout in seconds to stop the command. Default: run forever.
+    optional int64 timeout = 3;
+}
+
+message ExecSyncResponse {
+    // The captured command stdout output.
+    optional bytes stdout = 1;
+    // The captured command stderr output.
+    optional bytes stderr = 2;
+    // The exit code the command finished with.
+    optional int32 exit_code = 3;
 }
 
 message AttachRequest {
