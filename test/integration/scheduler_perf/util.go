@@ -80,34 +80,6 @@ func mustSetupScheduler() (schedulerConfigFactory *factory.ConfigFactory, destro
 	return
 }
 
-func makeNodes(c clientset.Interface, nodeCount int) {
-	glog.Infof("making %d nodes", nodeCount)
-	baseNode := &api.Node{
-		ObjectMeta: api.ObjectMeta{
-			GenerateName: "scheduler-test-node-",
-		},
-		Spec: api.NodeSpec{
-			ExternalID: "foobar",
-		},
-		Status: api.NodeStatus{
-			Capacity: api.ResourceList{
-				api.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
-				api.ResourceCPU:    resource.MustParse("4"),
-				api.ResourceMemory: resource.MustParse("32Gi"),
-			},
-			Phase: api.NodeRunning,
-			Conditions: []api.NodeCondition{
-				{Type: api.NodeReady, Status: api.ConditionTrue},
-			},
-		},
-	}
-	for i := 0; i < nodeCount; i++ {
-		if _, err := c.Core().Nodes().Create(baseNode); err != nil {
-			panic("error creating node: " + err.Error())
-		}
-	}
-}
-
 func makePodSpec() api.PodSpec {
 	return api.PodSpec{
 		Containers: []api.Container{{

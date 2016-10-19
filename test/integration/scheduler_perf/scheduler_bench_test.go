@@ -19,6 +19,11 @@ package benchmark
 import (
 	"testing"
 	"time"
+
+	"k8s.io/kubernetes/test/integration/framework"
+	testutils "k8s.io/kubernetes/test/utils"
+
+	"github.com/golang/glog"
 )
 
 // BenchmarkScheduling100Nodes0Pods benchmarks the scheduling rate
@@ -53,8 +58,17 @@ func benchmarkScheduling(numNodes, numScheduledPods int, b *testing.B) {
 	defer finalFunc()
 	c := schedulerConfigFactory.Client
 
-	makeNodes(c, numNodes)
+	nodePreparer := framework.NewIntegrationTestNodePreparer(
+		c,
+		map[int]testutils.PrepareNodeStrategy{numNodes: &testutils.TrivialNodePrepareStrategy{}},
+		"scheduler-perf-",
+	)
+	if err := nodePreparer.PrepareNodes(); err != nil {
+		glog.Fatalf("%v", err)
+	}
+	defer nodePreparer.CleanupNodes()
 	makePodsFromRC(c, "rc1", numScheduledPods)
+
 	for {
 		scheduled := schedulerConfigFactory.ScheduledPodLister.Indexer.List()
 		if len(scheduled) >= numScheduledPods {
