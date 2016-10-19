@@ -323,7 +323,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			}
 			errs = append(errs, err)
 		}
-		if len(infos) == 0 {
+		if len(infos) == 0 && len(errs) == 0 {
 			outputEmptyListWarning(errOut)
 		}
 
@@ -375,7 +375,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	if err != nil {
 		allErrs = append(allErrs, err)
 	}
-	if len(infos) == 0 {
+	if len(infos) == 0 && len(allErrs) == 0 {
 		outputEmptyListWarning(errOut)
 	}
 
