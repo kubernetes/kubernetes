@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
+	internalApi "k8s.io/kubernetes/pkg/kubelet/api"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/metrics"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -99,6 +100,17 @@ type Framework struct {
 	// Federation specific params. These are set only if federated = true.
 	FederationClientset_1_5 *federation_release_1_5.Clientset
 	FederationNamespace     *v1.Namespace
+
+	// CRI client
+	CriClient *InternalApiClient
+
+	// will this framework to use cri client
+	cri bool
+}
+
+type InternalApiClient struct {
+	CriRuntimeClient internalApi.RuntimeService
+	CriImageClient   internalApi.ImageManagerService
 }
 
 type TestDataSummary interface {
@@ -131,6 +143,29 @@ func NewDefaultFederatedFramework(baseName string) *Framework {
 func NewDefaultGroupVersionFramework(baseName string, groupVersion unversioned.GroupVersion) *Framework {
 	f := NewDefaultFramework(baseName)
 	f.options.GroupVersion = &groupVersion
+	return f
+}
+
+func NewDefaultCriFramework(baseName string) *Framework {
+	options := FrameworkOptions{
+		ClientQPS:   20,
+		ClientBurst: 50,
+	}
+	return NewCriFramework(baseName, options, nil)
+}
+
+func NewCriFramework(baseName string, options FrameworkOptions, client *InternalApiClient) *Framework {
+	f := &Framework{
+		BaseName:                 baseName,
+		AddonResourceConstraints: make(map[string]ResourceConstraint),
+		options:                  options,
+		CriClient:                client,
+		cri:                      true,
+	}
+
+	BeforeEach(f.BeforeEach)
+	AfterEach(f.AfterEach)
+
 	return f
 }
 
@@ -185,7 +220,7 @@ func (f *Framework) BeforeEach() {
 	// The fact that we need this feels like a bug in ginkgo.
 	// https://github.com/onsi/ginkgo/issues/222
 	f.cleanupHandle = AddCleanupAction(f.AfterEach)
-	if f.Client == nil {
+	if f.Client == nil && !f.cri {
 		By("Creating a kubernetes client")
 		config, err := LoadConfig()
 		Expect(err).NotTo(HaveOccurred())
@@ -229,23 +264,26 @@ func (f *Framework) BeforeEach() {
 		By(fmt.Sprintf("Created federation namespace %s", ns.Name))
 	}
 
-	By("Building a namespace api object")
-	namespace, err := f.CreateNamespace(f.BaseName, map[string]string{
-		"e2e-framework": f.BaseName,
-	})
-	Expect(err).NotTo(HaveOccurred())
-
-	f.Namespace = namespace
-
-	if TestContext.VerifyServiceAccount {
-		By("Waiting for a default service account to be provisioned in namespace")
-		err = WaitForDefaultServiceAccountInNamespace(f.Client, namespace.Name)
+	if !f.cri {
+		By("Building a namespace api object")
+		namespace, err := f.CreateNamespace(f.BaseName, map[string]string{
+			"e2e-framework": f.BaseName,
+		})
 		Expect(err).NotTo(HaveOccurred())
-	} else {
-		Logf("Skipping waiting for service account")
+
+		f.Namespace = namespace
+
+		if TestContext.VerifyServiceAccount {
+			By("Waiting for a default service account to be provisioned in namespace")
+			err = WaitForDefaultServiceAccountInNamespace(f.Client, namespace.Name)
+			Expect(err).NotTo(HaveOccurred())
+		} else {
+			Logf("Skipping waiting for service account")
+		}
 	}
 
 	if TestContext.GatherKubeSystemResourceUsageData != "false" && TestContext.GatherKubeSystemResourceUsageData != "none" {
+		var err error
 		f.gatherer, err = NewResourceUsageGatherer(f.Client, ResourceGathererOptions{
 			inKubemark: ProviderIs("kubemark"),
 			masterOnly: TestContext.GatherKubeSystemResourceUsageData == "master",
@@ -266,6 +304,12 @@ func (f *Framework) BeforeEach() {
 			f.logsSizeVerifier.Run()
 			f.logsSizeWaitGroup.Done()
 		}()
+	}
+
+	if f.cri {
+		criclient, err := loadCriClient()
+		Expect(err).NotTo(HaveOccurred())
+		f.CriClient = criclient
 	}
 }
 
@@ -350,6 +394,7 @@ func (f *Framework) AfterEach() {
 		f.FederationNamespace = nil
 		f.Client = nil
 		f.namespacesToDelete = nil
+		f.CriClient = nil
 
 		// if we had errors deleting, report them now.
 		if len(nsDeletionErrors) != 0 {
@@ -438,11 +483,13 @@ func (f *Framework) AfterEach() {
 		}
 	}
 
-	// Check whether all nodes are ready after the test.
-	// This is explicitly done at the very end of the test, to avoid
-	// e.g. not removing namespace in case of this failure.
-	if err := AllNodesReady(f.Client, 3*time.Minute); err != nil {
-		Failf("All nodes should be ready after test, %v", err)
+	if !f.cri {
+		// Check whether all nodes are ready after the test.
+		// This is explicitly done at the very end of the test, to avoid
+		// e.g. not removing namespace in case of this failure.
+		if err := AllNodesReady(f.Client, 3*time.Minute); err != nil {
+			Failf("All nodes should be ready after test, %v", err)
+		}
 	}
 }
 

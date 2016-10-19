@@ -61,6 +61,8 @@ import (
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
+	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/remote"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -1827,6 +1829,23 @@ func LoadClientset() (*release_1_5.Clientset, error) {
 		return nil, fmt.Errorf("error creating client: %v", err.Error())
 	}
 	return release_1_5.NewForConfig(config)
+}
+
+func loadCriClient() (*InternalApiClient, error) {
+	rService, err := remote.NewRemoteRuntimeService(TestContext.RuntimeServiceAddr, TestContext.RuntimeServiceTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	iService, err := remote.NewRemoteImageService(TestContext.ImageServiceAddr, TestContext.ImageServiceTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	return &InternalApiClient{
+		CriRuntimeClient: rService,
+		CriImageClient:   iService,
+	}, nil
 }
 
 // randomSuffix provides a random string to append to pods,services,rcs.
@@ -4573,4 +4592,20 @@ func (p *E2ETestNodePreparer) CleanupNodes() error {
 		}
 	}
 	return encounteredError
+}
+
+// podReady returns whether podsandbox state is ready.
+func PodReady(status *runtimeApi.PodSandboxStatus) bool {
+	if *status.State == runtimeApi.PodSandBoxState_READY {
+		return true
+	}
+	return false
+}
+
+// podFound returns whether podsandbox is found
+func PodFound(podsandboxs []*runtimeApi.PodSandbox, podId string) bool {
+	if len(podsandboxs) == 1 && podsandboxs[0].GetId() == podId {
+		return true
+	}
+	return false
 }
