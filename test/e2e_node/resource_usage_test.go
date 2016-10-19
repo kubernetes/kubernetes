@@ -94,6 +94,9 @@ var _ = framework.KubeDescribe("Resource-usage [Serial] [Slow]", func() {
 	Context("regular resource usage tracking", func() {
 		rTests := []resourceTest{
 			{
+				podsNr: 0,
+			},
+			{
 				podsNr: 10,
 			},
 			{
