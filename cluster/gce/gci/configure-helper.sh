@@ -529,9 +529,6 @@ function start-kubelet {
   if [[ -n "${EVICTION_HARD:-}" ]]; then
     flags+=" --eviction-hard=${EVICTION_HARD}"
   fi
-  if [[ "${ALLOCATE_NODE_CIDRS:-}" == "true" ]]; then
-    flags+=" --configure-cbr0=${ALLOCATE_NODE_CIDRS}"
-  fi
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     flags+=" --feature-gates=${FEATURE_GATES}"
   fi

@@ -148,7 +148,6 @@ coreos:
         --container-runtime=rkt \
         --rkt-path=/opt/rkt/rkt \
         --rkt-stage1-image=${RKT_STAGE1_IMAGE} \
-        --configure-cbr0=${KUBERNETES_CONFIGURE_CBR0} \
         --network-plugin=kubenet \
         --reconcile-cidr=true
         Restart=always
