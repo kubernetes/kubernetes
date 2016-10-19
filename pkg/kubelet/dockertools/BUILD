@@ -86,8 +86,15 @@ go_test(
         "images_test.go",
         "labels_test.go",
     ],
+    data = [
+        "fixtures/seccomp/sub/subtest",
+        "fixtures/seccomp/test",
+    ],
     library = "go_default_library",
-    tags = ["automanaged"],
+    tags = [
+        "automanaged",
+        "skip",
+    ],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
