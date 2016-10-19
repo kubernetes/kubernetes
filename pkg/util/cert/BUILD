@@ -25,6 +25,9 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["csr_test.go"],
+    data = [
+        "testdata/dontUseThisKey.pem",
+    ],
     library = "go_default_library",
     tags = ["automanaged"],
     deps = [],

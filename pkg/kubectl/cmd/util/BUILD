@@ -70,6 +70,9 @@ go_test(
         "helpers_test.go",
         "shortcut_restmapper_test.go",
     ],
+    data = [
+        "//api/swagger-spec",
+    ],
     library = "go_default_library",
     tags = ["automanaged"],
     deps = [

@@ -55,6 +55,15 @@ go_test(
         "schema_test.go",
         "validation_test.go",
     ],
+    data = [
+        "testdata/v1/invalidPod.yaml",
+        "testdata/v1/invalidPod1.json",
+        "testdata/v1/invalidPod2.json",
+        "testdata/v1/invalidPod3.json",
+        "testdata/v1/invalidPod4.yaml",
+        "testdata/v1/validPod.yaml",
+        "//api/swagger-spec",
+    ],
     library = "go_default_library",
     tags = ["automanaged"],
     deps = [
