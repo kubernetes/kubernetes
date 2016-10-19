@@ -112,7 +112,7 @@ type Config struct {
 	// same value for this field. (Numbers > 1 currently untested.)
 	MasterCount int
 
-	SecureServingInfo   *ServingInfo
+	SecureServingInfo   *SecureServingInfo
 	InsecureServingInfo *ServingInfo
 
 	// The port on PublicAddress where a read-write server will be installed.
@@ -183,17 +183,36 @@ type Config struct {
 type ServingInfo struct {
 	// BindAddress is the ip:port to serve on
 	BindAddress string
+}
+
+type SecureServingInfo struct {
+	ServingInfo
+
 	// ServerCert is the TLS cert info for serving secure traffic
-	ServerCert CertInfo
+	ServerCert GeneratableKeyCert
+	// SNICerts are named KeyCerts for serving secure traffic with SNI support.
+	SNICerts []NamedKeyCert
 	// ClientCA is the certificate bundle for all the signers that you'll recognize for incoming client certificates
 	ClientCA string
 }
 
-type CertInfo struct {
+type KeyCert struct {
 	// CertFile is a file containing a PEM-encoded certificate
 	CertFile string
 	// KeyFile is a file containing a PEM-encoded private key for the certificate specified by CertFile
 	KeyFile string
+}
+
+type NamedKeyCert struct {
+	KeyCert
+
+	// Names is a list of domain patterns: fully qualified domain names, possibly prefixed with
+	// wildcard segments.
+	Names []string
+}
+
+type GeneratableKeyCert struct {
+	KeyCert
 	// Generate indicates that the cert/key pair should be generated if its not present.
 	Generate bool
 }
@@ -253,18 +272,34 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 	}
 
 	if options.SecurePort > 0 {
-		secureServingInfo := &ServingInfo{
-			BindAddress: net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort)),
-			ServerCert: CertInfo{
-				CertFile: options.TLSCertFile,
-				KeyFile:  options.TLSPrivateKeyFile,
+		secureServingInfo := &SecureServingInfo{
+			ServingInfo: ServingInfo{
+				BindAddress: net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort)),
 			},
+			ServerCert: GeneratableKeyCert{
+				KeyCert: KeyCert{
+					CertFile: options.TLSCertFile,
+					KeyFile:  options.TLSPrivateKeyFile,
+				},
+			},
+			SNICerts: []NamedKeyCert{},
 			ClientCA: options.ClientCAFile,
 		}
 		if options.TLSCertFile == "" && options.TLSPrivateKeyFile == "" {
 			secureServingInfo.ServerCert.Generate = true
 			secureServingInfo.ServerCert.CertFile = path.Join(options.CertDirectory, "apiserver.crt")
 			secureServingInfo.ServerCert.KeyFile = path.Join(options.CertDirectory, "apiserver.key")
+		}
+
+		secureServingInfo.SNICerts = nil
+		for _, nkc := range options.SNIKeyCerts {
+			secureServingInfo.SNICerts = append(secureServingInfo.SNICerts, NamedKeyCert{
+				KeyCert: KeyCert{
+					KeyFile:  nkc.KeyFile,
+					CertFile: nkc.CertFile,
+				},
+				Names: nkc.Names,
+			})
 		}
 
 		c.SecureServingInfo = secureServingInfo

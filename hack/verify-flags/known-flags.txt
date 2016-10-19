@@ -548,6 +548,7 @@ tls-ca-file
 tls-cert-file
 tls-private-key-file
 to-version
+tls-sni-key-cert
 token-auth-file
 ttl-keys-prefix
 ttl-secs

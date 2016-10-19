@@ -18,6 +18,7 @@ package genericapiserver
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"mime"
 	"net"
@@ -31,9 +32,9 @@ import (
 	systemd "github.com/coreos/go-systemd/daemon"
 	"github.com/emicklei/go-restful"
 	"github.com/emicklei/go-restful/swagger"
+	"github.com/go-openapi/spec"
 	"github.com/golang/glog"
 
-	"github.com/go-openapi/spec"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -114,7 +115,7 @@ type GenericAPIServer struct {
 	// The registered APIs
 	HandlerContainer *genericmux.APIContainer
 
-	SecureServingInfo   *ServingInfo
+	SecureServingInfo   *SecureServingInfo
 	InsecureServingInfo *ServingInfo
 
 	// ExternalAddress is the address (hostname or IP and port) that should be used in
@@ -192,6 +193,11 @@ func (s *GenericAPIServer) Run() {
 	}
 
 	if s.SecureServingInfo != nil && s.Handler != nil {
+		namedCerts, err := getNamedCertificateMap(s.SecureServingInfo.SNICerts)
+		if err != nil {
+			glog.Fatalf("Unable to load SNI certificates: %v", err)
+		}
+
 		secureServer := &http.Server{
 			Addr:           s.SecureServingInfo.BindAddress,
 			Handler:        s.Handler,
@@ -200,7 +206,8 @@ func (s *GenericAPIServer) Run() {
 				// Can't use SSLv3 because of POODLE and BEAST
 				// Can't use TLSv1.0 because of POODLE and BEAST using CBC cipher
 				// Can't use TLSv1.1 because of RC4 cipher usage
-				MinVersion: tls.VersionTLS12,
+				MinVersion:        tls.VersionTLS12,
+				NameToCertificate: namedCerts,
 			},
 		}
 
@@ -216,7 +223,6 @@ func (s *GenericAPIServer) Run() {
 			secureServer.TLSConfig.ClientCAs = clientCAs
 			// "h2" NextProtos is necessary for enabling HTTP2 for go's 1.7 HTTP Server
 			secureServer.TLSConfig.NextProtos = []string{"h2"}
-
 		}
 
 		glog.Infof("Serving securely on %s", s.SecureServingInfo.BindAddress)
@@ -546,4 +552,41 @@ func waitForSuccessfulDial(https bool, network, address string, timeout, interva
 		return nil
 	}
 	return err
+}
+
+// getNamedCertificateMap returns a map of strings to *tls.Certificate, suitable for use in
+// tls.Config#NamedCertificates. Returns an error if any of the certs cannot be loaded.
+// Returns nil if len(namedKeyCerts) == 0
+func getNamedCertificateMap(namedKeyCerts []NamedKeyCert) (map[string]*tls.Certificate, error) {
+	if len(namedKeyCerts) == 0 {
+		return nil, nil
+	}
+	namedCerts := map[string]*tls.Certificate{}
+	for _, nkc := range namedKeyCerts {
+		cert, err := tls.LoadX509KeyPair(nkc.CertFile, nkc.KeyFile)
+		if err != nil {
+			return nil, err
+		}
+		if len(nkc.Names) > 0 {
+			for _, name := range nkc.Names {
+				namedCerts[name] = &cert
+			}
+		} else {
+			// read names from certificate common names and DNS names
+			if len(cert.Certificate) == 0 {
+				return nil, fmt.Errorf("no certificate found in %q", nkc.CertFile)
+			}
+			x509Cert, err := x509.ParseCertificate(cert.Certificate[0])
+			if err != nil {
+				return nil, fmt.Errorf("parse error for certificate in %q: %v", nkc.CertFile, err)
+			}
+			if len(x509Cert.Subject.CommonName) > 0 {
+				namedCerts[x509Cert.Subject.CommonName] = &cert
+			}
+			for _, san := range x509Cert.DNSNames {
+				namedCerts[san] = &cert
+			}
+		}
+	}
+	return namedCerts, nil
 }
