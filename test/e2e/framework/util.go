@@ -62,6 +62,7 @@ import (
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubelet/remote"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -1837,6 +1838,23 @@ func LoadClientset() (*release_1_5.Clientset, error) {
 		return nil, fmt.Errorf("error creating client: %v", err.Error())
 	}
 	return release_1_5.NewForConfig(config)
+}
+
+func loadCRIClient() (*InternalApiClient, error) {
+	rService, err := remote.NewRemoteRuntimeService(TestContext.RuntimeServiceAddr, TestContext.RuntimeServiceTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	iService, err := remote.NewRemoteImageService(TestContext.ImageServiceAddr, TestContext.ImageServiceTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	return &InternalApiClient{
+		CRIRuntimeClient: rService,
+		CRIImageClient:   iService,
+	}, nil
 }
 
 // randomSuffix provides a random string to append to pods,services,rcs.
