@@ -265,7 +265,7 @@ func (m *Master) InstallLegacyAPI(c *Config, restOptionsGetter genericapiserver.
 		}
 	}
 
-	if err := m.GenericAPIServer.InstallLegacyAPIGroup(genericapiserver.LegacyAPIPrefix, &apiGroupInfo); err != nil {
+	if err := m.GenericAPIServer.InstallLegacyAPIGroup(genericapiserver.DefaultLegacyAPIPrefix, &apiGroupInfo); err != nil {
 		glog.Fatalf("Error in registering group versions: %v", err)
 	}
 }
