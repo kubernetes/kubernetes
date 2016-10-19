@@ -202,8 +202,8 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 			}
 
 			By("Reading value under foo from member with index 2")
-			if v := pet.read(2, "foo"); v != "bar" {
-				framework.Failf("Read unexpected value %v, expected bar under key foo", v)
+			if err := pollReadWithTimeout(pet, 2, "foo", "bar"); err != nil {
+				framework.Failf("%v", err)
 			}
 		})
 
@@ -223,8 +223,8 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 			}
 
 			By("Reading value under foo from member with index 2")
-			if v := pet.read(2, "foo"); v != "bar" {
-				framework.Failf("Read unexpected value %v, expected bar under key foo", v)
+			if err := pollReadWithTimeout(pet, 2, "foo", "bar"); err != nil {
+				framework.Failf("%v", err)
 			}
 		})
 
@@ -244,8 +244,8 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 			}
 
 			By("Reading value under foo from member with index 2")
-			if v := pet.read(2, "foo"); v != "bar" {
-				framework.Failf("Read unexpected value %v, expected bar under key foo", v)
+			if err := pollReadWithTimeout(pet, 2, "foo", "bar"); err != nil {
+				framework.Failf("%v", err)
 			}
 		})
 	})
@@ -802,6 +802,18 @@ func deleteAllPetSets(c *client.Client, ns string) {
 
 func ExpectNoError(err error) {
 	Expect(err).NotTo(HaveOccurred())
+}
+
+func pollReadWithTimeout(pet petTester, petNumber int, key, expectedVal string) error {
+	return wait.PollImmediate(time.Second, timeout, func() (bool, error) {
+		val := pet.read(petNumber, key)
+		if val == "" {
+			return false, nil
+		} else if val != expectedVal {
+			return false, fmt.Errorf("Expected value %v, found %v", expectedVal, val)
+		}
+		return true, nil
+	})
 }
 
 func isInitialized(pod api.Pod) bool {
