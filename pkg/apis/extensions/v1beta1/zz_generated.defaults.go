@@ -92,6 +92,8 @@ func SetObjectDefaults_DaemonSet(in *DaemonSet) {
 				}
 			}
 		}
+		v1.SetDefaults_ResourceList(&a.Resources.Limits)
+		v1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
 			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -132,6 +134,8 @@ func SetObjectDefaults_DaemonSet(in *DaemonSet) {
 				}
 			}
 		}
+		v1.SetDefaults_ResourceList(&a.Resources.Limits)
+		v1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
 			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -212,6 +216,8 @@ func SetObjectDefaults_Deployment(in *Deployment) {
 				}
 			}
 		}
+		v1.SetDefaults_ResourceList(&a.Resources.Limits)
+		v1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
 			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -252,6 +258,8 @@ func SetObjectDefaults_Deployment(in *Deployment) {
 				}
 			}
 		}
+		v1.SetDefaults_ResourceList(&a.Resources.Limits)
+		v1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
 			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -343,6 +351,8 @@ func SetObjectDefaults_Job(in *Job) {
 				}
 			}
 		}
+		v1.SetDefaults_ResourceList(&a.Resources.Limits)
+		v1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
 			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -383,6 +393,8 @@ func SetObjectDefaults_Job(in *Job) {
 				}
 			}
 		}
+		v1.SetDefaults_ResourceList(&a.Resources.Limits)
+		v1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
 			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -474,6 +486,8 @@ func SetObjectDefaults_ReplicaSet(in *ReplicaSet) {
 				}
 			}
 		}
+		v1.SetDefaults_ResourceList(&a.Resources.Limits)
+		v1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
 			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -514,6 +528,8 @@ func SetObjectDefaults_ReplicaSet(in *ReplicaSet) {
 				}
 			}
 		}
+		v1.SetDefaults_ResourceList(&a.Resources.Limits)
+		v1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
 			v1.SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
