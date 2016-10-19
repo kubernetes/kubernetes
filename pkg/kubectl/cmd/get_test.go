@@ -34,8 +34,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
+	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/runtime/serializer/json"
@@ -91,26 +91,6 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 	return pods, svc, rc
 }
 
-func testDynamicResources() []*discovery.APIGroupResources {
-	return []*discovery.APIGroupResources{
-		{
-			Group: unversioned.APIGroup{
-				Versions: []unversioned.GroupVersionForDiscovery{
-					{Version: "v1"},
-				},
-				PreferredVersion: unversioned.GroupVersionForDiscovery{Version: "v1"},
-			},
-			VersionedResources: map[string][]unversioned.APIResource{
-				"v1": {
-					{Name: "pods", Namespaced: true, Kind: "Pod"},
-					{Name: "services", Namespaced: true, Kind: "Service"},
-					{Name: "replicationcontrollers", Namespaced: true, Kind: "ReplicationController"},
-				},
-			},
-		},
-	}
-}
-
 func testComponentStatusData() *api.ComponentStatusList {
 	good := api.ComponentStatus{
 		Conditions: []api.ComponentCondition{
@@ -140,11 +120,11 @@ func testComponentStatusData() *api.ComponentStatusList {
 
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestGetUnknownSchemaObject(t *testing.T) {
-	f, tf, codec, ns := NewTestFactory()
+	f, tf, codec, ns := cmdtesting.NewTestFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &internalType{Name: "foo"})},
+		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalType("", "", "foo"))},
 	}
 	tf.Namespace = "test"
 	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}}
@@ -155,7 +135,7 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"type", "foo"})
 
-	expected := &internalType{Name: "foo"}
+	expected := cmdtesting.NewInternalType("", "", "foo")
 	actual := tf.Printer.(*testPrinter).Objects[0]
 	if !reflect.DeepEqual(expected, actual) {
 		t.Errorf("unexpected object: %#v", actual)
@@ -186,19 +166,19 @@ func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 		"handles specific version": {
 			outputVersion:   registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 			listVersion:     registered.GroupOrDie(api.GroupName).GroupVersion.String(),
-			testtypeVersion: unlikelyGV.String(),
+			testtypeVersion: cmdtesting.UnlikelyGV.String(),
 			rcVersion:       registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 		},
 		"handles second specific version": {
 			outputVersion:   "unlikely.group/unlikelyversion",
 			listVersion:     registered.GroupOrDie(api.GroupName).GroupVersion.String(),
-			testtypeVersion: unlikelyGV.String(),
+			testtypeVersion: cmdtesting.UnlikelyGV.String(),
 			rcVersion:       registered.GroupOrDie(api.GroupName).GroupVersion.String(), // see expected behavior 3b
 		},
 		"handles common version": {
 			outputVersion:   registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 			listVersion:     registered.GroupOrDie(api.GroupName).GroupVersion.String(),
-			testtypeVersion: unlikelyGV.String(),
+			testtypeVersion: cmdtesting.UnlikelyGV.String(),
 			rcVersion:       registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 		},
 	}
@@ -212,7 +192,7 @@ func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 			}),
 		}
 
-		f, tf, codec := NewMixedFactory(regularClient)
+		f, tf, codec := cmdtesting.NewMixedFactory(regularClient)
 		negotiatedSerializer := serializer.NegotiatedSerializerWrapper(
 			runtime.SerializerInfo{Serializer: codec},
 			runtime.StreamSerializerInfo{})
@@ -220,7 +200,7 @@ func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: negotiatedSerializer,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &internalType{Name: "foo"})}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalType("", "", "foo"))}, nil
 			}),
 		}
 		tf.Namespace = "test"
@@ -257,7 +237,7 @@ func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestGetSchemaObject(t *testing.T) {
-	f, tf, _, _ := NewTestFactory()
+	f, tf, _, _ := cmdtesting.NewTestFactory()
 	tf.Mapper = testapi.Default.RESTMapper()
 	tf.Typer = api.Scheme
 	codec := testapi.Default.Codec()
@@ -283,7 +263,7 @@ func TestGetSchemaObject(t *testing.T) {
 func TestGetObjects(t *testing.T) {
 	pods, _, _ := testData()
 
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -328,7 +308,7 @@ func TestGetSortedObjects(t *testing.T) {
 		},
 	}
 
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -362,7 +342,7 @@ func TestGetSortedObjects(t *testing.T) {
 func TestGetObjectsIdentifiedByFile(t *testing.T) {
 	pods, _, _ := testData()
 
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -390,7 +370,7 @@ func TestGetObjectsIdentifiedByFile(t *testing.T) {
 func TestGetListObjects(t *testing.T) {
 	pods, _, _ := testData()
 
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -434,7 +414,7 @@ func extractResourceList(objs []runtime.Object) ([]runtime.Object, error) {
 func TestGetAllListObjects(t *testing.T) {
 	pods, _, _ := testData()
 
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -465,7 +445,7 @@ func TestGetAllListObjects(t *testing.T) {
 func TestGetListComponentStatus(t *testing.T) {
 	statuses := testComponentStatusData()
 
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -495,7 +475,7 @@ func TestGetListComponentStatus(t *testing.T) {
 func TestGetMultipleTypeObjects(t *testing.T) {
 	pods, svc, _ := testData()
 
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -535,7 +515,7 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 	pods, svc, _ := testData()
 
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -596,7 +576,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
 	pods, svc, _ := testData()
 
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -649,7 +629,7 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 		},
 	}
 
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -687,7 +667,7 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 func TestGetByNameForcesFlag(t *testing.T) {
 	pods, _, _ := testData()
 
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -780,7 +760,7 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 func TestWatchSelector(t *testing.T) {
 	pods, events := watchTestData()
 
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	podList := &api.PodList{
 		Items: pods,
@@ -829,7 +809,7 @@ func TestWatchSelector(t *testing.T) {
 func TestWatchResource(t *testing.T) {
 	pods, events := watchTestData()
 
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -868,7 +848,7 @@ func TestWatchResource(t *testing.T) {
 func TestWatchResourceIdentifiedByFile(t *testing.T) {
 	pods, events := watchTestData()
 
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -909,7 +889,7 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 func TestWatchOnlyResource(t *testing.T) {
 	pods, events := watchTestData()
 
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -948,7 +928,7 @@ func TestWatchOnlyResource(t *testing.T) {
 func TestWatchOnlyList(t *testing.T) {
 	pods, events := watchTestData()
 
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	podList := &api.PodList{
 		Items: pods,
