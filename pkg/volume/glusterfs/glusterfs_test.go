@@ -19,10 +19,13 @@ package glusterfs
 import (
 	"fmt"
 	"os"
+	"reflect"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -234,5 +237,156 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 
 	if !mounter.GetAttributes().ReadOnly {
 		t.Errorf("Expected true for mounter.IsReadOnly")
+	}
+}
+
+func TestParseClassParameters(t *testing.T) {
+	secret := api.Secret{
+		Data: map[string][]byte{
+			"data": []byte("mypassword"),
+		},
+	}
+
+	tests := []struct {
+		name         string
+		parameters   map[string]string
+		secret       *api.Secret
+		expectError  bool
+		expectConfig *provisioningConfig
+	}{
+		{
+			"password",
+			map[string]string{
+				"endpoint":    "endpointname",
+				"resturl":     "https://localhost:8080",
+				"restuser":    "admin",
+				"restuserkey": "password",
+			},
+			nil,   // secret
+			false, // expect error
+			&provisioningConfig{
+				endpoint:    "endpointname",
+				url:         "https://localhost:8080",
+				user:        "admin",
+				userKey:     "password",
+				secretValue: "password",
+			},
+		},
+		{
+			"secret",
+			map[string]string{
+				"endpoint":        "endpointname",
+				"resturl":         "https://localhost:8080",
+				"restuser":        "admin",
+				"secretname":      "mysecret",
+				"secretnamespace": "default",
+			},
+			&secret,
+			false, // expect error
+			&provisioningConfig{
+				endpoint:        "endpointname",
+				url:             "https://localhost:8080",
+				user:            "admin",
+				secretName:      "mysecret",
+				secretNamespace: "default",
+				secretValue:     "mypassword",
+			},
+		},
+		{
+			"no authentication",
+			map[string]string{
+				"endpoint":        "endpointname",
+				"resturl":         "https://localhost:8080",
+				"restauthenabled": "false",
+			},
+			&secret,
+			false, // expect error
+			&provisioningConfig{
+				endpoint: "endpointname",
+				url:      "https://localhost:8080",
+			},
+		},
+		{
+			"missing secret",
+			map[string]string{
+				"endpoint":        "endpointname",
+				"resturl":         "https://localhost:8080",
+				"secretname":      "mysecret",
+				"secretnamespace": "default",
+			},
+			nil,  // secret
+			true, // expect error
+			nil,
+		},
+		{
+			"secret with no namespace",
+			map[string]string{
+				"endpoint":   "endpointname",
+				"resturl":    "https://localhost:8080",
+				"secretname": "mysecret",
+			},
+			&secret,
+			true, // expect error
+			nil,
+		},
+		{
+			"missing url",
+			map[string]string{
+				"endpoint":    "endpointname",
+				"restuser":    "admin",
+				"restuserkey": "password",
+			},
+			nil,  // secret
+			true, // expect error
+			nil,
+		},
+		{
+			"missing endpoint",
+			map[string]string{
+				"resturl":     "https://localhost:8080",
+				"restuser":    "admin",
+				"restuserkey": "password",
+			},
+			nil,  // secret
+			true, // expect error
+			nil,
+		},
+		{
+			"unknown parameter",
+			map[string]string{
+				"unknown":     "yes",
+				"resturl":     "https://localhost:8080",
+				"restuser":    "admin",
+				"restuserkey": "password",
+			},
+			nil,  // secret
+			true, // expect error
+			nil,
+		},
+	}
+
+	for _, test := range tests {
+
+		client := &fake.Clientset{}
+		client.AddReactor("get", "secrets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+			if test.secret != nil {
+				return true, test.secret, nil
+			}
+			return true, nil, fmt.Errorf("Test %s did not set a secret", test.name)
+		})
+
+		cfg, err := parseClassParameters(test.parameters, client)
+
+		if err != nil && !test.expectError {
+			t.Errorf("Test %s got unexpected error %v", test.name, err)
+		}
+		if err == nil && test.expectError {
+			t.Errorf("test %s expected error and got none", test.name)
+		}
+		if test.expectConfig != nil {
+			if !reflect.DeepEqual(cfg, test.expectConfig) {
+				t.Errorf("Test %s returned unexpected data, expected: %+v, got: %+v", test.name, test.expectConfig, cfg)
+			}
+		}
 	}
 }

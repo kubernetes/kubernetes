@@ -41,7 +41,7 @@ import (
 
 // This file contains the controller base functionality, i.e. framework to
 // process PV/PVC added/updated/deleted events. The real binding, provisioning,
-// recycling and deleting is done in controller.go
+// recycling and deleting is done in pv_controller.go
 
 // NewPersistentVolumeController creates a new PersistentVolumeController
 func NewPersistentVolumeController(
