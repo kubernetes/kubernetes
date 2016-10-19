@@ -361,6 +361,7 @@ max-pods
 max-requests-inflight
 maximum-dead-containers
 maximum-dead-containers-per-container
+message
 mesos-authentication-principal
 mesos-authentication-provider
 mesos-authentication-secret-file
