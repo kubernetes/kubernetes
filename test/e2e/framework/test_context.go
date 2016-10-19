@@ -78,6 +78,8 @@ type TestContextType struct {
 	FeatureGates string
 	// Node e2e specific test context
 	NodeTestContextType
+	// CRI e2e specific test context
+	CRITestContextType
 
 	// Viper-only parameters.  These will in time replace all flags.
 
@@ -134,6 +136,14 @@ type CloudConfig struct {
 	Network           string
 
 	Provider cloudprovider.Interface
+}
+
+// CRITestContextType is part of TestContextType, it contains CRI client configuration.
+type CRITestContextType struct {
+	ImageServiceAddr      string
+	ImageServiceTimeout   time.Duration
+	RuntimeServiceAddr    string
+	RuntimeServiceTimeout time.Duration
 }
 
 var TestContext TestContextType
@@ -249,4 +259,12 @@ func ViperizeFlags() {
 
 	// TODO Consider wether or not we want to use overwriteFlagsWithViperConfig().
 	viper.Unmarshal(&TestContext)
+}
+
+// Register flags specific to the CRIClient e2e test suite.
+func RegisterCRIFlags() {
+	flag.StringVar(&TestContext.ImageServiceAddr, "image-service-addr", "/var/run/dockershim.sock", "image service socket for client to connect")
+	flag.DurationVar(&TestContext.ImageServiceTimeout, "image-serivce-timeout", 300*time.Second, "Timeout when trying to connect to image service")
+	flag.StringVar(&TestContext.RuntimeServiceAddr, "runtime-service-addr", "/var/run/dockershim.sock", "runtime service socket for client to connect")
+	flag.DurationVar(&TestContext.RuntimeServiceTimeout, "runtime-serivce-timeout", 300*time.Second, "Timeout when trying to connect to a runtime service")
 }

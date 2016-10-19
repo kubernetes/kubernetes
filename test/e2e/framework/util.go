@@ -62,6 +62,8 @@ import (
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
+	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/remote"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -1858,6 +1860,23 @@ func LoadClientset() (*release_1_5.Clientset, error) {
 		return nil, fmt.Errorf("error creating client: %v", err.Error())
 	}
 	return release_1_5.NewForConfig(config)
+}
+
+func loadCRIClient() (*InternalApiClient, error) {
+	rService, err := remote.NewRemoteRuntimeService(TestContext.RuntimeServiceAddr, TestContext.RuntimeServiceTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	iService, err := remote.NewRemoteImageService(TestContext.ImageServiceAddr, TestContext.ImageServiceTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	return &InternalApiClient{
+		CRIRuntimeClient: rService,
+		CRIImageClient:   iService,
+	}, nil
 }
 
 // randomSuffix provides a random string to append to pods,services,rcs.
@@ -4621,6 +4640,22 @@ func CleanupGCEResources(loadBalancerName string) (err error) {
 	hc, _ := gceCloud.GetHttpHealthCheck(loadBalancerName)
 	gceCloud.DeleteTargetPool(loadBalancerName, hc)
 	return nil
+}
+
+// PodFound returns whether PodSandbox is found
+func PodFound(podsandboxs []*runtimeApi.PodSandbox, podId string) bool {
+	if len(podsandboxs) == 1 && podsandboxs[0].GetId() == podId {
+		return true
+	}
+	return false
+}
+
+// ContainerFound returns whether containers is found
+func ContainerFound(containers []*runtimeApi.Container, containerID string) bool {
+	if len(containers) == 1 && containers[0].GetId() == containerID {
+		return true
+	}
+	return false
 }
 
 // getMaster populates the externalIP, internalIP and hostname fields of the master.
