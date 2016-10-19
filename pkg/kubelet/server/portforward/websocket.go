@@ -22,6 +22,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -60,14 +61,16 @@ func newV4Options(req *http.Request) (*v4Options, error) {
 		if len(portString) == 0 {
 			return nil, fmt.Errorf("%q is cannot be empty", api.PortHeader)
 		}
-		port, err := strconv.ParseUint(portString, 10, 16)
-		if err != nil {
-			return nil, fmt.Errorf("unable to parse %q as a port: %v", portString, err)
+		for _, p := range strings.Split(portString, ",") {
+			port, err := strconv.ParseUint(p, 10, 16)
+			if err != nil {
+				return nil, fmt.Errorf("unable to parse %q as a port: %v", portString, err)
+			}
+			if port < 1 {
+				return nil, fmt.Errorf("port %q must be > 0", portString)
+			}
+			ports = append(ports, uint16(port))
 		}
-		if port < 1 {
-			return nil, fmt.Errorf("port %q must be > 0", portString)
-		}
-		ports = append(ports, uint16(port))
 	}
 
 	return &v4Options{

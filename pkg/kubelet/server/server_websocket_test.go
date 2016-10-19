@@ -186,7 +186,8 @@ func TestServeWSPortForward(t *testing.T) {
 }
 
 func TestServeWSMultiplePortForward(t *testing.T) {
-	ports := []uint16{8000, 9000}
+	portsText := []string{"7000,8000", "9000"}
+	ports := []uint16{7000, 8000, 9000}
 	podNamespace := "other"
 	podName := "foo"
 	expectedPodName := getPodName(podName, podNamespace)
@@ -233,8 +234,8 @@ func TestServeWSMultiplePortForward(t *testing.T) {
 	}
 
 	url := fmt.Sprintf("ws://%s/portForward/%s/%s?", fw.testHTTPServer.Listener.Addr().String(), podNamespace, podName)
-	for _, port := range ports {
-		url = url + fmt.Sprintf("port=%d&", port)
+	for _, port := range portsText {
+		url = url + fmt.Sprintf("port=%s&", port)
 	}
 
 	ws, err := websocket.Dial(url, "", "http://127.0.0.1/")
