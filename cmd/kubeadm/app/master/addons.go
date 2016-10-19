@@ -43,7 +43,7 @@ func createKubeProxyPodSpec(cfg *kubeadmapi.MasterConfiguration, architecture st
 		Containers: []api.Container{{
 			Name:            kubeProxy,
 			Image:           images.GetCoreImage(images.KubeProxyImage, cfg, envParams["hyperkube_image"]),
-			Command:         append(getComponentCommand("proxy", cfg), "--kubeconfig=/run/kubeconfig"),
+			Command:         append(getProxyCommand(cfg), "--kubeconfig=/run/kubeconfig"),
 			SecurityContext: &api.SecurityContext{Privileged: &privilegedTrue},
 			VolumeMounts: []api.VolumeMount{
 				{
