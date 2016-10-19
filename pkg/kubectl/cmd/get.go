@@ -249,7 +249,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 				return fmt.Errorf("unable to output the provided object: %v", err)
 			}
 			filteredResourceCount++
-			cmdutil.PrintFilterCount(filteredResourceCount, mapping.Resource, errOut, filterOpts)
+			cmdutil.PrintFilterCount(filteredResourceCount, mapping.Resource, filterOpts)
 		}
 
 		// print watched changes
@@ -273,7 +273,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 					return false, err
 				}
 				filteredResourceCount++
-				cmdutil.PrintFilterCount(filteredResourceCount, mapping.Resource, errOut, filterOpts)
+				cmdutil.PrintFilterCount(filteredResourceCount, mapping.Resource, filterOpts)
 				return false, nil
 			})
 			return err
@@ -351,7 +351,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 				errs = append(errs, err)
 			}
 
-			cmdutil.PrintFilterCount(filteredResourceCount, res, errOut, filterOpts)
+			cmdutil.PrintFilterCount(filteredResourceCount, res, filterOpts)
 			return utilerrors.Reduce(utilerrors.Flatten(utilerrors.NewAggregate(errs)))
 		}
 
@@ -366,7 +366,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			filteredResourceCount++
 		}
 
-		cmdutil.PrintFilterCount(filteredResourceCount, res, errOut, filterOpts)
+		cmdutil.PrintFilterCount(filteredResourceCount, res, filterOpts)
 		return utilerrors.Reduce(utilerrors.Flatten(utilerrors.NewAggregate(errs)))
 	}
 
@@ -437,7 +437,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		if printer == nil || lastMapping == nil || mapping == nil || mapping.Resource != lastMapping.Resource {
 			if printer != nil {
 				w.Flush()
-				cmdutil.PrintFilterCount(filteredResourceCount, lastMapping.Resource, errOut, filterOpts)
+				cmdutil.PrintFilterCount(filteredResourceCount, lastMapping.Resource, filterOpts)
 			}
 			printer, err = f.PrinterForMapping(cmd, mapping, allNamespaces)
 			if err != nil {
@@ -495,7 +495,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	}
 	w.Flush()
 	if printer != nil && lastMapping != nil {
-		cmdutil.PrintFilterCount(filteredResourceCount, lastMapping.Resource, errOut, filterOpts)
+		cmdutil.PrintFilterCount(filteredResourceCount, lastMapping.Resource, filterOpts)
 	}
 	return utilerrors.NewAggregate(allErrs)
 }
