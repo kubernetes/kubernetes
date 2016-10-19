@@ -216,6 +216,10 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 			By("Creating foo:bar in member with index 0")
 			pet.write(0, map[string]string{"foo": "bar"})
 
+			// Wait for the write to complete to all slaves with a timeout of 100s (specified in ms).
+			By("waiting for all slaves to sync")
+			pet.waitForReplication(0, ps.Spec.Replicas - 1, 100000)
+
 			if restartCluster {
 				By("Restarting pet set " + ps.Name)
 				pst.restart(ps)
@@ -493,6 +497,11 @@ func (m *redisTester) write(petIndex int, kv map[string]string) {
 	for k, v := range kv {
 		framework.Logf(m.redisExec(fmt.Sprintf("SET %v %v", k, v), m.ps.Namespace, name))
 	}
+}
+
+func (m *redisTester) waitForReplication(petIndex, numSlaves int32, timeout int) {
+	name := fmt.Sprintf("%v-%d", m.ps.Name, petIndex)
+	framework.Logf(m.redisExec(fmt.Sprintf("WAIT %d %d", numSlaves, timeout), m.ps.Namespace, name))
 }
 
 func (m *redisTester) read(petIndex int, key string) string {
