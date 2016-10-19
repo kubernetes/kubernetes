@@ -42,6 +42,7 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation12]", fu
 	Describe("Namespace objects", func() {
 		var federationName string
 		var clusters map[string]*cluster // All clusters, keyed by cluster name
+		var nsName string
 
 		BeforeEach(func() {
 			framework.SkipUnlessFederated(f.ClientSet)
@@ -76,11 +77,13 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation12]", fu
 					Name: api.SimpleNameGenerator.GenerateName(namespacePrefix),
 				},
 			}
+			nsName = ns.Name
 			By(fmt.Sprintf("Creating namespace %s", ns.Name))
 			_, err := f.FederationClientset_1_5.Core().Namespaces().Create(&ns)
 			framework.ExpectNoError(err, "Failed to create namespace %s", ns.Name)
 
 			// Check subclusters if the namespace was created there.
+			By(fmt.Sprintf("Waiting for namespace %s to be created in all underlying clusters", ns.Name))
 			err = wait.Poll(5*time.Second, 2*time.Minute, func() (bool, error) {
 				for _, cluster := range clusters {
 					_, err := cluster.Core().Namespaces().Get(ns.Name)
@@ -95,9 +98,11 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation12]", fu
 			})
 			framework.ExpectNoError(err, "Not all namespaces created")
 
+			By(fmt.Sprintf("Deleting namespace %s", ns.Name))
 			deleteAllTestNamespaces(
 				f.FederationClientset_1_5.Core().Namespaces().List,
 				f.FederationClientset_1_5.Core().Namespaces().Delete)
+			By(fmt.Sprintf("Verifying that namespace %s was deleted from all underlying clusters", ns.Name))
 			// Verify that the namespace was deleted from all underlying clusters as well.
 			for clusterName, clusterClientset := range clusters {
 				_, err := clusterClientset.Core().Namespaces().Get(ns.Name)
@@ -105,6 +110,7 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation12]", fu
 					framework.Failf("expected NotFound error for namespace %s in cluster %s, got error: %v", ns.Name, clusterName, err)
 				}
 			}
+			By(fmt.Sprintf("Verified that deletion succeeded"))
 		})
 	})
 })

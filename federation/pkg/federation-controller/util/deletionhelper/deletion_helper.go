@@ -33,7 +33,7 @@ import (
 )
 
 const (
-	FinalizerDeleteFederatedDependents string = "delete-federated-dependents"
+	FinalizerDeleteFederatedDependents string = "federation.kubernetes.io/delete-federated-dependents"
 )
 
 type HasFinalizerFunc func(runtime.Object, string) bool
