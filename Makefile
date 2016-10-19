@@ -179,6 +179,14 @@ test-e2e: ginkgo generated_files
 test-e2e-node: ginkgo generated_files
 	hack/make-rules/test-e2e-node.sh
 
+# Build and run CRI end-to-end tests.
+#
+# Example:
+#   make test-e2e-cri
+.PHONY: test-e2e-cri
+test-e2e-cri: ginkgo
+	hack/make-rules/test-e2e-cri.sh
+
 # Build and run cmdline tests.
 #
 # Example:

@@ -37,7 +37,7 @@ import (
 // node e2e test.
 var ImageWhiteList sets.String
 
-// Convenience method for getting a pod client interface in the framework's namespace,
+// Convenient method for getting a pod client interface in the framework's namespace,
 // possibly applying test-suite specific transformations to the pod spec, e.g. for
 // node e2e pod scheduling.
 func (f *Framework) PodClient() *PodClient {
