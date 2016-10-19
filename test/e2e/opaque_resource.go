@@ -17,287 +17,357 @@ limitations under the License.
 package e2e
 
 import (
-	"encoding/json"
 	"fmt"
+	"strings"
+	"sync"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/system"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	. "github.com/onsi/gomega/types"
 )
-
-var opaqueResName api.ResourceName
 
 var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", func() {
 	f := framework.NewDefaultFramework("opaque-resource")
-	opaqueResName = api.OpaqueIntResourceName("foo")
+	opaqueResName := api.OpaqueIntResourceName("foo")
 	var node *api.Node
 
-	// Custom matcher to validate pod schedulability.
-	beScheduled := func() GomegaMatcher { return &scheduledMatcher{f} }
-	notBeScheduled := func() GomegaMatcher { return &notScheduledMatcher{f} }
-
 	BeforeEach(func() {
-		node = refresh(f, node)
-		removeOpaqueRes(f, node)
-		node = refresh(f, node)
+		if node == nil {
+			// Priming invocation; select the first non-master node.
+			nodes, err := f.ClientSet.Core().Nodes().List(api.ListOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			for _, n := range nodes.Items {
+				if !system.IsMasterNode(&n) {
+					node = &n
+					break
+				}
+			}
+			if node == nil {
+				Fail("unable to select a non-master node")
+			}
+		}
+
+		removeOpaqueResource(f, node.Name, opaqueResName)
+		addOpaqueResource(f, node.Name, opaqueResName)
 	})
 
-	It("should should patch node capacity and verify allocatable is updated following kubelet sync.", func() {
-		By("Verifying the advertised capacity and allocatable do not contain opaque resource 'foo'")
-		Expect(node.Status.Capacity).NotTo(HaveKey(opaqueResName))
-		Expect(node.Status.Allocatable).NotTo(HaveKey(opaqueResName))
+	It("should not break pods that do not consume opaque integer resources.", func() {
+		By("Creating a vanilla pod")
+		requests := api.ResourceList{api.ResourceCPU: resource.MustParse("0.1")}
+		limits := api.ResourceList{api.ResourceCPU: resource.MustParse("0.2")}
+		pod := newTestPod(f, "without-oir", requests, limits)
 
-		By("Patching node capacity to add an opaque integer resource")
-		// Use the client to patch node capacity, adding opaque "foo" resource.
-		patch := []byte(`[{"op": "add", "path": "/status/capacity/pod.alpha.kubernetes.io~1opaque-int-resource-foo", "value": "5"}]`)
-		f.Client.Patch(api.JSONPatchType).Resource("nodes").Name(node.Name).SubResource("status").Body(patch).Do()
-
-		By("Watching node status to verify the advertised opaque resource is eventually present in capacity")
-		awaitNodePredicate(f.Client, node, func(n *api.Node) bool {
-			rQuant, found := n.Status.Capacity[opaqueResName]
-			return found && rQuant.MilliValue() == int64(5000)
-		})
-
-		By("Watching node status to verify the advertised opaque resource is eventually present in allocatable")
-		awaitNodePredicate(f.Client, node, func(n *api.Node) bool {
-			rQuant := n.Status.Allocatable[opaqueResName]
-			return rQuant.MilliValue() == int64(5000)
-		})
+		By("Observing an event that indicates the pod was scheduled")
+		action := func() error {
+			_, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
+			return err
+		}
+		predicate := func(e *api.Event) bool {
+			return e.Type == api.EventTypeNormal &&
+				e.Reason == "Scheduled" &&
+				// Here we don't check for the bound node name since it can land on
+				// any one (this pod doesn't require any of the opaque resource.)
+				strings.Contains(e.Message, fmt.Sprintf("Successfully assigned %v", pod.Name))
+		}
+		success, err := observeEventAfterAction(f, predicate, action)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(success).To(Equal(true))
 	})
 
-	Context("With opaque resources already advertised", func() {
-		BeforeEach(func() {
-			node = refresh(f, node)
-			// Use the client to patch node capacity, adding opaque "foo" resource.
-			patch := []byte(`[{"op": "add", "path": "/status/capacity/pod.alpha.kubernetes.io~1opaque-int-resource-foo", "value": "5"}]`)
-			f.Client.Patch(api.JSONPatchType).Resource("nodes").Name(node.Name).SubResource("status").Body(patch).Do()
-			awaitNodePredicate(f.Client, node, func(n *api.Node) bool {
-				rQuant, found := n.Status.Allocatable[opaqueResName]
-				return found && rQuant.MilliValue() == int64(5000)
-			})
-			node = refresh(f, node)
-		})
+	It("should schedule pods that do consume opaque integer resources.", func() {
+		By("Creating a pod that requires less of the opaque resource than is allocatable on a node.")
+		requests := api.ResourceList{
+			api.ResourceCPU: resource.MustParse("0.1"),
+			opaqueResName:   resource.MustParse("1"),
+		}
+		limits := api.ResourceList{
+			api.ResourceCPU: resource.MustParse("0.2"),
+			opaqueResName:   resource.MustParse("2"),
+		}
+		pod := newTestPod(f, "min-oir", requests, limits)
 
-		It("should not break pods that do not consume opaque integer resources.", func() {
-			By("Verifying that a vanilla pod can still be scheduled")
-			requests := api.ResourceList{api.ResourceCPU: resource.MustParse("0.1")}
-			limits := api.ResourceList{api.ResourceCPU: resource.MustParse("0.2")}
-			pod, err := f.Client.Pods(f.Namespace.Name).Create(newTestPod(f, "without-oir", requests, limits))
-			Expect(err).NotTo(HaveOccurred())
-			Expect(pod).To(beScheduled())
-		})
+		By("Observing an event that indicates the pod was scheduled")
+		action := func() error {
+			_, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
+			return err
+		}
+		predicate := func(e *api.Event) bool {
+			return e.Type == api.EventTypeNormal &&
+				e.Reason == "Scheduled" &&
+				strings.Contains(e.Message, fmt.Sprintf("Successfully assigned %v to %v", pod.Name, node.Name))
+		}
+		success, err := observeEventAfterAction(f, predicate, action)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(success).To(Equal(true))
+	})
 
-		It("should schedule pods that do consume opaque integer resources.", func() {
-			By("Creating a pod that requires less of the opaque resource than is allocatable on a node.")
-			requests := api.ResourceList{
-				api.ResourceCPU: resource.MustParse("0.1"),
-				opaqueResName:   resource.MustParse("1"),
-			}
-			limits := api.ResourceList{
-				api.ResourceCPU: resource.MustParse("0.2"),
-				opaqueResName:   resource.MustParse("2"),
-			}
-			pod, err := f.Client.Pods(f.Namespace.Name).Create(newTestPod(f, "min-oir", requests, limits))
-			Expect(err).NotTo(HaveOccurred())
-			Expect(pod).To(beScheduled())
-		})
+	It("should not schedule pods that exceed the available amount of opaque integer resource.", func() {
+		By("Creating a pod that requires more of the opaque resource than is allocatable on any node")
+		requests := api.ResourceList{opaqueResName: resource.MustParse("6")}
+		limits := api.ResourceList{}
 
-		It("should not schedule pods that exceed the available amount of opaque integer resource.", func() {
-			By("Creating a pod that requires more of the opaque resource than is allocatable on any node")
-			requests := api.ResourceList{opaqueResName: resource.MustParse("6")}
-			limits := api.ResourceList{}
-			pod, err := f.Client.Pods(f.Namespace.Name).Create(newTestPod(f, "over-max-oir", requests, limits))
-			Expect(err).NotTo(HaveOccurred())
-			Expect(pod).To(notBeScheduled())
-		})
+		By("Observing an event that indicates the pod was not scheduled")
+		action := func() error {
+			_, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(newTestPod(f, "over-max-oir", requests, limits))
+			return err
+		}
+		predicate := func(e *api.Event) bool {
+			return e.Type == "Warning" &&
+				e.Reason == "FailedScheduling" &&
+				strings.Contains(e.Message, "failed to fit in any node")
+		}
+		success, err := observeEventAfterAction(f, predicate, action)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(success).To(Equal(true))
+	})
 
-		It("should account opaque integer resources in pods with multiple containers.", func() {
-			By("Creating a pod with two containers that together require less of the opaque resource than is allocatable on a node")
-			requests := api.ResourceList{opaqueResName: resource.MustParse("1")}
-			limits := api.ResourceList{}
-			// This pod consumes 2 "foo" resources.
-			pod := &api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Name: "mult-container-oir",
-				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Name:  "pause",
-							Image: framework.GetPauseImageName(f.Client),
-							Resources: api.ResourceRequirements{
-								Requests: requests,
-								Limits:   limits,
-							},
+	It("should account opaque integer resources in pods with multiple containers.", func() {
+		By("Creating a pod with two containers that together require less of the opaque resource than is allocatable on a node")
+		requests := api.ResourceList{opaqueResName: resource.MustParse("1")}
+		limits := api.ResourceList{}
+		image := framework.GetPauseImageName(f.ClientSet)
+		// This pod consumes 2 "foo" resources.
+		pod := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name: "mult-container-oir",
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "pause",
+						Image: image,
+						Resources: api.ResourceRequirements{
+							Requests: requests,
+							Limits:   limits,
 						},
-						{
-							Name:  "pause-sidecar",
-							Image: framework.GetPauseImageName(f.Client),
-							Resources: api.ResourceRequirements{
-								Requests: requests,
-								Limits:   limits,
-							},
+					},
+					{
+						Name:  "pause-sidecar",
+						Image: image,
+						Resources: api.ResourceRequirements{
+							Requests: requests,
+							Limits:   limits,
 						},
 					},
 				},
-			}
-			pod, err := f.Client.Pods(f.Namespace.Name).Create(pod)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(pod).To(beScheduled())
+			},
+		}
 
-			By("Creating a pod with two containers that together require more of the opaque resource than is allotable on any node")
-			requests = api.ResourceList{opaqueResName: resource.MustParse("3")}
-			limits = api.ResourceList{}
-			// This pod consumes 6 "foo" resources.
-			pod = &api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Name: "mult-container-over-max-oir",
-				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Name:  "pause",
-							Image: framework.GetPauseImageName(f.Client),
-							Resources: api.ResourceRequirements{
-								Requests: requests,
-								Limits:   limits,
-							},
+		By("Observing an event that indicates the pod was scheduled")
+		action := func() error {
+			_, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
+			return err
+		}
+		predicate := func(e *api.Event) bool {
+			return e.Type == api.EventTypeNormal &&
+				e.Reason == "Scheduled" &&
+				strings.Contains(e.Message, fmt.Sprintf("Successfully assigned %v to %v", pod.Name, node.Name))
+		}
+		success, err := observeEventAfterAction(f, predicate, action)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(success).To(Equal(true))
+
+		By("Creating a pod with two containers that together require more of the opaque resource than is allotable on any node")
+		requests = api.ResourceList{opaqueResName: resource.MustParse("3")}
+		limits = api.ResourceList{}
+		// This pod consumes 6 "foo" resources.
+		pod = &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name: "mult-container-over-max-oir",
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "pause",
+						Image: image,
+						Resources: api.ResourceRequirements{
+							Requests: requests,
+							Limits:   limits,
 						},
-						{
-							Name:  "pause-sidecar",
-							Image: framework.GetPauseImageName(f.Client),
-							Resources: api.ResourceRequirements{
-								Requests: requests,
-								Limits:   limits,
-							},
+					},
+					{
+						Name:  "pause-sidecar",
+						Image: image,
+						Resources: api.ResourceRequirements{
+							Requests: requests,
+							Limits:   limits,
 						},
 					},
 				},
-			}
-			pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(pod).To(notBeScheduled())
-		})
+			},
+		}
+
+		By("Observing an event that indicates the pod was not scheduled")
+		action = func() error {
+			_, err = f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
+			return err
+		}
+		predicate = func(e *api.Event) bool {
+			return e.Type == "Warning" &&
+				e.Reason == "FailedScheduling" &&
+				strings.Contains(e.Message, "failed to fit in any node")
+		}
+		success, err = observeEventAfterAction(f, predicate, action)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(success).To(Equal(true))
 	})
 })
 
-// Returns the current version of the supplied node. If `old` is nil, returns
-// any non-master node.
-func refresh(f *framework.Framework, old *api.Node) *api.Node {
-	if old == nil {
-		// Priming invocation; select the first non-master node.
-		nodes, err := f.Client.Nodes().List(api.ListOptions{})
-		Expect(err).NotTo(HaveOccurred())
-		for _, n := range nodes.Items {
-			if !system.IsMasterNode(&n) {
-				return &n
-			}
-		}
-		Fail("unable to select a non-master node")
-		return nil
+// Adds the opaque resource to a node.
+func addOpaqueResource(f *framework.Framework, nodeName string, opaqueResName api.ResourceName) {
+	action := func() error {
+		patch := []byte(fmt.Sprintf(`[{"op": "add", "path": "/status/capacity/%s", "value": "5"}]`, escapeForJSONPatch(opaqueResName)))
+		return f.ClientSet.Core().RESTClient().Patch(api.JSONPatchType).Resource("nodes").Name(nodeName).SubResource("status").Body(patch).Do().Error()
+	}
+	predicate := func(n *api.Node) bool {
+		capacity, foundCap := n.Status.Capacity[opaqueResName]
+		allocatable, foundAlloc := n.Status.Allocatable[opaqueResName]
+		return foundCap && capacity.MilliValue() == int64(5000) &&
+			foundAlloc && allocatable.MilliValue() == int64(5000)
+	}
+	success, err := observeNodeUpdateAfterAction(f, nodeName, predicate, action)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(success).To(Equal(true))
+}
+
+// Removes the opaque resource from a node.
+func removeOpaqueResource(f *framework.Framework, nodeName string, opaqueResName api.ResourceName) {
+	action := func() error {
+		patch := []byte(fmt.Sprintf(`[{"op": "remove", "path": "/status/capacity/%s"}]`, escapeForJSONPatch(opaqueResName)))
+		f.ClientSet.Core().RESTClient().Patch(api.JSONPatchType).Resource("nodes").Name(nodeName).SubResource("status").Body(patch).Do()
+		return nil // Ignore error -- the opaque resource may not exist.
+	}
+	predicate := func(n *api.Node) bool {
+		_, foundCap := n.Status.Capacity[opaqueResName]
+		_, foundAlloc := n.Status.Allocatable[opaqueResName]
+		return !foundCap && !foundAlloc
+	}
+	success, err := observeNodeUpdateAfterAction(f, nodeName, predicate, action)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(success).To(Equal(true))
+}
+
+func escapeForJSONPatch(resName api.ResourceName) string {
+	// Escape forward slashes in the resource name per the JSON Pointer spec.
+	// See https://tools.ietf.org/html/rfc6901#section-3
+	return strings.Replace(string(resName), "/", "~1", -1)
+}
+
+// Returns true if an node update matching the predicate was emitted from the
+// system after performing the supplied action.
+func observeNodeUpdateAfterAction(f *framework.Framework, nodeName string, nodePredicate func(*api.Node) bool, action func() error) (bool, error) {
+	observedMatchingNode := false
+	nodeSelector := fields.OneTermEqualSelector("metadata.name", nodeName)
+	informerStartedChan := make(chan struct{})
+	var informerStartedGuard sync.Once
+
+	_, controller := cache.NewInformer(
+		&cache.ListWatch{
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				options.FieldSelector = nodeSelector
+				ls, err := f.ClientSet.Core().Nodes().List(options)
+				return ls, err
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				options.FieldSelector = nodeSelector
+				w, err := f.ClientSet.Core().Nodes().Watch(options)
+				// Signal parent goroutine that watching has begun.
+				informerStartedGuard.Do(func() { close(informerStartedChan) })
+				return w, err
+			},
+		},
+		&api.Node{},
+		0,
+		cache.ResourceEventHandlerFuncs{
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				n, ok := newObj.(*api.Node)
+				Expect(ok).To(Equal(true))
+				if nodePredicate(n) {
+					observedMatchingNode = true
+				}
+			},
+		},
+	)
+
+	// Start the informer and block this goroutine waiting for the started signal.
+	informerStopChan := make(chan struct{})
+	defer func() { close(informerStopChan) }()
+	go controller.Run(informerStopChan)
+	<-informerStartedChan
+
+	// Invoke the action function.
+	err := action()
+	if err != nil {
+		return false, err
 	}
 
-	// Get the node that has the same name as the argument.
-	n, err := f.Client.Nodes().Get(old.Name)
-	Expect(err).NotTo(HaveOccurred())
-	return n
-}
-
-// Waits for the supplied predicate to become true for the supplied node.
-func awaitNodePredicate(c *unversioned.Client, node *api.Node, p func(*api.Node) bool) {
-	// Allocatable is updated by the kubelet on next sync following the above
-	// patch operation. Wait up 20s polling every 2s (default interval: 10s).
-	timeout := "20s"
-	pollInterval := "2s"
-	Eventually(func() bool {
-		n, e := c.Nodes().Get(node.Name)
-		if e != nil {
-			return false
-		}
-		return p(n)
-	}, timeout, pollInterval).Should(BeTrue())
-}
-
-// Removes the "foo" resources from the supplied node.
-func removeOpaqueRes(f *framework.Framework, n *api.Node) {
-	// Use the client to patch node capacity, removing foo resource.
-	patch := []byte(`[{"op": "remove", "path": "/status/capacity/pod.alpha.kubernetes.io~1opaque-int-resource-foo"}]`)
-	f.Client.Patch(api.JSONPatchType).Resource("nodes").Name(n.Name).SubResource("status").Body(patch).Do()
-	awaitNodePredicate(f.Client, n, func(n *api.Node) bool {
-		_, exists := n.Status.Allocatable[opaqueResName]
-		return !exists
-	})
-}
-
-type scheduledMatcher struct{ f *framework.Framework }
-
-func (m *scheduledMatcher) Match(actual interface{}) (success bool, err error) {
-	err = m.f.WaitForPodRunning(actual.(*api.Pod).Name)
-	success = err == nil
-	return
-}
-
-func (m *scheduledMatcher) FailureMessage(actual interface{}) (message string) {
-	pod := actual.(*api.Pod)
-	podJSON, runningPodJSON := podErrorJSON(m.f, pod)
-	return fmt.Sprintf("Expected pod [%s] to be scheduled\n%v\n\nRunning pods are:\n\n%s", pod.Name, string(podJSON), string(runningPodJSON))
-}
-
-func (m *scheduledMatcher) NegatedFailureMessage(actual interface{}) (message string) {
-	pod := actual.(*api.Pod)
-	podJSON, runningPodJSON := podErrorJSON(m.f, pod)
-	return fmt.Sprintf("Expected pod [%s] not to be scheduled\n%v\n\nRunning pods are:\n\n%s", pod.Name, string(podJSON), string(runningPodJSON))
-}
-
-type notScheduledMatcher struct{ f *framework.Framework }
-
-func (m *notScheduledMatcher) Match(actual interface{}) (success bool, err error) {
-	pod := actual.(*api.Pod)
-	// Wait up 1 minute polling every 5 seconds.
-	timeout := time.Minute
-	interval := 5 * time.Second
-	err = wait.Poll(interval, timeout, func() (done bool, err error) {
-		p, err := m.f.Client.Pods(m.f.Namespace.Name).Get(pod.Name)
-		if err != nil {
-			return false, nil
-		}
-		// Return true if the unschedulable condition is present.
-		for _, cond := range p.Status.Conditions {
-			if cond.Reason == "Unschedulable" {
-				return true, nil
-			}
-		}
-		return false, nil
+	// Poll whether the informer has found a matching node update with a timeout.
+	// Wait up 2 minutes polling every second.
+	timeout := 2 * time.Minute
+	interval := 1 * time.Second
+	err = wait.Poll(interval, timeout, func() (bool, error) {
+		return observedMatchingNode, nil
 	})
 	return err == nil, err
 }
 
-func (m *notScheduledMatcher) FailureMessage(actual interface{}) (message string) {
-	pod := actual.(*api.Pod)
-	podJSON, runningPodJSON := podErrorJSON(m.f, pod)
-	return fmt.Sprintf("Expected pod [%s] not to be scheduled\n%v\n\nRunning pods are:\n\n%s", pod.Name, string(podJSON), string(runningPodJSON))
-}
+// Returns true if an event matching the predicate was emitted from the system
+// after performing the supplied action.
+func observeEventAfterAction(f *framework.Framework, eventPredicate func(*api.Event) bool, action func() error) (bool, error) {
+	observedMatchingEvent := false
 
-func (m *notScheduledMatcher) NegatedFailureMessage(actual interface{}) (message string) {
-	pod := actual.(*api.Pod)
-	podJSON, runningPodJSON := podErrorJSON(m.f, pod)
-	return fmt.Sprintf("Expected pod [%s] to be scheduled\n%v\n\nRunning pods are:\n\n%s", pod.Name, string(podJSON), string(runningPodJSON))
-}
+	// Create an informer to list/watch events from the test framework namespace.
+	_, controller := cache.NewInformer(
+		&cache.ListWatch{
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				ls, err := f.ClientSet.Core().Events(f.Namespace.Name).List(options)
+				return ls, err
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				w, err := f.ClientSet.Core().Events(f.Namespace.Name).Watch(options)
+				return w, err
+			},
+		},
+		&api.Event{},
+		0,
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				e, ok := obj.(*api.Event)
+				By(fmt.Sprintf("Considering event: \nType = [%s], Reason = [%s], Message = [%s]", e.Type, e.Reason, e.Message))
+				Expect(ok).To(Equal(true))
+				if ok && eventPredicate(e) {
+					observedMatchingEvent = true
+				}
+			},
+		},
+	)
 
-func podErrorJSON(f *framework.Framework, pod *api.Pod) (podJSON []byte, runningPodJSON []byte) {
-	podJSON, err := json.MarshalIndent(pod, "", "  ")
-	runningPodJSON = []byte{}
-	allPods, err := f.Client.Pods(f.Namespace.Name).List(api.ListOptions{})
-	if err == nil {
-		runningPodJSON, _ = json.MarshalIndent(allPods.Items, "", "  ")
+	informerStopChan := make(chan struct{})
+	defer func() { close(informerStopChan) }()
+	go controller.Run(informerStopChan)
+
+	// Invoke the action function.
+	err := action()
+	if err != nil {
+		return false, err
 	}
-	return
+
+	// Poll whether the informer has found a matching event with a timeout.
+	// Wait up 2 minutes polling every second.
+	timeout := 2 * time.Minute
+	interval := 1 * time.Second
+	err = wait.Poll(interval, timeout, func() (bool, error) {
+		return observedMatchingEvent, nil
+	})
+	return err == nil, err
 }
