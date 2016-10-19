@@ -74,12 +74,6 @@ var (
 	// However, it can be modified to avoid periodic resync to break the
 	// TCP connection.
 	minWatchTimeout = 5 * time.Minute
-	// If we are within 'forceResyncThreshold' from the next planned resync
-	// and are just before issuing Watch(), resync will be forced now.
-	forceResyncThreshold = 3 * time.Second
-	// We try to set timeouts for Watch() so that we will finish about
-	// than 'timeoutThreshold' from next planned periodic resync.
-	timeoutThreshold = 1 * time.Second
 )
 
 // NewNamespaceKeyedIndexerAndReflector creates an Indexer and a Reflector
