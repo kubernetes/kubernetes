@@ -24,9 +24,20 @@ go_library(
     ],
 )
 
+filegroup(
+    name = "example_policy",
+    testonly = True,
+    srcs = [
+        "example_policy_file.jsonl",
+    ],
+)
+
 go_test(
     name = "go_default_test",
     srcs = ["abac_test.go"],
+    data = [
+        ":example_policy",
+    ],
     library = "go_default_library",
     tags = ["automanaged"],
     deps = [

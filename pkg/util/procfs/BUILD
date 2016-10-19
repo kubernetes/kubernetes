@@ -29,6 +29,7 @@ go_test(
     name = "go_default_test",
     srcs = ["procfs_linux_test.go"],
     library = "go_default_library",
+    local = 1,
     tags = ["automanaged"],
     deps = ["//vendor:github.com/stretchr/testify/assert"],
 )
