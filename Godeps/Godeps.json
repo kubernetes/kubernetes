@@ -323,6 +323,11 @@
 			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
 		},
 		{
+			"ImportPath": "github.com/cloudflare/cfssl/initca",
+			"Comment": "1.2.0",
+			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
+		},
+		{
 			"ImportPath": "github.com/cloudflare/cfssl/log",
 			"Comment": "1.2.0",
 			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
