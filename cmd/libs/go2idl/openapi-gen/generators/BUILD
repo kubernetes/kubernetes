@@ -28,7 +28,10 @@ go_test(
     name = "go_default_test",
     srcs = ["openapi_test.go"],
     library = "go_default_library",
-    tags = ["automanaged"],
+    tags = [
+        "automanaged",
+        "skip",
+    ],
     deps = [
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:k8s.io/gengo/generator",

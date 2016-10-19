@@ -148,8 +148,15 @@ go_test(
         "top_pod_test.go",
         "top_test.go",
     ],
+    data = [
+        "//examples:config",
+        "//test/fixtures",
+    ],
     library = "go_default_library",
-    tags = ["automanaged"],
+    tags = [
+        "automanaged",
+        "skip",
+    ],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/annotations:go_default_library",

@@ -28,7 +28,10 @@ go_test(
     name = "go_default_test",
     srcs = ["kubelet_client_test.go"],
     library = "go_default_library",
-    tags = ["automanaged"],
+    tags = [
+        "automanaged",
+        "skip",
+    ],
     deps = [
         "//pkg/client/clientset_generated/internalclientset/typed/core/unversioned:go_default_library",
         "//pkg/client/restclient:go_default_library",
