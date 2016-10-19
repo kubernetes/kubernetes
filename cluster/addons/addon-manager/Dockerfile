@@ -21,7 +21,6 @@ CROSS_BUILD_COPY qemu-ARCH-static /usr/bin/
 RUN pip install pyyaml
 
 ADD kube-addons.sh /opt/
-ADD kube-addon-update.sh /opt/
 ADD namespace.yaml /opt/
 ADD kubectl /usr/local/bin/
 
