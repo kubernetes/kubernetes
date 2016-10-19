@@ -59,8 +59,11 @@ import (
 )
 
 const (
-	// LegacyAPIPrefix is where the the legacy APIs will be located
-	LegacyAPIPrefix = "/api"
+	// DefaultLegacyAPIPrefix is where the the legacy APIs will be located.
+	DefaultLegacyAPIPrefix = "/api"
+
+	// APIGroupPrefix is where non-legacy API group will be located.
+	APIGroupPrefix = "/apis"
 )
 
 // Config is a structure used to configure a GenericAPIServer.
@@ -206,7 +209,7 @@ func NewConfig() *Config {
 		ServiceReadWritePort:   443,
 		RequestContextMapper:   api.NewRequestContextMapper(),
 		BuildHandlerChainsFunc: DefaultBuildHandlerChain,
-		LegacyAPIGroupPrefixes: sets.NewString(LegacyAPIPrefix),
+		LegacyAPIGroupPrefixes: sets.NewString(DefaultLegacyAPIPrefix),
 
 		EnableIndex:          true,
 		EnableSwaggerSupport: true,
@@ -275,7 +278,6 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 		c.InsecureServingInfo = insecureServingInfo
 	}
 
-	c.APIGroupPrefix = options.APIGroupPrefix
 	c.CorsAllowedOriginList = options.CorsAllowedOriginList
 	c.EnableGarbageCollection = options.EnableGarbageCollection
 	c.EnableProfiling = options.EnableProfiling
@@ -373,7 +375,6 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 	s := &GenericAPIServer{
 		ServiceClusterIPRange:  c.ServiceClusterIPRange,
 		LoopbackClientConfig:   c.LoopbackClientConfig,
-		apiPrefix:              c.APIGroupPrefix,
 		legacyAPIGroupPrefixes: c.LegacyAPIGroupPrefixes,
 		admissionControl:       c.AdmissionControl,
 		requestContextMapper:   c.RequestContextMapper,
@@ -522,8 +523,8 @@ func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
 }
 
 func NewRequestInfoResolver(c *Config) *request.RequestInfoFactory {
-	apiPrefixes := sets.NewString(strings.Trim(c.APIGroupPrefix, "/")) // all possible API prefixes
-	legacyAPIPrefixes := sets.String{}                                 // APIPrefixes that won't have groups (legacy)
+	apiPrefixes := sets.NewString(strings.Trim(APIGroupPrefix, "/")) // all possible API prefixes
+	legacyAPIPrefixes := sets.String{}                               // APIPrefixes that won't have groups (legacy)
 	for legacyAPIPrefix := range c.LegacyAPIGroupPrefixes {
 		apiPrefixes.Insert(strings.Trim(legacyAPIPrefix, "/"))
 		legacyAPIPrefixes.Insert(strings.Trim(legacyAPIPrefix, "/"))
