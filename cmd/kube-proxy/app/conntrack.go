@@ -34,7 +34,7 @@ type Conntracker interface {
 
 type realConntracker struct{}
 
-var readOnlySysFSError = errors.New("ReadOnlySysFS")
+var readOnlySysFSError = errors.New("readOnlySysFS")
 
 func (realConntracker) SetMax(max int) error {
 	glog.Infof("Setting nf_conntrack_max to %d", max)
