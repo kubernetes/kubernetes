@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 const (
@@ -267,7 +268,7 @@ var _ = framework.KubeDescribe("Services", func() {
 			Expect(err).NotTo(HaveOccurred())
 		}()
 
-		// Waiting for service to expose endpoint
+		// Waiting for service to expose endpoint.
 		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{serverPodName: {servicePort}})
 
 		By("Retrieve sourceip from a pod on the same node")
@@ -1101,8 +1102,6 @@ var _ = framework.KubeDescribe("Services", func() {
 		jig.SanityCheckService(svc, api.ServiceTypeLoadBalancer)
 		svcTcpPort := int(svc.Spec.Ports[0].Port)
 		framework.Logf("service port : %d", svcTcpPort)
-		tcpNodePort := int(svc.Spec.Ports[0].NodePort)
-		framework.Logf("TCP node port: %d", tcpNodePort)
 		ingressIP := getIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 		framework.Logf("TCP load balancer: %s", ingressIP)
 		healthCheckNodePort := int(service.GetServiceHealthCheckNodePort(svc))
@@ -1110,18 +1109,12 @@ var _ = framework.KubeDescribe("Services", func() {
 		if healthCheckNodePort == 0 {
 			framework.Failf("Service HealthCheck NodePort was not allocated")
 		}
-		nodeIP := pickNodeIP(jig.Client)
-		By("hitting the TCP service's NodePort on " + nodeIP + ":" + fmt.Sprintf("%d", tcpNodePort))
-		jig.TestReachableHTTP(nodeIP, tcpNodePort, kubeProxyLagTimeout)
+		// TODO(33957): test localOnly nodePort Services.
 		By("hitting the TCP service's service port, via its external VIP " + ingressIP + ":" + fmt.Sprintf("%d", svcTcpPort))
 		jig.TestReachableHTTP(ingressIP, svcTcpPort, kubeProxyLagTimeout)
-		By("reading clientIP using the TCP service's NodePort")
-		content := jig.GetHTTPContent(nodeIP, tcpNodePort, kubeProxyLagTimeout, "/clientip")
-		clientIP := content.String()
-		framework.Logf("ClientIP detected by target pod using NodePort is %s", clientIP)
 		By("reading clientIP using the TCP service's service port via its external VIP")
-		content = jig.GetHTTPContent(ingressIP, svcTcpPort, kubeProxyLagTimeout, "/clientip")
-		clientIP = content.String()
+		content := jig.GetHTTPContent(ingressIP, svcTcpPort, kubeProxyLagTimeout, "/clientip")
+		clientIP := content.String()
 		framework.Logf("ClientIP detected by target pod using VIP:SvcPort is %s", clientIP)
 		By("checking if Source IP is preserved")
 		if strings.HasPrefix(clientIP, "10.") {
@@ -1612,7 +1605,7 @@ func startServeHostnameService(c *client.Client, ns, name string, port, replicas
 
 	var createdPods []*api.Pod
 	maxContainerFailures := 0
-	config := framework.RCConfig{
+	config := testutils.RCConfig{
 		Client:               c,
 		Image:                "gcr.io/google_containers/serve_hostname:v1.4",
 		Name:                 name,
@@ -2073,7 +2066,7 @@ func (j *ServiceTestJig) newRCTemplate(namespace string) *api.ReplicationControl
 					Containers: []api.Container{
 						{
 							Name:  "netexec",
-							Image: "gcr.io/google_containers/netexec:1.6",
+							Image: "gcr.io/google_containers/netexec:1.7",
 							Args:  []string{"--http-port=80", "--udp-port=80"},
 							ReadinessProbe: &api.Probe{
 								PeriodSeconds: 3,
@@ -2332,11 +2325,16 @@ func execSourceipTest(f *framework.Framework, c *client.Client, ns, nodeName, se
 	timeout := 2 * time.Minute
 	framework.Logf("Waiting up to %v for sourceIp test to be executed", timeout)
 	cmd := fmt.Sprintf(`wget -T 30 -qO- %s:%d | grep client_address`, serviceIp, servicePort)
-	// need timeout mechanism because it may takes more times for iptables to be populated
+	// Need timeout mechanism because it may takes more times for iptables to be populated.
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2) {
 		stdout, err = framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 		if err != nil {
 			framework.Logf("got err: %v, retry until timeout", err)
+			continue
+		}
+		// Need to check output because wget -q might omit the error.
+		if strings.TrimSpace(stdout) == "" {
+			framework.Logf("got empty stdout, retry until timeout")
 			continue
 		}
 		break
@@ -2344,10 +2342,15 @@ func execSourceipTest(f *framework.Framework, c *client.Client, ns, nodeName, se
 
 	ExpectNoError(err)
 
-	// the stdout return from RunHostCmd seems to come with "\n", so TrimSpace is needed
-	// desired stdout in this format: client_address=x.x.x.x
+	// The stdout return from RunHostCmd seems to come with "\n", so TrimSpace is needed.
+	// Desired stdout in this format: client_address=x.x.x.x
 	outputs := strings.Split(strings.TrimSpace(stdout), "=")
-	sourceIp := outputs[1]
-
+	sourceIp := ""
+	if len(outputs) != 2 {
+		// Fail the test if output format is unexpected.
+		framework.Failf("exec pod returned unexpected stdout format: [%v]\n", stdout)
+	} else {
+		sourceIp = outputs[1]
+	}
 	return execPodIp, sourceIp
 }

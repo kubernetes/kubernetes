@@ -17,6 +17,7 @@ limitations under the License.
 package watch
 
 import (
+	"fmt"
 	"sync"
 
 	"k8s.io/kubernetes/pkg/runtime"
@@ -44,6 +45,8 @@ const (
 	Modified EventType = "MODIFIED"
 	Deleted  EventType = "DELETED"
 	Error    EventType = "ERROR"
+
+	DefaultChanSize int32 = 100
 )
 
 // Event represents a single event to a watched resource.
@@ -91,7 +94,7 @@ func NewFake() *FakeWatcher {
 	}
 }
 
-func NewFakeWithChanSize(size int) *FakeWatcher {
+func NewFakeWithChanSize(size int, blocking bool) *FakeWatcher {
 	return &FakeWatcher{
 		result: make(chan Event, size),
 	}
@@ -149,4 +152,118 @@ func (f *FakeWatcher) Error(errValue runtime.Object) {
 // Action sends an event of the requested type, for table-based testing.
 func (f *FakeWatcher) Action(action EventType, obj runtime.Object) {
 	f.result <- Event{action, obj}
+}
+
+// RaceFreeFakeWatcher lets you test anything that consumes a watch.Interface; threadsafe.
+type RaceFreeFakeWatcher struct {
+	result  chan Event
+	Stopped bool
+	sync.Mutex
+}
+
+func NewRaceFreeFake() *RaceFreeFakeWatcher {
+	return &RaceFreeFakeWatcher{
+		result: make(chan Event, DefaultChanSize),
+	}
+}
+
+// Stop implements Interface.Stop().
+func (f *RaceFreeFakeWatcher) Stop() {
+	f.Lock()
+	defer f.Unlock()
+	if !f.Stopped {
+		glog.V(4).Infof("Stopping fake watcher.")
+		close(f.result)
+		f.Stopped = true
+	}
+}
+
+func (f *RaceFreeFakeWatcher) IsStopped() bool {
+	f.Lock()
+	defer f.Unlock()
+	return f.Stopped
+}
+
+// Reset prepares the watcher to be reused.
+func (f *RaceFreeFakeWatcher) Reset() {
+	f.Lock()
+	defer f.Unlock()
+	f.Stopped = false
+	f.result = make(chan Event, DefaultChanSize)
+}
+
+func (f *RaceFreeFakeWatcher) ResultChan() <-chan Event {
+	f.Lock()
+	defer f.Unlock()
+	return f.result
+}
+
+// Add sends an add event.
+func (f *RaceFreeFakeWatcher) Add(obj runtime.Object) {
+	f.Lock()
+	defer f.Unlock()
+	if !f.Stopped {
+		select {
+		case f.result <- Event{Added, obj}:
+			return
+		default:
+			panic(fmt.Errorf("channel full"))
+		}
+	}
+}
+
+// Modify sends a modify event.
+func (f *RaceFreeFakeWatcher) Modify(obj runtime.Object) {
+	f.Lock()
+	defer f.Unlock()
+	if !f.Stopped {
+		select {
+		case f.result <- Event{Modified, obj}:
+			return
+		default:
+			panic(fmt.Errorf("channel full"))
+		}
+	}
+}
+
+// Delete sends a delete event.
+func (f *RaceFreeFakeWatcher) Delete(lastValue runtime.Object) {
+	f.Lock()
+	defer f.Unlock()
+	if !f.Stopped {
+		select {
+		case f.result <- Event{Deleted, lastValue}:
+			return
+		default:
+			panic(fmt.Errorf("channel full"))
+		}
+	}
+}
+
+// Error sends an Error event.
+func (f *RaceFreeFakeWatcher) Error(errValue runtime.Object) {
+	f.Lock()
+	defer f.Unlock()
+	if !f.Stopped {
+		select {
+		case f.result <- Event{Error, errValue}:
+			return
+		default:
+			panic(fmt.Errorf("channel full"))
+		}
+	}
+}
+
+// Action sends an event of the requested type, for table-based testing.
+func (f *RaceFreeFakeWatcher) Action(action EventType, obj runtime.Object) {
+	f.Lock()
+	defer f.Unlock()
+	if !f.Stopped {
+		select {
+		case f.result <- Event{action, obj}:
+			return
+		default:
+			panic(fmt.Errorf("channel full"))
+		}
+	}
 }

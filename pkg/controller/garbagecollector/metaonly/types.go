@@ -26,7 +26,8 @@ import (
 // TODO: enable meta-only decoding for protobuf.
 type MetadataOnlyObject struct {
 	unversioned.TypeMeta `json:",inline"`
-	v1.ObjectMeta        `json:"metadata,omitempty"`
+	// +optional
+	v1.ObjectMeta `json:"metadata,omitempty"`
 }
 
 // MetadataOnlyObjectList allows decoding from JSON data only the typemeta and metadata of
@@ -34,6 +35,7 @@ type MetadataOnlyObject struct {
 // TODO: enable meta-only decoding for protobuf.
 type MetadataOnlyObjectList struct {
 	unversioned.TypeMeta `json:",inline"`
+	// +optional
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	Items []MetadataOnlyObject `json:"items"`

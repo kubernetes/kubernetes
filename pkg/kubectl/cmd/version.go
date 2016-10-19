@@ -26,7 +26,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
-func NewCmdVersion(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdVersion(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "Print the client and server version information",
@@ -40,7 +40,7 @@ func NewCmdVersion(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunVersion(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
+func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 	kubectl.GetClientVersion(out)
 	if cmdutil.GetFlagBool(cmd, "client") {
 		return nil

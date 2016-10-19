@@ -3251,8 +3251,8 @@ func newTestServer(handler http.Handler) *httptest.Server {
 	return httptest.NewServer(handler)
 }
 
-func newTestRequestInfoResolver() *request.RequestInfoResolver {
-	return &request.RequestInfoResolver{
+func newTestRequestInfoResolver() *request.RequestInfoFactory {
+	return &request.RequestInfoFactory{
 		APIPrefixes:          sets.NewString("api", "apis"),
 		GrouplessAPIPrefixes: sets.NewString("api"),
 	}

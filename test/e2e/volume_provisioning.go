@@ -228,7 +228,7 @@ func runInPodWithVolume(c *client.Client, ns, claimName, command string) {
 		framework.ExpectNoError(c.Pods(ns).Delete(pod.Name, nil))
 	}()
 	framework.ExpectNoError(err, "Failed to create pod: %v", err)
-	framework.ExpectNoError(framework.WaitForPodSuccessInNamespaceSlow(c, pod.Name, pod.Spec.Containers[0].Name, pod.Namespace))
+	framework.ExpectNoError(framework.WaitForPodSuccessInNamespaceSlow(c, pod.Name, pod.Namespace))
 }
 
 func newStorageClass() *storage.StorageClass {

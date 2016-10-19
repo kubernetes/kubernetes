@@ -55,6 +55,8 @@ const (
 	HostNetworkNotSupported = "HostNetworkNotSupported"
 	UndefinedShaper         = "NilShaper"
 	NodeRebooted            = "Rebooted"
+	ContainerGCFailed       = "ContainerGCFailed"
+	ImageGCFailed           = "ImageGCFailed"
 
 	// Image manager event reason list
 	InvalidDiskCapacity = "InvalidDiskCapacity"
@@ -70,6 +72,7 @@ const (
 	FailedValidation = "FailedValidation"
 
 	// Lifecycle hooks
-	FailedPostStartHook = "FailedPostStartHook"
-	FailedPreStopHook   = "FailedPreStopHook"
+	FailedPostStartHook   = "FailedPostStartHook"
+	FailedPreStopHook     = "FailedPreStopHook"
+	UnfinishedPreStopHook = "UnfinishedPreStopHook"
 )

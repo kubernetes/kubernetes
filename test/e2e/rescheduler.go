@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -103,6 +104,6 @@ func podRunningOrUnschedulable(pod *api.Pod) bool {
 	if cond != nil && cond.Status == api.ConditionFalse && cond.Reason == "Unschedulable" {
 		return true
 	}
-	running, _ := framework.PodRunningReady(pod)
+	running, _ := testutils.PodRunningReady(pod)
 	return running
 }

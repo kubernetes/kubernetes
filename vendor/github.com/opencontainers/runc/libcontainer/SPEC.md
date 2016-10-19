@@ -71,7 +71,6 @@ that are required for executing a container's process.
 | /dev/tty     | 0666 |  rwm       |
 | /dev/random  | 0666 |  rwm       |
 | /dev/urandom | 0666 |  rwm       |
-| /dev/fuse    | 0666 |  rwm       |
 
 
 **ptmx**

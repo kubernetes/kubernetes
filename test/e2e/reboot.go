@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -106,7 +107,7 @@ var _ = framework.KubeDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 	It("each node by switching off the network interface and ensure they function upon switch on", func() {
 		// switch the network interface off for a while to simulate a network outage
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before network is down.
-		testReboot(f.Client, "nohup sh -c 'sleep 10 && sudo ip link set eth0 down && sleep 120 && sudo ip link set eth0 up' >/dev/null 2>&1 &")
+		testReboot(f.Client, "nohup sh -c 'sleep 10 && (sudo ifdown eth0 || sudo ip link set eth0 down) && sleep 120 && (sudo ifup eth0 || sudo ip link set eth0 up)' >/dev/null 2>&1 &")
 	})
 
 	It("each node by dropping all inbound packets for a while and ensure they function afterwards", func() {
@@ -179,7 +180,7 @@ func printStatusAndLogsForNotReadyPods(c *client.Client, ns string, podNames []s
 		if !podNameSet.Has(p.Name) {
 			continue
 		}
-		if ok, _ := framework.PodRunningReady(p); ok {
+		if ok, _ := testutils.PodRunningReady(p); ok {
 			continue
 		}
 		framework.Logf("Status for not ready pod %s/%s: %+v", p.Namespace, p.Name, p.Status)
@@ -209,7 +210,7 @@ func printStatusAndLogsForNotReadyPods(c *client.Client, ns string, podNames []s
 func rebootNode(c *client.Client, provider, name, rebootCmd string) bool {
 	// Setup
 	ns := api.NamespaceSystem
-	ps := framework.NewPodStore(c, ns, labels.Everything(), fields.OneTermEqualSelector(api.PodHostField, name))
+	ps := testutils.NewPodStore(c, ns, labels.Everything(), fields.OneTermEqualSelector(api.PodHostField, name))
 	defer ps.Stop()
 
 	// Get the node initially.

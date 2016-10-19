@@ -71,6 +71,9 @@ type RuntimeService interface {
 	RuntimeVersioner
 	ContainerManager
 	PodSandboxManager
+
+	// UpdateRuntimeConfig updates runtime configuration if specified
+	UpdateRuntimeConfig(runtimeConfig *runtimeApi.RuntimeConfig) error
 }
 
 // ImageManagerService interface should be implemented by a container image

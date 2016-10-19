@@ -15,21 +15,26 @@
 # A Dockerfile for creating a Kibana container that is designed
 # to work with Kubernetes logging.
 
-FROM java:openjdk-7-jre
-MAINTAINER Satnam Singh "satnam@google.com"
+FROM gcr.io/google_containers/ubuntu-slim:0.4
+
+MAINTAINER Mik Vyatskov "vmik@google.com"
 
 ENV DEBIAN_FRONTEND noninteractive
+ENV KIBANA_VERSION 4.6.1
 
-RUN apt-get update && \
-    apt-get install -y curl && \
-    apt-get clean
+RUN apt-get update \
+    && apt-get install -y curl \
+    && apt-get clean
 
-RUN cd / && \
-    curl -O https://download.elastic.co/kibana/kibana/kibana-4.0.2-linux-x64.tar.gz && \
-    tar xf kibana-4.0.2-linux-x64.tar.gz && \
-    rm kibana-4.0.2-linux-x64.tar.gz
+RUN set -x \
+    && cd / \
+    && mkdir /kibana \
+    && curl -O https://download.elastic.co/kibana/kibana/kibana-$KIBANA_VERSION-linux-x86_64.tar.gz \
+    && tar xf kibana-$KIBANA_VERSION-linux-x86_64.tar.gz -C /kibana --strip-components=1 \
+    && rm kibana-$KIBANA_VERSION-linux-x86_64.tar.gz
 
 COPY run.sh /run.sh
 
 EXPOSE 5601
+
 CMD ["/run.sh"]

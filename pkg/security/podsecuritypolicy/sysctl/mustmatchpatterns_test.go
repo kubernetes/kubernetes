@@ -58,11 +58,7 @@ func TestValidate(t *testing.T) {
 	}
 
 	for k, v := range tests {
-		strategy, err := NewMustMatchPatterns(v.patterns)
-		if err != nil {
-			t.Errorf("%s failed: %v", k, err)
-			continue
-		}
+		strategy := NewMustMatchPatterns(v.patterns)
 
 		pod := &api.Pod{}
 		errs := strategy.Validate(pod)
@@ -89,7 +85,7 @@ func TestValidate(t *testing.T) {
 		testDisallowed := func(key string, category string) {
 			for _, s := range v.disallowed {
 				pod.Annotations = map[string]string{
-					key: api.PodAnnotationsFromSysctls([]api.Sysctl{{s, "dummy"}}),
+					key: api.PodAnnotationsFromSysctls([]api.Sysctl{{Name: s, Value: "dummy"}}),
 				}
 				errs = strategy.Validate(pod)
 				if len(errs) == 0 {

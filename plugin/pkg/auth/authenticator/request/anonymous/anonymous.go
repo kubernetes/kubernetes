@@ -24,9 +24,9 @@ import (
 )
 
 const (
-	anonymousUser = "system:anonymous"
+	anonymousUser = user.Anonymous
 
-	unauthenticatedGroup = "system:unauthenticated"
+	unauthenticatedGroup = user.AllUnauthenticated
 )
 
 func NewAuthenticator() authenticator.Request {

@@ -213,9 +213,6 @@ func (plugin *rbdPlugin) newDeleterInternal(spec *volume.Spec, admin, secret str
 }
 
 func (plugin *rbdPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	if len(options.AccessModes) == 0 {
-		options.AccessModes = plugin.GetAccessModes()
-	}
 	return plugin.newProvisionerInternal(options, &RBDUtil{})
 }
 
@@ -237,7 +234,7 @@ type rbdVolumeProvisioner struct {
 }
 
 func (r *rbdVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
-	if r.options.Selector != nil {
+	if r.options.PVC.Spec.Selector != nil {
 		return nil, fmt.Errorf("claim Selector is not supported")
 	}
 	var err error
@@ -309,7 +306,10 @@ func (r *rbdVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 	rbd.RadosUser = r.Id
 	pv.Spec.PersistentVolumeSource.RBD = rbd
 	pv.Spec.PersistentVolumeReclaimPolicy = r.options.PersistentVolumeReclaimPolicy
-	pv.Spec.AccessModes = r.options.AccessModes
+	pv.Spec.AccessModes = r.options.PVC.Spec.AccessModes
+	if len(pv.Spec.AccessModes) == 0 {
+		pv.Spec.AccessModes = r.plugin.GetAccessModes()
+	}
 	pv.Spec.Capacity = api.ResourceList{
 		api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dMi", sizeMB)),
 	}

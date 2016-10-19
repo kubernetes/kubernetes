@@ -79,7 +79,7 @@ func TestReconcileLoadBalancerRemoveAllPortsRemovesFrontendConfig(t *testing.T) 
 		t.Error("Expected the loadbalancer to need an update")
 	}
 
-	// ensure we abandonded the frontend ip configuration
+	// ensure we abandoned the frontend ip configuration
 	if len(*lb.Properties.FrontendIPConfigurations) != 0 {
 		t.Error("Expected the loadbalancer to have no frontend ip configuration")
 	}
@@ -412,7 +412,8 @@ func TestNewCloudFromJSON(t *testing.T) {
 		"subnetName": "--subnet-name--",
 		"securityGroupName": "--security-group-name--",
 		"vnetName": "--vnet-name--",
-		"routeTableName": "--route-table-name--"
+		"routeTableName": "--route-table-name--",
+		"primaryAvailabilitySetName": "--primary-availability-set-name--"
 	}`
 	validateConfig(t, config)
 }
@@ -430,6 +431,7 @@ subnetName: --subnet-name--
 securityGroupName: --security-group-name--
 vnetName: --vnet-name--
 routeTableName: --route-table-name--
+primaryAvailabilitySetName: --primary-availability-set-name--
 `
 	validateConfig(t, config)
 }
@@ -475,6 +477,9 @@ func validateConfig(t *testing.T, config string) {
 	}
 	if azureCloud.RouteTableName != "--route-table-name--" {
 		t.Errorf("got incorrect value for RouteTableName")
+	}
+	if azureCloud.PrimaryAvailabilitySetName != "--primary-availability-set-name--" {
+		t.Errorf("got incorrect value for PrimaryAvailabilitySetName")
 	}
 }
 

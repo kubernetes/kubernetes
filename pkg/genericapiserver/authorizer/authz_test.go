@@ -20,6 +20,9 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
+
+	"k8s.io/kubernetes/pkg/auth/authorizer"
+	"k8s.io/kubernetes/pkg/auth/user"
 )
 
 // NewAlwaysAllowAuthorizer must return a struct which implements authorizer.Authorizer
@@ -113,5 +116,19 @@ func TestNewAuthorizerFromAuthorizationConfig(t *testing.T) {
 		} else if !tt.wantErr && (err != nil) {
 			t.Errorf("NewAuthorizerFromAuthorizationConfig %s: %v", tt.msg, err)
 		}
+	}
+}
+
+func TestPrivilegedGroupAuthorizer(t *testing.T) {
+	auth := NewPrivilegedGroups("allow-01", "allow-01")
+
+	yes := authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"no", "allow-01"}}}
+	no := authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"no", "deny-01"}}}
+
+	if authorized, _, _ := auth.Authorize(yes); !authorized {
+		t.Errorf("failed")
+	}
+	if authorized, _, _ := auth.Authorize(no); authorized {
+		t.Errorf("failed")
 	}
 }

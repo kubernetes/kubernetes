@@ -29,14 +29,12 @@ func TestMasterExportsSymbols(t *testing.T) {
 	_ = &master.Config{
 		GenericConfig: &genericapiserver.Config{
 			EnableSwaggerSupport: false,
-			RestfulContainer:     nil,
 		},
 		EnableCoreControllers: false,
 		EnableUISupport:       false,
 		EnableLogsSupport:     false,
 	}
-	m := &master.Master{
+	_ = &master.Master{
 		GenericAPIServer: &genericapiserver.GenericAPIServer{},
 	}
-	_ = (m).NewBootstrapController(master.EndpointReconcilerConfig{})
 }

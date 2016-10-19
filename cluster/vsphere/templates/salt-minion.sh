@@ -30,6 +30,23 @@ echo "master: $KUBE_MASTER" > /etc/salt/minion.d/master.conf
 # Turn on debugging for salt-minion
 # echo "DAEMON_ARGS=\"\$DAEMON_ARGS --log-file-level=debug\"" > /etc/default/salt-minion
 
+# Configuration to initialize vsphere cloud provider
+CLOUD_CONFIG=/etc/vsphere_cloud.config
+
+cat <<EOF > $CLOUD_CONFIG
+[Global]
+        user = $GOVC_USERNAME
+        password = $GOVC_PASSWORD
+        server = $GOVC_URL
+        port = $GOVC_PORT
+        insecure-flag = $GOVC_INSECURE
+        datacenter = $GOVC_DATACENTER
+        datastore = $GOVC_DATASTORE
+
+[Disk]
+	scsicontrollertype = pvscsi
+EOF
+
 # Our minions will have a pool role to distinguish them from the master.
 #
 # Setting the "minion_ip" here causes the kubelet to use its IP for
@@ -37,15 +54,15 @@ echo "master: $KUBE_MASTER" > /etc/salt/minion.d/master.conf
 #
 cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
-  hostname_override: $(ip route get 1.1.1.1 | awk '{print $7}')
   roles:
     - kubernetes-pool
     - kubernetes-pool-vsphere
   cloud: vsphere
+  cloud_config: $CLOUD_CONFIG
 EOF
 
 # Install Salt
 #
 # We specify -X to avoid a race condition that can cause minion failure to
 # install.  See https://github.com/saltstack/salt-bootstrap/issues/270
-curl -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s -- -X
+curl -L --connect-timeout 20 --retry 6 --retry-delay 10 https://bootstrap.saltstack.com | sh -s -- -X stable 2016.3.2

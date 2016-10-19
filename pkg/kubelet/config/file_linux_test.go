@@ -261,32 +261,13 @@ func watchFileAdded(watchDir bool, t *testing.T) {
 				testCase.writeToFile(dirName, fileName, t)
 			}
 
-			if watchDir {
-				defer func() {
-					// Remove the file
-					deleteFile(dirName, fileName, ch, t)
-				}()
-			}
-
 			go addFile()
 
-			if watchDir {
-				// expect an update by CREATE inotify event
-				expectUpdate(t, ch, testCase)
-				// expect an update by MODIFY inotify event
-				expectUpdate(t, ch, testCase)
-
-				from := fileName
-				fileName = fileName + "_ch"
-				go changeFileName(dirName, from, fileName, t)
-				// expect an update by MOVED_FROM inotify event cause changing file name
-				expectEmptyUpdate(t, ch)
-				// expect an update by MOVED_TO inotify event cause changing file name
-				expectUpdate(t, ch, testCase)
-			} else {
-				// expect an update by SourceFile.resetStoreFromPath()
-				expectUpdate(t, ch, testCase)
-			}
+			// For !watchDir: expect an update by SourceFile.resetStoreFromPath().
+			// For watchDir: expect at least one update from CREATE & MODIFY inotify event.
+			// Shouldn't expect two updates from CREATE & MODIFY because CREATE doesn't guarantee file written.
+			// In that case no update will be sent from CREATE event.
+			expectUpdate(t, ch, testCase)
 		}()
 	}
 }

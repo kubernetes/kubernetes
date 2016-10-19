@@ -160,24 +160,24 @@ type HostPortRange struct {
 // VolumeSecurityPolicy allows and disallows the use of different types of volume plugins.
 type VolumeSecurityPolicy struct {
 	// HostPath allows or disallows the use of the HostPath volume plugin.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#hostpath
+	// More info: http://kubernetes.io/docs/user-guide/volumes#hostpath
 	HostPath bool `json:"hostPath,omitempty"`
 	// EmptyDir allows or disallows the use of the EmptyDir volume plugin.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#emptydir
+	// More info: http://kubernetes.io/docs/user-guide/volumes#emptydir
 	EmptyDir bool `json:"emptyDir,omitempty"`
 	// GCEPersistentDisk allows or disallows the use of the GCEPersistentDisk volume plugin.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#gcepersistentdisk
+	// More info: http://kubernetes.io/docs/user-guide/volumes#gcepersistentdisk
 	GCEPersistentDisk bool `json:"gcePersistentDisk,omitempty"`
 	// AWSElasticBlockStore allows or disallows the use of the AWSElasticBlockStore volume plugin.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore
+	// More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore
 	AWSElasticBlockStore bool `json:"awsElasticBlockStore,omitempty"`
 	// GitRepo allows or disallows the use of the GitRepo volume plugin.
 	GitRepo bool `json:"gitRepo,omitempty"`
 	// Secret allows or disallows the use of the Secret volume plugin.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#secrets
+	// More info: http://kubernetes.io/docs/user-guide/volumes#secrets
 	Secret bool `json:"secret,omitempty"`
 	// NFS allows or disallows the use of the NFS volume plugin.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs
+	// More info: http://kubernetes.io/docs/user-guide/volumes#nfs
 	NFS bool `json:"nfs,omitempty"`
 	// ISCSI allows or disallows the use of the ISCSI volume plugin.
 	// More info: http://releases.k8s.io/HEAD/examples/volumes/iscsi/README.md
@@ -186,7 +186,7 @@ type VolumeSecurityPolicy struct {
 	// More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md
 	Glusterfs bool `json:"glusterfs,omitempty"`
 	// PersistentVolumeClaim allows or disallows the use of the PersistentVolumeClaim volume plugin.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistentvolumeclaims
+	// More info: http://kubernetes.io/docs/user-guide/persistent-volumes#persistentvolumeclaims
 	PersistentVolumeClaim bool `json:"persistentVolumeClaim,omitempty"`
 	// RBD allows or disallows the use of the RBD volume plugin.
 	// More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md

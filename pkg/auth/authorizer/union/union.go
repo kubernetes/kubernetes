@@ -37,17 +37,17 @@ func (authzHandler unionAuthzHandler) Authorize(a authorizer.Attributes) (bool, 
 		errlist    []error
 		reasonlist []string
 	)
+
 	for _, currAuthzHandler := range authzHandler {
 		authorized, reason, err := currAuthzHandler.Authorize(a)
 
 		if err != nil {
 			errlist = append(errlist, err)
-			continue
+		}
+		if len(reason) != 0 {
+			reasonlist = append(reasonlist, reason)
 		}
 		if !authorized {
-			if reason != "" {
-				reasonlist = append(reasonlist, reason)
-			}
 			continue
 		}
 		return true, reason, nil

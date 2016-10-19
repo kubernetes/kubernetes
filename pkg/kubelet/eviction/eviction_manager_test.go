@@ -613,7 +613,9 @@ func TestMinReclaim(t *testing.T) {
 				Value: ThresholdValue{
 					Quantity: quantityMustParse("1Gi"),
 				},
-				MinReclaim: quantityMustParse("500Mi"),
+				MinReclaim: &ThresholdValue{
+					Quantity: quantityMustParse("500Mi"),
+				},
 			},
 		},
 	}
@@ -788,7 +790,9 @@ func TestNodeReclaimFuncs(t *testing.T) {
 				Value: ThresholdValue{
 					Quantity: quantityMustParse("1Gi"),
 				},
-				MinReclaim: quantityMustParse("500Mi"),
+				MinReclaim: &ThresholdValue{
+					Quantity: quantityMustParse("500Mi"),
+				},
 			},
 		},
 	}
@@ -916,7 +920,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 }
 
 func TestDiskPressureNodeFsInodes(t *testing.T) {
-	// TODO: we need to know inodes used when cadvisor supports per container stats
+	// TODO(dashpole): we need to know inodes used when cadvisor supports per container stats
 	podMaker := func(name string, requests api.ResourceList, limits api.ResourceList) (*api.Pod, statsapi.PodStats) {
 		pod := newPod(name, []api.Container{
 			newContainer(name, requests, limits),
@@ -943,7 +947,7 @@ func TestDiskPressureNodeFsInodes(t *testing.T) {
 		}
 		return result
 	}
-	// TODO: pass inodes used in future when supported by cadvisor.
+	// TODO(dashpole): pass inodes used in future when supported by cadvisor.
 	podsToMake := []struct {
 		name     string
 		requests api.ResourceList
@@ -1013,9 +1017,9 @@ func TestDiskPressureNodeFsInodes(t *testing.T) {
 	// synchronize
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 
-	// we should not have disk pressure
-	if manager.IsUnderDiskPressure() {
-		t.Errorf("Manager should not report disk pressure")
+	// we should not have inode pressure
+	if manager.IsUnderInodePressure() {
+		t.Errorf("Manager should not report inode pressure")
 	}
 
 	// try to admit our pod (should succeed)
@@ -1028,9 +1032,9 @@ func TestDiskPressureNodeFsInodes(t *testing.T) {
 	summaryProvider.result = summaryStatsMaker("1.5Mi", "4Mi", podStats)
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 
-	// we should have disk pressure
-	if !manager.IsUnderDiskPressure() {
-		t.Errorf("Manager should report disk pressure since soft threshold was met")
+	// we should have inode pressure
+	if !manager.IsUnderInodePressure() {
+		t.Errorf("Manager should report inode pressure since soft threshold was met")
 	}
 
 	// verify no pod was yet killed because there has not yet been enough time passed.
@@ -1043,9 +1047,9 @@ func TestDiskPressureNodeFsInodes(t *testing.T) {
 	summaryProvider.result = summaryStatsMaker("1.5Mi", "4Mi", podStats)
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 
-	// we should have disk pressure
-	if !manager.IsUnderDiskPressure() {
-		t.Errorf("Manager should report disk pressure since soft threshold was met")
+	// we should have inode pressure
+	if !manager.IsUnderInodePressure() {
+		t.Errorf("Manager should report inode pressure since soft threshold was met")
 	}
 
 	// verify the right pod was killed with the right grace period.
@@ -1063,24 +1067,24 @@ func TestDiskPressureNodeFsInodes(t *testing.T) {
 	podKiller.pod = nil
 	podKiller.gracePeriodOverride = nil
 
-	// remove disk pressure
+	// remove inode pressure
 	fakeClock.Step(20 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("3Mi", "4Mi", podStats)
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 
-	// we should not have disk pressure
-	if manager.IsUnderDiskPressure() {
-		t.Errorf("Manager should not report disk pressure")
+	// we should not have inode pressure
+	if manager.IsUnderInodePressure() {
+		t.Errorf("Manager should not report inode pressure")
 	}
 
-	// induce disk pressure!
+	// induce inode pressure!
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("0.5Mi", "4Mi", podStats)
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 
-	// we should have disk pressure
-	if !manager.IsUnderDiskPressure() {
-		t.Errorf("Manager should report disk pressure")
+	// we should have inode pressure
+	if !manager.IsUnderInodePressure() {
+		t.Errorf("Manager should report inode pressure")
 	}
 
 	// check the right pod was killed
@@ -1097,15 +1101,15 @@ func TestDiskPressureNodeFsInodes(t *testing.T) {
 		t.Errorf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, false, result.Admit)
 	}
 
-	// reduce disk pressure
+	// reduce inode pressure
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("3Mi", "4Mi", podStats)
 	podKiller.pod = nil // reset state
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 
-	// we should have disk pressure (because transition period not yet met)
-	if !manager.IsUnderDiskPressure() {
-		t.Errorf("Manager should report disk pressure")
+	// we should have inode pressure (because transition period not yet met)
+	if !manager.IsUnderInodePressure() {
+		t.Errorf("Manager should report inode pressure")
 	}
 
 	// no pod should have been killed
@@ -1124,9 +1128,9 @@ func TestDiskPressureNodeFsInodes(t *testing.T) {
 	podKiller.pod = nil // reset state
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 
-	// we should not have disk pressure (because transition period met)
-	if manager.IsUnderDiskPressure() {
-		t.Errorf("Manager should not report disk pressure")
+	// we should not have inode pressure (because transition period met)
+	if manager.IsUnderInodePressure() {
+		t.Errorf("Manager should not report inode pressure")
 	}
 
 	// no pod should have been killed

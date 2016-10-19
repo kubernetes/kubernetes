@@ -50,7 +50,8 @@ func (dc *DeploymentController) rollback(deployment *extensions.Deployment, toRe
 		}
 		if v == *toRevision {
 			glog.V(4).Infof("Found replica set %q with desired revision %d", rs.Name, v)
-			// rollback by copying podTemplate.Spec from the replica set, and increment revision number by 1
+			// rollback by copying podTemplate.Spec from the replica set
+			// revision number will be incremented during the next getAllReplicaSetsAndSyncRevision call
 			// no-op if the the spec matches current deployment's podTemplate.Spec
 			deployment, performedRollback, err := dc.rollbackToTemplate(deployment, rs)
 			if performedRollback && err == nil {

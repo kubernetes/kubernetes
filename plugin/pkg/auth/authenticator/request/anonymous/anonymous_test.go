@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/auth/authenticator"
+	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -32,10 +33,10 @@ func TestAnonymous(t *testing.T) {
 	if !ok {
 		t.Fatalf("Unexpectedly unauthenticated")
 	}
-	if u.GetName() != "system:anonymous" {
-		t.Fatalf("Expected username %s, got %s", "system:anonymous", u.GetName())
+	if u.GetName() != user.Anonymous {
+		t.Fatalf("Expected username %s, got %s", user.Anonymous, u.GetName())
 	}
-	if !sets.NewString(u.GetGroups()...).Equal(sets.NewString("system:unauthenticated")) {
-		t.Fatalf("Expected group %s, got %v", "system:unauthenticated", u.GetGroups())
+	if !sets.NewString(u.GetGroups()...).Equal(sets.NewString(user.AllUnauthenticated)) {
+		t.Fatalf("Expected group %s, got %v", user.AllUnauthenticated, u.GetGroups())
 	}
 }

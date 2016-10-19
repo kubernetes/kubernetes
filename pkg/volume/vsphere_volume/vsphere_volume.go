@@ -321,9 +321,6 @@ type vsphereVolumeProvisioner struct {
 var _ volume.Provisioner = &vsphereVolumeProvisioner{}
 
 func (plugin *vsphereVolumePlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	if len(options.AccessModes) == 0 {
-		options.AccessModes = plugin.GetAccessModes()
-	}
 	return plugin.newProvisionerInternal(options, &VsphereDiskUtil{})
 }
 
@@ -353,7 +350,7 @@ func (v *vsphereVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 		},
 		Spec: api.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: v.options.PersistentVolumeReclaimPolicy,
-			AccessModes:                   v.options.AccessModes,
+			AccessModes:                   v.options.PVC.Spec.AccessModes,
 			Capacity: api.ResourceList{
 				api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dKi", sizeKB)),
 			},
@@ -365,6 +362,10 @@ func (v *vsphereVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 			},
 		},
 	}
+	if len(v.options.PVC.Spec.AccessModes) == 0 {
+		pv.Spec.AccessModes = v.plugin.GetAccessModes()
+	}
+
 	return pv, nil
 }
 

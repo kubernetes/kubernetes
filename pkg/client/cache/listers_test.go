@@ -280,11 +280,11 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 }
 
 func TestStoreToReplicaSetLister(t *testing.T) {
-	store := NewStore(MetaNamespaceKeyFunc)
+	store := NewIndexer(MetaNamespaceKeyFunc, Indexers{NamespaceIndex: MetaNamespaceIndexFunc})
 	lister := StoreToReplicaSetLister{store}
 	testCases := []struct {
 		inRSs      []*extensions.ReplicaSet
-		list       func() ([]extensions.ReplicaSet, error)
+		list       func() ([]*extensions.ReplicaSet, error)
 		outRSNames sets.String
 		expectErr  bool
 	}{
@@ -293,8 +293,8 @@ func TestStoreToReplicaSetLister(t *testing.T) {
 			inRSs: []*extensions.ReplicaSet{
 				{ObjectMeta: api.ObjectMeta{Name: "basic"}},
 			},
-			list: func() ([]extensions.ReplicaSet, error) {
-				return lister.List()
+			list: func() ([]*extensions.ReplicaSet, error) {
+				return lister.List(labels.Everything())
 			},
 			outRSNames: sets.NewString("basic"),
 		},
@@ -308,7 +308,7 @@ func TestStoreToReplicaSetLister(t *testing.T) {
 					},
 				},
 			},
-			list: func() ([]extensions.ReplicaSet, error) {
+			list: func() ([]*extensions.ReplicaSet, error) {
 				pod := &api.Pod{
 					ObjectMeta: api.ObjectMeta{Name: "pod1", Namespace: "ns"},
 				}
@@ -324,7 +324,7 @@ func TestStoreToReplicaSetLister(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
 				},
 			},
-			list: func() ([]extensions.ReplicaSet, error) {
+			list: func() ([]*extensions.ReplicaSet, error) {
 				pod := &api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						Name:      "pod1",
@@ -353,7 +353,7 @@ func TestStoreToReplicaSetLister(t *testing.T) {
 					},
 				},
 			},
-			list: func() ([]extensions.ReplicaSet, error) {
+			list: func() ([]*extensions.ReplicaSet, error) {
 				pod := &api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						Name:      "pod1",

@@ -211,3 +211,21 @@ func TestSerializedPuller(t *testing.T) {
 		}
 	}
 }
+
+func TestApplyDefaultImageTag(t *testing.T) {
+	for _, testCase := range []struct {
+		Input  string
+		Output string
+	}{
+		{Input: "root", Output: "root:latest"},
+		{Input: "root:tag", Output: "root:tag"},
+		{Input: "root@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", Output: "root@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+	} {
+		image, err := applyDefaultImageTag(testCase.Input)
+		if err != nil {
+			t.Errorf("applyDefaultImageTag(%s) failed: %v", testCase.Input, err)
+		} else if image != testCase.Output {
+			t.Errorf("Expected image reference: %q, got %q", testCase.Output, image)
+		}
+	}
+}

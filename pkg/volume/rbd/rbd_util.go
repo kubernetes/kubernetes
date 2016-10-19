@@ -314,7 +314,8 @@ func (util *RBDUtil) DetachDisk(c rbdUnmounter, mntPath string) error {
 }
 
 func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *api.RBDVolumeSource, size int, err error) {
-	volSizeBytes := p.options.Capacity.Value()
+	capacity := p.options.PVC.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
+	volSizeBytes := capacity.Value()
 	// convert to MB that rbd defaults on
 	sz := int(volume.RoundUpSize(volSizeBytes, 1024*1024))
 	volSz := fmt.Sprintf("%d", sz)
@@ -371,7 +372,7 @@ func (util *RBDUtil) DeleteImage(p *rbdVolumeDeleter) error {
 		if err == nil {
 			return nil
 		} else {
-			glog.Errorf("failed to delete rbd image, error %v ouput %v", err, string(output))
+			glog.Errorf("failed to delete rbd image, error %v output %v", err, string(output))
 		}
 	}
 	return err

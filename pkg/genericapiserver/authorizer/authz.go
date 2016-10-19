@@ -24,11 +24,8 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/auth/authorizer/union"
+	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
-	"k8s.io/kubernetes/pkg/registry/rbac/clusterrole"
-	"k8s.io/kubernetes/pkg/registry/rbac/clusterrolebinding"
-	"k8s.io/kubernetes/pkg/registry/rbac/role"
-	"k8s.io/kubernetes/pkg/registry/rbac/rolebinding"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/webhook"
 )
@@ -77,8 +74,11 @@ type privilegedGroupAuthorizer struct {
 }
 
 func (r *privilegedGroupAuthorizer) Authorize(attr authorizer.Attributes) (bool, string, error) {
-	for attr_group := range attr.GetUser().GetGroups() {
-		for priv_group := range r.groups {
+	if attr.GetUser() == nil {
+		return false, "Error", errors.New("no user on request.")
+	}
+	for _, attr_group := range attr.GetUser().GetGroups() {
+		for _, priv_group := range r.groups {
 			if priv_group == attr_group {
 				return true, "", nil
 			}
@@ -114,10 +114,7 @@ type AuthorizationConfig struct {
 	// User which can bootstrap role policies
 	RBACSuperUser string
 
-	RBACClusterRoleRegistry        clusterrole.Registry
-	RBACClusterRoleBindingRegistry clusterrolebinding.Registry
-	RBACRoleRegistry               role.Registry
-	RBACRoleBindingRegistry        rolebinding.Registry
+	InformerFactory informers.SharedInformerFactory
 }
 
 // NewAuthorizerFromAuthorizationConfig returns the right sort of union of multiple authorizer.Authorizer objects
@@ -164,10 +161,10 @@ func NewAuthorizerFromAuthorizationConfig(authorizationModes []string, config Au
 			authorizers = append(authorizers, webhookAuthorizer)
 		case options.ModeRBAC:
 			rbacAuthorizer := rbac.New(
-				config.RBACRoleRegistry,
-				config.RBACRoleBindingRegistry,
-				config.RBACClusterRoleRegistry,
-				config.RBACClusterRoleBindingRegistry,
+				config.InformerFactory.Roles().Lister(),
+				config.InformerFactory.RoleBindings().Lister(),
+				config.InformerFactory.ClusterRoles().Lister(),
+				config.InformerFactory.ClusterRoleBindings().Lister(),
 				config.RBACSuperUser,
 			)
 			authorizers = append(authorizers, rbacAuthorizer)

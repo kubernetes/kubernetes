@@ -19,6 +19,7 @@ package dockershim
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	dockertypes "github.com/docker/engine-api/types"
 
@@ -35,7 +36,7 @@ const (
 	statusExitedPrefix  = "Exited"
 )
 
-func toRuntimeAPIImage(image *dockertypes.Image) (*runtimeApi.Image, error) {
+func imageToRuntimeAPIImage(image *dockertypes.Image) (*runtimeApi.Image, error) {
 	if image == nil {
 		return nil, fmt.Errorf("unable to convert a nil pointer to a runtime API image")
 	}
@@ -49,6 +50,31 @@ func toRuntimeAPIImage(image *dockertypes.Image) (*runtimeApi.Image, error) {
 	}, nil
 }
 
+func imageInspectToRuntimeAPIImage(image *dockertypes.ImageInspect) (*runtimeApi.Image, error) {
+	if image == nil {
+		return nil, fmt.Errorf("unable to convert a nil pointer to a runtime API image")
+	}
+
+	size := uint64(image.VirtualSize)
+	return &runtimeApi.Image{
+		Id:          &image.ID,
+		RepoTags:    image.RepoTags,
+		RepoDigests: image.RepoDigests,
+		Size_:       &size,
+	}, nil
+
+}
+
+func toPullableImageID(id string, image *dockertypes.ImageInspect) string {
+	// Default to the image ID, but if RepoDigests is not empty, use
+	// the first digest instead.
+	imageID := DockerImageIDPrefix + id
+	if len(image.RepoDigests) > 0 {
+		imageID = DockerPullableImageIDPrefix + image.RepoDigests[0]
+	}
+	return imageID
+}
+
 func toRuntimeAPIContainer(c *dockertypes.Container) (*runtimeApi.Container, error) {
 	state := toRuntimeAPIContainerState(c.Status)
 	metadata, err := parseContainerName(c.Names[0])
@@ -56,14 +82,19 @@ func toRuntimeAPIContainer(c *dockertypes.Container) (*runtimeApi.Container, err
 		return nil, err
 	}
 	labels, annotations := extractLabels(c.Labels)
+	sandboxID := c.Labels[sandboxIDLabelKey]
+	// The timestamp in dockertypes.Container is in seconds.
+	createdAt := c.Created * int64(time.Second)
 	return &runtimeApi.Container{
-		Id:          &c.ID,
-		Metadata:    metadata,
-		Image:       &runtimeApi.ImageSpec{Image: &c.Image},
-		ImageRef:    &c.ImageID,
-		State:       &state,
-		Labels:      labels,
-		Annotations: annotations,
+		Id:           &c.ID,
+		PodSandboxId: &sandboxID,
+		Metadata:     metadata,
+		Image:        &runtimeApi.ImageSpec{Image: &c.Image},
+		ImageRef:     &c.ImageID,
+		State:        &state,
+		CreatedAt:    &createdAt,
+		Labels:       labels,
+		Annotations:  annotations,
 	}, nil
 }
 
@@ -115,11 +146,13 @@ func toRuntimeAPISandbox(c *dockertypes.Container) (*runtimeApi.PodSandbox, erro
 		return nil, err
 	}
 	labels, annotations := extractLabels(c.Labels)
+	// The timestamp in dockertypes.Container is in seconds.
+	createdAt := c.Created * int64(time.Second)
 	return &runtimeApi.PodSandbox{
 		Id:          &c.ID,
 		Metadata:    metadata,
 		State:       &state,
-		CreatedAt:   &c.Created,
+		CreatedAt:   &createdAt,
 		Labels:      labels,
 		Annotations: annotations,
 	}, nil

@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	fakeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	rl "k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -40,7 +41,7 @@ func TestTryAcquireOrRenew(t *testing.T) {
 	past := time.Now().Add(-1000 * time.Hour)
 
 	tests := []struct {
-		observedRecord LeaderElectionRecord
+		observedRecord rl.LeaderElectionRecord
 		observedTime   time.Time
 		reactors       []struct {
 			verb     string
@@ -116,7 +117,7 @@ func TestTryAcquireOrRenew(t *testing.T) {
 								Namespace: action.GetNamespace(),
 								Name:      action.(core.GetAction).GetName(),
 								Annotations: map[string]string{
-									LeaderElectionRecordAnnotationKey: `{"holderIdentity":"bing"}`,
+									rl.LeaderElectionRecordAnnotationKey: `{"holderIdentity":"bing"}`,
 								},
 							},
 						}, nil
@@ -129,7 +130,7 @@ func TestTryAcquireOrRenew(t *testing.T) {
 					},
 				},
 			},
-			observedRecord: LeaderElectionRecord{HolderIdentity: "bing"},
+			observedRecord: rl.LeaderElectionRecord{HolderIdentity: "bing"},
 			observedTime:   past,
 
 			expectSuccess:    true,
@@ -150,7 +151,7 @@ func TestTryAcquireOrRenew(t *testing.T) {
 								Namespace: action.GetNamespace(),
 								Name:      action.(core.GetAction).GetName(),
 								Annotations: map[string]string{
-									LeaderElectionRecordAnnotationKey: `{"holderIdentity":"bing"}`,
+									rl.LeaderElectionRecordAnnotationKey: `{"holderIdentity":"bing"}`,
 								},
 							},
 						}, nil
@@ -176,7 +177,7 @@ func TestTryAcquireOrRenew(t *testing.T) {
 								Namespace: action.GetNamespace(),
 								Name:      action.(core.GetAction).GetName(),
 								Annotations: map[string]string{
-									LeaderElectionRecordAnnotationKey: `{"holderIdentity":"baz"}`,
+									rl.LeaderElectionRecordAnnotationKey: `{"holderIdentity":"baz"}`,
 								},
 							},
 						}, nil
@@ -190,7 +191,7 @@ func TestTryAcquireOrRenew(t *testing.T) {
 				},
 			},
 			observedTime:   future,
-			observedRecord: LeaderElectionRecord{HolderIdentity: "baz"},
+			observedRecord: rl.LeaderElectionRecord{HolderIdentity: "baz"},
 
 			expectSuccess: true,
 			outHolder:     "baz",
@@ -203,10 +204,16 @@ func TestTryAcquireOrRenew(t *testing.T) {
 		wg.Add(1)
 		var reportedLeader string
 
-		lec := LeaderElectionConfig{
+		lock := rl.EndpointsLock{
 			EndpointsMeta: api.ObjectMeta{Namespace: "foo", Name: "bar"},
-			Identity:      "baz",
-			EventRecorder: &record.FakeRecorder{},
+			LockConfig: rl.ResourceLockConfig{
+				Identity:      "baz",
+				EventRecorder: &record.FakeRecorder{},
+			},
+		}
+
+		lec := LeaderElectionConfig{
+			Lock:          &lock,
 			LeaseDuration: 10 * time.Second,
 			Callbacks: LeaderCallbacks{
 				OnNewLeader: func(l string) {
@@ -229,7 +236,7 @@ func TestTryAcquireOrRenew(t *testing.T) {
 			observedRecord: test.observedRecord,
 			observedTime:   test.observedTime,
 		}
-		le.config.Client = c
+		lock.Client = c
 
 		if test.expectSuccess != le.tryAcquireOrRenew() {
 			t.Errorf("[%v]unexpected result of tryAcquireOrRenew: [succeded=%v]", i, !test.expectSuccess)

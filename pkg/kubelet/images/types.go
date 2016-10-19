@@ -37,6 +37,9 @@ var (
 
 	// Get http error when pulling image from registry
 	RegistryUnavailable = errors.New("RegistryUnavailable")
+
+	// Unable to parse the image name.
+	ErrInvalidImageName = errors.New("InvalidImageName")
 )
 
 // ImageManager provides an interface to manage the lifecycle of images.

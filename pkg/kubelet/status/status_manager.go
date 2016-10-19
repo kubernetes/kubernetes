@@ -414,7 +414,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	if err == nil {
 		translatedUID := m.podManager.TranslatePodUID(pod.UID)
 		if len(translatedUID) > 0 && translatedUID != uid {
-			glog.V(3).Infof("Pod %q was deleted and then recreated, skipping status update", format.Pod(pod))
+			glog.V(2).Infof("Pod %q was deleted and then recreated, skipping status update; old UID %q, new UID %q", format.Pod(pod), uid, translatedUID)
 			m.deletePodStatus(uid)
 			return
 		}

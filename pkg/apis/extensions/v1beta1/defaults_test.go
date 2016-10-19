@@ -765,6 +765,78 @@ func TestDefaultRequestIsNotSetForReplicaSet(t *testing.T) {
 	}
 }
 
+func TestSetDefaultHorizontalPodAutoscalerMinReplicas(t *testing.T) {
+	tests := []struct {
+		hpa            HorizontalPodAutoscaler
+		expectReplicas int32
+	}{
+		{
+			hpa:            HorizontalPodAutoscaler{},
+			expectReplicas: 1,
+		},
+		{
+			hpa: HorizontalPodAutoscaler{
+				Spec: HorizontalPodAutoscalerSpec{
+					MinReplicas: newInt32(3),
+				},
+			},
+			expectReplicas: 3,
+		},
+	}
+
+	for _, test := range tests {
+		hpa := &test.hpa
+		obj2 := roundTrip(t, runtime.Object(hpa))
+		hpa2, ok := obj2.(*HorizontalPodAutoscaler)
+		if !ok {
+			t.Errorf("unexpected object: %v", hpa2)
+			t.FailNow()
+		}
+		if hpa2.Spec.MinReplicas == nil {
+			t.Errorf("unexpected nil MinReplicas")
+		} else if test.expectReplicas != *hpa2.Spec.MinReplicas {
+			t.Errorf("expected: %d MinReplicas, got: %d", test.expectReplicas, *hpa2.Spec.MinReplicas)
+		}
+	}
+}
+
+func TestSetDefaultHorizontalPodAutoscalerCpuUtilization(t *testing.T) {
+	tests := []struct {
+		hpa               HorizontalPodAutoscaler
+		expectUtilization int32
+	}{
+		{
+			hpa:               HorizontalPodAutoscaler{},
+			expectUtilization: 80,
+		},
+		{
+			hpa: HorizontalPodAutoscaler{
+				Spec: HorizontalPodAutoscalerSpec{
+					CPUUtilization: &CPUTargetUtilization{
+						TargetPercentage: int32(50),
+					},
+				},
+			},
+			expectUtilization: 50,
+		},
+	}
+
+	for _, test := range tests {
+		hpa := &test.hpa
+		obj2 := roundTrip(t, runtime.Object(hpa))
+		hpa2, ok := obj2.(*HorizontalPodAutoscaler)
+		if !ok {
+			t.Errorf("unexpected object: %v", hpa2)
+			t.FailNow()
+		}
+		if hpa2.Spec.CPUUtilization == nil {
+			t.Errorf("unexpected nil CPUUtilization")
+		} else if test.expectUtilization != hpa2.Spec.CPUUtilization.TargetPercentage {
+			t.Errorf("expected: %d CPUUtilization, got: %d", test.expectUtilization, hpa2.Spec.CPUUtilization.TargetPercentage)
+		}
+	}
+}
+
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 	data, err := runtime.Encode(api.Codecs.LegacyCodec(SchemeGroupVersion), obj)
 	if err != nil {

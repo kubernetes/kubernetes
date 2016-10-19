@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/capabilities"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/group"
+	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/selinux"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/sysctl"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/user"
@@ -56,6 +57,11 @@ func (f *simpleStrategyFactory) CreateStrategies(psp *extensions.PodSecurityPoli
 		errs = append(errs, err)
 	}
 
+	seccompStrat, err := createSeccompStrategy(psp)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
 	fsGroupStrat, err := createFSGroupStrategy(&psp.Spec.FSGroup)
 	if err != nil {
 		errs = append(errs, err)
@@ -79,10 +85,7 @@ func (f *simpleStrategyFactory) CreateStrategies(psp *extensions.PodSecurityPoli
 			errs = append(errs, err)
 		}
 	}
-	sysctlsStrat, err := createSysctlsStrategy(unsafeSysctls)
-	if err != nil {
-		errs = append(errs, err)
-	}
+	sysctlsStrat := createSysctlsStrategy(unsafeSysctls)
 
 	if len(errs) > 0 {
 		return nil, errors.NewAggregate(errs)
@@ -95,6 +98,7 @@ func (f *simpleStrategyFactory) CreateStrategies(psp *extensions.PodSecurityPoli
 		FSGroupStrategy:           fsGroupStrat,
 		SupplementalGroupStrategy: supGroupStrat,
 		CapabilitiesStrategy:      capStrat,
+		SeccompStrategy:           seccompStrat,
 		SysctlsStrategy:           sysctlsStrat,
 	}
 
@@ -132,6 +136,11 @@ func createAppArmorStrategy(psp *extensions.PodSecurityPolicy) (apparmor.Strateg
 	return apparmor.NewStrategy(psp.Annotations), nil
 }
 
+// createSeccompStrategy creates a new seccomp strategy.
+func createSeccompStrategy(psp *extensions.PodSecurityPolicy) (seccomp.Strategy, error) {
+	return seccomp.NewStrategy(psp.Annotations), nil
+}
+
 // createFSGroupStrategy creates a new fsgroup strategy
 func createFSGroupStrategy(opts *extensions.FSGroupStrategyOptions) (group.GroupStrategy, error) {
 	switch opts.Rule {
@@ -162,6 +171,6 @@ func createCapabilitiesStrategy(defaultAddCaps, requiredDropCaps, allowedCaps []
 }
 
 // createSysctlsStrategy creates a new unsafe sysctls strategy.
-func createSysctlsStrategy(sysctlsPatterns []string) (sysctl.SysctlsStrategy, error) {
+func createSysctlsStrategy(sysctlsPatterns []string) sysctl.SysctlsStrategy {
 	return sysctl.NewMustMatchPatterns(sysctlsPatterns)
 }

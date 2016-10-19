@@ -28,10 +28,11 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
+	"k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -87,7 +88,6 @@ func Run(s *options.SchedulerServer) error {
 	kubeconfig.QPS = s.KubeAPIQPS
 	kubeconfig.Burst = int(s.KubeAPIBurst)
 
-	kubeClient, err := client.New(kubeconfig)
 	if err != nil {
 		glog.Fatalf("Invalid API configuration: %v", err)
 	}
@@ -114,7 +114,7 @@ func Run(s *options.SchedulerServer) error {
 		glog.Fatal(server.ListenAndServe())
 	}()
 
-	configFactory := factory.NewConfigFactory(kubeClient, s.SchedulerName, s.HardPodAffinitySymmetricWeight, s.FailureDomains)
+	configFactory := factory.NewConfigFactory(leaderElectionClient, s.SchedulerName, s.HardPodAffinitySymmetricWeight, s.FailureDomains)
 	config, err := createConfig(s, configFactory)
 
 	if err != nil {
@@ -124,7 +124,7 @@ func Run(s *options.SchedulerServer) error {
 	eventBroadcaster := record.NewBroadcaster()
 	config.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: s.SchedulerName})
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
+	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: leaderElectionClient.Core().Events("")})
 
 	sched := scheduler.New(config)
 
@@ -145,14 +145,21 @@ func Run(s *options.SchedulerServer) error {
 		return err
 	}
 
-	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
+	// TODO: enable other lock types
+	rl := resourcelock.EndpointsLock{
 		EndpointsMeta: api.ObjectMeta{
 			Namespace: "kube-system",
 			Name:      "kube-scheduler",
 		},
-		Client:        leaderElectionClient,
-		Identity:      id,
-		EventRecorder: config.Recorder,
+		Client: leaderElectionClient,
+		LockConfig: resourcelock.ResourceLockConfig{
+			Identity:      id,
+			EventRecorder: config.Recorder,
+		},
+	}
+
+	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
+		Lock:          &rl,
 		LeaseDuration: s.LeaderElection.LeaseDuration.Duration,
 		RenewDeadline: s.LeaderElection.RenewDeadline.Duration,
 		RetryPeriod:   s.LeaderElection.RetryPeriod.Duration,

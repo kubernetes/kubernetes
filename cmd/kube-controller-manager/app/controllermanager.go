@@ -18,8 +18,6 @@ limitations under the License.
 // components.  This includes replication controllers, service endpoints and
 // nodes.
 //
-// CAUTION: If you update code in this file, you may need to also update code
-//          in contrib/mesos/pkg/controllermanager/controllermanager.go
 package app
 
 import (
@@ -41,6 +39,7 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
+	"k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
@@ -164,7 +163,21 @@ func Run(s *options.CMServer) error {
 	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "controller-manager"})
 
 	run := func(stop <-chan struct{}) {
-		err := StartControllers(s, kubeconfig, stop, recorder)
+		rootClientBuilder := controller.SimpleControllerClientBuilder{
+			ClientConfig: kubeconfig,
+		}
+		var clientBuilder controller.ControllerClientBuilder
+		if len(s.ServiceAccountKeyFile) > 0 {
+			clientBuilder = controller.SAControllerClientBuilder{
+				ClientConfig: restclient.AnonymousClientConfig(kubeconfig),
+				CoreClient:   kubeClient.Core(),
+				Namespace:    "kube-system",
+			}
+		} else {
+			clientBuilder = rootClientBuilder
+		}
+
+		err := StartControllers(s, kubeconfig, rootClientBuilder, clientBuilder, stop, recorder)
 		glog.Fatalf("error running controllers: %v", err)
 		panic("unreachable")
 	}
@@ -179,14 +192,21 @@ func Run(s *options.CMServer) error {
 		return err
 	}
 
-	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
+	// TODO: enable other lock types
+	rl := resourcelock.EndpointsLock{
 		EndpointsMeta: api.ObjectMeta{
 			Namespace: "kube-system",
 			Name:      "kube-controller-manager",
 		},
-		Client:        leaderElectionClient,
-		Identity:      id,
-		EventRecorder: recorder,
+		Client: leaderElectionClient,
+		LockConfig: resourcelock.ResourceLockConfig{
+			Identity:      id,
+			EventRecorder: recorder,
+		},
+	}
+
+	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
+		Lock:          &rl,
 		LeaseDuration: s.LeaderElection.LeaseDuration.Duration,
 		RenewDeadline: s.LeaderElection.RenewDeadline.Duration,
 		RetryPeriod:   s.LeaderElection.RetryPeriod.Duration,
@@ -200,12 +220,42 @@ func Run(s *options.CMServer) error {
 	panic("unreachable")
 }
 
-func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, stop <-chan struct{}, recorder record.EventRecorder) error {
-	client := func(userAgent string) clientset.Interface {
-		return clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, userAgent))
+func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootClientBuilder, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}, recorder record.EventRecorder) error {
+	client := func(serviceAccountName string) clientset.Interface {
+		return rootClientBuilder.ClientOrDie(serviceAccountName)
 	}
 	discoveryClient := client("controller-discovery").Discovery()
 	sharedInformers := informers.NewSharedInformerFactory(client("shared-informers"), ResyncPeriod(s)())
+
+	// always start the SA token controller first using a full-power client, since it needs to mint tokens for the rest
+	if len(s.ServiceAccountKeyFile) > 0 {
+		privateKey, err := serviceaccount.ReadPrivateKey(s.ServiceAccountKeyFile)
+		if err != nil {
+			return fmt.Errorf("Error reading key for service account token controller: %v", err)
+		} else {
+			var rootCA []byte
+			if s.RootCAFile != "" {
+				rootCA, err = ioutil.ReadFile(s.RootCAFile)
+				if err != nil {
+					return fmt.Errorf("error reading root-ca-file at %s: %v", s.RootCAFile, err)
+				}
+				if _, err := certutil.ParseCertsPEM(rootCA); err != nil {
+					return fmt.Errorf("error parsing root-ca-file at %s: %v", s.RootCAFile, err)
+				}
+			} else {
+				rootCA = kubeconfig.CAData
+			}
+
+			go serviceaccountcontroller.NewTokensController(
+				rootClientBuilder.ClientOrDie("tokens-controller"),
+				serviceaccountcontroller.TokensControllerOptions{
+					TokenGenerator: serviceaccount.JWTTokenGenerator(privateKey),
+					RootCA:         rootCA,
+				},
+			).Run(int(s.ConcurrentSATokenSyncs), wait.NeverStop)
+			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+		}
+	}
 
 	go endpointcontroller.NewEndpointController(sharedInformers.Pods().Informer(), client("endpoint-controller")).
 		Run(int(s.ConcurrentEndpointSyncs), wait.NeverStop)
@@ -213,7 +263,7 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, stop <
 
 	go replicationcontroller.NewReplicationManager(
 		sharedInformers.Pods().Informer(),
-		client("replication-controller"),
+		clientBuilder.ClientOrDie("replication-controller"),
 		ResyncPeriod(s),
 		replicationcontroller.BurstReplicas,
 		int(s.LookupCacheSizeForRC),
@@ -240,7 +290,9 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, stop <
 	if err != nil {
 		glog.Warningf("Unsuccessful parsing of service CIDR %v: %v", s.ServiceCIDR, err)
 	}
-	nodeController, err := nodecontroller.NewNodeController(sharedInformers.Pods().Informer(), cloud, client("node-controller"),
+	nodeController, err := nodecontroller.NewNodeController(
+		sharedInformers.Pods(), sharedInformers.Nodes(), sharedInformers.DaemonSets(),
+		cloud, client("node-controller"),
 		s.PodEvictionTimeout.Duration, s.NodeEvictionRate, s.SecondaryNodeEvictionRate, s.LargeClusterSizeThreshold, s.UnhealthyZoneThreshold, s.NodeMonitorGracePeriod.Duration,
 		s.NodeStartupGracePeriod.Duration, s.NodeMonitorPeriod.Duration, clusterCIDR, serviceCIDR,
 		int(s.NodeCIDRMaskSize), s.AllocateNodeCIDRs)
@@ -363,14 +415,14 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, stop <
 
 		if containsResource(resources, "deployments") {
 			glog.Infof("Starting deployment controller")
-			go deployment.NewDeploymentController(client("deployment-controller"), ResyncPeriod(s)).
+			go deployment.NewDeploymentController(sharedInformers.Deployments(), sharedInformers.ReplicaSets(), sharedInformers.Pods(), client("deployment-controller")).
 				Run(int(s.ConcurrentDeploymentSyncs), wait.NeverStop)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
 
 		if containsResource(resources, "replicasets") {
 			glog.Infof("Starting ReplicaSet controller")
-			go replicaset.NewReplicaSetController(sharedInformers.Pods().Informer(), client("replicaset-controller"), ResyncPeriod(s), replicaset.BurstReplicas, int(s.LookupCacheSizeForRS), s.EnableGarbageCollector).
+			go replicaset.NewReplicaSetController(sharedInformers.ReplicaSets(), sharedInformers.Pods(), client("replicaset-controller"), replicaset.BurstReplicas, int(s.LookupCacheSizeForRS), s.EnableGarbageCollector).
 				Run(int(s.ConcurrentRSSyncs), wait.NeverStop)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
@@ -475,36 +527,6 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, stop <
 			} else {
 				go certController.Run(1, wait.NeverStop)
 			}
-			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
-		}
-	}
-
-	var rootCA []byte
-
-	if s.RootCAFile != "" {
-		rootCA, err = ioutil.ReadFile(s.RootCAFile)
-		if err != nil {
-			return fmt.Errorf("error reading root-ca-file at %s: %v", s.RootCAFile, err)
-		}
-		if _, err := certutil.ParseCertsPEM(rootCA); err != nil {
-			return fmt.Errorf("error parsing root-ca-file at %s: %v", s.RootCAFile, err)
-		}
-	} else {
-		rootCA = kubeconfig.CAData
-	}
-
-	if len(s.ServiceAccountKeyFile) > 0 {
-		privateKey, err := serviceaccount.ReadPrivateKey(s.ServiceAccountKeyFile)
-		if err != nil {
-			glog.Errorf("Error reading key for service account token controller: %v", err)
-		} else {
-			go serviceaccountcontroller.NewTokensController(
-				client("tokens-controller"),
-				serviceaccountcontroller.TokensControllerOptions{
-					TokenGenerator: serviceaccount.JWTTokenGenerator(privateKey),
-					RootCA:         rootCA,
-				},
-			).Run(int(s.ConcurrentSATokenSyncs), wait.NeverStop)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
 	}

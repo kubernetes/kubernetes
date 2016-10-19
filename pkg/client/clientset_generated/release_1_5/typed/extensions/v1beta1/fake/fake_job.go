@@ -19,6 +19,7 @@ package fake
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
@@ -63,14 +64,14 @@ func (c *FakeJobs) UpdateStatus(job *v1beta1.Job) (*v1beta1.Job, error) {
 	return obj.(*v1beta1.Job), err
 }
 
-func (c *FakeJobs) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeJobs) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewDeleteAction(jobsResource, c.ns, name), &v1beta1.Job{})
 
 	return err
 }
 
-func (c *FakeJobs) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakeJobs) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(jobsResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.JobList{})
@@ -87,7 +88,7 @@ func (c *FakeJobs) Get(name string) (result *v1beta1.Job, err error) {
 	return obj.(*v1beta1.Job), err
 }
 
-func (c *FakeJobs) List(opts api.ListOptions) (result *v1beta1.JobList, err error) {
+func (c *FakeJobs) List(opts v1.ListOptions) (result *v1beta1.JobList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewListAction(jobsResource, c.ns, opts), &v1beta1.JobList{})
 
@@ -95,7 +96,7 @@ func (c *FakeJobs) List(opts api.ListOptions) (result *v1beta1.JobList, err erro
 		return nil, err
 	}
 
-	label := opts.LabelSelector
+	label, _, _ := core.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -109,7 +110,7 @@ func (c *FakeJobs) List(opts api.ListOptions) (result *v1beta1.JobList, err erro
 }
 
 // Watch returns a watch.Interface that watches the requested jobs.
-func (c *FakeJobs) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeJobs) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(jobsResource, c.ns, opts))
 

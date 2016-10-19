@@ -1260,15 +1260,12 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 	tags[cloudVolumeCreatedForVolumeNameTag] = pvName
 
 	options := vol.VolumeOptions{
-		Capacity:                      claim.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)],
-		AccessModes:                   claim.Spec.AccessModes,
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
 		CloudTags:                     &tags,
 		ClusterName:                   ctrl.clusterName,
 		PVName:                        pvName,
-		PVCName:                       claim.Name,
+		PVC:                           claim,
 		Parameters:                    storageClass.Parameters,
-		Selector:                      claim.Spec.Selector,
 	}
 
 	// Provision the volume

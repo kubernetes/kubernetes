@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/rbac/validation"
+	rbacregistry "k8s.io/kubernetes/pkg/registry/rbac"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -42,14 +43,12 @@ func NewStorage(s rest.StandardStorage, ruleResolver validation.AuthorizationRul
 }
 
 func (s *Storage) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-	if user, ok := api.UserFrom(ctx); ok {
-		if s.superUser != "" && user.GetName() == s.superUser {
-			return s.StandardStorage.Create(ctx, obj)
-		}
+	if rbacregistry.EscalationAllowed(ctx, s.superUser) {
+		return s.StandardStorage.Create(ctx, obj)
 	}
 
 	roleBinding := obj.(*rbac.RoleBinding)
-	rules, err := s.ruleResolver.GetRoleReferenceRules(ctx, roleBinding.RoleRef, roleBinding.Namespace)
+	rules, err := s.ruleResolver.GetRoleReferenceRules(roleBinding.RoleRef, roleBinding.Namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -60,16 +59,14 @@ func (s *Storage) Create(ctx api.Context, obj runtime.Object) (runtime.Object, e
 }
 
 func (s *Storage) Update(ctx api.Context, name string, obj rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
-	if user, ok := api.UserFrom(ctx); ok {
-		if s.superUser != "" && user.GetName() == s.superUser {
-			return s.StandardStorage.Update(ctx, name, obj)
-		}
+	if rbacregistry.EscalationAllowed(ctx, s.superUser) {
+		return s.StandardStorage.Update(ctx, name, obj)
 	}
 
 	nonEscalatingInfo := wrapUpdatedObjectInfo(obj, func(ctx api.Context, obj runtime.Object, oldObj runtime.Object) (runtime.Object, error) {
 		roleBinding := obj.(*rbac.RoleBinding)
 
-		rules, err := s.ruleResolver.GetRoleReferenceRules(ctx, roleBinding.RoleRef, roleBinding.Namespace)
+		rules, err := s.ruleResolver.GetRoleReferenceRules(roleBinding.RoleRef, roleBinding.Namespace)
 		if err != nil {
 			return nil, err
 		}

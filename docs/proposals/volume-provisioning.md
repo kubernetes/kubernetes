@@ -112,8 +112,7 @@ We propose that:
     1. If the claim has non-empty `claim.Spec.Class`, only PVs with the same
         `pv.Spec.Class` are considered.
 
-    2. If the claim has empty `claim.Spec.Class`, all existing PVs are
-        considered.
+    2. If the claim has empty `claim.Spec.Class`, only PVs with an unset `pv.Spec.Class` are considered.
 
     All "considered" volumes are evaluated and the
     smallest matching volume is bound to the claim.

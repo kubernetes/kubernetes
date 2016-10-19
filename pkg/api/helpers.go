@@ -123,6 +123,7 @@ func IsStandardContainerResourceName(str string) bool {
 var standardLimitRangeTypes = sets.NewString(
 	string(LimitTypePod),
 	string(LimitTypeContainer),
+	string(LimitTypePersistentVolumeClaim),
 )
 
 // IsStandardLimitRangeType returns true if the type is Pod or Container
@@ -511,7 +512,6 @@ func TolerationToleratesTaint(toleration *Toleration, taint *Taint) bool {
 		return true
 	}
 	return false
-
 }
 
 // TaintToleratedByTolerations checks if taint is tolerated by any of the tolerations.
@@ -577,7 +577,7 @@ func SysctlsFromPodAnnotation(annotation string) ([]Sysctl, error) {
 	sysctls := make([]Sysctl, len(kvs))
 	for i, kv := range kvs {
 		cs := strings.Split(kv, "=")
-		if len(cs) != 2 {
+		if len(cs) != 2 || len(cs[0]) == 0 {
 			return nil, fmt.Errorf("sysctl %q not of the format sysctl_name=value", kv)
 		}
 		sysctls[i].Name = cs[0]

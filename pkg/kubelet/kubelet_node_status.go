@@ -317,22 +317,7 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 		return fmt.Errorf("no node instance returned for %q", kl.nodeName)
 	}
 
-	// Flannel is the authoritative source of pod CIDR, if it's running.
-	// This is a short term compromise till we get flannel working in
-	// reservation mode.
-	if kl.flannelExperimentalOverlay {
-		flannelPodCIDR := kl.runtimeState.podCIDR()
-		if node.Spec.PodCIDR != flannelPodCIDR {
-			node.Spec.PodCIDR = flannelPodCIDR
-			glog.Infof("Updating podcidr to %v", node.Spec.PodCIDR)
-			if updatedNode, err := kl.kubeClient.Core().Nodes().Update(node); err != nil {
-				glog.Warningf("Failed to update podCIDR: %v", err)
-			} else {
-				// Update the node resourceVersion so the status update doesn't fail.
-				node = updatedNode
-			}
-		}
-	} else if kl.reconcileCIDR {
+	if kl.reconcileCIDR {
 		kl.updatePodCIDR(node.Spec.PodCIDR)
 	}
 
@@ -359,6 +344,14 @@ func (kl *Kubelet) recordNodeStatusEvent(eventtype, event string) {
 
 // Set IP addresses for the node.
 func (kl *Kubelet) setNodeAddress(node *api.Node) error {
+
+	if kl.nodeIP != nil {
+		if err := kl.validateNodeIP(); err != nil {
+			return fmt.Errorf("failed to validate nodeIP: %v", err)
+		}
+		glog.V(2).Infof("Using node IP: %q", kl.nodeIP.String())
+	}
+
 	if kl.cloud != nil {
 		instances, ok := kl.cloud.Instances()
 		if !ok {
@@ -372,6 +365,19 @@ func (kl *Kubelet) setNodeAddress(node *api.Node) error {
 		if err != nil {
 			return fmt.Errorf("failed to get node address from cloud provider: %v", err)
 		}
+
+		if kl.nodeIP != nil {
+			for _, nodeAddress := range nodeAddresses {
+				if nodeAddress.Address == kl.nodeIP.String() {
+					node.Status.Addresses = []api.NodeAddress{
+						{Type: nodeAddress.Type, Address: nodeAddress.Address},
+					}
+					return nil
+				}
+			}
+			return fmt.Errorf("failed to get node address from cloud provider that matches ip: %v", kl.nodeIP)
+		}
+
 		node.Status.Addresses = nodeAddresses
 	} else {
 		var ipAddr net.IP
@@ -721,6 +727,65 @@ func (kl *Kubelet) setNodeDiskPressureCondition(node *api.Node) {
 	}
 }
 
+// setNodeInodePressureCondition for the node.
+// TODO: this needs to move somewhere centralized...
+func (kl *Kubelet) setNodeInodePressureCondition(node *api.Node) {
+	currentTime := unversioned.NewTime(kl.clock.Now())
+	var condition *api.NodeCondition
+
+	// Check if NodeInodePressure condition already exists and if it does, just pick it up for update.
+	for i := range node.Status.Conditions {
+		if node.Status.Conditions[i].Type == api.NodeInodePressure {
+			condition = &node.Status.Conditions[i]
+		}
+	}
+
+	newCondition := false
+	// If the NodeInodePressure condition doesn't exist, create one
+	if condition == nil {
+		condition = &api.NodeCondition{
+			Type:   api.NodeInodePressure,
+			Status: api.ConditionUnknown,
+		}
+		// cannot be appended to node.Status.Conditions here because it gets
+		// copied to the slice. So if we append to the slice here none of the
+		// updates we make below are reflected in the slice.
+		newCondition = true
+	}
+
+	// Update the heartbeat time
+	condition.LastHeartbeatTime = currentTime
+
+	// Note: The conditions below take care of the case when a new NodeInodePressure condition is
+	// created and as well as the case when the condition already exists. When a new condition
+	// is created its status is set to api.ConditionUnknown which matches either
+	// condition.Status != api.ConditionTrue or
+	// condition.Status != api.ConditionFalse in the conditions below depending on whether
+	// the kubelet is under inode pressure or not.
+	if kl.evictionManager.IsUnderInodePressure() {
+		if condition.Status != api.ConditionTrue {
+			condition.Status = api.ConditionTrue
+			condition.Reason = "KubeletHasInodePressure"
+			condition.Message = "kubelet has inode pressure"
+			condition.LastTransitionTime = currentTime
+			kl.recordNodeStatusEvent(api.EventTypeNormal, "NodeHasInodePressure")
+		}
+	} else {
+		if condition.Status != api.ConditionFalse {
+			condition.Status = api.ConditionFalse
+			condition.Reason = "KubeletHasNoInodePressure"
+			condition.Message = "kubelet has no inode pressure"
+			condition.LastTransitionTime = currentTime
+			kl.recordNodeStatusEvent(api.EventTypeNormal, "NodeHasNoInodePressure")
+		}
+	}
+
+	if newCondition {
+		node.Status.Conditions = append(node.Status.Conditions, *condition)
+	}
+
+}
+
 // Set OODcondition for the node.
 func (kl *Kubelet) setNodeOODCondition(node *api.Node) {
 	currentTime := unversioned.NewTime(kl.clock.Now())
@@ -835,6 +900,7 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*api.Node) error {
 		withoutError(kl.setNodeOODCondition),
 		withoutError(kl.setNodeMemoryPressureCondition),
 		withoutError(kl.setNodeDiskPressureCondition),
+		withoutError(kl.setNodeInodePressureCondition),
 		withoutError(kl.setNodeReadyCondition),
 		withoutError(kl.setNodeVolumesInUseStatus),
 		withoutError(kl.recordNodeSchedulableEvent),
@@ -847,4 +913,37 @@ func SetNodeStatus(f func(*api.Node) error) Option {
 	return func(k *Kubelet) {
 		k.setNodeStatusFuncs = append(k.setNodeStatusFuncs, f)
 	}
+}
+
+// Validate given node IP belongs to the current host
+func (kl *Kubelet) validateNodeIP() error {
+	if kl.nodeIP == nil {
+		return nil
+	}
+
+	// Honor IP limitations set in setNodeStatus()
+	if kl.nodeIP.IsLoopback() {
+		return fmt.Errorf("nodeIP can't be loopback address")
+	}
+	if kl.nodeIP.To4() == nil {
+		return fmt.Errorf("nodeIP must be IPv4 address")
+	}
+
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return err
+	}
+	for _, addr := range addrs {
+		var ip net.IP
+		switch v := addr.(type) {
+		case *net.IPNet:
+			ip = v.IP
+		case *net.IPAddr:
+			ip = v.IP
+		}
+		if ip != nil && ip.Equal(kl.nodeIP) {
+			return nil
+		}
+	}
+	return fmt.Errorf("Node IP: %q not found in the host's network interfaces", kl.nodeIP.String())
 }

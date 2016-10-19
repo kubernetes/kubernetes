@@ -42,7 +42,7 @@ func makeContainerConfig(sConfig *runtimeApi.PodSandboxConfig, name, image strin
 // TestListContainers creates several containers and then list them to check
 // whether the correct metadatas, states, and labels are returned.
 func TestListContainers(t *testing.T) {
-	ds, _, _ := newTestDockerSevice()
+	ds, _, _ := newTestDockerService()
 	podName, namespace := "foo", "bar"
 	containerName, image := "sidecar", "logger"
 
@@ -52,7 +52,7 @@ func TestListContainers(t *testing.T) {
 		s := makeSandboxConfig(fmt.Sprintf("%s%d", podName, i),
 			fmt.Sprintf("%s%d", namespace, i), fmt.Sprintf("%d", i), 0)
 		labels := map[string]string{"abc.xyz": fmt.Sprintf("label%d", i)}
-		annotations := map[string]string{"foo.bar.baz": fmt.Sprintf("annotaion%d", i)}
+		annotations := map[string]string{"foo.bar.baz": fmt.Sprintf("annotation%d", i)}
 		c := makeContainerConfig(s, fmt.Sprintf("%s%d", containerName, i),
 			fmt.Sprintf("%s:v%d", image, i), uint32(i), labels, annotations)
 		sConfigs = append(sConfigs, s)
@@ -61,6 +61,7 @@ func TestListContainers(t *testing.T) {
 
 	expected := []*runtimeApi.Container{}
 	state := runtimeApi.ContainerState_RUNNING
+	var createdAt int64 = 0
 	for i := range configs {
 		// We don't care about the sandbox id; pass a bogus one.
 		sandboxID := fmt.Sprintf("sandboxid%d", i)
@@ -73,13 +74,15 @@ func TestListContainers(t *testing.T) {
 		// Prepend to the expected list because ListContainers returns
 		// the most recent containers first.
 		expected = append([]*runtimeApi.Container{{
-			Metadata:    configs[i].Metadata,
-			Id:          &id,
-			State:       &state,
-			Image:       configs[i].Image,
-			ImageRef:    &imageRef,
-			Labels:      configs[i].Labels,
-			Annotations: configs[i].Annotations,
+			Metadata:     configs[i].Metadata,
+			Id:           &id,
+			PodSandboxId: &sandboxID,
+			State:        &state,
+			CreatedAt:    &createdAt,
+			Image:        configs[i].Image,
+			ImageRef:     &imageRef,
+			Labels:       configs[i].Labels,
+			Annotations:  configs[i].Annotations,
 		}}, expected...)
 	}
 	containers, err := ds.ListContainers(nil)
@@ -91,18 +94,18 @@ func TestListContainers(t *testing.T) {
 // TestContainerStatus tests the basic lifecycle operations and verify that
 // the status returned reflects the operations performed.
 func TestContainerStatus(t *testing.T) {
-	ds, _, fClock := newTestDockerSevice()
+	ds, fDocker, fClock := newTestDockerService()
 	sConfig := makeSandboxConfig("foo", "bar", "1", 0)
 	labels := map[string]string{"abc.xyz": "foo"}
 	annotations := map[string]string{"foo.bar.baz": "abc"}
 	config := makeContainerConfig(sConfig, "pause", "iamimage", 0, labels, annotations)
 
 	var defaultTime time.Time
-	dt := defaultTime.Unix()
+	dt := defaultTime.UnixNano()
 	ct, st, ft := dt, dt, dt
 	state := runtimeApi.ContainerState_CREATED
 	// The following variables are not set in FakeDockerClient.
-	imageRef := ""
+	imageRef := DockerImageIDPrefix + ""
 	exitCode := int32(0)
 	var reason, message string
 
@@ -124,8 +127,16 @@ func TestContainerStatus(t *testing.T) {
 
 	// Create the container.
 	fClock.SetTime(time.Now().Add(-1 * time.Hour))
-	*expected.CreatedAt = fClock.Now().Unix()
-	id, err := ds.CreateContainer("sandboxid", config, sConfig)
+	*expected.CreatedAt = fClock.Now().UnixNano()
+	const sandboxId = "sandboxid"
+	id, err := ds.CreateContainer(sandboxId, config, sConfig)
+
+	// Check internal labels
+	c, err := fDocker.InspectContainer(id)
+	assert.NoError(t, err)
+	assert.Equal(t, c.Config.Labels[containerTypeLabelKey], containerTypeLabelContainer)
+	assert.Equal(t, c.Config.Labels[sandboxIDLabelKey], sandboxId)
+
 	// Set the id manually since we don't know the id until it's created.
 	expected.Id = &id
 	assert.NoError(t, err)
@@ -135,7 +146,7 @@ func TestContainerStatus(t *testing.T) {
 
 	// Advance the clock and start the container.
 	fClock.SetTime(time.Now())
-	*expected.StartedAt = fClock.Now().Unix()
+	*expected.StartedAt = fClock.Now().UnixNano()
 	*expected.State = runtimeApi.ContainerState_RUNNING
 
 	err = ds.StartContainer(id)
@@ -145,7 +156,7 @@ func TestContainerStatus(t *testing.T) {
 
 	// Advance the clock and stop the container.
 	fClock.SetTime(time.Now().Add(1 * time.Hour))
-	*expected.FinishedAt = fClock.Now().Unix()
+	*expected.FinishedAt = fClock.Now().UnixNano()
 	*expected.State = runtimeApi.ContainerState_EXITED
 	*expected.Reason = "Completed"
 

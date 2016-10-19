@@ -28,6 +28,8 @@ import (
 	"github.com/golang/glog"
 
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
@@ -86,14 +88,19 @@ func extractLabels(input map[string]string) (map[string]string, map[string]strin
 		// Check if the key is used internally by the shim.
 		internal := false
 		for _, internalKey := range internalLabelKeys {
-			// TODO: containerTypeLabelKey is the only internal label the shim uses
-			// right now. Expand this to a list later.
 			if k == internalKey {
 				internal = true
 				break
 			}
 		}
 		if internal {
+			continue
+		}
+
+		// Delete the container name label for the sandbox. It is added in the shim,
+		// should not be exposed via CRI.
+		if k == types.KubernetesContainerNameLabel &&
+			input[containerTypeLabelKey] == containerTypeLabelSandbox {
 			continue
 		}
 
@@ -179,12 +186,30 @@ func makePortsAndBindings(pm []*runtimeApi.PortMapping) (map[dockernat.Port]stru
 	return exposedPorts, portBindings
 }
 
-// TODO: Seccomp support. Need to figure out how to pass seccomp options
-// through the runtime API (annotations?).See dockerManager.getSecurityOpts()
-// for the details. Always set the default seccomp profile for now.
-// Also need to support syntax for different docker versions.
-func getSeccompOpts() string {
-	return fmt.Sprintf("%s=%s", "seccomp", defaultSeccompProfile)
+// getContainerSecurityOpt gets container security options from container and sandbox config, currently from sandbox
+// annotations.
+// It is an experimental feature and may be promoted to official runtime api in the future.
+func getContainerSecurityOpts(containerName string, sandboxConfig *runtimeApi.PodSandboxConfig, seccompProfileRoot string) ([]string, error) {
+	appArmorOpts, err := dockertools.GetAppArmorOpts(sandboxConfig.GetAnnotations(), containerName)
+	if err != nil {
+		return nil, err
+	}
+	seccompOpts, err := dockertools.GetSeccompOpts(sandboxConfig.GetAnnotations(), containerName, seccompProfileRoot)
+	if err != nil {
+		return nil, err
+	}
+	securityOpts := append(appArmorOpts, seccompOpts...)
+	var opts []string
+	for _, securityOpt := range securityOpts {
+		k, v := securityOpt.GetKV()
+		opts = append(opts, fmt.Sprintf("%s=%s", k, v))
+	}
+	return opts, nil
+}
+
+func getSandboxSecurityOpts(sandboxConfig *runtimeApi.PodSandboxConfig, seccompProfileRoot string) ([]string, error) {
+	// sandboxContainerName doesn't exist in the pod, so pod security options will be returned by default.
+	return getContainerSecurityOpts(sandboxContainerName, sandboxConfig, seccompProfileRoot)
 }
 
 func getNetworkNamespace(c *dockertypes.ContainerJSON) string {

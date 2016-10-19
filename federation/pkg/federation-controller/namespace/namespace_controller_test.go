@@ -31,6 +31,7 @@ import (
 	fake_kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -110,6 +111,12 @@ func TestNamespaceController(t *testing.T) {
 	createdNamespace := GetNamespaceFromChan(cluster1CreateChan)
 	assert.NotNil(t, createdNamespace)
 	assert.Equal(t, ns1.Name, createdNamespace.Name)
+
+	// Wait for the secret to appear in the informer store
+	err := WaitForStoreUpdate(
+		namespaceController.namespaceFederatedInformer.GetTargetStore(),
+		cluster1.Name, ns1.Name, wait.ForeverTestTimeout)
+	assert.Nil(t, err, "namespace should have appeared in the informer store")
 
 	// Test update federated namespace.
 	ns1.Annotations = map[string]string{

@@ -1025,7 +1025,15 @@ function configure-salt() {
 
 function run-salt() {
   echo "== Calling Salt =="
-  salt-call --local state.highstate || true
+  local rc=0
+  for i in {0..6}; do
+    salt-call --local state.highstate && rc=0 || rc=$?
+    if [[ "${rc}" == 0 ]]; then
+      return 0
+    fi
+  done
+  echo "Salt failed to run repeatedly" >&2
+  return "${rc}"
 }
 
 function run-user-script() {

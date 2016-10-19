@@ -118,7 +118,12 @@ func (plugin *execNetworkPlugin) Init(host network.Host, hairpinMode componentco
 	plugin.host = host
 	// call the init script
 	out, err := utilexec.New().Command(plugin.getExecutable(), initCmd).CombinedOutput()
-	glog.V(5).Infof("Init 'exec' network plugin output: %s, %v", string(out), err)
+	if err != nil {
+		glog.V(5).Infof("Init 'exec' network plugin output: %s, %v", string(out), err)
+	} else {
+		glog.V(5).Infof("Init 'exec' network plugin output: %s", string(out))
+	}
+
 	return err
 }
 
@@ -142,21 +147,32 @@ func (plugin *execNetworkPlugin) validate() error {
 
 func (plugin *execNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID) error {
 	out, err := utilexec.New().Command(plugin.getExecutable(), setUpCmd, namespace, name, id.ID).CombinedOutput()
-	glog.V(5).Infof("SetUpPod 'exec' network plugin output: %s, %v", string(out), err)
+	if err != nil {
+		glog.V(5).Infof("SetUpPod 'exec' network plugin output: %s, %v", string(out), err)
+	} else {
+		glog.V(5).Infof("SetUpPod 'exec' network plugin output: %s", string(out))
+	}
+
 	return err
 }
 
 func (plugin *execNetworkPlugin) TearDownPod(namespace string, name string, id kubecontainer.ContainerID) error {
 	out, err := utilexec.New().Command(plugin.getExecutable(), tearDownCmd, namespace, name, id.ID).CombinedOutput()
-	glog.V(5).Infof("TearDownPod 'exec' network plugin output: %s, %v", string(out), err)
+	if err != nil {
+		glog.V(5).Infof("TearDownPod 'exec' network plugin output: %s, %v", string(out), err)
+	} else {
+		glog.V(5).Infof("TearDownPod 'exec' network plugin output: %s", string(out))
+	}
 	return err
 }
 
 func (plugin *execNetworkPlugin) GetPodNetworkStatus(namespace string, name string, id kubecontainer.ContainerID) (*network.PodNetworkStatus, error) {
 	out, err := utilexec.New().Command(plugin.getExecutable(), statusCmd, namespace, name, id.ID).CombinedOutput()
-	glog.V(5).Infof("Status 'exec' network plugin output: %s, %v", string(out), err)
 	if err != nil {
+		glog.V(5).Infof("Status 'exec' network plugin output: %s, %v", string(out), err)
 		return nil, err
+	} else {
+		glog.V(5).Infof("Status 'exec' network plugin output: %s", string(out))
 	}
 	if string(out) == "" {
 		return nil, nil

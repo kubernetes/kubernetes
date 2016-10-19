@@ -19,33 +19,31 @@ package set
 import (
 	"io"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 var (
-	set_long = dedent.Dedent(`
+	set_long = templates.LongDesc(`
 		Configure application resources
-	
+
 		These commands help you make changes to existing application resources.`)
-	set_example = dedent.Dedent(``)
 )
 
-func NewCmdSet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
-
+func NewCmdSet(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "set SUBCOMMAND",
-		Short:   "Set specific features on objects",
-		Long:    set_long,
-		Example: set_example,
+		Use:   "set SUBCOMMAND",
+		Short: "Set specific features on objects",
+		Long:  set_long,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Help()
 		},
 	}
 
 	// add subcommands
-	cmd.AddCommand(NewCmdImage(f, out))
+	cmd.AddCommand(NewCmdImage(f, out, err))
+	cmd.AddCommand(NewCmdResources(f, out, err))
 
 	return cmd
 }

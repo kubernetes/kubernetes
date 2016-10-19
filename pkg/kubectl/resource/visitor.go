@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/yaml"
@@ -638,4 +639,52 @@ func RetrieveLazy(info *Info, err error) error {
 		return info.Get()
 	}
 	return nil
+}
+
+type FilterFunc func(info *Info, err error) (bool, error)
+
+type FilteredVisitor struct {
+	visitor Visitor
+	filters []FilterFunc
+}
+
+func NewFilteredVisitor(v Visitor, fn ...FilterFunc) Visitor {
+	if len(fn) == 0 {
+		return v
+	}
+	return FilteredVisitor{v, fn}
+}
+
+func (v FilteredVisitor) Visit(fn VisitorFunc) error {
+	return v.visitor.Visit(func(info *Info, err error) error {
+		if err != nil {
+			return err
+		}
+		for _, filter := range v.filters {
+			ok, err := filter(info, nil)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				return nil
+			}
+		}
+		return fn(info, nil)
+	})
+}
+
+func FilterBySelector(s labels.Selector) FilterFunc {
+	return func(info *Info, err error) (bool, error) {
+		if err != nil {
+			return false, err
+		}
+		a, err := meta.Accessor(info.Object)
+		if err != nil {
+			return false, err
+		}
+		if !s.Matches(labels.Set(a.GetLabels())) {
+			return false, nil
+		}
+		return true, nil
+	}
 }

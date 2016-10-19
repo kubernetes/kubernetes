@@ -128,6 +128,31 @@ func (m *kubeGenericRuntimeManager) sandboxToKubeContainer(s *runtimeApi.PodSand
 	}, nil
 }
 
+// getContainerSpec gets the container spec by containerName.
+func getContainerSpec(pod *api.Pod, containerName string) *api.Container {
+	for i, c := range pod.Spec.Containers {
+		if containerName == c.Name {
+			return &pod.Spec.Containers[i]
+		}
+	}
+	for i, c := range pod.Spec.InitContainers {
+		if containerName == c.Name {
+			return &pod.Spec.InitContainers[i]
+		}
+	}
+
+	return nil
+}
+
+// isContainerFailed returns true if container has exited and exitcode is not zero.
+func isContainerFailed(status *kubecontainer.ContainerStatus) bool {
+	if status.State == kubecontainer.ContainerStateExited && status.ExitCode != 0 {
+		return true
+	}
+
+	return false
+}
+
 // milliCPUToShares converts milliCPU to CPU shares
 func milliCPUToShares(milliCPU int64) int64 {
 	if milliCPU == 0 {

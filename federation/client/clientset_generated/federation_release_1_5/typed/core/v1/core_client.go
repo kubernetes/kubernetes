@@ -25,6 +25,7 @@ import (
 
 type CoreInterface interface {
 	GetRESTClient() *restclient.RESTClient
+	ConfigMapsGetter
 	EventsGetter
 	NamespacesGetter
 	SecretsGetter
@@ -34,6 +35,10 @@ type CoreInterface interface {
 // CoreClient is used to interact with features provided by the Core group.
 type CoreClient struct {
 	*restclient.RESTClient
+}
+
+func (c *CoreClient) ConfigMaps(namespace string) ConfigMapInterface {
+	return newConfigMaps(c, namespace)
 }
 
 func (c *CoreClient) Events(namespace string) EventInterface {

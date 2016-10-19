@@ -20,9 +20,8 @@ import (
 	"net/http"
 
 	assetfs "github.com/elazarl/go-bindata-assetfs"
-	"github.com/emicklei/go-restful"
 
-	"k8s.io/kubernetes/pkg/apiserver"
+	"k8s.io/kubernetes/pkg/genericapiserver/mux"
 	"k8s.io/kubernetes/pkg/genericapiserver/routes/data/swagger"
 )
 
@@ -30,12 +29,12 @@ import (
 type SwaggerUI struct{}
 
 // Install adds the SwaggerUI webservice to the given mux.
-func (l SwaggerUI) Install(mux *apiserver.PathRecorderMux, c *restful.Container) {
+func (l SwaggerUI) Install(c *mux.APIContainer) {
 	fileServer := http.FileServer(&assetfs.AssetFS{
 		Asset:    swagger.Asset,
 		AssetDir: swagger.AssetDir,
 		Prefix:   "third_party/swagger-ui",
 	})
 	prefix := "/swagger-ui/"
-	mux.Handle(prefix, http.StripPrefix(prefix, fileServer))
+	c.NonSwaggerRoutes.Handle(prefix, http.StripPrefix(prefix, fileServer))
 }

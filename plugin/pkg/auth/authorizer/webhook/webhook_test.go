@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -183,7 +184,11 @@ current-context: default
 				return fmt.Errorf("failed to execute test template: %v", err)
 			}
 			// Create a new authorizer
-			_, err = newWithBackoff(p, 0, 0, 0)
+			sarClient, err := subjectAccessReviewInterfaceFromKubeconfig(p)
+			if err != nil {
+				return fmt.Errorf("error building sar client: %v", err)
+			}
+			_, err = newWithBackoff(sarClient, 0, 0, 0)
 			return err
 		}()
 		if err != nil && !tt.wantErr {
@@ -203,6 +208,7 @@ type Service interface {
 
 // NewTestServer wraps a Service as an httptest.Server.
 func NewTestServer(s Service, cert, key, caCert []byte) (*httptest.Server, error) {
+	const webhookPath = "/testserver"
 	var tlsConfig *tls.Config
 	if cert != nil {
 		cert, err := tls.X509KeyPair(cert, key)
@@ -223,26 +229,44 @@ func NewTestServer(s Service, cert, key, caCert []byte) (*httptest.Server, error
 	}
 
 	serveHTTP := func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			http.Error(w, fmt.Sprintf("unexpected method: %v", r.Method), http.StatusMethodNotAllowed)
+			return
+		}
+		if r.URL.Path != webhookPath {
+			http.Error(w, fmt.Sprintf("unexpected path: %v", r.URL.Path), http.StatusNotFound)
+			return
+		}
+
 		var review v1beta1.SubjectAccessReview
-		if err := json.NewDecoder(r.Body).Decode(&review); err != nil {
+		bodyData, _ := ioutil.ReadAll(r.Body)
+		if err := json.Unmarshal(bodyData, &review); err != nil {
 			http.Error(w, fmt.Sprintf("failed to decode body: %v", err), http.StatusBadRequest)
 			return
 		}
+
+		// ensure we received the serialized review as expected
+		if review.APIVersion != "authorization.k8s.io/v1beta1" {
+			http.Error(w, fmt.Sprintf("wrong api version: %s", string(bodyData)), http.StatusBadRequest)
+			return
+		}
+		// once we have a successful request, always call the review to record that we were called
+		s.Review(&review)
 		if s.HTTPStatusCode() < 200 || s.HTTPStatusCode() >= 300 {
 			http.Error(w, "HTTP Error", s.HTTPStatusCode())
 			return
 		}
-		s.Review(&review)
 		type status struct {
-			Allowed bool   `json:"allowed"`
-			Reason  string `json:"reason"`
+			Allowed         bool   `json:"allowed"`
+			Reason          string `json:"reason"`
+			EvaluationError string `json:"evaluationError"`
 		}
 		resp := struct {
 			APIVersion string `json:"apiVersion"`
 			Status     status `json:"status"`
 		}{
 			APIVersion: v1beta1.SchemeGroupVersion.String(),
-			Status:     status{review.Status.Allowed, review.Status.Reason},
+			Status:     status{review.Status.Allowed, review.Status.Reason, review.Status.EvaluationError},
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)
@@ -251,6 +275,12 @@ func NewTestServer(s Service, cert, key, caCert []byte) (*httptest.Server, error
 	server := httptest.NewUnstartedServer(http.HandlerFunc(serveHTTP))
 	server.TLS = tlsConfig
 	server.StartTLS()
+
+	// Adjust the path to point to our custom path
+	serverURL, _ := url.Parse(server.URL)
+	serverURL.Path = webhookPath
+	server.URL = serverURL.String()
+
 	return server, nil
 }
 
@@ -258,9 +288,11 @@ func NewTestServer(s Service, cert, key, caCert []byte) (*httptest.Server, error
 type mockService struct {
 	allow      bool
 	statusCode int
+	called     int
 }
 
 func (m *mockService) Review(r *v1beta1.SubjectAccessReview) {
+	m.called++
 	r.Status.Allowed = m.allow
 }
 func (m *mockService) Allow()              { m.allow = true }
@@ -291,7 +323,11 @@ func newAuthorizer(callbackURL string, clientCert, clientKey, ca []byte, cacheTi
 	if err := json.NewEncoder(tempfile).Encode(config); err != nil {
 		return nil, err
 	}
-	return newWithBackoff(p, cacheTime, cacheTime, 0)
+	sarClient, err := subjectAccessReviewInterfaceFromKubeconfig(p)
+	if err != nil {
+		return nil, fmt.Errorf("error building sar client: %v", err)
+	}
+	return newWithBackoff(sarClient, cacheTime, cacheTime, 0)
 }
 
 func TestTLSConfig(t *testing.T) {
@@ -506,29 +542,36 @@ func TestWebhook(t *testing.T) {
 }
 
 type webhookCacheTestCase struct {
-	statusCode         int
+	attr authorizer.AttributesRecord
+
+	allow      bool
+	statusCode int
+
 	expectedErr        bool
 	expectedAuthorized bool
-	expectedCached     bool
+	expectedCalls      int
 }
 
-func testWebhookCacheCases(t *testing.T, serv *mockService, wh *WebhookAuthorizer, attr authorizer.AttributesRecord, tests []webhookCacheTestCase) {
-	for _, test := range tests {
+func testWebhookCacheCases(t *testing.T, serv *mockService, wh *WebhookAuthorizer, tests []webhookCacheTestCase) {
+	for i, test := range tests {
+		serv.called = 0
+		serv.allow = test.allow
 		serv.statusCode = test.statusCode
-		authorized, _, err := wh.Authorize(attr)
+		authorized, _, err := wh.Authorize(test.attr)
 		if test.expectedErr && err == nil {
-			t.Errorf("Expected error")
+			t.Errorf("%d: Expected error", i)
+			continue
 		} else if !test.expectedErr && err != nil {
-			t.Fatal(err)
+			t.Errorf("%d: unexpected error: %v", i, err)
+			continue
 		}
-		if test.expectedAuthorized && !authorized {
-			if test.expectedCached {
-				t.Errorf("Webhook should have successful response cached, but authorizer reported unauthorized.")
-			} else {
-				t.Errorf("Webhook returned HTTP %d, but authorizer reported unauthorized.", test.statusCode)
-			}
-		} else if !test.expectedAuthorized && authorized {
-			t.Errorf("Webhook returned HTTP %d, but authorizer reported success.", test.statusCode)
+
+		if test.expectedAuthorized != authorized {
+			t.Errorf("%d: expected authorized=%v, got %v", i, test.expectedAuthorized, authorized)
+		}
+
+		if test.expectedCalls != serv.called {
+			t.Errorf("%d: expected %d calls, got %d", i, test.expectedCalls, serv.called)
 		}
 	}
 }
@@ -549,27 +592,29 @@ func TestWebhookCache(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	aliceAttr := authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "alice"}}
+	bobAttr := authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "bob"}}
+
 	tests := []webhookCacheTestCase{
-		{statusCode: 500, expectedErr: true, expectedAuthorized: false, expectedCached: false},
-		{statusCode: 404, expectedErr: true, expectedAuthorized: false, expectedCached: false},
-		{statusCode: 403, expectedErr: true, expectedAuthorized: false, expectedCached: false},
-		{statusCode: 401, expectedErr: true, expectedAuthorized: false, expectedCached: false},
-		{statusCode: 200, expectedErr: false, expectedAuthorized: true, expectedCached: false},
-		{statusCode: 500, expectedErr: false, expectedAuthorized: true, expectedCached: true},
+		// server error and 429's retry
+		{attr: aliceAttr, allow: false, statusCode: 500, expectedErr: true, expectedAuthorized: false, expectedCalls: 5},
+		{attr: aliceAttr, allow: false, statusCode: 429, expectedErr: true, expectedAuthorized: false, expectedCalls: 5},
+		// regular errors return errors but do not retry
+		{attr: aliceAttr, allow: false, statusCode: 404, expectedErr: true, expectedAuthorized: false, expectedCalls: 1},
+		{attr: aliceAttr, allow: false, statusCode: 403, expectedErr: true, expectedAuthorized: false, expectedCalls: 1},
+		{attr: aliceAttr, allow: false, statusCode: 401, expectedErr: true, expectedAuthorized: false, expectedCalls: 1},
+		// successful responses are cached
+		{attr: aliceAttr, allow: true, statusCode: 200, expectedErr: false, expectedAuthorized: true, expectedCalls: 1},
+		// later requests within the cache window don't hit the backend
+		{attr: aliceAttr, allow: false, statusCode: 500, expectedErr: false, expectedAuthorized: true, expectedCalls: 0},
+
+		// a request with different attributes doesn't hit the cache
+		{attr: bobAttr, allow: false, statusCode: 500, expectedErr: true, expectedAuthorized: false, expectedCalls: 5},
+		// successful response for other attributes is cached
+		{attr: bobAttr, allow: true, statusCode: 200, expectedErr: false, expectedAuthorized: true, expectedCalls: 1},
+		// later requests within the cache window don't hit the backend
+		{attr: bobAttr, allow: false, statusCode: 500, expectedErr: false, expectedAuthorized: true, expectedCalls: 0},
 	}
 
-	attr := authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "alice"}}
-	serv.allow = true
-
-	testWebhookCacheCases(t, serv, wh, attr, tests)
-
-	// For a different request, webhook should be called again.
-	tests = []webhookCacheTestCase{
-		{statusCode: 500, expectedErr: true, expectedAuthorized: false, expectedCached: false},
-		{statusCode: 200, expectedErr: false, expectedAuthorized: true, expectedCached: false},
-		{statusCode: 500, expectedErr: false, expectedAuthorized: true, expectedCached: true},
-	}
-	attr = authorizer.AttributesRecord{User: &user.DefaultInfo{Name: "bob"}}
-
-	testWebhookCacheCases(t, serv, wh, attr, tests)
+	testWebhookCacheCases(t, serv, wh, tests)
 }

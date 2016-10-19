@@ -196,13 +196,13 @@ option go_package = "v1";
 // ownership management and SELinux relabeling.
 message AWSElasticBlockStoreVolumeSource {
   // Unique ID of the persistent disk resource in AWS (Amazon EBS volume).
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore
+  // More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore
   optional string volumeID = 1;
 
   // Filesystem type of the volume that you want to mount.
   // Tip: Ensure that the filesystem type is supported by the host operating system.
   // Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore
+  // More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore
   // TODO: how do we prevent errors in the filesystem from compromising the machine
   optional string fsType = 2;
 
@@ -214,7 +214,7 @@ message AWSElasticBlockStoreVolumeSource {
 
   // Specify "true" to force and set the ReadOnly property in VolumeMounts to "true".
   // If omitted, the default is "false".
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore
+  // More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore
   optional bool readOnly = 4;
 }
 
@@ -256,13 +256,13 @@ option go_package = "v1";
 // ownership management and SELinux relabeling.
 message AWSElasticBlockStoreVolumeSource {
   // Unique ID of the persistent disk resource in AWS (Amazon EBS volume).
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore
+  // More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore
   optional string volumeID = 1 [(gogoproto.customname) = "VolumeID", (gogoproto.nullable) = false];
 
   // Filesystem type of the volume that you want to mount.
   // Tip: Ensure that the filesystem type is supported by the host operating system.
   // Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore
+  // More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore
   // TODO: how do we prevent errors in the filesystem from compromising the machine
   optional string fsType = 2 [(gogoproto.customname) = "FSType", (gogoproto.nullable) = false];
 
@@ -274,7 +274,7 @@ message AWSElasticBlockStoreVolumeSource {
 
   // Specify "true" to force and set the ReadOnly property in VolumeMounts to "true".
   // If omitted, the default is "false".
-  // More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#awselasticblockstore
+  // More info: http://kubernetes.io/docs/user-guide/volumes#awselasticblockstore
   optional bool readOnly = 4 [(gogoproto.customname) = "ReadOnly", (gogoproto.nullable) = false];
 }
 

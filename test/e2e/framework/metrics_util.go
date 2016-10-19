@@ -463,7 +463,7 @@ func LogSuspiciousLatency(latencyData []PodLatencyData, latencyDataLag []PodLate
 	}
 	for _, l := range latencyData {
 		if l.Latency > NodeStartupThreshold {
-			HighLatencyKubeletOperations(c, 1*time.Second, l.Node)
+			HighLatencyKubeletOperations(c, 1*time.Second, l.Node, Logf)
 		}
 	}
 	Logf("Approx throughput: %v pods/min",

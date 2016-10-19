@@ -21,6 +21,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/kubernetes/pkg/client/restclient"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 )
 
@@ -37,8 +38,8 @@ type PostStartHookFunc func(context PostStartHookContext) error
 
 // PostStartHookContext provides information about this API server to a PostStartHookFunc
 type PostStartHookContext struct {
-	// TODO this should probably contain a cluster-admin powered client config which can be used to loopback
-	// to this API server.  That client config doesn't exist yet.
+	// LoopbackClientConfig is a config for a privileged loopback connection to the API server
+	LoopbackClientConfig *restclient.Config
 }
 
 // PostStartHookProvider is an interface in addition to provide a post start hook for the api server
@@ -74,10 +75,12 @@ func (s *GenericAPIServer) AddPostStartHook(name string, hook PostStartHookFunc)
 }
 
 // RunPostStartHooks runs the PostStartHooks for the server
-func (s *GenericAPIServer) RunPostStartHooks(context PostStartHookContext) {
+func (s *GenericAPIServer) RunPostStartHooks() {
 	s.postStartHookLock.Lock()
 	defer s.postStartHookLock.Unlock()
 	s.postStartHooksCalled = true
+
+	context := PostStartHookContext{LoopbackClientConfig: s.LoopbackClientConfig}
 
 	for hookName, hook := range s.postStartHooks {
 		go runPostStartHook(hookName, hook, context)

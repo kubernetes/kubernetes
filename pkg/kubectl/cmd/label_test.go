@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -128,8 +128,8 @@ func TestParseLabels(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			labels:    []string{"a="},
-			expectErr: true,
+			labels:   []string{"a="},
+			expected: map[string]string{"a": ""},
 		},
 		{
 			labels:    []string{"a=%^$"},
@@ -314,7 +314,7 @@ func TestLabelErrors(t *testing.T) {
 		f, tf, _, _ := NewAPIFactory()
 		tf.Printer = &testPrinter{}
 		tf.Namespace = "test"
-		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
+		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}}
 
 		buf := bytes.NewBuffer([]byte{})
 		cmd := NewCmdLabel(f, buf)
@@ -323,7 +323,14 @@ func TestLabelErrors(t *testing.T) {
 		for k, v := range testCase.flags {
 			cmd.Flags().Set(k, v)
 		}
-		err := RunLabel(f, buf, cmd, testCase.args, &resource.FilenameOptions{})
+		opts := LabelOptions{}
+		err := opts.Complete(f, buf, cmd, testCase.args)
+		if err == nil {
+			err = opts.Validate()
+		}
+		if err == nil {
+			err = opts.RunLabel(f, cmd)
+		}
 		if !testCase.errFn(err) {
 			t.Errorf("%s: unexpected error: %v", k, err)
 			continue
@@ -367,14 +374,51 @@ func TestLabelForResourceFromFile(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
+	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}}
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdLabel(f, buf)
-	options := &resource.FilenameOptions{}
-	options.Filenames = []string{"../../../examples/storage/cassandra/cassandra-controller.yaml"}
+	opts := LabelOptions{FilenameOptions: resource.FilenameOptions{
+		Filenames: []string{"../../../examples/storage/cassandra/cassandra-controller.yaml"}}}
+	err := opts.Complete(f, buf, cmd, []string{"a=b"})
+	if err == nil {
+		err = opts.Validate()
+	}
+	if err == nil {
+		err = opts.RunLabel(f, cmd)
+	}
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(buf.String(), "labeled") {
+		t.Errorf("did not set labels: %s", buf.String())
+	}
+}
 
-	err := RunLabel(f, buf, cmd, []string{"a=b"}, options)
+func TestLabelLocal(t *testing.T) {
+	f, tf, _, ns := NewAPIFactory()
+	tf.Client = &fake.RESTClient{
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
+			return nil, nil
+		}),
+	}
+	tf.Namespace = "test"
+	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}}
+
+	buf := bytes.NewBuffer([]byte{})
+	cmd := NewCmdLabel(f, buf)
+	cmd.Flags().Set("local", "true")
+	opts := LabelOptions{FilenameOptions: resource.FilenameOptions{
+		Filenames: []string{"../../../examples/storage/cassandra/cassandra-controller.yaml"}}}
+	err := opts.Complete(f, buf, cmd, []string{"a=b"})
+	if err == nil {
+		err = opts.Validate()
+	}
+	if err == nil {
+		err = opts.RunLabel(f, cmd)
+	}
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -415,13 +459,21 @@ func TestLabelMultipleObjects(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
+	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}}
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdLabel(f, buf)
 	cmd.Flags().Set("all", "true")
 
-	if err := RunLabel(f, buf, cmd, []string{"pods", "a=b"}, &resource.FilenameOptions{}); err != nil {
+	opts := LabelOptions{}
+	err := opts.Complete(f, buf, cmd, []string{"pods", "a=b"})
+	if err == nil {
+		err = opts.Validate()
+	}
+	if err == nil {
+		err = opts.RunLabel(f, cmd)
+	}
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if strings.Count(buf.String(), "labeled") != len(pods.Items) {

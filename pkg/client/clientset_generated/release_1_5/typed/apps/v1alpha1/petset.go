@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
 	v1alpha1 "k8s.io/kubernetes/pkg/apis/apps/v1alpha1"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -33,11 +34,11 @@ type PetSetInterface interface {
 	Create(*v1alpha1.PetSet) (*v1alpha1.PetSet, error)
 	Update(*v1alpha1.PetSet) (*v1alpha1.PetSet, error)
 	UpdateStatus(*v1alpha1.PetSet) (*v1alpha1.PetSet, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string) (*v1alpha1.PetSet, error)
-	List(opts api.ListOptions) (*v1alpha1.PetSetList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
+	List(opts v1.ListOptions) (*v1alpha1.PetSetList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.PetSet, err error)
 	PetSetExpansion
 }
@@ -95,7 +96,7 @@ func (c *petSets) UpdateStatus(petSet *v1alpha1.PetSet) (result *v1alpha1.PetSet
 }
 
 // Delete takes name of the petSet and deletes it. Returns an error if one occurs.
-func (c *petSets) Delete(name string, options *api.DeleteOptions) error {
+func (c *petSets) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("petsets").
@@ -106,7 +107,7 @@ func (c *petSets) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *petSets) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *petSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("petsets").
@@ -129,7 +130,7 @@ func (c *petSets) Get(name string) (result *v1alpha1.PetSet, err error) {
 }
 
 // List takes label and field selectors, and returns the list of PetSets that match those selectors.
-func (c *petSets) List(opts api.ListOptions) (result *v1alpha1.PetSetList, err error) {
+func (c *petSets) List(opts v1.ListOptions) (result *v1alpha1.PetSetList, err error) {
 	result = &v1alpha1.PetSetList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -141,7 +142,7 @@ func (c *petSets) List(opts api.ListOptions) (result *v1alpha1.PetSetList, err e
 }
 
 // Watch returns a watch.Interface that watches the requested petSets.
-func (c *petSets) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *petSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

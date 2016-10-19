@@ -37,16 +37,20 @@ import (
 	"k8s.io/kubernetes/pkg/controller/petset"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
+	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
 	petsetPoll = 10 * time.Second
 	// Some pets install base packages via wget
-	petsetTimeout           = 10 * time.Minute
+	petsetTimeout = 10 * time.Minute
+	// Timeout for pet pods to change state
+	petPodTimeout           = 5 * time.Minute
 	zookeeperManifestPath   = "test/e2e/testing-manifests/petset/zookeeper"
 	mysqlGaleraManifestPath = "test/e2e/testing-manifests/petset/mysql-galera"
 	redisManifestPath       = "test/e2e/testing-manifests/petset/redis"
@@ -153,6 +157,8 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 			By("Waiting for pet at index 1 to enter running.")
 			pst.waitForRunning(2, ps)
 
+			// TODO: verify petset status.replicas
+
 			// Now we have 1 healthy and 1 unhealthy pet. Deleting the healthy pet should *not*
 			// create a new pet till the remaining pet becomes healthy, which won't happen till
 			// we set the healthy bit.
@@ -242,6 +248,121 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 				framework.Failf("Read unexpected value %v, expected bar under key foo", v)
 			}
 		})
+	})
+})
+
+var _ = framework.KubeDescribe("Pet set recreate [Slow] [Feature:PetSet]", func() {
+	f := framework.NewDefaultFramework("pet-set-recreate")
+	var c *client.Client
+	var ns string
+
+	labels := map[string]string{
+		"foo": "bar",
+		"baz": "blah",
+	}
+	headlessSvcName := "test"
+	podName := "test-pod"
+	petSetName := "web"
+	petPodName := "web-0"
+
+	BeforeEach(func() {
+		framework.SkipUnlessProviderIs("gce", "vagrant")
+		By("creating service " + headlessSvcName + " in namespace " + f.Namespace.Name)
+		headlessService := createServiceSpec(headlessSvcName, "", true, labels)
+		_, err := f.Client.Services(f.Namespace.Name).Create(headlessService)
+		framework.ExpectNoError(err)
+		c = f.Client
+		ns = f.Namespace.Name
+	})
+
+	AfterEach(func() {
+		if CurrentGinkgoTestDescription().Failed {
+			dumpDebugInfo(c, ns)
+		}
+		By("Deleting all petset in ns " + ns)
+		deleteAllPetSets(c, ns)
+	})
+
+	It("should recreate evicted petset", func() {
+		By("looking for a node to schedule pet set and pod")
+		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
+		node := nodes.Items[0]
+
+		By("creating pod with conflicting port in namespace " + f.Namespace.Name)
+		conflictingPort := api.ContainerPort{HostPort: 21017, ContainerPort: 21017, Name: "conflict"}
+		pod := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name: podName,
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "nginx",
+						Image: "gcr.io/google_containers/nginx-slim:0.7",
+						Ports: []api.ContainerPort{conflictingPort},
+					},
+				},
+				NodeName: node.Name,
+			},
+		}
+		pod, err := f.Client.Pods(f.Namespace.Name).Create(pod)
+		framework.ExpectNoError(err)
+
+		By("creating petset with conflicting port in namespace " + f.Namespace.Name)
+		ps := newPetSet(petSetName, f.Namespace.Name, headlessSvcName, 1, nil, nil, labels)
+		petContainer := &ps.Spec.Template.Spec.Containers[0]
+		petContainer.Ports = append(petContainer.Ports, conflictingPort)
+		ps.Spec.Template.Spec.NodeName = node.Name
+		_, err = f.Client.Apps().PetSets(f.Namespace.Name).Create(ps)
+		framework.ExpectNoError(err)
+
+		By("waiting until pod " + podName + " will start running in namespace " + f.Namespace.Name)
+		if err := f.WaitForPodRunning(podName); err != nil {
+			framework.Failf("Pod %v did not start running: %v", podName, err)
+		}
+
+		var initialPetPodUID types.UID
+		By("waiting until pet pod " + petPodName + " will be recreated and deleted at least once in namespace " + f.Namespace.Name)
+		w, err := f.Client.Pods(f.Namespace.Name).Watch(api.SingleObject(api.ObjectMeta{Name: petPodName}))
+		framework.ExpectNoError(err)
+		// we need to get UID from pod in any state and wait until pet set controller will remove pod atleast once
+		_, err = watch.Until(petPodTimeout, w, func(event watch.Event) (bool, error) {
+			pod := event.Object.(*api.Pod)
+			switch event.Type {
+			case watch.Deleted:
+				framework.Logf("Observed delete event for pet pod %v in namespace %v", pod.Name, pod.Namespace)
+				if initialPetPodUID == "" {
+					return false, nil
+				}
+				return true, nil
+			}
+			framework.Logf("Observed pet pod in namespace: %v, name: %v, uid: %v, status phase: %v. Waiting for petset controller to delete.",
+				pod.Namespace, pod.Name, pod.UID, pod.Status.Phase)
+			initialPetPodUID = pod.UID
+			return false, nil
+		})
+		if err != nil {
+			framework.Failf("Pod %v expected to be re-created atleast once", petPodName)
+		}
+
+		By("removing pod with conflicting port in namespace " + f.Namespace.Name)
+		err = f.Client.Pods(f.Namespace.Name).Delete(pod.Name, api.NewDeleteOptions(0))
+		framework.ExpectNoError(err)
+
+		By("waiting when pet pod " + petPodName + " will be recreated in namespace " + f.Namespace.Name + " and will be in running state")
+		// we may catch delete event, thats why we are waiting for running phase like this, and not with watch.Until
+		Eventually(func() error {
+			petPod, err := f.Client.Pods(f.Namespace.Name).Get(petPodName)
+			if err != nil {
+				return err
+			}
+			if petPod.Status.Phase != api.PodRunning {
+				return fmt.Errorf("Pod %v is not in running phase: %v", petPod.Name, petPod.Status.Phase)
+			} else if petPod.UID == initialPetPodUID {
+				return fmt.Errorf("Pod %v wasn't recreated: %v == %v", petPod.Name, petPod.UID, initialPetPodUID)
+			}
+			return nil
+		}, petPodTimeout, 2*time.Second).Should(BeNil())
 	})
 })
 
@@ -452,12 +573,15 @@ func (p *petSetTester) execInPets(ps *apps.PetSet, cmd string) error {
 
 func (p *petSetTester) saturate(ps *apps.PetSet) {
 	// TODO: Watch events and check that creation timestamps don't overlap
-	for i := 0; i < ps.Spec.Replicas; i++ {
+	var i int32
+	for i = 0; i < ps.Spec.Replicas; i++ {
 		framework.Logf("Waiting for pet at index " + fmt.Sprintf("%v", i+1) + " to enter Running")
 		p.waitForRunning(i+1, ps)
 		framework.Logf("Marking pet at index " + fmt.Sprintf("%v", i) + " healthy")
 		p.setHealthy(ps)
 	}
+	framework.Logf("Waiting for pet set status.replicas updated to %d", ps.Spec.Replicas)
+	p.waitForStatus(ps, ps.Spec.Replicas)
 }
 
 func (p *petSetTester) deletePetAtIndex(index int, ps *apps.PetSet) {
@@ -470,7 +594,7 @@ func (p *petSetTester) deletePetAtIndex(index int, ps *apps.PetSet) {
 	}
 }
 
-func (p *petSetTester) scale(ps *apps.PetSet, count int) error {
+func (p *petSetTester) scale(ps *apps.PetSet, count int32) error {
 	name := ps.Name
 	ns := ps.Namespace
 	p.update(ns, name, func(ps *apps.PetSet) { ps.Spec.Replicas = count })
@@ -478,7 +602,7 @@ func (p *petSetTester) scale(ps *apps.PetSet, count int) error {
 	var petList *api.PodList
 	pollErr := wait.PollImmediate(petsetPoll, petsetTimeout, func() (bool, error) {
 		petList = p.getPodList(ps)
-		if len(petList.Items) == count {
+		if int32(len(petList.Items)) == count {
 			return true, nil
 		}
 		return false, nil
@@ -542,15 +666,15 @@ func (p *petSetTester) confirmPetCount(count int, ps *apps.PetSet, timeout time.
 	}
 }
 
-func (p *petSetTester) waitForRunning(numPets int, ps *apps.PetSet) {
+func (p *petSetTester) waitForRunning(numPets int32, ps *apps.PetSet) {
 	pollErr := wait.PollImmediate(petsetPoll, petsetTimeout,
 		func() (bool, error) {
 			podList := p.getPodList(ps)
-			if len(podList.Items) < numPets {
+			if int32(len(podList.Items)) < numPets {
 				framework.Logf("Found %d pets, waiting for %d", len(podList.Items), numPets)
 				return false, nil
 			}
-			if len(podList.Items) > numPets {
+			if int32(len(podList.Items)) > numPets {
 				return false, fmt.Errorf("Too many pods scheduled, expected %d got %d", numPets, len(podList.Items))
 			}
 			for _, p := range podList.Items {
@@ -586,6 +710,25 @@ func (p *petSetTester) setHealthy(ps *apps.PetSet) {
 		ExpectNoError(err)
 		framework.Logf("Set annotation %v to %v on pod %v", petset.PetSetInitAnnotation, p.Annotations[petset.PetSetInitAnnotation], pod.Name)
 		markedHealthyPod = pod.Name
+	}
+}
+
+func (p *petSetTester) waitForStatus(ps *apps.PetSet, expectedReplicas int32) {
+	ns, name := ps.Namespace, ps.Name
+	pollErr := wait.PollImmediate(petsetPoll, petsetTimeout,
+		func() (bool, error) {
+			psGet, err := p.c.Apps().PetSets(ns).Get(name)
+			if err != nil {
+				return false, err
+			}
+			if psGet.Status.Replicas != expectedReplicas {
+				framework.Logf("Waiting for pet set status to become %d, currently %d", expectedReplicas, ps.Status.Replicas)
+				return false, nil
+			}
+			return true, nil
+		})
+	if pollErr != nil {
+		framework.Failf("Failed waiting for pet set status.replicas updated to %d, got %d: %v", expectedReplicas, ps.Status.Replicas, pollErr)
 	}
 }
 
@@ -698,7 +841,7 @@ func newPVC(name string) api.PersistentVolumeClaim {
 	}
 }
 
-func newPetSet(name, ns, governingSvcName string, replicas int, petMounts []api.VolumeMount, podMounts []api.VolumeMount, labels map[string]string) *apps.PetSet {
+func newPetSet(name, ns, governingSvcName string, replicas int32, petMounts []api.VolumeMount, podMounts []api.VolumeMount, labels map[string]string) *apps.PetSet {
 	mounts := append(petMounts, podMounts...)
 	claims := []api.PersistentVolumeClaim{}
 	for _, m := range petMounts {

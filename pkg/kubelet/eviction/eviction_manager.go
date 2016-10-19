@@ -62,6 +62,8 @@ type managerImpl struct {
 	resourceToRankFunc map[api.ResourceName]rankFunc
 	// resourceToNodeReclaimFuncs maps a resource to an ordered list of functions that know how to reclaim that resource.
 	resourceToNodeReclaimFuncs map[api.ResourceName]nodeReclaimFuncs
+	// last observations from synchronize
+	lastObservations signalObservations
 }
 
 // ensure it implements the required interface
@@ -136,6 +138,13 @@ func (m *managerImpl) IsUnderDiskPressure() bool {
 	return hasNodeCondition(m.nodeConditions, api.NodeDiskPressure)
 }
 
+// IsUnderDiskPressure returns true if the node is under disk pressure.
+func (m *managerImpl) IsUnderInodePressure() bool {
+	m.RLock()
+	defer m.RUnlock()
+	return hasNodeCondition(m.nodeConditions, api.NodeInodePressure)
+}
+
 // synchronize is the main control loop that enforces eviction thresholds.
 func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc) {
 	// if we have nothing to do, just return
@@ -175,6 +184,9 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		thresholds = mergeThresholds(thresholds, thresholdsNotYetResolved)
 	}
 
+	// determine the set of thresholds whose stats have been updated since the last sync
+	thresholds = thresholdsUpdatedStats(thresholds, observations, m.lastObservations)
+
 	// track when a threshold was first observed
 	thresholdsFirstObservedAt := thresholdsFirstObservedAt(thresholds, m.thresholdsFirstObservedAt, now)
 
@@ -196,6 +208,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	m.thresholdsFirstObservedAt = thresholdsFirstObservedAt
 	m.nodeConditionsLastObservedAt = nodeConditionsLastObservedAt
 	m.thresholdsMet = thresholds
+	m.lastObservations = observations
 	m.Unlock()
 
 	// determine the set of resources under starvation

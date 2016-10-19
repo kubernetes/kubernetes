@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -82,7 +83,7 @@ func newDaemonSet(name string) *extensions.DaemonSet {
 
 func newNode(name string, label map[string]string) *api.Node {
 	return &api.Node{
-		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
+		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String()},
 		ObjectMeta: api.ObjectMeta{
 			Name:      name,
 			Labels:    label,
@@ -107,7 +108,7 @@ func addNodes(nodeStore cache.Store, startIndex, numNodes int, label map[string]
 
 func newPod(podName string, nodeName string, label map[string]string) *api.Pod {
 	pod := &api.Pod{
-		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
+		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String()},
 		ObjectMeta: api.ObjectMeta{
 			GenerateName: podName,
 			Labels:       label,
@@ -137,7 +138,7 @@ func addPods(podStore cache.Store, nodeName string, label map[string]string, num
 }
 
 func newTestController() (*DaemonSetsController, *controller.FakePodControl) {
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
 	informerFactory := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 
 	manager := NewDaemonSetsController(informerFactory.DaemonSets(), informerFactory.Pods(), informerFactory.Nodes(), clientset, 0)
@@ -567,4 +568,30 @@ func TestNodeAffinityDaemonLaunchesPods(t *testing.T) {
 	daemon.Spec.Template.ObjectMeta.Annotations = affinity
 	manager.dsStore.Add(daemon)
 	syncAndValidateDaemonSets(t, manager, daemon, podControl, 3, 0)
+}
+
+func TestNumberReadyStatus(t *testing.T) {
+	manager, podControl := newTestController()
+	addNodes(manager.nodeStore.Store, 0, 2, simpleNodeLabel)
+	addPods(manager.podStore.Indexer, "node-0", simpleDaemonSetLabel, 1)
+	addPods(manager.podStore.Indexer, "node-1", simpleDaemonSetLabel, 1)
+	daemon := newDaemonSet("foo")
+	manager.dsStore.Add(daemon)
+
+	syncAndValidateDaemonSets(t, manager, daemon, podControl, 0, 0)
+	if daemon.Status.NumberReady != 0 {
+		t.Errorf("Wrong daemon %s status: %v", daemon.Name, daemon.Status)
+	}
+
+	selector, _ := unversioned.LabelSelectorAsSelector(daemon.Spec.Selector)
+	daemonPods, _ := manager.podStore.Pods(daemon.Namespace).List(selector)
+	for _, pod := range daemonPods {
+		condition := api.PodCondition{Type: api.PodReady, Status: api.ConditionTrue}
+		pod.Status.Conditions = append(pod.Status.Conditions, condition)
+	}
+
+	syncAndValidateDaemonSets(t, manager, daemon, podControl, 0, 0)
+	if daemon.Status.NumberReady != 2 {
+		t.Errorf("Wrong daemon %s status: %v", daemon.Name, daemon.Status)
+	}
 }

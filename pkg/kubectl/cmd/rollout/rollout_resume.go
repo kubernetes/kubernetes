@@ -19,11 +19,11 @@ package rollout
 import (
 	"io"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -44,19 +44,19 @@ type ResumeConfig struct {
 }
 
 var (
-	resume_long = dedent.Dedent(`
+	resume_long = templates.LongDesc(`
 		Resume a paused resource
 
 		Paused resources will not be reconciled by a controller. By resuming a
 		resource, we allow it to be reconciled again.
 		Currently only deployments support being resumed.`)
 
-	resume_example = dedent.Dedent(`
+	resume_example = templates.Examples(`
 		# Resume an already paused deployment
 		kubectl rollout resume deployment/nginx`)
 )
 
-func NewCmdRolloutResume(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdRolloutResume(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &ResumeConfig{}
 
 	validArgs := []string{"deployment"}
@@ -88,7 +88,7 @@ func NewCmdRolloutResume(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func (o *ResumeConfig) CompleteResume(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string) error {
+func (o *ResumeConfig) CompleteResume(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string) error {
 	if len(args) == 0 && cmdutil.IsFilenameEmpty(o.Filenames) {
 		return cmdutil.UsageError(cmd, cmd.Use)
 	}

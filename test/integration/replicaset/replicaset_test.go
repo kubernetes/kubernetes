@@ -127,9 +127,8 @@ func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespa
 	return ret, nil
 }
 
-func rmSetup(t *testing.T, enableGarbageCollector bool) (*httptest.Server, *replicaset.ReplicaSetController, cache.SharedIndexInformer, clientset.Interface) {
+func rmSetup(t *testing.T, enableGarbageCollector bool) (*httptest.Server, *replicaset.ReplicaSetController, cache.SharedIndexInformer, cache.SharedIndexInformer, clientset.Interface) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.EnableCoreControllers = false
 	_, s := framework.RunAMaster(masterConfig)
 
 	config := restclient.Config{Host: s.URL}
@@ -138,14 +137,12 @@ func rmSetup(t *testing.T, enableGarbageCollector bool) (*httptest.Server, *repl
 		t.Fatalf("Error in create clientset: %v", err)
 	}
 	resyncPeriod := 12 * time.Hour
-	resyncPeriodFunc := func() time.Duration {
-		return resyncPeriod
-	}
-	podInformer := informers.NewPodInformer(internalclientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "pod-informer")), resyncPeriod)
+	informers := informers.NewSharedInformerFactory(internalclientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "rs-informers")), resyncPeriod)
+
 	rm := replicaset.NewReplicaSetController(
-		podInformer,
+		informers.ReplicaSets(),
+		informers.Pods(),
 		internalclientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "replicaset-controller")),
-		resyncPeriodFunc,
 		replicaset.BurstReplicas,
 		4096,
 		enableGarbageCollector,
@@ -154,7 +151,7 @@ func rmSetup(t *testing.T, enableGarbageCollector bool) (*httptest.Server, *repl
 	if err != nil {
 		t.Fatalf("Failed to create replicaset controller")
 	}
-	return s, rm, podInformer, clientSet
+	return s, rm, informers.ReplicaSets().Informer(), informers.Pods().Informer(), clientSet
 }
 
 // wait for the podInformer to observe the pods. Call this function before
@@ -224,7 +221,7 @@ func TestAdoption(t *testing.T) {
 		},
 	}
 	for i, tc := range testCases {
-		s, rm, podInformer, clientSet := rmSetup(t, true)
+		s, rm, rsInformer, podInformer, clientSet := rmSetup(t, true)
 		ns := framework.CreateTestingNamespace(fmt.Sprintf("rs-adoption-%d", i), s, t)
 		defer framework.DeleteTestingNamespace(ns, s, t)
 
@@ -244,6 +241,7 @@ func TestAdoption(t *testing.T) {
 		}
 
 		stopCh := make(chan struct{})
+		go rsInformer.Run(stopCh)
 		go podInformer.Run(stopCh)
 		waitToObservePods(t, podInformer, 1)
 		go rm.Run(5, stopCh)
@@ -301,7 +299,7 @@ func TestUpdateSelectorToAdopt(t *testing.T) {
 	// We have pod1, pod2 and rs. rs.spec.replicas=1. At first rs.Selector
 	// matches pod1 only; change the selector to match pod2 as well. Verify
 	// there is only one pod left.
-	s, rm, podInformer, clientSet := rmSetup(t, true)
+	s, rm, rsInformer, podInformer, clientSet := rmSetup(t, true)
 	ns := framework.CreateTestingNamespace("rs-update-selector-to-adopt", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 	rs := newRS("rs", ns.Name, 1)
@@ -315,6 +313,7 @@ func TestUpdateSelectorToAdopt(t *testing.T) {
 	createRSsPods(t, clientSet, []*v1beta1.ReplicaSet{rs}, []*v1.Pod{pod1, pod2}, ns.Name)
 
 	stopCh := make(chan struct{})
+	go rsInformer.Run(stopCh)
 	go podInformer.Run(stopCh)
 	go rm.Run(5, stopCh)
 	waitRSStable(t, clientSet, rs, ns.Name)
@@ -341,7 +340,7 @@ func TestUpdateSelectorToRemoveControllerRef(t *testing.T) {
 	// matches pod1 and pod2; change the selector to match only pod1. Verify
 	// that rs creates one more pod, so there are 3 pods. Also verify that
 	// pod2's controllerRef is cleared.
-	s, rm, podInformer, clientSet := rmSetup(t, true)
+	s, rm, rsInformer, podInformer, clientSet := rmSetup(t, true)
 	ns := framework.CreateTestingNamespace("rs-update-selector-to-remove-controllerref", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 	rs := newRS("rs", ns.Name, 2)
@@ -352,6 +351,7 @@ func TestUpdateSelectorToRemoveControllerRef(t *testing.T) {
 	createRSsPods(t, clientSet, []*v1beta1.ReplicaSet{rs}, []*v1.Pod{pod1, pod2}, ns.Name)
 
 	stopCh := make(chan struct{})
+	go rsInformer.Run(stopCh)
 	go podInformer.Run(stopCh)
 	waitToObservePods(t, podInformer, 2)
 	go rm.Run(5, stopCh)
@@ -387,7 +387,7 @@ func TestUpdateLabelToRemoveControllerRef(t *testing.T) {
 	// matches pod1 and pod2; change pod2's labels to non-matching. Verify
 	// that rs creates one more pod, so there are 3 pods. Also verify that
 	// pod2's controllerRef is cleared.
-	s, rm, podInformer, clientSet := rmSetup(t, true)
+	s, rm, rsInformer, podInformer, clientSet := rmSetup(t, true)
 	ns := framework.CreateTestingNamespace("rs-update-label-to-remove-controllerref", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 	rs := newRS("rs", ns.Name, 2)
@@ -396,6 +396,7 @@ func TestUpdateLabelToRemoveControllerRef(t *testing.T) {
 	createRSsPods(t, clientSet, []*v1beta1.ReplicaSet{rs}, []*v1.Pod{pod1, pod2}, ns.Name)
 
 	stopCh := make(chan struct{})
+	go rsInformer.Run(stopCh)
 	go podInformer.Run(stopCh)
 	go rm.Run(5, stopCh)
 	waitRSStable(t, clientSet, rs, ns.Name)
@@ -429,7 +430,7 @@ func TestUpdateLabelToBeAdopted(t *testing.T) {
 	// matches pod1 only; change pod2's labels to be matching. Verify the RS
 	// controller adopts pod2 and delete one of them, so there is only 1 pod
 	// left.
-	s, rm, podInformer, clientSet := rmSetup(t, true)
+	s, rm, rsInformer, podInformer, clientSet := rmSetup(t, true)
 	ns := framework.CreateTestingNamespace("rs-update-label-to-be-adopted", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 	rs := newRS("rs", ns.Name, 1)
@@ -443,6 +444,7 @@ func TestUpdateLabelToBeAdopted(t *testing.T) {
 	createRSsPods(t, clientSet, []*v1beta1.ReplicaSet{rs}, []*v1.Pod{pod1, pod2}, ns.Name)
 
 	stopCh := make(chan struct{})
+	go rsInformer.Run(stopCh)
 	go podInformer.Run(stopCh)
 	go rm.Run(5, stopCh)
 	waitRSStable(t, clientSet, rs, ns.Name)

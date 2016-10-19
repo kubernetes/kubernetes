@@ -23,6 +23,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 func TestUntil(t *testing.T) {
@@ -106,6 +108,41 @@ func TestJitterUntilReturnsImmediately(t *testing.T) {
 	}, 30*time.Second, 1.0, true, ch)
 	if now.Add(25 * time.Second).Before(time.Now()) {
 		t.Errorf("JitterUntil did not return immediately when the stop chan was closed inside the func")
+	}
+}
+
+func TestJitterUntilRecoversPanic(t *testing.T) {
+	// Save and restore crash handlers
+	originalReallyCrash := runtime.ReallyCrash
+	originalHandlers := runtime.PanicHandlers
+	defer func() {
+		runtime.ReallyCrash = originalReallyCrash
+		runtime.PanicHandlers = originalHandlers
+	}()
+
+	called := 0
+	handled := 0
+
+	// Hook up a custom crash handler to ensure it is called when a jitter function panics
+	runtime.ReallyCrash = false
+	runtime.PanicHandlers = []func(interface{}){
+		func(p interface{}) {
+			handled++
+		},
+	}
+
+	ch := make(chan struct{})
+	JitterUntil(func() {
+		called++
+		if called > 2 {
+			close(ch)
+			return
+		}
+		panic("TestJitterUntilRecoversPanic")
+	}, time.Millisecond, 1.0, true, ch)
+
+	if called != 3 {
+		t.Errorf("Expected panic recovers")
 	}
 }
 

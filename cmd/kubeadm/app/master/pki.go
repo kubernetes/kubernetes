@@ -20,9 +20,10 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
+	"net"
 	"path"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
@@ -45,7 +46,7 @@ func newCertificateAuthority() (*rsa.PrivateKey, *x509.Certificate, error) {
 	return key, cert, nil
 }
 
-func newServerKeyAndCert(s *kubeadmapi.KubeadmConfig, caCert *x509.Certificate, caKey *rsa.PrivateKey, altNames certutil.AltNames) (*rsa.PrivateKey, *x509.Certificate, error) {
+func newServerKeyAndCert(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey, altNames certutil.AltNames) (*rsa.PrivateKey, *x509.Certificate, error) {
 	key, err := certutil.NewPrivateKey()
 	if err != nil {
 		return nil, nil, fmt.Errorf("unabel to create private key [%v]", err)
@@ -55,12 +56,16 @@ func newServerKeyAndCert(s *kubeadmapi.KubeadmConfig, caCert *x509.Certificate, 
 		"kubernetes",
 		"kubernetes.default",
 		"kubernetes.default.svc",
-		fmt.Sprintf("kubernetes.default.svc.%s", s.InitFlags.Services.DNSDomain),
+		fmt.Sprintf("kubernetes.default.svc.%s", cfg.Networking.DNSDomain),
 	}
 
-	internalAPIServerVirtualIP, err := ipallocator.GetIndexedIP(&s.InitFlags.Services.CIDR, 1)
+	_, n, err := net.ParseCIDR(cfg.Networking.ServiceSubnet)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to allocate IP address for the API server from the given CIDR (%q) [%v]", &s.InitFlags.Services.CIDR, err)
+		return nil, nil, fmt.Errorf("error parsing CIDR %q: %v", cfg.Networking.ServiceSubnet, err)
+	}
+	internalAPIServerVirtualIP, err := ipallocator.GetIndexedIP(n, 1)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to allocate IP address for the API server from the given CIDR (%q) [%v]", &cfg.Networking.ServiceSubnet, err)
 	}
 
 	altNames.IPs = append(altNames.IPs, internalAPIServerVirtualIP)
@@ -96,11 +101,7 @@ func newClientKeyAndCert(caCert *x509.Certificate, caKey *rsa.PrivateKey) (*rsa.
 }
 
 func writeKeysAndCert(pkiPath string, name string, key *rsa.PrivateKey, cert *x509.Certificate) error {
-	var (
-		publicKeyPath   = path.Join(pkiPath, fmt.Sprintf("%s-pub.pem", name))
-		privateKeyPath  = path.Join(pkiPath, fmt.Sprintf("%s-key.pem", name))
-		certificatePath = path.Join(pkiPath, fmt.Sprintf("%s.pem", name))
-	)
+	publicKeyPath, privateKeyPath, certificatePath := pathsKeysCerts(pkiPath, name)
 
 	if key != nil {
 		if err := certutil.WriteKey(privateKeyPath, certutil.EncodePrivateKeyPEM(key)); err != nil {
@@ -124,6 +125,12 @@ func writeKeysAndCert(pkiPath string, name string, key *rsa.PrivateKey, cert *x5
 	return nil
 }
 
+func pathsKeysCerts(pkiPath, name string) (string, string, string) {
+	return path.Join(pkiPath, fmt.Sprintf("%s-pub.pem", name)),
+		path.Join(pkiPath, fmt.Sprintf("%s-key.pem", name)),
+		path.Join(pkiPath, fmt.Sprintf("%s.pem", name))
+}
+
 func newServiceAccountKey() (*rsa.PrivateKey, error) {
 	key, err := certutil.NewPrivateKey()
 	if err != nil {
@@ -136,16 +143,22 @@ func newServiceAccountKey() (*rsa.PrivateKey, error) {
 // It first generates a self-signed CA certificate, a server certificate (signed by the CA) and a key for
 // signing service account tokens. It returns CA key and certificate, which is convenient for use with
 // client config funcs.
-func CreatePKIAssets(s *kubeadmapi.KubeadmConfig) (*rsa.PrivateKey, *x509.Certificate, error) {
+func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) (*rsa.PrivateKey, *x509.Certificate, error) {
 	var (
 		err      error
 		altNames certutil.AltNames
 	)
 
-	altNames.IPs = append(altNames.IPs, s.InitFlags.API.AdvertiseAddrs...)
-	altNames.DNSNames = append(altNames.DNSNames, s.InitFlags.API.ExternalDNSNames...)
+	for _, a := range cfg.API.AdvertiseAddresses {
+		if ip := net.ParseIP(a); ip != nil {
+			altNames.IPs = append(altNames.IPs, ip)
+		} else {
+			return nil, nil, fmt.Errorf("could not parse ip %q", a)
+		}
+	}
+	altNames.DNSNames = append(altNames.DNSNames, cfg.API.ExternalDNSNames...)
 
-	pkiPath := path.Join(s.EnvParams["host_pki_path"])
+	pkiPath := path.Join(kubeadmapi.GetEnvParams()["host_pki_path"])
 
 	caKey, caCert, err := newCertificateAuthority()
 	if err != nil {
@@ -155,8 +168,11 @@ func CreatePKIAssets(s *kubeadmapi.KubeadmConfig) (*rsa.PrivateKey, *x509.Certif
 	if err := writeKeysAndCert(pkiPath, "ca", caKey, caCert); err != nil {
 		return nil, nil, fmt.Errorf("<master/pki> failure while saving CA keys and certificate - %v", err)
 	}
+	fmt.Printf("<master/pki> generated Certificate Authority key and certificate:\n%s\n", certutil.FormatCert(caCert))
+	pub, prv, cert := pathsKeysCerts(pkiPath, "ca")
+	fmt.Printf("Public: %s\nPrivate: %s\nCert: %s\n", pub, prv, cert)
 
-	apiKey, apiCert, err := newServerKeyAndCert(s, caCert, caKey, altNames)
+	apiKey, apiCert, err := newServerKeyAndCert(cfg, caCert, caKey, altNames)
 	if err != nil {
 		return nil, nil, fmt.Errorf("<master/pki> failure while creating API server keys and certificate - %v", err)
 	}
@@ -164,17 +180,21 @@ func CreatePKIAssets(s *kubeadmapi.KubeadmConfig) (*rsa.PrivateKey, *x509.Certif
 	if err := writeKeysAndCert(pkiPath, "apiserver", apiKey, apiCert); err != nil {
 		return nil, nil, fmt.Errorf("<master/pki> failure while saving API server keys and certificate - %v", err)
 	}
+	fmt.Printf("<master/pki> generated API Server key and certificate:\n%s\n", certutil.FormatCert(apiCert))
+	pub, prv, cert = pathsKeysCerts(pkiPath, "apiserver")
+	fmt.Printf("Public: %s\nPrivate: %s\nCert: %s\n", pub, prv, cert)
 
 	saKey, err := newServiceAccountKey()
 	if err != nil {
 		return nil, nil, fmt.Errorf("<master/pki> failure while creating service account signing keys [%v]", err)
 	}
-
 	if err := writeKeysAndCert(pkiPath, "sa", saKey, nil); err != nil {
 		return nil, nil, fmt.Errorf("<master/pki> failure while saving service account signing keys - %v", err)
 	}
+	fmt.Printf("<master/pki> generated Service Account Signing keys:\n")
+	pub, prv, _ = pathsKeysCerts(pkiPath, "sa")
+	fmt.Printf("Public: %s\nPrivate: %s\n", pub, prv)
 
-	// TODO(phase1+) print a summary of SANs used and checksums (signatures) of each of the certificates
 	fmt.Printf("<master/pki> created keys and certificates in %q\n", pkiPath)
 	return caKey, caCert, nil
 }

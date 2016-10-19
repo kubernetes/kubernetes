@@ -96,7 +96,7 @@ const (
 //  5.  The payload is written to the new timestamped directory
 //  6.  Symlinks and directory for new user-visible files are created (if needed).
 //
-//      For example consider the files:
+//      For example, consider the files:
 //        <target-dir>/podName
 //        <target-dir>/user/labels
 //        <target-dir>/k8s/annotations

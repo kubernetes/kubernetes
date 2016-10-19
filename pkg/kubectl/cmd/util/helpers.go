@@ -88,22 +88,25 @@ func DefaultBehaviorOnFatal() {
 	fatalErrHandler = fatal
 }
 
-// fatal prints the message if set and then exits. If V(2) or greater, glog.Fatal
-// is invoked for extended information.
+// fatal prints the message (if provided) and then exits. If V(2) or greater,
+// glog.Fatal is invoked for extended information.
 func fatal(msg string, code int) {
+	if glog.V(2) {
+		glog.FatalDepth(2, msg)
+	}
 	if len(msg) > 0 {
 		// add newline if needed
 		if !strings.HasSuffix(msg, "\n") {
 			msg += "\n"
 		}
-
-		if glog.V(2) {
-			glog.FatalDepth(2, msg)
-		}
 		fmt.Fprint(os.Stderr, msg)
 	}
 	os.Exit(code)
 }
+
+// ErrExit may be passed to CheckError to instruct it to output nothing but exit with
+// status code 1.
+var ErrExit = fmt.Errorf("exit")
 
 // CheckErr prints a user friendly error to STDERR and exits with a non-zero
 // exit code. Unrecognized errors will be printed with an "error: " prefix.
@@ -129,6 +132,9 @@ func checkErr(prefix string, err error, handleErr func(string, int)) {
 
 	switch {
 	case err == nil:
+		return
+	case err == ErrExit:
+		handleErr("", DefaultErrorExitCode)
 		return
 	case kerrors.IsInvalid(err):
 		details := err.(*kerrors.StatusError).Status().Details
@@ -296,7 +302,7 @@ func isWatch(cmd *cobra.Command) bool {
 func GetFlagString(cmd *cobra.Command, flag string) string {
 	s, err := cmd.Flags().GetString(flag)
 	if err != nil {
-		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return s
 }
@@ -305,7 +311,7 @@ func GetFlagString(cmd *cobra.Command, flag string) string {
 func GetFlagStringSlice(cmd *cobra.Command, flag string) []string {
 	s, err := cmd.Flags().GetStringSlice(flag)
 	if err != nil {
-		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return s
 }
@@ -331,7 +337,7 @@ func GetWideFlag(cmd *cobra.Command) bool {
 func GetFlagBool(cmd *cobra.Command, flag string) bool {
 	b, err := cmd.Flags().GetBool(flag)
 	if err != nil {
-		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return b
 }
@@ -340,7 +346,7 @@ func GetFlagBool(cmd *cobra.Command, flag string) bool {
 func GetFlagInt(cmd *cobra.Command, flag string) int {
 	i, err := cmd.Flags().GetInt(flag)
 	if err != nil {
-		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return i
 }
@@ -349,7 +355,7 @@ func GetFlagInt(cmd *cobra.Command, flag string) int {
 func GetFlagInt64(cmd *cobra.Command, flag string) int64 {
 	i, err := cmd.Flags().GetInt64(flag)
 	if err != nil {
-		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return i
 }
@@ -357,7 +363,7 @@ func GetFlagInt64(cmd *cobra.Command, flag string) int64 {
 func GetFlagDuration(cmd *cobra.Command, flag string) time.Duration {
 	d, err := cmd.Flags().GetDuration(flag)
 	if err != nil {
-		glog.Fatalf("err accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
 	}
 	return d
 }
@@ -605,7 +611,7 @@ func ParsePairs(pairArgs []string, pairType string, supportRemove bool) (newPair
 	for _, pairArg := range pairArgs {
 		if strings.Index(pairArg, "=") != -1 {
 			parts := strings.SplitN(pairArg, "=", 2)
-			if len(parts) != 2 || len(parts[1]) == 0 {
+			if len(parts) != 2 {
 				if invalidBuf.Len() > 0 {
 					invalidBuf.WriteString(", ")
 				}
@@ -698,12 +704,10 @@ func FilterResourceList(obj runtime.Object, filterFuncs kubectl.Filters, filterO
 	return filterCount, list, nil
 }
 
-func PrintFilterCount(hiddenObjNum int, resource string, out io.Writer, options *kubectl.PrintOptions) error {
+func PrintFilterCount(hiddenObjNum int, resource string, options *kubectl.PrintOptions) {
 	if !options.NoHeaders && !options.ShowAll && hiddenObjNum > 0 {
-		_, err := fmt.Fprintf(out, "  info: %d completed object(s) was(were) not shown in %s list. Pass --show-all to see all objects.\n\n", hiddenObjNum, resource)
-		return err
+		glog.V(2).Infof("  info: %d completed object(s) was(were) not shown in %s list. Pass --show-all to see all objects.\n\n", hiddenObjNum, resource)
 	}
-	return nil
 }
 
 // ObjectListToVersionedObject receives a list of api objects and a group version

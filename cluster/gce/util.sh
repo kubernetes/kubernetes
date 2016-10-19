@@ -669,12 +669,22 @@ function create-network() {
     gcloud compute networks create --project "${PROJECT}" "${NETWORK}" --range "10.240.0.0/16"
   fi
 
-  if ! gcloud compute firewall-rules --project "${PROJECT}" describe "${NETWORK}-default-internal" &>/dev/null; then
-    gcloud compute firewall-rules create "${NETWORK}-default-internal" \
+  if ! gcloud compute firewall-rules --project "${PROJECT}" describe "${NETWORK}-default-internal-master" &>/dev/null; then
+    gcloud compute firewall-rules create "${NETWORK}-default-internal-master" \
       --project "${PROJECT}" \
       --network "${NETWORK}" \
       --source-ranges "10.0.0.0/8" \
-      --allow "tcp:1-65535,udp:1-65535,icmp" &
+      --allow "tcp:1-2379,tcp:2382-65535,udp:1-65535,icmp" \
+      --target-tags "${MASTER_TAG}"&
+  fi
+
+  if ! gcloud compute firewall-rules --project "${PROJECT}" describe "${NETWORK}-default-internal-node" &>/dev/null; then
+    gcloud compute firewall-rules create "${NETWORK}-default-internal-node" \
+      --project "${PROJECT}" \
+      --network "${NETWORK}" \
+      --source-ranges "10.0.0.0/8" \
+      --allow "tcp:1-65535,udp:1-65535,icmp" \
+      --target-tags "${NODE_TAG}"&
   fi
 
   if ! gcloud compute firewall-rules describe --project "${PROJECT}" "${NETWORK}-default-ssh" &>/dev/null; then
@@ -683,6 +693,27 @@ function create-network() {
       --network "${NETWORK}" \
       --source-ranges "0.0.0.0/0" \
       --allow "tcp:22" &
+  fi
+}
+
+function delete-firewall-rules() {
+  for fw in $@; do
+    if [[ -n $(gcloud compute firewall-rules --project "${PROJECT}" describe "${fw}" --format='value(name)' 2>/dev/null || true) ]]; then
+      gcloud compute firewall-rules delete --project "${PROJECT}" --quiet "${fw}" &
+    fi
+  done
+  kube::util::wait-for-jobs || {
+    echo -e "${color_red}Failed to delete firewall rules.${color_norm}" >&2
+  }
+}
+
+function delete-network() {
+  if [[ -n $(gcloud compute networks --project "${PROJECT}" describe "${NETWORK}" --format='value(name)' 2>/dev/null || true) ]]; then
+    if ! gcloud compute networks delete --project "${PROJECT}" --quiet "${NETWORK}"; then
+      echo "Failed to delete network '${NETWORK}'. Listing firewall-rules:"
+      gcloud compute firewall-rules --project "${PROJECT}" list --filter="network=${NETWORK}"
+      return 1
+    fi
   fi
 }
 
@@ -721,6 +752,16 @@ function create-master() {
       --zone "${ZONE}" \
       --type "${CLUSTER_REGISTRY_DISK_TYPE_GCE}" \
       --size "${CLUSTER_REGISTRY_DISK_SIZE}" &
+  fi
+
+  # Create rule for accessing and securing etcd servers.
+  if ! gcloud compute firewall-rules --project "${PROJECT}" describe "${MASTER_NAME}-etcd" &>/dev/null; then
+    gcloud compute firewall-rules create "${MASTER_NAME}-etcd" \
+      --project "${PROJECT}" \
+      --network "${NETWORK}" \
+      --source-tags "${MASTER_TAG}" \
+      --allow "tcp:2380,tcp:2381" \
+      --target-tags "${MASTER_TAG}" &
   fi
 
   # Generate a bearer token for this cluster. We push this separately
@@ -1253,13 +1294,8 @@ function kube-down() {
 
   # If there are no more remaining master replicas, we should delete all remaining network resources.
   if [[ "${REMAINING_MASTER_COUNT}" == "0" ]]; then
-    # Delete firewall rule for the master.
-    if gcloud compute firewall-rules describe --project "${PROJECT}" "${MASTER_NAME}-https" &>/dev/null; then
-      gcloud compute firewall-rules delete  \
-        --project "${PROJECT}" \
-        --quiet \
-        "${MASTER_NAME}-https"
-    fi
+    # Delete firewall rule for the master, etcd servers, and nodes.
+    delete-firewall-rules "${MASTER_NAME}-https" "${MASTER_NAME}-etcd" "${NODE_TAG}-all"
     # Delete the master's reserved IP
     if gcloud compute addresses describe "${MASTER_NAME}-ip" --region "${REGION}" --project "${PROJECT}" &>/dev/null; then
       gcloud compute addresses delete \
@@ -1267,13 +1303,6 @@ function kube-down() {
         --region "${REGION}" \
         --quiet \
         "${MASTER_NAME}-ip"
-    fi
-    # Delete firewall rule for minions.
-    if gcloud compute firewall-rules describe --project "${PROJECT}" "${NODE_TAG}-all" &>/dev/null; then
-      gcloud compute firewall-rules delete  \
-        --project "${PROJECT}" \
-        --quiet \
-        "${NODE_TAG}-all"
     fi
   fi
 
@@ -1326,6 +1355,16 @@ function kube-down() {
       "${INSTANCE_PREFIX}"-influxdb-pd
   fi
 
+  # Delete all remaining firewall rules and network.
+  delete-firewall-rules \
+    "${NETWORK}-default-internal-master" \
+    "${NETWORK}-default-internal-node" \
+    "${NETWORK}-default-ssh" \
+    "${NETWORK}-default-internal"  # Pre-1.5 clusters
+  if [[ "${KUBE_DELETE_NETWORK}" == "true" ]]; then
+    delete-network || true  # might fail if there are leaked firewall rules
+  fi
+
   # If there are no more remaining master replicas, we should update kubeconfig.
   if [[ "${REMAINING_MASTER_COUNT}" == "0" ]]; then
     export CONTEXT="${PROJECT}_${INSTANCE_PREFIX}"
@@ -1346,7 +1385,7 @@ function kube-down() {
 function get-replica-name() {
   echo $(gcloud compute instances list \
     --project "${PROJECT}" \
-    --zone "${ZONE}" \
+    --zones "${ZONE}" \
     --regexp "$(get-replica-name-regexp)" \
     --format "value(name)" | head -n1)
 }
@@ -1694,14 +1733,9 @@ function test-setup() {
 function test-teardown() {
   detect-project
   echo "Shutting down test cluster in background."
-  gcloud compute firewall-rules delete  \
-    --project "${PROJECT}" \
-    --quiet \
-    "${NODE_TAG}-${INSTANCE_PREFIX}-http-alt" || true
-  gcloud compute firewall-rules delete  \
-    --project "${PROJECT}" \
-    --quiet \
-    "${NODE_TAG}-${INSTANCE_PREFIX}-nodeports" || true
+  delete-firewall-rules \
+    "${NODE_TAG}-${INSTANCE_PREFIX}-http-alt" \
+    "${NODE_TAG}-${INSTANCE_PREFIX}-nodeports"
   if [[ ${MULTIZONE:-} == "true" ]]; then
       local zones=( ${E2E_ZONES} )
       # tear them down in reverse order, finally tearing down the master too.

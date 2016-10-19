@@ -28,6 +28,7 @@ import (
 	federationcache "k8s.io/kubernetes/federation/client/cache"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
@@ -159,10 +160,12 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface, fed
 	s.serviceStore.Indexer, s.serviceController = cache.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-				return s.federationClient.Core().Services(v1.NamespaceAll).List(options)
+				versionedOptions := util.VersionizeV1ListOptions(options)
+				return s.federationClient.Core().Services(v1.NamespaceAll).List(versionedOptions)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return s.federationClient.Core().Services(v1.NamespaceAll).Watch(options)
+				versionedOptions := util.VersionizeV1ListOptions(options)
+				return s.federationClient.Core().Services(v1.NamespaceAll).Watch(versionedOptions)
 			},
 		},
 		&v1.Service{},
@@ -182,10 +185,12 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface, fed
 	s.clusterStore.Store, s.clusterController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-				return s.federationClient.Federation().Clusters().List(options)
+				versionedOptions := util.VersionizeV1ListOptions(options)
+				return s.federationClient.Federation().Clusters().List(versionedOptions)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return s.federationClient.Federation().Clusters().Watch(options)
+				versionedOptions := util.VersionizeV1ListOptions(options)
+				return s.federationClient.Federation().Clusters().Watch(versionedOptions)
 			},
 		},
 		&v1beta1.Cluster{},
@@ -387,7 +392,7 @@ func (s *ServiceController) deleteClusterService(clusterName string, cachedServi
 	glog.V(4).Infof("Deleting service %s/%s from cluster %s", service.Namespace, service.Name, clusterName)
 	var err error
 	for i := 0; i < clientRetryCount; i++ {
-		err = clientset.Core().Services(service.Namespace).Delete(service.Name, &api.DeleteOptions{})
+		err = clientset.Core().Services(service.Namespace).Delete(service.Name, &v1.DeleteOptions{})
 		if err == nil || errors.IsNotFound(err) {
 			glog.V(4).Infof("Service %s/%s deleted from cluster %s", service.Namespace, service.Name, clusterName)
 			delete(cachedService.endpointMap, clusterName)

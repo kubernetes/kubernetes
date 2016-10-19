@@ -256,7 +256,7 @@ func getNodeRuntimeOperationErrorRate(c *client.Client, node string) (NodeRuntim
 }
 
 // HighLatencyKubeletOperations logs and counts the high latency metrics exported by the kubelet server via /metrics.
-func HighLatencyKubeletOperations(c *client.Client, threshold time.Duration, nodeName string) (KubeletLatencyMetrics, error) {
+func HighLatencyKubeletOperations(c *client.Client, threshold time.Duration, nodeName string, logFunc func(fmt string, args ...interface{})) (KubeletLatencyMetrics, error) {
 	ms, err := getKubeletMetrics(c, nodeName)
 	if err != nil {
 		return KubeletLatencyMetrics{}, err
@@ -264,7 +264,7 @@ func HighLatencyKubeletOperations(c *client.Client, threshold time.Duration, nod
 	latencyMetrics := GetKubeletLatencyMetrics(ms)
 	sort.Sort(latencyMetrics)
 	var badMetrics KubeletLatencyMetrics
-	Logf("\nLatency metrics for node %v", nodeName)
+	logFunc("\nLatency metrics for node %v", nodeName)
 	for _, m := range latencyMetrics {
 		if m.Latency > threshold {
 			badMetrics = append(badMetrics, m)
@@ -463,7 +463,6 @@ func TargetContainers() []string {
 		rootContainerName,
 		stats.SystemContainerRuntime,
 		stats.SystemContainerKubelet,
-		stats.SystemContainerMisc,
 	}
 }
 

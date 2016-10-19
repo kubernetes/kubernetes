@@ -196,7 +196,7 @@ func (f CodecFactory) SupportedStreamingMediaTypes() []string {
 // TODO: make this call exist only in pkg/api, and initialize it with the set of default versions.
 //   All other callers will be forced to request a Codec directly.
 func (f CodecFactory) LegacyCodec(version ...unversioned.GroupVersion) runtime.Codec {
-	return versioning.NewCodecForScheme(f.scheme, f.legacySerializer, f.universal, unversioned.GroupVersions(version), runtime.InternalGroupVersioner)
+	return versioning.NewDefaultingCodecForScheme(f.scheme, f.legacySerializer, f.universal, unversioned.GroupVersions(version), runtime.InternalGroupVersioner)
 }
 
 // UniversalDeserializer can convert any stored data recognized by this factory into a Go object that satisfies
@@ -235,7 +235,7 @@ func (f CodecFactory) CodecForVersions(encoder runtime.Encoder, decoder runtime.
 	if decode == nil {
 		decode = runtime.InternalGroupVersioner
 	}
-	return versioning.NewCodecForScheme(f.scheme, encoder, decoder, encode, decode)
+	return versioning.NewDefaultingCodecForScheme(f.scheme, encoder, decoder, encode, decode)
 }
 
 // DecoderToVersion returns a decoder that targets the provided group version.

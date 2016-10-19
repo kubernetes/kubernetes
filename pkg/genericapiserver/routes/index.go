@@ -20,19 +20,17 @@ import (
 	"net/http"
 	"sort"
 
-	"github.com/emicklei/go-restful"
-
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apiserver"
+	"k8s.io/kubernetes/pkg/genericapiserver/mux"
 )
 
 // Index provides a webservice for the http root / listing all known paths.
 type Index struct{}
 
 // Install adds the Index webservice to the given mux.
-func (i Index) Install(mux *apiserver.PathRecorderMux, c *restful.Container) {
-	// do not register this using restful Webservice since we do not want to surface this in api docs.
-	mux.BaseMux().HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+func (i Index) Install(c *mux.APIContainer) {
+	c.SecretRoutes.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		status := http.StatusOK
 		if r.URL.Path != "/" && r.URL.Path != "/index.html" {
 			// Since "/" matches all paths, handleIndex is called for all paths for which there is no handler registered.
@@ -45,7 +43,7 @@ func (i Index) Install(mux *apiserver.PathRecorderMux, c *restful.Container) {
 			handledPaths = append(handledPaths, ws.RootPath())
 		}
 		// Extract the paths handled using mux handler.
-		handledPaths = append(handledPaths, mux.HandledPaths()...)
+		handledPaths = append(handledPaths, c.NonSwaggerRoutes.HandledPaths()...)
 		sort.Strings(handledPaths)
 		apiserver.WriteRawJSON(status, unversioned.RootPaths{Paths: handledPaths}, w)
 	})

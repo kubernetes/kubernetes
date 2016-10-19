@@ -55,8 +55,9 @@ type Builder struct {
 
 	resources []string
 
-	namespace string
-	names     []string
+	namespace    string
+	allNamespace bool
+	names        []string
 
 	resourceTuples []resourceTuple
 
@@ -291,11 +292,12 @@ func (b *Builder) DefaultNamespace() *Builder {
 }
 
 // AllNamespaces instructs the builder to use NamespaceAll as a namespace to request resources
-// acroll all namespace. This overrides the namespace set by NamespaceParam().
+// across all of the namespace. This overrides the namespace set by NamespaceParam().
 func (b *Builder) AllNamespaces(allNamespace bool) *Builder {
 	if allNamespace {
 		b.namespace = api.NamespaceAll
 	}
+	b.allNamespace = allNamespace
 	return b
 }
 
@@ -538,6 +540,11 @@ func (b *Builder) visitorResult() *Result {
 		b.selector = labels.Everything()
 	}
 
+	// visit items specified by paths
+	if len(b.paths) != 0 {
+		return b.visitByPaths()
+	}
+
 	// visit selectors
 	if b.selector != nil {
 		return b.visitBySelector()
@@ -551,11 +558,6 @@ func (b *Builder) visitorResult() *Result {
 	// visit items specified by name
 	if len(b.names) != 0 {
 		return b.visitByName()
-	}
-
-	// visit items specified by paths
-	if len(b.paths) != 0 {
-		return b.visitByPaths()
 	}
 
 	if len(b.resources) != 0 {
@@ -573,14 +575,6 @@ func (b *Builder) visitBySelector() *Result {
 	}
 	if len(b.resources) == 0 {
 		return &Result{err: fmt.Errorf("at least one resource must be specified to use a selector")}
-	}
-	// empty selector has different error message for paths being provided
-	if len(b.paths) != 0 {
-		if b.selector.Empty() {
-			return &Result{err: fmt.Errorf("when paths, URLs, or stdin is provided as input, you may not specify a resource by arguments as well")}
-		} else {
-			return &Result{err: fmt.Errorf("a selector may not be specified when path, URL, or stdin is provided as input")}
-		}
 	}
 	mappings, err := b.resourceMappings()
 	if err != nil {
@@ -613,9 +607,6 @@ func (b *Builder) visitByResource() *Result {
 		isSingular = len(b.resourceTuples) == 1
 	}
 
-	if len(b.paths) != 0 {
-		return &Result{singular: isSingular, err: fmt.Errorf("when paths, URLs, or stdin is provided as input, you may not specify a resource by arguments as well")}
-	}
 	if len(b.resources) != 0 {
 		return &Result{singular: isSingular, err: fmt.Errorf("you may not specify individual resources and bulk resources in the same call")}
 	}
@@ -655,7 +646,11 @@ func (b *Builder) visitByResource() *Result {
 			selectorNamespace = ""
 		} else {
 			if len(b.namespace) == 0 {
-				return &Result{singular: isSingular, err: fmt.Errorf("namespace may not be empty when retrieving a resource by name")}
+				errMsg := "namespace may not be empty when retrieving a resource by name"
+				if b.allNamespace {
+					errMsg = "a resource cannot be retrieved by name across all namespaces"
+				}
+				return &Result{singular: isSingular, err: fmt.Errorf(errMsg)}
 			}
 		}
 
@@ -701,7 +696,11 @@ func (b *Builder) visitByName() *Result {
 		selectorNamespace = ""
 	} else {
 		if len(b.namespace) == 0 {
-			return &Result{singular: isSingular, err: fmt.Errorf("namespace may not be empty when retrieving a resource by name")}
+			errMsg := "namespace may not be empty when retrieving a resource by name"
+			if b.allNamespace {
+				errMsg = "a resource cannot be retrieved by name across all namespaces"
+			}
+			return &Result{singular: isSingular, err: fmt.Errorf(errMsg)}
 		}
 	}
 
@@ -717,6 +716,12 @@ func (b *Builder) visitByPaths() *Result {
 	singular := !b.dir && !b.stream && len(b.paths) == 1
 	if len(b.resources) != 0 {
 		return &Result{singular: singular, err: fmt.Errorf("when paths, URLs, or stdin is provided as input, you may not specify resource arguments as well")}
+	}
+	if len(b.names) != 0 {
+		return &Result{err: fmt.Errorf("name cannot be provided when a path is specified")}
+	}
+	if len(b.resourceTuples) != 0 {
+		return &Result{err: fmt.Errorf("resource/name arguments cannot be provided when a path is specified")}
 	}
 
 	var visitors Visitor
@@ -737,6 +742,9 @@ func (b *Builder) visitByPaths() *Result {
 			visitors = NewDecoratedVisitor(visitors, SetNamespace(b.namespace))
 		}
 		visitors = NewDecoratedVisitor(visitors, RetrieveLatest)
+	}
+	if b.selector != nil {
+		visitors = NewFilteredVisitor(visitors, FilterBySelector(b.selector))
 	}
 	return &Result{singular: singular, visitor: visitors, sources: b.paths}
 }

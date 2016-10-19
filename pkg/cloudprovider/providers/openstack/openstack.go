@@ -17,7 +17,6 @@ limitations under the License.
 package openstack
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -32,6 +31,8 @@ import (
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/openstack"
 	"github.com/rackspace/gophercloud/openstack/compute/v2/servers"
+	"github.com/rackspace/gophercloud/openstack/identity/v3/extensions/trust"
+	token3 "github.com/rackspace/gophercloud/openstack/identity/v3/tokens"
 	"github.com/rackspace/gophercloud/pagination"
 
 	"github.com/golang/glog"
@@ -41,12 +42,6 @@ import (
 )
 
 const ProviderName = "openstack"
-
-// metadataUrl is URL to OpenStack metadata server. It's hardcoded IPv4
-// link-local address as documented in "OpenStack Cloud Administrator Guide",
-// chapter Compute - Networking with nova-network.
-// http://docs.openstack.org/admin-guide-cloud/compute-networking-nova.html#metadata-service
-const metadataUrl = "http://169.254.169.254/openstack/2012-08-10/meta_data.json"
 
 var ErrNotFound = errors.New("Failed to find object")
 var ErrMultipleResults = errors.New("Multiple results where only one expected")
@@ -79,14 +74,16 @@ type LoadBalancer struct {
 }
 
 type LoadBalancerOpts struct {
-	LBVersion         string     `gcfg:"lb-version"` // overrides autodetection. v1 or v2
-	SubnetId          string     `gcfg:"subnet-id"`  // required
-	FloatingNetworkId string     `gcfg:"floating-network-id"`
-	LBMethod          string     `gcfg:"lb-method"`
-	CreateMonitor     bool       `gcfg:"create-monitor"`
-	MonitorDelay      MyDuration `gcfg:"monitor-delay"`
-	MonitorTimeout    MyDuration `gcfg:"monitor-timeout"`
-	MonitorMaxRetries uint       `gcfg:"monitor-max-retries"`
+	LBVersion            string     `gcfg:"lb-version"` // overrides autodetection. v1 or v2
+	SubnetId             string     `gcfg:"subnet-id"`  // required
+	FloatingNetworkId    string     `gcfg:"floating-network-id"`
+	LBMethod             string     `gcfg:"lb-method"`
+	CreateMonitor        bool       `gcfg:"create-monitor"`
+	MonitorDelay         MyDuration `gcfg:"monitor-delay"`
+	MonitorTimeout       MyDuration `gcfg:"monitor-timeout"`
+	MonitorMaxRetries    uint       `gcfg:"monitor-max-retries"`
+	ManageSecurityGroups bool       `gcfg:"manage-security-groups"`
+	NodeSecurityGroupID  string     `gcfg:"node-security-group"`
 }
 
 // OpenStack is an implementation of cloud provider Interface for OpenStack.
@@ -107,6 +104,7 @@ type Config struct {
 		ApiKey     string `gcfg:"api-key"`
 		TenantId   string `gcfg:"tenant-id"`
 		TenantName string `gcfg:"tenant-name"`
+		TrustId    string `gcfg:"trust-id"`
 		DomainId   string `gcfg:"domain-id"`
 		DomainName string `gcfg:"domain-name"`
 		Region     string
@@ -152,27 +150,6 @@ func readConfig(config io.Reader) (Config, error) {
 	return cfg, err
 }
 
-// parseMetadataUUID reads JSON from OpenStack metadata server and parses
-// instance ID out of it.
-func parseMetadataUUID(jsonData []byte) (string, error) {
-	// We should receive an object with { 'uuid': '<uuid>' } and couple of other
-	// properties (which we ignore).
-
-	obj := struct{ UUID string }{}
-	err := json.Unmarshal(jsonData, &obj)
-	if err != nil {
-		return "", err
-	}
-
-	uuid := obj.UUID
-	if uuid == "" {
-		err = fmt.Errorf("cannot parse OpenStack metadata, got empty uuid")
-		return "", err
-	}
-
-	return uuid, nil
-}
-
 func readInstanceID() (string, error) {
 	// Try to find instance ID on the local filesystem (created by cloud-init)
 	const instanceIDFile = "/var/lib/cloud/data/instance-id"
@@ -184,41 +161,32 @@ func readInstanceID() (string, error) {
 		if instanceID != "" {
 			return instanceID, nil
 		}
-		// Fall through with empty instanceID and try metadata server.
+		// Fall through to metadata server lookup
 	}
-	glog.V(5).Infof("Cannot read %s: '%v', trying metadata server", instanceIDFile, err)
 
-	// Try to get JSON from metdata server.
-	resp, err := http.Get(metadataUrl)
+	md, err := getMetadata()
 	if err != nil {
-		glog.V(3).Infof("Cannot read %s: %v", metadataUrl, err)
 		return "", err
 	}
 
-	if resp.StatusCode != 200 {
-		err = fmt.Errorf("got unexpected status code when reading metadata from %s: %s", metadataUrl, resp.Status)
-		glog.V(3).Infof("%v", err)
-		return "", err
-	}
-
-	defer resp.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		glog.V(3).Infof("Cannot get HTTP response body from %s: %v", metadataUrl, err)
-		return "", err
-	}
-	instanceID, err := parseMetadataUUID(bodyBytes)
-	if err != nil {
-		glog.V(3).Infof("Cannot parse instance ID from metadata from %s: %v", metadataUrl, err)
-		return "", err
-	}
-
-	glog.V(3).Infof("Got instance id from %s: %s", metadataUrl, instanceID)
-	return instanceID, nil
+	return md.Uuid, nil
 }
 
 func newOpenStack(cfg Config) (*OpenStack, error) {
-	provider, err := openstack.AuthenticatedClient(cfg.toAuthOptions())
+	provider, err := openstack.NewClient(cfg.Global.AuthUrl)
+	if err != nil {
+		return nil, err
+	}
+	if cfg.Global.TrustId != "" {
+		authOptionsExt := trust.AuthOptionsExt{
+			TrustID:     cfg.Global.TrustId,
+			AuthOptions: token3.AuthOptions{AuthOptions: cfg.toAuthOptions()},
+		}
+		err = trust.AuthenticateV3Trust(provider, authOptionsExt)
+	} else {
+		err = openstack.Authenticate(provider, cfg.toAuthOptions())
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -445,9 +413,18 @@ func (os *OpenStack) Zones() (cloudprovider.Zones, bool) {
 	return os, true
 }
 func (os *OpenStack) GetZone() (cloudprovider.Zone, error) {
-	glog.V(1).Infof("Current zone is %v", os.region)
+	md, err := getMetadata()
+	if err != nil {
+		return cloudprovider.Zone{}, err
+	}
 
-	return cloudprovider.Zone{Region: os.region}, nil
+	zone := cloudprovider.Zone{
+		FailureDomain: md.AvailabilityZone,
+		Region:        os.region,
+	}
+	glog.V(1).Infof("Current zone is %v", zone)
+
+	return zone, nil
 }
 
 func (os *OpenStack) Routes() (cloudprovider.Routes, bool) {

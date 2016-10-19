@@ -19,6 +19,7 @@ package fake
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
 	v1alpha1 "k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
@@ -59,13 +60,13 @@ func (c *FakeCertificateSigningRequests) UpdateStatus(certificateSigningRequest 
 	return obj.(*v1alpha1.CertificateSigningRequest), err
 }
 
-func (c *FakeCertificateSigningRequests) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeCertificateSigningRequests) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewRootDeleteAction(certificatesigningrequestsResource, name), &v1alpha1.CertificateSigningRequest{})
 	return err
 }
 
-func (c *FakeCertificateSigningRequests) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakeCertificateSigningRequests) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewRootDeleteCollectionAction(certificatesigningrequestsResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.CertificateSigningRequestList{})
@@ -81,14 +82,14 @@ func (c *FakeCertificateSigningRequests) Get(name string) (result *v1alpha1.Cert
 	return obj.(*v1alpha1.CertificateSigningRequest), err
 }
 
-func (c *FakeCertificateSigningRequests) List(opts api.ListOptions) (result *v1alpha1.CertificateSigningRequestList, err error) {
+func (c *FakeCertificateSigningRequests) List(opts v1.ListOptions) (result *v1alpha1.CertificateSigningRequestList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewRootListAction(certificatesigningrequestsResource, opts), &v1alpha1.CertificateSigningRequestList{})
 	if obj == nil {
 		return nil, err
 	}
 
-	label := opts.LabelSelector
+	label, _, _ := core.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -102,7 +103,7 @@ func (c *FakeCertificateSigningRequests) List(opts api.ListOptions) (result *v1a
 }
 
 // Watch returns a watch.Interface that watches the requested certificateSigningRequests.
-func (c *FakeCertificateSigningRequests) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeCertificateSigningRequests) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewRootWatchAction(certificatesigningrequestsResource, opts))
 }

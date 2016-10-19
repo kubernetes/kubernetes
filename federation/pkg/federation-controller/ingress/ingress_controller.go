@@ -18,7 +18,6 @@ package ingress
 
 import (
 	"fmt"
-	"reflect"
 	"sync"
 	"time"
 
@@ -127,10 +126,12 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 	ic.ingressInformerStore, ic.ingressInformerController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-				return client.Extensions().Ingresses(api.NamespaceAll).List(options)
+				versionedOptions := util.VersionizeV1ListOptions(options)
+				return client.Extensions().Ingresses(api.NamespaceAll).List(versionedOptions)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return client.Extensions().Ingresses(api.NamespaceAll).Watch(options)
+				versionedOptions := util.VersionizeV1ListOptions(options)
+				return client.Extensions().Ingresses(api.NamespaceAll).Watch(versionedOptions)
 			},
 		},
 		&extensions_v1beta1.Ingress{},
@@ -148,10 +149,12 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 			return cache.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-						return targetClient.Extensions().Ingresses(api.NamespaceAll).List(options)
+						versionedOptions := util.VersionizeV1ListOptions(options)
+						return targetClient.Extensions().Ingresses(api.NamespaceAll).List(versionedOptions)
 					},
 					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-						return targetClient.Extensions().Ingresses(api.NamespaceAll).Watch(options)
+						versionedOptions := util.VersionizeV1ListOptions(options)
+						return targetClient.Extensions().Ingresses(api.NamespaceAll).Watch(versionedOptions)
 					},
 				},
 				&extensions_v1beta1.Ingress{},
@@ -184,13 +187,15 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 						if targetClient == nil {
 							glog.Errorf("Internal error: targetClient is nil")
 						}
-						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).List(options) // we only want to list one by name - unfortunately Kubernetes don't have a selector for that.
+						versionedOptions := util.VersionizeV1ListOptions(options)
+						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).List(versionedOptions) // we only want to list one by name - unfortunately Kubernetes don't have a selector for that.
 					},
 					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 						if targetClient == nil {
 							glog.Errorf("Internal error: targetClient is nil")
 						}
-						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).Watch(options) // as above
+						versionedOptions := util.VersionizeV1ListOptions(options)
+						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).Watch(versionedOptions) // as above
 					},
 				},
 				&v1.ConfigMap{},
@@ -238,7 +243,7 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 		func(client kubeclientset.Interface, obj pkg_runtime.Object) error {
 			ingress := obj.(*extensions_v1beta1.Ingress)
 			glog.V(4).Infof("Attempting to delete Ingress: %v", ingress)
-			err := client.Extensions().Ingresses(ingress.Namespace).Delete(ingress.Name, &api.DeleteOptions{})
+			err := client.Extensions().Ingresses(ingress.Namespace).Delete(ingress.Name, &v1.DeleteOptions{})
 			return err
 		})
 
@@ -267,7 +272,7 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 			configMap := obj.(*v1.ConfigMap)
 			configMapName := types.NamespacedName{Name: configMap.Name, Namespace: configMap.Namespace}
 			glog.Errorf("Internal error: Incorrectly attempting to delete ConfigMap: %q", configMapName)
-			err := client.Core().ConfigMaps(configMap.Namespace).Delete(configMap.Name, &api.DeleteOptions{})
+			err := client.Core().ConfigMaps(configMap.Namespace).Delete(configMap.Name, &v1.DeleteOptions{})
 			return err
 		})
 	return ic
@@ -311,17 +316,9 @@ func (ic *IngressController) Run(stopChan <-chan struct{}) {
 		}
 		ic.reconcileConfigMapForCluster(clusterName)
 	})
-	go func() {
-		select {
-		case <-time.After(time.Minute):
-			glog.V(4).Infof("Ingress controller is garbage collecting")
-			ic.ingressBackoff.GC()
-			ic.configMapBackoff.GC()
-			glog.V(4).Infof("Ingress controller garbage collection complete")
-		case <-stopChan:
-			return
-		}
-	}()
+
+	util.StartBackoffGC(ic.ingressBackoff, stopChan)
+	util.StartBackoffGC(ic.configMapBackoff, stopChan)
 }
 
 func (ic *IngressController) deliverIngressObj(obj interface{}, delay time.Duration, failed bool) {
@@ -665,7 +662,7 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 					ClusterName: cluster.Name,
 				})
 			} else {
-				glog.V(4).Infof("No annotation %q exists on ingress %q in federation, and index of cluster %q is %d and not zero.  Not queueing create operation for ingress %q until annotation exists", staticIPNameKeyWritable, ingress, cluster.Name, clusterIndex)
+				glog.V(4).Infof("No annotation %q exists on ingress %q in federation, and index of cluster %q is %d and not zero.  Not queueing create operation for ingress %q until annotation exists", staticIPNameKeyWritable, ingress, cluster.Name, clusterIndex, ingress)
 			}
 		} else {
 			clusterIngress := clusterIngressObj.(*extensions_v1beta1.Ingress)
@@ -713,8 +710,7 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 				glog.V(4).Infof(logStr, "Not transferring")
 			}
 			// Update existing cluster ingress, if needed.
-			if util.ObjectMetaEquivalent(baseIngress.ObjectMeta, clusterIngress.ObjectMeta) &&
-				reflect.DeepEqual(baseIngress.Spec, clusterIngress.Spec) {
+			if util.ObjectMetaAndSpecEquivalent(baseIngress, clusterIngress) {
 				glog.V(4).Infof("Ingress %q in cluster %q does not need an update: cluster ingress is equivalent to federated ingress", ingress, cluster.Name)
 			} else {
 				glog.V(4).Infof("Ingress %s in cluster %s needs an update: cluster ingress %v is not equivalent to federated ingress %v", ingress, cluster.Name, clusterIngress, desiredIngress)

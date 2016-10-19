@@ -53,14 +53,14 @@ func (c *FakePodTemplates) Update(podTemplate *v1.PodTemplate) (result *v1.PodTe
 	return obj.(*v1.PodTemplate), err
 }
 
-func (c *FakePodTemplates) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakePodTemplates) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewDeleteAction(podtemplatesResource, c.ns, name), &v1.PodTemplate{})
 
 	return err
 }
 
-func (c *FakePodTemplates) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakePodTemplates) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(podtemplatesResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.PodTemplateList{})
@@ -77,7 +77,7 @@ func (c *FakePodTemplates) Get(name string) (result *v1.PodTemplate, err error) 
 	return obj.(*v1.PodTemplate), err
 }
 
-func (c *FakePodTemplates) List(opts api.ListOptions) (result *v1.PodTemplateList, err error) {
+func (c *FakePodTemplates) List(opts v1.ListOptions) (result *v1.PodTemplateList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewListAction(podtemplatesResource, c.ns, opts), &v1.PodTemplateList{})
 
@@ -85,7 +85,7 @@ func (c *FakePodTemplates) List(opts api.ListOptions) (result *v1.PodTemplateLis
 		return nil, err
 	}
 
-	label := opts.LabelSelector
+	label, _, _ := core.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -99,7 +99,7 @@ func (c *FakePodTemplates) List(opts api.ListOptions) (result *v1.PodTemplateLis
 }
 
 // Watch returns a watch.Interface that watches the requested podTemplates.
-func (c *FakePodTemplates) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakePodTemplates) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(podtemplatesResource, c.ns, opts))
 
