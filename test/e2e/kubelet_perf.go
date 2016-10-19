@@ -201,7 +201,7 @@ var _ = framework.KubeDescribe("Kubelet [Serial] [Slow]", func() {
 		// affect the runtime cpu usage. Fail the test if prepulling cannot
 		// finish in time.
 		if err := framework.WaitForPodsSuccess(f.Client, api.NamespaceSystem, framework.ImagePullerLabels, imagePrePullingLongTimeout); err != nil {
-			framework.Failf("Image puller didn't complete in %v, not running resource usage test since the metrics might be adultrated", imagePrePullingLongTimeout)
+			framework.Failf("Image puller didn't complete in %v, not running resource usage test since the metrics might be adulterated", imagePrePullingLongTimeout)
 		}
 		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
 		nodeNames = sets.NewString()
