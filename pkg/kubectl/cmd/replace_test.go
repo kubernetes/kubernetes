@@ -25,12 +25,13 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
+	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
 func TestReplaceObject(t *testing.T) {
 	_, _, rc := testData()
 
-	f, tf, codec, _ := NewAPIFactory()
+	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	ns := dynamic.ContentConfig().NegotiatedSerializer
 	tf.Printer = &testPrinter{}
 	deleted := false
@@ -86,7 +87,7 @@ func TestReplaceObject(t *testing.T) {
 func TestReplaceMultipleObject(t *testing.T) {
 	_, svc, rc := testData()
 
-	f, tf, codec, _ := NewAPIFactory()
+	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	ns := dynamic.ContentConfig().NegotiatedSerializer
 	tf.Printer = &testPrinter{}
 	redisMasterDeleted := false
@@ -156,7 +157,7 @@ func TestReplaceMultipleObject(t *testing.T) {
 func TestReplaceDirectory(t *testing.T) {
 	_, _, rc := testData()
 
-	f, tf, codec, _ := NewAPIFactory()
+	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	ns := dynamic.ContentConfig().NegotiatedSerializer
 	tf.Printer = &testPrinter{}
 	created := map[string]bool{}
@@ -213,7 +214,7 @@ func TestReplaceDirectory(t *testing.T) {
 func TestForceReplaceObjectNotFound(t *testing.T) {
 	_, _, rc := testData()
 
-	f, tf, codec, _ := NewAPIFactory()
+	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	ns := dynamic.ContentConfig().NegotiatedSerializer
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{

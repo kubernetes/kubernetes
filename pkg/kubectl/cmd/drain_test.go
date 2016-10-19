@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/conversion"
+	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -132,7 +133,7 @@ func TestCordon(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		f, tf, codec, ns := NewAPIFactory()
+		f, tf, codec, ns := cmdtesting.NewAPIFactory()
 		new_node := &api.Node{}
 		updated := false
 		tf.Client = &fake.RESTClient{
@@ -459,7 +460,7 @@ func TestDrain(t *testing.T) {
 	for _, test := range tests {
 		new_node := &api.Node{}
 		deleted := false
-		f, tf, codec, ns := NewAPIFactory()
+		f, tf, codec, ns := cmdtesting.NewAPIFactory()
 
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: ns,
@@ -567,7 +568,7 @@ func refJson(t *testing.T, o runtime.Object) string {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	_, _, codec, _ := NewAPIFactory()
+	_, _, codec, _ := cmdtesting.NewAPIFactory()
 	json, err := runtime.Encode(codec, &api.SerializedReference{Reference: *ref})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

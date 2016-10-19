@@ -28,13 +28,14 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
+	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
 func TestDeleteObjectByTuple(t *testing.T) {
 	_, _, rc := testData()
 
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -66,7 +67,7 @@ func TestDeleteObjectByTuple(t *testing.T) {
 func TestDeleteNamedObject(t *testing.T) {
 	_, _, rc := testData()
 
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -98,7 +99,7 @@ func TestDeleteNamedObject(t *testing.T) {
 func TestDeleteObject(t *testing.T) {
 	_, _, rc := testData()
 
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -128,7 +129,7 @@ func TestDeleteObject(t *testing.T) {
 }
 
 func TestDeleteObjectNotFound(t *testing.T) {
-	f, tf, _, ns := NewAPIFactory()
+	f, tf, _, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -157,7 +158,7 @@ func TestDeleteObjectNotFound(t *testing.T) {
 }
 
 func TestDeleteObjectIgnoreNotFound(t *testing.T) {
-	f, tf, _, ns := NewAPIFactory()
+	f, tf, _, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -189,7 +190,7 @@ func TestDeleteObjectIgnoreNotFound(t *testing.T) {
 func TestDeleteAllNotFound(t *testing.T) {
 	_, svc, _ := testData()
 
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 
 	// Add an item to the list which will result in a 404 on delete
 	svc.Items = append(svc.Items, api.Service{ObjectMeta: api.ObjectMeta{Name: "foo"}})
@@ -231,7 +232,7 @@ func TestDeleteAllNotFound(t *testing.T) {
 func TestDeleteAllIgnoreNotFound(t *testing.T) {
 	_, svc, _ := testData()
 
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 
 	// Add an item to the list which will result in a 404 on delete
 	svc.Items = append(svc.Items, api.Service{ObjectMeta: api.ObjectMeta{Name: "foo"}})
@@ -271,7 +272,7 @@ func TestDeleteAllIgnoreNotFound(t *testing.T) {
 func TestDeleteMultipleObject(t *testing.T) {
 	_, svc, rc := testData()
 
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -305,7 +306,7 @@ func TestDeleteMultipleObject(t *testing.T) {
 func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 	_, svc, _ := testData()
 
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -341,7 +342,7 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 
 func TestDeleteMultipleResourcesWithTheSameName(t *testing.T) {
 	_, svc, rc := testData()
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -377,7 +378,7 @@ func TestDeleteMultipleResourcesWithTheSameName(t *testing.T) {
 func TestDeleteDirectory(t *testing.T) {
 	_, _, rc := testData()
 
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -408,7 +409,7 @@ func TestDeleteDirectory(t *testing.T) {
 func TestDeleteMultipleSelector(t *testing.T) {
 	pods, svc, _ := testData()
 
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -473,7 +474,7 @@ func TestResourceErrors(t *testing.T) {
 	}
 
 	for k, testCase := range testCases {
-		f, tf, _, _ := NewAPIFactory()
+		f, tf, _, _ := cmdtesting.NewAPIFactory()
 		tf.Printer = &testPrinter{}
 		tf.Namespace = "test"
 		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}}
