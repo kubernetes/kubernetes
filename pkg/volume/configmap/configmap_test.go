@@ -275,13 +275,14 @@ func TestPlugin(t *testing.T) {
 		testNamespace  = "test_configmap_namespace"
 		testName       = "test_configmap_name"
 
-		volumeSpec = volumeSpec(testVolumeName, testName, 0644)
-		configMap  = configMap(testNamespace, testName)
-		client     = fake.NewSimpleClientset(&configMap)
-		pluginMgr  = volume.VolumePluginMgr{}
-		_, host    = newTestHost(t, client)
+		volumeSpec    = volumeSpec(testVolumeName, testName, 0644)
+		configMap     = configMap(testNamespace, testName)
+		client        = fake.NewSimpleClientset(&configMap)
+		pluginMgr     = volume.VolumePluginMgr{}
+		tempDir, host = newTestHost(t, client)
 	)
 
+	defer os.RemoveAll(tempDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 
 	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
@@ -345,6 +346,7 @@ func TestPluginReboot(t *testing.T) {
 		rootDir, host = newTestHost(t, client)
 	)
 
+	defer os.RemoveAll(rootDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 
 	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
