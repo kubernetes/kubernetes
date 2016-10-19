@@ -47,7 +47,7 @@ func createTestCerts(spec TestCertSpec) (certFilePath, keyFilePath string, err e
 		ips = append(ips, net.ParseIP(ip))
 	}
 
-	certPem, keyPem, err := utilcert.GenerateSelfSignedCertKey(spec.host, ips, spec.names)
+	_, _, certPem, keyPem, err := utilcert.GenerateSelfSignedCertKey(spec.host, ips, spec.names)
 	if err != nil {
 		return "", "", err
 	}

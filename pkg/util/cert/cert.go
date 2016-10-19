@@ -17,7 +17,6 @@ limitations under the License.
 package cert
 
 import (
-	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	cryptorand "crypto/rand"
@@ -30,6 +29,15 @@ import (
 	"math/big"
 	"net"
 	"time"
+
+	"github.com/cloudflare/cfssl/config"
+	"github.com/cloudflare/cfssl/csr"
+	"github.com/cloudflare/cfssl/helpers"
+	"github.com/cloudflare/cfssl/initca"
+	"github.com/cloudflare/cfssl/signer"
+	"github.com/cloudflare/cfssl/signer/local"
+
+	"github.com/golang/glog"
 )
 
 const (
@@ -126,56 +134,84 @@ func MakeEllipticPrivateKeyPEM() ([]byte, error) {
 	return pem.EncodeToMemory(privateKeyPemBlock), nil
 }
 
-// GenerateSelfSignedCertKey creates a self-signed certificate and key for the given host.
-// Host may be an IP or a DNS name
-// You may also specify additional subject alt names (either ip or dns names) for the certificate
-func GenerateSelfSignedCertKey(host string, alternateIPs []net.IP, alternateDNS []string) ([]byte, []byte, error) {
-	priv, err := rsa.GenerateKey(cryptorand.Reader, 2048)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	template := x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			CommonName: host,
+// GenerateSelfSignedCertKey creates a self-signed CA, a server key and certificate signed
+// with the CA. Host may be an IP or a DNS name. You may also specify additional subject
+// alt names (either ip or dns names) for the certificate.
+func GenerateSelfSignedCertKey(host string, alternateIPs []net.IP, alternateDNS []string) (caCertPem []byte, caKeyPem []byte, certPem []byte, keyPem []byte, err error) {
+	// create root CA
+	glog.Infof("Creating root ca")
+	rootCAReq := csr.CertificateRequest{
+		CN: fmt.Sprintf("%s@ca-%d", host, time.Now().Unix()),
+		KeyRequest: &csr.BasicKeyRequest{
+			A: "rsa",
+			S: 2048,
 		},
-		NotBefore: time.Now(),
-		NotAfter:  time.Now().Add(time.Hour * 24 * 365),
-
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
-		IsCA: true,
+		CA: &csr.CAConfig{
+			Expiry: fmt.Sprintf("%dh", 24*365*1),
+		},
 	}
-
-	if ip := net.ParseIP(host); ip != nil {
-		template.IPAddresses = append(template.IPAddresses, ip)
-	} else {
-		template.DNSNames = append(template.DNSNames, host)
-	}
-
-	template.IPAddresses = append(template.IPAddresses, alternateIPs...)
-	template.DNSNames = append(template.DNSNames, alternateDNS...)
-
-	derBytes, err := x509.CreateCertificate(cryptorand.Reader, &template, &template, &priv.PublicKey, priv)
+	caCertPem, _, caKeyPem, err = initca.New(&rootCAReq)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, fmt.Errorf("error creating root-ca: %v", err)
 	}
 
-	// Generate cert
-	certBuffer := bytes.Buffer{}
-	if err := pem.Encode(&certBuffer, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}); err != nil {
-		return nil, nil, err
+	// create key and csr
+	glog.Infof("Creating signing request for apiserver key")
+	hosts := []string{host}
+	for _, ip := range alternateIPs {
+		hosts = append(hosts, ip.String())
+	}
+	hosts = append(hosts, alternateDNS...)
+	req := csr.CertificateRequest{
+		CN: fmt.Sprintf("%s@%d", host, time.Now().Unix()),
+		KeyRequest: &csr.BasicKeyRequest{
+			A: "rsa",
+			S: 2048,
+		},
+		CA: &csr.CAConfig{
+			Expiry: fmt.Sprintf("%dh", 24*365*1),
+		},
+		Hosts: hosts,
 	}
 
-	// Generate key
-	keyBuffer := bytes.Buffer{}
-	if err := pem.Encode(&keyBuffer, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)}); err != nil {
-		return nil, nil, err
+	glog.Infof("Creating apiserver key and certificate")
+	gen := csr.Generator{
+		Validator: func(req *csr.CertificateRequest) error {
+			return nil
+		},
+	}
+	keyCSR, keyPem, err := gen.ProcessRequest(&req)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("error creating key and csr: %v", err)
 	}
 
-	return certBuffer.Bytes(), keyBuffer.Bytes(), nil
+	// sign key with root CA
+	caKey, err := helpers.ParsePrivateKeyPEM(caKeyPem)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("failed to parse private ca key: %v", err)
+	}
+	caCert, err := helpers.ParseCertificatePEM(caCertPem)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("failed to parse ca cert: %v", err)
+	}
+	glog.Infof("Signing apiserver certificate with root-ca")
+	policy := config.Signing{
+		Profiles: map[string]*config.SigningProfile{},
+		Default:  config.DefaultConfig(),
+	}
+	policy.Default.ExpiryString = fmt.Sprintf("%dh", 24*365*10)
+	s, err := local.NewSigner(caKey, caCert, signer.DefaultSigAlgo(caKey), &policy)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("error creating signer: %v", err)
+	}
+	certPem, err = s.Sign(signer.SignRequest{
+		Request: string(keyCSR),
+	})
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("error signing crt: %v", err)
+	}
+
+	return caCertPem, caKeyPem, certPem, keyPem, nil
 }
 
 // FormatBytesCert receives byte array certificate and formats in human-readable format
