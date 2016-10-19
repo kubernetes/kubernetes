@@ -19,11 +19,11 @@ package cmd
 import (
 	"bufio"
 	"bytes"
+	goerrors "errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"reflect"
 	gruntime "runtime"
 	"strings"
 
@@ -38,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/crlf"
-	"k8s.io/kubernetes/pkg/util/strategicpatch"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/util/yaml"
 
@@ -271,7 +270,7 @@ func RunEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 				meta.SetList(updates.Object, mutatedObjects)
 			}
 
-			err = visitToPatch(originalObj, updates, mapper, resourceMapper, encoder, out, errOut, defaultVersion, &results, file)
+			err = visitToReplace(originalObj, updates, mapper, resourceMapper, encoder, out, errOut, defaultVersion, &results, file)
 			if err != nil {
 				return preservedFile(err, results.file, errOut)
 			}
@@ -361,9 +360,9 @@ func getMapperAndResult(f cmdutil.Factory, args []string, options *resource.File
 	return mapper, resourceMapper, r, cmdNamespace, err
 }
 
-func visitToPatch(originalObj runtime.Object, updates *resource.Info, mapper meta.RESTMapper, resourceMapper *resource.Mapper, encoder runtime.Encoder, out, errOut io.Writer, defaultVersion unversioned.GroupVersion, results *editResults, file string) error {
-	patchVisitor := resource.NewFlattenListVisitor(updates, resourceMapper)
-	err := patchVisitor.Visit(func(info *resource.Info, incomingErr error) error {
+func visitToReplace(originalObj runtime.Object, updates *resource.Info, mapper meta.RESTMapper, resourceMapper *resource.Mapper, encoder runtime.Encoder, out, errOut io.Writer, defaultVersion unversioned.GroupVersion, results *editResults, file string) error {
+	replaceVisitor := resource.NewFlattenListVisitor(updates, resourceMapper)
+	err := replaceVisitor.Visit(func(info *resource.Info, incomingErr error) error {
 		currOriginalObj := originalObj
 
 		// if we're editing a list, then navigate the list to find the item that we're currently trying to edit
@@ -396,54 +395,48 @@ func visitToPatch(originalObj runtime.Object, updates *resource.Info, mapper met
 
 		}
 
-		originalSerialization, err := runtime.Encode(encoder, currOriginalObj)
+		ok, err := checkAPiVersionKindName(currOriginalObj, info.Object)
 		if err != nil {
 			return err
 		}
-		editedSerialization, err := runtime.Encode(encoder, info.Object)
-		if err != nil {
-			return err
-		}
-
-		// compute the patch on a per-item basis
-		// use strategic merge to create a patch
-		originalJS, err := yaml.ToJSON(originalSerialization)
-		if err != nil {
-			return err
-		}
-		editedJS, err := yaml.ToJSON(editedSerialization)
-		if err != nil {
-			return err
-		}
-
-		if reflect.DeepEqual(originalJS, editedJS) {
-			// no edit, so just skip it.
-			cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, false, "skipped")
-			return nil
-		}
-
-		preconditions := []strategicpatch.PreconditionFunc{strategicpatch.RequireKeyUnchanged("apiVersion"),
-			strategicpatch.RequireKeyUnchanged("kind"), strategicpatch.RequireMetadataKeyUnchanged("name")}
-		patch, err := strategicpatch.CreateTwoWayMergePatch(originalJS, editedJS, currOriginalObj, preconditions...)
-		if err != nil {
-			glog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
-			if strategicpatch.IsPreconditionFailed(err) {
-				return preservedFile(nil, file, errOut)
-			}
-			return err
+		if !ok {
+			return goerrors.New("At least one of apiVersion, kind and name was changed")
 		}
 
 		results.version = defaultVersion
-		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch)
+		replaced, err := resource.NewHelper(info.Client, info.Mapping).Replace(info.Namespace, info.Name, true, info.Object)
 		if err != nil {
 			fmt.Fprintln(out, results.addError(err, info))
 			return nil
 		}
-		info.Refresh(patched, true)
+		info.Refresh(replaced, true)
 		cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, false, "edited")
 		return nil
 	})
 	return err
+}
+
+func checkAPiVersionKindName(oldObj, newObj runtime.Object) (bool, error) {
+	oldMetaAccessor, err := meta.Accessor(oldObj)
+	if err != nil {
+		return false, err
+	}
+	newMetaAccessor, err := meta.Accessor(newObj)
+	if err != nil {
+		return false, err
+	}
+	oldTypeAccessor, err := meta.TypeAccessor(oldObj)
+	if err != nil {
+		return false, err
+	}
+	newTypeAccessor, err := meta.TypeAccessor(newObj)
+	if err != nil {
+		return false, err
+	}
+	return oldMetaAccessor.GetName() == newMetaAccessor.GetName() &&
+			oldTypeAccessor.GetKind() == newTypeAccessor.GetKind() &&
+			oldTypeAccessor.GetAPIVersion() == newTypeAccessor.GetAPIVersion(),
+		nil
 }
 
 func visitAnnotation(cmd *cobra.Command, f cmdutil.Factory, updates *resource.Info, resourceMapper *resource.Mapper, encoder runtime.Encoder) ([]runtime.Object, error) {
