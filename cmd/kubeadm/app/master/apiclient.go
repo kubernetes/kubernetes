@@ -19,6 +19,7 @@ package master
 import (
 	"encoding/json"
 	"fmt"
+	"runtime"
 	"time"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
@@ -206,14 +207,11 @@ func SetMasterTaintTolerations(meta *api.ObjectMeta) {
 	meta.Annotations[api.TolerationsAnnotationKey] = string(tolerationsAnnotation)
 }
 
-func SetMasterNodeAffinity(meta *api.ObjectMeta) {
+// SetNodeAffinity is a basic helper to set meta.Annotations[api.AffinityAnnotationKey] for one or more api.NodeSelectorRequirement(s)
+func SetNodeAffinity(meta *api.ObjectMeta, expr ...api.NodeSelectorRequirement) {
 	nodeAffinity := &api.NodeAffinity{
 		RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
-			NodeSelectorTerms: []api.NodeSelectorTerm{{
-				MatchExpressions: []api.NodeSelectorRequirement{{
-					Key: "kubeadm.alpha.kubernetes.io/role", Operator: api.NodeSelectorOpIn, Values: []string{"master"},
-				}},
-			}},
+			NodeSelectorTerms: []api.NodeSelectorTerm{{MatchExpressions: expr}},
 		},
 	}
 	affinityAnnotation, _ := json.Marshal(api.Affinity{NodeAffinity: nodeAffinity})
@@ -221,6 +219,21 @@ func SetMasterNodeAffinity(meta *api.ObjectMeta) {
 		meta.Annotations = map[string]string{}
 	}
 	meta.Annotations[api.AffinityAnnotationKey] = string(affinityAnnotation)
+}
+
+// MasterNodeAffinity returns api.NodeSelectorRequirement to be used with SetNodeAffinity to set affinity to master node
+func MasterNodeAffinity() api.NodeSelectorRequirement {
+	return api.NodeSelectorRequirement{
+		Key: "kubeadm.alpha.kubernetes.io/role", Operator: api.NodeSelectorOpIn, Values: []string{"master"},
+	}
+}
+
+// NativeArchitectureNodeAffinity returns api.NodeSelectorRequirement to be used with SetNodeAffinity to nodes with CPU architecture
+// the same as master node
+func NativeArchitectureNodeAffinity() api.NodeSelectorRequirement {
+	return api.NodeSelectorRequirement{
+		Key: "beta.kubernetes.io/arch", Operator: api.NodeSelectorOpIn, Values: []string{runtime.GOARCH},
+	}
 }
 
 func createDummyDeployment(client *clientset.Clientset) {
