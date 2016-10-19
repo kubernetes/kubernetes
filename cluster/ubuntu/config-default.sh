@@ -74,7 +74,7 @@ FLANNEL_BACKEND=''
 # FLANNEL_OTHER_NET_CONFIG=', "SubnetMin": "172.16.10.0", "SubnetMax": "172.16.90.0"'
 
 export FLANNEL_OTHER_NET_CONFIG
-FLANNEL_OTHER_NET_CONFIG=''
+FLANNEL_OTHER_NET_CONFIG=${FLANNEL_OTHER_NET_CONFIG:-""}
 
 # Admission Controllers to invoke prior to persisting objects in
 # cluster.  If we included ResourceQuota, we should keep it at the end
