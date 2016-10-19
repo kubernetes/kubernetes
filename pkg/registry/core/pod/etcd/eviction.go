@@ -107,14 +107,8 @@ func (r *EvictionREST) checkAndDecrement(namespace string, pdb policy.PodDisrupt
 		return false, nil
 	}
 
-	copied, err := api.Scheme.DeepCopy(pdb)
-	if err != nil {
-		return false, err
-	}
-	newPDB := copied.(policy.PodDisruptionBudget)
-	newPDB.Status.PodDisruptionAllowed = false
-
-	if _, err := r.podDisruptionBudgetClient.PodDisruptionBudgets(namespace).Update(&newPDB); err != nil {
+	pdb.Status.PodDisruptionAllowed = false
+	if _, err := r.podDisruptionBudgetClient.PodDisruptionBudgets(namespace).Update(&pdb); err != nil {
 		return false, err
 	}
 
