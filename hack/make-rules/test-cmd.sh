@@ -1728,6 +1728,33 @@ __EOF__
   # Post-condition: configmap exists and has expected values
   kube::test::get_object_assert 'configmap/test-configmap --namespace=test-configmaps' "{{$id_field}}" 'test-configmap'
   [[ "$(kubectl get configmap/test-configmap --namespace=test-configmaps -o yaml "${kube_flags[@]}" | grep 'key1: value1')" ]]
+
+  ### Replace a generic configmap in a specific namespace
+  # Pre-condition: the configmap 'test-configmap' exists
+  kube::test::get_object_assert 'configmaps --namespace=test-configmaps' "{{range.items}}{{$id_field}}:{{end}}" 'test-configmap:'
+  # Command
+  kubectl replace configmap test-configmap --from-literal=key1=value2 --namespace=test-configmaps
+  # Post-condition: configmap exists and has updated values
+  kube::test::get_object_assert 'configmap/test-configmap --namespace=test-configmaps' "{{$id_field}}" 'test-configmap'
+  [[ "$(kubectl get configmap/test-configmap --namespace=test-configmaps -o yaml "${kube_flags[@]}" | grep 'key1: value2')" ]]
+
+  ### Force replace a generic configmap in a specific namespace
+  # Command
+  kubectl replace configmap test-configmap --force --from-literal=key1=value3 --namespace=test-configmaps
+  # Post-condition: configmap exists and has updated values
+  kube::test::get_object_assert 'configmap/test-configmap --namespace=test-configmaps' "{{$id_field}}" 'test-configmap'
+  [[ "$(kubectl get configmap/test-configmap --namespace=test-configmaps -o yaml "${kube_flags[@]}" | grep 'key1: value3')" ]]
+  # Clean-up
+  kubectl delete configmap test-configmap --namespace=test-configmaps
+
+  ### Force replace a generic configmap when the configmap doesn't exist
+  # Pre-condition: no configmaps exists
+  kube::test::get_object_assert 'configmaps --namespace=test-configmaps' "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl replace configmap test-configmap --force --from-literal=key1=value4 --namespace=test-configmaps
+  # Post-condition: configmap exists and has updated values
+  kube::test::get_object_assert 'configmap/test-configmap --namespace=test-configmaps' "{{$id_field}}" 'test-configmap'
+  [[ "$(kubectl get configmap/test-configmap --namespace=test-configmaps -o yaml "${kube_flags[@]}" | grep 'key1: value4')" ]]
   # Clean-up
   kubectl delete configmap test-configmap --namespace=test-configmaps
   kubectl delete namespace test-configmaps

@@ -395,6 +395,15 @@ func AddGeneratorFlags(cmd *cobra.Command, defaultGenerator string) {
 	AddDryRunFlag(cmd)
 }
 
+func AddForceReplaceFlags(cmd *cobra.Command, supportCascade bool) {
+	cmd.Flags().Bool("force", false, "Delete and re-create the specified resource")
+	cmd.Flags().Duration("timeout", 0, "Only relevant during a force replace. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
+	if supportCascade {
+		cmd.Flags().Int("grace-period", -1, "Only relevant during a force replace. Period of time in seconds given to the old resource to terminate gracefully. Ignored if negative.")
+		cmd.Flags().Bool("cascade", false, "Only relevant during a force replace. If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).")
+	}
+}
+
 func ReadConfigDataFromReader(reader io.Reader, source string) ([]byte, error) {
 	data, err := ioutil.ReadAll(reader)
 	if err != nil {

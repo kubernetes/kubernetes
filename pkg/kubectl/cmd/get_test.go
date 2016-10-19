@@ -91,6 +91,30 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 	return pods, svc, rc
 }
 
+func genTestData() (*api.ConfigMapList, *api.SecretList) {
+	cm := &api.ConfigMapList{
+		ListMeta: unversioned.ListMeta{
+			ResourceVersion: "19",
+		},
+		Items: []api.ConfigMap{
+			{
+				ObjectMeta: api.ObjectMeta{Name: "configmap1", Namespace: "test", ResourceVersion: "21"},
+			},
+		},
+	}
+	secret := &api.SecretList{
+		ListMeta: unversioned.ListMeta{
+			ResourceVersion: "20",
+		},
+		Items: []api.Secret{
+			{
+				ObjectMeta: api.ObjectMeta{Name: "secret1", Namespace: "test", ResourceVersion: "22"},
+			},
+		},
+	}
+	return cm, secret
+}
+
 func testDynamicResources() []*discovery.APIGroupResources {
 	return []*discovery.APIGroupResources{
 		{

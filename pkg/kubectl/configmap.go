@@ -124,6 +124,19 @@ func (s ConfigMapGeneratorV1) validate() error {
 	return nil
 }
 
+// HandleConfigMapReplace replace a the data field of a configmap
+// with the infomation from file sources and literal sources
+func HandleConfigMapReplace(configMap *api.ConfigMap, fileSources, literalSources []string) error {
+	configMap.Data = make(map[string]string)
+	if err := handleConfigMapFromFileSources(configMap, fileSources); err != nil {
+		return err
+	}
+	if err := handleConfigMapFromLiteralSources(configMap, literalSources); err != nil {
+		return err
+	}
+	return nil
+}
+
 // handleConfigMapFromLiteralSources adds the specified literal source
 // information into the provided configMap.
 func handleConfigMapFromLiteralSources(configMap *api.ConfigMap, literalSources []string) error {

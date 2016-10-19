@@ -26,7 +26,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -34,6 +36,18 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
+
+// ReplaceSubcommandOptions is an options struct to support replace subcommands
+type ReplaceSubcommandOptions struct {
+	// Name of the resource
+	Name string
+	// Resource type of the resource
+	Resource string
+	// Subtype of the resource (optional)
+	Subtype string
+	// OutputFormat
+	OutputFormat string
+}
 
 var (
 	replace_long = templates.LongDesc(`
@@ -79,16 +93,14 @@ func NewCmdReplace(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	usage := "to use to replace the resource."
 	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
 	cmd.MarkFlagRequired("filename")
-	cmd.Flags().Bool("force", false, "Delete and re-create the specified resource")
-	cmd.Flags().Bool("cascade", false, "Only relevant during a force replace. If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).")
-	cmd.Flags().Int("grace-period", -1, "Only relevant during a force replace. Period of time in seconds given to the old resource to terminate gracefully. Ignored if negative.")
-	cmd.Flags().Duration("timeout", 0, "Only relevant during a force replace. The length of time to wait before giving up on a delete of the old resource, zero means determine a timeout from the size of the object. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
+	cmdutil.AddForceReplaceFlags(cmd, true)
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddOutputFlagsForMutation(cmd)
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 
+	cmd.AddCommand(NewCmdReplaceConfigMap(f, out))
 	return cmd
 }
 
@@ -281,6 +293,177 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 	}
 	if count == 0 {
 		return fmt.Errorf("no objects passed to replace")
+	}
+	return nil
+}
+
+// RunReplaceSubcommand executes a replace subcommand using the specified options
+func RunReplaceSubcommand(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string, options *ReplaceSubcommandOptions) error {
+	if len(os.Args) > 1 && os.Args[1] == "update" {
+		printDeprecationWarning("replace", "update")
+	}
+
+	cmdNamespace, _, err := f.DefaultNamespace()
+	if err != nil {
+		return err
+	}
+	force := cmdutil.GetFlagBool(cmd, "force")
+	shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
+	if force {
+		return forceReplaceSubcommand(f, out, cmd, args, shortOutput, options)
+	}
+	if cmdutil.GetFlagDuration(cmd, "timeout") != 0 {
+		return fmt.Errorf("--timeout must have --force specified")
+	}
+
+	mapper, typer := f.Object()
+	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+		NamespaceParam(cmdNamespace).DefaultNamespace().
+		ResourceTypeOrNameArgs(true, options.Resource, options.Name).
+		Flatten().
+		Do()
+	err = r.Err()
+	if err != nil {
+		return err
+	}
+
+	return r.Visit(func(info *resource.Info, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, f.JSONEncoder()); err != nil {
+			return cmdutil.AddSourceToErr("replacing", info.Source, err)
+		}
+
+		if cmdutil.ShouldRecord(cmd, info) {
+			if err := cmdutil.RecordChangeCause(info.Object, f.Command()); err != nil {
+				return cmdutil.AddSourceToErr("replacing", info.Source, err)
+			}
+		}
+
+		switch obj := info.Object.(type) {
+		case *api.ConfigMap:
+			err := kubectl.HandleConfigMapReplace(obj,
+				cmdutil.GetFlagStringSlice(cmd, "from-file"),
+				cmdutil.GetFlagStringSlice(cmd, "from-literal"),
+			)
+			if err != nil {
+				return cmdutil.AddSourceToErr("replacing", info.Source, err)
+			}
+		default:
+			return cmdutil.AddSourceToErr("replacing", info.Source, fmt.Errorf("Replacing object type \"%T\" is not supported", obj))
+		}
+
+		obj, err := resource.NewHelper(info.Client, info.Mapping).Replace(info.Namespace, info.Name, true, info.Object)
+		if err != nil {
+			return cmdutil.AddSourceToErr("replacing", info.Source, err)
+		}
+		err = info.Refresh(obj, true)
+		if err != nil {
+			return err
+		}
+		f.PrintObjectSpecificMessage(obj, out)
+		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, "replaced")
+		return nil
+	})
+}
+
+func forceReplaceSubcommand(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, shortOutput bool, options *ReplaceSubcommandOptions) error {
+	cmdNamespace, _, err := f.DefaultNamespace()
+	if err != nil {
+		return err
+	}
+
+	mapper, typer, err := f.UnstructuredObject()
+	if err != nil {
+		return err
+	}
+	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), runtime.UnstructuredJSONScheme).
+		NamespaceParam(cmdNamespace).DefaultNamespace().
+		ResourceTypeOrNameArgs(true, options.Resource, options.Name).
+		Flatten().
+		Do()
+	err = r.Err()
+	if err != nil {
+		return err
+	}
+	//Replace will create a resource if it doesn't exist already, so ignore not found error
+	ignoreNotFound := true
+	timeout := cmdutil.GetFlagDuration(cmd, "timeout")
+	err = DeleteResult(r, out, ignoreNotFound, shortOutput, mapper)
+	if err != nil {
+		return err
+	}
+
+	if timeout == 0 {
+		timeout = kubectl.Timeout
+	}
+	r.Visit(func(info *resource.Info, err error) error {
+		if err != nil {
+			return err
+		}
+		return wait.PollImmediate(kubectl.Interval, timeout, func() (bool, error) {
+			if err := info.Get(); !errors.IsNotFound(err) {
+				return false, err
+			}
+			return true, nil
+		})
+	})
+
+	var generator kubectl.StructuredGenerator
+	switch options.Resource {
+	case "configmaps":
+		generator = &kubectl.ConfigMapGeneratorV1{
+			Name:           options.Name,
+			FileSources:    cmdutil.GetFlagStringSlice(cmd, "from-file"),
+			LiteralSources: cmdutil.GetFlagStringSlice(cmd, "from-literal"),
+		}
+	default:
+		return cmdutil.UsageError(cmd, fmt.Sprintf("Force replacing \"%s\" is not supported.", options.Resource))
+	}
+
+	obj, err := generator.StructuredGenerate()
+	if err != nil {
+		return err
+	}
+	mapper, typer = f.Object()
+	gvks, _, err := typer.ObjectKinds(obj)
+	if err != nil {
+		return err
+	}
+	gvk := gvks[0]
+	mapping, err := mapper.RESTMapping(unversioned.GroupKind{Group: gvk.Group, Kind: gvk.Kind}, gvk.Version)
+	if err != nil {
+		return err
+	}
+	client, err := f.ClientForMapping(mapping)
+	if err != nil {
+		return err
+	}
+	resourceMapper := &resource.Mapper{
+		ObjectTyper:  typer,
+		RESTMapper:   mapper,
+		ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
+	}
+	info, err := resourceMapper.InfoForObject(obj, nil)
+	if err != nil {
+		return err
+	}
+	if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, f.JSONEncoder()); err != nil {
+		return err
+	}
+	obj, err = resource.NewHelper(client, mapping).Create(cmdNamespace, true, info.Object)
+	if err != nil {
+		return err
+	}
+	err = info.Refresh(obj, true)
+	if err != nil {
+		return err
+	}
+
+	if useShortOutput := options.OutputFormat == "name"; useShortOutput || len(options.OutputFormat) == 0 {
+		cmdutil.PrintSuccess(mapper, useShortOutput, out, mapping.Resource, options.Name, "replaced")
 	}
 	return nil
 }
