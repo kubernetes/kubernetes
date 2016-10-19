@@ -512,7 +512,6 @@ func TolerationToleratesTaint(toleration *Toleration, taint *Taint) bool {
 		return true
 	}
 	return false
-
 }
 
 // TaintToleratedByTolerations checks if taint is tolerated by any of the tolerations.
