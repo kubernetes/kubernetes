@@ -38,6 +38,7 @@ message APIGroup {
 
   // preferredVersion is the version preferred by the API server, which
   // probably is the storage version.
+  // +optional
   optional GroupVersionForDiscovery preferredVersion = 3;
 
   // a map of client CIDR to server address that is serving this group.
@@ -185,9 +186,11 @@ message LabelSelector {
   // matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
   // map is equivalent to an element of matchExpressions, whose key field is "key", the
   // operator is "In", and the values array contains only "value". The requirements are ANDed.
+  // +optional
   map<string, string> matchLabels = 1;
 
   // matchExpressions is a list of label selector requirements. The requirements are ANDed.
+  // +optional
   repeated LabelSelectorRequirement matchExpressions = 2;
 }
 
@@ -205,6 +208,7 @@ message LabelSelectorRequirement {
   // the values array must be non-empty. If the operator is Exists or DoesNotExist,
   // the values array must be empty. This array is replaced during a strategic
   // merge patch.
+  // +optional
   repeated string values = 3;
 }
 
@@ -214,6 +218,7 @@ message ListMeta {
   // SelfLink is a URL representing this object.
   // Populated by the system.
   // Read-only.
+  // +optional
   optional string selfLink = 1;
 
   // String that identifies the server's internal version of this object that
@@ -222,6 +227,7 @@ message ListMeta {
   // Populated by the system.
   // Read-only.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency
+  // +optional
   optional string resourceVersion = 2;
 }
 
@@ -246,29 +252,35 @@ message ServerAddressByClientCIDR {
 message Status {
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+  // +optional
   optional ListMeta metadata = 1;
 
   // Status of the operation.
   // One of: "Success" or "Failure".
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+  // +optional
   optional string status = 2;
 
   // A human-readable description of the status of this operation.
+  // +optional
   optional string message = 3;
 
   // A machine-readable description of why this operation is in the
   // "Failure" status. If this value is empty there
   // is no information available. A Reason clarifies an HTTP status
   // code but does not override it.
+  // +optional
   optional string reason = 4;
 
   // Extended data associated with the reason.  Each reason may define its
   // own extended details. This field is optional and the data returned
   // is not guaranteed to conform to any schema except that defined by
   // the reason type.
+  // +optional
   optional StatusDetails details = 5;
 
   // Suggested HTTP return code for this status, 0 if not set.
+  // +optional
   optional int32 code = 6;
 }
 
@@ -277,10 +289,12 @@ message Status {
 message StatusCause {
   // A machine-readable description of the cause of the error. If this value is
   // empty there is no information available.
+  // +optional
   optional string reason = 1;
 
   // A human-readable description of the cause of the error.  This field may be
   // presented as-is to a reader.
+  // +optional
   optional string message = 2;
 
   // The field of the resource that has caused this error, as named by its JSON
@@ -292,6 +306,7 @@ message StatusCause {
   // Examples:
   //   "name" - the field "name" on the current resource
   //   "items[0].name" - the field "name" on the first array entry in "items"
+  // +optional
   optional string field = 3;
 }
 
@@ -304,21 +319,26 @@ message StatusCause {
 message StatusDetails {
   // The name attribute of the resource associated with the status StatusReason
   // (when there is a single name which can be described).
+  // +optional
   optional string name = 1;
 
   // The group attribute of the resource associated with the status StatusReason.
+  // +optional
   optional string group = 2;
 
   // The kind attribute of the resource associated with the status StatusReason.
   // On some operations may differ from the requested resource Kind.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+  // +optional
   optional string kind = 3;
 
   // The Causes array includes more details associated with the StatusReason
   // failure. Not all StatusReasons may provide detailed causes.
+  // +optional
   repeated StatusCause causes = 4;
 
   // If specified, the time in seconds before the operation should be retried.
+  // +optional
   optional int32 retryAfterSeconds = 5;
 }
 
@@ -367,12 +387,14 @@ message TypeMeta {
   // Cannot be updated.
   // In CamelCase.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+  // +optional
   optional string kind = 1;
 
   // APIVersion defines the versioned schema of this representation of an object.
   // Servers should convert recognized schemas to the latest internal value, and
   // may reject unrecognized values.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources
+  // +optional
   optional string apiVersion = 2;
 }
 

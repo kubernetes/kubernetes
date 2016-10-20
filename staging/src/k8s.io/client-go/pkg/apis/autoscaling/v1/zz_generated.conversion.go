@@ -77,7 +77,6 @@ func Convert_autoscaling_CrossVersionObjectReference_To_v1_CrossVersionObjectRef
 }
 
 func autoConvert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(in *HorizontalPodAutoscaler, out *autoscaling.HorizontalPodAutoscaler, s conversion.Scope) error {
-	SetDefaults_HorizontalPodAutoscaler(in)
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}

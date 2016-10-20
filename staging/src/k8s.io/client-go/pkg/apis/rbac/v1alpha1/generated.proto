@@ -33,6 +33,7 @@ option go_package = "v1alpha1";
 // ClusterRole is a cluster level, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding or ClusterRoleBinding.
 message ClusterRole {
   // Standard object's metadata.
+  // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
   // Rules holds all the PolicyRules for this ClusterRole
@@ -43,6 +44,7 @@ message ClusterRole {
 // and adds who information via Subject.
 message ClusterRoleBinding {
   // Standard object's metadata.
+  // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
   // Subjects holds references to the objects the role applies to.
@@ -56,6 +58,7 @@ message ClusterRoleBinding {
 // ClusterRoleBindingList is a collection of ClusterRoleBindings
 message ClusterRoleBindingList {
   // Standard object's metadata.
+  // +optional
   optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
 
   // Items is a list of ClusterRoleBindings
@@ -65,6 +68,7 @@ message ClusterRoleBindingList {
 // ClusterRoleList is a collection of ClusterRoles
 message ClusterRoleList {
   // Standard object's metadata.
+  // +optional
   optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
 
   // Items is a list of ClusterRoles
@@ -79,28 +83,34 @@ message PolicyRule {
 
   // AttributeRestrictions will vary depending on what the Authorizer/AuthorizationAttributeBuilder pair supports.
   // If the Authorizer does not recognize how to handle the AttributeRestrictions, the Authorizer should report an error.
+  // +optional
   optional k8s.io.kubernetes.pkg.runtime.RawExtension attributeRestrictions = 2;
 
   // APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of
   // the enumerated resources in any API group will be allowed.
+  // +optional
   repeated string apiGroups = 3;
 
   // Resources is a list of resources this rule applies to.  ResourceAll represents all resources.
+  // +optional
   repeated string resources = 4;
 
   // ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.
+  // +optional
   repeated string resourceNames = 5;
 
   // NonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path
   // This name is intentionally different than the internal type so that the DefaultConvert works nicely and because the ordering may be different.
   // Since non-resource URLs are not namespaced, this field is only applicable for ClusterRoles referenced from a ClusterRoleBinding.
   // Rules can either apply to API resources (such as "pods" or "secrets") or non-resource URL paths (such as "/api"),  but not both.
+  // +optional
   repeated string nonResourceURLs = 6;
 }
 
 // Role is a namespaced, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding.
 message Role {
   // Standard object's metadata.
+  // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
   // Rules holds all the PolicyRules for this Role
@@ -112,6 +122,7 @@ message Role {
 // namespace only have effect in that namespace.
 message RoleBinding {
   // Standard object's metadata.
+  // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
   // Subjects holds references to the objects the role applies to.
@@ -125,6 +136,7 @@ message RoleBinding {
 // RoleBindingList is a collection of RoleBindings
 message RoleBindingList {
   // Standard object's metadata.
+  // +optional
   optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
 
   // Items is a list of RoleBindings
@@ -134,6 +146,7 @@ message RoleBindingList {
 // RoleList is a collection of Roles
 message RoleList {
   // Standard object's metadata.
+  // +optional
   optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
 
   // Items is a list of Roles
@@ -160,6 +173,7 @@ message Subject {
   optional string kind = 1;
 
   // APIVersion holds the API group and version of the referenced object.
+  // +optional
   optional string apiVersion = 2;
 
   // Name of the object being referenced.
@@ -167,6 +181,7 @@ message Subject {
 
   // Namespace of the referenced object.  If the object kind is non-namespace, such as "User" or "Group", and this value is not empty
   // the Authorizer should report an error.
+  // +optional
   optional string namespace = 4;
 }
 

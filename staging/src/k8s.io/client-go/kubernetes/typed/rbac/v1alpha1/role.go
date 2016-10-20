@@ -21,6 +21,7 @@ import (
 	v1 "k8s.io/client-go/pkg/api/v1"
 	v1alpha1 "k8s.io/client-go/pkg/apis/rbac/v1alpha1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // RolesGetter has a method to return a RoleInterface.
@@ -44,14 +45,14 @@ type RoleInterface interface {
 
 // roles implements RoleInterface
 type roles struct {
-	client *RbacClient
+	client rest.Interface
 	ns     string
 }
 
 // newRoles returns a Roles
 func newRoles(c *RbacClient, namespace string) *roles {
 	return &roles{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

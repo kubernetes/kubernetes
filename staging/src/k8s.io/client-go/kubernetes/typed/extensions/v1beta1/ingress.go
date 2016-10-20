@@ -21,6 +21,7 @@ import (
 	v1 "k8s.io/client-go/pkg/api/v1"
 	v1beta1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // IngressesGetter has a method to return a IngressInterface.
@@ -45,14 +46,14 @@ type IngressInterface interface {
 
 // ingresses implements IngressInterface
 type ingresses struct {
-	client *ExtensionsClient
+	client rest.Interface
 	ns     string
 }
 
 // newIngresses returns a Ingresses
 func newIngresses(c *ExtensionsClient, namespace string) *ingresses {
 	return &ingresses{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

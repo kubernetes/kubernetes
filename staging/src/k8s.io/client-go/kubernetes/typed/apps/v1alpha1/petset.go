@@ -21,6 +21,7 @@ import (
 	v1 "k8s.io/client-go/pkg/api/v1"
 	v1alpha1 "k8s.io/client-go/pkg/apis/apps/v1alpha1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // PetSetsGetter has a method to return a PetSetInterface.
@@ -45,14 +46,14 @@ type PetSetInterface interface {
 
 // petSets implements PetSetInterface
 type petSets struct {
-	client *AppsClient
+	client rest.Interface
 	ns     string
 }
 
 // newPetSets returns a PetSets
 func newPetSets(c *AppsClient, namespace string) *petSets {
 	return &petSets{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

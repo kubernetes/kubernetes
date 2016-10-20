@@ -288,25 +288,6 @@ func (s *StoreToPVFetcher) GetPersistentVolumeInfo(id string) (*api.PersistentVo
 	return o.(*api.PersistentVolume), nil
 }
 
-// Typed wrapper around a store of PersistentVolumeClaims
-type StoreToPVCFetcher struct {
-	Store
-}
-
-// GetPersistentVolumeClaimInfo returns cached data for the PersistentVolumeClaim 'id'.
-func (s *StoreToPVCFetcher) GetPersistentVolumeClaimInfo(namespace string, id string) (*api.PersistentVolumeClaim, error) {
-	o, exists, err := s.Get(&api.PersistentVolumeClaim{ObjectMeta: api.ObjectMeta{Namespace: namespace, Name: id}})
-	if err != nil {
-		return nil, fmt.Errorf("error retrieving PersistentVolumeClaim '%s/%s' from cache: %v", namespace, id, err)
-	}
-
-	if !exists {
-		return nil, fmt.Errorf("PersistentVolumeClaim '%s/%s' not found", namespace, id)
-	}
-
-	return o.(*api.PersistentVolumeClaim), nil
-}
-
 // StoreToPetSetLister gives a store List and Exists methods. The store must contain only PetSets.
 type StoreToPetSetLister struct {
 	Store

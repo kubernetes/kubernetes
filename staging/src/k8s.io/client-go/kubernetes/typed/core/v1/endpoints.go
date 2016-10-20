@@ -20,6 +20,7 @@ import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // EndpointsGetter has a method to return a EndpointsInterface.
@@ -43,14 +44,14 @@ type EndpointsInterface interface {
 
 // endpoints implements EndpointsInterface
 type endpoints struct {
-	client *CoreClient
+	client rest.Interface
 	ns     string
 }
 
 // newEndpoints returns a Endpoints
 func newEndpoints(c *CoreClient, namespace string) *endpoints {
 	return &endpoints{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

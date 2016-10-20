@@ -171,6 +171,7 @@ var standardResources = sets.NewString(
 	string(ResourceConfigMaps),
 	string(ResourcePersistentVolumeClaims),
 	string(ResourceStorage),
+	string(ResourceRequestsStorage),
 )
 
 // IsStandardResourceName returns true if the resource is known to the system
@@ -235,6 +236,20 @@ var standardFinalizers = sets.NewString(
 	string(FinalizerKubernetes),
 	FinalizerOrphan,
 )
+
+// HasAnnotation returns a bool if passed in annotation exists
+func HasAnnotation(obj ObjectMeta, ann string) bool {
+	_, found := obj.Annotations[ann]
+	return found
+}
+
+// SetMetaDataAnnotation sets the annotation and value
+func SetMetaDataAnnotation(obj *ObjectMeta, ann string, value string) {
+	if obj.Annotations == nil {
+		obj.Annotations = make(map[string]string)
+	}
+	obj.Annotations[ann] = value
+}
 
 func IsStandardFinalizerName(str string) bool {
 	return standardFinalizers.Has(str)
@@ -512,7 +527,6 @@ func TolerationToleratesTaint(toleration *Toleration, taint *Taint) bool {
 		return true
 	}
 	return false
-
 }
 
 // TaintToleratedByTolerations checks if taint is tolerated by any of the tolerations.

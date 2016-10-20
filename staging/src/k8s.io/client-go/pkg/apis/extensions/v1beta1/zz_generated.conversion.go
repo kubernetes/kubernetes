@@ -319,7 +319,6 @@ func Convert_extensions_CustomMetricTargetList_To_v1beta1_CustomMetricTargetList
 }
 
 func autoConvert_v1beta1_DaemonSet_To_extensions_DaemonSet(in *DaemonSet, out *extensions.DaemonSet, s conversion.Scope) error {
-	SetDefaults_DaemonSet(in)
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -476,7 +475,6 @@ func Convert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus(in *extension
 }
 
 func autoConvert_v1beta1_Deployment_To_extensions_Deployment(in *Deployment, out *extensions.Deployment, s conversion.Scope) error {
-	SetDefaults_Deployment(in)
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -851,7 +849,6 @@ func Convert_extensions_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(in 
 }
 
 func autoConvert_v1beta1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(in *HorizontalPodAutoscaler, out *autoscaling.HorizontalPodAutoscaler, s conversion.Scope) error {
-	SetDefaults_HorizontalPodAutoscaler(in)
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -1322,7 +1319,6 @@ func Convert_extensions_IngressTLS_To_v1beta1_IngressTLS(in *extensions.IngressT
 }
 
 func autoConvert_v1beta1_Job_To_batch_Job(in *Job, out *batch.Job, s conversion.Scope) error {
-	SetDefaults_Job(in)
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -1601,7 +1597,6 @@ func Convert_unversioned_LabelSelectorRequirement_To_v1beta1_LabelSelectorRequir
 }
 
 func autoConvert_v1beta1_NetworkPolicy_To_extensions_NetworkPolicy(in *NetworkPolicy, out *extensions.NetworkPolicy, s conversion.Scope) error {
-	SetDefaults_NetworkPolicy(in)
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
@@ -2106,7 +2101,6 @@ func Convert_extensions_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(i
 }
 
 func autoConvert_v1beta1_ReplicaSet_To_extensions_ReplicaSet(in *ReplicaSet, out *extensions.ReplicaSet, s conversion.Scope) error {
-	SetDefaults_ReplicaSet(in)
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
