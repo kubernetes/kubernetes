@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	dockercontainer "github.com/docker/engine-api/types/container"
-	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
 func TestModifyContainerConfig(t *testing.T) {
@@ -32,13 +32,13 @@ func TestModifyContainerConfig(t *testing.T) {
 
 	cases := []struct {
 		name     string
-		podSc    *runtimeApi.PodSecurityContext
-		sc       *runtimeApi.SecurityContext
+		podSc    *runtimeapi.PodSecurityContext
+		sc       *runtimeapi.SecurityContext
 		expected *dockercontainer.Config
 	}{
 		{
 			name: "container.SecurityContext.RunAsUser set",
-			sc: &runtimeApi.SecurityContext{
+			sc: &runtimeapi.SecurityContext{
 				RunAsUser: &uid,
 			},
 			expected: &dockercontainer.Config{
@@ -47,12 +47,12 @@ func TestModifyContainerConfig(t *testing.T) {
 		},
 		{
 			name:     "no RunAsUser value set",
-			sc:       &runtimeApi.SecurityContext{},
+			sc:       &runtimeapi.SecurityContext{},
 			expected: &dockercontainer.Config{},
 		},
 		{
 			name: "pod.Spec.SecurityContext.RunAsUser set",
-			podSc: &runtimeApi.PodSecurityContext{
+			podSc: &runtimeapi.PodSecurityContext{
 				RunAsUser: &uid,
 			},
 			expected: &dockercontainer.Config{
@@ -61,10 +61,10 @@ func TestModifyContainerConfig(t *testing.T) {
 		},
 		{
 			name: "container.SecurityContext.RunAsUser overrides pod.Spec.SecurityContext.RunAsUser",
-			podSc: &runtimeApi.PodSecurityContext{
+			podSc: &runtimeapi.PodSecurityContext{
 				RunAsUser: &uid,
 			},
-			sc: &runtimeApi.SecurityContext{
+			sc: &runtimeapi.SecurityContext{
 				RunAsUser: &overrideUid,
 			},
 			expected: &dockercontainer.Config{
@@ -84,7 +84,7 @@ func TestModifyContainerConfig(t *testing.T) {
 
 func TestModifyHostConfig(t *testing.T) {
 	priv := true
-	setPrivSC := &runtimeApi.SecurityContext{}
+	setPrivSC := &runtimeapi.SecurityContext{}
 	setPrivSC.Privileged = &priv
 	setPrivHC := &dockercontainer.HostConfig{
 		Privileged: true,
@@ -104,8 +104,8 @@ func TestModifyHostConfig(t *testing.T) {
 
 	cases := []struct {
 		name     string
-		podSc    *runtimeApi.PodSecurityContext
-		sc       *runtimeApi.SecurityContext
+		podSc    *runtimeapi.PodSecurityContext
+		sc       *runtimeapi.SecurityContext
 		expected *dockercontainer.HostConfig
 	}{
 		{
@@ -120,21 +120,21 @@ func TestModifyHostConfig(t *testing.T) {
 		},
 		{
 			name: "container.SecurityContext.Capabilities",
-			sc: &runtimeApi.SecurityContext{
+			sc: &runtimeapi.SecurityContext{
 				Capabilities: inputCapabilities(),
 			},
 			expected: setCapsHC,
 		},
 		{
 			name: "container.SecurityContext.SELinuxOptions",
-			sc: &runtimeApi.SecurityContext{
+			sc: &runtimeapi.SecurityContext{
 				SelinuxOptions: inputSELinuxOptions(),
 			},
 			expected: setSELinuxHC,
 		},
 		{
 			name: "pod.Spec.SecurityContext.SELinuxOptions",
-			podSc: &runtimeApi.PodSecurityContext{
+			podSc: &runtimeapi.PodSecurityContext{
 				SelinuxOptions: inputSELinuxOptions(),
 			},
 			expected: setSELinuxHC,
@@ -158,8 +158,8 @@ func TestModifyHostConfig(t *testing.T) {
 }
 
 func TestModifyHostConfigPodSecurityContext(t *testing.T) {
-	supplementalGroupsSC := &runtimeApi.PodSecurityContext{}
-	supplementalGroupsSC.SupplementGroups = []int64{2222}
+	supplementalGroupsSC := &runtimeapi.PodSecurityContext{}
+	supplementalGroupsSC.SupplementalGroups = []int64{2222}
 	supplementalGroupHC := &dockercontainer.HostConfig{}
 	supplementalGroupHC.GroupAdd = []string{"2222"}
 	fsGroupHC := &dockercontainer.HostConfig{}
@@ -169,7 +169,7 @@ func TestModifyHostConfigPodSecurityContext(t *testing.T) {
 	fsGroup := int64(1234)
 
 	testCases := map[string]struct {
-		securityContext *runtimeApi.PodSecurityContext
+		securityContext *runtimeapi.PodSecurityContext
 		expected        *dockercontainer.HostConfig
 	}{
 		"nil": {
@@ -181,13 +181,13 @@ func TestModifyHostConfigPodSecurityContext(t *testing.T) {
 			expected:        supplementalGroupHC,
 		},
 		"FSGroup": {
-			securityContext: &runtimeApi.PodSecurityContext{FsGroup: &fsGroup},
+			securityContext: &runtimeapi.PodSecurityContext{FsGroup: &fsGroup},
 			expected:        fsGroupHC,
 		},
 		"FSGroup + SupplementalGroups": {
-			securityContext: &runtimeApi.PodSecurityContext{
-				SupplementGroups: []int64{2222},
-				FsGroup:          &fsGroup,
+			securityContext: &runtimeapi.PodSecurityContext{
+				SupplementalGroups: []int64{2222},
+				FsGroup:            &fsGroup,
 			},
 			expected: bothHC,
 		},
@@ -234,13 +234,13 @@ func TestModifySecurityOption(t *testing.T) {
 	}
 }
 
-func overridePodSecurityContext() *runtimeApi.PodSecurityContext {
+func overridePodSecurityContext() *runtimeapi.PodSecurityContext {
 	user := "user2"
 	role := "role2"
 	stype := "type2"
 	level := "level2"
-	return &runtimeApi.PodSecurityContext{
-		SelinuxOptions: &runtimeApi.SELinuxOption{
+	return &runtimeapi.PodSecurityContext{
+		SelinuxOptions: &runtimeapi.SELinuxOption{
 			User:  &user,
 			Role:  &role,
 			Type:  &stype,
@@ -249,29 +249,29 @@ func overridePodSecurityContext() *runtimeApi.PodSecurityContext {
 	}
 }
 
-func fullValidSecurityContext() *runtimeApi.SecurityContext {
+func fullValidSecurityContext() *runtimeapi.SecurityContext {
 	priv := true
-	return &runtimeApi.SecurityContext{
+	return &runtimeapi.SecurityContext{
 		Privileged:     &priv,
 		Capabilities:   inputCapabilities(),
 		SelinuxOptions: inputSELinuxOptions(),
 	}
 }
 
-func inputCapabilities() *runtimeApi.Capability {
-	return &runtimeApi.Capability{
+func inputCapabilities() *runtimeapi.Capability {
+	return &runtimeapi.Capability{
 		AddCapabilities:  []string{"addCapA", "addCapB"},
 		DropCapabilities: []string{"dropCapA", "dropCapB"},
 	}
 }
 
-func inputSELinuxOptions() *runtimeApi.SELinuxOption {
+func inputSELinuxOptions() *runtimeapi.SELinuxOption {
 	user := "user"
 	role := "role"
 	stype := "type"
 	level := "level"
 
-	return &runtimeApi.SELinuxOption{
+	return &runtimeapi.SELinuxOption{
 		User:  &user,
 		Role:  &role,
 		Type:  &stype,
