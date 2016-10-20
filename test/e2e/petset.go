@@ -53,6 +53,10 @@ const (
 	// Should the test restart petset clusters?
 	// TODO: enable when we've productionzed bringup of pets in this e2e.
 	restartCluster = false
+
+	// Timeout for reads from databases running on pets.
+	readTimeout = 60 * time.Second
+
 )
 
 // Time: 25m, slow by design.
@@ -662,15 +666,20 @@ func ExpectNoError(err error) {
 }
 
 func pollReadWithTimeout(pet petTester, petNumber int, key, expectedVal string) error {
-	return wait.PollImmediate(time.Second, timeout, func() (bool, error) {
+	err := wait.PollImmediate(time.Second, readTimeout, func() (bool, error) {
 		val := pet.read(petNumber, key)
 		if val == "" {
 			return false, nil
 		} else if val != expectedVal {
-			return false, fmt.Errorf("Expected value %v, found %v", expectedVal, val)
+			return false, fmt.Errorf("expected value %v, found %v", expectedVal, val)
 		}
 		return true, nil
 	})
+
+	if err == wait.ErrWaitTimeout {
+		return fmt.Errorf("timed out when trying to read value for key %v from pet %d", key, petNumber)
+	}
+	return err
 }
 
 func isInitialized(pod api.Pod) bool {
