@@ -56,7 +56,7 @@ We need to add below features to enhance GPU(especial NVIDIA GPU) capabilities. 
  3. Provide general GPU interface for all the GPU vendors, like initialization, assign/free GPUs to container, available GPUs.
 
 
-**Relative issues**: #28216, #29509, #19047, #17035, #25557
+**Relevant issues**: #28216, #29509, #19047, #17035, #25557
 
 #### Pod yaml example:
 
