@@ -288,7 +288,6 @@ func Convert_batch_JobSpec_To_v1beta1_JobSpec(in *batch.JobSpec, out *JobSpec, s
 	out.Parallelism = in.Parallelism
 	out.Completions = in.Completions
 	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
-	// unable to generate simple pointer conversion for unversioned.LabelSelector -> v1beta1.LabelSelector
 	if in.Selector != nil {
 		out.Selector = new(LabelSelector)
 		if err := Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in.Selector, out.Selector, s); err != nil {
@@ -322,7 +321,6 @@ func Convert_v1beta1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpec, s
 	out.Parallelism = in.Parallelism
 	out.Completions = in.Completions
 	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
-	// unable to generate simple pointer conversion for v1beta1.LabelSelector -> unversioned.LabelSelector
 	if in.Selector != nil {
 		out.Selector = new(unversioned.LabelSelector)
 		if err := Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in.Selector, out.Selector, s); err != nil {
