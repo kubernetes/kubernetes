@@ -75,8 +75,8 @@ func MakeClientConfigWithToken(config *clientcmdapi.Config, clusterName string, 
 	return newConfig
 }
 
-func WriteKubeconfigIfNotExists(name string, kubeconfig *clientcmdapi.Config) error {
-	envParams := kubeadmapi.GetEnvParams()
+func WriteKubeconfigIfNotExists(name string, kubeconfig *clientcmdapi.Config, env map[string]string) error {
+	envParams := kubeadmapi.GetEnvParams(env)
 	if err := os.MkdirAll(envParams["kubernetes_dir"], 0700); err != nil {
 		return fmt.Errorf("<util/kubeconfig> failed to create directory %q [%v]", envParams["kubernetes_dir"], err)
 	}

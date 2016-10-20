@@ -31,7 +31,7 @@ import (
 )
 
 func createKubeProxyPodSpec(cfg *kubeadmapi.MasterConfiguration) api.PodSpec {
-	envParams := kubeadmapi.GetEnvParams()
+	envParams := kubeadmapi.GetEnvParams(nil)
 	privilegedTrue := true
 	return api.PodSpec{
 		SecurityContext: &api.PodSecurityContext{HostNetwork: true},

@@ -17,16 +17,40 @@ limitations under the License.
 package util
 
 import (
+	"bytes"
 	"fmt"
-	"log"
-	"math/rand"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
-	"time"
 
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
+)
+
+const (
+	configOut1 = `apiVersion: v1
+clusters:
+- cluster:
+    server: ""
+  name: ""
+contexts: []
+current-context: ""
+kind: Config
+preferences: {}
+users: []
+`
+	configOut2 = `apiVersion: v1
+clusters:
+- cluster:
+    server: ""
+  name: kubernetes
+contexts: []
+current-context: ""
+kind: Config
+preferences: {}
+users: []
+`
 )
 
 type configClient struct {
@@ -48,10 +72,6 @@ type configClientWithToken struct {
 	clusterName string
 	userName    string
 	token       string
-}
-
-func init() {
-	rand.Seed(time.Now().UTC().UnixNano())
 }
 
 func TestCreateBasicClientConfig(t *testing.T) {
@@ -131,43 +151,48 @@ func TestMakeClientConfigWithToken(t *testing.T) {
 	}
 }
 
-func setEnvs() {
-	rand := rand.Int()
+func TestWriteKubeconfigIfNotExists(t *testing.T) {
+	tmpdir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatalf("Couldn't create tmpdir")
+	}
+	defer os.Remove(tmpdir)
+
 	var envParams = map[string]string{
-		"kubernetes_dir":     fmt.Sprintf("/tmp/%d/etc/kubernetes", rand),
-		"host_pki_path":      fmt.Sprintf("/tmp/%d/etc/kubernetes/pki", rand),
-		"host_etcd_path":     fmt.Sprintf("/tmp/%d/var/lib/etcd", rand),
+		"kubernetes_dir":     fmt.Sprintf("%s/etc/kubernetes", tmpdir),
+		"host_pki_path":      fmt.Sprintf("%s/etc/kubernetes/pki", tmpdir),
+		"host_etcd_path":     fmt.Sprintf("%s/var/lib/etcd", tmpdir),
 		"hyperkube_image":    "",
 		"discovery_image":    fmt.Sprintf("gcr.io/google_containers/kube-discovery-%s:%s", runtime.GOARCH, "1.0"),
 		"etcd_image":         "",
 		"component_loglevel": "--v=4",
 	}
-	for k, v := range envParams {
-		err := os.Setenv(fmt.Sprintf("KUBE_%s", strings.ToUpper(k)), v)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-}
-
-func TestWriteKubeconfigIfNotExists(t *testing.T) {
-	setEnvs()
 	var writeConfig = []struct {
 		name     string
 		cc       configClient
 		expected error
+		file     []byte
 	}{
-		{fmt.Sprintf("%d", rand.Int()), configClient{}, nil},
-		{fmt.Sprintf("%d", rand.Int()), configClient{c: "kubernetes"}, nil},
+		{"test1", configClient{}, nil, []byte(configOut1)},
+		{"test2", configClient{c: "kubernetes"}, nil, []byte(configOut2)},
 	}
 	for _, rt := range writeConfig {
 		c := CreateBasicClientConfig(rt.cc.c, rt.cc.s, rt.cc.ca)
-		err := WriteKubeconfigIfNotExists(rt.name, c)
+		err := WriteKubeconfigIfNotExists(rt.name, c, envParams)
 		if err != rt.expected {
 			t.Errorf(
-				"failed WriteKubeconfigIfNotExists:\n\texpected: %s\n\t  actual: %s",
+				"failed WriteKubeconfigIfNotExists with an error:\n\texpected: %s\n\t  actual: %s",
 				err,
 				rt.expected,
+			)
+		}
+		configPath := filepath.Join(envParams["kubernetes_dir"], fmt.Sprintf("%s.conf", rt.name))
+		newFile, err := ioutil.ReadFile(configPath)
+		if !bytes.Equal(newFile, rt.file) {
+			t.Errorf(
+				"failed WriteKubeconfigIfNotExists config write:\n\texpected: %s\n\t  actual: %s",
+				newFile,
+				rt.file,
 			)
 		}
 	}

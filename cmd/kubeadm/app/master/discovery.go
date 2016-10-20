@@ -61,7 +61,7 @@ func encodeKubeDiscoverySecretData(cfg *kubeadmapi.MasterConfiguration, caCert *
 }
 
 func newKubeDiscoveryPodSpec(cfg *kubeadmapi.MasterConfiguration) api.PodSpec {
-	envParams := kubeadmapi.GetEnvParams()
+	envParams := kubeadmapi.GetEnvParams(nil)
 	return api.PodSpec{
 		// We have to use host network namespace, as `HostPort`/`HostIP` are Docker's
 		// buisness and CNI support isn't quite there yet (except for kubenet)

@@ -25,7 +25,7 @@ import (
 
 // TODO(phase2) use componentconfig
 // we need some params for testing etc, let's keep these hidden for now
-func GetEnvParams() map[string]string {
+func GetEnvParams(env map[string]string) map[string]string {
 
 	envParams := map[string]string{
 		// TODO(phase1+): Mode prefix and host_pki_path to another place as constants, and use them everywhere
@@ -40,6 +40,10 @@ func GetEnvParams() map[string]string {
 	}
 
 	for k := range envParams {
+		if e, ok := env[k]; ok {
+			envParams[k] = e
+			continue
+		}
 		if v := os.Getenv(fmt.Sprintf("KUBE_%s", strings.ToUpper(k))); v != "" {
 			envParams[k] = v
 		}

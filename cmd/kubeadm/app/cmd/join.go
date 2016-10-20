@@ -142,7 +142,7 @@ func (j *Join) Run(out io.Writer) error {
 		return err
 	}
 
-	err = kubeadmutil.WriteKubeconfigIfNotExists("kubelet", kubeconfig)
+	err = kubeadmutil.WriteKubeconfigIfNotExists("kubelet", kubeconfig, nil)
 	if err != nil {
 		return err
 	}

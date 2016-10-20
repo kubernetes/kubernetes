@@ -216,7 +216,7 @@ func (i *Init) Run(out io.Writer) error {
 	// importing existing files, may be we could even make our command idempotant,
 	// or at least allow for external PKI and stuff)
 	for name, kubeconfig := range kubeconfigs {
-		if err := kubeadmutil.WriteKubeconfigIfNotExists(name, kubeconfig); err != nil {
+		if err := kubeadmutil.WriteKubeconfigIfNotExists(name, kubeconfig, nil); err != nil {
 			return err
 		}
 	}

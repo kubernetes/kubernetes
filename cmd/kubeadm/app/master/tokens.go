@@ -48,12 +48,12 @@ func generateTokenIfNeeded(s *kubeadmapi.Secrets) error {
 }
 
 func CreateTokenAuthFile(s *kubeadmapi.Secrets) error {
-	tokenAuthFilePath := path.Join(kubeadmapi.GetEnvParams()["host_pki_path"], "tokens.csv")
+	tokenAuthFilePath := path.Join(kubeadmapi.GetEnvParams(nil)["host_pki_path"], "tokens.csv")
 	if err := generateTokenIfNeeded(s); err != nil {
 		return fmt.Errorf("<master/tokens> failed to generate token(s) [%v]", err)
 	}
-	if err := os.MkdirAll(kubeadmapi.GetEnvParams()["host_pki_path"], 0700); err != nil {
-		return fmt.Errorf("<master/tokens> failed to create directory %q [%v]", kubeadmapi.GetEnvParams()["host_pki_path"], err)
+	if err := os.MkdirAll(kubeadmapi.GetEnvParams(nil)["host_pki_path"], 0700); err != nil {
+		return fmt.Errorf("<master/tokens> failed to create directory %q [%v]", kubeadmapi.GetEnvParams(nil)["host_pki_path"], err)
 	}
 	serialized := []byte(fmt.Sprintf("%s,kubeadm-node-csr,%s,system:kubelet-bootstrap\n", s.BearerToken, uuid.NewUUID()))
 	// DumpReaderToFile create a file with mode 0600
