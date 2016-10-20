@@ -702,6 +702,10 @@ MANIFEST_URL_HEADER: $(yaml-quote ${MANIFEST_URL_HEADER:-})
 NUM_NODES: $(yaml-quote ${NUM_NODES})
 STORAGE_BACKEND: $(yaml-quote ${STORAGE_BACKEND:-etcd2})
 ENABLE_GARBAGE_COLLECTOR: $(yaml-quote ${ENABLE_GARBAGE_COLLECTOR:-})
+ETCD_CA_KEY: $(yaml-quote ${ETCD_CA_KEY_BASE64:-})
+ETCD_CA_CERT: $(yaml-quote ${ETCD_CA_CERT_BASE64:-})
+ETCD_PEER_KEY: $(yaml-quote ${ETCD_PEER_KEY_BASE64:-})
+ETCD_PEER_CERT: $(yaml-quote ${ETCD_PEER_CERT_BASE64:-})
 EOF
     # ETCD_IMAGE (if set) allows to use a custom etcd image.
     if [ -n "${ETCD_IMAGE:-}" ]; then

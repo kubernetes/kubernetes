@@ -65,6 +65,8 @@ script
 	create_master_auth
 	echo "Creating master instance kubelet auth file"
 	create_master_kubelet_auth
+	echo "Creating auth files for etcd"
+	create-master-etcd-auth
 	echo "Assemble kubelet command line"
 	# Kubelet command flags will be written in /etc/default/kubelet
 	assemble_kubelet_flags
