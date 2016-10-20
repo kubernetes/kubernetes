@@ -44,7 +44,7 @@ var (
 		cat pod.json | kubectl create -f -`)
 )
 
-func NewCmdCreate(f cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 
 	cmd := &cobra.Command{
@@ -54,7 +54,8 @@ func NewCmdCreate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Example: create_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			if cmdutil.IsFilenameEmpty(options.Filenames) {
-				cmd.Help()
+				defaultRunFunc := cmdutil.DefaultSubCommandRun(errOut)
+				defaultRunFunc(cmd, args)
 				return
 			}
 			cmdutil.CheckErr(ValidateArgs(cmd, args))
@@ -76,10 +77,10 @@ func NewCmdCreate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	// create subcommands
 	cmd.AddCommand(NewCmdCreateNamespace(f, out))
 	cmd.AddCommand(NewCmdCreateQuota(f, out))
-	cmd.AddCommand(NewCmdCreateSecret(f, out))
+	cmd.AddCommand(NewCmdCreateSecret(f, out, errOut))
 	cmd.AddCommand(NewCmdCreateConfigMap(f, out))
 	cmd.AddCommand(NewCmdCreateServiceAccount(f, out))
-	cmd.AddCommand(NewCmdCreateService(f, out))
+	cmd.AddCommand(NewCmdCreateService(f, out, errOut))
 	cmd.AddCommand(NewCmdCreateDeployment(f, out))
 	return cmd
 }

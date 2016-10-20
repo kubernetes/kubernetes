@@ -39,16 +39,14 @@ var (
 		`)
 )
 
-func NewCmdRollout(f cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdRollout(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "rollout SUBCOMMAND",
 		Short:   "Manage a deployment rollout",
 		Long:    rollout_long,
 		Example: rollout_example,
-		Run: func(cmd *cobra.Command, args []string) {
-			cmd.Help()
-		},
+		Run:     cmdutil.DefaultSubCommandRun(errOut),
 	}
 	// subcommands
 	cmd.AddCommand(NewCmdRolloutHistory(f, out))
