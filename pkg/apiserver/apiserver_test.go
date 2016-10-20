@@ -27,6 +27,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -1919,6 +1920,83 @@ func TestDeleteWithOptions(t *testing.T) {
 
 	client := http.Client{}
 	request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
+	res, err := client.Do(request)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.StatusCode != http.StatusOK {
+		t.Errorf("unexpected response: %s %#v", request.URL, res)
+		s, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		t.Logf(string(s))
+	}
+	if simpleStorage.deleted != ID {
+		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
+	}
+	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{})
+	if !api.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
+		t.Errorf("unexpected delete options: %s", diff.ObjectDiff(simpleStorage.deleteOptions, item))
+	}
+}
+
+func TestDeleteWithOptionsQuery(t *testing.T) {
+	storage := map[string]rest.Storage{}
+	simpleStorage := SimpleRESTStorage{}
+	ID := "id"
+	storage["simple"] = &simpleStorage
+	handler := handle(storage)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	grace := int64(300)
+	item := &api.DeleteOptions{
+		GracePeriodSeconds: &grace,
+	}
+
+	client := http.Client{}
+	request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID+"?gracePeriodSeconds="+strconv.FormatInt(grace, 10), nil)
+	res, err := client.Do(request)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.StatusCode != http.StatusOK {
+		t.Errorf("unexpected response: %s %#v", request.URL, res)
+		s, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		t.Logf(string(s))
+	}
+	if simpleStorage.deleted != ID {
+		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
+	}
+	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{})
+	if !api.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
+		t.Errorf("unexpected delete options: %s", diff.ObjectDiff(simpleStorage.deleteOptions, item))
+	}
+}
+
+func TestDeleteWithOptionsQueryAndBody(t *testing.T) {
+	storage := map[string]rest.Storage{}
+	simpleStorage := SimpleRESTStorage{}
+	ID := "id"
+	storage["simple"] = &simpleStorage
+	handler := handle(storage)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	grace := int64(300)
+	item := &api.DeleteOptions{
+		GracePeriodSeconds: &grace,
+	}
+	body, err := runtime.Encode(codec, item)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	client := http.Client{}
+	request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID+"?gracePeriodSeconds="+strconv.FormatInt(grace+10, 10), bytes.NewReader(body))
 	res, err := client.Do(request)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

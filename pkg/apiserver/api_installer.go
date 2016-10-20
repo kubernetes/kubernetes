@@ -249,14 +249,15 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		return nil, err
 	}
 
+	var versionedDeleteOptions runtime.Object
 	var versionedDeleterObject interface{}
 	switch {
 	case isGracefulDeleter:
-		objectPtr, err := a.group.Creater.New(optionsExternalVersion.WithKind("DeleteOptions"))
+		versionedDeleteOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind("DeleteOptions"))
 		if err != nil {
 			return nil, err
 		}
-		versionedDeleterObject = indirectArbitraryPointer(objectPtr)
+		versionedDeleterObject = indirectArbitraryPointer(versionedDeleteOptions)
 		isDeleter = true
 	case isDeleter:
 		gracefulDeleter = rest.GracefulDeleteAdapter{Deleter: deleter}
@@ -625,6 +626,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Returns(http.StatusOK, "OK", versionedStatus)
 			if isGracefulDeleter {
 				route.Reads(versionedDeleterObject)
+				if err := addObjectParams(ws, route, versionedDeleteOptions); err != nil {
+					return nil, err
+				}
 			}
 			addParams(route, action.Params)
 			ws.Route(route)
@@ -927,6 +931,11 @@ func addObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj in
 			}
 			switch sf.Type.Kind() {
 			case reflect.Interface, reflect.Struct:
+			case reflect.Ptr:
+				if sf.Type.Elem().Kind() == reflect.Interface || sf.Type.Elem().Kind() == reflect.Struct {
+					continue
+				}
+				fallthrough
 			default:
 				jsonTag := sf.Tag.Get("json")
 				if len(jsonTag) == 0 {
