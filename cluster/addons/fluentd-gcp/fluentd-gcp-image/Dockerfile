@@ -52,5 +52,7 @@ RUN apt-get -q update && \
 COPY google-fluentd.conf /etc/google-fluentd/google-fluentd.conf
 COPY google-fluentd-journal.conf /etc/google-fluentd/google-fluentd-journal.conf
 
+ENV LD_PRELOAD /opt/google-fluentd/embedded/lib/libjemalloc.so
+
 # Start Fluentd to pick up our config that watches Docker container logs.
 CMD /usr/sbin/google-fluentd "$FLUENTD_ARGS"
