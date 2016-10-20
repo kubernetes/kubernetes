@@ -23,9 +23,11 @@ import (
 	"strings"
 )
 
+var GlobalEnvParams = SetEnvParams()
+
 // TODO(phase2) use componentconfig
 // we need some params for testing etc, let's keep these hidden for now
-func GetEnvParams() map[string]string {
+func SetEnvParams() *EnvParams {
 
 	envParams := map[string]string{
 		// TODO(phase1+): Mode prefix and host_pki_path to another place as constants, and use them everywhere
@@ -45,5 +47,13 @@ func GetEnvParams() map[string]string {
 		}
 	}
 
-	return envParams
+        return &EnvParams{
+                KubernetesDir:     envParams["kubernetes_dir"],
+                HostPKIPath:       envParams["host_pki_path"],
+                HostEtcdPath:      envParams["host_etcd_path"],
+                HyperkubeImage:    envParams["hyperkube_image"],
+                DiscoveryImage:    envParams["discovery_image"],
+                EtcdImage:         envParams["etcd_image"],
+                ComponentLoglevel: envParams["component_loglevel"],
+        }
 }
