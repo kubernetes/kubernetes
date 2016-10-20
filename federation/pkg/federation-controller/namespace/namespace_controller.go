@@ -138,7 +138,6 @@ func NewNamespaceController(client federationclientset.Interface) *NamespaceCont
 					func(obj runtime.Object) { nc.deliverNamespaceObj(obj, nc.namespaceReviewDelay, false) },
 				))
 		},
-
 		&util.ClusterLifecycleHandlerFuncs{
 			ClusterAvailable: func(cluster *federation_api.Cluster) {
 				// When new cluster becomes available process all the namespaces again.
