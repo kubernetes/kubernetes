@@ -199,3 +199,8 @@ func getStableKey(pod *api.Pod, container *api.Container) string {
 	hash := strconv.FormatUint(kubecontainer.HashContainer(container), 16)
 	return fmt.Sprintf("%s_%s_%s_%s_%s", pod.Name, pod.Namespace, string(pod.UID), container.Name, hash)
 }
+
+// isContainerActive returns true if the container is created or running.
+func isContainerActive(status *kubecontainer.ContainerStatus) bool {
+	return status.State == kubecontainer.ContainerStateRunning || status.State == kubecontainer.ContainerStateCreated
+}
