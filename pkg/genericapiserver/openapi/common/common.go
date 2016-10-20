@@ -66,7 +66,7 @@ type Config struct {
 
 	// SecurityDefinitions is list of all security definitions for OpenAPI service. If this is not nil, the user of config
 	// is responsible to provide DefaultSecurity and (maybe) add unauthorized response to CommonResponses.
-	SecurityDefinitions *SecurityDefinitions
+	SecurityDefinitions *spec.SecurityDefinitions
 
 	// DefaultSecurity for all operations. This will pass as spec.SwaggerProps.Security to OpenAPI.
 	// For most cases, this will be list of acceptable definitions in SecurityDefinitions.
@@ -140,38 +140,4 @@ func GetOpenAPITypeFormat(typeName string) (string, string) {
 		return "", ""
 	}
 	return mapped[0], mapped[1]
-}
-
-type SecurityDefinitions struct {
-	spec.SecurityDefinitions
-}
-
-func NewSecurityDefinition() SecurityDefinitions {
-	return SecurityDefinitions{SecurityDefinitions: spec.SecurityDefinitions{}}
-}
-
-// AddTokenBearerDefinition adds a token bearer security definition if it does not exist.
-func (s *SecurityDefinitions) AddTokenBearerDefinition() {
-	if _, exists := s.SecurityDefinitions["TokenBearer"]; !exists {
-		s.SecurityDefinitions["TokenBearer"] = &spec.SecurityScheme{
-			SecuritySchemeProps: spec.SecuritySchemeProps{
-				Type:        "apiKey",
-				Name:        "authorization",
-				In:          "header",
-				Description: "Token Bearer authentication",
-			},
-		}
-	}
-}
-
-// AddBasicDefinition adds a basic security definition if it does not exist.
-func (s *SecurityDefinitions) AddBasicDefinition() {
-	if _, exists := s.SecurityDefinitions["HTTPBasic"]; !exists {
-		s.SecurityDefinitions["HTTPBasic"] = &spec.SecurityScheme{
-			SecuritySchemeProps: spec.SecuritySchemeProps{
-				Type:        "basic",
-				Description: "HTTP Basic authentication",
-			},
-		}
-	}
 }

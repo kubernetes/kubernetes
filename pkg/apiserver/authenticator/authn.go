@@ -19,11 +19,12 @@ package authenticator
 import (
 	"time"
 
+	"github.com/go-openapi/spec"
+
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
 	"k8s.io/kubernetes/pkg/auth/group"
 	"k8s.io/kubernetes/pkg/auth/user"
-	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/password/keystone"
@@ -59,9 +60,11 @@ type AuthenticatorConfig struct {
 
 // New returns an authenticator.Request or an error that supports the standard
 // Kubernetes authentication mechanisms.
-func New(config AuthenticatorConfig) (authenticator.Request, *common.SecurityDefinitions, error) {
+func New(config AuthenticatorConfig) (authenticator.Request, *spec.SecurityDefinitions, error) {
 	var authenticators []authenticator.Request
-	securityDefinitions := common.NewSecurityDefinition()
+	securityDefinitions := spec.SecurityDefinitions{}
+	hasBasicAuth := false
+	hasTokenAuth := false
 
 	// BasicAuth methods, local first, then remote
 	if len(config.BasicAuthFile) > 0 {
@@ -70,7 +73,7 @@ func New(config AuthenticatorConfig) (authenticator.Request, *common.SecurityDef
 			return nil, nil, err
 		}
 		authenticators = append(authenticators, basicAuth)
-		securityDefinitions.AddBasicDefinition()
+		hasBasicAuth = true
 	}
 	if len(config.KeystoneURL) > 0 {
 		keystoneAuth, err := newAuthenticatorFromKeystoneURL(config.KeystoneURL)
@@ -78,7 +81,7 @@ func New(config AuthenticatorConfig) (authenticator.Request, *common.SecurityDef
 			return nil, nil, err
 		}
 		authenticators = append(authenticators, keystoneAuth)
-		securityDefinitions.AddBasicDefinition()
+		hasBasicAuth = true
 	}
 
 	// X509 methods
@@ -97,7 +100,7 @@ func New(config AuthenticatorConfig) (authenticator.Request, *common.SecurityDef
 			return nil, nil, err
 		}
 		authenticators = append(authenticators, tokenAuth)
-		securityDefinitions.AddTokenBearerDefinition()
+		hasTokenAuth = true
 	}
 	if len(config.ServiceAccountKeyFiles) > 0 {
 		serviceAccountAuth, err := newServiceAccountAuthenticator(config.ServiceAccountKeyFiles, config.ServiceAccountLookup, config.ServiceAccountTokenGetter)
@@ -105,7 +108,7 @@ func New(config AuthenticatorConfig) (authenticator.Request, *common.SecurityDef
 			return nil, nil, err
 		}
 		authenticators = append(authenticators, serviceAccountAuth)
-		securityDefinitions.AddTokenBearerDefinition()
+		hasTokenAuth = true
 	}
 	// NOTE(ericchiang): Keep the OpenID Connect after Service Accounts.
 	//
@@ -119,7 +122,7 @@ func New(config AuthenticatorConfig) (authenticator.Request, *common.SecurityDef
 			return nil, nil, err
 		}
 		authenticators = append(authenticators, oidcAuth)
-		securityDefinitions.AddTokenBearerDefinition()
+		hasTokenAuth = true
 	}
 	if len(config.WebhookTokenAuthnConfigFile) > 0 {
 		webhookTokenAuth, err := newWebhookTokenAuthenticator(config.WebhookTokenAuthnConfigFile, config.WebhookTokenAuthnCacheTTL)
@@ -127,13 +130,33 @@ func New(config AuthenticatorConfig) (authenticator.Request, *common.SecurityDef
 			return nil, nil, err
 		}
 		authenticators = append(authenticators, webhookTokenAuth)
-		securityDefinitions.AddTokenBearerDefinition()
+		hasTokenAuth = true
 	}
 
 	// always add anytoken last, so that every other token authenticator gets to try first
 	if config.AnyToken {
 		authenticators = append(authenticators, bearertoken.New(anytoken.AnyTokenAuthenticator{}))
-		securityDefinitions.AddTokenBearerDefinition()
+		hasTokenAuth = true
+	}
+
+	if hasBasicAuth {
+		securityDefinitions["HTTPBasic"] = &spec.SecurityScheme{
+			SecuritySchemeProps: spec.SecuritySchemeProps{
+				Type:        "basic",
+				Description: "HTTP Basic authentication",
+			},
+		}
+	}
+
+	if hasTokenAuth {
+		securityDefinitions["TokenBearer"] = &spec.SecurityScheme{
+			SecuritySchemeProps: spec.SecuritySchemeProps{
+				Type:        "apiKey",
+				Name:        "authorization",
+				In:          "header",
+				Description: "Token Bearer authentication",
+			},
+		}
 	}
 
 	if len(authenticators) == 0 {

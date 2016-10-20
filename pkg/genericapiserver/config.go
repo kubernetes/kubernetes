@@ -340,7 +340,7 @@ func (c *Config) Complete() completedConfig {
 	if c.OpenAPIConfig != nil && c.OpenAPIConfig.SecurityDefinitions != nil {
 		c.OpenAPIConfig.DefaultSecurity = []map[string][]string{}
 		keys := []string{}
-		for k := range c.OpenAPIConfig.SecurityDefinitions.SecurityDefinitions {
+		for k := range *c.OpenAPIConfig.SecurityDefinitions {
 			keys = append(keys, k)
 		}
 		sort.Strings(keys)

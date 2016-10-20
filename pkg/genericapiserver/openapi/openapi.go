@@ -86,7 +86,7 @@ func (o *openAPI) init(webServices []*restful.WebService) error {
 		return err
 	}
 	if o.config.SecurityDefinitions != nil {
-		o.swagger.SecurityDefinitions = o.config.SecurityDefinitions.SecurityDefinitions
+		o.swagger.SecurityDefinitions = *o.config.SecurityDefinitions
 		o.swagger.Security = o.config.DefaultSecurity
 	}
 	return nil
