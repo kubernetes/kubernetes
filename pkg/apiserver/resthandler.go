@@ -783,7 +783,7 @@ func DeleteResource(r rest.GracefulDeleter, isGracefulDeletion bool, scope Reque
 				}
 			} else {
 				if values := req.Request.URL.Query(); len(values) > 0 {
-					if err := scope.ParameterCodec.DecodeParameters(values, scope.Kind.GroupVersion(), &options); err != nil {
+					if err := scope.ParameterCodec.DecodeParameters(values, scope.Kind.GroupVersion(), options); err != nil {
 						scope.err(err, res.ResponseWriter, req.Request)
 						return
 					}
