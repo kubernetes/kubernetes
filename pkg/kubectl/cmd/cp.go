@@ -180,6 +180,7 @@ func copyFromPod(f cmdutil.Factory, cmd *cobra.Command, out, cmderr io.Writer, s
 }
 
 func makeTar(filepath string, writer io.Writer) error {
+	// TODO: use compression here?
 	tarWriter := tar.NewWriter(writer)
 	defer tarWriter.Close()
 	return recursiveTar(path.Dir(filepath), path.Base(filepath), tarWriter)
@@ -221,6 +222,7 @@ func recursiveTar(base, file string, tw *tar.Writer) error {
 }
 
 func untarAll(reader io.Reader, destFile, prefix string) error {
+	// TODO: use compression here?
 	tarReader := tar.NewReader(reader)
 	for {
 		header, err := tarReader.Next()
