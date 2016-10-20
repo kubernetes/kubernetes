@@ -10,7 +10,8 @@ Cadvisor should be healthy on every node.,vishh,0
 Cassandra should create and scale cassandra,fabioy,1
 CassandraPetSet should create petset,erictune,1
 Celery-RabbitMQ should create and stop celery+rabbitmq servers,luxas,1
-Cluster level logging using Elasticsearch should check that logs from pods on all nodes are ingested into Elasticsearch,dchen1107,1
+Cluster level logging using Elasticsearch should check that logs from containers are ingested into Elasticsearch,crassirostris,0
+Cluster level logging using GCL should check that logs from containers are ingested in GCL,crassirostris,0
 Cluster size autoscaling Should scale cluster size based on cpu reservation,dchen1107,1
 Cluster size autoscaling Should scale cluster size based on cpu utilization,ixdy,1
 Cluster size autoscaling Should scale cluster size based on memory reservation,ghodss,1
