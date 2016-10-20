@@ -207,6 +207,11 @@ func buildContainerLogsPath(containerName string, restartCount int) string {
 	return fmt.Sprintf("%s_%d.log", containerName, restartCount)
 }
 
+// buildFullContainerLogsPath builds absolute log path for container.
+func buildFullContainerLogsPath(podUID types.UID, containerName string, restartCount int) string {
+	return filepath.Join(buildPodLogsDirectory(podUID), buildContainerLogsPath(containerName, restartCount))
+}
+
 // buildPodLogsDirectory builds absolute log directory path for a pod sandbox.
 func buildPodLogsDirectory(podUID types.UID) string {
 	return filepath.Join(podLogsRootDirectory, string(podUID))
