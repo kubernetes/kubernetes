@@ -19,6 +19,7 @@ package master
 import (
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"reflect"
 	"strconv"
@@ -99,6 +100,7 @@ type Config struct {
 	Tunneler          genericapiserver.Tunneler
 	EnableUISupport   bool
 	EnableLogsSupport bool
+	ProxyTransport    http.RoundTripper
 }
 
 // EndpointReconcilerConfig holds the endpoint reconciler and endpoint reconciliation interval to be
@@ -197,7 +199,7 @@ func (c completedConfig) New() (*Master, error) {
 	if c.GenericConfig.APIResourceConfigSource.AnyResourcesForVersionEnabled(apiv1.SchemeGroupVersion) {
 		legacyRESTStorageProvider := corerest.LegacyRESTStorageProvider{
 			StorageFactory:            c.StorageFactory,
-			ProxyTransport:            s.ProxyTransport,
+			ProxyTransport:            c.ProxyTransport,
 			KubeletClientConfig:       c.KubeletClientConfig,
 			EventTTL:                  c.EventTTL,
 			ServiceClusterIPRange:     c.GenericConfig.ServiceClusterIPRange,
