@@ -263,6 +263,30 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	}
 }
 
+func TestWaitUntilFreshAndGet(t *testing.T) {
+	store := newTestWatchCache(3)
+
+	// In background, update the store.
+	go func() {
+		store.Add(makeTestPod("foo", 2))
+		store.Add(makeTestPod("bar", 5))
+	}()
+
+	obj, exists, resourceVersion, err := store.WaitUntilFreshAndGet(5, "prefix/ns/bar", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resourceVersion != 5 {
+		t.Errorf("unexpected resourceVersion: %v, expected: 5", resourceVersion)
+	}
+	if !exists {
+		t.Fatalf("no results returned: %#v", obj)
+	}
+	if !api.Semantic.DeepEqual(&storeElement{Key: "prefix/ns/bar", Object: makeTestPod("bar", 5)}, obj) {
+		t.Errorf("unexpected element returned: %#v", obj)
+	}
+}
+
 func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 	store := newTestWatchCache(3)
 	fc := store.clock.(*clock.FakeClock)
