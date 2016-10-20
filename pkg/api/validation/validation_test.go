@@ -6495,6 +6495,12 @@ func TestValidateResourceNames(t *testing.T) {
 	}{
 		{"memory", true, ""},
 		{"cpu", true, ""},
+		{"storage", true, ""},
+		{"requests.cpu", true, ""},
+		{"requests.memory", true, ""},
+		{"requests.storage", true, ""},
+		{"limits.cpu", true, ""},
+		{"limits.memory", true, ""},
 		{"network", false, ""},
 		{"disk", false, ""},
 		{"", false, ""},
