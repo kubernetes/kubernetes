@@ -493,6 +493,9 @@ func (s *Server) getContainerLogs(request *restful.Request, response *restful.Re
 		return
 	}
 	fw := flushwriter.Wrap(response.ResponseWriter)
+	// Byte limit logic is already implemented in kuberuntime. However, we still need this for
+	// old runtime integration.
+	// TODO(random-liu): Remove this once we switch to CRI integration.
 	if logOptions.LimitBytes != nil {
 		fw = limitwriter.New(fw, *logOptions.LimitBytes)
 	}
