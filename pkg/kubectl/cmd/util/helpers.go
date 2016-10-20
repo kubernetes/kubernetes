@@ -262,12 +262,15 @@ func PrintErrorWithCauses(err error, errOut io.Writer) bool {
 	switch t := err.(type) {
 	case *kerrors.StatusError:
 		errorDetails := t.Status().Details
-		fmt.Fprintf(errOut, "error: %s %q is invalid\n\n", errorDetails.Kind, errorDetails.Name)
-		for _, cause := range errorDetails.Causes {
-			msg := fmt.Sprintf("* %s: %s", cause.Field, cause.Message)
-			fmt.Fprintf(errOut, "%s\n", msg)
+		fmt.Fprintf(errOut, "error: %s %q is invalid\n", errorDetails.Kind, errorDetails.Name)
+
+		if errorDetails != nil {
+			fmt.Fprintf(errOut, "\n")
+			for _, cause := range errorDetails.Causes {
+				fmt.Fprintf(errOut, "* %s: %s\n", cause.Field, cause.Message)
+			}
+			return true
 		}
-		return true
 	}
 	return false
 }
