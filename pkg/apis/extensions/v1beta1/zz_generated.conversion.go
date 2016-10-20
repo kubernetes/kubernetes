@@ -118,10 +118,6 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_batch_JobSpec_To_v1beta1_JobSpec,
 		Convert_v1beta1_JobStatus_To_batch_JobStatus,
 		Convert_batch_JobStatus_To_v1beta1_JobStatus,
-		Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector,
-		Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector,
-		Convert_v1beta1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement,
-		Convert_unversioned_LabelSelectorRequirement_To_v1beta1_LabelSelectorRequirement,
 		Convert_v1beta1_NetworkPolicy_To_extensions_NetworkPolicy,
 		Convert_extensions_NetworkPolicy_To_v1beta1_NetworkPolicy,
 		Convert_v1beta1_NetworkPolicyIngressRule_To_extensions_NetworkPolicyIngressRule,
@@ -378,7 +374,7 @@ func Convert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *DaemonSetSpec
 }
 
 func autoConvert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *extensions.DaemonSetSpec, out *DaemonSetSpec, s conversion.Scope) error {
-	out.Selector = (*LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
 	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -543,7 +539,7 @@ func autoConvert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensi
 	if err := api.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
-	out.Selector = (*LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
 	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -1203,7 +1199,7 @@ func autoConvert_batch_JobSpec_To_v1beta1_JobSpec(in *batch.JobSpec, out *JobSpe
 	out.Parallelism = (*int32)(unsafe.Pointer(in.Parallelism))
 	out.Completions = (*int32)(unsafe.Pointer(in.Completions))
 	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
-	out.Selector = (*LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
 	// WARNING: in.ManualSelector requires manual conversion: does not exist in peer-type
 	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
@@ -1245,70 +1241,6 @@ func autoConvert_batch_JobStatus_To_v1beta1_JobStatus(in *batch.JobStatus, out *
 
 func Convert_batch_JobStatus_To_v1beta1_JobStatus(in *batch.JobStatus, out *JobStatus, s conversion.Scope) error {
 	return autoConvert_batch_JobStatus_To_v1beta1_JobStatus(in, out, s)
-}
-
-func autoConvert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in *LabelSelector, out *unversioned.LabelSelector, s conversion.Scope) error {
-	{
-		m := (*map[string]string)(unsafe.Pointer(&in.MatchLabels))
-		out.MatchLabels = *m
-	}
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.MatchExpressions))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.MatchExpressions))
-		*outHdr = *inHdr
-	}
-	return nil
-}
-
-func Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in *LabelSelector, out *unversioned.LabelSelector, s conversion.Scope) error {
-	return autoConvert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in, out, s)
-}
-
-func autoConvert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in *unversioned.LabelSelector, out *LabelSelector, s conversion.Scope) error {
-	{
-		m := (*map[string]string)(unsafe.Pointer(&in.MatchLabels))
-		out.MatchLabels = *m
-	}
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.MatchExpressions))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.MatchExpressions))
-		*outHdr = *inHdr
-	}
-	return nil
-}
-
-func Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in *unversioned.LabelSelector, out *LabelSelector, s conversion.Scope) error {
-	return autoConvert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in, out, s)
-}
-
-func autoConvert_v1beta1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement(in *LabelSelectorRequirement, out *unversioned.LabelSelectorRequirement, s conversion.Scope) error {
-	out.Key = in.Key
-	out.Operator = unversioned.LabelSelectorOperator(in.Operator)
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Values))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Values))
-		*outHdr = *inHdr
-	}
-	return nil
-}
-
-func Convert_v1beta1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement(in *LabelSelectorRequirement, out *unversioned.LabelSelectorRequirement, s conversion.Scope) error {
-	return autoConvert_v1beta1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement(in, out, s)
-}
-
-func autoConvert_unversioned_LabelSelectorRequirement_To_v1beta1_LabelSelectorRequirement(in *unversioned.LabelSelectorRequirement, out *LabelSelectorRequirement, s conversion.Scope) error {
-	out.Key = in.Key
-	out.Operator = LabelSelectorOperator(in.Operator)
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Values))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Values))
-		*outHdr = *inHdr
-	}
-	return nil
-}
-
-func Convert_unversioned_LabelSelectorRequirement_To_v1beta1_LabelSelectorRequirement(in *unversioned.LabelSelectorRequirement, out *LabelSelectorRequirement, s conversion.Scope) error {
-	return autoConvert_unversioned_LabelSelectorRequirement_To_v1beta1_LabelSelectorRequirement(in, out, s)
 }
 
 func autoConvert_v1beta1_NetworkPolicy_To_extensions_NetworkPolicy(in *NetworkPolicy, out *extensions.NetworkPolicy, s conversion.Scope) error {
@@ -1416,8 +1348,8 @@ func Convert_v1beta1_NetworkPolicyPeer_To_extensions_NetworkPolicyPeer(in *Netwo
 }
 
 func autoConvert_extensions_NetworkPolicyPeer_To_v1beta1_NetworkPolicyPeer(in *extensions.NetworkPolicyPeer, out *NetworkPolicyPeer, s conversion.Scope) error {
-	out.PodSelector = (*LabelSelector)(unsafe.Pointer(in.PodSelector))
-	out.NamespaceSelector = (*LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
+	out.PodSelector = (*unversioned.LabelSelector)(unsafe.Pointer(in.PodSelector))
+	out.NamespaceSelector = (*unversioned.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
 	return nil
 }
 
@@ -1446,9 +1378,7 @@ func Convert_extensions_NetworkPolicyPort_To_v1beta1_NetworkPolicyPort(in *exten
 }
 
 func autoConvert_v1beta1_NetworkPolicySpec_To_extensions_NetworkPolicySpec(in *NetworkPolicySpec, out *extensions.NetworkPolicySpec, s conversion.Scope) error {
-	if err := Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(&in.PodSelector, &out.PodSelector, s); err != nil {
-		return err
-	}
+	out.PodSelector = in.PodSelector
 	{
 		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Ingress))
 		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Ingress))
@@ -1462,9 +1392,7 @@ func Convert_v1beta1_NetworkPolicySpec_To_extensions_NetworkPolicySpec(in *Netwo
 }
 
 func autoConvert_extensions_NetworkPolicySpec_To_v1beta1_NetworkPolicySpec(in *extensions.NetworkPolicySpec, out *NetworkPolicySpec, s conversion.Scope) error {
-	if err := Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(&in.PodSelector, &out.PodSelector, s); err != nil {
-		return err
-	}
+	out.PodSelector = in.PodSelector
 	{
 		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Ingress))
 		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Ingress))
@@ -1778,7 +1706,7 @@ func autoConvert_extensions_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec(in *extensi
 		return err
 	}
 	out.MinReadySeconds = in.MinReadySeconds
-	out.Selector = (*LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
 	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}

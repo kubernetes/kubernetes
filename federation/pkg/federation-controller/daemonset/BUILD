@@ -44,6 +44,7 @@ go_test(
         "//federation/client/clientset_generated/federation_release_1_5/fake:go_default_library",
         "//federation/pkg/federation-controller/util:go_default_library",
         "//federation/pkg/federation-controller/util/test:go_default_library",
+        "//pkg/api/unversioned:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/release_1_5:go_default_library",
