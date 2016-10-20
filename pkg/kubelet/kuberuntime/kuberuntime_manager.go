@@ -903,3 +903,70 @@ func (m *kubeGenericRuntimeManager) UpdatePodCIDR(podCIDR string) error {
 			},
 		})
 }
+
+func (m *kubeGenericRuntimeManager) NewSyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
+	// Split the pod status.
+	statuses := newStatusGroup(pod, podStatus)
+
+	// Try to prune the init containers before every sync iteration to reduce GC pressure.
+	result, err := m.pruneInitContainers(statuses.initContainerStatuses, false)
+	podSyncResult.AddSyncResult(result...)
+	if err != nil {
+		glog.Errorf("Error during pruning init containers: %v", err)
+		return
+	}
+
+	// Compute action.
+	action := newSyncAction(pod, pullSecrets)
+	action.computeSyncAction(pod, statuses, m.livenessManager)
+
+	// Take action.
+	if action.needsToKillContainers() {
+		result, err := action.killContainers(m)
+		podSyncResult.AddSyncResult(result...)
+		if err != nil {
+			glog.Errorf("Error during killing containers: %v", err)
+			return
+		}
+	}
+
+	if action.needsToKillSandboxes() {
+		result, err := action.killSandboxes(m)
+		podSyncResult.AddSyncResult(result...)
+		if err != nil {
+			glog.Errorf("Error during killing sandboxes: %v", err)
+			return
+		}
+	}
+
+	if action.needsToStartSandbox() {
+		// Prune all old init containers if we are starting
+		// a new pod.
+		// Otherwise they will be treated as finished init
+		// containers in the next SyncPod() call.
+		result, err := m.pruneInitContainers(statuses.initContainerStatuses, true)
+		podSyncResult.AddSyncResult(result...)
+		if err != nil {
+			glog.Errorf("Error during pruning init containers: %v", err)
+			return
+		}
+
+		result, err = action.startSandbox(m)
+		podSyncResult.AddSyncResult(result...)
+		if err != nil {
+			glog.Errorf("Error during starting sandbox: %v", err)
+			return
+		}
+	}
+
+	if action.needsToStartContainers() {
+		result, err := action.startContainers(m, backoff)
+		podSyncResult.AddSyncResult(result...)
+		if err != nil {
+			glog.Errorf("Error during starting containers: %v", err)
+			return
+		}
+	}
+
+	return
+}
