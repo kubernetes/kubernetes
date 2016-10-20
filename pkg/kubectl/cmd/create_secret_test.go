@@ -27,7 +27,12 @@ import (
 )
 
 func TestCreateSecretGeneric(t *testing.T) {
-	secretObject := &api.Secret{}
+	secretObject := &api.Secret{
+		Data: map[string][]byte{
+			"password": []byte("includes,comma"),
+			"username": []byte("test_user"),
+		},
+	}
 	secretObject.Name = "my-secret"
 	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
@@ -47,6 +52,8 @@ func TestCreateSecretGeneric(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdCreateSecretGeneric(f, buf)
 	cmd.Flags().Set("output", "name")
+	cmd.Flags().Set("from-literal", "password=includes,comma")
+	cmd.Flags().Set("from-literal", "username=test_user")
 	cmd.Run(cmd, []string{secretObject.Name})
 	expectedOutput := "secret/" + secretObject.Name + "\n"
 	if buf.String() != expectedOutput {
