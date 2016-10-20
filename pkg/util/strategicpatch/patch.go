@@ -570,7 +570,7 @@ func getTagStructType(dataStruct interface{}) (reflect.Type, error) {
 
 var errBadPatchTypeFmt = "unknown patch type: %s in map: %v"
 
-// Merge fields from a patch map into the original map. Note: This may modify
+// mergeMap merges fields from a patch map into the original map. Note: This may modify
 // both the original map and the patch because getting a deep copy of a map in
 // golang is highly non-trivial.
 // flag mergeDeleteList controls if using the parallel list to delete or keeping the list.
@@ -1381,4 +1381,36 @@ func toYAML(v interface{}) (string, error) {
 	}
 
 	return string(y), nil
+}
+
+// GuidedJsonMerge merges two JSON formatted items by following the structure of dataStruct's type. We use
+// dataStruct's type to respect strategicMerge guidelines and ensure the structure of the JSON items
+// (e.g. no fields are missing, no additional fields exist, etc).
+// j2 will overwrite fields of j1 in case of field collisions.
+func GuidedJsonMerge(j1, j2 []byte, dataStruct interface{}) ([]byte, error) {
+	j1Map := map[string]interface{}{}
+	if len(j1) > 0 {
+		if err := json.Unmarshal(j1, &j1Map); err != nil {
+			return nil, fmt.Errorf("Invalid JSON document: %s", j1)
+		}
+	}
+
+	j2Map := map[string]interface{}{}
+	if len(j2) > 0 {
+		if err := json.Unmarshal(j2, &j2Map); err != nil {
+			return nil, fmt.Errorf("Invalid JSON document: %s", j2)
+		}
+	}
+
+	t, err := getTagStructType(dataStruct)
+	if err != nil {
+		return nil, err
+	}
+
+	mergedMap, err := mergeMap(j1Map, j2Map, t, false, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return json.Marshal(mergedMap)
 }
