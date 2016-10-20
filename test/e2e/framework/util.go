@@ -2350,15 +2350,27 @@ func waitListSchedulableNodesOrDie(c clientset.Interface) *api.NodeList {
 	return nodes
 }
 
+// isNodeTainted checks if a node is tainted and thus not schedulable to pods (without a toleration)
+func isNodeTainted(node *api.Node) bool {
+	nodeTaints, err := api.GetTaintsFromNodeAnnotations(node.Annotations)
+	if err != nil {
+		Failf("error getting taints: %v", err)
+	}
+
+	return len(nodeTaints) > 0
+}
+
 // Node is schedulable if:
 // 1) doesn't have "unschedulable" field set
 // 2) it's Ready condition is set to true
 // 3) doesn't have NetworkUnavailable condition set to true
+// 4) it isn't tainted
 func isNodeSchedulable(node *api.Node) bool {
 	nodeReady := IsNodeConditionSetAsExpected(node, api.NodeReady, true)
+	isTainted := isNodeTainted(node)
 	networkReady := IsNodeConditionUnset(node, api.NodeNetworkUnavailable) ||
 		IsNodeConditionSetAsExpectedSilent(node, api.NodeNetworkUnavailable, false)
-	return !node.Spec.Unschedulable && nodeReady && networkReady
+	return !node.Spec.Unschedulable && nodeReady && networkReady && !isTainted
 }
 
 // GetReadySchedulableNodesOrDie addresses the common use case of getting nodes you can do work on.
