@@ -8727,7 +8727,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					"selector": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Selector is a label query over pods that should match the pod count. Normally, the system sets this field for you. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
-							Ref:         spec.MustCreateRef("#/definitions/v1.LabelSelector"),
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.LabelSelector"),
 						},
 					},
 					"manualSelector": {
@@ -8748,7 +8748,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			},
 		},
 		Dependencies: []string{
-			"v1.LabelSelector", "v1.PodTemplateSpec"},
+			"unversioned.LabelSelector", "v1.PodTemplateSpec"},
 	},
 	"v1.JobStatus": {
 		Schema: spec.Schema{
@@ -8835,83 +8835,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					},
 				},
 				Required: []string{"key", "path"},
-			},
-		},
-		Dependencies: []string{},
-	},
-	"v1.LabelSelector": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
-				Properties: map[string]spec.Schema{
-					"matchLabels": {
-						SchemaProps: spec.SchemaProps{
-							Description: "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
-							Type:        []string{"object"},
-							AdditionalProperties: &spec.SchemaOrBool{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Type:   []string{"string"},
-										Format: "",
-									},
-								},
-							},
-						},
-					},
-					"matchExpressions": {
-						SchemaProps: spec.SchemaProps{
-							Description: "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1.LabelSelectorRequirement"),
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.LabelSelectorRequirement"},
-	},
-	"v1.LabelSelectorRequirement": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
-				Properties: map[string]spec.Schema{
-					"key": {
-						SchemaProps: spec.SchemaProps{
-							Description: "key is the label key that the selector applies to.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"operator": {
-						SchemaProps: spec.SchemaProps{
-							Description: "operator represents a key's relationship to a set of values. Valid operators ard In, NotIn, Exists and DoesNotExist.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"values": {
-						SchemaProps: spec.SchemaProps{
-							Description: "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Type:   []string{"string"},
-										Format: "",
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"key", "operator"},
 			},
 		},
 		Dependencies: []string{},
@@ -15744,7 +15667,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					"selector": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Selector is a label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
-							Ref:         spec.MustCreateRef("#/definitions/v1beta1.LabelSelector"),
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.LabelSelector"),
 						},
 					},
 					"template": {
@@ -15758,7 +15681,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			},
 		},
 		Dependencies: []string{
-			"v1.PodTemplateSpec", "v1beta1.LabelSelector"},
+			"unversioned.LabelSelector", "v1.PodTemplateSpec"},
 	},
 	"v1beta1.DaemonSetStatus": {
 		Schema: spec.Schema{
@@ -15913,7 +15836,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					"selector": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Label selector for pods. Existing ReplicaSets whose pods are selected by this will be the ones affected by this deployment.",
-							Ref:         spec.MustCreateRef("#/definitions/v1beta1.LabelSelector"),
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.LabelSelector"),
 						},
 					},
 					"template": {
@@ -15960,7 +15883,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			},
 		},
 		Dependencies: []string{
-			"v1.PodTemplateSpec", "v1beta1.DeploymentStrategy", "v1beta1.LabelSelector", "v1beta1.RollbackConfig"},
+			"unversioned.LabelSelector", "v1.PodTemplateSpec", "v1beta1.DeploymentStrategy", "v1beta1.RollbackConfig"},
 	},
 	"v1beta1.DeploymentStatus": {
 		Schema: spec.Schema{
@@ -16681,7 +16604,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					"selector": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Selector is a label query over pods that should match the pod count. Normally, the system sets this field for you. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
-							Ref:         spec.MustCreateRef("#/definitions/v1beta1.LabelSelector"),
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.LabelSelector"),
 						},
 					},
 					"autoSelector": {
@@ -16702,7 +16625,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			},
 		},
 		Dependencies: []string{
-			"v1.PodTemplateSpec", "v1beta1.LabelSelector"},
+			"unversioned.LabelSelector", "v1.PodTemplateSpec"},
 	},
 	"v1beta1.JobStatus": {
 		Schema: spec.Schema{
@@ -16760,83 +16683,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{
 			"unversioned.Time", "v1beta1.JobCondition"},
-	},
-	"v1beta1.LabelSelector": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
-				Properties: map[string]spec.Schema{
-					"matchLabels": {
-						SchemaProps: spec.SchemaProps{
-							Description: "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
-							Type:        []string{"object"},
-							AdditionalProperties: &spec.SchemaOrBool{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Type:   []string{"string"},
-										Format: "",
-									},
-								},
-							},
-						},
-					},
-					"matchExpressions": {
-						SchemaProps: spec.SchemaProps{
-							Description: "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1beta1.LabelSelectorRequirement"),
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1beta1.LabelSelectorRequirement"},
-	},
-	"v1beta1.LabelSelectorRequirement": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
-				Properties: map[string]spec.Schema{
-					"key": {
-						SchemaProps: spec.SchemaProps{
-							Description: "key is the label key that the selector applies to.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"operator": {
-						SchemaProps: spec.SchemaProps{
-							Description: "operator represents a key's relationship to a set of values. Valid operators ard In, NotIn, Exists and DoesNotExist.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"values": {
-						SchemaProps: spec.SchemaProps{
-							Description: "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Type:   []string{"string"},
-										Format: "",
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"key", "operator"},
-			},
-		},
-		Dependencies: []string{},
 	},
 	"v1beta1.LocalSubjectAccessReview": {
 		Schema: spec.Schema{
@@ -16964,20 +16810,20 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					"podSelector": {
 						SchemaProps: spec.SchemaProps{
 							Description: "This is a label selector which selects Pods in this namespace. This field follows standard label selector semantics. If not provided, this selector selects no pods. If present but empty, this selector selects all pods in this namespace.",
-							Ref:         spec.MustCreateRef("#/definitions/v1beta1.LabelSelector"),
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.LabelSelector"),
 						},
 					},
 					"namespaceSelector": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Selects Namespaces using cluster scoped-labels.  This matches all pods in all namespaces selected by this label selector. This field follows standard label selector semantics. If omitted, this selector selects no namespaces. If present but empty, this selector selects all namespaces.",
-							Ref:         spec.MustCreateRef("#/definitions/v1beta1.LabelSelector"),
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.LabelSelector"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"v1beta1.LabelSelector"},
+			"unversioned.LabelSelector"},
 	},
 	"v1beta1.NetworkPolicyPort": {
 		Schema: spec.Schema{
@@ -17009,7 +16855,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					"podSelector": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Selects the pods to which this NetworkPolicy object applies.  The array of ingress rules is applied to any pods selected by this field. Multiple network policies can select the same set of pods.  In this case, the ingress rules for each are combined additively. This field is NOT optional and follows standard label selector semantics. An empty podSelector matches all pods in this namespace.",
-							Ref:         spec.MustCreateRef("#/definitions/v1beta1.LabelSelector"),
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.LabelSelector"),
 						},
 					},
 					"ingress": {
@@ -17030,7 +16876,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			},
 		},
 		Dependencies: []string{
-			"v1beta1.LabelSelector", "v1beta1.NetworkPolicyIngressRule"},
+			"unversioned.LabelSelector", "v1beta1.NetworkPolicyIngressRule"},
 	},
 	"v1beta1.NonResourceAttributes": {
 		Schema: spec.Schema{
@@ -17378,7 +17224,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					"selector": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Selector is a label query over pods that should match the replica count. If the selector is empty, it is defaulted to the labels present on the pod template. Label keys and values that must match in order to be controlled by this replica set. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
-							Ref:         spec.MustCreateRef("#/definitions/v1beta1.LabelSelector"),
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.LabelSelector"),
 						},
 					},
 					"template": {
@@ -17391,7 +17237,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			},
 		},
 		Dependencies: []string{
-			"v1.PodTemplateSpec", "v1beta1.LabelSelector"},
+			"unversioned.LabelSelector", "v1.PodTemplateSpec"},
 	},
 	"v1beta1.ReplicaSetStatus": {
 		Schema: spec.Schema{
@@ -18444,7 +18290,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					"selector": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Selector is a label query over pods that should match the pod count. Normally, the system sets this field for you. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
-							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.LabelSelector"),
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.LabelSelector"),
 						},
 					},
 					"manualSelector": {
@@ -18465,7 +18311,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			},
 		},
 		Dependencies: []string{
-			"v1.PodTemplateSpec", "v2alpha1.LabelSelector"},
+			"unversioned.LabelSelector", "v1.PodTemplateSpec"},
 	},
 	"v2alpha1.JobStatus": {
 		Schema: spec.Schema{
@@ -18569,83 +18415,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{
 			"v1.ObjectMeta", "v2alpha1.JobSpec"},
-	},
-	"v2alpha1.LabelSelector": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
-				Properties: map[string]spec.Schema{
-					"matchLabels": {
-						SchemaProps: spec.SchemaProps{
-							Description: "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
-							Type:        []string{"object"},
-							AdditionalProperties: &spec.SchemaOrBool{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Type:   []string{"string"},
-										Format: "",
-									},
-								},
-							},
-						},
-					},
-					"matchExpressions": {
-						SchemaProps: spec.SchemaProps{
-							Description: "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v2alpha1.LabelSelectorRequirement"),
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"v2alpha1.LabelSelectorRequirement"},
-	},
-	"v2alpha1.LabelSelectorRequirement": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
-				Properties: map[string]spec.Schema{
-					"key": {
-						SchemaProps: spec.SchemaProps{
-							Description: "key is the label key that the selector applies to.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"operator": {
-						SchemaProps: spec.SchemaProps{
-							Description: "operator represents a key's relationship to a set of values. Valid operators ard In, NotIn, Exists and DoesNotExist.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"values": {
-						SchemaProps: spec.SchemaProps{
-							Description: "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Type:   []string{"string"},
-										Format: "",
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"key", "operator"},
-			},
-		},
-		Dependencies: []string{},
 	},
 	"v2alpha1.ScheduledJob": {
 		Schema: spec.Schema{
