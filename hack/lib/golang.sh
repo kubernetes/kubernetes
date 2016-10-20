@@ -154,20 +154,47 @@ readonly KUBE_ALL_TARGETS=(
 )
 readonly KUBE_ALL_BINARIES=("${KUBE_ALL_TARGETS[@]##*/}")
 
-readonly KUBE_STATIC_LIBRARIES=(
-  kube-apiserver
-  kube-controller-manager
-  kube-dns
-  kube-scheduler
-  kube-proxy
-  kube-discovery
-  kubeadm
-  kubectl
-)
+# Asks golang what it thinks the host platform is. The go tool chain does some
+# slightly different things when the target platform matches the host platform.
+kube::golang::host_platform() {
+  echo "$(go env GOHOSTOS)/$(go env GOHOSTARCH)"
+}
+
+kube::golang::current_platform() {
+  local os="${GOOS-}"
+  if [[ -z $os ]]; then
+    os=$(go env GOHOSTOS)
+  fi
+
+  local arch="${GOARCH-}"
+  if [[ -z $arch ]]; then
+    arch=$(go env GOHOSTARCH)
+  fi
+
+  echo "$os/$arch"
+}
+
+# If we're building kubectl on darwin, we should use CGO
+if [[ $(kube::golang::host_platform) == "darwin/"* ]]; then
+  readonly KUBE_STATIC_LIBRARIES=()
+else
+  readonly KUBE_STATIC_LIBRARIES=(
+    kube-apiserver
+    kube-controller-manager
+    kube-dns
+    kube-scheduler
+    kube-proxy
+    kube-discovery
+    kubeadm
+    kubectl
+  )
+fi
 
 kube::golang::is_statically_linked_library() {
   local e
-  for e in "${KUBE_STATIC_LIBRARIES[@]}"; do [[ "$1" == *"/$e" ]] && return 0; done;
+  if [ -n "${KUBE_STATIC_LIBRARIES:+x}" ]; then
+    for e in "${KUBE_STATIC_LIBRARIES[@]}"; do [[ "$1" == *"/$e" ]] && return 0; done;
+  fi
   # Allow individual overrides--e.g., so that you can get a static build of
   # kubectl for inclusion in a container.
   if [ -n "${KUBE_STATIC_OVERRIDES:+x}" ]; then
@@ -190,26 +217,6 @@ kube::golang::binaries_from_targets() {
       echo "${KUBE_GO_PACKAGE}/${target}"
     fi
   done
-}
-
-# Asks golang what it thinks the host platform is. The go tool chain does some
-# slightly different things when the target platform matches the host platform.
-kube::golang::host_platform() {
-  echo "$(go env GOHOSTOS)/$(go env GOHOSTARCH)"
-}
-
-kube::golang::current_platform() {
-  local os="${GOOS-}"
-  if [[ -z $os ]]; then
-    os=$(go env GOHOSTOS)
-  fi
-
-  local arch="${GOARCH-}"
-  if [[ -z $arch ]]; then
-    arch=$(go env GOHOSTARCH)
-  fi
-
-  echo "$os/$arch"
 }
 
 # Takes the the platform name ($1) and sets the appropriate golang env variables
