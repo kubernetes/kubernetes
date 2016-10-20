@@ -213,6 +213,12 @@ func getSandboxSecurityOpts(sandboxConfig *runtimeApi.PodSandboxConfig, seccompP
 }
 
 func getNetworkNamespace(c *dockertypes.ContainerJSON) string {
+	if c.State.Pid == 0 {
+		// Docker reports pid 0 for an exited container. We can't use it to
+		// check the network namespace, so return an empty string instead.
+		glog.V(4).Infof("Cannot find network namespace for the terminated container %q", c.ID)
+		return ""
+	}
 	return fmt.Sprintf(dockerNetNSFmt, c.State.Pid)
 }
 
