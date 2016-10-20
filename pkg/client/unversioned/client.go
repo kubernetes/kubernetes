@@ -31,6 +31,7 @@ type Interface interface {
 	PodsNamespacer
 	PodTemplatesNamespacer
 	ReplicationControllersNamespacer
+	DeploymentsNamespacer
 	ServicesNamespacer
 	EndpointsNamespacer
 	NodesInterface
