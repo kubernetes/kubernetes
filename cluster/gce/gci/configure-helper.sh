@@ -375,6 +375,13 @@ current-context: service-account-context
 EOF
 }
 
+function create-master-etcd-auth {
+  local -r auth_dir="/etc/srv/kubernetes"
+  echo "${ETCD_CA_CERT}" | base64 --decode > "${auth_dir}/etcd-ca.crt"
+  echo "${ETCD_PEER_KEY}" | base64 --decode > "${auth_dir}/etcd-peer.key"
+  echo "${ETCD_PEER_CERT}" | base64 --decode > "${auth_dir}/etcd-peer.crt"
+}
+
 function assemble-docker-flags {
   echo "Assemble docker command line flags"
   local docker_opts="-p /var/run/docker.pid --iptables=false --ip-masq=false"
@@ -609,7 +616,7 @@ function prepare-etcd-manifest {
   local etcd_cluster=""
   local cluster_state="new"
   for host in $(echo "${INITIAL_ETCD_CLUSTER:-${host_name}}" | tr "," "\n"); do
-    etcd_host="etcd-${host}=http://${host}:$3"
+    etcd_host="etcd-${host}=https://${host}:$3"
     if [[ -n "${etcd_cluster}" ]]; then
       etcd_cluster+=","
       cluster_state="existing"
@@ -627,6 +634,8 @@ function prepare-etcd-manifest {
   sed -i -e "s@{{ *etcd_cluster *}}@$etcd_cluster@g" "${temp_file}"
   sed -i -e "s@{{ *storage_backend *}}@${STORAGE_BACKEND:-}@g" "${temp_file}"
   sed -i -e "s@{{ *cluster_state *}}@$cluster_state@g" "${temp_file}"
+  sed -i -e "s@{{ *etcd_protocol *}}@https@g" "${temp_file}"
+  sed -i -e "s@{{ *etcd_creds *}}@--peer-trusted-ca-file /etc/srv/kubernetes/etcd-ca.crt --peer-cert-file /etc/srv/kubernetes/etcd-peer.crt --peer-key-file /etc/srv/kubernetes/etcd-peer.key -peer-client-cert-auth@g" "${temp_file}"
   if [[ -n "${TEST_ETCD_VERSION:-}" ]]; then
     sed -i -e "s@{{ *pillar\.get('etcd_docker_tag', '\(.*\)') *}}@${TEST_ETCD_VERSION}@g" "${temp_file}"
   else
@@ -1192,6 +1201,7 @@ if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   mount-master-pd
   create-master-auth
   create-master-kubelet-auth
+  create-master-etcd-auth
 else
   create-kubelet-kubeconfig
   create-kubeproxy-kubeconfig

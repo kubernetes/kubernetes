@@ -780,6 +780,7 @@ function create-master() {
   KUBERNETES_MASTER_NAME="${MASTER_RESERVED_IP}"
 
   create-certs "${MASTER_RESERVED_IP}"
+  create-etcd-certs
 
   # Sets MASTER_ROOT_DISK_SIZE that is used by create-master-instance
   get-master-root-disk-size
@@ -805,7 +806,7 @@ function add-replica-to-etcd() {
     --project "${PROJECT}" \
     --zone "${EXISTING_MASTER_ZONE}" \
     --command \
-      "curl localhost:${client_port}/v2/members -XPOST -H \"Content-Type: application/json\" -d '{\"peerURLs\":[\"http://${REPLICA_NAME}:${internal_port}\"]}'"
+      "curl localhost:${client_port}/v2/members -XPOST -H \"Content-Type: application/json\" -d '{\"peerURLs\":[\"https://${REPLICA_NAME}:${internal_port}\"]}'"
   return $?
 }
 
