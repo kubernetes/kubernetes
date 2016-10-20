@@ -42,6 +42,7 @@ var (
 	ErrCreatePodSandbox = errors.New("CreatePodSandboxError")
 	ErrConfigPodSandbox = errors.New("ConfigPodSandboxError")
 	ErrKillPodSandbox   = errors.New("KillPodSandboxError")
+	ErrRemoveContainer  = errors.New("RemoveContainerError")
 )
 
 var (
@@ -62,6 +63,7 @@ const (
 	CreatePodSandbox SyncAction = "CreatePodSandbox"
 	ConfigPodSandbox SyncAction = "ConfigPodSandbox"
 	KillPodSandbox   SyncAction = "KillPodSandbox"
+	RemoveContainer  SyncAction = "RemoveContainer"
 )
 
 // SyncResult is the result of sync action.
