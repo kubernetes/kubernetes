@@ -135,8 +135,9 @@ func Convert_v1beta1_ScaleStatus_To_extensions_ScaleStatus(in *ScaleStatus, out 
 func Convert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensions.DeploymentSpec, out *DeploymentSpec, s conversion.Scope) error {
 	out.Replicas = &in.Replicas
 	if in.Selector != nil {
-		out.Selector = new(LabelSelector)
-		if err := Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in.Selector, out.Selector, s); err != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = new(unversioned.LabelSelector)
+		if err := s.Convert(*in, *out, 0); err != nil {
 			return err
 		}
 	} else {
@@ -251,8 +252,9 @@ func Convert_extensions_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec(in *extensions.
 	*out.Replicas = int32(in.Replicas)
 	out.MinReadySeconds = in.MinReadySeconds
 	if in.Selector != nil {
-		out.Selector = new(LabelSelector)
-		if err := Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in.Selector, out.Selector, s); err != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = new(unversioned.LabelSelector)
+		if err := s.Convert(*in, *out, 0); err != nil {
 			return err
 		}
 	} else {
@@ -289,8 +291,9 @@ func Convert_batch_JobSpec_To_v1beta1_JobSpec(in *batch.JobSpec, out *JobSpec, s
 	out.Completions = in.Completions
 	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
 	if in.Selector != nil {
-		out.Selector = new(LabelSelector)
-		if err := Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in.Selector, out.Selector, s); err != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = new(unversioned.LabelSelector)
+		if err := s.Convert(*in, *out, 0); err != nil {
 			return err
 		}
 	} else {
@@ -322,8 +325,9 @@ func Convert_v1beta1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpec, s
 	out.Completions = in.Completions
 	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
 	if in.Selector != nil {
-		out.Selector = new(unversioned.LabelSelector)
-		if err := Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in.Selector, out.Selector, s); err != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = new(unversioned.LabelSelector)
+		if err := s.Convert(*in, *out, 0); err != nil {
 			return err
 		}
 	} else {
