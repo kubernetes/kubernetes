@@ -2720,12 +2720,12 @@ func TestCreateYAML(t *testing.T) {
 	simple := &apiservertesting.Simple{
 		Other: "bar",
 	}
-	serializer, ok := runtime.SerializerInfoForMediaType(api.Codecs, "application/yaml")
+	info, ok := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), "application/yaml")
 	if !ok {
 		t.Fatal("No yaml serializer")
 	}
-	encoder := api.Codecs.EncoderForVersion(serializer, testGroupVersion)
-	decoder := api.Codecs.DecoderToVersion(serializer, testInternalGroupVersion)
+	encoder := api.Codecs.EncoderForVersion(info.Serializer, testGroupVersion)
+	decoder := api.Codecs.DecoderToVersion(info.Serializer, testInternalGroupVersion)
 
 	data, err := runtime.Encode(encoder, simple)
 	if err != nil {
@@ -3217,7 +3217,7 @@ func BenchmarkUpdateProtobuf(b *testing.B) {
 	dest.Path = "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/foo/simples/bar"
 	dest.RawQuery = ""
 
-	info, _ := runtime.SerializerInfoForMediaType(api.Codecs, "application/vnd.kubernetes.protobuf")
+	info, _ := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), "application/vnd.kubernetes.protobuf")
 	e := api.Codecs.EncoderForVersion(info.Serializer, newGroupVersion)
 	data, err := runtime.Encode(e, &items[0])
 	if err != nil {

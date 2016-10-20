@@ -94,7 +94,7 @@ type SerializerInfo struct {
 	// EncodesAsText indicates this serializer can be encoded to UTF-8 safely.
 	EncodesAsText bool
 	// Serializer is the individual object serializer for this media type.
-	Serializer
+	Serializer Serializer
 	// PrettySerializer, if set, can serialize this object in a form biased towards
 	// readability.
 	PrettySerializer Serializer

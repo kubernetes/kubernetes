@@ -189,7 +189,9 @@ type mediaTypeOptions struct {
 	// viewing
 	pretty bool
 
-	// stream describes whether this is a streaming serializer request or not
+	// stream, if set, indicates that a streaming protocol variant of this encoding
+	// is desired. The only currently supported value is watch which returns versioned
+	// events. In the future, this may refer to other stream protocols.
 	stream string
 
 	// convert is a request to alter the type of object returned by the server from the
@@ -276,15 +278,15 @@ func acceptMediaTypeOptions(params map[string]string, accepts *acceptedMediaType
 }
 
 // negotiateMediaTypeOptions returns the most appropriate content type given the accept header and
-// a list of alternatives, and also retrieves the
+// a list of alternatives along with the accepted media type parameters.
 func negotiateMediaTypeOptions(header string, accepted []acceptedMediaType, endpoint endpointRestrictions) (mediaTypeOptions, bool) {
-	clauses := goautoneg.ParseAccept(header)
 	if len(header) == 0 && len(accepted) > 0 {
 		return mediaTypeOptions{
 			accepted: &accepted[0],
 		}, true
 	}
 
+	clauses := goautoneg.ParseAccept(header)
 	for _, clause := range clauses {
 		for i := range accepted {
 			accepts := &accepted[i]
@@ -292,6 +294,8 @@ func negotiateMediaTypeOptions(header string, accepted []acceptedMediaType, endp
 			case clause.Type == accepts.Type && clause.SubType == accepts.SubType,
 				clause.Type == accepts.Type && clause.SubType == "*",
 				clause.Type == "*" && clause.SubType == "*":
+				// TODO: should we prefer the first type with no unrecognized options?  Do we need to ignore unrecognized
+				// parameters.
 				return acceptMediaTypeOptions(clause.Params, accepts, endpoint)
 			}
 		}

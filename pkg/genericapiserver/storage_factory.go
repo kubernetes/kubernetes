@@ -247,7 +247,7 @@ func NewStorageCodec(storageMediaType string, ns runtime.StorageSerializer, stor
 	if err != nil {
 		return nil, fmt.Errorf("%q is not a valid mime-type", storageMediaType)
 	}
-	serializer, ok := runtime.SerializerInfoForMediaType(ns, mediaType)
+	serializer, ok := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), mediaType)
 	if !ok {
 		return nil, fmt.Errorf("unable to find serializer for %q", storageMediaType)
 	}

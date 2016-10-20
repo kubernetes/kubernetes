@@ -301,11 +301,11 @@ func TestWatchRead(t *testing.T) {
 
 	for _, protocol := range protocols {
 		for _, test := range testCases {
-			s, ok := runtime.SerializerInfoForMediaType(api.Codecs, test.MediaType)
-			if !ok || s.StreamSerializer == nil {
-				t.Fatal(s)
+			info, ok := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), test.MediaType)
+			if !ok || info.StreamSerializer == nil {
+				t.Fatal(info)
 			}
-			serializer := s.StreamSerializer
+			streamSerializer := info.StreamSerializer
 
 			r, contentType := protocol.fn(test.Accept)
 			defer r.Close()
@@ -313,17 +313,13 @@ func TestWatchRead(t *testing.T) {
 			if contentType != "__default__" && contentType != test.ExpectedContentType {
 				t.Errorf("Unexpected content type: %#v", contentType)
 			}
-			objectSerializer, ok := runtime.SerializerInfoForMediaType(api.Codecs, test.MediaType)
-			if !ok {
-				t.Fatal(objectSerializer)
-			}
-			objectCodec := api.Codecs.DecoderToVersion(objectSerializer, testInternalGroupVersion)
+			objectCodec := api.Codecs.DecoderToVersion(info.Serializer, testInternalGroupVersion)
 
 			var fr io.ReadCloser = r
 			if !protocol.selfFraming {
-				fr = serializer.Framer.NewFrameReader(r)
+				fr = streamSerializer.Framer.NewFrameReader(r)
 			}
-			d := streaming.NewDecoder(fr, serializer)
+			d := streaming.NewDecoder(fr, streamSerializer.Serializer)
 
 			var w *watch.FakeWatcher
 			for w == nil {
@@ -575,7 +571,7 @@ func TestWatchHTTPTimeout(t *testing.T) {
 	timeoutCh := make(chan time.Time)
 	done := make(chan struct{})
 
-	info, ok := runtime.SerializerInfoForMediaType(api.Codecs, runtime.ContentTypeJSON)
+	info, ok := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	if !ok || info.StreamSerializer == nil {
 		t.Fatal(info)
 	}

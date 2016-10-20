@@ -421,7 +421,7 @@ func writeNegotiated(s runtime.NegotiatedSerializer, gv unversioned.GroupVersion
 	w.Header().Set("Content-Type", serializer.MediaType)
 	w.WriteHeader(statusCode)
 
-	encoder := s.EncoderForVersion(serializer, gv)
+	encoder := s.EncoderForVersion(serializer.Serializer, gv)
 	if err := encoder.Encode(object, w); err != nil {
 		errorJSONFatal(err, encoder, w)
 	}

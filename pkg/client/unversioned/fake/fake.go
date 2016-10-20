@@ -92,19 +92,19 @@ func (c *RESTClient) request(verb string) *restclient.Request {
 		NegotiatedSerializer: c.NegotiatedSerializer,
 	}
 	ns := c.NegotiatedSerializer
-	serializer, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)
+	info, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	internalVersion := unversioned.GroupVersion{
 		Group:   registered.GroupOrDie(api.GroupName).GroupVersion.Group,
 		Version: runtime.APIVersionInternal,
 	}
 	internalVersion.Version = runtime.APIVersionInternal
 	serializers := restclient.Serializers{
-		Encoder: ns.EncoderForVersion(serializer, registered.GroupOrDie(api.GroupName).GroupVersion),
-		Decoder: ns.DecoderToVersion(serializer, internalVersion),
+		Encoder: ns.EncoderForVersion(info.Serializer, registered.GroupOrDie(api.GroupName).GroupVersion),
+		Decoder: ns.DecoderToVersion(info.Serializer, internalVersion),
 	}
-	if serializer.StreamSerializer != nil {
-		serializers.StreamingSerializer = serializer.StreamSerializer.Serializer
-		serializers.Framer = serializer.StreamSerializer.Framer
+	if info.StreamSerializer != nil {
+		serializers.StreamingSerializer = info.StreamSerializer.Serializer
+		serializers.Framer = info.StreamSerializer.Framer
 	}
 	return restclient.NewRequest(c, verb, &url.URL{Host: "localhost"}, "", config, serializers, nil, nil)
 }
