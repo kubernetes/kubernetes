@@ -626,7 +626,7 @@ message ExecRequest {
     repeated string cmd = 2;
     // Whether use tty
     optional bool tty = 3;
-    // Streaming stdin
+    // Whether to stream stdin
     optional bool stdin = 4;
 }
 
@@ -638,8 +638,8 @@ message ExecResponse {
 message AttachRequest {
     // The id of the container
     optional string container_id = 1;
-    // Streaming stdin
-    optional string stdin = 2;
+    // Whether to stream stdin
+    optional bool stdin = 2;
 }
 
 message AttachResponse {
