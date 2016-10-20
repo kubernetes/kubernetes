@@ -281,6 +281,21 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 				gracePeriod:   options.GracePeriod,
 			}
 
+			// During Unmarshaling of the user's object config to a Go struct, explicit null values are not preserved.
+			// For this, we merge the raw configuration file (that has null values) with the currently loaded
+			// configuration (which has extra information like annotations and empty structs). There might be conflicts,
+			// which we resolve in favor of info.Raw. The conflicts should only be empty initialized structs that we will
+			// overwrite only if the user has defined a null.
+			// TODO(andronat): Do we want to store user's explicit null values?
+			tObj := info.VersionedObject
+			if tObj == nil {
+				tObj = info.Object
+			}
+			modified, err = strategicpatch.GuidedJsonMerge(modified, info.Raw, tObj)
+			if err != nil {
+				return cmdutil.AddSourceToErr(fmt.Sprintf("Restoring user defined null values failed:\n loaded object: %s\n raw object: %s\n ", string(modified), string(info.Raw)), info.Source, err)
+			}
+
 			patchBytes, err := patcher.patch(info.Object, modified, info.Source, info.Namespace, info.Name)
 			if err != nil {
 				return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patchBytes, info), info.Source, err)
