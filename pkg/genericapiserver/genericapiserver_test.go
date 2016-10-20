@@ -17,7 +17,6 @@ limitations under the License.
 package genericapiserver
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -40,7 +39,6 @@ import (
 	genericmux "k8s.io/kubernetes/pkg/genericapiserver/mux"
 	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
 
@@ -54,8 +52,6 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	config := NewConfig()
 	config.PublicAddress = net.ParseIP("192.168.10.4")
 	config.RequestContextMapper = api.NewRequestContextMapper()
-	config.ProxyDialer = func(network, addr string) (net.Conn, error) { return nil, nil }
-	config.ProxyTLSClientConfig = &tls.Config{}
 	config.LegacyAPIGroupPrefixes = sets.NewString("/api")
 
 	return etcdServer, *config, assert.New(t)
@@ -88,14 +84,6 @@ func TestNew(t *testing.T) {
 	serviceReadWriteIP, _ := ipallocator.GetIndexedIP(serviceClusterIPRange, 1)
 	assert.Equal(s.ServiceReadWriteIP, serviceReadWriteIP)
 	assert.Equal(s.ExternalAddress, net.JoinHostPort(config.PublicAddress.String(), "6443"))
-
-	// These functions should point to the same memory location
-	serverDialer, _ := utilnet.Dialer(s.ProxyTransport)
-	serverDialerFunc := fmt.Sprintf("%p", serverDialer)
-	configDialerFunc := fmt.Sprintf("%p", config.ProxyDialer)
-	assert.Equal(serverDialerFunc, configDialerFunc)
-
-	assert.Equal(s.ProxyTransport.(*http.Transport).TLSClientConfig, config.ProxyTLSClientConfig)
 }
 
 // Verifies that AddGroupVersions works as expected.
