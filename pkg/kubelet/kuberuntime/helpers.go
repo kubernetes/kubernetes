@@ -202,12 +202,12 @@ func getStableKey(pod *api.Pod, container *api.Container) string {
 	return fmt.Sprintf("%s_%s_%s_%s_%s", pod.Name, pod.Namespace, string(pod.UID), container.Name, hash)
 }
 
-// getContainerLogsPath gets relative log path for container.
-func getContainerLogsPath(containerName string, restartCount int) string {
+// buildContainerLogsPath builds log path for container relative to pod logs directory.
+func buildContainerLogsPath(containerName string, restartCount int) string {
 	return fmt.Sprintf("%s_%d.log", containerName, restartCount)
 }
 
-// getPodLogsDirectory gets absolute log directory path for a pod sandbox.
-func getPodLogsDirectory(podUID types.UID) string {
+// buildPodLogsDirectory builds absolute log directory path for a pod sandbox.
+func buildPodLogsDirectory(podUID types.UID) string {
 	return filepath.Join(podLogsRootDirectory, string(podUID))
 }

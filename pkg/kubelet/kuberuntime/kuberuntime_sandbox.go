@@ -90,7 +90,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *api.Pod, attem
 		podSandboxConfig.Hostname = &hostname
 	}
 
-	logDir := getPodLogsDirectory(pod.UID)
+	logDir := buildPodLogsDirectory(pod.UID)
 	podSandboxConfig.LogDirectory = &logDir
 
 	cgroupParent := ""

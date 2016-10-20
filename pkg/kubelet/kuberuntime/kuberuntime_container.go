@@ -136,7 +136,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 	}
 
 	command, args := kubecontainer.ExpandContainerCommandAndArgs(container, opts.Envs)
-	containerLogsPath := getContainerLogsPath(container.Name, restartCount)
+	containerLogsPath := buildContainerLogsPath(container.Name, restartCount)
 	podHasSELinuxLabel := pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SELinuxOptions != nil
 	restartCountUint32 := uint32(restartCount)
 	config := &runtimeApi.ContainerConfig{
@@ -725,8 +725,8 @@ func (m *kubeGenericRuntimeManager) removeContainerLog(containerID string) error
 	}
 	labeledInfo := getContainerInfoFromLabels(status.Labels)
 	annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
-	path := filepath.Join(getPodLogsDirectory(labeledInfo.PodUID),
-		getContainerLogsPath(labeledInfo.ContainerName, annotatedInfo.RestartCount))
+	path := filepath.Join(buildPodLogsDirectory(labeledInfo.PodUID),
+		buildContainerLogsPath(labeledInfo.ContainerName, annotatedInfo.RestartCount))
 	if err := m.osInterface.Remove(path); err != nil && !os.IsNotExist(err) {
 		glog.Errorf("Failed to remove container %q log %q: %v", containerID, path, err)
 		return err

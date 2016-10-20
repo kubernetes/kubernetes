@@ -185,20 +185,61 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 	return "", err
 }
 
+// getContainerLogPath returns the container log path specified by kubelet and the real
+// path where docker stores the container log.
+func (ds *dockerService) getContainerLogPath(containerID string) (string, string, error) {
+	info, err := ds.client.InspectContainer(containerID)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to inspect container %q: %v", containerID, err)
+	}
+	return info.Config.Labels[containerLogPathLabelKey], info.LogPath, nil
+}
+
+// createContainerLogSymlink creates the symlink for docker container log.
+func (ds *dockerService) createContainerLogSymlink(containerID string) error {
+	path, realPath, err := ds.getContainerLogPath(containerID)
+	if err != nil {
+		return fmt.Errorf("failed to get container %q log path: %v", containerID, err)
+	}
+	if path != "" {
+		// Only create the symlink when container log path is specified.
+		if err = ds.os.Symlink(realPath, path); err != nil {
+			return fmt.Errorf("failed to create symbolic link %q to the container log file %q for container %q: %v",
+				path, realPath, containerID, err)
+		}
+	}
+	return nil
+}
+
+// removeContainerLogSymlink removes the symlink for docker container log.
+func (ds *dockerService) removeContainerLogSymlink(containerID string) error {
+	path, _, err := ds.getContainerLogPath(containerID)
+	if err != nil {
+		return fmt.Errorf("failed to get container %q log path: %v", containerID, err)
+	}
+	if path != "" {
+		// Only remove the symlink when container log path is specified.
+		err := ds.os.Remove(path)
+		if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("failed to remove container %q log symlink %q: %v", containerID, path, err)
+		}
+	}
+	return nil
+}
+
 // StartContainer starts the container.
 func (ds *dockerService) StartContainer(containerID string) error {
 	err := ds.client.StartContainer(containerID)
 	if err != nil {
 		return fmt.Errorf("failed to start container %q: %v", containerID, err)
 	}
-	// TODO: Should we stop the container if an error occurs during start.
-	path, realPath, err := ds.getContainerLogPath(containerID)
-	if err != nil {
-		return fmt.Errorf("failed to get container %q log path: %v", containerID, err)
-	}
-	if err = ds.os.Symlink(realPath, path); err != nil {
-		return fmt.Errorf("failed to create symbolic link %q to the container log file %q for container %q",
-			path, realPath, containerID)
+	// Create container log symlink.
+	if err := ds.createContainerLogSymlink(containerID); err != nil {
+		// Stop the container if the symlink creation fails.
+		if err := ds.client.StopContainer(containerID, 0); err != nil {
+			glog.Errorf("Failed to stop container %q: %v", containerID, err)
+		}
+		return err
 	}
 	return nil
 }
@@ -214,34 +255,15 @@ func (ds *dockerService) RemoveContainer(containerID string) error {
 	// Ideally, log lifecycle should be independent of container lifecycle.
 	// However, docker will remove container log after container is removed,
 	// we can't prevent that now, so we also cleanup the symlink here.
-	path, _, err := ds.getContainerLogPath(containerID)
+	err := ds.removeContainerLogSymlink(containerID)
 	if err != nil {
-		// TODO: Consider whether we should return here.
-		return fmt.Errorf("failed to get container %q log path: %v", containerID, err)
-	}
-	err = ds.os.Remove(path)
-	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to remove container %q log symlink %q: %v", containerID, path, err)
+		return err
 	}
 	err = ds.client.RemoveContainer(containerID, dockertypes.ContainerRemoveOptions{RemoveVolumes: true})
 	if err != nil {
 		return fmt.Errorf("failed to remove container %q: %v", containerID, err)
 	}
 	return nil
-}
-
-// getContainerLogPath returns the container log path specified by kubelet and the real
-// path where docker stores the container log.
-func (ds *dockerService) getContainerLogPath(containerID string) (string, string, error) {
-	info, err := ds.client.InspectContainer(containerID)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to inspect container %q: %v", containerID, err)
-	}
-	path, ok := info.Config.Labels[containerLogPathLabelKey]
-	if !ok {
-		return "", "", fmt.Errorf("failed to get container %q log path from labels %+v", containerID, info.Config.Labels)
-	}
-	return path, info.LogPath, nil
 }
 
 func getContainerTimestamps(r *dockertypes.ContainerJSON) (time.Time, time.Time, time.Time, error) {
