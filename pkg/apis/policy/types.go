@@ -90,6 +90,9 @@ type PodDisruptionBudgetList struct {
 	Items                []PodDisruptionBudget `json:"items"`
 }
 
+// +genclient=true
+// +noMethods=true
+
 // Eviction evicts a pod from its node subject to certain policies and safety constraints.
 // This is a subresource of Pod.  A request to cause such an eviction is
 // created by POSTing to .../pods/<pod name>/eviction.
