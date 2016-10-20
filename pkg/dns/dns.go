@@ -462,12 +462,15 @@ func (kd *KubeDNS) newExternalNameService(service *kapi.Service) {
 // the subtree matching the name are returned.
 func (kd *KubeDNS) Records(name string, exact bool) (retval []skymsg.Service, err error) {
 	glog.V(2).Infof("Received DNS Request:%s, exact:%v", name, exact)
+
 	trimmed := strings.TrimRight(name, ".")
 	segments := strings.Split(trimmed, ".")
 	isFederationQuery := false
 	federationSegments := []string{}
+
 	if !exact && kd.isFederationQuery(segments) {
-		glog.V(2).Infof("federation service query: Received federation query. Going to try to find local service first")
+		glog.V(2).Infof(
+			"federation service query: Received federation query. Going to try to find local service first")
 		// Try quering the non-federation (local) service first.
 		// Will try the federation one later, if this fails.
 		isFederationQuery = true
@@ -476,18 +479,24 @@ func (kd *KubeDNS) Records(name string, exact bool) (retval []skymsg.Service, er
 		// Federation name is 3rd in the segment (after service name and namespace).
 		segments = append(segments[:2], segments[3:]...)
 	}
+
 	path := reverseArray(segments)
 	records, err := kd.getRecordsForPath(path, exact)
+
 	if err != nil {
 		return nil, err
 	}
-	if !isFederationQuery {
-		if len(records) > 0 {
-			return records, nil
-		}
-		return nil, etcd.Error{Code: etcd.ErrorCodeKeyNotFound}
+
+	if isFederationQuery {
+		return kd.recordsForFederation(records, path, exact, federationSegments)
+	} else if len(records) > 0 {
+		return records, nil
 	}
 
+	return nil, etcd.Error{Code: etcd.ErrorCodeKeyNotFound}
+}
+
+func (kd *KubeDNS) recordsForFederation(records []skymsg.Service, path []string, exact bool, federationSegments []string) (retval []skymsg.Service, err error) {
 	// For federation query, verify that the local service has endpoints.
 	validRecord := false
 	for _, val := range records {
@@ -496,7 +505,8 @@ func (kd *KubeDNS) Records(name string, exact bool) (retval []skymsg.Service, er
 		if !kd.isHeadlessServiceRecord(&val) {
 			ok, err := kd.serviceWithClusterIPHasEndpoints(&val)
 			if err != nil {
-				glog.V(2).Infof("federation service query: unexpected error while trying to find if service has endpoint: %v", err)
+				glog.V(2).Infof(
+					"federation service query: unexpected error while trying to find if service has endpoint: %v", err)
 				continue
 			}
 			if !ok {
@@ -507,6 +517,7 @@ func (kd *KubeDNS) Records(name string, exact bool) (retval []skymsg.Service, er
 		validRecord = true
 		break
 	}
+
 	if validRecord {
 		// There is a local service with valid endpoints, return its CNAME.
 		name := strings.Join(reverseArray(path), ".")
@@ -516,14 +527,15 @@ func (kd *KubeDNS) Records(name string, exact bool) (retval []skymsg.Service, er
 		if !strings.HasSuffix(name, ".") {
 			name = name + "."
 		}
-		glog.Infof("federation service query: Returning CNAME for local service : %s", name)
+		glog.V(2).Infof("federation service query: Returning CNAME for local service : %s", name)
 		return []skymsg.Service{{Host: name}}, nil
 	}
 
 	// If the name query is not an exact query and does not match any records in the local store,
 	// attempt to send a federation redirect (CNAME) response.
 	if !exact {
-		glog.V(2).Infof("federation service query: Did not find a local service. Trying federation redirect (CNAME) response")
+		glog.V(2).Infof(
+			"federation service query: Did not find a local service. Trying federation redirect (CNAME) response")
 		return kd.federationRecords(reverseArray(federationSegments))
 	}
 
