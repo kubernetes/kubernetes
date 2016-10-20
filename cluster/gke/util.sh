@@ -401,6 +401,8 @@ function test-teardown() {
 function kube-down() {
   echo "... in gke:kube-down()" >&2
   detect-project >&2
-  "${GCLOUD}" ${CMD_GROUP:-} container clusters delete --project="${PROJECT}" \
-    --zone="${ZONE}" "${CLUSTER_NAME}" --quiet
+  if "${GCLOUD}" ${CMD_GROUP:-} container clusters describe --project="${PROJECT}" --zone="${ZONE}" "${CLUSER_NAME}" --quiet &>/dev/null; then
+    "${GCLOUD}" ${CMD_GROUP:-} container clusters delete --project="${PROJECT}" \
+      --zone="${ZONE}" "${CLUSTER_NAME}" --quiet
+  fi
 }
