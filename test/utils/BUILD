@@ -33,6 +33,7 @@ go_library(
         "//pkg/runtime:go_default_library",
         "//pkg/util/sets:go_default_library",
         "//pkg/util/uuid:go_default_library",
+        "//pkg/util/workqueue:go_default_library",
         "//pkg/watch:go_default_library",
         "//vendor:github.com/golang/glog",
     ],
