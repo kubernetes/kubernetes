@@ -19,7 +19,6 @@ package dns
 import (
 	"encoding/json"
 	"fmt"
-	"hash/fnv"
 	"net"
 	"strings"
 	"sync"
@@ -33,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	kcache "k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/dns/util"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -62,15 +62,6 @@ const (
 	// never change. So we expire the cache and retrieve a node once every 180 seconds.
 	// The value is chosen to be neither too long nor too short.
 	nodeCacheTTL = 180 * time.Second
-
-	// default priority used for service records
-	defaultPriority = 10
-
-	// default weight used for service records
-	defaultWeight = 10
-
-	// default TTL used for service records
-	defaultTTL = 30
 )
 
 type KubeDNS struct {
@@ -334,7 +325,7 @@ func (kd *KubeDNS) fqdn(service *kapi.Service, subpaths ...string) string {
 
 func (kd *KubeDNS) newPortalService(service *kapi.Service) {
 	subCache := NewTreeCache()
-	recordValue, recordLabel := getSkyMsg(service.Spec.ClusterIP, 0)
+	recordValue, recordLabel := util.GetSkyMsg(service.Spec.ClusterIP, 0)
 	subCache.setEntry(recordLabel, recordValue, kd.fqdn(service, recordLabel))
 
 	// Generate SRV Records
@@ -349,7 +340,7 @@ func (kd *KubeDNS) newPortalService(service *kapi.Service) {
 	}
 	subCachePath := append(kd.domainPath, serviceSubdomain, service.Namespace)
 	host := kd.getServiceFQDN(service)
-	reverseRecord, _ := getSkyMsg(host, 0)
+	reverseRecord, _ := util.GetSkyMsg(host, 0)
 
 	kd.cacheLock.Lock()
 	defer kd.cacheLock.Unlock()
@@ -370,7 +361,7 @@ func (kd *KubeDNS) generateRecordsForHeadlessService(e *kapi.Endpoints, svc *kap
 		for subIdx := range e.Subsets[idx].Addresses {
 			address := &e.Subsets[idx].Addresses[subIdx]
 			endpointIP := address.IP
-			recordValue, endpointName := getSkyMsg(endpointIP, 0)
+			recordValue, endpointName := util.GetSkyMsg(endpointIP, 0)
 			if hostLabel, exists := getHostname(address, podHostnames); exists {
 				endpointName = hostLabel
 			}
@@ -422,7 +413,7 @@ func (kd *KubeDNS) generateSRVRecordValue(svc *kapi.Service, portNumber int, lab
 	for _, cNameLabel := range labels {
 		host = cNameLabel + "." + host
 	}
-	recordValue, _ := getSkyMsg(host, portNumber)
+	recordValue, _ := util.GetSkyMsg(host, portNumber)
 	return recordValue
 }
 
@@ -455,7 +446,7 @@ func (kd *KubeDNS) newHeadlessService(service *kapi.Service) error {
 func (kd *KubeDNS) newExternalNameService(service *kapi.Service) {
 	// Create a CNAME record for the service's ExternalName.
 	// TODO: TTL?
-	recordValue, _ := getSkyMsg(service.Spec.ExternalName, 0)
+	recordValue, _ := util.GetSkyMsg(service.Spec.ExternalName, 0)
 	cachePath := append(kd.domainPath, serviceSubdomain, service.Namespace)
 	fqdn := kd.fqdn(service)
 	glog.V(2).Infof("newExternalNameService: storing key %s with value %v as %s under %v", service.Name, recordValue, fqdn, cachePath)
@@ -544,7 +535,7 @@ func (kd *KubeDNS) getRecordsForPath(path []string, exact bool) ([]skymsg.Servic
 	if kd.isPodRecord(path) {
 		ip, err := kd.getPodIP(path)
 		if err == nil {
-			skyMsg, _ := getSkyMsg(ip, 0)
+			skyMsg, _ := util.GetSkyMsg(ip, 0)
 			return []skymsg.Service{*skyMsg}, nil
 		}
 		return nil, err
@@ -669,32 +660,6 @@ func (kd *KubeDNS) getPodIP(path []string) (string, error) {
 		return ip, nil
 	}
 	return "", fmt.Errorf("Invalid IP Address %v", ip)
-}
-
-func hashServiceRecord(msg *skymsg.Service) string {
-	s := fmt.Sprintf("%v", msg)
-	h := fnv.New32a()
-	h.Write([]byte(s))
-	return fmt.Sprintf("%x", h.Sum32())
-}
-
-func newServiceRecord(ip string, port int) *skymsg.Service {
-	return &skymsg.Service{
-		Host:     ip,
-		Port:     port,
-		Priority: defaultPriority,
-		Weight:   defaultWeight,
-		Ttl:      defaultTTL,
-	}
-}
-
-// Returns record in a format that SkyDNS understands.
-// Also return the hash of the record.
-func getSkyMsg(ip string, port int) (*skymsg.Service, string) {
-	msg := newServiceRecord(ip, port)
-	hash := hashServiceRecord(msg)
-	glog.V(2).Infof("DNS Record:%s, hash:%s", fmt.Sprintf("%v", msg), hash)
-	return msg, fmt.Sprintf("%x", hash)
 }
 
 // isFederationQuery checks if the given query `path` matches the federated service query pattern.
