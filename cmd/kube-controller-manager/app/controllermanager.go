@@ -531,10 +531,11 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 		}
 	}
 
-	serviceaccountcontroller.NewServiceAccountsController(
+	go serviceaccountcontroller.NewServiceAccountsController(
+		sharedInformers.ServiceAccounts(), sharedInformers.Namespaces(),
 		client("service-account-controller"),
 		serviceaccountcontroller.DefaultServiceAccountsControllerOptions(),
-	).Run()
+	).Run(5, stop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	if s.EnableGarbageCollector {
