@@ -171,7 +171,7 @@ var (
     Create a LoadBalancer service with the specified name.`)
 
 	serviceLoadBalancerExample = templates.Examples(`
-    # Create a new nodeport service named my-lbs
+    # Create a new LoadBalancer service named my-lbs
     kubectl create service loadbalancer my-lbs --tcp=5678:8080`)
 )
 
