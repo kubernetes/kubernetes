@@ -99,14 +99,14 @@ func TestGenerateToken(t *testing.T) {
                 givenToken := strings.Split(strings.ToLower(rt.s.GivenToken), ".")
                 if len(givenToken) != rt.l {
                         t.Errorf(
-                                "failed GenerateToken:\n\texpected: %d\n\t  actual: %d",
+                                "failed GenerateToken num parts:\n\texpected: %d\n\t  actual: %d",
                                 rt.l,
                                 len(givenToken),
                         )
                 }
                 if len(givenToken[0]) != rt.n {
                         t.Errorf(
-                                "failed GenerateToken:\n\texpected: %d\n\t  actual: %d",
+                                "failed GenerateToken first part length:\n\texpected: %d\n\t  actual: %d",
                                 rt.l,
                                 len(givenToken),
                         )
@@ -129,9 +129,10 @@ func TestUseGivenTokenIfValid(t *testing.T) {
                 actual, _ := UseGivenTokenIfValid(&rt.s)
                 if actual != rt.expected {
                         t.Errorf(
-                                "failed UseGivenTokenIfValid:\n\texpected: %t\n\t  actual: %t",
+                                "failed UseGivenTokenIfValid:\n\texpected: %t\n\t  actual: %t\n\t token:%s",
                                 rt.expected,
                                 actual,
+                                rt.s.GivenToken,
                         )
                 }
         }

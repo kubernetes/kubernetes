@@ -34,11 +34,12 @@ func TestCheckErr(t *testing.T) {
                 expected int
         }{
                 {nil, 0},
-                {fmt.Errorf(""), 1},
-                {&preflight.PreFlightError{}, 2},
+                {fmt.Errorf(""), DefaultErrorExitCode},
+                {&preflight.PreFlightError{}, PreFlight},
         }
 
         for _, rt := range tokenTest {
+                codeReturned = 0
                 checkErr("", rt.e, errHandle)
                 if codeReturned != rt.expected {
                         t.Errorf(
