@@ -475,6 +475,7 @@ function start-kubelet {
   flags+=" --config=/etc/kubernetes/manifests"
   flags+=" --kubelet-cgroups=/kubelet"
   flags+=" --system-cgroups=/system"
+  flags+=" --mounter-path=${KUBE_HOME}/bin/mounter"
 
   if [[ -n "${KUBELET_PORT:-}" ]]; then
     flags+=" --port=${KUBELET_PORT}"
