@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM debian:jessie
+FROM ubuntu:xenial
 MAINTAINER vishh@google.com
 
-RUN apt-get update && apt-get install -y nfs-common glusterfs-client
+RUN apt-get update && apt-get install -y nfs-common=1:1.2.8-9ubuntu12 glusterfs-client=3.7.6-1ubuntu1
 
 ENTRYPOINT ["/bin/mount"]
