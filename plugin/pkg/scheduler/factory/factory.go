@@ -364,10 +364,13 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		return nil, err
 	}
 
+	predicateMetaProducer, err := f.GetPredicateMetadataProducer()
+	if err != nil {
+		return nil, err
+	}
+
 	f.Run()
-
-	algo := scheduler.NewGenericScheduler(f.schedulerCache, predicateFuncs, priorityMetaProducer, priorityConfigs, extenders)
-
+	algo := scheduler.NewGenericScheduler(f.schedulerCache, predicateFuncs, predicateMetaProducer, priorityConfigs, priorityMetaProducer, extenders)
 	podBackoff := podBackoff{
 		perPodBackoff: map[types.NamespacedName]*backoffEntry{},
 		clock:         realClock{},
@@ -407,6 +410,14 @@ func (f *ConfigFactory) GetPriorityMetadataProducer() (algorithm.MetadataProduce
 	}
 
 	return getPriorityMetadataProducer(*pluginArgs)
+}
+
+func (f *ConfigFactory) GetPredicateMetadataProducer() (algorithm.MetadataProducer, error) {
+	pluginArgs, err := f.getPluginArgs()
+	if err != nil {
+		return nil, err
+	}
+	return getPredicateMetadataProducer(*pluginArgs)
 }
 
 func (f *ConfigFactory) GetPredicates(predicateKeys sets.String) (map[string]algorithm.FitPredicate, error) {
