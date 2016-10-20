@@ -4548,8 +4548,7 @@ func (p *E2ETestNodePreparer) PrepareNodes() error {
 	for k, strategy := range p.countToStrategy {
 		sum += k
 		for ; index < sum; index++ {
-			err := testutils.DoPrepareNode(p.client, &nodes.Items[index], strategy)
-			if err != nil {
+			if err := testutils.DoPrepareNode(p.client, &nodes.Items[index], strategy); err != nil {
 				glog.Errorf("Aborting node preparation: %v", err)
 				return err
 			}
@@ -4560,22 +4559,21 @@ func (p *E2ETestNodePreparer) PrepareNodes() error {
 }
 
 func (p *E2ETestNodePreparer) CleanupNodes() error {
-	encounteredError := false
+	var encounteredError error
 	nodes := GetReadySchedulableNodesOrDie(p.client)
 	for i := range nodes.Items {
 		var err error
 		name := nodes.Items[i].Name
 		strategy, found := p.nodeToAppliedStrategy[name]
 		if found {
-			err = testutils.DoCleanupNode(p.client, name, strategy)
-			if err != nil {
+			if err = testutils.DoCleanupNode(p.client, name, strategy); err != nil {
 				glog.Errorf("Skipping cleanup of Node: failed update of %v: %v", name, err)
-				encounteredError = true
+				encounteredError = err
 			}
 		}
 	}
-	if encounteredError {
-		return fmt.Errorf("Encountered error while cleaning up pods.")
+	if encounteredError != nil {
+		return fmt.Errorf("Encountered error while cleaning up pods: %v", encounteredError)
 	}
 	return nil
 }

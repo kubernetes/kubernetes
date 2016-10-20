@@ -63,8 +63,7 @@ func benchmarkScheduling(numNodes, numScheduledPods int, b *testing.B) {
 		map[int]testutils.PrepareNodeStrategy{numNodes: &testutils.TrivialNodePrepareStrategy{}},
 		"scheduler-perf-",
 	)
-	err := nodePreparer.PrepareNodes()
-	if err != nil {
+	if err := nodePreparer.PrepareNodes(); err != nil {
 		glog.Fatalf("%v", err)
 	}
 	defer nodePreparer.CleanupNodes()

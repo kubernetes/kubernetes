@@ -56,6 +56,7 @@ func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 			GenerateName: p.nodeNamePrefix,
 		},
 		Spec: api.NodeSpec{
+			// TODO: investigate why this is needed.
 			ExternalID: "foo",
 		},
 		Status: api.NodeStatus{
@@ -82,8 +83,7 @@ func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 	for k, strategy := range p.countToStrategy {
 		sum += k
 		for ; index < sum; index++ {
-			err := testutils.DoPrepareNode(p.client, &nodes.Items[index], strategy)
-			if err != nil {
+			if err := testutils.DoPrepareNode(p.client, &nodes.Items[index], strategy); err != nil {
 				glog.Errorf("Aborting node preparation: %v", err)
 				return err
 			}
@@ -95,8 +95,7 @@ func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 func (p *IntegrationTestNodePreparer) CleanupNodes() error {
 	nodes := e2eframework.GetReadySchedulableNodesOrDie(p.client)
 	for i := range nodes.Items {
-		err := p.client.Core().Nodes().Delete(nodes.Items[i].Name, &api.DeleteOptions{})
-		if err != nil {
+		if err := p.client.Core().Nodes().Delete(nodes.Items[i].Name, &api.DeleteOptions{}); err != nil {
 			glog.Errorf("Error while deleting Node: %v", err)
 		}
 	}
