@@ -60,7 +60,6 @@ const (
 
 	// Timeout for reads from databases running on pets.
 	readTimeout = 60 * time.Second
-
 )
 
 // Time: 25m, slow by design.
