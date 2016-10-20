@@ -183,8 +183,8 @@ func TestBuildSummary(t *testing.T) {
 		assert.EqualValues(t, testTime(creationTime, seed).Unix(), sys.StartTime.Time.Unix(), name+".StartTime")
 		checkCPUStats(t, name, seed, sys.CPU)
 		checkMemoryStats(t, name, seed, info, sys.Memory)
-		checkFsStats(t, rootfsCapacity, rootfsAvailable, totalRootfsInodes, rootfsInodesFree, sys.Logs)
-		checkFsStats(t, imagefsCapacity, imagefsAvailable, totalImagefsInodes, imagefsInodesFree, sys.Rootfs)
+		assert.Nil(t, sys.Logs, name+".Logs")
+		assert.Nil(t, sys.Rootfs, name+".Rootfs")
 	}
 
 	assert.Equal(t, 3, len(summary.Pods))
