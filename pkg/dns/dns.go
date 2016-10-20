@@ -50,9 +50,6 @@ const (
 	// A subdomain added to the user specified dmoain for all pods.
 	podSubdomain = "pod"
 
-	// arpaSuffix is the standard suffix for PTR IP reverse lookups.
-	arpaSuffix = ".in-addr.arpa."
-
 	// Resync period for the kube controller loop.
 	resyncPeriod = 5 * time.Minute
 
@@ -133,7 +130,7 @@ func NewKubeDNS(client clientset.Interface, domain string, federations map[strin
 		nodesStore:          kcache.NewStore(kcache.MetaNamespaceKeyFunc),
 		reverseRecordMap:    make(map[string]*skymsg.Service),
 		clusterIPServiceMap: make(map[string]*kapi.Service),
-		domainPath:          reverseArray(strings.Split(strings.TrimRight(domain, "."), ".")),
+		domainPath:          util.ReverseArray(strings.Split(strings.TrimRight(domain, "."), ".")),
 		federations:         federations,
 	}
 	kd.setEndpointsStore()
@@ -320,7 +317,7 @@ func (kd *KubeDNS) getServiceFromEndpoints(e *kapi.Endpoints) (*kapi.Service, er
 // elements rooted at the given service, ending at a service record.
 func (kd *KubeDNS) fqdn(service *kapi.Service, subpaths ...string) string {
 	domainLabels := append(append(kd.domainPath, serviceSubdomain, service.Namespace, service.Name), subpaths...)
-	return dns.Fqdn(strings.Join(reverseArray(domainLabels), "."))
+	return dns.Fqdn(strings.Join(util.ReverseArray(domainLabels), "."))
 }
 
 func (kd *KubeDNS) newPortalService(service *kapi.Service) {
@@ -339,7 +336,7 @@ func (kd *KubeDNS) newPortalService(service *kapi.Service) {
 		}
 	}
 	subCachePath := append(kd.domainPath, serviceSubdomain, service.Namespace)
-	host := kd.getServiceFQDN(service)
+	host := getServiceFQDN(kd.domain, service)
 	reverseRecord, _ := util.GetSkyMsg(host, 0)
 
 	kd.cacheLock.Lock()
@@ -480,7 +477,7 @@ func (kd *KubeDNS) Records(name string, exact bool) (retval []skymsg.Service, er
 		segments = append(segments[:2], segments[3:]...)
 	}
 
-	path := reverseArray(segments)
+	path := util.ReverseArray(segments)
 	records, err := kd.getRecordsForPath(path, exact)
 
 	if err != nil {
@@ -520,7 +517,7 @@ func (kd *KubeDNS) recordsForFederation(records []skymsg.Service, path []string,
 
 	if validRecord {
 		// There is a local service with valid endpoints, return its CNAME.
-		name := strings.Join(reverseArray(path), ".")
+		name := strings.Join(util.ReverseArray(path), ".")
 		// Ensure that this name that we are returning as a CNAME response is a fully qualified
 		// domain name so that the client's resolver library doesn't have to go through its
 		// search list all over again.
@@ -536,14 +533,13 @@ func (kd *KubeDNS) recordsForFederation(records []skymsg.Service, path []string,
 	if !exact {
 		glog.V(2).Infof(
 			"federation service query: Did not find a local service. Trying federation redirect (CNAME) response")
-		return kd.federationRecords(reverseArray(federationSegments))
+		return kd.federationRecords(util.ReverseArray(federationSegments))
 	}
 
 	return nil, etcd.Error{Code: etcd.ErrorCodeKeyNotFound}
 }
 
 func (kd *KubeDNS) getRecordsForPath(path []string, exact bool) ([]skymsg.Service, error) {
-	retval := []skymsg.Service{}
 	if kd.isPodRecord(path) {
 		ip, err := kd.getPodIP(path)
 		if err == nil {
@@ -572,10 +568,14 @@ func (kd *KubeDNS) getRecordsForPath(path []string, exact bool) ([]skymsg.Servic
 	defer kd.cacheLock.RUnlock()
 	records := kd.cache.getValuesForPathWithWildcards(path...)
 	glog.V(2).Infof("Received %d records for %v from cache", len(records), path)
+
+	retval := []skymsg.Service{}
 	for _, val := range records {
 		retval = append(retval, *val)
 	}
+
 	glog.V(2).Infof("records:%v, retval:%v, path:%v", records, retval, path)
+
 	return retval, nil
 }
 
@@ -622,7 +622,7 @@ func (kd *KubeDNS) ReverseRecord(name string) (*skymsg.Service, error) {
 	glog.V(2).Infof("Received ReverseRecord Request:%s", name)
 
 	// if portalIP is not a valid IP, the reverseRecordMap lookup will fail
-	portalIP, ok := extractIP(name)
+	portalIP, ok := util.ExtractIP(name)
 	if !ok {
 		return nil, fmt.Errorf("does not support reverse lookup for %s", name)
 	}
@@ -634,19 +634,6 @@ func (kd *KubeDNS) ReverseRecord(name string) (*skymsg.Service, error) {
 	}
 
 	return nil, fmt.Errorf("must be exactly one service record")
-}
-
-// extractIP turns a standard PTR reverse record lookup name
-// into an IP address
-func extractIP(reverseName string) (string, bool) {
-	if !strings.HasSuffix(reverseName, arpaSuffix) {
-		return "", false
-	}
-	search := strings.TrimSuffix(reverseName, arpaSuffix)
-
-	// reverse the segments and then combine them
-	segments := reverseArray(strings.Split(search, "."))
-	return strings.Join(segments, "."), true
 }
 
 // e.g {"local", "cluster", "pod", "default", "10-0-0-1"}
@@ -729,7 +716,7 @@ func (kd *KubeDNS) federationRecords(queryPath []string) ([]skymsg.Service, erro
 	// `queryPath` is a reversed-array of the queried name, reverse it back to make it easy
 	// to follow through this code and reduce confusion. There is no reason for it to be
 	// reversed here.
-	path := reverseArray(queryPath)
+	path := util.ReverseArray(queryPath)
 
 	// Check if the name query matches the federation query pattern.
 	if !kd.isFederationQuery(path) {
@@ -827,14 +814,7 @@ func (kd *KubeDNS) getClusterZoneAndRegion() (string, string, error) {
 	return zone, region, nil
 }
 
-func (kd *KubeDNS) getServiceFQDN(service *kapi.Service) string {
-	return strings.Join([]string{service.Name, service.Namespace, serviceSubdomain, kd.domain}, ".")
-}
-
-func reverseArray(arr []string) []string {
-	for i := 0; i < len(arr)/2; i++ {
-		j := len(arr) - i - 1
-		arr[i], arr[j] = arr[j], arr[i]
-	}
-	return arr
+func getServiceFQDN(domain string, service *kapi.Service) string {
+	return strings.Join(
+		[]string{service.Name, service.Namespace, serviceSubdomain, domain}, ".")
 }
