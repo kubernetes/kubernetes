@@ -701,6 +701,10 @@ MANIFEST_URL_HEADER: $(yaml-quote ${MANIFEST_URL_HEADER:-})
 NUM_NODES: $(yaml-quote ${NUM_NODES})
 STORAGE_BACKEND: $(yaml-quote ${STORAGE_BACKEND:-})
 ENABLE_GARBAGE_COLLECTOR: $(yaml-quote ${ENABLE_GARBAGE_COLLECTOR:-})
+ETCD_CA_KEY: $(yaml-quote ${ETCD_CA_KEY_BASE64:-})
+ETCD_CA_CERT: $(yaml-quote ${ETCD_CA_CERT_BASE64:-})
+ETCD_PEER_KEY: $(yaml-quote ${ETCD_PEER_KEY_BASE64:-})
+ETCD_PEER_CERT: $(yaml-quote ${ETCD_PEER_CERT_BASE64:-})
 EOF
     if [ -n "${ETCD_VERSION:-}" ]; then
       cat >>$file <<EOF
@@ -914,6 +918,71 @@ function generate-certs {
     echo "=== Failed to generate certificates: Aborting ===" >&2
     exit 2
   }
+}
+
+# Generates SSL certificates for etcd cluster. Uses cfssl program.
+#
+# Assumed vars:
+#   KUBE_TEMP: temporary directory
+#
+# Args:
+#  $1: CA certificate
+#  $2: CA key
+#
+# If CA cert/key is empty, the function will also generate certs for CA.
+#
+# Vars set:
+#   ETCD_CA_KEY_BASE64
+#   ETCD_CA_CERT_BASE64
+#   ETCD_PEER_KEY_BASE64
+#   ETCD_PEER_CERT_BASE64
+#
+function create-etcd-certs {
+  local ca_cert=${1:-}
+  local ca_key=${2:-}
+
+  mkdir -p "${KUBE_TEMP}/cfssl"
+  pushd "${KUBE_TEMP}/cfssl"
+  curl -s -L -o cfssl https://pkg.cfssl.org/R1.2/cfssl_linux-amd64
+  curl -s -L -o cfssljson https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64
+  chmod +x cfssl
+  chmod +x cfssljson
+
+  cat >ca-config.json <<EOF
+{
+    "signing": {
+        "default": {
+            "expiry": "168h"
+        },
+        "profiles": {
+            "client-server": {
+                "expiry": "43800h",
+                "usages": [
+                    "signing",
+                    "key encipherment"
+                ]
+            }
+        }
+    }
+}
+EOF
+  if [[ ! -z "${ca_key}" && ! -z "${ca_cert}" ]]; then
+    echo "${ca_key}" | base64 --decode > ca-key.pem
+    echo "${ca_cert}" | base64 --decode | gunzip > ca.pem
+  else
+    ./cfssl print-defaults csr > ca-csr.json
+    ./cfssl gencert -initca ca-csr.json | ./cfssljson -bare ca -
+  fi
+
+  echo '{"CN":"'"${MASTER_NAME}"'","hosts":[""],"key":{"algo":"ecdsa","size":256}}' \
+      | ./cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=client-server -hostname="${MASTER_NAME}" - \
+      | ./cfssljson -bare etcd
+
+  ETCD_CA_KEY_BASE64=$(cat "ca-key.pem" | base64 | tr -d '\r\n')
+  ETCD_CA_CERT_BASE64=$(cat "ca.pem" | gzip | base64 | tr -d '\r\n')
+  ETCD_PEER_KEY_BASE64=$(cat "etcd-key.pem" | base64 | tr -d '\r\n')
+  ETCD_PEER_CERT_BASE64=$(cat "etcd.pem" | gzip | base64 | tr -d '\r\n')
+  popd
 }
 
 #
