@@ -26,8 +26,6 @@
 # This is where the final release artifacts are created locally
 readonly RELEASE_STAGE="${LOCAL_OUTPUT_ROOT}/release-stage"
 readonly RELEASE_DIR="${LOCAL_OUTPUT_ROOT}/release-tars"
-readonly GCS_STAGE="${LOCAL_OUTPUT_ROOT}/gcs-stage"
-
 
 # Validate a ci version
 #
