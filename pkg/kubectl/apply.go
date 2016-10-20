@@ -18,11 +18,13 @@ package kubectl
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
 
 // GetOriginalConfiguration retrieves the original configuration of the object
@@ -77,6 +79,7 @@ func SetOriginalConfiguration(info *resource.Info, original []byte) error {
 func GetModifiedConfiguration(info *resource.Info, annotate bool, codec runtime.Encoder) ([]byte, error) {
 	// First serialize the object without the annotation to prevent recursion,
 	// then add that serialization to it as the annotation and serialize it again.
+	// Recursion might happen if kubectl reads an object directly from the apiserver.
 	var modified []byte
 	if info.VersionedObject != nil {
 		// If an object was read from input, use that version.
@@ -94,6 +97,7 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool, codec runtime.
 		original := annots[annotations.LastAppliedConfigAnnotation]
 		delete(annots, annotations.LastAppliedConfigAnnotation)
 		accessor.SetAnnotations(annots)
+
 		// TODO: this needs to be abstracted - there should be no assumption that versioned object
 		// can be marshalled to JSON.
 		modified, err = json.Marshal(info.VersionedObject)
@@ -102,6 +106,7 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool, codec runtime.
 		}
 
 		if annotate {
+			// TODO(andronat): Do we want to store user's explicit null values?
 			annots[annotations.LastAppliedConfigAnnotation] = string(modified)
 			accessor.SetAnnotations(annots)
 			// TODO: this needs to be abstracted - there should be no assumption that versioned object
@@ -115,6 +120,14 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool, codec runtime.
 		// Restore the object to its original condition.
 		annots[annotations.LastAppliedConfigAnnotation] = original
 		accessor.SetAnnotations(annots)
+
+		// The Unmarshal process that loads the user configuration does not preserve the null values given by the
+		// user. For this, we merge the raw configuration file (that has null values) with the currently loaded
+		// configuration (which has extra information like annotations and empty structs). There should be no conflicts.
+		modified, err = restoreJSONNulls(modified, info.Raw, info.VersionedObject)
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		// Otherwise, use the server side version of the object.
 		accessor := info.Mapping.MetadataAccessor
@@ -187,4 +200,35 @@ func CreateOrUpdateAnnotation(createAnnotation bool, info *resource.Info, codec 
 		return CreateApplyAnnotation(info, codec)
 	}
 	return UpdateApplyAnnotation(info, codec)
+}
+
+// restoreJSONNulls is used to restore missing null values declared at the user's configuration file.
+// We do not expect conflicts.
+// TODO(andronat): Do we really need dataStruct? Is there any scenario where 'patchStrategy' might create problems?
+func restoreJSONNulls(j1, j2 []byte, dataStruct interface{}) ([]byte, error) {
+	j1Map := map[string]interface{}{}
+	if len(j1) > 0 {
+		if err := json.Unmarshal(j1, &j1Map); err != nil {
+			return nil, fmt.Errorf("Invalid JSON document")
+		}
+	}
+
+	j2Map := map[string]interface{}{}
+	if len(j2) > 0 {
+		if err := json.Unmarshal(j2, &j2Map); err != nil {
+			return nil, fmt.Errorf("Invalid JSON document")
+		}
+	}
+
+	t, err := strategicpatch.GetTagStructType(dataStruct)
+	if err != nil {
+		return nil, err
+	}
+
+	mergedMap, err := strategicpatch.MergeMap(j1Map, j2Map, t, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return json.Marshal(mergedMap)
 }

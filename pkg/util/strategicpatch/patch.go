@@ -156,7 +156,7 @@ func CreateTwoWayMergePatch(original, modified []byte, dataStruct interface{}, f
 		}
 	}
 
-	t, err := getTagStructType(dataStruct)
+	t, err := GetTagStructType(dataStruct)
 	if err != nil {
 		return nil, err
 	}
@@ -491,12 +491,12 @@ func StrategicMergePatch(original, patch []byte, dataStruct interface{}) ([]byte
 		return nil, errBadJSONDoc
 	}
 
-	t, err := getTagStructType(dataStruct)
+	t, err := GetTagStructType(dataStruct)
 	if err != nil {
 		return nil, err
 	}
 
-	result, err := mergeMap(originalMap, patchMap, t, true)
+	result, err := MergeMap(originalMap, patchMap, t, true)
 	if err != nil {
 		return nil, err
 	}
@@ -504,7 +504,7 @@ func StrategicMergePatch(original, patch []byte, dataStruct interface{}) ([]byte
 	return json.Marshal(result)
 }
 
-func getTagStructType(dataStruct interface{}) (reflect.Type, error) {
+func GetTagStructType(dataStruct interface{}) (reflect.Type, error) {
 	if dataStruct == nil {
 		return nil, fmt.Errorf(errBadArgTypeFmt, "struct", "nil")
 	}
@@ -523,13 +523,13 @@ func getTagStructType(dataStruct interface{}) (reflect.Type, error) {
 
 var errBadPatchTypeFmt = "unknown patch type: %s in map: %v"
 
-// Merge fields from a patch map into the original map. Note: This may modify
+// MergeMap merges fields from a patch map into the original map. Note: This may modify
 // both the original map and the patch because getting a deep copy of a map in
 // golang is highly non-trivial.
 // If patch contains any null field (e.g. field_1: null) that is not
 // present in original, then to propagate it to the end result use
 // ignoreUnmatchedNulls == false.
-func mergeMap(original, patch map[string]interface{}, t reflect.Type, ignoreUnmatchedNulls bool) (map[string]interface{}, error) {
+func MergeMap(original, patch map[string]interface{}, t reflect.Type, ignoreUnmatchedNulls bool) (map[string]interface{}, error) {
 	if v, ok := patch[directiveMarker]; ok {
 		if v == replaceDirective {
 			// If the patch contains "$patch: replace", don't merge it, just use the
@@ -594,7 +594,7 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type, ignoreUnma
 				typedOriginal := original[k].(map[string]interface{})
 				typedPatch := patchV.(map[string]interface{})
 				var err error
-				original[k], err = mergeMap(typedOriginal, typedPatch, fieldType, ignoreUnmatchedNulls)
+				original[k], err = MergeMap(typedOriginal, typedPatch, fieldType, ignoreUnmatchedNulls)
 				if err != nil {
 					return nil, err
 				}
@@ -712,7 +712,7 @@ func mergeSlice(original, patch []interface{}, elemType reflect.Type, mergeKey s
 			var mergedMaps interface{}
 			var err error
 			// Merge into original.
-			mergedMaps, err = mergeMap(originalMap, typedV, elemType, ignoreUnmatchedNulls)
+			mergedMaps, err = MergeMap(originalMap, typedV, elemType, ignoreUnmatchedNulls)
 			if err != nil {
 				return nil, err
 			}
@@ -1005,7 +1005,7 @@ func HasConflicts(left, right interface{}) (bool, error) {
 // strings. Since patches of the same Type have congruent keys, this is valid
 // for multiple patch types. This method supports strategic merge patch semantics.
 func MergingMapsHaveConflicts(left, right map[string]interface{}, dataStruct interface{}) (bool, error) {
-	t, err := getTagStructType(dataStruct)
+	t, err := GetTagStructType(dataStruct)
 	if err != nil {
 		return true, err
 	}
@@ -1200,7 +1200,7 @@ func CreateThreeWayMergePatch(original, modified, current []byte, dataStruct int
 		}
 	}
 
-	t, err := getTagStructType(dataStruct)
+	t, err := GetTagStructType(dataStruct)
 	if err != nil {
 		return nil, err
 	}
@@ -1219,7 +1219,7 @@ func CreateThreeWayMergePatch(original, modified, current []byte, dataStruct int
 		return nil, err
 	}
 
-	patchMap, err := mergeMap(deletionsMap, deltaMap, t, false)
+	patchMap, err := MergeMap(deletionsMap, deltaMap, t, false)
 	if err != nil {
 		return nil, err
 	}
