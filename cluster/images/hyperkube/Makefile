@@ -107,13 +107,15 @@ endif
 	curl -sSL --retry 5 https://storage.googleapis.com/kubernetes-release/network-plugins/cni-${ARCH}-${CNI_RELEASE}.tar.gz | tar -xz -C ${TEMP_DIR}/cni-bin
 
 	docker build -t ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${TEMP_DIR}
+ifeq ($(ARCH),amd64)
+	docker rmi ${REGISTRY}/hyperkube:${VERSION} || true
+	docker tag ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${REGISTRY}/hyperkube:${VERSION}
+endif
 	rm -rf "${TEMP_DIR}"
 
 push: build
 	gcloud docker -- push ${REGISTRY}/hyperkube-${ARCH}:${VERSION}
 ifeq ($(ARCH),amd64)
-	docker rmi ${REGISTRY}/hyperkube:${VERSION} || true
-	docker tag ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${REGISTRY}/hyperkube:${VERSION}
 	gcloud docker -- push ${REGISTRY}/hyperkube:${VERSION}
 endif
 
