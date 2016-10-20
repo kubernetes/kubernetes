@@ -13,8 +13,8 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "expansion_generated.go",
-        "poddisruptionbudget.go",
+        "zz_generated.eviction.go",
+        "zz_generated.poddisruptionbudget.go",
     ],
     tags = ["automanaged"],
     deps = [
