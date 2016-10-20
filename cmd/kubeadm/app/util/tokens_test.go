@@ -154,7 +154,7 @@ func TestRandBytes(t *testing.T) {
                 actual, _, err := RandBytes(rt.r)
                 if err != rt.expected {
                         t.Errorf(
-                                "failed RandBytes:\n\texpected: %t\n\t  actual: %t",
+                                "failed RandBytes:\n\texpected: %s\n\t  actual: %s",
                                 rt.expected,
                                 err,
                         )
