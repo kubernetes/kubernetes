@@ -161,10 +161,10 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 	if shouldCheckOrAssignHealthCheckNodePort(service) {
 		var healthCheckNodePort int
 		var err error
-		if l, ok := service.Annotations[apiservice.AnnotationHealthCheckNodePort]; ok {
+		if l, ok := service.Annotations[apiservice.BetaAnnotationHealthCheckNodePort]; ok {
 			healthCheckNodePort, err = strconv.Atoi(l)
 			if err != nil || healthCheckNodePort <= 0 {
-				return nil, errors.NewInternalError(fmt.Errorf("Failed to parse annotation %v: %v", apiservice.AnnotationHealthCheckNodePort, err))
+				return nil, errors.NewInternalError(fmt.Errorf("Failed to parse annotation %v: %v", apiservice.BetaAnnotationHealthCheckNodePort, err))
 			}
 		}
 		if healthCheckNodePort > 0 {
@@ -183,7 +183,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 				return nil, errors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %v", err))
 			}
 			// Insert the newly allocated health check port as an annotation (plan of record for Alpha)
-			service.Annotations[apiservice.AnnotationHealthCheckNodePort] = fmt.Sprintf("%d", healthCheckNodePort)
+			service.Annotations[apiservice.BetaAnnotationHealthCheckNodePort] = fmt.Sprintf("%d", healthCheckNodePort)
 		}
 	}
 
@@ -313,7 +313,7 @@ func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service) (boo
 				errmsg := fmt.Sprintf("Failed to allocate requested HealthCheck nodePort %v:%v",
 					requestedHealthCheckNodePort, err)
 				el := field.ErrorList{field.Invalid(field.NewPath("metadata", "annotations"),
-					apiservice.AnnotationHealthCheckNodePort, errmsg)}
+					apiservice.BetaAnnotationHealthCheckNodePort, errmsg)}
 				return false, errors.NewInvalid(api.Kind("Service"), service.Name, el)
 			}
 			glog.Infof("Reserved user requested nodePort: %d", requestedHealthCheckNodePort)
@@ -327,7 +327,7 @@ func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service) (boo
 				return false, errors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %v", err))
 			}
 			// Insert the newly allocated health check port as an annotation (plan of record for Alpha)
-			service.Annotations[apiservice.AnnotationHealthCheckNodePort] = fmt.Sprintf("%d", healthCheckNodePort)
+			service.Annotations[apiservice.BetaAnnotationHealthCheckNodePort] = fmt.Sprintf("%d", healthCheckNodePort)
 			glog.Infof("Reserved health check nodePort: %d", healthCheckNodePort)
 		}
 
@@ -338,29 +338,30 @@ func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service) (boo
 			glog.Warningf("Error releasing service health check %s node port %d: %v", service.Name, oldHealthCheckNodePort, err)
 			return false, errors.NewInternalError(fmt.Errorf("failed to free health check nodePort: %v", err))
 		} else {
-			delete(service.Annotations, apiservice.AnnotationHealthCheckNodePort)
+			delete(service.Annotations, apiservice.BetaAnnotationHealthCheckNodePort)
+			delete(service.Annotations, apiservice.AlphaAnnotationHealthCheckNodePort)
 			glog.Infof("Freed health check nodePort: %d", oldHealthCheckNodePort)
 		}
 
 	case !oldServiceHasHealthCheckNodePort && !assignHealthCheckNodePort:
-		if _, ok := service.Annotations[apiservice.AnnotationHealthCheckNodePort]; ok {
+		if _, ok := service.Annotations[apiservice.BetaAnnotationHealthCheckNodePort]; ok {
 			glog.Warningf("Attempt to insert health check node port annotation DENIED")
 			el := field.ErrorList{field.Invalid(field.NewPath("metadata", "annotations"),
-				apiservice.AnnotationHealthCheckNodePort, "Cannot insert healthcheck nodePort annotation")}
+				apiservice.BetaAnnotationHealthCheckNodePort, "Cannot insert healthcheck nodePort annotation")}
 			return false, errors.NewInvalid(api.Kind("Service"), service.Name, el)
 		}
 
 	case oldServiceHasHealthCheckNodePort && assignHealthCheckNodePort:
-		if _, ok := service.Annotations[apiservice.AnnotationHealthCheckNodePort]; !ok {
+		if _, ok := service.Annotations[apiservice.BetaAnnotationHealthCheckNodePort]; !ok {
 			glog.Warningf("Attempt to delete health check node port annotation DENIED")
 			el := field.ErrorList{field.Invalid(field.NewPath("metadata", "annotations"),
-				apiservice.AnnotationHealthCheckNodePort, "Cannot delete healthcheck nodePort annotation")}
+				apiservice.BetaAnnotationHealthCheckNodePort, "Cannot delete healthcheck nodePort annotation")}
 			return false, errors.NewInvalid(api.Kind("Service"), service.Name, el)
 		}
 		if oldHealthCheckNodePort != requestedHealthCheckNodePort {
 			glog.Warningf("Attempt to change value of health check node port annotation DENIED")
 			el := field.ErrorList{field.Invalid(field.NewPath("metadata", "annotations"),
-				apiservice.AnnotationHealthCheckNodePort, "Cannot change healthcheck nodePort during update")}
+				apiservice.BetaAnnotationHealthCheckNodePort, "Cannot change healthcheck nodePort during update")}
 			return false, errors.NewInvalid(api.Kind("Service"), service.Name, el)
 		}
 	}
