@@ -461,6 +461,13 @@ var _ = framework.KubeDescribe("Density", func() {
 		name := fmt.Sprintf("[Feature:%s] should allow starting %d pods per node", feature, testArg.podsPerNode)
 		itArg := testArg
 		It(name, func() {
+			nodePreparer := framework.NewE2ETestNodePreparer(
+				f.ClientSet,
+				map[int]testutils.PrepareNodeStrategy{nodeCount: &testutils.TrivialNodePrepareStrategy{}},
+			)
+			framework.ExpectNoError(nodePreparer.PrepareNodes())
+			defer nodePreparer.CleanupNodes()
+
 			podsPerNode := itArg.podsPerNode
 			if podsPerNode == 30 {
 				f.AddonResourceConstraints = func() map[string]framework.ResourceConstraint { return density30AddonResourceVerifier(nodeCount) }()
