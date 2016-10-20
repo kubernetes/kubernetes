@@ -257,7 +257,6 @@ func TestParseClassParameters(t *testing.T) {
 		{
 			"password",
 			map[string]string{
-				"endpoint":    "endpointname",
 				"resturl":     "https://localhost:8080",
 				"restuser":    "admin",
 				"restuserkey": "password",
@@ -265,7 +264,6 @@ func TestParseClassParameters(t *testing.T) {
 			nil,   // secret
 			false, // expect error
 			&provisioningConfig{
-				endpoint:    "endpointname",
 				url:         "https://localhost:8080",
 				user:        "admin",
 				userKey:     "password",
@@ -275,7 +273,6 @@ func TestParseClassParameters(t *testing.T) {
 		{
 			"secret",
 			map[string]string{
-				"endpoint":        "endpointname",
 				"resturl":         "https://localhost:8080",
 				"restuser":        "admin",
 				"secretname":      "mysecret",
@@ -284,7 +281,6 @@ func TestParseClassParameters(t *testing.T) {
 			&secret,
 			false, // expect error
 			&provisioningConfig{
-				endpoint:        "endpointname",
 				url:             "https://localhost:8080",
 				user:            "admin",
 				secretName:      "mysecret",
@@ -295,21 +291,18 @@ func TestParseClassParameters(t *testing.T) {
 		{
 			"no authentication",
 			map[string]string{
-				"endpoint":        "endpointname",
 				"resturl":         "https://localhost:8080",
 				"restauthenabled": "false",
 			},
 			&secret,
 			false, // expect error
 			&provisioningConfig{
-				endpoint: "endpointname",
-				url:      "https://localhost:8080",
+				url: "https://localhost:8080",
 			},
 		},
 		{
 			"missing secret",
 			map[string]string{
-				"endpoint":        "endpointname",
 				"resturl":         "https://localhost:8080",
 				"secretname":      "mysecret",
 				"secretnamespace": "default",
@@ -321,7 +314,6 @@ func TestParseClassParameters(t *testing.T) {
 		{
 			"secret with no namespace",
 			map[string]string{
-				"endpoint":   "endpointname",
 				"resturl":    "https://localhost:8080",
 				"secretname": "mysecret",
 			},
@@ -332,18 +324,6 @@ func TestParseClassParameters(t *testing.T) {
 		{
 			"missing url",
 			map[string]string{
-				"endpoint":    "endpointname",
-				"restuser":    "admin",
-				"restuserkey": "password",
-			},
-			nil,  // secret
-			true, // expect error
-			nil,
-		},
-		{
-			"missing endpoint",
-			map[string]string{
-				"resturl":     "https://localhost:8080",
 				"restuser":    "admin",
 				"restuserkey": "password",
 			},
