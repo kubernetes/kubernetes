@@ -10380,11 +10380,6 @@
       "type": "string",
       "description": "Status of the condition, one of True, False, Unknown."
      },
-     "lastProbeTime": {
-      "type": "string",
-      "format": "date-time",
-      "description": "Last time we probed the condition."
-     },
      "lastTransitionTime": {
       "type": "string",
       "format": "date-time",
