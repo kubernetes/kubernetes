@@ -170,8 +170,9 @@ func Convert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *DeploymentS
 	}
 
 	if in.Selector != nil {
-		out.Selector = new(unversioned.LabelSelector)
-		if err := Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in.Selector, out.Selector, s); err != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = new(unversioned.LabelSelector)
+		if err := s.Convert(*in, *out, 0); err != nil {
 			return err
 		}
 	} else {
@@ -273,8 +274,9 @@ func Convert_v1beta1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(in *ReplicaSetS
 	}
 	out.MinReadySeconds = in.MinReadySeconds
 	if in.Selector != nil {
-		out.Selector = new(unversioned.LabelSelector)
-		if err := Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in.Selector, out.Selector, s); err != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = new(unversioned.LabelSelector)
+		if err := s.Convert(*in, *out, 0); err != nil {
 			return err
 		}
 	} else {
