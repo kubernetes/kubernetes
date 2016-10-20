@@ -29,7 +29,7 @@ import (
 type Config struct {
 	// The queue for your objects; either a FIFO or
 	// a DeltaFIFO. Your Process() function should accept
-	// the output of this Oueue's Pop() method.
+	// the output of this Queue's Pop() method.
 	Queue
 
 	// Something that can list and watch your objects.
@@ -121,6 +121,11 @@ func (c *Controller) Requeue(obj interface{}) error {
 // TODO: Consider doing the processing in parallel. This will require a little thought
 // to make sure that we don't end up processing the same object multiple times
 // concurrently.
+//
+// TODO: Plumb through the stopCh here (and down to the queue) so that this can
+// actually exit when the controller is stopped. Or just give up on this stuff
+// ever being stoppable. Converting this whole package to use Context would
+// also be helpful.
 func (c *Controller) processLoop() {
 	for {
 		obj, err := c.config.Queue.Pop(PopProcessFunc(c.config.Process))
@@ -134,7 +139,7 @@ func (c *Controller) processLoop() {
 }
 
 // ResourceEventHandler can handle notifications for events that happen to a
-// resource.  The events are informational only, so you can't return an
+// resource. The events are informational only, so you can't return an
 // error.
 //  * OnAdd is called when an object is added.
 //  * OnUpdate is called when an object is modified. Note that oldObj is the

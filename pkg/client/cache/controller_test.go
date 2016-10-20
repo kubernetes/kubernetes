@@ -283,6 +283,9 @@ func TestHammerController(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 	close(stop)
 
+	// TODO: Verify that no goroutines were leaked here and that everything shut
+	// down cleanly.
+
 	outputSetLock.Lock()
 	t.Logf("got: %#v", outputSet)
 }
