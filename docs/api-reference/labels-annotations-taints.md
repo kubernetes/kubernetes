@@ -44,6 +44,7 @@ This document serves both as a reference to the values, and as a coordination po
   - [beta.kubernetes.io/instance-type](#betakubernetesioinstance-type)
   - [failure-domain.beta.kubernetes.io/region](#failure-domainbetakubernetesioregion)
   - [failure-domain.beta.kubernetes.io/zone](#failure-domainbetakubernetesiozone)
+  - [`dedicated` taint](#dedicated-taint)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -130,6 +131,19 @@ If `PersistentVolumeLabel` does not support automatic labeling of your Persisten
 adding the labels manually (or adding support to `PersistentVolumeLabel`), if you want the scheduler to prevent
 pods from mounting volumes in a different zone.  If your infrastructure doesn't have this constraint, you don't
 need to add the zone labels to the volumes at all.
+
+
+## `dedicated` taint
+
+Some installation methods (kops, kubeadm) will taint masters (typically instead of marking master nodes unschedulable).
+This allows for pods (with the correct toleration) to run on master nodes, which allows management of
+system services through the API and `kubectl apply`, instead of relying on static pods and the kube-addons manager.
+
+Example:
+
+```
+scheduler.alpha.kubernetes.io/taints: '[{"key":"dedicated","value":"master","effect":"NoSchedule"}]'
+```
 
 
 
