@@ -228,6 +228,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	}
 
 	masterConfig.GenericConfig.LoopbackClientConfig.BearerToken = privilegedLoopbackToken
+	masterConfig.GenericConfig = masterConfig.GenericConfig.Complete().Config
 
 	m, err := masterConfig.Complete().New()
 	if err != nil {
@@ -344,7 +345,7 @@ func NewMasterConfig() *master.Config {
 		"",
 		NewSingleContentTypeSerializer(api.Scheme, testapi.Storage.Codec(), runtime.ContentTypeJSON))
 
-	genericConfig := genericapiserver.NewConfig().Complete().Config
+	genericConfig := genericapiserver.NewConfig()
 	kubeVersion := version.Get()
 	genericConfig.Version = &kubeVersion
 	genericConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
