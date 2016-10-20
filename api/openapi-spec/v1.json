@@ -14686,10 +14686,6 @@
      "status"
     ],
     "properties": {
-     "lastProbeTime": {
-      "description": "Last time we probed the condition.",
-      "$ref": "#/definitions/unversioned.Time"
-     },
      "lastTransitionTime": {
       "description": "The last time the condition transitioned from one status to another.",
       "$ref": "#/definitions/unversioned.Time"
