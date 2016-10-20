@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"sync"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/util/workqueue"
 
 	"github.com/golang/glog"
 )
@@ -670,4 +672,155 @@ func DoCleanupNode(client clientset.Interface, nodeName string, strategy Prepare
 		time.Sleep(100 * time.Millisecond)
 	}
 	return fmt.Errorf("To many conflicts when trying to cleanup Node %v", nodeName)
+}
+
+type TestPodCreateStrategy func(client clientset.Interface, namespace string, podCount int) error
+
+type CountToPodStrategy struct {
+	Count    int
+	Strategy TestPodCreateStrategy
+}
+
+type TestPodCreatorConfig map[string][]CountToPodStrategy
+
+func NewTestPodCreatorConfig() *TestPodCreatorConfig {
+	config := make(TestPodCreatorConfig)
+	return &config
+}
+
+func (c *TestPodCreatorConfig) AddStrategy(
+	namespace string, podCount int, strategy TestPodCreateStrategy) {
+	(*c)[namespace] = append((*c)[namespace], CountToPodStrategy{Count: podCount, Strategy: strategy})
+}
+
+type TestPodCreator struct {
+	Client clientset.Interface
+	// namespace -> count -> strategy
+	Config *TestPodCreatorConfig
+}
+
+func NewTestPodCreator(client clientset.Interface, config *TestPodCreatorConfig) *TestPodCreator {
+	return &TestPodCreator{
+		Client: client,
+		Config: config,
+	}
+}
+
+func (c *TestPodCreator) CreatePods() error {
+	for ns, v := range *(c.Config) {
+		for _, countToStrategy := range v {
+			if err := countToStrategy.Strategy(c.Client, ns, countToStrategy.Count); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func makePodSpec() api.PodSpec {
+	return api.PodSpec{
+		Containers: []api.Container{{
+			Name:  "pause",
+			Image: "kubernetes/pause",
+			Ports: []api.ContainerPort{{ContainerPort: 80}},
+			Resources: api.ResourceRequirements{
+				Limits: api.ResourceList{
+					api.ResourceCPU:    resource.MustParse("100m"),
+					api.ResourceMemory: resource.MustParse("500Mi"),
+				},
+				Requests: api.ResourceList{
+					api.ResourceCPU:    resource.MustParse("100m"),
+					api.ResourceMemory: resource.MustParse("500Mi"),
+				},
+			},
+		}},
+	}
+}
+
+func makeCreatePod(client clientset.Interface, namespace string, podTemplate *api.Pod) error {
+	var err error
+	for attempt := 0; attempt < retries; attempt++ {
+		if _, err := client.Core().Pods(namespace).Create(podTemplate); err == nil {
+			return nil
+		}
+		glog.Errorf("Error while creating pod, maybe retry: %v", err)
+	}
+	return fmt.Errorf("Terminal error while creating pod, won't retry: %v", err)
+}
+
+func createPod(client clientset.Interface, namespace string, podCount int, podTemplate *api.Pod) error {
+	var createError error
+	lock := sync.Mutex{}
+	createPodFunc := func(i int) {
+		if err := makeCreatePod(client, namespace, podTemplate); err != nil {
+			lock.Lock()
+			defer lock.Unlock()
+			createError = err
+		}
+	}
+
+	if podCount < 30 {
+		workqueue.Parallelize(podCount, podCount, createPodFunc)
+	} else {
+		workqueue.Parallelize(30, podCount, createPodFunc)
+	}
+	return createError
+}
+
+func createController(client clientset.Interface, controllerName, namespace string, podCount int, podTemplate *api.Pod) error {
+	rc := &api.ReplicationController{
+		ObjectMeta: api.ObjectMeta{
+			Name: controllerName,
+		},
+		Spec: api.ReplicationControllerSpec{
+			Replicas: int32(podCount),
+			Selector: map[string]string{"name": controllerName},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{"name": controllerName},
+				},
+				Spec: podTemplate.Spec,
+			},
+		},
+	}
+	var err error
+	for attempt := 0; attempt < retries; attempt++ {
+		if _, err := client.Core().ReplicationControllers(namespace).Create(rc); err == nil {
+			return nil
+		}
+		glog.Errorf("Error while creating rc, maybe retry: %v", err)
+	}
+	return fmt.Errorf("Terminal error while creating rc, won't retry: %v", err)
+}
+
+func NewCustomCreatePodStrategy(podTemplate *api.Pod) TestPodCreateStrategy {
+	return func(client clientset.Interface, namespace string, podCount int) error {
+		return createPod(client, namespace, podCount, podTemplate)
+	}
+}
+
+func NewSimpleCreatePodStrategy() TestPodCreateStrategy {
+	basePod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			GenerateName: "simple-pod-",
+		},
+		Spec: makePodSpec(),
+	}
+	return NewCustomCreatePodStrategy(basePod)
+}
+
+func NewSimpleWithControllerCreatePodStrategy(controllerName string) TestPodCreateStrategy {
+	return func(client clientset.Interface, namespace string, podCount int) error {
+		basePod := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				GenerateName: controllerName + "-pod-",
+				Labels:       map[string]string{"name": controllerName},
+			},
+			Spec: makePodSpec(),
+		}
+		if err := createController(client, controllerName, namespace, podCount, basePod); err != nil {
+			return err
+		}
+		return createPod(client, namespace, podCount, basePod)
+	}
 }
