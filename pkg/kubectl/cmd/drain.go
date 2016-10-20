@@ -20,15 +20,19 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"reflect"
 	"strings"
 	"time"
 
+	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/fields"
@@ -49,6 +53,7 @@ type DrainOptions struct {
 	GracePeriodSeconds int
 	IgnoreDaemonsets   bool
 	Timeout            time.Duration
+	backOff            clockwork.Clock
 	DeleteLocalData    bool
 	mapper             meta.RESTMapper
 	nodeInfo           *resource.Info
@@ -154,7 +159,7 @@ var (
 )
 
 func NewCmdDrain(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &DrainOptions{factory: f, out: out}
+	options := &DrainOptions{factory: f, out: out, backOff: clockwork.NewRealClock()}
 
 	cmd := &cobra.Command{
 		Use:     "drain NODE",
@@ -224,16 +229,43 @@ func (o *DrainOptions) RunDrain() error {
 		return err
 	}
 
+	err := o.deletePodsSimple()
+	// TODO: update IsTooManyRequests() when the TooManyRequests(429) error returned from the API server has a non-empty Reason field
+	for i := 1; i <= maxPatchRetry && apierrors.IsTooManyRequests(err); i++ {
+		if i > triesBeforeBackOff {
+			currBackOffPeriod := time.Duration(math.Exp2(float64(i-triesBeforeBackOff))) * backOffPeriod
+			fmt.Fprintf(o.out, "Retry in %v\n", currBackOffPeriod)
+			o.backOff.Sleep(currBackOffPeriod)
+		}
+		fmt.Fprintf(o.out, "Retrying\n")
+		err = o.deletePodsSimple()
+	}
+	if err == nil {
+		cmdutil.PrintSuccess(o.mapper, false, o.out, "node", o.nodeInfo.Name, false, "drained")
+	}
+	return err
+}
+
+func (o *DrainOptions) deletePodsSimple() error {
 	pods, err := o.getPodsForDeletion()
 	if err != nil {
 		return err
 	}
-
-	if err = o.deletePods(pods); err != nil {
-		return err
+	if o.Timeout == 0 {
+		o.Timeout = kubectl.Timeout + time.Duration(10*len(pods))*time.Second
 	}
-	cmdutil.PrintSuccess(o.mapper, false, o.out, "node", o.nodeInfo.Name, false, "drained")
-	return nil
+	err = o.deletePods(pods)
+	if err != nil {
+		pendingPods, newErr := o.getPodsForDeletion()
+		if newErr != nil {
+			return newErr
+		}
+		fmt.Fprintf(o.out, "There are pending pods when an error occured: %v\n", err)
+		for _, pendindPod := range pendingPods {
+			cmdutil.PrintSuccess(o.mapper, true, o.out, "pod", pendindPod.Name, false, "")
+		}
+	}
+	return err
 }
 
 func (o *DrainOptions) getController(sr *api.SerializedReference) (interface{}, error) {
@@ -246,6 +278,8 @@ func (o *DrainOptions) getController(sr *api.SerializedReference) (interface{}, 
 		return o.client.Batch().Jobs(sr.Reference.Namespace).Get(sr.Reference.Name)
 	case "ReplicaSet":
 		return o.client.Extensions().ReplicaSets(sr.Reference.Namespace).Get(sr.Reference.Name)
+	case "PetSet":
+		return o.client.Apps().PetSets(sr.Reference.Namespace).Get(sr.Reference.Name)
 	}
 	return nil, fmt.Errorf("Unknown controller kind %q", sr.Reference.Kind)
 }
@@ -388,32 +422,127 @@ func (o *DrainOptions) getPodsForDeletion() (pods []api.Pod, err error) {
 	return pods, nil
 }
 
-// deletePods deletes the pods on the api server
-func (o *DrainOptions) deletePods(pods []api.Pod) error {
-	deleteOptions := api.DeleteOptions{}
+func (o *DrainOptions) evictPod(pod api.Pod) error {
+	deleteOptions := &api.DeleteOptions{}
 	if o.GracePeriodSeconds >= 0 {
 		gracePeriodSeconds := int64(o.GracePeriodSeconds)
 		deleteOptions.GracePeriodSeconds = &gracePeriodSeconds
 	}
+	eviction := &policy.Eviction{
+		TypeMeta: unversioned.TypeMeta{
+			APIVersion: "policy/v1alpha1",
+			Kind:       "Eviction",
+		},
+		ObjectMeta: api.ObjectMeta{
+			Name:      pod.Name,
+			Namespace: pod.Namespace,
+		},
+		DeleteOptions: deleteOptions,
+	}
+	return o.client.Policy().Evictions(eviction.Namespace).Evict(eviction)
+}
 
-	for _, pod := range pods {
-		err := o.client.Core().Pods(pod.Namespace).Delete(pod.Name, &deleteOptions)
-		if err != nil {
+// deletePods deletes the pods on the api server
+func (o *DrainOptions) deletePods(pods []api.Pod) error {
+	pods, nameToPets, err := o.filterPetsets(pods)
+
+	doneCh := make(chan bool, len(nameToPets)+1)
+	errCh := make(chan error, 1)
+
+	go o.deleteRegularPods(pods, doneCh, errCh)
+	for name := range nameToPets {
+		go o.deletePets(nameToPets[name], doneCh, errCh)
+	}
+
+	doneCount := 0
+	for {
+		select {
+		case err = <-errCh:
 			return err
+		case <-doneCh:
+			doneCount++
+			if doneCount == len(nameToPets)+1 {
+				return nil
+			}
+		case <-time.After(o.Timeout):
+			return fmt.Errorf("Drain did not complete within %v", o.Timeout)
+		}
+	}
+	return nil
+}
+
+func (o *DrainOptions) deleteRegularPods(pods []api.Pod, doneCh chan bool, errCh chan error) {
+	if len(pods) == 0 {
+		doneCh <- true
+		return
+	}
+	for _, pod := range pods {
+		err := o.evictPod(pod)
+		if err != nil {
+			errCh <- err
+			return
 		}
 	}
 
 	getPodFn := func(namespace, name string) (*api.Pod, error) {
 		return o.client.Core().Pods(namespace).Get(name)
 	}
-	pendingPods, err := o.waitForDelete(pods, kubectl.Interval, o.Timeout, getPodFn)
+	_, err := o.waitForDelete(pods, kubectl.Interval, o.Timeout, getPodFn)
 	if err != nil {
-		fmt.Fprintf(o.out, "There are pending pods when an error occured:\n")
-		for _, pendindPod := range pendingPods {
-			cmdutil.PrintSuccess(o.mapper, true, o.out, "pod", pendindPod.Name, false, "")
+		errCh <- err
+		return
+	}
+	doneCh <- true
+}
+
+func (o *DrainOptions) deletePets(pets []api.Pod, doneCh chan bool, errCh chan error) {
+	if len(pets) == 0 {
+		doneCh <- true
+		return
+	}
+	for _, pet := range pets {
+		err := o.evictPod(pet)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		err = wait.PollImmediate(kubectl.Interval, o.Timeout, func() (bool, error) {
+			p, err := o.client.Core().Pods(pet.Namespace).Get(pet.Name)
+			if err == nil && p != nil && p.ObjectMeta.UID != pet.ObjectMeta.UID && p.Status.Phase == api.PodRunning {
+				return true, nil
+			} else if apierrors.IsNotFound(err) {
+				return false, nil
+			} else {
+				return false, err
+			}
+		})
+		if err != nil {
+			errCh <- err
+			return
 		}
 	}
-	return err
+	doneCh <- true
+}
+
+func (o *DrainOptions) filterPetsets(pods []api.Pod) ([]api.Pod, map[string][]api.Pod, error) {
+	nonpets := []api.Pod{}
+	nameToPets := make(map[string][]api.Pod)
+	for _, pod := range pods {
+		sr, err := o.getPodCreator(pod)
+		if err != nil {
+			return nonpets, nameToPets, err
+		}
+		if sr.Reference.Kind == "PetSet" {
+			if pets, ok := nameToPets[sr.Reference.Name]; ok {
+				nameToPets[sr.Reference.Name] = append(pets, pod)
+			} else {
+				nameToPets[sr.Reference.Name] = []api.Pod{pod}
+			}
+		} else {
+			nonpets = append(nonpets, pod)
+		}
+	}
+	return nonpets, nameToPets, nil
 }
 
 func (o *DrainOptions) waitForDelete(pods []api.Pod, interval, timeout time.Duration, getPodFn func(namespace, name string) (*api.Pod, error)) ([]api.Pod, error) {

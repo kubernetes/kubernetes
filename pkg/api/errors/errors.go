@@ -413,6 +413,16 @@ func IsInternalError(err error) bool {
 	return reasonForError(err) == unversioned.StatusReasonInternalError
 }
 
+// IsTooManyRequests determines if err is an error which indicates that there are too many requests
+// that the server cannot handle.
+func IsTooManyRequests(err error) bool {
+	switch t := err.(type) {
+	case APIStatus:
+		return t.Status().Code == StatusTooManyRequests
+	}
+	return false
+}
+
 // IsUnexpectedServerError returns true if the server response was not in the expected API format,
 // and may be the result of another HTTP actor.
 func IsUnexpectedServerError(err error) bool {
