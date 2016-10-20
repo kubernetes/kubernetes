@@ -7,23 +7,20 @@
   "spec": {
     "containers": [
       {
-        "name": "curl",
-        "image": "tutum/curl:trusty",
-        "args": [
-          "bash"
-        ],
+        "name": "busybox",
+        "image": "busybox",
         "stdin": true,
         "stdinOnce": true,
         "tty": true,
         "volumeMounts": [{
-          "mountPath": "/usr/local/bin/kubectl",
+          "mountPath": "/usr/bin/kubectl",
           "name": "kubectl"
         }]
       }
     ],
     "volumes": [{
       "name":"kubectl",
-      "hostPath":{"path": "/usr/local/bin/kubectl"}
+      "hostPath":{"path": "/usr/bin/kubectl"}
     }]
   }
 }
