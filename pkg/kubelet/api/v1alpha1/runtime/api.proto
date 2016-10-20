@@ -138,7 +138,9 @@ message PodSecurityContext {
     // The configurations for the sandbox's namespaces.
     // This will be used only if the PodSandbox uses namespace for isolation.
     optional NamespaceOption namespace_options = 2;
-    // Optional SELinux context to be applied.
+    // Optional SELinux context to be applied. If set in both SecurityContext
+	// and PodSecurityContext, the value specified in SecurityContext takes
+	// precedence for the container.
     optional SELinuxOption selinux_options = 3;
     // The UID to run the entrypoint of the container process.
     // Defaults to user specified in image metadata if unspecified.
@@ -157,7 +159,7 @@ message PodSecurityContext {
     // A list of groups applied to the first process run in each container, in addition
     // to the container's primary GID.  If unspecified, no groups will be added to
     // any container.
-    repeated int64 supplement_groups = 7;
+    repeated int64 supplemental_groups = 7;
     // A special supplemental group that applies to all containers in a pod.
     // Some volume types allow the Kubelet to change the ownership of that volume
     // to be owned by the pod:
@@ -437,11 +439,12 @@ message SecurityContext {
     // Capabilities to add or drop.
     optional Capability capabilities = 1;
     // If set, run container in privileged mode.
-    // Processes in privileged containers are essentially equivalent to root on the host.
     optional bool privileged = 2;
-    // Optional SELinux context to be applied.
+    // Optional SELinux context to be applied. If set in both SecurityContext
+	// and PodSecurityContext, the value specified in SecurityContext takes
+	// precedence for the container.
     optional SELinuxOption selinux_options = 3;
-    // The UID to run the entrypoint of the container process.
+    // The UID to run the the container process.
     // Defaults to user specified in image metadata if unspecified.
     // May also be set in PodSecurityContext.  If set in both SecurityContext and
     // PodSecurityContext, the value specified here takes precedence.

@@ -21,7 +21,7 @@ import (
 	"strconv"
 
 	dockercontainer "github.com/docker/engine-api/types/container"
-	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
 const (
@@ -32,13 +32,13 @@ const (
 )
 
 // applySandboxSecurityContext updates docker sandbox options according to security context.
-func applySandboxSecurityContext(podSc *runtimeApi.PodSecurityContext, config *dockercontainer.Config, hc *dockercontainer.HostConfig) {
+func applySandboxSecurityContext(podSc *runtimeapi.PodSecurityContext, config *dockercontainer.Config, hc *dockercontainer.HostConfig) {
 	modifyContainerConfig(nil, podSc, config)
 	modifyHostConfig(nil, podSc, hc, true)
 }
 
 // applyContainerSecurityContext updates docker container options according to security context.
-func applyContainerSecurityContext(podSc *runtimeApi.LinuxPodSandboxConfig, lc *runtimeApi.LinuxContainerConfig, config *dockercontainer.Config, hc *dockercontainer.HostConfig) {
+func applyContainerSecurityContext(podSc *runtimeapi.LinuxPodSandboxConfig, lc *runtimeapi.LinuxContainerConfig, config *dockercontainer.Config, hc *dockercontainer.HostConfig) {
 	if podSc == nil && lc == nil {
 		return
 	}
@@ -60,7 +60,7 @@ func applyContainerSecurityContext(podSc *runtimeApi.LinuxPodSandboxConfig, lc *
 }
 
 // modifyContainerConfig applies security context config to dockercontainer.Config.
-func modifyContainerConfig(sc *runtimeApi.SecurityContext, podSc *runtimeApi.PodSecurityContext, config *dockercontainer.Config) {
+func modifyContainerConfig(sc *runtimeapi.SecurityContext, podSc *runtimeapi.PodSecurityContext, config *dockercontainer.Config) {
 	effectiveSC := determineEffectiveSecurityContext(podSc, sc)
 	if effectiveSC == nil {
 		return
@@ -71,7 +71,7 @@ func modifyContainerConfig(sc *runtimeApi.SecurityContext, podSc *runtimeApi.Pod
 }
 
 // modifyHostConfig applies security context config to dockercontainer.HostConfig.
-func modifyHostConfig(sc *runtimeApi.SecurityContext, podSc *runtimeApi.PodSecurityContext, hostConfig *dockercontainer.HostConfig, isSandbox bool) {
+func modifyHostConfig(sc *runtimeapi.SecurityContext, podSc *runtimeapi.PodSecurityContext, hostConfig *dockercontainer.HostConfig, isSandbox bool) {
 	// Apply supplemental groups
 	// TODO: We skip application of supplemental groups to the
 	// sandbox container to work around a runc issue which
@@ -81,7 +81,7 @@ func modifyHostConfig(sc *runtimeApi.SecurityContext, podSc *runtimeApi.PodSecur
 	// This can be removed once the fix makes it into the
 	// required version of docker.
 	if !isSandbox && podSc != nil {
-		for _, group := range podSc.SupplementGroups {
+		for _, group := range podSc.SupplementalGroups {
 			hostConfig.GroupAdd = append(hostConfig.GroupAdd, strconv.FormatInt(group, 10))
 		}
 		if podSc.FsGroup != nil {
@@ -141,7 +141,7 @@ func MakeCapabilities(capAdd []string, capDrop []string) ([]string, []string) {
 	return addCaps, dropCaps
 }
 
-func determineEffectiveSecurityContext(podSc *runtimeApi.PodSecurityContext, sc *runtimeApi.SecurityContext) *runtimeApi.SecurityContext {
+func determineEffectiveSecurityContext(podSc *runtimeapi.PodSecurityContext, sc *runtimeapi.SecurityContext) *runtimeapi.SecurityContext {
 	effectiveSc := securityContextFromPodSecurityContext(podSc)
 	if effectiveSc == nil && sc == nil {
 		return nil
@@ -180,12 +180,12 @@ func determineEffectiveSecurityContext(podSc *runtimeApi.PodSecurityContext, sc 
 	return effectiveSc
 }
 
-func securityContextFromPodSecurityContext(podSc *runtimeApi.PodSecurityContext) *runtimeApi.SecurityContext {
+func securityContextFromPodSecurityContext(podSc *runtimeapi.PodSecurityContext) *runtimeapi.SecurityContext {
 	if podSc == nil {
 		return nil
 	}
 
-	synthesized := &runtimeApi.SecurityContext{}
+	synthesized := &runtimeapi.SecurityContext{}
 	if podSc.SelinuxOptions != nil {
 		synthesized.SelinuxOptions = podSc.SelinuxOptions
 	}
