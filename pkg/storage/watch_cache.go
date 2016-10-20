@@ -245,8 +245,10 @@ func (w *watchCache) List() []interface{} {
 	return w.store.List()
 }
 
-// WaitUntilFreshAndList returns list of pointers to <storeElement> objects.
-func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, trace *util.Trace) ([]interface{}, uint64, error) {
+// waitUntilFreshAndBlock waits until cache is at least as fresh as given <resourceVersion>.
+// NOTE: This function acquired lock and doesn't release it.
+// You HAVE TO explicitly call w.RUnlock() after this function.
+func (w *watchCache) waitUntilFreshAndBlock(resourceVersion uint64, trace *util.Trace) error {
 	startTime := w.clock.Now()
 	go func() {
 		// Wake us up when the time limit has expired.  The docs
@@ -261,20 +263,40 @@ func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, trace *util.T
 	}()
 
 	w.RLock()
-	defer w.RUnlock()
 	if trace != nil {
 		trace.Step("watchCache locked acquired")
 	}
 	for w.resourceVersion < resourceVersion {
 		if w.clock.Since(startTime) >= MaximumListWait {
-			return nil, 0, fmt.Errorf("time limit exceeded while waiting for resource version %v (current value: %v)", resourceVersion, w.resourceVersion)
+			return fmt.Errorf("time limit exceeded while waiting for resource version %v (current value: %v)", resourceVersion, w.resourceVersion)
 		}
 		w.cond.Wait()
 	}
 	if trace != nil {
 		trace.Step("watchCache fresh enough")
 	}
+	return nil
+}
+
+// WaitUntilFreshAndList returns list of pointers to <storeElement> objects.
+func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, trace *util.Trace) ([]interface{}, uint64, error) {
+	err := w.waitUntilFreshAndBlock(resourceVersion, trace)
+	defer w.RUnlock()
+	if err != nil {
+		return nil, 0, err
+	}
 	return w.store.List(), w.resourceVersion, nil
+}
+
+// WaitUntilFreshAndGet returns a pointers to <storeElement> object.
+func (w *watchCache) WaitUntilFreshAndGet(resourceVersion uint64, key string, trace *util.Trace) (interface{}, bool, uint64, error) {
+	err := w.waitUntilFreshAndBlock(resourceVersion, trace)
+	defer w.RUnlock()
+	if err != nil {
+		return nil, false, 0, err
+	}
+	value, exists, err := w.store.GetByKey(key)
+	return value, exists, w.resourceVersion, err
 }
 
 func (w *watchCache) ListKeys() []string {
