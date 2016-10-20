@@ -110,8 +110,8 @@ func TestDoRequestCreated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	created := false
-	body, err := c.Get().Prefix("test").Do().WasCreated(&created).Raw()
+	var statusCode int
+	body, err := c.Get().Prefix("test").Do().StatusCode(&statusCode).Raw()
 
 	testParam := TestParam{actualError: err, expectingError: false, expCreated: true,
 		expStatus: status, testBody: false}
@@ -125,8 +125,8 @@ func TestDoRequestNotCreated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	created := false
-	body, err := c.Get().Prefix("test").Do().WasCreated(&created).Raw()
+	var statusCode int
+	body, err := c.Get().Prefix("test").Do().StatusCode(&statusCode).Raw()
 	testParam := TestParam{actualError: err, expectingError: false, expCreated: false,
 		expStatus: expectedStatus, testBody: false}
 	validate(testParam, t, body, fakeHandler)
@@ -140,8 +140,8 @@ func TestDoRequestAcceptedNoContentReturned(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	created := false
-	body, err := c.Get().Prefix("test").Do().WasCreated(&created).Raw()
+	var statusCode int
+	body, err := c.Get().Prefix("test").Do().StatusCode(&statusCode).Raw()
 	testParam := TestParam{actualError: err, expectingError: false, expCreated: false,
 		testBody: false}
 	validate(testParam, t, body, fakeHandler)
@@ -154,8 +154,8 @@ func TestBadRequest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	created := false
-	body, err := c.Get().Prefix("test").Do().WasCreated(&created).Raw()
+	var statusCode int
+	body, err := c.Get().Prefix("test").Do().StatusCode(&statusCode).Raw()
 	testParam := TestParam{actualError: err, expectingError: true, expCreated: false,
 		testBody: true}
 	validate(testParam, t, body, fakeHandler)
