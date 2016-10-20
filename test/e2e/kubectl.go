@@ -476,6 +476,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 
 	framework.KubeDescribe("Kubectl should be able to talk to api server", func() {
 		It("kubectl runing in a pod should talk to api server [Conformance]", func() {
+			framework.SkipUnlessProviderIs("gce", "gke")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			podJson := readTestFileOrDie(kubectlInPodFilename)
 			By("validating api verions")
