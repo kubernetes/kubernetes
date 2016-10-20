@@ -4535,6 +4535,7 @@ func NewE2ETestNodePreparer(client clientset.Interface, countToStrategy map[int]
 }
 
 func (p *E2ETestNodePreparer) PrepareNodes() error {
+	glog.Infof("p.client: %p", p.client)
 	nodes := GetReadySchedulableNodesOrDie(p.client)
 	numTemplates := 0
 	for k := range p.countToStrategy {
