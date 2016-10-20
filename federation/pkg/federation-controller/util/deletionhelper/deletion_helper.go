@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api"
+	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/runtime"
 
@@ -95,13 +96,13 @@ func (dh *DeletionHelper) HandleFederatedDependents(obj runtime.Object) (
 		glog.V(2).Infof("obj does not have %s finalizer. Nothing to do", FinalizerDeleteFederatedDependents)
 		return obj, nil
 	}
-	hasOrphanFinalizer := dh.hasFinalizerFunc(obj, api.FinalizerOrphan)
+	hasOrphanFinalizer := dh.hasFinalizerFunc(obj, api_v1.FinalizerOrphan)
 	if hasOrphanFinalizer {
 		glog.V(3).Infof("Found finalizer orphan. Nothing to do, just remove the finalizer")
 		// If the obj has FinalizerOrphan finalizer, then we need to orphan the
 		// corresponding objects in underlying clusters.
 		// Just remove both the finalizers in that case.
-		obj, err := dh.removeFinalizerFunc(obj, api.FinalizerOrphan)
+		obj, err := dh.removeFinalizerFunc(obj, api_v1.FinalizerOrphan)
 		if err != nil {
 			return obj, err
 		}
