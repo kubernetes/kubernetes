@@ -306,6 +306,7 @@ Pet set recreate should recreate evicted statefulset,roberthbailey,1
 "Pod Disks should schedule a pod w/ a readonly PD on two hosts, then remove both ungracefully.",saad-ali,1
 "Pod Disks should schedule a pod w/two RW PDs both mounted to one container, write to PD, verify contents, delete pod, recreate pod, verify contents, and repeat in rapid succession",saad-ali,0
 Pod garbage collector should handle the creation of 1000 pods,wojtek-t,1
+Pods Delete Grace Period should be submitted and removed,bdbauer,0
 Pods should allow activeDeadlineSeconds to be updated,derekwaynecarr,0
 Pods should be submitted and removed,davidopp,1
 Pods should be updated,derekwaynecarr,1
