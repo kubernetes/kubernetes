@@ -1,6 +1,25 @@
-assignees:
-  - davidopp
-  - derekwaynecarr
-  - erictune
-  - lavalamp
-  - liggitt
+approvers:
+- davidopp
+- derekwaynecarr
+- erictune
+- lavalamp
+- liggitt
+reviewers:
+- brendandburns
+- caesarxuchao
+- csrwng
+- david-mcmahon
+- deads2k
+- derekwaynecarr
+- eparis
+- feiskyer
+- hodovska
+- hurf
+- krousey
+- liggitt
+- mikedanese
+- pweil-
+- tummychow
+- wojtek-t
+- xiang90
+- zhengguoyong

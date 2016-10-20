@@ -1,4 +1,29 @@
-maintainers:
+approvers:
 - pmorie
 - saad-ali
 - thockin
+reviewers:
+- chakri-nelluri
+- david-mcmahon
+- ddysher
+- dims
+- eparis
+- erictune
+- fabioy
+- fgrzadkowski
+- jijun2
+- jimmidyson
+- jingxu97
+- krousey
+- markturansky
+- mikedanese
+- pigmej
+- pmorie
+- pwittrock
+- resouer
+- saad-ali
+- swagiaal
+- therc
+- thockin
+- timstclair
+- vishh

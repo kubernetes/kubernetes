@@ -1,3 +1,28 @@
-maintainers:
+approvers:
 - jsafrane
 - spothanis
+reviewers:
+- bprashanth
+- chakri-nelluri
+- ciwang
+- david-mcmahon
+- dims
+- fabioy
+- fgrzadkowski
+- goltermann
+- jijun2
+- jingxu97
+- jsafrane
+- justinsb
+- markturansky
+- pigmej
+- pmorie
+- pwittrock
+- resouer
+- rootfs
+- saad-ali
+- screeley44
+- spothanis
+- swagiaal
+- thockin
+- timstclair

@@ -1,5 +1,27 @@
-assignees:
-  - lavalamp
-  - smarterclayton
-  - nikhiljindal
-  - krousey
+approvers:
+- krousey
+- lavalamp
+- nikhiljindal
+- smarterclayton
+reviewers:
+- caesarxuchao
+- david-mcmahon
+- deads2k
+- dims
+- ericchiang
+- hodovska
+- hongchaodeng
+- jianhuiz
+- kshafiee
+- liggitt
+- luxas
+- mbohlool
+- mikedanese
+- mksalawa
+- mwielgus
+- nikhiljindal
+- pweil-
+- soltysh
+- sttts
+- timothysc
+- wojtek-t
