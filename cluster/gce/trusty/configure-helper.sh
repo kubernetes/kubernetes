@@ -428,6 +428,15 @@ create_master_kubelet_auth() {
   fi
 }
 
+function create-master-etcd-auth {
+  if [[ -n "${ETCD_CA_CERT:-}" && -n "${ETCD_PEER_KEY:-}" && -n "${ETCD_PEER_CERT:-}" ]]; then
+    local -r auth_dir="/etc/srv/kubernetes"
+    echo "${ETCD_CA_CERT}" | base64 --decode | gunzip > "${auth_dir}/etcd-ca.crt"
+    echo "${ETCD_PEER_KEY}" | base64 --decode > "${auth_dir}/etcd-peer.key"
+    echo "${ETCD_PEER_CERT}" | base64 --decode | gunzip > "${auth_dir}/etcd-peer.crt"
+  fi
+}
+
 # Replaces the variables in the etcd manifest file with the real values, and then
 # copy the file to the manifest dir
 # $1: value for variable 'suffix'
@@ -440,7 +449,7 @@ prepare_etcd_manifest() {
   local etcd_cluster=""
   local cluster_state="new"
   for host in $(echo "${INITIAL_ETCD_CLUSTER:-${host_name}}" | tr "," "\n"); do
-    etcd_host="etcd-${host}=http://${host}:$3"
+    etcd_host="etcd-${host}=https://${host}:$3"
     if [[ -n "${etcd_cluster}" ]]; then
       etcd_cluster+=","
       cluster_state="existing"
@@ -468,6 +477,8 @@ prepare_etcd_manifest() {
   else
     sed -i -e "s@{{ *pillar\.get('etcd_docker_tag', '\(.*\)') *}}@\1@g" "${etcd_temp_file}"
   fi
+  sed -i -e "s@{{ *etcd_protocol *}}@https@g" "${etcd_temp_file}"
+  sed -i -e "s@{{ *etcd_creds *}}@--peer-trusted-ca-file /etc/srv/kubernetes/etcd-ca.crt --peer-cert-file /etc/srv/kubernetes/etcd-peer.crt --peer-key-file /etc/srv/kubernetes/etcd-peer.key -peer-client-cert-auth@g" "${etcd_temp_file}"
   if [[ -n "${ETCD_VERSION:-}" ]]; then
     sed -i -e "s@{{ *pillar\.get('etcd_version', '\(.*\)') *}}@${ETCD_VERSION}@g" "${etcd_temp_file}"
   else
