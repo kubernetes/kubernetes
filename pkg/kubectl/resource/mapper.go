@@ -69,6 +69,10 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 	namespace, _ := mapping.MetadataAccessor.Namespace(obj)
 	resourceVersion, _ := mapping.MetadataAccessor.ResourceVersion(obj)
 
+	// data is guaranteed to be JSON
+	copiedData := make([]byte, len(data))
+	copy(copiedData, data)
+
 	return &Info{
 		Mapping:         mapping,
 		Client:          client,
@@ -78,6 +82,7 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 		VersionedObject: versioned,
 		Object:          obj,
 		ResourceVersion: resourceVersion,
+		Raw:             copiedData,
 	}, nil
 }
 

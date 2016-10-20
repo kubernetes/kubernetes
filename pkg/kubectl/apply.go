@@ -77,6 +77,7 @@ func SetOriginalConfiguration(info *resource.Info, original []byte) error {
 func GetModifiedConfiguration(info *resource.Info, annotate bool, codec runtime.Encoder) ([]byte, error) {
 	// First serialize the object without the annotation to prevent recursion,
 	// then add that serialization to it as the annotation and serialize it again.
+	// Recursion might happen if kubectl reads an object directly from the apiserver.
 	var modified []byte
 	if info.VersionedObject != nil {
 		// If an object was read from input, use that version.
@@ -94,6 +95,7 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool, codec runtime.
 		original := annots[annotations.LastAppliedConfigAnnotation]
 		delete(annots, annotations.LastAppliedConfigAnnotation)
 		accessor.SetAnnotations(annots)
+
 		// TODO: this needs to be abstracted - there should be no assumption that versioned object
 		// can be marshalled to JSON.
 		modified, err = json.Marshal(info.VersionedObject)
