@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	fake "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/dns/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -190,7 +191,9 @@ func TestSkySimpleSRVLookup(t *testing.T) {
 	targets := []string{}
 	for _, eip := range endpointIPs {
 		// A portal service is always created with a port of '0'
-		targets = append(targets, fmt.Sprintf("%v.%v", fmt.Sprintf("%x", hashServiceRecord(newServiceRecord(eip, 0))), name))
+		targets = append(targets,
+			fmt.Sprintf("%x.%v",
+				util.HashServiceRecord(util.NewServiceRecord(eip, 0)), name))
 	}
 	assertSRVRecordsMatchTarget(t, rec, targets...)
 }
@@ -255,7 +258,8 @@ func TestSkyNamedPortSRVLookup(t *testing.T) {
 
 	svcDomain := strings.Join([]string{testService, testNamespace, "svc", testDomain}, ".")
 	assertARecordsMatchIPs(t, extra, eip)
-	assertSRVRecordsMatchTarget(t, rec, fmt.Sprintf("%v.%v", fmt.Sprintf("%x", hashServiceRecord(newServiceRecord(eip, 0))), svcDomain))
+	assertSRVRecordsMatchTarget(
+		t, rec, fmt.Sprintf("%x.%v", util.HashServiceRecord(util.NewServiceRecord(eip, 0)), svcDomain))
 	assertSRVRecordsMatchPort(t, rec, 8081)
 }
 
