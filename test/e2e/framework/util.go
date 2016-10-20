@@ -4514,3 +4514,63 @@ func ListNamespaceEvents(c *client.Client, ns string) error {
 	}
 	return nil
 }
+
+// E2ETestNodePreparer implements testutils.TestNodePreparer interface, which is used
+// to create/modify Nodes before running a test.
+type E2ETestNodePreparer struct {
+	client clientset.Interface
+	// Specifies how many nodes should be modified using the given strategy.
+	// Only one strategy can be applied to a single Node, so there needs to
+	// be at least <sum_of_keys> Nodes in the cluster.
+	countToStrategy       map[int]testutils.PrepareNodeStrategy
+	nodeToAppliedStrategy map[string]testutils.PrepareNodeStrategy
+}
+
+func NewE2ETestNodePreparer(client clientset.Interface, countToStrategy map[int]testutils.PrepareNodeStrategy) testutils.TestNodePreparer {
+	return &E2ETestNodePreparer{
+		client:                client,
+		countToStrategy:       countToStrategy,
+		nodeToAppliedStrategy: make(map[string]testutils.PrepareNodeStrategy),
+	}
+}
+
+func (p *E2ETestNodePreparer) PrepareNodes() error {
+	nodes := GetReadySchedulableNodesOrDie(p.client)
+	numTemplates := 0
+	for k := range p.countToStrategy {
+		numTemplates += k
+	}
+	if numTemplates > len(nodes.Items) {
+		return fmt.Errorf("Can't prepare Nodes. Got more templates than existing Nodes.")
+	}
+	index := 0
+	sum := 0
+	for k, strategy := range p.countToStrategy {
+		sum += k
+		for ; index < sum; index++ {
+			if err := testutils.DoPrepareNode(p.client, &nodes.Items[index], strategy); err != nil {
+				glog.Errorf("Aborting node preparation: %v", err)
+				return err
+			}
+			p.nodeToAppliedStrategy[nodes.Items[index].Name] = strategy
+		}
+	}
+	return nil
+}
+
+func (p *E2ETestNodePreparer) CleanupNodes() error {
+	var encounteredError error
+	nodes := GetReadySchedulableNodesOrDie(p.client)
+	for i := range nodes.Items {
+		var err error
+		name := nodes.Items[i].Name
+		strategy, found := p.nodeToAppliedStrategy[name]
+		if found {
+			if err = testutils.DoCleanupNode(p.client, name, strategy); err != nil {
+				glog.Errorf("Skipping cleanup of Node: failed update of %v: %v", name, err)
+				encounteredError = err
+			}
+		}
+	}
+	return encounteredError
+}
