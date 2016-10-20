@@ -17,10 +17,13 @@ limitations under the License.
 package kubectl
 
 import (
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api/annotations"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
 
 // GetOriginalConfiguration retrieves the original configuration of the object
@@ -75,6 +78,7 @@ func SetOriginalConfiguration(info *resource.Info, original []byte) error {
 func GetModifiedConfiguration(info *resource.Info, annotate bool, codec runtime.Encoder) ([]byte, error) {
 	// First serialize the object without the annotation to prevent recursion,
 	// then add that serialization to it as the annotation and serialize it again.
+	// Recursion might happen if kubectl reads an object directly from the apiserver.
 	var modified []byte
 	if info.VersionedObject != nil {
 		// If an object was read from input, use that version.
@@ -92,6 +96,7 @@ func GetModifiedConfiguration(info *resource.Info, annotate bool, codec runtime.
 		original := annots[annotations.LastAppliedConfigAnnotation]
 		delete(annots, annotations.LastAppliedConfigAnnotation)
 		accessor.SetAnnotations(annots)
+
 		// TODO: this needs to be abstracted - there should be no assumption that versioned object
 		// can be marshalled to JSON.
 		modified, err = runtime.Encode(codec, info.VersionedObject)
@@ -185,4 +190,28 @@ func CreateOrUpdateAnnotation(createAnnotation bool, info *resource.Info, codec 
 		return CreateApplyAnnotation(info, codec)
 	}
 	return UpdateApplyAnnotation(info, codec)
+}
+
+func GetModifiedConfigurationWithNulls(info *resource.Info, codec runtime.Encoder) ([]byte, error) {
+	modified, err := GetModifiedConfiguration(info, true, codec)
+	if err != nil {
+		return nil, err
+	}
+
+	// During Unmarshaling of the user's object config to a Go struct, explicit null values are not preserved.
+	// For this, we merge the raw configuration file (that has null values) with the currently loaded
+	// configuration (which has extra information like annotations and empty structs). There might be conflicts,
+	// which we resolve in favor of info.Raw. The conflicts should only be empty initialized structs that we will
+	// overwrite only if the user has defined a null.
+	// TODO(andronat): Do we want to store user's explicit null values?
+	tObj := info.VersionedObject
+	if tObj == nil {
+		tObj = info.Object
+	}
+	modified, err = strategicpatch.GuidedJsonMerge(modified, info.Raw, tObj)
+	if err != nil {
+		return nil, fmt.Errorf("restoring user defined null values failed:\n loaded object: %s\n raw object: %s\n ", string(modified), string(info.Raw))
+	}
+
+	return modified, nil
 }

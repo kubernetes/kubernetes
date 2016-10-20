@@ -93,6 +93,7 @@ go_library(
         "//pkg/util/jsonpath:go_default_library",
         "//pkg/util/node:go_default_library",
         "//pkg/util/slice:go_default_library",
+        "//pkg/util/strategicpatch:go_default_library",
         "//pkg/util/uuid:go_default_library",
         "//vendor:github.com/emicklei/go-restful/swagger",
         "//vendor:github.com/ghodss/yaml",
