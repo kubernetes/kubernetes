@@ -67,13 +67,6 @@ else
 
   push_build=${release_infra_clone}/push-build.sh
 
-  if [[ ! -x ${push_build} ]]; then
-    # TODO: Remove/Restore this with the full deprecation PR
-    push_build=${release_infra_clone}/push-ci-build.sh
-    #echo "FATAL: Something went wrong. ${push_build} isn't available." \
-    #     "Exiting..." >&2
-    #exit 1
-  fi
   [[ -n "${KUBE_GCS_RELEASE_BUCKET-}" ]] \
     && bucket_flag="--bucket=${KUBE_GCS_RELEASE_BUCKET-}"
   ${FEDERATION} && federation_flag="--federation"
