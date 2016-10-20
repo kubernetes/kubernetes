@@ -74,12 +74,16 @@ kube::etcd::install() {
     cd "${KUBE_ROOT}/third_party"
     if [[ $(uname) == "Darwin" ]]; then
       download_file="etcd-v${ETCD_VERSION}-darwin-amd64.zip"
-      curl -fsSLO --retry 3 --keepalive-time 2 https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/"${download_file}"
+      url="https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/${download_file}"
+      kube::util::download_file "${url}" "${download_file}"
       unzip -o "${download_file}"
       ln -fns "etcd-v${ETCD_VERSION}-darwin-amd64" etcd
       rm "${download_file}"
     else
-      curl -fsSL --retry 3 --keepalive-time 2 https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-linux-amd64.tar.gz | tar xzf -
+      url="https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-linux-amd64.tar.gz"
+      download_file="etcd-v${ETCD_VERSION}-linux-amd64.tar.gz"
+      kube::util::download_file "${url}" "${download_file}"
+      tar xzf "${download_file}"
       ln -fns "etcd-v${ETCD_VERSION}-linux-amd64" etcd
     fi
     kube::log::info "etcd v${ETCD_VERSION} installed. To use:"
