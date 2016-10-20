@@ -600,18 +600,6 @@ function kube-up() {
   if [[ ${KUBE_USE_EXISTING_MASTER:-} == "true" ]]; then
     parse-master-env
     create-nodes
-  elif [[ ${KUBE_EXPERIMENTAL_REPLICATE_EXISTING_MASTER:-} == "true" ]]; then
-    # TODO(jsz): implement adding replica for other distributions.
-    if  [[ "${MASTER_OS_DISTRIBUTION}" != "gci" ]]; then
-      echo "Master replication supported only for gci"
-      return 1
-    fi
-    create-loadbalancer
-    # If replication of master fails, we need to ensure that the replica is removed from etcd clusters.
-    if ! replicate-master; then
-      remove-replica-from-etcd 2379 || true
-      remove-replica-from-etcd 4002 || true
-    fi
   else
     check-existing
     create-network
