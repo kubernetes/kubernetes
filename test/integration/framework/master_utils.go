@@ -344,7 +344,7 @@ func NewMasterConfig() *master.Config {
 		"",
 		NewSingleContentTypeSerializer(api.Scheme, testapi.Storage.Codec(), runtime.ContentTypeJSON))
 
-	genericConfig := genericapiserver.NewConfig()
+	genericConfig := genericapiserver.NewConfig().Complete().Config
 	kubeVersion := version.Get()
 	genericConfig.Version = &kubeVersion
 	genericConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
