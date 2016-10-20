@@ -55,7 +55,7 @@ func newKubeDNS() *KubeDNS {
 		reverseRecordMap:    make(map[string]*skymsg.Service),
 		clusterIPServiceMap: make(map[string]*kapi.Service),
 		cacheLock:           sync.RWMutex{},
-		domainPath:          reverseArray(strings.Split(strings.TrimRight(testDomain, "."), ".")),
+		domainPath:          util.ReverseArray(strings.Split(strings.TrimRight(testDomain, "."), ".")),
 		nodesStore:          cache.NewStore(cache.MetaNamespaceKeyFunc),
 	}
 	return kd
@@ -671,7 +671,7 @@ func assertDNSForHeadlessService(t *testing.T, kd *KubeDNS, e *kapi.Endpoints) {
 }
 
 func assertDNSForExternalService(t *testing.T, kd *KubeDNS, s *kapi.Service) {
-	records, err := kd.Records(getServiceFQDN(kd, s), false)
+	records, err := kd.Records(getServiceFQDN(kd.domain, s), false)
 	require.NoError(t, err)
 	assert.Equal(t, 1, len(records))
 	assert.Equal(t, testExternalName, records[0].Host)
@@ -704,13 +704,13 @@ func getIPForCName(t *testing.T, kd *KubeDNS, cname string) string {
 }
 
 func assertNoDNSForHeadlessService(t *testing.T, kd *KubeDNS, s *kapi.Service) {
-	records, err := kd.Records(getServiceFQDN(kd, s), false)
+	records, err := kd.Records(getServiceFQDN(kd.domain, s), false)
 	require.Error(t, err)
 	assert.Equal(t, 0, len(records))
 }
 
 func assertNoDNSForExternalService(t *testing.T, kd *KubeDNS, s *kapi.Service) {
-	records, err := kd.Records(getServiceFQDN(kd, s), false)
+	records, err := kd.Records(getServiceFQDN(kd.domain, s), false)
 	require.Error(t, err)
 	assert.Equal(t, 0, len(records))
 }
@@ -719,7 +719,7 @@ func assertSRVForNamedPort(t *testing.T, kd *KubeDNS, s *kapi.Service, portName 
 	records, err := kd.Records(getSRVFQDN(kd, s, portName), false)
 	require.NoError(t, err)
 	assert.Equal(t, 1, len(records))
-	assert.Equal(t, getServiceFQDN(kd, s), records[0].Host)
+	assert.Equal(t, getServiceFQDN(kd.domain, s), records[0].Host)
 }
 
 func assertNoSRVForNamedPort(t *testing.T, kd *KubeDNS, s *kapi.Service, portName string) {
@@ -729,7 +729,7 @@ func assertNoSRVForNamedPort(t *testing.T, kd *KubeDNS, s *kapi.Service, portNam
 }
 
 func assertNoDNSForClusterIP(t *testing.T, kd *KubeDNS, s *kapi.Service) {
-	serviceFQDN := getServiceFQDN(kd, s)
+	serviceFQDN := getServiceFQDN(kd.domain, s)
 	queries := getEquivalentQueries(serviceFQDN, s.Namespace)
 	for _, query := range queries {
 		records, err := kd.Records(query, false)
@@ -739,7 +739,7 @@ func assertNoDNSForClusterIP(t *testing.T, kd *KubeDNS, s *kapi.Service) {
 }
 
 func assertDNSForClusterIP(t *testing.T, kd *KubeDNS, s *kapi.Service) {
-	serviceFQDN := getServiceFQDN(kd, s)
+	serviceFQDN := getServiceFQDN(kd.domain, s)
 	queries := getEquivalentQueries(serviceFQDN, s.Namespace)
 	for _, query := range queries {
 		records, err := kd.Records(query, false)
@@ -750,16 +750,16 @@ func assertDNSForClusterIP(t *testing.T, kd *KubeDNS, s *kapi.Service) {
 }
 
 func assertReverseRecord(t *testing.T, kd *KubeDNS, s *kapi.Service) {
-	segments := reverseArray(strings.Split(s.Spec.ClusterIP, "."))
-	reverseLookup := fmt.Sprintf("%s%s", strings.Join(segments, "."), arpaSuffix)
+	segments := util.ReverseArray(strings.Split(s.Spec.ClusterIP, "."))
+	reverseLookup := fmt.Sprintf("%s%s", strings.Join(segments, "."), util.ArpaSuffix)
 	reverseRecord, err := kd.ReverseRecord(reverseLookup)
 	require.NoError(t, err)
-	assert.Equal(t, kd.getServiceFQDN(s), reverseRecord.Host)
+	assert.Equal(t, getServiceFQDN(kd.domain, s), reverseRecord.Host)
 }
 
 func assertNoReverseRecord(t *testing.T, kd *KubeDNS, s *kapi.Service) {
-	segments := reverseArray(strings.Split(s.Spec.ClusterIP, "."))
-	reverseLookup := fmt.Sprintf("%s%s", strings.Join(segments, "."), arpaSuffix)
+	segments := util.ReverseArray(strings.Split(s.Spec.ClusterIP, "."))
+	reverseLookup := fmt.Sprintf("%s%s", strings.Join(segments, "."), util.ArpaSuffix)
 	reverseRecord, err := kd.ReverseRecord(reverseLookup)
 	require.Error(t, err)
 	require.Nil(t, reverseRecord)
@@ -777,10 +777,6 @@ func getEquivalentQueries(serviceFQDN, namespace string) []string {
 
 func getFederationServiceFQDN(kd *KubeDNS, s *kapi.Service, federationName string) string {
 	return fmt.Sprintf("%s.%s.%s.svc.%s", s.Name, s.Namespace, federationName, kd.domain)
-}
-
-func getServiceFQDN(kd *KubeDNS, s *kapi.Service) string {
-	return fmt.Sprintf("%s.%s.svc.%s", s.Name, s.Namespace, kd.domain)
 }
 
 func getEndpointsFQDN(kd *KubeDNS, e *kapi.Endpoints) string {
