@@ -57,6 +57,9 @@ const (
 	// Should the test restart petset clusters?
 	// TODO: enable when we've productionzed bringup of pets in this e2e.
 	restartCluster = false
+
+	// Timeout for reads from databases running on pets.
+	readTimeout = 60 * time.Second
 )
 
 // Time: 25m, slow by design.
@@ -202,8 +205,8 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 			}
 
 			By("Reading value under foo from member with index 2")
-			if v := pet.read(2, "foo"); v != "bar" {
-				framework.Failf("Read unexpected value %v, expected bar under key foo", v)
+			if err := pollReadWithTimeout(pet, 2, "foo", "bar"); err != nil {
+				framework.Failf("%v", err)
 			}
 		})
 
@@ -223,8 +226,8 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 			}
 
 			By("Reading value under foo from member with index 2")
-			if v := pet.read(2, "foo"); v != "bar" {
-				framework.Failf("Read unexpected value %v, expected bar under key foo", v)
+			if err := pollReadWithTimeout(pet, 2, "foo", "bar"); err != nil {
+				framework.Failf("%v", err)
 			}
 		})
 
@@ -244,8 +247,8 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 			}
 
 			By("Reading value under foo from member with index 2")
-			if v := pet.read(2, "foo"); v != "bar" {
-				framework.Failf("Read unexpected value %v, expected bar under key foo", v)
+			if err := pollReadWithTimeout(pet, 2, "foo", "bar"); err != nil {
+				framework.Failf("%v", err)
 			}
 		})
 	})
@@ -802,6 +805,23 @@ func deleteAllPetSets(c *client.Client, ns string) {
 
 func ExpectNoError(err error) {
 	Expect(err).NotTo(HaveOccurred())
+}
+
+func pollReadWithTimeout(pet petTester, petNumber int, key, expectedVal string) error {
+	err := wait.PollImmediate(time.Second, readTimeout, func() (bool, error) {
+		val := pet.read(petNumber, key)
+		if val == "" {
+			return false, nil
+		} else if val != expectedVal {
+			return false, fmt.Errorf("expected value %v, found %v", expectedVal, val)
+		}
+		return true, nil
+	})
+
+	if err == wait.ErrWaitTimeout {
+		return fmt.Errorf("timed out when trying to read value for key %v from pet %d", key, petNumber)
+	}
+	return err
 }
 
 func isInitialized(pod api.Pod) bool {
