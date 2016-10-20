@@ -19,6 +19,7 @@ package unversioned
 import (
 	federation "k8s.io/kubernetes/federation/apis/federation"
 	api "k8s.io/kubernetes/pkg/api"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -44,13 +45,13 @@ type ClusterInterface interface {
 
 // clusters implements ClusterInterface
 type clusters struct {
-	client *FederationClient
+	client restclient.Interface
 }
 
 // newClusters returns a Clusters
 func newClusters(c *FederationClient) *clusters {
 	return &clusters{
-		client: c,
+		client: c.RESTClient(),
 	}
 }
 

@@ -19,6 +19,7 @@ package v1
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -43,14 +44,14 @@ type EventInterface interface {
 
 // events implements EventInterface
 type events struct {
-	client *CoreClient
+	client restclient.Interface
 	ns     string
 }
 
 // newEvents returns a Events
 func newEvents(c *CoreClient, namespace string) *events {
 	return &events{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

@@ -19,6 +19,7 @@ package v1
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -43,14 +44,14 @@ type ConfigMapInterface interface {
 
 // configMaps implements ConfigMapInterface
 type configMaps struct {
-	client *CoreClient
+	client restclient.Interface
 	ns     string
 }
 
 // newConfigMaps returns a ConfigMaps
 func newConfigMaps(c *CoreClient, namespace string) *configMaps {
 	return &configMaps{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

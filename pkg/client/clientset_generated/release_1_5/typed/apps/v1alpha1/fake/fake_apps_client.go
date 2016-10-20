@@ -30,8 +30,9 @@ func (c *FakeApps) PetSets(namespace string) v1alpha1.PetSetInterface {
 	return &FakePetSets{c, namespace}
 }
 
-// GetRESTClient returns a RESTClient that is used to communicate
+// RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeApps) GetRESTClient() *restclient.RESTClient {
-	return nil
+func (c *FakeApps) RESTClient() restclient.Interface {
+	var ret *restclient.RESTClient
+	return ret
 }
