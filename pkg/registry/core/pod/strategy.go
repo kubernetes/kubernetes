@@ -166,18 +166,15 @@ func MatchPod(label labels.Selector, field fields.Selector) storage.SelectionPre
 				return nil, nil, fmt.Errorf("not a pod")
 			}
 
-			// podLabels is already sitting there ready to be used.
-			// podFields is not available directly and requires allocation of a map.
-			// Only bother if the fields might be useful to determining the match.
-			// One common case is for a replication controller to set up a watch
-			// based on labels alone; in that case we can avoid allocating the field map.
-			// This is especially important in the apiserver.
-			podLabels := labels.Set(pod.ObjectMeta.Labels)
+			// Compute fields only if field selectors is non-empty
+			// (otherwise those won't be used).
+			// Those are generally also not needed if label selector does
+			// not match labels, but additional computation of it is expensive.
 			var podFields fields.Set
-			if !field.Empty() && label.Matches(podLabels) {
+			if !field.Empty() {
 				podFields = PodToSelectableFields(pod)
 			}
-			return podLabels, podFields, nil
+			return labels.Set(pod.ObjectMeta.Labels), podFields, nil
 		},
 		IndexFields: []string{"spec.nodeName"},
 	}
