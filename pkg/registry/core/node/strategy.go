@@ -154,7 +154,16 @@ func MatchNode(label labels.Selector, field fields.Selector) pkgstorage.Selectio
 			if !ok {
 				return nil, nil, fmt.Errorf("not a node")
 			}
-			return labels.Set(nodeObj.ObjectMeta.Labels), NodeToSelectableFields(nodeObj), nil
+
+			// Compute fields only if field selectors is non-empty
+			// (otherwise those won't be used).
+			// Those are generally also not needed if label selector does
+			// not match labels, but additional computation of it is expensive.
+			var nodeFields fields.Set
+			if !field.Empty() {
+				nodeFields = NodeToSelectableFields(nodeObj)
+			}
+			return labels.Set(nodeObj.ObjectMeta.Labels), nodeFields, nil
 		},
 		IndexFields: []string{"metadata.name"},
 	}
