@@ -25,14 +25,10 @@ import (
 )
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
-	_, fieldsSet, err := EndpointsAttributes(&api.Endpoints{})
-	if err != nil {
-		t.Fatal(err)
-	}
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 		"Endpoints",
-		fieldsSet,
+		EndpointsToSelectableFields(&api.Endpoints{}),
 		nil,
 	)
 }
