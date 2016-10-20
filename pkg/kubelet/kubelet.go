@@ -460,6 +460,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	} else {
 		klet.networkPlugin = plug
 	}
+	klet.networkPluginRequiresCloudRoutes = kubeCfg.NetworkPluginRequiresCloudRoutes
 
 	machineInfo, err := klet.GetCachedMachineInfo()
 	if err != nil {
@@ -813,6 +814,8 @@ type Kubelet struct {
 
 	// Network plugin.
 	networkPlugin network.NetworkPlugin
+
+	networkPluginRequiresCloudRoutes bool
 
 	// Handles container probing.
 	probeManager prober.Manager

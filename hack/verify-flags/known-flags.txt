@@ -375,6 +375,7 @@ namespace-sync-period
 network-plugin
 network-plugin-dir
 network-plugin-mtu
+network-plugin-requires-cloud-routes
 no-headers
 no-headers
 no-suggestions

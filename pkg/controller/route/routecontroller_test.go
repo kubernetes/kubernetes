@@ -75,11 +75,11 @@ func TestReconcile(t *testing.T) {
 	nodeNoCidr := api.Node{ObjectMeta: api.ObjectMeta{Name: "node-2", UID: "02"}, Spec: api.NodeSpec{PodCIDR: ""}}
 
 	testCases := []struct {
-		nodes                      []api.Node
-		initialRoutes              []*cloudprovider.Route
-		expectedRoutes             []*cloudprovider.Route
-		expectedNetworkUnavailable []bool
-		clientset                  *fake.Clientset
+		nodes                           []api.Node
+		initialRoutes                   []*cloudprovider.Route
+		expectedRoutes                  []*cloudprovider.Route
+		expectedCloudNetworkUnavailable []bool
+		clientset                       *fake.Clientset
 	}{
 		// 2 nodes, routes already there
 		{
@@ -95,8 +95,8 @@ func TestReconcile(t *testing.T) {
 				{cluster + "-01", "node-1", "10.120.0.0/24"},
 				{cluster + "-02", "node-2", "10.120.1.0/24"},
 			},
-			expectedNetworkUnavailable: []bool{true, true},
-			clientset:                  fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, node2}}),
+			expectedCloudNetworkUnavailable: []bool{true, true},
+			clientset:                       fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, node2}}),
 		},
 		// 2 nodes, one route already there
 		{
@@ -111,8 +111,8 @@ func TestReconcile(t *testing.T) {
 				{cluster + "-01", "node-1", "10.120.0.0/24"},
 				{cluster + "-02", "node-2", "10.120.1.0/24"},
 			},
-			expectedNetworkUnavailable: []bool{true, true},
-			clientset:                  fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, node2}}),
+			expectedCloudNetworkUnavailable: []bool{true, true},
+			clientset:                       fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, node2}}),
 		},
 		// 2 nodes, no routes yet
 		{
@@ -125,8 +125,8 @@ func TestReconcile(t *testing.T) {
 				{cluster + "-01", "node-1", "10.120.0.0/24"},
 				{cluster + "-02", "node-2", "10.120.1.0/24"},
 			},
-			expectedNetworkUnavailable: []bool{true, true},
-			clientset:                  fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, node2}}),
+			expectedCloudNetworkUnavailable: []bool{true, true},
+			clientset:                       fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, node2}}),
 		},
 		// 2 nodes, a few too many routes
 		{
@@ -144,8 +144,8 @@ func TestReconcile(t *testing.T) {
 				{cluster + "-01", "node-1", "10.120.0.0/24"},
 				{cluster + "-02", "node-2", "10.120.1.0/24"},
 			},
-			expectedNetworkUnavailable: []bool{true, true},
-			clientset:                  fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, node2}}),
+			expectedCloudNetworkUnavailable: []bool{true, true},
+			clientset:                       fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, node2}}),
 		},
 		// 2 nodes, 2 routes, but only 1 is right
 		{
@@ -161,8 +161,8 @@ func TestReconcile(t *testing.T) {
 				{cluster + "-01", "node-1", "10.120.0.0/24"},
 				{cluster + "-02", "node-2", "10.120.1.0/24"},
 			},
-			expectedNetworkUnavailable: []bool{true, true},
-			clientset:                  fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, node2}}),
+			expectedCloudNetworkUnavailable: []bool{true, true},
+			clientset:                       fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, node2}}),
 		},
 		// 2 nodes, one node without CIDR assigned.
 		{
@@ -174,8 +174,8 @@ func TestReconcile(t *testing.T) {
 			expectedRoutes: []*cloudprovider.Route{
 				{cluster + "-01", "node-1", "10.120.0.0/24"},
 			},
-			expectedNetworkUnavailable: []bool{true, false},
-			clientset:                  fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, nodeNoCidr}}),
+			expectedCloudNetworkUnavailable: []bool{true, false},
+			clientset:                       fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{node1, nodeNoCidr}}),
 		},
 	}
 	for i, testCase := range testCases {
@@ -198,12 +198,12 @@ func TestReconcile(t *testing.T) {
 		for _, action := range testCase.clientset.Actions() {
 			if action.GetVerb() == "update" && action.GetResource().Resource == "nodes" {
 				node := action.(core.UpdateAction).GetObject().(*api.Node)
-				_, condition := api.GetNodeCondition(&node.Status, api.NodeNetworkUnavailable)
+				_, condition := api.GetNodeCondition(&node.Status, api.NodeCloudNetworkUnavailable)
 				if condition == nil {
-					t.Errorf("%d. Missing NodeNetworkUnavailable condition for Node %v", i, node.Name)
+					t.Errorf("%d. Missing NodeCloudNetworkUnavailable condition for Node %v", i, node.Name)
 				} else {
 					check := func(index int) bool {
-						return (condition.Status == api.ConditionFalse) == testCase.expectedNetworkUnavailable[index]
+						return (condition.Status == api.ConditionFalse) == testCase.expectedCloudNetworkUnavailable[index]
 					}
 					index := -1
 					for j := range testCase.nodes {
@@ -216,8 +216,8 @@ func TestReconcile(t *testing.T) {
 						continue
 					}
 					if !check(index) {
-						t.Errorf("%d. Invalid NodeNetworkUnavailable condition for Node %v, expected %v, got %v",
-							i, node.Name, testCase.expectedNetworkUnavailable[index], (condition.Status == api.ConditionFalse))
+						t.Errorf("%d. Invalid NodeCloudNetworkUnavailable condition for Node %v, expected %v, got %v",
+							i, node.Name, testCase.expectedCloudNetworkUnavailable[index], (condition.Status == api.ConditionFalse))
 					}
 				}
 			}

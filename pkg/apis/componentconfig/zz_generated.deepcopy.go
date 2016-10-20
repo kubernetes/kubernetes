@@ -261,6 +261,7 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.NetworkPluginName = in.NetworkPluginName
 		out.NetworkPluginMTU = in.NetworkPluginMTU
 		out.NetworkPluginDir = in.NetworkPluginDir
+		out.NetworkPluginRequiresCloudRoutes = in.NetworkPluginRequiresCloudRoutes
 		out.CNIConfDir = in.CNIConfDir
 		out.CNIBinDir = in.CNIBinDir
 		out.VolumePluginDir = in.VolumePluginDir

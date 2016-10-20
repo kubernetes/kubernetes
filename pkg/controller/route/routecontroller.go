@@ -166,7 +166,7 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 			}(nodeName, nameHint, route)
 		} else {
 			// Update condition only if it doesn't reflect the current state.
-			_, condition := api.GetNodeCondition(&node.Status, api.NodeNetworkUnavailable)
+			_, condition := api.GetNodeCondition(&node.Status, api.NodeCloudNetworkUnavailable)
 			if condition == nil || condition.Status != api.ConditionFalse {
 				rc.updateNetworkingCondition(types.NodeName(node.Name), true)
 			}
@@ -204,7 +204,7 @@ func (rc *RouteController) updateNetworkingCondition(nodeName types.NodeName, ro
 		currentTime := unversioned.Now()
 		if routeCreated {
 			err = nodeutil.SetNodeCondition(rc.kubeClient, nodeName, api.NodeCondition{
-				Type:               api.NodeNetworkUnavailable,
+				Type:               api.NodeCloudNetworkUnavailable,
 				Status:             api.ConditionFalse,
 				Reason:             "RouteCreated",
 				Message:            "RouteController created a route",
@@ -212,7 +212,7 @@ func (rc *RouteController) updateNetworkingCondition(nodeName types.NodeName, ro
 			})
 		} else {
 			err = nodeutil.SetNodeCondition(rc.kubeClient, nodeName, api.NodeCondition{
-				Type:               api.NodeNetworkUnavailable,
+				Type:               api.NodeCloudNetworkUnavailable,
 				Status:             api.ConditionTrue,
 				Reason:             "NoRouteCreated",
 				Message:            "RouteController failed to create a route",

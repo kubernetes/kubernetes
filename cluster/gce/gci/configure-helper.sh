@@ -511,6 +511,9 @@ function start-kubelet {
       flags+=" --network-plugin-dir=/home/kubernetes/bin"
     fi
     flags+=" --network-plugin=${NETWORK_PROVIDER}"
+    if [[ "${NETWORK_PROVIDER:-}" == "kubenet" ]]; then
+      flags+=" --network-plugin-requires-cloud-routes=true"
+    fi
   fi
   flags+=" --reconcile-cidr=${reconcile_cidr}"
   if [[ -n "${NON_MASQUERADE_CIDR:-}" ]]; then

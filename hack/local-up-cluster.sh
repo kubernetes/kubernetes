@@ -449,6 +449,9 @@ function start_kubelet {
       kubenet_plugin_args=""
       if [[ "${NET_PLUGIN}" == "kubenet" ]]; then
         kubenet_plugin_args="--reconcile-cidr=true "
+        if [ -n "${CLOUD_PROVIDER}" ]; then
+          kubenet_plugin_args="${kubenet_plugin_args} --network-plugin-requires-cloud-routes=true "
+        fi
       fi
 
       container_runtime_endpoint_args=""
