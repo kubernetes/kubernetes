@@ -38,7 +38,7 @@ const (
 )
 
 // Create/delete secret api objects
-var _ = framework.KubeDescribe("Federation secrets [Feature:Federation12]", func() {
+var _ = framework.KubeDescribe("Federation secrets [Feature:Federation]", func() {
 	var clusters map[string]*cluster // All clusters, keyed by cluster name
 
 	f := framework.NewDefaultFederatedFramework("federated-secret")
