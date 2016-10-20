@@ -38,10 +38,10 @@ service RuntimeService {
     // ContainerStatus returns status of the container.
     rpc ContainerStatus(ContainerStatusRequest) returns (ContainerStatusResponse) {}
 
+    // ExecSync runs a command in a container synchronously.
+    rpc ExecSync(ExecSyncRequest) returns (ExecSyncResponse) {}
     // Exec prepares a streaming endpoint to execute a command in the container.
     rpc Exec(ExecRequest) returns (ExecResponse) {}
-    // ExecSync runs a command in a container synchonously.
-    rpc ExecSync(ExecSyncRequest) returns (ExecSyncResponse) {}
     // Attach prepares a streaming endpoint to attach to a running container.
     rpc Attach(AttachRequest) returns (AttachResponse) {}
     // PortForward prepares a streaming endpoint to forward ports from a PodSandbox.
@@ -601,22 +601,6 @@ message ContainerStatusResponse {
     optional ContainerStatus status = 1;
 }
 
-message ExecRequest {
-    // The id of the container
-    optional string container_id = 1;
-    // The cmd to execute
-    repeated string cmd = 2;
-    // Whether use tty
-    optional bool tty = 3;
-    // Streaming stdin
-    optional bool stdin = 4;
-}
-
-message ExecResponse {
-    // The fully qualified URL of the exec streaming server
-    optional string url = 1;
-}
-
 message ExecSyncRequest {
     // The id of the container
     optional string container_id = 1;
@@ -633,6 +617,22 @@ message ExecSyncResponse {
     optional bytes stderr = 2;
     // The exit code the command finished with.
     optional int32 exit_code = 3;
+}
+
+message ExecRequest {
+    // The id of the container
+    optional string container_id = 1;
+    // The cmd to execute
+    repeated string cmd = 2;
+    // Whether use tty
+    optional bool tty = 3;
+    // Streaming stdin
+    optional bool stdin = 4;
+}
+
+message ExecResponse {
+    // The fully qualified URL of the exec streaming server
+    optional string url = 1;
 }
 
 message AttachRequest {
