@@ -14755,139 +14755,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"unversioned.Duration"},
 	},
-	"v1alpha1.PetSet": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "PetSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe PetSet guarantees that a given network identity will always map to the same storage identity. PetSet is currently in alpha and subject to change without notice.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Ref: spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
-						},
-					},
-					"spec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Spec defines the desired identities of pets in this set.",
-							Ref:         spec.MustCreateRef("#/definitions/v1alpha1.PetSetSpec"),
-						},
-					},
-					"status": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Status is the current status of Pets in this PetSet. This data may be out of date by some window of time.",
-							Ref:         spec.MustCreateRef("#/definitions/v1alpha1.PetSetStatus"),
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.ObjectMeta", "v1alpha1.PetSetSpec", "v1alpha1.PetSetStatus"},
-	},
-	"v1alpha1.PetSetList": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "PetSetList is a collection of PetSets.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Ref: spec.MustCreateRef("#/definitions/unversioned.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Type: []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1alpha1.PetSet"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-		},
-		Dependencies: []string{
-			"unversioned.ListMeta", "v1alpha1.PetSet"},
-	},
-	"v1alpha1.PetSetSpec": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "A PetSetSpec is the specification of a PetSet.",
-				Properties: map[string]spec.Schema{
-					"replicas": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Replicas is the desired number of replicas of the given Template. These are replicas in the sense that they are instantiations of the same Template, but individual replicas also have a consistent identity. If unspecified, defaults to 1.",
-							Type:        []string{"integer"},
-							Format:      "int32",
-						},
-					},
-					"selector": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Selector is a label query over pods that should match the replica count. If empty, defaulted to labels on the pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
-							Ref:         spec.MustCreateRef("#/definitions/unversioned.LabelSelector"),
-						},
-					},
-					"template": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Template is the object that describes the pod that will be created if insufficient replicas are detected. Each pod stamped out by the PetSet will fulfill this Template, but have a unique identity from the rest of the PetSet.",
-							Ref:         spec.MustCreateRef("#/definitions/v1.PodTemplateSpec"),
-						},
-					},
-					"volumeClaimTemplates": {
-						SchemaProps: spec.SchemaProps{
-							Description: "VolumeClaimTemplates is a list of claims that pets are allowed to reference. The PetSet controller is responsible for mapping network identities to claims in a way that maintains the identity of a pet. Every claim in this list must have at least one matching (by name) volumeMount in one container in the template. A claim in this list takes precedence over any volumes in the template, with the same name.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1.PersistentVolumeClaim"),
-									},
-								},
-							},
-						},
-					},
-					"serviceName": {
-						SchemaProps: spec.SchemaProps{
-							Description: "ServiceName is the name of the service that governs this PetSet. This service must exist before the PetSet, and is responsible for the network identity of the set. Pets get DNS/hostnames that follow the pattern: pet-specific-string.serviceName.default.svc.cluster.local where \"pet-specific-string\" is managed by the PetSet controller.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-				},
-				Required: []string{"template", "serviceName"},
-			},
-		},
-		Dependencies: []string{
-			"unversioned.LabelSelector", "v1.PersistentVolumeClaim", "v1.PodTemplateSpec"},
-	},
-	"v1alpha1.PetSetStatus": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "PetSetStatus represents the current state of a PetSet.",
-				Properties: map[string]spec.Schema{
-					"observedGeneration": {
-						SchemaProps: spec.SchemaProps{
-							Description: "most recent generation observed by this autoscaler.",
-							Type:        []string{"integer"},
-							Format:      "int64",
-						},
-					},
-					"replicas": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Replicas is the number of actual replicas.",
-							Type:        []string{"integer"},
-							Format:      "int32",
-						},
-					},
-				},
-				Required: []string{"replicas"},
-			},
-		},
-		Dependencies: []string{},
-	},
 	"v1alpha1.PodDisruptionBudget": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -16912,6 +16779,139 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 						},
 					},
 				},
+			},
+		},
+		Dependencies: []string{},
+	},
+	"v1beta1.PetSet": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PetSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe PetSet guarantees that a given network identity will always map to the same storage identity. PetSet is currently in alpha and subject to change without notice.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Ref: spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Spec defines the desired identities of pets in this set.",
+							Ref:         spec.MustCreateRef("#/definitions/v1beta1.PetSetSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status is the current status of Pets in this PetSet. This data may be out of date by some window of time.",
+							Ref:         spec.MustCreateRef("#/definitions/v1beta1.PetSetStatus"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"v1.ObjectMeta", "v1beta1.PetSetSpec", "v1beta1.PetSetStatus"},
+	},
+	"v1beta1.PetSetList": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PetSetList is a collection of PetSets.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Ref: spec.MustCreateRef("#/definitions/unversioned.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/v1beta1.PetSet"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"unversioned.ListMeta", "v1beta1.PetSet"},
+	},
+	"v1beta1.PetSetSpec": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "A PetSetSpec is the specification of a PetSet.",
+				Properties: map[string]spec.Schema{
+					"replicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Replicas is the desired number of replicas of the given Template. These are replicas in the sense that they are instantiations of the same Template, but individual replicas also have a consistent identity. If unspecified, defaults to 1.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"selector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Selector is a label query over pods that should match the replica count. If empty, defaulted to labels on the pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.LabelSelector"),
+						},
+					},
+					"template": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Template is the object that describes the pod that will be created if insufficient replicas are detected. Each pod stamped out by the PetSet will fulfill this Template, but have a unique identity from the rest of the PetSet.",
+							Ref:         spec.MustCreateRef("#/definitions/v1.PodTemplateSpec"),
+						},
+					},
+					"volumeClaimTemplates": {
+						SchemaProps: spec.SchemaProps{
+							Description: "VolumeClaimTemplates is a list of claims that pets are allowed to reference. The PetSet controller is responsible for mapping network identities to claims in a way that maintains the identity of a pet. Every claim in this list must have at least one matching (by name) volumeMount in one container in the template. A claim in this list takes precedence over any volumes in the template, with the same name.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/v1.PersistentVolumeClaim"),
+									},
+								},
+							},
+						},
+					},
+					"serviceName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ServiceName is the name of the service that governs this PetSet. This service must exist before the PetSet, and is responsible for the network identity of the set. Pets get DNS/hostnames that follow the pattern: pet-specific-string.serviceName.default.svc.cluster.local where \"pet-specific-string\" is managed by the PetSet controller.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"template", "serviceName"},
+			},
+		},
+		Dependencies: []string{
+			"unversioned.LabelSelector", "v1.PersistentVolumeClaim", "v1.PodTemplateSpec"},
+	},
+	"v1beta1.PetSetStatus": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PetSetStatus represents the current state of a PetSet.",
+				Properties: map[string]spec.Schema{
+					"observedGeneration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "most recent generation observed by this autoscaler.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"replicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Replicas is the number of actual replicas.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+				Required: []string{"replicas"},
 			},
 		},
 		Dependencies: []string{},

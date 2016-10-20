@@ -31,7 +31,7 @@ go_library(
         "//pkg/apis/policy/install:go_default_library",
         "//pkg/apis/rbac/install:go_default_library",
         "//pkg/apis/storage/install:go_default_library",
-        "//pkg/client/clientset_generated/release_1_5/typed/apps/v1alpha1:go_default_library",
+        "//pkg/client/clientset_generated/release_1_5/typed/apps/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/release_1_5/typed/authentication/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/release_1_5/typed/authorization/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/release_1_5/typed/autoscaling/v1:go_default_library",
