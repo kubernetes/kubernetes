@@ -18,7 +18,7 @@ package release_1_5
 
 import (
 	"github.com/golang/glog"
-	v1alpha1apps "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/apps/v1alpha1"
+	v1beta1apps "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/apps/v1beta1"
 	v1beta1authentication "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/authentication/v1beta1"
 	v1beta1authorization "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/authorization/v1beta1"
 	v1autoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/autoscaling/v1"
@@ -38,7 +38,7 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	Core() v1core.CoreInterface
-	Apps() v1alpha1apps.AppsInterface
+	Apps() v1beta1apps.AppsInterface
 	Authentication() v1beta1authentication.AuthenticationInterface
 	Authorization() v1beta1authorization.AuthorizationInterface
 	Autoscaling() v1autoscaling.AutoscalingInterface
@@ -55,7 +55,7 @@ type Interface interface {
 type Clientset struct {
 	*discovery.DiscoveryClient
 	*v1core.CoreClient
-	*v1alpha1apps.AppsClient
+	*v1beta1apps.AppsClient
 	*v1beta1authentication.AuthenticationClient
 	*v1beta1authorization.AuthorizationClient
 	*v1autoscaling.AutoscalingClient
@@ -76,7 +76,7 @@ func (c *Clientset) Core() v1core.CoreInterface {
 }
 
 // Apps retrieves the AppsClient
-func (c *Clientset) Apps() v1alpha1apps.AppsInterface {
+func (c *Clientset) Apps() v1beta1apps.AppsInterface {
 	if c == nil {
 		return nil
 	}
@@ -172,7 +172,7 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
-	clientset.AppsClient, err = v1alpha1apps.NewForConfig(&configShallowCopy)
+	clientset.AppsClient, err = v1beta1apps.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -226,7 +226,7 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 func NewForConfigOrDie(c *restclient.Config) *Clientset {
 	var clientset Clientset
 	clientset.CoreClient = v1core.NewForConfigOrDie(c)
-	clientset.AppsClient = v1alpha1apps.NewForConfigOrDie(c)
+	clientset.AppsClient = v1beta1apps.NewForConfigOrDie(c)
 	clientset.AuthenticationClient = v1beta1authentication.NewForConfigOrDie(c)
 	clientset.AuthorizationClient = v1beta1authorization.NewForConfigOrDie(c)
 	clientset.AutoscalingClient = v1autoscaling.NewForConfigOrDie(c)
@@ -245,7 +245,7 @@ func NewForConfigOrDie(c *restclient.Config) *Clientset {
 func New(c restclient.Interface) *Clientset {
 	var clientset Clientset
 	clientset.CoreClient = v1core.New(c)
-	clientset.AppsClient = v1alpha1apps.New(c)
+	clientset.AppsClient = v1beta1apps.New(c)
 	clientset.AuthenticationClient = v1beta1authentication.New(c)
 	clientset.AuthorizationClient = v1beta1authorization.New(c)
 	clientset.AutoscalingClient = v1autoscaling.New(c)

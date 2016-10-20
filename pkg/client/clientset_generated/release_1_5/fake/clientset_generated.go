@@ -20,8 +20,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
-	v1alpha1apps "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/apps/v1alpha1"
-	fakev1alpha1apps "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/apps/v1alpha1/fake"
+	v1beta1apps "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/apps/v1beta1"
+	fakev1beta1apps "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/apps/v1beta1/fake"
 	v1beta1authentication "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/authentication/v1beta1"
 	fakev1beta1authentication "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/authentication/v1beta1/fake"
 	v1beta1authorization "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/authorization/v1beta1"
@@ -88,8 +88,8 @@ func (c *Clientset) Core() v1core.CoreInterface {
 }
 
 // Apps retrieves the AppsClient
-func (c *Clientset) Apps() v1alpha1apps.AppsInterface {
-	return &fakev1alpha1apps.FakeApps{Fake: &c.Fake}
+func (c *Clientset) Apps() v1beta1apps.AppsInterface {
+	return &fakev1beta1apps.FakeApps{Fake: &c.Fake}
 }
 
 // Authentication retrieves the AuthenticationClient
