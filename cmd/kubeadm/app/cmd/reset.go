@@ -25,18 +25,20 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/util/initsystem"
 )
 
+// NewCmdReset returns "kubeadm reset" command.
 func NewCmdReset(out io.Writer) *cobra.Command {
 	var skipPreFlight bool
 	cmd := &cobra.Command{
 		Use:   "reset",
-		Short: "Revert the actions kubeadm init or join made to the machine",
+		Short: "Run this to revert any changes made to this host by 'kubeadm init' or 'kubeadm join'.",
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunReset(out, cmd, skipPreFlight)
-			cmdutil.CheckErr(err)
+			r, err := NewReset(skipPreFlight)
+			kubeadmutil.CheckErr(err)
+			kubeadmutil.CheckErr(r.Run(out))
 		},
 	}
 
@@ -48,17 +50,24 @@ func NewCmdReset(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunReset(out io.Writer, cmd *cobra.Command, skipPreFlight bool) error {
+type Reset struct{}
+
+func NewReset(skipPreFlight bool) (*Reset, error) {
 	if !skipPreFlight {
 		fmt.Println("Running pre-flight checks")
 		err := preflight.RunResetCheck()
 		if err != nil {
-			return &preflight.PreFlightError{Msg: err.Error()}
+			return nil, &preflight.PreFlightError{Msg: err.Error()}
 		}
 	} else {
 		fmt.Println("Skipping pre-flight checks")
 	}
 
+	return &Reset{}, nil
+}
+
+// Run reverts any changes made to this host by "kubeadm init" or "kubeadm join".
+func (r *Reset) Run(out io.Writer) error {
 	serviceToStop := "kubelet"
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
@@ -83,7 +92,6 @@ func RunReset(out io.Writer, cmd *cobra.Command, skipPreFlight bool) error {
 
 	dockerCheck := preflight.ServiceCheck{Service: "docker"}
 	if warnings, errors := dockerCheck.Check(); len(warnings) == 0 && len(errors) == 0 {
-
 		fmt.Println("Stopping all running docker containers...")
 		if err := exec.Command("sh", "-c", "docker ps | grep 'k8s_' | awk '{print $1}' | xargs docker rm --force --volumes").Run(); err != nil {
 			fmt.Println("failed to stop the running containers")
