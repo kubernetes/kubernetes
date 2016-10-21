@@ -23,13 +23,13 @@ import (
 )
 
 type StorageInterface interface {
-	GetRESTClient() *restclient.RESTClient
+	RESTClient() restclient.Interface
 	StorageClassesGetter
 }
 
 // StorageClient is used to interact with features provided by the Storage group.
 type StorageClient struct {
-	*restclient.RESTClient
+	restClient restclient.Interface
 }
 
 func (c *StorageClient) StorageClasses() StorageClassInterface {
@@ -60,7 +60,7 @@ func NewForConfigOrDie(c *restclient.Config) *StorageClient {
 }
 
 // New creates a new StorageClient for the given RESTClient.
-func New(c *restclient.RESTClient) *StorageClient {
+func New(c restclient.Interface) *StorageClient {
 	return &StorageClient{c}
 }
 
@@ -89,11 +89,11 @@ func setConfigDefaults(config *restclient.Config) error {
 	return nil
 }
 
-// GetRESTClient returns a RESTClient that is used to communicate
+// RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *StorageClient) GetRESTClient() *restclient.RESTClient {
+func (c *StorageClient) RESTClient() restclient.Interface {
 	if c == nil {
 		return nil
 	}
-	return c.RESTClient
+	return c.restClient
 }

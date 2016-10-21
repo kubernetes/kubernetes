@@ -70,8 +70,8 @@ var (
 
 // NewEndpointController returns a new *EndpointController.
 func NewEndpointController(podInformer cache.SharedIndexInformer, client clientset.Interface) *EndpointController {
-	if client != nil && client.Core().GetRESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("endpoint_controller", client.Core().GetRESTClient().GetRateLimiter())
+	if client != nil && client.Core().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("endpoint_controller", client.Core().RESTClient().GetRateLimiter())
 	}
 	e := &EndpointController{
 		client: client,

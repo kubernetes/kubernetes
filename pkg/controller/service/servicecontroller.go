@@ -102,8 +102,8 @@ func New(cloud cloudprovider.Interface, kubeClient clientset.Interface, clusterN
 	broadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
 	recorder := broadcaster.NewRecorder(api.EventSource{Component: "service-controller"})
 
-	if kubeClient != nil && kubeClient.Core().GetRESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("service_controller", kubeClient.Core().GetRESTClient().GetRateLimiter())
+	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("service_controller", kubeClient.Core().RESTClient().GetRateLimiter())
 	}
 
 	s := &ServiceController{
@@ -175,7 +175,7 @@ func (s *ServiceController) Run(workers int) {
 	for i := 0; i < workers; i++ {
 		go wait.Until(s.worker, time.Second, wait.NeverStop)
 	}
-	nodeLW := cache.NewListWatchFromClient(s.kubeClient.(*clientset.Clientset).CoreClient, "nodes", api.NamespaceAll, fields.Everything())
+	nodeLW := cache.NewListWatchFromClient(s.kubeClient.Core().RESTClient(), "nodes", api.NamespaceAll, fields.Everything())
 	cache.NewReflector(nodeLW, &api.Node{}, s.nodeLister.Store, 0).Run()
 	go wait.Until(s.nodeSyncLoop, nodeSyncPeriod, wait.NeverStop)
 }

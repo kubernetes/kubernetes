@@ -19,6 +19,7 @@ package unversioned
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -43,13 +44,13 @@ type ClusterRoleBindingInterface interface {
 
 // clusterRoleBindings implements ClusterRoleBindingInterface
 type clusterRoleBindings struct {
-	client *RbacClient
+	client restclient.Interface
 }
 
 // newClusterRoleBindings returns a ClusterRoleBindings
 func newClusterRoleBindings(c *RbacClient) *clusterRoleBindings {
 	return &clusterRoleBindings{
-		client: c,
+		client: c.RESTClient(),
 	}
 }
 

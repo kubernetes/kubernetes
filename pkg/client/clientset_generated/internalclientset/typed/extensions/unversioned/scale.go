@@ -16,6 +16,10 @@ limitations under the License.
 
 package unversioned
 
+import (
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
+)
+
 // ScalesGetter has a method to return a ScaleInterface.
 // A group's client should implement this interface.
 type ScalesGetter interface {
@@ -29,14 +33,14 @@ type ScaleInterface interface {
 
 // scales implements ScaleInterface
 type scales struct {
-	client *ExtensionsClient
+	client restclient.Interface
 	ns     string
 }
 
 // newScales returns a Scales
 func newScales(c *ExtensionsClient, namespace string) *scales {
 	return &scales{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

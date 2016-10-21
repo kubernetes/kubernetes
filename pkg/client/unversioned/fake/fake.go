@@ -23,10 +23,12 @@ import (
 	"net/url"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/flowcontrol"
 )
 
 func CreateHTTPClient(roundTripper func(*http.Request) (*http.Response, error)) *http.Client {
@@ -69,6 +71,18 @@ func (c *RESTClient) Post() *restclient.Request {
 
 func (c *RESTClient) Delete() *restclient.Request {
 	return c.request("DELETE")
+}
+
+func (c *RESTClient) Verb(verb string) *restclient.Request {
+	return c.request(verb)
+}
+
+func (c *RESTClient) APIVersion() unversioned.GroupVersion {
+	return *(testapi.Default.GroupVersion())
+}
+
+func (c *RESTClient) GetRateLimiter() flowcontrol.RateLimiter {
+	return nil
 }
 
 func (c *RESTClient) request(verb string) *restclient.Request {

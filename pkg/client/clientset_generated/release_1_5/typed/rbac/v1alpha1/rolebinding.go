@@ -20,6 +20,7 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	v1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -44,14 +45,14 @@ type RoleBindingInterface interface {
 
 // roleBindings implements RoleBindingInterface
 type roleBindings struct {
-	client *RbacClient
+	client restclient.Interface
 	ns     string
 }
 
 // newRoleBindings returns a RoleBindings
 func newRoleBindings(c *RbacClient, namespace string) *roleBindings {
 	return &roleBindings{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

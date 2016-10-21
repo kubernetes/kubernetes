@@ -18,6 +18,7 @@ package unversioned
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -42,14 +43,14 @@ type ConfigMapInterface interface {
 
 // configMaps implements ConfigMapInterface
 type configMaps struct {
-	client *CoreClient
+	client restclient.Interface
 	ns     string
 }
 
 // newConfigMaps returns a ConfigMaps
 func newConfigMaps(c *CoreClient, namespace string) *configMaps {
 	return &configMaps{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

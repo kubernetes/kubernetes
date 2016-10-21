@@ -58,8 +58,9 @@ func (c *FakeExtensions) ThirdPartyResources() v1beta1.ThirdPartyResourceInterfa
 	return &FakeThirdPartyResources{c}
 }
 
-// GetRESTClient returns a RESTClient that is used to communicate
+// RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeExtensions) GetRESTClient() *restclient.RESTClient {
-	return nil
+func (c *FakeExtensions) RESTClient() restclient.Interface {
+	var ret *restclient.RESTClient
+	return ret
 }
