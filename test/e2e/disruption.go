@@ -69,7 +69,7 @@ var _ = framework.KubeDescribe("DisruptionController [Feature:PodDisruptionbudge
 		}
 		_, err := cs.Policy().PodDisruptionBudgets(ns).Create(&pdb)
 		Expect(err).NotTo(HaveOccurred())
-		for i := 0; i < 2; i++ {
+		for i := 0; i < 3; i++ {
 			pod := &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name:      fmt.Sprintf("pod-%d", i),
