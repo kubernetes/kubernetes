@@ -7376,7 +7376,15 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "",
 						},
 					},
+					"SynchronousGarbageCollection": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Should the owner object keep existing in the key-value store until all dependents are removed. The option is cascading, i.e., the object’s dependents will be deleted with the same SynchronousGarbageCollection. This option and OrphanDependents are exclusive. Defaults to false.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
+				Required: []string{"SynchronousGarbageCollection"},
 			},
 		},
 		Dependencies: []string{

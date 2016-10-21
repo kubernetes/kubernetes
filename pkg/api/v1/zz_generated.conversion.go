@@ -1436,6 +1436,7 @@ func autoConvert_v1_DeleteOptions_To_api_DeleteOptions(in *DeleteOptions, out *a
 		out.Preconditions = nil
 	}
 	out.OrphanDependents = in.OrphanDependents
+	out.SynchronousGarbageCollection = in.SynchronousGarbageCollection
 	return nil
 }
 
@@ -1458,6 +1459,7 @@ func autoConvert_api_DeleteOptions_To_v1_DeleteOptions(in *api.DeleteOptions, ou
 		out.Preconditions = nil
 	}
 	out.OrphanDependents = in.OrphanDependents
+	out.SynchronousGarbageCollection = in.SynchronousGarbageCollection
 	return nil
 }
 

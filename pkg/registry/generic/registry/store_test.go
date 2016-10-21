@@ -1021,6 +1021,137 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 	}
 }
 
+// Test the DeleteOptions.SynchronousGC is handled correctly
+func TestStoreDeleteWithSynchronousGC(t *testing.T) {
+	trueVar := true
+	initialGeneration := int64(1)
+
+	// defaultDeleteStrategy doesn't implement rest.GarbageCollectionDeleteStrategy.
+	defaultDeleteStrategy := &testRESTStrategy{api.Scheme, api.SimpleNameGenerator, true, false, true}
+	// orphanDeleteStrategy indicates the default garbage collection policy is
+	// to orphan dependentes.
+	orphanDeleteStrategy := &testOrphanDeleteStrategy{defaultDeleteStrategy}
+
+	testcases := map[string]struct {
+		options  *api.DeleteOptions
+		strategy rest.RESTDeleteStrategy
+		// finalizers that are already set in the object
+		existingFinalizers []string
+		// expected error occurs at deletion time
+		expectedError bool
+		// expected error message at deletion time
+		expectedErrorMessage string
+		expectedNotFound     bool
+		expectedFinalizers   []string
+	}{
+		"no existing finalizers, SyncGC=true, Orphan=true": {
+			options:              &api.DeleteOptions{OrphanDependents: &trueVar, SynchronousGarbageCollection: &trueVar},
+			strategy:             defaultDeleteStrategy,
+			expectedError:        true,
+			expectedErrorMessage: "cannot be both set",
+		},
+		"no existing finalizers, SyncGC=true, Orphan=nil, defaultDeleteStrategy": {
+			options:            &api.DeleteOptions{SynchronousGarbageCollection: &trueVar},
+			strategy:           defaultDeleteStrategy,
+			expectedFinalizers: []string{api.FinalizerSynchronousGC},
+		},
+		"no existing finalizers, SyncGC=true, Orphan=nil, orphanDeleteStrategy": {
+			options:            &api.DeleteOptions{SynchronousGarbageCollection: &trueVar},
+			strategy:           orphanDeleteStrategy,
+			expectedFinalizers: []string{api.FinalizerSynchronousGC},
+		},
+		"existing Orphan finalizer, SyncGC=true, Orphan=nil, defaultDeleteStrategy": {
+			existingFinalizers: []string{api.FinalizerOrphan},
+			options:            &api.DeleteOptions{SynchronousGarbageCollection: &trueVar},
+			strategy:           defaultDeleteStrategy,
+			expectedFinalizers: []string{api.FinalizerSynchronousGC},
+		},
+		"existing Orphan finalizer, SyncGC=true, Orphan=nil, orphanDeleteStrategy": {
+			existingFinalizers: []string{api.FinalizerOrphan},
+			options:            &api.DeleteOptions{SynchronousGarbageCollection: &trueVar},
+			strategy:           orphanDeleteStrategy,
+			expectedFinalizers: []string{api.FinalizerSynchronousGC},
+		},
+		"no existing finalizers, SyncGC=nil, Orphan=nil,defaultDeleteStrategy": {
+			options:          &api.DeleteOptions{},
+			strategy:         defaultDeleteStrategy,
+			expectedNotFound: true,
+		},
+		"no existing finalizers, SyncGC=nil, Orphan=nil,orphanDeleteStrategy": {
+			options:            &api.DeleteOptions{},
+			strategy:           orphanDeleteStrategy,
+			expectedFinalizers: []string{api.FinalizerOrphan},
+		},
+	}
+
+	testContext := api.WithNamespace(api.NewContext(), "test")
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	registry.EnableGarbageCollection = true
+	defer destroyFunc()
+
+	createPod := func(i int, finalizers []string) *api.Pod {
+		return &api.Pod{
+			ObjectMeta: api.ObjectMeta{Name: fmt.Sprintf("pod-%d", i), Finalizers: finalizers, Generation: initialGeneration},
+			Spec:       api.PodSpec{NodeName: "machine"},
+		}
+	}
+
+	i := 0
+	for title, tc := range testcases {
+		t.Logf("case title: %s", title)
+		registry.DeleteStrategy = tc.strategy
+		i++
+		pod := createPod(i, tc.existingFinalizers)
+		// create pod
+		_, err := registry.Create(testContext, pod)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		_, err = registry.Delete(testContext, pod.Name, tc.options)
+		if !tc.expectedError && err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		if tc.expectedError {
+			if err == nil {
+				t.Fatalf("expected error")
+			}
+			if e, a := tc.expectedErrorMessage, err.Error(); !strings.Contains(a, e) {
+				t.Fatalf("expected error to contain %v, got %v", e, a)
+			}
+		}
+		obj, err := registry.Get(testContext, pod.Name)
+		if tc.expectedNotFound {
+			if err == nil || !errors.IsNotFound(err) {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			continue
+		}
+		if !tc.expectedNotFound && err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		if !tc.expectedNotFound {
+			pod, ok := obj.(*api.Pod)
+			if !ok {
+				t.Fatalf("Expect the object to be a pod, but got %#v", obj)
+			}
+			if e, a := tc.expectedFinalizers, pod.ObjectMeta.Finalizers; !reflect.DeepEqual(e, a) {
+				t.Errorf("%v: Expect object %s to have finalizers %v, got %v", pod.Name, pod.ObjectMeta.Name, e, a)
+			}
+			if !tc.expectedError {
+				if pod.ObjectMeta.DeletionTimestamp == nil {
+					t.Errorf("%v: Expect the object to have DeletionTimestamp set, but got %#v", pod.Name, pod.ObjectMeta)
+				}
+				if pod.ObjectMeta.DeletionGracePeriodSeconds == nil || *pod.ObjectMeta.DeletionGracePeriodSeconds != 0 {
+					t.Errorf("%v: Expect the object to have 0 DeletionGracePeriodSecond, but got %#v", pod.Name, pod.ObjectMeta)
+				}
+				if pod.Generation <= initialGeneration {
+					t.Errorf("%v: Deletion didn't increase Generation.", pod.Name)
+				}
+			}
+		}
+	}
+}
+
 func TestStoreDeleteCollection(t *testing.T) {
 	podA := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	podB := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}}

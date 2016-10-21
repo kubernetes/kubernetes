@@ -2669,8 +2669,9 @@ type FinalizerName string
 
 // These are internal finalizer values to Kubernetes, must be qualified name unless defined here
 const (
-	FinalizerKubernetes FinalizerName = "kubernetes"
-	FinalizerOrphan     string        = "orphan"
+	FinalizerKubernetes    FinalizerName = "kubernetes"
+	FinalizerOrphan        string        = "orphan"
+	FinalizerSynchronousGC string        = "collectingGarbage"
 )
 
 // NamespaceStatus is information about the current status of a Namespace.
@@ -2755,6 +2756,12 @@ type DeleteOptions struct {
 	// finalizer will be added to/removed from the object's finalizers list.
 	// +optional
 	OrphanDependents *bool `json:"orphanDependents,omitempty"`
+
+	// Should the owner object keep existing in the key-value store until all dependents are removed.
+	// The option is cascading, i.e., the object’s dependents will be deleted with the same SynchronousGarbageCollection option.
+	// This option and OrphanDependents are exclusive.
+	// Defaults to false.
+	SynchronousGarbageCollection *bool
 }
 
 // ExportOptions is the query options to the standard REST get call.

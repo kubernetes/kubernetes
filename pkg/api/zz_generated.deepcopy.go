@@ -800,6 +800,13 @@ func DeepCopy_api_DeleteOptions(in interface{}, out interface{}, c *conversion.C
 		} else {
 			out.OrphanDependents = nil
 		}
+		if in.SynchronousGarbageCollection != nil {
+			in, out := &in.SynchronousGarbageCollection, &out.SynchronousGarbageCollection
+			*out = new(bool)
+			**out = **in
+		} else {
+			out.SynchronousGarbageCollection = nil
+		}
 		return nil
 	}
 }

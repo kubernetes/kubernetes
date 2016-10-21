@@ -772,6 +772,13 @@ func DeepCopy_v1_DeleteOptions(in interface{}, out interface{}, c *conversion.Cl
 		} else {
 			out.OrphanDependents = nil
 		}
+		if in.SynchronousGarbageCollection != nil {
+			in, out := &in.SynchronousGarbageCollection, &out.SynchronousGarbageCollection
+			*out = new(bool)
+			**out = **in
+		} else {
+			out.SynchronousGarbageCollection = nil
+		}
 		return nil
 	}
 }

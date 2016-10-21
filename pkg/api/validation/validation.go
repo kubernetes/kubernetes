@@ -395,9 +395,7 @@ func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn Val
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabels(meta.Labels, fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(meta.Annotations, fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidateOwnerReferences(meta.OwnerReferences, fldPath.Child("ownerReferences"))...)
-	for _, finalizer := range meta.Finalizers {
-		allErrs = append(allErrs, validateFinalizerName(finalizer, fldPath.Child("finalizers"))...)
-	}
+	allErrs = append(allErrs, ValidateFinalizers(meta.Finalizers, fldPath.Child("finalizers"))...)
 	return allErrs
 }
 
@@ -3399,6 +3397,29 @@ func ValidateNamespace(namespace *api.Namespace) field.ErrorList {
 	allErrs := ValidateObjectMeta(&namespace.ObjectMeta, false, ValidateNamespaceName, field.NewPath("metadata"))
 	for i := range namespace.Spec.Finalizers {
 		allErrs = append(allErrs, validateFinalizerName(string(namespace.Spec.Finalizers[i]), field.NewPath("spec", "finalizers"))...)
+	}
+	return allErrs
+}
+
+// ValidateFinalizers tests if the finalizers name are valid, and if there are conflict finalizers
+func ValidateFinalizers(finalizers []string, fldPath *field.Path) field.ErrorList {
+	if fldPath == nil {
+		fldPath = field.NewPath("metadata", "finalizers")
+	}
+	allErrs := field.ErrorList{}
+	hasOrphanFinalizer := false
+	hasSynchronousGCFinalizer := false
+	for _, finalizer := range finalizers {
+		allErrs = append(allErrs, validateFinalizerName(finalizer, fldPath)...)
+		if finalizer == api.FinalizerOrphan {
+			hasOrphanFinalizer = true
+		}
+		if finalizer == api.FinalizerSynchronousGC {
+			hasSynchronousGCFinalizer = true
+		}
+	}
+	if hasSynchronousGCFinalizer && hasOrphanFinalizer {
+		allErrs = append(allErrs, field.Invalid(fldPath, finalizers, fmt.Sprintf("%s and %s cannot be both set", api.FinalizerOrphan, api.FinalizerSynchronousGC)))
 	}
 	return allErrs
 }
