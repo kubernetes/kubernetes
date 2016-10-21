@@ -473,8 +473,6 @@ function start-kubelet {
   flags+=" --cluster-dns=${DNS_SERVER_IP}"
   flags+=" --cluster-domain=${DNS_DOMAIN}"
   flags+=" --config=/etc/kubernetes/manifests"
-  flags+=" --kubelet-cgroups=/kubelet"
-  flags+=" --system-cgroups=/system"
 
   if [[ -n "${KUBELET_PORT:-}" ]]; then
     flags+=" --port=${KUBELET_PORT}"
@@ -1167,6 +1165,9 @@ For Kubernetes copyright and licensing information, see:
 EOF
 }
 
+function override-kubectl {
+    mount -B ${KUBE_HOME}/kubectl /usr/bin/kubectl
+}
 
 ########### Main Function ###########
 echo "Start to configure instance for kubernetes"
@@ -1201,6 +1202,7 @@ else
   create-kubeproxy-kubeconfig
 fi
 
+override-kubectl
 assemble-docker-flags
 load-docker-images
 start-kubelet
