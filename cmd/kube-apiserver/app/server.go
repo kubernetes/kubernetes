@@ -338,6 +338,6 @@ func Run(s *options.APIServer) error {
 	}
 
 	sharedInformers.Start(wait.NeverStop)
-	m.GenericAPIServer.Run()
+	m.GenericAPIServer.Run(nil)
 	return nil
 }
