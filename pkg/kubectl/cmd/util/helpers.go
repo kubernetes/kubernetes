@@ -272,6 +272,8 @@ func PrintErrorWithCauses(err error, errOut io.Writer) bool {
 			return true
 		}
 	}
+
+	fmt.Fprintf(errOut, "error: %v\n", err)
 	return false
 }
 
