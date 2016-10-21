@@ -452,6 +452,14 @@ k8s.io/kubernetes/cmd/kubeadm/app/images,davidopp,1
 k8s.io/kubernetes/cmd/kubeadm/app/util,krousey,1
 k8s.io/kubernetes/cmd/kubelet/app,hurf,1
 k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup.k8s.io/unversioned,eparis,1
+k8s.io/kubernetes/cmd/kubernetes-discovery/discoverysummarizer,thockin,1
+k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset,bgrant0607,1
+k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup.k8s.io/internalversion,eparis,1
+k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/testgroup/unversioned,wojtek-t,1
+k8s.io/kubernetes/cmd/libs/go2idl/deepcopy-gen/generators,mwielgus,1
+k8s.io/kubernetes/cmd/libs/go2idl/generator,ixdy,1
+k8s.io/kubernetes/cmd/libs/go2idl/import-boss/generators,kevin-wangzefeng,1
+k8s.io/kubernetes/cmd/libs/go2idl/namer,luxas,1
 k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen/generators,davidopp,1
 k8s.io/kubernetes/cmd/mungedocs,mwielgus,1
 k8s.io/kubernetes/examples,Random-Liu,0

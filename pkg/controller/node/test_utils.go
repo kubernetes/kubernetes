@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
+	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/clock"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
@@ -59,7 +59,7 @@ type FakeNodeHandler struct {
 }
 
 type FakeLegacyHandler struct {
-	unversionedcore.CoreInterface
+	unversionedcore.CoreInternalversionInterface
 	n *FakeNodeHandler
 }
 
@@ -73,7 +73,7 @@ func (c *FakeNodeHandler) getUpdatedNodesCopy() []*api.Node {
 	return updatedNodesCopy
 }
 
-func (c *FakeNodeHandler) Core() unversionedcore.CoreInterface {
+func (c *FakeNodeHandler) Core() unversionedcore.CoreInternalversionInterface {
 	return &FakeLegacyHandler{c.Clientset.Core(), c}
 }
 

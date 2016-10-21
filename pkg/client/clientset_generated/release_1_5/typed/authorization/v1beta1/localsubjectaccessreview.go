@@ -38,7 +38,7 @@ type localSubjectAccessReviews struct {
 }
 
 // newLocalSubjectAccessReviews returns a LocalSubjectAccessReviews
-func newLocalSubjectAccessReviews(c *AuthorizationClient, namespace string) *localSubjectAccessReviews {
+func newLocalSubjectAccessReviews(c *AuthorizationV1beta1Client, namespace string) *localSubjectAccessReviews {
 	return &localSubjectAccessReviews{
 		client: c.RESTClient(),
 		ns:     namespace,

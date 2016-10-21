@@ -18,5 +18,5 @@ package fake
 
 // FakeSelfSubjectAccessReviews implements SelfSubjectAccessReviewInterface
 type FakeSelfSubjectAccessReviews struct {
-	Fake *FakeAuthorization
+	Fake *FakeAuthorizationV1beta1
 }

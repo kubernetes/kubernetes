@@ -49,7 +49,7 @@ type serviceAccounts struct {
 }
 
 // newServiceAccounts returns a ServiceAccounts
-func newServiceAccounts(c *CoreClient, namespace string) *serviceAccounts {
+func newServiceAccounts(c *CoreV1Client, namespace string) *serviceAccounts {
 	return &serviceAccounts{
 		client: c.RESTClient(),
 		ns:     namespace,

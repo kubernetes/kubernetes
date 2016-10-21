@@ -38,7 +38,7 @@ type Interface interface {
 type Clientset struct {
 	*discovery.DiscoveryClient
 	*v1beta1federation.FederationClient
-	*v1core.CoreClient
+	*v1core.CoreUnversionedClient
 	*v1beta1extensions.ExtensionsClient
 }
 
@@ -50,12 +50,12 @@ func (c *Clientset) Federation() v1beta1federation.FederationInterface {
 	return c.FederationClient
 }
 
-// Core retrieves the CoreClient
+// Core retrieves the CoreUnversionedClient
 func (c *Clientset) Core() v1core.CoreInterface {
 	if c == nil {
 		return nil
 	}
-	return c.CoreClient
+	return c.CoreUnversionedClient
 }
 
 // Extensions retrieves the ExtensionsClient
@@ -83,7 +83,7 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
-	clientset.CoreClient, err = v1core.NewForConfig(&configShallowCopy)
+	clientset.CoreUnversionedClient, err = v1core.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +105,7 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 func NewForConfigOrDie(c *restclient.Config) *Clientset {
 	var clientset Clientset
 	clientset.FederationClient = v1beta1federation.NewForConfigOrDie(c)
-	clientset.CoreClient = v1core.NewForConfigOrDie(c)
+	clientset.CoreUnversionedClient = v1core.NewForConfigOrDie(c)
 	clientset.ExtensionsClient = v1beta1extensions.NewForConfigOrDie(c)
 
 	clientset.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
@@ -116,7 +116,7 @@ func NewForConfigOrDie(c *restclient.Config) *Clientset {
 func New(c *restclient.RESTClient) *Clientset {
 	var clientset Clientset
 	clientset.FederationClient = v1beta1federation.New(c)
-	clientset.CoreClient = v1core.New(c)
+	clientset.CoreUnversionedClient = v1core.New(c)
 	clientset.ExtensionsClient = v1beta1extensions.New(c)
 
 	clientset.DiscoveryClient = discovery.NewDiscoveryClient(c)

@@ -43,12 +43,12 @@ type EndpointsInterface interface {
 
 // endpoints implements EndpointsInterface
 type endpoints struct {
-	client *CoreClient
+	client *CoreUnversionedClient
 	ns     string
 }
 
 // newEndpoints returns a Endpoints
-func newEndpoints(c *CoreClient, namespace string) *endpoints {
+func newEndpoints(c *CoreUnversionedClient, namespace string) *endpoints {
 	return &endpoints{
 		client: c,
 		ns:     namespace,

@@ -49,7 +49,7 @@ type clusterRoles struct {
 }
 
 // newClusterRoles returns a ClusterRoles
-func newClusterRoles(c *RbacClient) *clusterRoles {
+func newClusterRoles(c *RbacV1alpha1Client) *clusterRoles {
 	return &clusterRoles{
 		client: c.RESTClient(),
 	}

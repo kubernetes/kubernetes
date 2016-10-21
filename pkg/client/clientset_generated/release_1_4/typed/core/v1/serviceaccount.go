@@ -43,12 +43,12 @@ type ServiceAccountInterface interface {
 
 // serviceAccounts implements ServiceAccountInterface
 type serviceAccounts struct {
-	client *CoreClient
+	client *CoreUnversionedClient
 	ns     string
 }
 
 // newServiceAccounts returns a ServiceAccounts
-func newServiceAccounts(c *CoreClient, namespace string) *serviceAccounts {
+func newServiceAccounts(c *CoreUnversionedClient, namespace string) *serviceAccounts {
 	return &serviceAccounts{
 		client: c,
 		ns:     namespace,

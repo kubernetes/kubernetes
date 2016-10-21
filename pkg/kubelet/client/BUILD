@@ -33,7 +33,7 @@ go_test(
         "skip",
     ],
     deps = [
-        "//pkg/client/clientset_generated/internalclientset/typed/core/unversioned:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/client/restclient:go_default_library",
     ],
 )

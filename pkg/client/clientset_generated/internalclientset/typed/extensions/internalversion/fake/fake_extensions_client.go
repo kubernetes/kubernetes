@@ -1,0 +1,66 @@
+/*
+Copyright 2016 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package fake
+
+import (
+	internalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
+	core "k8s.io/kubernetes/pkg/client/testing/core"
+)
+
+type FakeExtensionsInternalversion struct {
+	*core.Fake
+}
+
+func (c *FakeExtensionsInternalversion) DaemonSets(namespace string) internalversion.DaemonSetInterface {
+	return &FakeDaemonSets{c, namespace}
+}
+
+func (c *FakeExtensionsInternalversion) Deployments(namespace string) internalversion.DeploymentInterface {
+	return &FakeDeployments{c, namespace}
+}
+
+func (c *FakeExtensionsInternalversion) Ingresses(namespace string) internalversion.IngressInterface {
+	return &FakeIngresses{c, namespace}
+}
+
+func (c *FakeExtensionsInternalversion) NetworkPolicies(namespace string) internalversion.NetworkPolicyInterface {
+	return &FakeNetworkPolicies{c, namespace}
+}
+
+func (c *FakeExtensionsInternalversion) PodSecurityPolicies() internalversion.PodSecurityPolicyInterface {
+	return &FakePodSecurityPolicies{c}
+}
+
+func (c *FakeExtensionsInternalversion) ReplicaSets(namespace string) internalversion.ReplicaSetInterface {
+	return &FakeReplicaSets{c, namespace}
+}
+
+func (c *FakeExtensionsInternalversion) Scales(namespace string) internalversion.ScaleInterface {
+	return &FakeScales{c, namespace}
+}
+
+func (c *FakeExtensionsInternalversion) ThirdPartyResources() internalversion.ThirdPartyResourceInterface {
+	return &FakeThirdPartyResources{c}
+}
+
+// RESTClient returns a RESTClient that is used to communicate
+// with API server by this client implementation.
+func (c *FakeExtensionsInternalversion) RESTClient() restclient.Interface {
+	var ret *restclient.RESTClient
+	return ret
+}
