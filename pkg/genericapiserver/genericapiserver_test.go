@@ -343,8 +343,8 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 	// Add a Group.
 	extensionsVersions := []unversioned.GroupVersionForDiscovery{
 		{
-			GroupVersion: testapi.Extensions.GroupVersion().String(),
-			Version:      testapi.Extensions.GroupVersion().Version,
+			GroupVersion: registered.GroupOrDie(extensions.GroupName).GroupVersion.String(),
+			Version:      registered.GroupOrDie(extensions.GroupName).GroupVersion.Version,
 		},
 	}
 	extensionsPreferredVersion := unversioned.GroupVersionForDiscovery{

@@ -92,23 +92,23 @@ func (c *Client) Setup(t *testing.T) *Client {
 		// We will fix this by supporting multiple group versions in Config
 		c.AutoscalingClient = client.NewAutoscalingOrDie(&restclient.Config{
 			Host:          c.server.URL,
-			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Autoscaling.GroupVersion()},
+			ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie("autoscaling").GroupVersion},
 		})
 		c.BatchClient = client.NewBatchOrDie(&restclient.Config{
 			Host:          c.server.URL,
-			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Batch.GroupVersion()},
+			ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie("batch").GroupVersion},
 		})
 		c.ExtensionsClient = client.NewExtensionsOrDie(&restclient.Config{
 			Host:          c.server.URL,
-			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Extensions.GroupVersion()},
+			ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie("extensions").GroupVersion},
 		})
 		c.RbacClient = client.NewRbacOrDie(&restclient.Config{
 			Host:          c.server.URL,
-			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Rbac.GroupVersion()},
+			ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie("rbac.authorization.k8s.io").GroupVersion},
 		})
 		c.StorageClient = client.NewStorageOrDie(&restclient.Config{
 			Host:          c.server.URL,
-			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Storage.GroupVersion()},
+			ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie("storage.k8s.io").GroupVersion},
 		})
 
 		c.Clientset = clientset.NewForConfigOrDie(&restclient.Config{Host: c.server.URL})
