@@ -904,7 +904,7 @@ func (m *kubeGenericRuntimeManager) UpdatePodCIDR(podCIDR string) error {
 		})
 }
 
-func (m *kubeGenericRuntimeManager) NewSyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
+func (m *kubeGenericRuntimeManager) NewSyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backoff *flowcontrol.Backoff) (podSyncResult kubecontainer.PodSyncResult) {
 	// Split the pod status.
 	statuses := newStatusGroup(pod, podStatus)
 
