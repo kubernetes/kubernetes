@@ -30,6 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -49,50 +51,48 @@ func TestWatchList(t *testing.T) {
 // - update should trigger Modified event
 // - update that gets filtered should trigger Deleted event
 func testWatch(t *testing.T, recursive bool) {
+	ctx, store, cluster := testSetup(t)
+	defer cluster.Terminate(t)
 	podFoo := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	podBar := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}}
 
 	tests := []struct {
 		key        string
-		filter     func(runtime.Object) bool
-		trigger    func() []storage.MatchValue
+		pred       storage.SelectionPredicate
 		watchTests []*testWatchStruct
 	}{{ // create a key
 		key:        "/somekey-1",
 		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}},
-		filter:     storage.EverythingFunc,
-		trigger:    storage.NoTriggerFunc,
-	}, { // create a key but obj gets filtered
-		key:        "/somekey-2",
-		watchTests: []*testWatchStruct{{podFoo, false, ""}},
-		filter:     func(runtime.Object) bool { return false },
-		trigger:    storage.NoTriggerFunc,
+		pred:       storage.Everything,
 	}, { // create a key but obj gets filtered. Then update it with unfiltered obj
 		key:        "/somekey-3",
 		watchTests: []*testWatchStruct{{podFoo, false, ""}, {podBar, true, watch.Added}},
-		filter: func(obj runtime.Object) bool {
-			pod := obj.(*api.Pod)
-			return pod.Name == "bar"
+		pred: storage.SelectionPredicate{
+			Label: labels.Everything(),
+			Field: fields.ParseSelectorOrDie("metadata.name=bar"),
+			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+				pod := obj.(*api.Pod)
+				return nil, fields.Set{"metadata.name": pod.Name}, nil
+			},
 		},
-		trigger: storage.NoTriggerFunc,
 	}, { // update
 		key:        "/somekey-4",
 		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}, {podBar, true, watch.Modified}},
-		filter:     storage.EverythingFunc,
-		trigger:    storage.NoTriggerFunc,
+		pred:       storage.Everything,
 	}, { // delete because of being filtered
 		key:        "/somekey-5",
 		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}, {podBar, true, watch.Deleted}},
-		filter: func(obj runtime.Object) bool {
-			pod := obj.(*api.Pod)
-			return pod.Name != "bar"
+		pred: storage.SelectionPredicate{
+			Label: labels.Everything(),
+			Field: fields.ParseSelectorOrDie("metadata.name!=bar"),
+			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+				pod := obj.(*api.Pod)
+				return nil, fields.Set{"metadata.name": pod.Name}, nil
+			},
 		},
-		trigger: storage.NoTriggerFunc,
 	}}
 	for i, tt := range tests {
-		ctx, store, cluster := testSetup(t)
-		filter := storage.NewSimpleFilter(tt.filter, tt.trigger)
-		w, err := store.watch(ctx, tt.key, "0", filter, recursive)
+		w, err := store.watch(ctx, tt.key, "0", tt.pred, recursive)
 		if err != nil {
 			t.Fatalf("Watch failed: %v", err)
 		}
@@ -122,7 +122,6 @@ func testWatch(t *testing.T, recursive bool) {
 		}
 		w.Stop()
 		testCheckStop(t, i, w)
-		cluster.Terminate(t)
 	}
 }
 
@@ -196,17 +195,20 @@ func TestWatchContextCancel(t *testing.T) {
 	defer cluster.Terminate(t)
 	canceledCtx, cancel := context.WithCancel(ctx)
 	cancel()
-	w := store.watcher.createWatchChan(canceledCtx, "/abc", 0, false, storage.Everything)
-	// When we do a client.Get with a canceled context, it will return error.
-	// Nonetheless, when we try to send it over internal errChan, we should detect
-	// it's context canceled and not send it.
-	err := w.sync()
-	w.ctx = ctx
-	w.sendError(err)
+	// When we watch with a canceled context, we should detect that it's context canceled.
+	// We won't take it as error and also close the watcher.
+	w, err := store.watcher.Watch(canceledCtx, "/abc", 0, false, storage.Everything)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	select {
-	case err := <-w.errChan:
-		t.Errorf("cancelling context shouldn't return any error. Err: %v", err)
-	default:
+	case _, ok := <-w.ResultChan():
+		if ok {
+			t.Error("ResultChan() should be closed")
+		}
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("timeout after %v", wait.ForeverTestTimeout)
 	}
 }
 

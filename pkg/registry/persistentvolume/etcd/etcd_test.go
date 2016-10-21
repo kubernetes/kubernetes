@@ -71,6 +71,7 @@ func validChangedPersistentVolume() *api.PersistentVolume {
 func TestCreate(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).ClusterScope()
 	pv := validNewPersistentVolume("foo")
 	pv.ObjectMeta = api.ObjectMeta{GenerateName: "foo"}
@@ -87,6 +88,7 @@ func TestCreate(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).ClusterScope()
 	test.TestUpdate(
 		// valid
@@ -105,6 +107,7 @@ func TestUpdate(t *testing.T) {
 func TestDelete(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).ClusterScope().ReturnDeletedObject()
 	test.TestDelete(validNewPersistentVolume("foo"))
 }
@@ -112,6 +115,7 @@ func TestDelete(t *testing.T) {
 func TestGet(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).ClusterScope()
 	test.TestGet(validNewPersistentVolume("foo"))
 }
@@ -119,6 +123,7 @@ func TestGet(t *testing.T) {
 func TestList(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).ClusterScope()
 	test.TestList(validNewPersistentVolume("foo"))
 }
@@ -126,6 +131,7 @@ func TestList(t *testing.T) {
 func TestWatch(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).ClusterScope()
 	test.TestWatch(
 		validNewPersistentVolume("foo"),
@@ -150,6 +156,7 @@ func TestWatch(t *testing.T) {
 func TestUpdateStatus(t *testing.T) {
 	storage, statusStorage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	ctx := api.NewContext()
 	key, _ := storage.KeyFunc(ctx, "foo")
 	key = etcdtest.AddPrefix(key)

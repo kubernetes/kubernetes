@@ -147,8 +147,8 @@ func NodeToSelectableFields(node *api.Node) fields.Set {
 }
 
 // MatchNode returns a generic matcher for a given label and field selector.
-func MatchNode(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
-	return &generic.SelectionPredicate{
+func MatchNode(label labels.Selector, field fields.Selector) pkgstorage.SelectionPredicate {
+	return pkgstorage.SelectionPredicate{
 		Label: label,
 		Field: field,
 		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {

@@ -88,6 +88,7 @@ var validController = validNewController()
 func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Controller.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Controller.Store)
 	controller := validNewController()
 	controller.ObjectMeta = api.ObjectMeta{}
@@ -108,6 +109,7 @@ func TestCreate(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Controller.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Controller.Store)
 	test.TestUpdate(
 		// valid
@@ -135,6 +137,7 @@ func TestUpdate(t *testing.T) {
 func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Controller.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Controller.Store)
 	test.TestDelete(validNewController())
 }
@@ -142,6 +145,7 @@ func TestDelete(t *testing.T) {
 func TestGenerationNumber(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Controller.Store.DestroyFunc()
 	modifiedSno := *validNewController()
 	modifiedSno.Generation = 100
 	modifiedSno.Status.ObservedGeneration = 10
@@ -192,6 +196,7 @@ func TestGenerationNumber(t *testing.T) {
 func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Controller.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Controller.Store)
 	test.TestGet(validNewController())
 }
@@ -199,6 +204,7 @@ func TestGet(t *testing.T) {
 func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Controller.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Controller.Store)
 	test.TestList(validNewController())
 }
@@ -206,6 +212,7 @@ func TestList(t *testing.T) {
 func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Controller.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Controller.Store)
 	test.TestWatch(
 		validController,
@@ -240,6 +247,7 @@ func TestWatch(t *testing.T) {
 func TestScaleGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Controller.Store.DestroyFunc()
 
 	ctx := api.WithNamespace(api.NewContext(), namespace)
 	rc, err := createController(storage.Controller, *validController, t)
@@ -276,6 +284,7 @@ func TestScaleGet(t *testing.T) {
 func TestScaleUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Controller.Store.DestroyFunc()
 
 	ctx := api.WithNamespace(api.NewContext(), namespace)
 	rc, err := createController(storage.Controller, *validController, t)

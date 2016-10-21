@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/selection"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
-	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/storage/storagebackend/factory"
 	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
@@ -107,14 +106,14 @@ func NewTestGenericStoreRegistry(t *testing.T) (factory.DestroyFunc, *Store) {
 
 // matchPodName returns selection predicate that matches any pod with name in the set.
 // Makes testing simpler.
-func matchPodName(names ...string) *generic.SelectionPredicate {
+func matchPodName(names ...string) storage.SelectionPredicate {
 	// Note: even if pod name is a field, we have to use labels,
 	// because field selector doesn't support "IN" operator.
 	l, err := labels.NewRequirement("name", selection.In, sets.NewString(names...))
 	if err != nil {
 		panic("Labels requirement must validate successfully")
 	}
-	return &generic.SelectionPredicate{
+	return storage.SelectionPredicate{
 		Label: labels.Everything().Add(*l),
 		Field: fields.Everything(),
 		GetAttrs: func(obj runtime.Object) (label labels.Set, field fields.Set, err error) {
@@ -124,8 +123,8 @@ func matchPodName(names ...string) *generic.SelectionPredicate {
 	}
 }
 
-func matchEverything() *generic.SelectionPredicate {
-	return &generic.SelectionPredicate{
+func matchEverything() storage.SelectionPredicate {
+	return storage.SelectionPredicate{
 		Label: labels.Everything(),
 		Field: fields.Everything(),
 		GetAttrs: func(obj runtime.Object) (label labels.Set, field fields.Set, err error) {
@@ -149,7 +148,7 @@ func TestStoreList(t *testing.T) {
 
 	table := map[string]struct {
 		in      *api.PodList
-		m       *generic.SelectionPredicate
+		m       storage.SelectionPredicate
 		out     runtime.Object
 		context api.Context
 	}{
@@ -1145,7 +1144,7 @@ func TestStoreWatch(t *testing.T) {
 	noNamespaceContext := api.NewContext()
 
 	table := map[string]struct {
-		selectPred *generic.SelectionPredicate
+		selectPred storage.SelectionPredicate
 		context    api.Context
 	}{
 		"single": {
@@ -1197,12 +1196,16 @@ func TestStoreWatch(t *testing.T) {
 
 func newTestGenericStoreRegistry(t *testing.T, hasCacheEnabled bool) (factory.DestroyFunc, *Store) {
 	podPrefix := "/pods"
-	server := etcdtesting.NewEtcdTestClientServer(t)
+	server, sc := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
 	strategy := &testRESTStrategy{api.Scheme, api.SimpleNameGenerator, true, false, true}
 
-	codec := testapi.Default.StorageCodec()
-	s := etcdstorage.NewEtcdStorage(server.Client, codec, etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize)
+	sc.Codec = testapi.Default.StorageCodec()
+	s, dFunc, err := factory.Create(*sc)
+	if err != nil {
+		t.Fatalf("Error creating storage: %v", err)
+	}
 	destroyFunc := func() {
+		dFunc()
 		server.Terminate(t)
 	}
 	if hasCacheEnabled {
@@ -1214,7 +1217,7 @@ func newTestGenericStoreRegistry(t *testing.T, hasCacheEnabled bool) (factory.De
 			ResourcePrefix: podPrefix,
 			KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NoNamespaceKeyFunc(podPrefix, obj) },
 			NewListFunc:    func() runtime.Object { return &api.PodList{} },
-			Codec:          codec,
+			Codec:          sc.Codec,
 		}
 		cacher := storage.NewCacherFromConfig(config)
 		d := destroyFunc
@@ -1242,8 +1245,8 @@ func newTestGenericStoreRegistry(t *testing.T, hasCacheEnabled bool) (factory.De
 			return path.Join(podPrefix, id), nil
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) { return obj.(*api.Pod).Name, nil },
-		PredicateFunc: func(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
-			return &generic.SelectionPredicate{
+		PredicateFunc: func(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
+			return storage.SelectionPredicate{
 				Label: label,
 				Field: field,
 				GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {

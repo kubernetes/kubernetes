@@ -24,6 +24,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 
@@ -226,36 +228,32 @@ func TestGetToList(t *testing.T) {
 
 	tests := []struct {
 		key         string
-		filter      func(runtime.Object) bool
-		trigger     func() []storage.MatchValue
+		pred        storage.SelectionPredicate
 		expectedOut []*api.Pod
 	}{{ // test GetToList on existing key
 		key:         key,
-		filter:      storage.EverythingFunc,
-		trigger:     storage.NoTriggerFunc,
+		pred:        storage.Everything,
 		expectedOut: []*api.Pod{storedObj},
 	}, { // test GetToList on non-existing key
 		key:         "/non-existing",
-		filter:      storage.EverythingFunc,
-		trigger:     storage.NoTriggerFunc,
+		pred:        storage.Everything,
 		expectedOut: nil,
-	}, { // test GetToList with filter to reject the pod
+	}, { // test GetToList with matching pod name
 		key: "/non-existing",
-		filter: func(obj runtime.Object) bool {
-			pod, ok := obj.(*api.Pod)
-			if !ok {
-				t.Fatal("It should be able to convert obj to *api.Pod")
-			}
-			return pod.Name != storedObj.Name
+		pred: storage.SelectionPredicate{
+			Label: labels.Everything(),
+			Field: fields.ParseSelectorOrDie("metadata.name!=" + storedObj.Name),
+			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+				pod := obj.(*api.Pod)
+				return nil, fields.Set{"metadata.name": pod.Name}, nil
+			},
 		},
-		trigger:     storage.NoTriggerFunc,
 		expectedOut: nil,
 	}}
 
 	for i, tt := range tests {
 		out := &api.PodList{}
-		filter := storage.NewSimpleFilter(tt.filter, tt.trigger)
-		err := store.GetToList(ctx, tt.key, filter, out)
+		err := store.GetToList(ctx, tt.key, tt.pred, out)
 		if err != nil {
 			t.Fatalf("GetToList failed: %v", err)
 		}
@@ -492,41 +490,36 @@ func TestList(t *testing.T) {
 
 	tests := []struct {
 		prefix      string
-		filter      func(runtime.Object) bool
-		trigger     func() []storage.MatchValue
+		pred        storage.SelectionPredicate
 		expectedOut []*api.Pod
 	}{{ // test List on existing key
 		prefix:      "/one-level/",
-		filter:      storage.EverythingFunc,
-		trigger:     storage.NoTriggerFunc,
+		pred:        storage.Everything,
 		expectedOut: []*api.Pod{preset[0].storedObj},
 	}, { // test List on non-existing key
 		prefix:      "/non-existing/",
-		filter:      storage.EverythingFunc,
-		trigger:     storage.NoTriggerFunc,
+		pred:        storage.Everything,
 		expectedOut: nil,
-	}, { // test List with filter
+	}, { // test List with pod name matching
 		prefix: "/one-level/",
-		filter: func(obj runtime.Object) bool {
-			pod, ok := obj.(*api.Pod)
-			if !ok {
-				t.Fatal("It should be able to convert obj to *api.Pod")
-			}
-			return pod.Name != preset[0].storedObj.Name
+		pred: storage.SelectionPredicate{
+			Label: labels.Everything(),
+			Field: fields.ParseSelectorOrDie("metadata.name!=" + preset[0].storedObj.Name),
+			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+				pod := obj.(*api.Pod)
+				return nil, fields.Set{"metadata.name": pod.Name}, nil
+			},
 		},
-		trigger:     storage.NoTriggerFunc,
 		expectedOut: nil,
 	}, { // test List with multiple levels of directories and expect flattened result
 		prefix:      "/two-level/",
-		filter:      storage.EverythingFunc,
-		trigger:     storage.NoTriggerFunc,
+		pred:        storage.Everything,
 		expectedOut: []*api.Pod{preset[1].storedObj, preset[2].storedObj},
 	}}
 
 	for i, tt := range tests {
 		out := &api.PodList{}
-		filter := storage.NewSimpleFilter(tt.filter, tt.trigger)
-		err := store.List(ctx, tt.prefix, "0", filter, out)
+		err := store.List(ctx, tt.prefix, "0", tt.pred, out)
 		if err != nil {
 			t.Fatalf("List failed: %v", err)
 		}

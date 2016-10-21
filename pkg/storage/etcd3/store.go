@@ -255,7 +255,7 @@ func (s *store) GuaranteedUpdate(ctx context.Context, key string, out runtime.Ob
 }
 
 // GetToList implements storage.Interface.GetToList.
-func (s *store) GetToList(ctx context.Context, key string, filter storage.Filter, listObj runtime.Object) error {
+func (s *store) GetToList(ctx context.Context, key string, pred storage.SelectionPredicate, listObj runtime.Object) error {
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
 		return err
@@ -273,7 +273,7 @@ func (s *store) GetToList(ctx context.Context, key string, filter storage.Filter
 		data: getResp.Kvs[0].Value,
 		rev:  uint64(getResp.Kvs[0].ModRevision),
 	}}
-	if err := decodeList(elems, filter, listPtr, s.codec, s.versioner); err != nil {
+	if err := decodeList(elems, storage.SimpleFilter(pred), listPtr, s.codec, s.versioner); err != nil {
 		return err
 	}
 	// update version with cluster level revision
@@ -281,7 +281,7 @@ func (s *store) GetToList(ctx context.Context, key string, filter storage.Filter
 }
 
 // List implements storage.Interface.List.
-func (s *store) List(ctx context.Context, key, resourceVersion string, filter storage.Filter, listObj runtime.Object) error {
+func (s *store) List(ctx context.Context, key, resourceVersion string, pred storage.SelectionPredicate, listObj runtime.Object) error {
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
 		return err
@@ -305,7 +305,7 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, filter st
 			rev:  uint64(kv.ModRevision),
 		}
 	}
-	if err := decodeList(elems, filter, listPtr, s.codec, s.versioner); err != nil {
+	if err := decodeList(elems, storage.SimpleFilter(pred), listPtr, s.codec, s.versioner); err != nil {
 		return err
 	}
 	// update version with cluster level revision
@@ -313,22 +313,22 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, filter st
 }
 
 // Watch implements storage.Interface.Watch.
-func (s *store) Watch(ctx context.Context, key string, resourceVersion string, filter storage.Filter) (watch.Interface, error) {
-	return s.watch(ctx, key, resourceVersion, filter, false)
+func (s *store) Watch(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate) (watch.Interface, error) {
+	return s.watch(ctx, key, resourceVersion, pred, false)
 }
 
 // WatchList implements storage.Interface.WatchList.
-func (s *store) WatchList(ctx context.Context, key string, resourceVersion string, filter storage.Filter) (watch.Interface, error) {
-	return s.watch(ctx, key, resourceVersion, filter, true)
+func (s *store) WatchList(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate) (watch.Interface, error) {
+	return s.watch(ctx, key, resourceVersion, pred, true)
 }
 
-func (s *store) watch(ctx context.Context, key string, rv string, filter storage.Filter, recursive bool) (watch.Interface, error) {
+func (s *store) watch(ctx context.Context, key string, rv string, pred storage.SelectionPredicate, recursive bool) (watch.Interface, error) {
 	rev, err := storage.ParseWatchResourceVersion(rv)
 	if err != nil {
 		return nil, err
 	}
 	key = keyWithPrefix(s.pathPrefix, key)
-	return s.watcher.Watch(ctx, key, int64(rev), recursive, filter)
+	return s.watcher.Watch(ctx, key, int64(rev), recursive, pred)
 }
 
 func (s *store) getState(getResp *clientv3.GetResponse, key string, v reflect.Value, ignoreNotFound bool) (*objState, error) {
@@ -416,7 +416,7 @@ func decode(codec runtime.Codec, versioner storage.Versioner, value []byte, objP
 
 // decodeList decodes a list of values into a list of objects, with resource version set to corresponding rev.
 // On success, ListPtr would be set to the list of objects.
-func decodeList(elems []*elemForDecode, filter storage.Filter, ListPtr interface{}, codec runtime.Codec, versioner storage.Versioner) error {
+func decodeList(elems []*elemForDecode, filter storage.FilterFunc, ListPtr interface{}, codec runtime.Codec, versioner storage.Versioner) error {
 	v, err := conversion.EnforcePtr(ListPtr)
 	if err != nil || v.Kind() != reflect.Slice {
 		panic("need ptr to slice")
@@ -428,7 +428,7 @@ func decodeList(elems []*elemForDecode, filter storage.Filter, ListPtr interface
 		}
 		// being unable to set the version does not prevent the object from being extracted
 		versioner.UpdateObject(obj, elem.rev)
-		if filter.Filter(obj) {
+		if filter(obj) {
 			v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
 		}
 	}
@@ -444,7 +444,7 @@ func checkPreconditions(key string, preconditions *storage.Preconditions, out ru
 		return storage.NewInternalErrorf("can't enforce preconditions %v on un-introspectable object %v, got error: %v", *preconditions, out, err)
 	}
 	if preconditions.UID != nil && *preconditions.UID != objMeta.UID {
-		errMsg := fmt.Sprintf("Precondition failed: UID in precondition: %v, UID in object meta: %v", preconditions.UID, objMeta.UID)
+		errMsg := fmt.Sprintf("Precondition failed: UID in precondition: %v, UID in object meta: %v", *preconditions.UID, objMeta.UID)
 		return storage.NewInvalidObjError(key, errMsg)
 	}
 	return nil

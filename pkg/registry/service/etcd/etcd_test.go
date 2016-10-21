@@ -59,6 +59,7 @@ func validService() *api.Service {
 func TestCreate(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	validService := validService()
 	validService.ObjectMeta = api.ObjectMeta{}
@@ -89,6 +90,7 @@ func TestCreate(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).AllowCreateOnUpdate()
 	test.TestUpdate(
 		// valid
@@ -114,6 +116,7 @@ func TestUpdate(t *testing.T) {
 func TestDelete(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).AllowCreateOnUpdate()
 	test.TestDelete(validService())
 }
@@ -121,6 +124,7 @@ func TestDelete(t *testing.T) {
 func TestGet(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).AllowCreateOnUpdate()
 	test.TestGet(validService())
 }
@@ -128,6 +132,7 @@ func TestGet(t *testing.T) {
 func TestList(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).AllowCreateOnUpdate()
 	test.TestList(validService())
 }
@@ -135,6 +140,7 @@ func TestList(t *testing.T) {
 func TestWatch(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	test.TestWatch(
 		validService(),
