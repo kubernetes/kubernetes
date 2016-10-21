@@ -86,7 +86,7 @@ func (s *GenericAPIServer) serveSecurely(stopCh <-chan struct{}) error {
 	}
 
 	glog.Infof("Serving securely on %s", s.SecureServingInfo.BindAddress)
-	s.effectiveSecurePort, err = runServer(secureServer, stopCh)
+	s.effectiveSecurePort, err = runServer(secureServer, s.SecureServingInfo.BindNetwork, stopCh)
 	return err
 }
 
@@ -101,20 +101,24 @@ func (s *GenericAPIServer) serveInsecurely(stopCh <-chan struct{}) error {
 	}
 	glog.Infof("Serving insecurely on %s", s.InsecureServingInfo.BindAddress)
 	var err error
-	s.effectiveInsecurePort, err = runServer(insecureServer, stopCh)
+	s.effectiveInsecurePort, err = runServer(insecureServer, s.InsecureServingInfo.BindNetwork, stopCh)
 	return err
 }
 
 // runServer listens on the given port, then spawns a go-routine continuously serving
 // until the stopCh is closed. The port is returned. This function does not block.
-func runServer(server *http.Server, stopCh <-chan struct{}) (int, error) {
+func runServer(server *http.Server, network string, stopCh <-chan struct{}) (int, error) {
 	addr := server.Addr
-	if addr == "" {
+	if len(addr) == 0 {
 		addr = ":https"
 	}
 
+	if len(network) == 0 {
+		network = "tcp"
+	}
+
 	// first listen is synchronous (fail early!)
-	ln, err := net.Listen("tcp", addr)
+	ln, err := net.Listen(network, addr)
 	if err != nil {
 		return 0, fmt.Errorf("Failed to listen on %v: %v", addr, err)
 	}
