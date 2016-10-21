@@ -38,8 +38,14 @@ service RuntimeService {
     // ContainerStatus returns status of the container.
     rpc ContainerStatus(ContainerStatusRequest) returns (ContainerStatusResponse) {}
 
-    // Exec executes the command in the container.
-    rpc Exec(stream ExecRequest) returns (stream ExecResponse) {}
+    // ExecSync runs a command in a container synchronously.
+    rpc ExecSync(ExecSyncRequest) returns (ExecSyncResponse) {}
+    // Exec prepares a streaming endpoint to execute a command in the container.
+    rpc Exec(ExecRequest) returns (ExecResponse) {}
+    // Attach prepares a streaming endpoint to attach to a running container.
+    rpc Attach(AttachRequest) returns (AttachResponse) {}
+    // PortForward prepares a streaming endpoint to forward ports from a PodSandbox.
+    rpc PortForward(PortForwardRequest) returns (PortForwardResponse) {}
 
     // UpdateRuntimeConfig updates the runtime configuration based on request
     rpc UpdateRuntimeConfig(UpdateRuntimeConfigRequest) returns (UpdateRuntimeConfigResponse) {}
@@ -623,6 +629,24 @@ message ContainerStatusResponse {
     optional ContainerStatus status = 1;
 }
 
+message ExecSyncRequest {
+    // The id of the container
+    optional string container_id = 1;
+    // The cmd to execute
+    repeated string cmd = 2;
+    // Timeout in seconds to stop the command. Default: run forever.
+    optional int64 timeout = 3;
+}
+
+message ExecSyncResponse {
+    // The captured command stdout output.
+    optional bytes stdout = 1;
+    // The captured command stderr output.
+    optional bytes stderr = 2;
+    // The exit code the command finished with.
+    optional int32 exit_code = 3;
+}
+
 message ExecRequest {
     // The id of the container
     optional string container_id = 1;
@@ -630,15 +654,37 @@ message ExecRequest {
     repeated string cmd = 2;
     // Whether use tty
     optional bool tty = 3;
-    // Streaming stdin
-    optional bytes stdin = 4;
+    // Whether to stream stdin
+    optional bool stdin = 4;
 }
 
 message ExecResponse {
-    // Streaming stdout
-    optional bytes stdout = 1;
-    // Streaming stderr
-    optional bytes stderr = 2;
+    // The fully qualified URL of the exec streaming server
+    optional string url = 1;
+}
+
+message AttachRequest {
+    // The id of the container
+    optional string container_id = 1;
+    // Whether to stream stdin
+    optional bool stdin = 2;
+}
+
+message AttachResponse {
+    // The fully qualified URL of the attach streaming server
+    optional string url = 1;
+}
+
+message PortForwardRequest {
+    // The id of the container
+    optional string pod_sandbox_id = 1;
+    // The port to forward
+    repeated int32 port = 2;
+}
+
+message PortForwardResponse {
+    // The fully qualified URL of the port-forward streaming server
+    optional string url = 1;
 }
 
 message ImageFilter {
