@@ -40,7 +40,7 @@ go_library(
         "//pkg/apimachinery/registered:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset/typed/core/unversioned:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/client/clientset_generated/release_1_5:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/typed/discovery:go_default_library",

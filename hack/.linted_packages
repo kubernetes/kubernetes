@@ -22,9 +22,10 @@ cmd/kubeadm/app/apis/kubeadm/install
 cmd/kubectl
 cmd/kubelet
 cmd/kubernetes-discovery
+cmd/libs/go2idl/client-gen
 cmd/libs/go2idl/client-gen/generators
-cmd/libs/go2idl/client-gen/test_apis/testgroup.k8s.io/install
-cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup.k8s.io/unversioned
+cmd/libs/go2idl/client-gen/test_apis/testgroup/install
+cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup.k8s.io/internalversion
 cmd/libs/go2idl/conversion-gen
 cmd/libs/go2idl/deepcopy-gen
 cmd/libs/go2idl/defaulter-gen

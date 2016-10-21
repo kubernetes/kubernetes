@@ -26,8 +26,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/client/cache"
 	fake_internal "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/unversioned"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/unversioned/fake"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion/fake"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/errors"
 )
@@ -285,7 +285,7 @@ type fakeClient struct {
 	statefulsetClient *fakeStatefulSetClient
 }
 
-func (c *fakeClient) Apps() unversioned.AppsInterface {
+func (c *fakeClient) Apps() internalversion.AppsInterface {
 	return &fakeApps{c, &fake.FakeApps{}}
 }
 
@@ -294,7 +294,7 @@ type fakeApps struct {
 	*fake.FakeApps
 }
 
-func (c *fakeApps) StatefulSets(namespace string) unversioned.StatefulSetInterface {
+func (c *fakeApps) StatefulSets(namespace string) internalversion.StatefulSetInterface {
 	c.statefulsetClient.Namespace = namespace
 	return c.statefulsetClient
 }

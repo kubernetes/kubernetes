@@ -49,7 +49,7 @@ type events struct {
 }
 
 // newEvents returns a Events
-func newEvents(c *CoreClient, namespace string) *events {
+func newEvents(c *CoreV1Client, namespace string) *events {
 	return &events{
 		client: c.RESTClient(),
 		ns:     namespace,
