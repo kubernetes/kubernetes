@@ -228,6 +228,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	}
 
 	masterConfig.GenericConfig.LoopbackClientConfig.BearerToken = privilegedLoopbackToken
+	masterConfig.GenericConfig = masterConfig.GenericConfig.Complete().Config
 
 	m, err := masterConfig.Complete().New()
 	if err != nil {
