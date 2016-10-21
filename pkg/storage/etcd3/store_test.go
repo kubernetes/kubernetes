@@ -253,7 +253,7 @@ func TestGetToList(t *testing.T) {
 
 	for i, tt := range tests {
 		out := &api.PodList{}
-		err := store.GetToList(ctx, tt.key, tt.pred, out)
+		err := store.GetToList(ctx, tt.key, "", tt.pred, out)
 		if err != nil {
 			t.Fatalf("GetToList failed: %v", err)
 		}
