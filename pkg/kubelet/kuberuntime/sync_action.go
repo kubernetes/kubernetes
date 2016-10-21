@@ -17,7 +17,6 @@ limitations under the License.
 package kuberuntime
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -34,7 +33,7 @@ type statusGroup struct {
 
 // newStatusGroup returns a statusGroup object that contains the sandbox statuses,
 // init container statuses and the app container statuses.
-func newStatusGroup(pod *api.Pod, podStatus *kubecontainer.PodStatus) *statusGroup {
+func newStatusGroup(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *statusGroup {
 	var initContainerStatuses []*kubecontainer.ContainerStatus
 	var appContainerStatuses []*kubecontainer.ContainerStatus
 
@@ -81,7 +80,7 @@ type containerKillInfo struct {
 // containerStartInfo describes a container that needs to be started, and the reason for that.
 type containerStartInfo struct {
 	// The pointer to the API container that needs to be started.
-	container *api.Container
+	container *v1.Container
 	// The reason why the container will be started, e.g. due to restart.
 	// Used for logging.
 	reason string
@@ -105,7 +104,7 @@ type sandboxKillInfo struct {
 // sandboxStartInfo describes a sandbox that needs to be started, and the reason for that.
 type sandboxStartInfo struct {
 	// The pointer to the API pod that needs to be started.
-	sandbox *api.Pod
+	sandbox *v1.Pod
 	// The number of the attempts that we have tried so far to start
 	// the sandbox.
 	attempt int
@@ -149,7 +148,7 @@ func (a *syncAction) addContainerToKill(s *kubecontainer.ContainerStatus, reason
 }
 
 // addSandboxToStart add the info of the sandbox that's going to be started.
-func (a *syncAction) addSandboxToStart(pod *api.Pod, attempt int, reason string) {
+func (a *syncAction) addSandboxToStart(pod *v1.Pod, attempt int, reason string) {
 	a.sandboxToStart = &sandboxStartInfo{
 		attempt: attempt,
 		reason:  reason,
@@ -157,7 +156,7 @@ func (a *syncAction) addSandboxToStart(pod *api.Pod, attempt int, reason string)
 }
 
 // addContainerToStart add one more container info the the containersToStart list.
-func (a *syncAction) addContainerToStart(container *api.Container, reason string, status *kubecontainer.ContainerStatus) {
+func (a *syncAction) addContainerToStart(container *v1.Container, reason string, status *kubecontainer.ContainerStatus) {
 	a.containersToStart = append(a.containersToStart, &containerStartInfo{
 		container: container,
 		reason:    reason,
@@ -199,6 +198,7 @@ func (a *syncAction) computeSyncActionSandboxCleanup(statuses *statusGroup) {}
 // - (3) sandbox cleanup phase computation, which checks if we need to clean up the sandbox.
 func computeSyncAction(pod *v1.Pod, statuses *statusGroup, livenessManager proberesults.Manager) *syncAction {
 	var a syncAction
+
 	// (1) compute the sandboxes, and containers that we need to kill.
 	a.computeSyncActionKillingPhase(statuses, livenessManager)
 
