@@ -589,24 +589,22 @@ func (cont *GCEIngressController) init() {
 	}
 }
 
+// staticIP allocates a random static ip with the given name. Returns a string
+// representation of the ip. Caller is expected to manage cleanup of the ip.
 func (cont *GCEIngressController) staticIP(name string) string {
-	ExpectNoError(gcloudCreate("addresses", name, cont.cloud.ProjectID, "--global"))
-	cont.staticIPName = name
-	ipList := []compute.Address{}
-	if pollErr := wait.PollImmediate(5*time.Second, cloudResourcePollTimeout, func() (bool, error) {
-		gcloudList("addresses", name, cont.cloud.ProjectID, &ipList)
-		if len(ipList) != 1 {
-			framework.Logf("Failed to find static ip %v even though create call succeeded, found ips %+v", name, ipList)
-			return false, nil
+	gceCloud := cont.cloud.Provider.(*gcecloud.GCECloud)
+	ip, err := gceCloud.ReserveGlobalStaticIP(name, "")
+	if err != nil {
+		if delErr := gceCloud.DeleteGlobalStaticIP(name); delErr != nil {
+			if cont.isHTTPErrorCode(delErr, http.StatusNotFound) {
+				framework.Logf("Static ip with name %v was not allocated, nothing to delete", name)
+			} else {
+				framework.Logf("Failed to delete static ip %v: %v", name, delErr)
+			}
 		}
-		return true, nil
-	}); pollErr != nil {
-		if err := gcloudDelete("addresses", name, cont.cloud.ProjectID, "--global"); err == nil {
-			framework.Logf("Failed to get AND delete address %v even though create call succeeded", name)
-		}
-		framework.Failf("Failed to find static ip %v even though create call succeeded, found ips %+v", name, ipList)
+		framework.Failf("Failed to allocated static ip %v: %v", name, err)
 	}
-	return ipList[0].Address
+	return ip.Address
 }
 
 // gcloudList unmarshals json output of gcloud into given out interface.
