@@ -144,15 +144,15 @@ message PodSecurityContext {
     optional SELinuxOption selinux_options = 3;
     // The UID to run the entrypoint of the container process.
     // Defaults to user specified in image metadata if unspecified.
-    // May also be set in PodSecurityContext.  If set in both SecurityContext and
-    // PodSecurityContext, the value specified here takes precedence.
+    // May also be set in SecurityContext. If set in both SecurityContext and
+    // PodSecurityContext, the value specified in SecurityContext takes precedence.
     optional int64 run_as_user = 4;
     // Indicates that the container must run as a non-root user.
     // If true, the runtime should validate the image at runtime to ensure that it
     // does not run as UID 0 (root) and fail to start the container if it does.
     // If unset or false, no such validation will be performed.
-    // May also be set in PodSecurityContext.  If set in both SecurityContext and
-    // PodSecurityContext, the value specified here takes precedence.
+    // May also be set in SecurityContext.  If set in both SecurityContext and
+    // PodSecurityContext, the value specified in SecurityContext takes precedence.
     optional bool run_as_non_root = 5;
     // If set, the root filesystem of the container is read-only.
     optional bool readonly_rootfs = 6;
@@ -433,7 +433,7 @@ message Capability {
 }
 
 // SecurityContext holds security configuration that will be applied to a container.
-// Some fields are present in both SecurityContext and PodSecurityContext.  When both
+// Some fields are present in both SecurityContext and PodSecurityContext. When both
 // are set, the values in SecurityContext take precedence.
 message SecurityContext {
     // Capabilities to add or drop.
@@ -441,12 +441,12 @@ message SecurityContext {
     // If set, run container in privileged mode.
     optional bool privileged = 2;
     // Optional SELinux context to be applied. If set in both SecurityContext
-	// and PodSecurityContext, the value specified in SecurityContext takes
-	// precedence for the container.
+	// and PodSecurityContext, the value specified here takes precedence
+	// for the container.
     optional SELinuxOption selinux_options = 3;
     // The UID to run the the container process.
     // Defaults to user specified in image metadata if unspecified.
-    // May also be set in PodSecurityContext.  If set in both SecurityContext and
+    // May also be set in PodSecurityContext. If set in both SecurityContext and
     // PodSecurityContext, the value specified here takes precedence.
     optional int64 run_as_user = 4;
     // Indicates that the container must run as a non-root user.
