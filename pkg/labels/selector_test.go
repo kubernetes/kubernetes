@@ -320,7 +320,7 @@ func TestRequirementConstructor(t *testing.T) {
 		{strings.Repeat("a", 254), selection.Exists, nil, false}, //breaks DNS rule that len(key) <= 253
 	}
 	for _, rc := range requirementConstructorTests {
-		if _, err := NewRequirement(rc.Key, rc.Op, rc.Vals); err == nil && !rc.Success {
+		if _, err := NewRequirement(rc.Key, rc.Op, rc.Vals.List()); err == nil && !rc.Success {
 			t.Errorf("expected error with key:%#v op:%v vals:%v, got no error", rc.Key, rc.Op, rc.Vals)
 		} else if err != nil && rc.Success {
 			t.Errorf("expected no error with key:%#v op:%v vals:%v, got:%v", rc.Key, rc.Op, rc.Vals, err)
@@ -525,7 +525,7 @@ func TestSetSelectorParser(t *testing.T) {
 }
 
 func getRequirement(key string, op selection.Operator, vals sets.String, t *testing.T) Requirement {
-	req, err := NewRequirement(key, op, vals)
+	req, err := NewRequirement(key, op, vals.List())
 	if err != nil {
 		t.Errorf("NewRequirement(%v, %v, %v) resulted in error:%v", key, op, vals, err)
 		return Requirement{}
@@ -548,22 +548,22 @@ func TestAdd(t *testing.T) {
 			"key",
 			selection.In,
 			[]string{"value"},
-			internalSelector{Requirement{"key", selection.In, sets.NewString("value")}},
+			internalSelector{Requirement{"key", selection.In, []string{"value"}}},
 		},
 		{
 			"keyEqualsOperator",
-			internalSelector{Requirement{"key", selection.In, sets.NewString("value")}},
+			internalSelector{Requirement{"key", selection.In, []string{"value"}}},
 			"key2",
 			selection.Equals,
 			[]string{"value2"},
 			internalSelector{
-				Requirement{"key", selection.In, sets.NewString("value")},
-				Requirement{"key2", selection.Equals, sets.NewString("value2")},
+				Requirement{"key", selection.In, []string{"value"}},
+				Requirement{"key2", selection.Equals, []string{"value2"}},
 			},
 		},
 	}
 	for _, ts := range testCases {
-		req, err := NewRequirement(ts.key, ts.operator, sets.NewString(ts.values...))
+		req, err := NewRequirement(ts.key, ts.operator, ts.values)
 		if err != nil {
 			t.Errorf("%s - Unable to create labels.Requirement", ts.name)
 		}
