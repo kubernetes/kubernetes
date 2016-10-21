@@ -51,8 +51,6 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 		return nil, fmt.Errorf("<master/apiclient> failed to create API client [%v]", err)
 	}
 
-	return client, nil
-
 	fmt.Println("<master/apiclient> created API client, waiting for the control plane to become ready")
 
 	start := time.Now()
