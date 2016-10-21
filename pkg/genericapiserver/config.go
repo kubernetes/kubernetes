@@ -469,9 +469,16 @@ func (c completedConfig) MaybeGenerateServingCerts() error {
 		alternateIPs := []net.IP{c.ServiceReadWriteIP}
 		alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes", "localhost"}
 
-		if err := certutil.GenerateSelfSignedCert(c.PublicAddress.String(), c.SecureServingInfo.ServerCert.CertFile, c.SecureServingInfo.ServerCert.KeyFile, alternateIPs, alternateDNS); err != nil {
-			return fmt.Errorf("Unable to generate self signed cert: %v", err)
+		if cert, key, err := certutil.GenerateSelfSignedCertKey(c.PublicAddress.String(), alternateIPs, alternateDNS); err != nil {
+			return fmt.Errorf("unable to generate self signed cert: %v", err)
 		} else {
+			if err := certutil.WriteCert(c.SecureServingInfo.ServerCert.CertFile, cert); err != nil {
+				return err
+			}
+
+			if err := certutil.WriteKey(c.SecureServingInfo.ServerCert.KeyFile, key); err != nil {
+				return err
+			}
 			glog.Infof("Generated self-signed cert (%s, %s)", c.SecureServingInfo.ServerCert.CertFile, c.SecureServingInfo.ServerCert.KeyFile)
 		}
 	}
