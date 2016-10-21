@@ -121,7 +121,7 @@ func TestRunOnce(t *testing.T) {
 		t.Fatalf("failed to initialize eviction manager: %v", err)
 	}
 	kb.evictionManager = evictionManager
-	kb.AddPodAdmitHandler(evictionAdmitHandler)
+	kb.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)
 	if err := kb.setupDataDirs(); err != nil {
 		t.Errorf("Failed to init data dirs: %v", err)
 	}

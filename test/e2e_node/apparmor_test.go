@@ -54,8 +54,7 @@ func testAppArmorNode() {
 
 		It("should reject an unloaded profile", func() {
 			status := runAppArmorTest(f, apparmor.ProfileNamePrefix+"non-existant-profile")
-			Expect(status.Phase).To(Equal(api.PodFailed), "PodStatus: %+v", status)
-			Expect(status.Reason).To(Equal("AppArmor"), "PodStatus: %+v", status)
+			expectSoftRejection(status)
 		})
 		It("should enforce a profile blocking writes", func() {
 			status := runAppArmorTest(f, apparmor.ProfileNamePrefix+apparmorProfilePrefix+"deny-write")
@@ -85,8 +84,7 @@ func testNonAppArmorNode() {
 
 		It("should reject a pod with an AppArmor profile", func() {
 			status := runAppArmorTest(f, apparmor.ProfileRuntimeDefault)
-			Expect(status.Phase).To(Equal(api.PodFailed), "PodStatus: %+v", status)
-			Expect(status.Reason).To(Equal("AppArmor"), "PodStatus: %+v", status)
+			expectSoftRejection(status)
 		})
 	})
 }
@@ -172,6 +170,14 @@ func createPodWithAppArmor(f *framework.Framework, profile string) *api.Pod {
 		},
 	}
 	return f.PodClient().Create(pod)
+}
+
+func expectSoftRejection(status api.PodStatus) {
+	args := []interface{}{"PodStatus: %+v", status}
+	Expect(status.Phase).To(Equal(api.PodPending), args...)
+	Expect(status.Reason).To(Equal("AppArmor"), args...)
+	Expect(status.Message).To(ContainSubstring("AppArmor"), args...)
+	Expect(status.ContainerStatuses[0].State.Waiting.Reason).To(Equal("Blocked"), args...)
 }
 
 func isAppArmorEnabled() bool {
