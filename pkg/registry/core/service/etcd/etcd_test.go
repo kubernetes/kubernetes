@@ -100,6 +100,7 @@ func TestUpdate(t *testing.T) {
 			object := obj.(*api.Service)
 			object.Spec = api.ServiceSpec{
 				Selector:        map[string]string{"bar": "baz2"},
+				ClusterIP:       "None",
 				SessionAffinity: api.ServiceAffinityNone,
 				Type:            api.ServiceTypeClusterIP,
 				Ports: []api.ServicePort{{
