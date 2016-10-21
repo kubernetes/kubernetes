@@ -36,6 +36,7 @@ import (
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/services"
+	"k8s.io/kubernetes/test/e2e_node/system"
 
 	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
@@ -48,6 +49,7 @@ import (
 var e2es *services.E2EServices
 
 var runServicesMode = flag.Bool("run-services-mode", false, "If true, only run services (etcd, apiserver) in current process, and not run test.")
+var systemVerification = flag.Bool("system-verification", true, "If true, run system verification to verify the system configuration before functionality test, including the configuration of os, kernel, cgroup etc.")
 
 func init() {
 	framework.RegisterCommonFlags()
@@ -106,6 +108,12 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 		glog.Infof("Pre-pulling images so that they are cached for the tests.")
 		err := PrePullAllImages()
 		Expect(err).ShouldNot(HaveOccurred())
+	}
+
+	// TODO(random-liu): Add system verification only mode.
+	// Run system verification test.
+	if *systemVerification {
+		Expect(system.Validate()).To(Succeed(), "system verification")
 	}
 
 	// TODO(yifan): Temporary workaround to disable coreos from auto restart
