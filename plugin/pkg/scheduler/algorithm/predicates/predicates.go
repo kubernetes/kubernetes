@@ -1134,11 +1134,6 @@ func isPodBestEffort(pod *api.Pod) bool {
 // CheckNodeMemoryPressurePredicate checks if a pod can be scheduled on a node
 // reporting memory pressure condition.
 func CheckNodeMemoryPressurePredicate(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
-	node := nodeInfo.Node()
-	if node == nil {
-		return false, nil, fmt.Errorf("node not found")
-	}
-
 	var podBestEffort bool
 	if predicateMeta, ok := meta.(*predicateMetadata); ok {
 		podBestEffort = predicateMeta.podBestEffort
@@ -1146,54 +1141,34 @@ func CheckNodeMemoryPressurePredicate(pod *api.Pod, meta interface{}, nodeInfo *
 		// We couldn't parse metadata - fallback to computing it.
 		podBestEffort = isPodBestEffort(pod)
 	}
-
 	// pod is not BestEffort pod
 	if !podBestEffort {
 		return true, nil, nil
 	}
 
 	// is node under presure?
-	for _, cond := range node.Status.Conditions {
-		if cond.Type == api.NodeMemoryPressure && cond.Status == api.ConditionTrue {
-			return false, []algorithm.PredicateFailureReason{ErrNodeUnderMemoryPressure}, nil
-		}
+	if nodeInfo.MemoryPressureCondition() == api.ConditionTrue {
+		return false, []algorithm.PredicateFailureReason{ErrNodeUnderMemoryPressure}, nil
 	}
-
 	return true, nil, nil
 }
 
 // CheckNodeDiskPressurePredicate checks if a pod can be scheduled on a node
 // reporting disk pressure condition.
 func CheckNodeDiskPressurePredicate(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
-	node := nodeInfo.Node()
-	if node == nil {
-		return false, nil, fmt.Errorf("node not found")
-	}
-
 	// is node under presure?
-	for _, cond := range node.Status.Conditions {
-		if cond.Type == api.NodeDiskPressure && cond.Status == api.ConditionTrue {
-			return false, []algorithm.PredicateFailureReason{ErrNodeUnderDiskPressure}, nil
-		}
+	if nodeInfo.DiskPressureCondition() == api.ConditionTrue {
+		return false, []algorithm.PredicateFailureReason{ErrNodeUnderDiskPressure}, nil
 	}
-
 	return true, nil, nil
 }
 
 // CheckNodeInodePressurePredicate checks if a pod can be scheduled on a node
 // reporting inode pressure condition.
 func CheckNodeInodePressurePredicate(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
-	node := nodeInfo.Node()
-	if node == nil {
-		return false, nil, fmt.Errorf("node not found")
-	}
-
 	// is node under presure?
-	for _, cond := range node.Status.Conditions {
-		if cond.Type == api.NodeInodePressure && cond.Status == api.ConditionTrue {
-			return false, []algorithm.PredicateFailureReason{ErrNodeUnderInodePressure}, nil
-		}
+	if nodeInfo.InodePressureCondition() == api.ConditionTrue {
+		return false, []algorithm.PredicateFailureReason{ErrNodeUnderInodePressure}, nil
 	}
-
 	return true, nil, nil
 }
