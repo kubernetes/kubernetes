@@ -95,7 +95,7 @@ func getMetadataFromConfigDrive() (*Metadata, error) {
 
 	glog.V(4).Infof("Attempting to mount configdrive %s on %s", dev, mntdir)
 
-	mounter := mount.New()
+	mounter := mount.New("" /* default mount path */)
 	err = mounter.Mount(dev, mntdir, "iso9660", []string{"ro"})
 	if err != nil {
 		err = mounter.Mount(dev, mntdir, "vfat", []string{"ro"})
