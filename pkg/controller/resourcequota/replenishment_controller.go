@@ -18,6 +18,7 @@ package resourcequota
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/golang/glog"
 
@@ -50,6 +51,8 @@ type ReplenishmentControllerOptions struct {
 	// The function to invoke when a change is observed that should trigger
 	// replenishment
 	ReplenishmentFunc ReplenishmentFunc
+	// MetricNamePrefix is a name to prefix the rate limit metric with
+	MetricNamePrefix string
 }
 
 // PodReplenishmentUpdateFunc will replenish if the old pod was quota tracked but the new is not
@@ -114,7 +117,15 @@ func NewReplenishmentControllerFactoryFromClient(kubeClient clientset.Interface)
 func (r *replenishmentControllerFactory) NewController(options *ReplenishmentControllerOptions) (cache.ControllerInterface, error) {
 	var result cache.ControllerInterface
 	if r.kubeClient != nil && r.kubeClient.Core().GetRESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("replenishment_controller", r.kubeClient.Core().GetRESTClient().GetRateLimiter())
+		name := []string{"replenishment_controller"}
+		if len(options.MetricNamePrefix) > 0 {
+			name = append(name, options.MetricNamePrefix)
+		}
+		if len(options.GroupKind.Group) > 0 {
+			name = append(name, options.GroupKind.Group)
+		}
+		name = append(name, strings.ToLower(options.GroupKind.Kind))
+		metrics.RegisterMetricAndTrackRateLimiterUsage(strings.Join(name, "_"), r.kubeClient.Core().GetRESTClient().GetRateLimiter())
 	}
 
 	switch options.GroupKind {
