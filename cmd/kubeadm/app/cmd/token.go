@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"path"
@@ -25,6 +26,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 )
@@ -75,5 +77,32 @@ func RunToken(out io.Writer, cmd *cobra.Command, skipPreFlight bool) error {
 	}
 	fmt.Println(client)
 
+	tokenSecret := &kubeadmapi.Secrets{}
+	err = kubeadmutil.GenerateToken(tokenSecret)
+	if err != nil {
+		return err
+	}
+	fmt.Println(tokenSecret.GivenToken)
+
+	fmt.Println("<cmd/token> Submitting token secret to server.")
+	secret := &api.Secret{
+		ObjectMeta: api.ObjectMeta{Name: tokenSecret.TokenID},
+		Type:       api.SecretTypeOpaque,
+		Data:       encodeTokenSecretData(tokenSecret),
+	}
+	if _, err := client.Secrets(api.NamespaceSystem).Create(secret); err != nil {
+		return fmt.Errorf("<cmd/token> failed to create token secret [%v]", err)
+	}
+
 	return nil
+}
+
+func encodeTokenSecretData(tokenSecret *kubeadmapi.Secrets) map[string][]byte {
+	var (
+		data = map[string][]byte{}
+	)
+
+	data[tokenSecret.TokenID], _ = json.Marshal(tokenSecret)
+
+	return data
 }
