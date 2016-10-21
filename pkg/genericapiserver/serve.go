@@ -20,7 +20,161 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"net"
+	"net/http"
+	"sync"
+	"time"
+
+	certutil "k8s.io/kubernetes/pkg/util/cert"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+
+	"github.com/golang/glog"
 )
+
+// serveSecurely runs the secure http server. It fails only if certificates cannot
+// be loaded or the initial listen call fails. The actual server loop (stoppable by closing
+// stopCh) runs in a go routine, i.e. serveSecurely does not block.
+func (s *GenericAPIServer) serveSecurely(stopCh <-chan struct{}) error {
+	namedCerts, err := getNamedCertificateMap(s.SecureServingInfo.SNICerts)
+	if err != nil {
+		return fmt.Errorf("unable to load SNI certificates: %v", err)
+	}
+
+	secureServer := &http.Server{
+		Addr:           s.SecureServingInfo.BindAddress,
+		Handler:        s.Handler,
+		MaxHeaderBytes: 1 << 20,
+		TLSConfig: &tls.Config{
+			// Can't use SSLv3 because of POODLE and BEAST
+			// Can't use TLSv1.0 because of POODLE and BEAST using CBC cipher
+			// Can't use TLSv1.1 because of RC4 cipher usage
+			MinVersion:        tls.VersionTLS12,
+			NameToCertificate: namedCerts,
+			// enable HTTP2 for go's 1.7 HTTP Server
+			NextProtos: []string{"h2", "http/1.1"},
+		},
+	}
+
+	if len(s.SecureServingInfo.ServerCert.CertFile) != 0 || len(s.SecureServingInfo.ServerCert.KeyFile) != 0 {
+		secureServer.TLSConfig.Certificates = make([]tls.Certificate, 1)
+		secureServer.TLSConfig.Certificates[0], err = tls.LoadX509KeyPair(s.SecureServingInfo.ServerCert.CertFile, s.SecureServingInfo.ServerCert.KeyFile)
+		if err != nil {
+			return fmt.Errorf("unable to load server certificate: %v", err)
+		}
+	}
+
+	// append all named certs. Otherwise, the go tls stack will think no SNI processing
+	// is necessary because there is only one cert anyway.
+	// Moreover, if ServerCert.CertFile/ServerCert.KeyFile are not set, the first SNI
+	// cert will become the default cert. That's what we expect anyway.
+	for _, c := range namedCerts {
+		secureServer.TLSConfig.Certificates = append(secureServer.TLSConfig.Certificates, *c)
+	}
+
+	if len(s.SecureServingInfo.ClientCA) > 0 {
+		clientCAs, err := certutil.NewPool(s.SecureServingInfo.ClientCA)
+		if err != nil {
+			return fmt.Errorf("unable to load client CA file: %v", err)
+		}
+		// Populate PeerCertificates in requests, but don't reject connections without certificates
+		// This allows certificates to be validated by authenticators, while still allowing other auth types
+		secureServer.TLSConfig.ClientAuth = tls.RequestClientCert
+		// Specify allowed CAs for client certificates
+		secureServer.TLSConfig.ClientCAs = clientCAs
+	}
+
+	glog.Infof("Serving securely on %s", s.SecureServingInfo.BindAddress)
+	s.effectiveSecurePort, err = runServer(secureServer, stopCh)
+	return err
+}
+
+// serveInsecurely run the insecure http server. It fails only if the initial listen
+// call fails. The actual server loop (stoppable by closing stopCh) runs in a go
+// routine, i.e. serveInsecurely does not block.
+func (s *GenericAPIServer) serveInsecurely(stopCh <-chan struct{}) error {
+	insecureServer := &http.Server{
+		Addr:           s.InsecureServingInfo.BindAddress,
+		Handler:        s.InsecureHandler,
+		MaxHeaderBytes: 1 << 20,
+	}
+	glog.Infof("Serving insecurely on %s", s.InsecureServingInfo.BindAddress)
+	var err error
+	s.effectiveInsecurePort, err = runServer(insecureServer, stopCh)
+	return err
+}
+
+// runServer listens on the given port, then spawns a go-routine continuously serving
+// until the stopCh is closed. The port is returned. This function does not block.
+func runServer(server *http.Server, stopCh <-chan struct{}) (int, error) {
+	addr := server.Addr
+	if addr == "" {
+		addr = ":https"
+	}
+
+	// first listen is synchronous (fail early!)
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return 0, fmt.Errorf("Failed to listen on %v: %v", addr, err)
+	}
+
+	// get port
+	tcpAddr, ok := ln.Addr().(*net.TCPAddr)
+	if !ok {
+		ln.Close()
+		return 0, fmt.Errorf("invalid listen address: %q", ln.Addr().String())
+	}
+
+	lock := sync.Mutex{} // to avoid we close an old listener during a listen retry
+	go func() {
+		<-stopCh
+		lock.Lock()
+		defer lock.Unlock()
+		ln.Close()
+	}()
+
+	go func() {
+		defer utilruntime.HandleCrash()
+
+		for {
+			var listener net.Listener
+			listener = tcpKeepAliveListener{ln.(*net.TCPListener)}
+			if server.TLSConfig != nil {
+				listener = tls.NewListener(listener, server.TLSConfig)
+			}
+
+			err := server.Serve(listener)
+			glog.Errorf("Error serving %v (%v); will try again.", addr, err)
+
+			// listen again, but never retry instead of fail.
+			func() {
+				lock.Lock()
+				defer lock.Unlock()
+				for {
+					time.Sleep(15 * time.Second)
+
+					ln, err = net.Listen("tcp", addr)
+					if err == nil {
+						return
+					}
+					select {
+					case <-stopCh:
+						return
+					default:
+					}
+					glog.Errorf("Error listening on %v (%v); will try again.", addr, err)
+				}
+			}()
+
+			select {
+			case <-stopCh:
+				return
+			default:
+			}
+		}
+	}()
+
+	return tcpAddr.Port, nil
+}
 
 // getNamedCertificateMap returns a map of strings to *tls.Certificate, suitable for use in
 // tls.Config#NamedCertificates. Returns an error if any of the certs cannot be loaded.
@@ -81,4 +235,22 @@ func getNamedCertificateMap(namedCertKeys []NamedCertKey) (map[string]*tls.Certi
 	}
 
 	return tlsCertsByName, nil
+}
+
+// tcpKeepAliveListener sets TCP keep-alive timeouts on accepted
+// connections. It's used by ListenAndServe and ListenAndServeTLS so
+// dead TCP connections (e.g. closing laptop mid-download) eventually
+// go away.
+type tcpKeepAliveListener struct {
+	*net.TCPListener
+}
+
+func (ln tcpKeepAliveListener) Accept() (c net.Conn, err error) {
+	tc, err := ln.AcceptTCP()
+	if err != nil {
+		return
+	}
+	tc.SetKeepAlive(true)
+	tc.SetKeepAlivePeriod(3 * time.Minute)
+	return tc, nil
 }
