@@ -2368,6 +2368,7 @@ func (s *StorageClassDescriber) Describe(namespace, name string, describerSettin
 	}
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", sc.Name)
+		fmt.Fprintf(out, "Description:\t%s\n", storageutil.GetStorageClassDescription(sc.ObjectMeta))
 		fmt.Fprintf(out, "IsDefaultClass:\t%s\n", storageutil.IsDefaultAnnotationText(sc.ObjectMeta))
 		fmt.Fprintf(out, "Annotations:\t%s\n", labels.FormatLabels(sc.Annotations))
 		fmt.Fprintf(out, "Provisioner:\t%s\n", sc.Provisioner)

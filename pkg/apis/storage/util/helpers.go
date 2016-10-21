@@ -45,6 +45,8 @@ const BetaStorageClassAnnotation = "volume.beta.kubernetes.io/storage-class"
 //   volume belongs.
 //TODO: Update this to final annotation value as it matches BetaStorageClassAnnotation for now
 const StorageClassAnnotation = "volume.beta.kubernetes.io/storage-class"
+const StorageClassKubernetesDescription = "kubernetes.io/description"
+const StorageClassDescription = "description"
 
 // GetVolumeStorageClass returns value of StorageClassAnnotation or empty string in case
 // the annotation does not exist.
@@ -83,6 +85,19 @@ func GetStorageClassAnnotation(obj api.ObjectMeta) string {
 		return class
 	}
 	if class, ok := obj.Annotations[AlphaStorageClassAnnotation]; ok {
+		return class
+	}
+
+	return ""
+}
+
+// GetStorageClassDescription returns the StorageClass description value
+// if the annotation is set, empty string if not
+func GetStorageClassDescription(obj api.ObjectMeta) string {
+	if class, ok := obj.Annotations[StorageClassKubernetesDescription]; ok {
+		return class
+	}
+	if class, ok := obj.Annotations[StorageClassDescription]; ok {
 		return class
 	}
 
