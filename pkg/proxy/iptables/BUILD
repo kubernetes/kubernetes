@@ -22,6 +22,7 @@ go_library(
         "//pkg/types:go_default_library",
         "//pkg/util/config:go_default_library",
         "//pkg/util/exec:go_default_library",
+        "//pkg/util/flowcontrol:go_default_library",
         "//pkg/util/iptables:go_default_library",
         "//pkg/util/sets:go_default_library",
         "//pkg/util/slice:go_default_library",
