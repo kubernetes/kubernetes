@@ -77,7 +77,8 @@ func TestLongRunningRequestRegexp(t *testing.T) {
 	}
 }
 
-var insecurePort = 8082
+var securePort = 6443 + 2
+var insecurePort = 8080 + 2
 var serverIP = fmt.Sprintf("http://localhost:%v", insecurePort)
 var groupVersions = []unversioned.GroupVersion{
 	fed_v1b1.SchemeGroupVersion,
@@ -86,6 +87,7 @@ var groupVersions = []unversioned.GroupVersion{
 
 func TestRun(t *testing.T) {
 	s := options.NewServerRunOptions()
+	s.GenericServerRunOptions.SecurePort = securePort
 	s.GenericServerRunOptions.InsecurePort = insecurePort
 	_, ipNet, _ := net.ParseCIDR("10.10.10.0/24")
 	s.GenericServerRunOptions.ServiceClusterIPRange = *ipNet
