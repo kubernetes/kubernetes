@@ -56,6 +56,7 @@ network_closure.sh
 
 # Also ignore etcd installed by hack/install-etcd.sh
 /third_party/etcd*
+/default.etcd
 
 # User cluster configs
 .kubeconfig
