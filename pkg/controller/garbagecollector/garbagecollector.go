@@ -489,7 +489,8 @@ func (gc *GarbageCollector) monitorFor(resource unversioned.GroupVersionResource
 		}
 		runtimeObject.GetObjectKind().SetGroupVersionKind(kind)
 	}
-	monitor.store, monitor.controller = cache.NewInformer(
+	monitor.store, monitor.controller = cache.NewNamedInformer(
+		fmt.Sprintf("garbagecollector(%s)", resource),
 		gcListWatcher(client, resource),
 		nil,
 		ResourceResyncTime,

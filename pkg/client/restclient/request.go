@@ -905,6 +905,10 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 		}
 	}
 
+	if resp.StatusCode == http.StatusNotAcceptable {
+		glog.Infof("%s %s: server responded with 406, we sent %q and got %q", req.Method, req.URL.String(), req.Header.Get("Accept"), resp.Header.Get("Content-Type"))
+	}
+
 	// verify the content type is accurate
 	contentType := resp.Header.Get("Content-Type")
 	decoder := r.serializers.Decoder
