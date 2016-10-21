@@ -55,6 +55,10 @@ type Config struct {
 	//       the object completely if desired. Pass the object in
 	//       question to this interface as a parameter.
 	RetryOnError bool
+
+	// ReflectorName if set is used to describe the reflector in log
+	// messages.
+	ReflectorName string
 }
 
 // ProcessFunc processes a single object.
@@ -86,12 +90,23 @@ func New(c *Config) *Controller {
 // Run blocks; call via go.
 func (c *Controller) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
-	r := NewReflector(
-		c.config.ListerWatcher,
-		c.config.ObjectType,
-		c.config.Queue,
-		c.config.FullResyncPeriod,
-	)
+	var r *Reflector
+	if len(c.config.ReflectorName) > 0 {
+		r = NewNamedReflector(
+			c.config.ReflectorName,
+			c.config.ListerWatcher,
+			c.config.ObjectType,
+			c.config.Queue,
+			c.config.FullResyncPeriod,
+		)
+	} else {
+		r = NewReflector(
+			c.config.ListerWatcher,
+			c.config.ObjectType,
+			c.config.Queue,
+			c.config.FullResyncPeriod,
+		)
+	}
 
 	c.reflectorMutex.Lock()
 	c.reflector = r
@@ -193,6 +208,15 @@ func DeletionHandlingMetaNamespaceKeyFunc(obj interface{}) (string, error) {
 	return MetaNamespaceKeyFunc(obj)
 }
 
+func NewInformer(
+	lw ListerWatcher,
+	objType runtime.Object,
+	resyncPeriod time.Duration,
+	h ResourceEventHandler,
+) (Store, *Controller) {
+	return NewNamedInformer("", lw, objType, resyncPeriod, h)
+}
+
 // NewInformer returns a Store and a controller for populating the store
 // while also providing event notifications. You should only used the returned
 // Store for Get/List operations; Add/Modify/Deletes will cause the event
@@ -208,7 +232,8 @@ func DeletionHandlingMetaNamespaceKeyFunc(obj interface{}) (string, error) {
 //    or you stop the controller).
 //  * h is the object you want notifications sent to.
 //
-func NewInformer(
+func NewNamedInformer(
+	name string,
 	lw ListerWatcher,
 	objType runtime.Object,
 	resyncPeriod time.Duration,
@@ -223,6 +248,7 @@ func NewInformer(
 	fifo := NewDeltaFIFO(MetaNamespaceKeyFunc, nil, clientState)
 
 	cfg := &Config{
+		ReflectorName:    name,
 		Queue:            fifo,
 		ListerWatcher:    lw,
 		ObjectType:       objType,

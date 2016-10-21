@@ -548,6 +548,7 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 		config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
 		metaOnlyClientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
 		config.ContentConfig = dynamic.ContentConfig()
+		glog.Infof("Initializing garbage collector with %#v", config.ContentConfig.NegotiatedSerializer)
 		clientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
 		garbageCollector, err := garbagecollector.NewGarbageCollector(metaOnlyClientPool, clientPool, restMapper, groupVersionResources)
 		if err != nil {

@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"bitbucket.org/ww/goautoneg"
+	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -67,6 +68,7 @@ func negotiateOutputSerializer(req *http.Request, ns runtime.NegotiatedSerialize
 	mediaType, ok := negotiateMediaTypeOptions(req.Header.Get("Accept"), acceptedMediaTypesForEndpoint(ns), defaultEndpointRestrictions)
 	if !ok {
 		supported, _ := mediaTypesForSerializer(ns)
+		glog.Infof("Negotiate serialization for %q failed, supported: %v", req.Header.Get("Accept"), supported)
 		return runtime.SerializerInfo{}, errNotAcceptable{supported}
 	}
 	return mediaType.accepted.Serializer, nil
@@ -76,6 +78,7 @@ func negotiateOutputStreamSerializer(req *http.Request, ns runtime.NegotiatedSer
 	mediaType, ok := negotiateMediaTypeOptions(req.Header.Get("Accept"), acceptedMediaTypesForEndpoint(ns), defaultEndpointRestrictions)
 	if !ok || mediaType.accepted.Serializer.StreamSerializer == nil {
 		_, supported := mediaTypesForSerializer(ns)
+		glog.Infof("Negotiate stream serialization for %q failed, supported: %v", req.Header.Get("Accept"), supported)
 		return runtime.SerializerInfo{}, errNotAcceptable{supported}
 	}
 	return mediaType.accepted.Serializer, nil
