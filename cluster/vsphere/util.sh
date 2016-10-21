@@ -325,23 +325,52 @@ function setup-pod-routes {
   # identify the subnet assigned to the node by the kubernetes controller manager.
   KUBE_NODE_BRIDGE_NETWORK=()
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
-     printf " finding network of cbr0 bridge on node  ${NODE_NAMES[$i]}\n"
-     network=$(kube-ssh ${KUBE_NODE_IP_ADDRESSES[$i]} 'sudo ip route show | grep -E "dev cbr0" | cut -d     " " -f1')
-     KUBE_NODE_BRIDGE_NETWORK+=("${network}")
-  done
+    printf " finding network of cbr0 bridge on node  ${NODE_NAMES[$i]}\n"
 
+    network=""
+    top2_octets_final=$(echo $NODE_IP_RANGES | awk -F "." '{ print $1 "." $2 }') # Assume that a 24 bit mask per node
+
+    attempt=0
+    max_attempt=60
+    while true ; do
+      attempt=$(($attempt+1))
+
+      network=$(kube-ssh ${KUBE_NODE_IP_ADDRESSES[$i]} 'sudo ip route show | grep -E "dev cbr0" | cut -d     " " -f1')
+      top2_octets_read=$(echo $network | awk -F "." '{ print $1 "." $2 }')
+
+      if [[ "$top2_octets_read" == "$top2_octets_final" ]]; then
+        break
+      fi
+
+      if (( $attempt == $max_attempt )); then
+        echo
+        echo "(Failed) Waiting for cbr0 bridge to come up @ ${NODE_NAMES[$i]}"
+        echo
+        exit 1
+      fi
+
+      printf "."
+      sleep 5
+    done
+
+    printf "\n"
+    KUBE_NODE_BRIDGE_NETWORK+=("${network}")
+  done
 
   # Make the pods visible to each other and to the master.
   # The master needs have routes to the pods for the UI to work.
   local j
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
-     printf "setting up routes for ${NODE_NAMES[$i]}"
-     kube-ssh "${KUBE_MASTER_IP}" "sudo route add -net ${KUBE_NODE_BRIDGE_NETWORK[${i}]} gw ${KUBE_NODE_IP_ADDRESSES[${i}]}"
-     for (( j=0; j<${#NODE_NAMES[@]}; j++)); do
-        if [[ $i != $j ]]; then
-           kube-ssh ${KUBE_NODE_IP_ADDRESSES[$i]} "sudo route add -net ${KUBE_NODE_BRIDGE_NETWORK[$j]} gw ${KUBE_NODE_IP_ADDRESSES[$j]}"
-        fi
-      done
+    printf "setting up routes for ${NODE_NAMES[$i]}\n"
+    printf " adding route to ${MASTER_NAME} for network ${KUBE_NODE_BRIDGE_NETWORK[${i}]} via ${KUBE_NODE_IP_ADDRESSES[${i}]}\n"
+    kube-ssh "${KUBE_MASTER_IP}" "sudo route add -net ${KUBE_NODE_BRIDGE_NETWORK[${i}]} gw ${KUBE_NODE_IP_ADDRESSES[${i}]}"
+    for (( j=0; j<${#NODE_NAMES[@]}; j++)); do
+      if [[ $i != $j ]]; then
+        printf " adding route to ${NODE_NAMES[$j]} for network ${KUBE_NODE_BRIDGE_NETWORK[${i}]} via ${KUBE_NODE_IP_ADDRESSES[${i}]}\n" 
+        kube-ssh ${KUBE_NODE_IP_ADDRESSES[$i]} "sudo route add -net ${KUBE_NODE_BRIDGE_NETWORK[$j]} gw ${KUBE_NODE_IP_ADDRESSES[$j]}"
+      fi
+    done
+    printf "\n"
   done
 }
 
@@ -465,17 +494,17 @@ function kube-up {
   printf "Waiting for salt-master to be up on ${KUBE_MASTER} ...\n"
   remote-pgrep ${KUBE_MASTER_IP} "salt-master"
 
+  printf "Waiting for all packages to be installed on ${KUBE_MASTER} ...\n"
+  kube-check  ${KUBE_MASTER_IP} 'sudo salt "kubernetes-master" state.highstate -t 30 | grep -E "Failed:[[:space:]]+0"'
+
   local i
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     printf "Waiting for salt-minion to be up on ${NODE_NAMES[$i]} ....\n"
     remote-pgrep ${KUBE_NODE_IP_ADDRESSES[$i]} "salt-minion"
+    printf "Waiting for all salt packages to be installed on ${NODE_NAMES[$i]} .... \n"
+    kube-check  ${KUBE_MASTER_IP} 'sudo salt '"${NODE_NAMES[$i]}"' state.highstate -t 30 | grep -E "Failed:[[:space:]]+0"'
     printf " OK\n"
   done
-
-  printf "Waiting for init highstate to be done on all nodes (this can take a few minutes) ...\n"
-  kube-check  ${KUBE_MASTER_IP} 'sudo salt '\''*'\'' state.show_highstate -t 50'
-  printf "Waiting for all packages to be installed on all nodes (this can take a few minutes) ...\n"
-  kube-check  ${KUBE_MASTER_IP} 'sudo salt '\''*'\'' state.highstate -t 50 | grep -E "Failed:[[:space:]]+0"'
 
   echo
 
