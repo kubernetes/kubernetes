@@ -1119,12 +1119,7 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod, node
 }
 
 func PodToleratesNodeTaints(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
-	node := nodeInfo.Node()
-	if node == nil {
-		return false, nil, fmt.Errorf("node not found")
-	}
-
-	taints, err := v1.GetTaintsFromNodeAnnotations(node.Annotations)
+	taints, err := nodeInfo.Taints()
 	if err != nil {
 		return false, nil, err
 	}

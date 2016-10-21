@@ -49,6 +49,10 @@ type NodeInfo struct {
 	// explicitly as int, to avoid conversions and improve performance.
 	allowedPodNumber int
 
+	// Cached tains of the node for faster lookup.
+	taints    []v1.Taint
+	taintsErr error
+
 	// Cached conditions of node for faster lookup.
 	memoryPressureCondition v1.ConditionStatus
 	diskPressureCondition   v1.ConditionStatus
@@ -126,6 +130,13 @@ func (n *NodeInfo) AllowedPodNumber() int {
 	return n.allowedPodNumber
 }
 
+func (n *NodeInfo) Taints() ([]v1.Taint, error) {
+	if n == nil {
+		return nil, nil
+	}
+	return n.taints, n.taintsErr
+}
+
 func (n *NodeInfo) MemoryPressureCondition() v1.ConditionStatus {
 	if n == nil {
 		return v1.ConditionUnknown
@@ -171,6 +182,7 @@ func (n *NodeInfo) Clone() *NodeInfo {
 		nonzeroRequest:          &(*n.nonzeroRequest),
 		allocatableResource:     &(*n.allocatableResource),
 		allowedPodNumber:        n.allowedPodNumber,
+		taintsErr:               n.taintsErr,
 		memoryPressureCondition: n.memoryPressureCondition,
 		diskPressureCondition:   n.diskPressureCondition,
 		generation:              n.generation,
@@ -180,6 +192,9 @@ func (n *NodeInfo) Clone() *NodeInfo {
 	}
 	if len(n.podsWithAffinity) > 0 {
 		clone.podsWithAffinity = append([]*v1.Pod(nil), n.podsWithAffinity...)
+	}
+	if len(n.taints) > 0 {
+		clone.taints = append([]v1.Taint(nil), n.taints...)
 	}
 	return clone
 }
@@ -326,6 +341,7 @@ func (n *NodeInfo) SetNode(node *v1.Node) error {
 			}
 		}
 	}
+	n.taints, n.taintsErr = v1.GetTaintsFromNodeAnnotations(node.Annotations)
 	for i := range node.Status.Conditions {
 		cond := &node.Status.Conditions[i]
 		switch cond.Type {
@@ -350,6 +366,7 @@ func (n *NodeInfo) RemoveNode(node *v1.Node) error {
 	n.node = nil
 	n.allocatableResource = &Resource{}
 	n.allowedPodNumber = 0
+	n.taints, n.taintsErr = nil, nil
 	n.memoryPressureCondition = v1.ConditionUnknown
 	n.diskPressureCondition = v1.ConditionUnknown
 	n.generation++
