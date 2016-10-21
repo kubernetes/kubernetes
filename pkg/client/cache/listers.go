@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // AppendFunc is used to add a matching item to whatever list the caller is using
@@ -90,6 +91,79 @@ func ListAllByNamespace(indexer Indexer, namespace string, selector labels.Selec
 	}
 
 	return nil
+}
+
+// GenericLister is a lister skin on a generic Indexer
+type GenericLister interface {
+	// List will return all objects across namespaces
+	List(selector labels.Selector) (ret []runtime.Object, err error)
+	// Get will attempt to retrieve assuming that name==key
+	Get(name string) (runtime.Object, error)
+	// ByNamespace will give you a GenericNamespaceLister for one namespace
+	ByNamespace(namespace string) GenericNamespaceLister
+}
+
+// GenericNamespaceLister is a lister skin on a generic Indexer
+type GenericNamespaceLister interface {
+	// List will return all objects in this namespace
+	List(selector labels.Selector) (ret []runtime.Object, err error)
+	// Get will attempt to retrieve by namespace and name
+	Get(name string) (runtime.Object, error)
+}
+
+func NewGenericLister(indexer Indexer, resource unversioned.GroupResource) GenericLister {
+	return &genericLister{indexer: indexer, resource: resource}
+}
+
+type genericLister struct {
+	indexer  Indexer
+	resource unversioned.GroupResource
+}
+
+func (s *genericLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
+	err = ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(runtime.Object))
+	})
+	return ret, err
+}
+
+func (s *genericLister) ByNamespace(namespace string) GenericNamespaceLister {
+	return &genericNamespaceLister{indexer: s.indexer, namespace: namespace, resource: s.resource}
+}
+
+func (s *genericLister) Get(name string) (runtime.Object, error) {
+	obj, exists, err := s.indexer.GetByKey(name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(s.resource, name)
+	}
+	return obj.(runtime.Object), nil
+}
+
+type genericNamespaceLister struct {
+	indexer   Indexer
+	namespace string
+	resource  unversioned.GroupResource
+}
+
+func (s *genericNamespaceLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
+	err = ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(runtime.Object))
+	})
+	return ret, err
+}
+
+func (s *genericNamespaceLister) Get(name string) (runtime.Object, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(s.resource, name)
+	}
+	return obj.(runtime.Object), nil
 }
 
 //  TODO: generate these classes and methods for all resources of interest using
