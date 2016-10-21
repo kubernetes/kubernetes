@@ -86,6 +86,7 @@ var groupVersions = []unversioned.GroupVersion{
 
 func TestRun(t *testing.T) {
 	s := options.NewServerRunOptions()
+	s.GenericServerRunOptions.SecurePort = 0
 	s.GenericServerRunOptions.InsecurePort = insecurePort
 	_, ipNet, _ := net.ParseCIDR("10.10.10.0/24")
 	s.GenericServerRunOptions.ServiceClusterIPRange = *ipNet

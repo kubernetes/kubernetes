@@ -44,9 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	"k8s.io/kubernetes/pkg/genericapiserver/routes"
 	"k8s.io/kubernetes/pkg/runtime"
-	certutil "k8s.io/kubernetes/pkg/util/cert"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -115,6 +113,9 @@ type GenericAPIServer struct {
 	SecureServingInfo   *SecureServingInfo
 	InsecureServingInfo *ServingInfo
 
+	// numerical ports, set after listening
+	effectiveSecurePort, effectiveInsecurePort int
+
 	// ExternalAddress is the address (hostname or IP and port) that should be used in
 	// external (public internet) URLs for this GenericAPIServer.
 	ExternalAddress string
@@ -180,7 +181,6 @@ type preparedGenericAPIServer struct {
 
 // PrepareRun does post API installation setup steps.
 func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
-	// install APIs which depend on other APIs to be installed
 	if s.enableSwaggerSupport {
 		routes.Swagger{ExternalAddress: s.ExternalAddress}.Install(s.HandlerContainer)
 	}
@@ -192,70 +192,19 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	return preparedGenericAPIServer{s}
 }
 
-func (s preparedGenericAPIServer) Run() {
+// Run spawns the http servers (secure and insecure). It only returns if stopCh is closed
+// or one of the ports cannot be listened on initially.
+func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) {
 	if s.SecureServingInfo != nil && s.Handler != nil {
-		namedCerts, err := getNamedCertificateMap(s.SecureServingInfo.SNICerts)
-		if err != nil {
-			glog.Fatalf("Unable to load SNI certificates: %v", err)
+		if err := s.serveSecurely(stopCh); err != nil {
+			glog.Fatal(err)
 		}
-
-		secureServer := &http.Server{
-			Addr:           s.SecureServingInfo.BindAddress,
-			Handler:        s.Handler,
-			MaxHeaderBytes: 1 << 20,
-			TLSConfig: &tls.Config{
-				// Can't use SSLv3 because of POODLE and BEAST
-				// Can't use TLSv1.0 because of POODLE and BEAST using CBC cipher
-				// Can't use TLSv1.1 because of RC4 cipher usage
-				MinVersion:        tls.VersionTLS12,
-				NameToCertificate: namedCerts,
-			},
-		}
-
-		if len(s.SecureServingInfo.ClientCA) > 0 {
-			clientCAs, err := certutil.NewPool(s.SecureServingInfo.ClientCA)
-			if err != nil {
-				glog.Fatalf("Unable to load client CA file: %v", err)
-			}
-			// Populate PeerCertificates in requests, but don't reject connections without certificates
-			// This allows certificates to be validated by authenticators, while still allowing other auth types
-			secureServer.TLSConfig.ClientAuth = tls.RequestClientCert
-			// Specify allowed CAs for client certificates
-			secureServer.TLSConfig.ClientCAs = clientCAs
-			// "h2" NextProtos is necessary for enabling HTTP2 for go's 1.7 HTTP Server
-			secureServer.TLSConfig.NextProtos = []string{"h2"}
-		}
-
-		glog.Infof("Serving securely on %s", s.SecureServingInfo.BindAddress)
-		go func() {
-			defer utilruntime.HandleCrash()
-
-			for {
-				if err := secureServer.ListenAndServeTLS(s.SecureServingInfo.ServerCert.CertFile, s.SecureServingInfo.ServerCert.KeyFile); err != nil {
-					glog.Errorf("Unable to listen for secure (%v); will try again.", err)
-				}
-				time.Sleep(15 * time.Second)
-			}
-		}()
 	}
 
 	if s.InsecureServingInfo != nil && s.InsecureHandler != nil {
-		insecureServer := &http.Server{
-			Addr:           s.InsecureServingInfo.BindAddress,
-			Handler:        s.InsecureHandler,
-			MaxHeaderBytes: 1 << 20,
+		if err := s.serveInsecurely(stopCh); err != nil {
+			glog.Fatal(err)
 		}
-		glog.Infof("Serving insecurely on %s", s.InsecureServingInfo.BindAddress)
-		go func() {
-			defer utilruntime.HandleCrash()
-
-			for {
-				if err := insecureServer.ListenAndServe(); err != nil {
-					glog.Errorf("Unable to listen for insecure (%v); will try again.", err)
-				}
-				time.Sleep(15 * time.Second)
-			}
-		}()
 	}
 
 	// Attempt to verify the server came up for 20 seconds (100 tries * 100ms, 100ms timeout per try) per port
@@ -277,7 +226,9 @@ func (s preparedGenericAPIServer) Run() {
 		glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
 	}
 
-	select {}
+	select {
+	case <-stopCh:
+	}
 }
 
 // installAPIResources is a private method for installing the REST storage backing each api groupversionresource
@@ -500,4 +451,3 @@ func waitForSuccessfulDial(https bool, network, address string, timeout, interva
 	}
 	return err
 }
-

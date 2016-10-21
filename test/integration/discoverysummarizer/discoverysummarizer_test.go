@@ -67,6 +67,7 @@ func runDiscoverySummarizer(t *testing.T) string {
 
 func runAPIServer(t *testing.T) string {
 	serverRunOptions := apiserver.NewServerRunOptions()
+	serverRunOptions.SecurePort = 0
 	// Change the port, because otherwise it will fail if examples/apiserver/apiserver_test and this are run in parallel.
 	serverRunOptions.InsecurePort = 8083
 	go func() {
