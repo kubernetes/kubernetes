@@ -550,6 +550,10 @@ func (p *glusterfsVolumeProvisioner) CreateVolume() (r *api.GlusterfsVolumeSourc
 	endpoint, service, err := p.createEndpointService(epNamespace, epServiceName, dynamicHostIps, p.options.PVC.Name)
 	if err != nil {
 		glog.Errorf("glusterfs: failed to create endpoint/service")
+		err = cli.VolumeDelete(volume.Id)
+		if err != nil {
+			glog.Errorf("glusterfs: error when deleting the volume :%v , manual deletion required", err)
+		}
 		return nil, 0, fmt.Errorf("failed to create endpoint/service %v", err)
 	}
 	glog.V(3).Infof("glusterfs: dynamic ep %v and svc : %v ", endpoint, service)
