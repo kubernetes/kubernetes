@@ -14,24 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package normalization
+package types
 
-import "strings"
-
-func Group(group string) string {
-	if group == "api" {
-		return "core"
-	}
-	return group
+type GroupVersion struct {
+	Group   string
+	Version string
 }
 
-func Version(version string) string {
-	if version == "" {
-		return "unversioned"
-	}
-	return version
+type GroupVersions struct {
+	Group    string
+	Versions []string
 }
 
-func BeforeFirstDot(dotted string) string {
-	return strings.Split(dotted, ".")[0]
+// GroupVersionPackage contains group name, version name, and the package name client-gen will generate for this group version.
+type GroupVersionPackage struct {
+	Group   string
+	Version string
+	// If a user calls a group client without specifying the version (e.g.,
+	// c.Core(), instead of c.CoreV1()), the default version will be returned.
+	IsDefaultVersion bool
+	GroupVersion     string
+	PackageName      string
 }

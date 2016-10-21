@@ -31,8 +31,8 @@ type genFakeForType struct {
 	generator.DefaultGen
 	outputPackage string
 	group         string
-	inputPackage  string
 	version       string
+	inputPackage  string
 	typeToMatch   *types.Type
 	imports       namer.ImportTracker
 }
@@ -106,6 +106,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		"Package":              namer.IC(pkg),
 		"namespaced":           namespaced,
 		"Group":                namer.IC(g.group),
+		"GroupVersion":         namer.IC(g.group) + namer.IC(g.version),
 		"group":                canonicalGroup,
 		"groupName":            groupName,
 		"version":              canonicalVersion,
@@ -180,7 +181,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 var structNamespaced = `
 // Fake$.type|publicPlural$ implements $.type|public$Interface
 type Fake$.type|publicPlural$ struct {
-	Fake *Fake$.Group$
+	Fake *Fake$.GroupVersion$
 	ns     string
 }
 `
@@ -189,7 +190,7 @@ type Fake$.type|publicPlural$ struct {
 var structNonNamespaced = `
 // Fake$.type|publicPlural$ implements $.type|public$Interface
 type Fake$.type|publicPlural$ struct {
-	Fake *Fake$.Group$
+	Fake *Fake$.GroupVersion$
 }
 `
 
