@@ -36,6 +36,7 @@ import (
 const apiCallRetryInterval = 500 * time.Millisecond
 
 func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Clientset, error) {
+
 	adminClientConfig, err := clientcmd.NewDefaultClientConfig(
 		*adminConfig,
 		&clientcmd.ConfigOverrides{},
@@ -43,13 +44,14 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 	if err != nil {
 		return nil, fmt.Errorf("<master/apiclient> failed to create API client configuration [%v]", err)
 	}
-
 	fmt.Println("<master/apiclient> created API client configuration")
 
 	client, err := clientset.NewForConfig(adminClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("<master/apiclient> failed to create API client [%v]", err)
 	}
+
+	return client, nil
 
 	fmt.Println("<master/apiclient> created API client, waiting for the control plane to become ready")
 
