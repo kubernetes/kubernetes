@@ -17,10 +17,11 @@ limitations under the License.
 package cmd
 
 import (
+	"bytes"
 	"fmt"
+	"html/template"
 	"io"
 	"io/ioutil"
-	"strings"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -34,6 +35,18 @@ import (
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 	"k8s.io/kubernetes/pkg/runtime"
 	netutil "k8s.io/kubernetes/pkg/util/net"
+)
+
+const (
+	joinArgsTemplateLiteral = `--token={{.Cfg.Secrets.GivenToken -}}
+		{{if ne .Cfg.API.BindPort .DefaultAPIBindPort -}}
+		{{" --api-port="}}{{.Cfg.API.BindPort -}}
+		{{end -}}
+		{{if ne .Cfg.Discovery.BindPort .DefaultDiscoveryBindPort -}}
+		{{" --discovery-port="}}{{.Cfg.Discovery.BindPort -}}
+		{{end -}}
+		{{" "}}{{index .Cfg.API.AdvertiseAddresses 0 -}}
+`
 )
 
 var (
@@ -186,6 +199,13 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 	return &Init{cfg: cfg}, nil
 }
 
+// joinArgsData denotes a data object which is needed by function generateJoinArgs to generate kubeadm join arguments.
+type joinArgsData struct {
+	Cfg                      *kubeadmapi.MasterConfiguration
+	DefaultAPIBindPort       uint
+	DefaultDiscoveryBindPort uint
+}
+
 // Run executes master node provisioning, including certificates, needed static pod manifests, etc.
 func (i *Init) Run(out io.Writer) error {
 	if err := kubemaster.CreateTokenAuthFile(&i.cfg.Secrets); err != nil {
@@ -239,16 +259,21 @@ func (i *Init) Run(out io.Writer) error {
 		return err
 	}
 
-	// TODO(phase1+) we could probably use templates for this logic, and reference struct fields directly etc
-	joinArgs := []string{fmt.Sprintf("--token=%s", i.cfg.Secrets.GivenToken)}
-	if i.cfg.API.BindPort != kubeadmapi.DefaultAPIBindPort {
-		joinArgs = append(joinArgs, fmt.Sprintf("--api-port=%d", i.cfg.API.BindPort))
+	data := joinArgsData{i.cfg, kubeadmapi.DefaultAPIBindPort, kubeadmapi.DefaultDiscoveryBindPort}
+	if joinArgs, err := generateJoinArgs(data); err != nil {
+		return err
+	} else {
+		fmt.Fprintf(out, initDoneMsgf, joinArgs)
 	}
-	if i.cfg.Discovery.BindPort != kubeadmapi.DefaultDiscoveryBindPort {
-		joinArgs = append(joinArgs, fmt.Sprintf("--discovery-port=%d", i.cfg.Discovery.BindPort))
-	}
-	joinArgs = append(joinArgs, i.cfg.API.AdvertiseAddresses[0])
-	fmt.Fprintf(out, initDoneMsgf, strings.Join(joinArgs, " "))
-
 	return nil
+}
+
+// generateJoinArgs generates kubeadm join arguments
+func generateJoinArgs(data joinArgsData) (string, error) {
+	joinArgsTemplate := template.Must(template.New("joinArgsTemplate").Parse(joinArgsTemplateLiteral))
+	var b bytes.Buffer
+	if err := joinArgsTemplate.Execute(&b, data); err != nil {
+		return "", err
+	}
+	return b.String(), nil
 }
