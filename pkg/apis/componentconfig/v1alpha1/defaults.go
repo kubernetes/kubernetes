@@ -80,6 +80,9 @@ func SetDefaults_KubeProxyConfiguration(obj *KubeProxyConfiguration) {
 	if obj.IPTablesSyncPeriod.Duration == 0 {
 		obj.IPTablesSyncPeriod = unversioned.Duration{Duration: 30 * time.Second}
 	}
+	if obj.IPTablesMinSyncPeriod.Duration == 0 {
+		obj.IPTablesMinSyncPeriod = unversioned.Duration{Duration: 2 * time.Second}
+	}
 	zero := unversioned.Duration{}
 	if obj.UDPIdleTimeout == zero {
 		obj.UDPIdleTimeout = unversioned.Duration{Duration: 250 * time.Millisecond}
