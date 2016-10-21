@@ -1311,7 +1311,7 @@ var _ = framework.KubeDescribe("ESIPP [Slow][Feature:ExternalTrafficLocalOnly]",
 
 		By(fmt.Sprintf("endpoints present on nodes %v, absent on nodes %v", endpointNodeMap, noEndpointNodeMap))
 		for nodeName, nodeIPs := range noEndpointNodeMap {
-			By(fmt.Sprintf("Checking %v (%v:%v%v) proxies to endpoints on another node", nodeName, nodeIPs[0], path, svcNodePort))
+			By(fmt.Sprintf("Checking %v (%v:%v%v) proxies to endpoints on another node", nodeName, nodeIPs[0], svcNodePort, path))
 			jig.GetHTTPContent(nodeIPs[0], svcNodePort, kubeProxyLagTimeout, path)
 		}
 
@@ -1331,16 +1331,17 @@ var _ = framework.KubeDescribe("ESIPP [Slow][Feature:ExternalTrafficLocalOnly]",
 
 		// Poll till kube-proxy re-adds the MASQUERADE rule on the node.
 		By(fmt.Sprintf("checking source ip is NOT preserved through loadbalancer %v", ingressIP))
+		var clientIP string
 		pollErr := wait.PollImmediate(framework.Poll, kubeProxyLagTimeout, func() (bool, error) {
 			content := jig.GetHTTPContent(ingressIP, svcTCPPort, kubeProxyLagTimeout, "/clientip")
-			clientIP := content.String()
+			clientIP = content.String()
 			if strings.HasPrefix(clientIP, "10.") {
 				return true, nil
 			}
-			return false, fmt.Errorf("Source IP (%v) is the client IP, expected a ten-dot cluster ip.", clientIP)
+			return false, nil
 		})
 		if pollErr != nil {
-			framework.Failf("Source IP WAS preserved even after ESIPP turned off: %v", pollErr)
+			framework.Failf("Source IP WAS preserved even after ESIPP turned off. Got %v, expected a ten-dot cluster ip.", clientIP)
 		}
 
 		// TODO: We need to attempt to create another service with the previously
@@ -1358,15 +1359,16 @@ var _ = framework.KubeDescribe("ESIPP [Slow][Feature:ExternalTrafficLocalOnly]",
 				fmt.Sprintf("%d", healthCheckNodePort)
 		})
 		pollErr = wait.PollImmediate(framework.Poll, kubeProxyLagTimeout, func() (bool, error) {
-			content := jig.GetHTTPContent(ingressIP, svcTCPPort, kubeProxyLagTimeout, "/clientip")
-			clientIP := content.String()
+			content := jig.GetHTTPContent(ingressIP, svcTCPPort, kubeProxyLagTimeout, path)
+			clientIP = content.String()
+			By(fmt.Sprintf("Endpoint %v:%v%v returned client ip %v", ingressIP, svcTCPPort, path, clientIP))
 			if !strings.HasPrefix(clientIP, "10.") {
 				return true, nil
 			}
-			return false, fmt.Errorf("Source IP (%v) is not the client IP, expected a public IP.", clientIP)
+			return false, nil
 		})
 		if pollErr != nil {
-			framework.Failf("Source IP was not preserved when the ESIPP annotation was on: %v", pollErr)
+			framework.Failf("Source IP (%v) is not the client IP even after ESIPP turned on, expected a public IP.", clientIP)
 		}
 	})
 })
