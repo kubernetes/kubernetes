@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
@@ -455,6 +456,7 @@ func (h *HumanReadablePrinter) FinishPrint(output io.Writer, res string) error {
 // pkg/kubectl/cmd/get.go to reflect the new resource type.
 var podColumns = []string{"NAME", "READY", "STATUS", "RESTARTS", "AGE"}
 var podTemplateColumns = []string{"TEMPLATE", "CONTAINER(S)", "IMAGE(S)", "PODLABELS"}
+var podDisruptionBudgetColumns = []string{"NAME", "MIN-AVAILABLE", "SELECTOR"}
 var replicationControllerColumns = []string{"NAME", "DESIRED", "CURRENT", "READY", "AGE"}
 var replicaSetColumns = []string{"NAME", "DESIRED", "CURRENT", "READY", "AGE"}
 var jobColumns = []string{"NAME", "DESIRED", "SUCCESSFUL", "AGE"}
@@ -516,6 +518,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(podColumns, h.printPod)
 	h.Handler(podTemplateColumns, printPodTemplate)
 	h.Handler(podTemplateColumns, printPodTemplateList)
+	h.Handler(podDisruptionBudgetColumns, printPodDisruptionBudget)
+	h.Handler(podDisruptionBudgetColumns, printPodDisruptionBudgetList)
 	h.Handler(replicationControllerColumns, printReplicationController)
 	h.Handler(replicationControllerColumns, printReplicationControllerList)
 	h.Handler(replicaSetColumns, printReplicaSet)
@@ -800,6 +804,41 @@ func printPodTemplate(pod *api.PodTemplate, w io.Writer, options PrintOptions) e
 func printPodTemplateList(podList *api.PodTemplateList, w io.Writer, options PrintOptions) error {
 	for _, pod := range podList.Items {
 		if err := printPodTemplate(&pod, w, options); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printPodDisruptionBudget(pdb *policy.PodDisruptionBudget, w io.Writer, options PrintOptions) error {
+	// name, minavailable, selector
+	name := formatResourceName(options.Kind, pdb.Name, options.WithKind)
+	namespace := pdb.Namespace
+
+	if options.WithNamespace {
+		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
+			return err
+		}
+	}
+
+	selector := "<none>"
+	if pdb.Spec.Selector != nil {
+		selector = unversioned.FormatLabelSelector(pdb.Spec.Selector)
+	}
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n",
+		name,
+		pdb.Spec.MinAvailable.String(),
+		selector,
+	); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func printPodDisruptionBudgetList(pdbList *policy.PodDisruptionBudgetList, w io.Writer, options PrintOptions) error {
+	for _, pdb := range pdbList.Items {
+		if err := printPodDisruptionBudget(&pdb, w, options); err != nil {
 			return err
 		}
 	}
