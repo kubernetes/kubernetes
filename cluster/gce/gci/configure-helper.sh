@@ -514,7 +514,7 @@ function start-kubelet {
   fi
   flags+=" --reconcile-cidr=${reconcile_cidr}"
   if [[ -n "${NON_MASQUERADE_CIDR:-}" ]]; then
-    flag+=" --non-masquerade-cidr=${NON_MASQUERADE_CIDR}"
+    flags+=" --non-masquerade-cidr=${NON_MASQUERADE_CIDR}"
   fi
   if [[ "${ENABLE_MANIFEST_URL:-}" == "true" ]]; then
     flags+=" --manifest-url=${MANIFEST_URL}"
