@@ -872,6 +872,7 @@ k8s.io/kubernetes/pkg/util/testing,jlowdermilk,1
 k8s.io/kubernetes/pkg/util/threading,roberthbailey,1
 k8s.io/kubernetes/pkg/util/validation,Q-Lee,1
 k8s.io/kubernetes/pkg/util/validation/field,timstclair,1
+k8s.io/kubernetes/pkg/util/version,danwinship,0
 k8s.io/kubernetes/pkg/util/wait,Q-Lee,1
 k8s.io/kubernetes/pkg/util/workqueue,mtaufen,1
 k8s.io/kubernetes/pkg/util/wsstream,timothysc,1
