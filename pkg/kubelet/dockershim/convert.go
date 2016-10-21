@@ -91,33 +91,18 @@ func toRuntimeAPIContainer(c *dockertypes.Container) (*runtimeApi.Container, err
 	}, nil
 }
 
-func toDockerContainerStatus(state runtimeApi.ContainerState) string {
-	switch state {
-	case runtimeApi.ContainerState_CREATED:
-		return "created"
-	case runtimeApi.ContainerState_RUNNING:
-		return "running"
-	case runtimeApi.ContainerState_EXITED:
-		return "exited"
-	case runtimeApi.ContainerState_UNKNOWN:
-		fallthrough
-	default:
-		return "unknown"
-	}
-}
-
 func toRuntimeAPIContainerState(c *dockertypes.Container) runtimeApi.ContainerState {
 	if len(c.State) == 0 {
 		// Docker <= 1.10 (remote API <= 1.22) does not include "State" in the
 		// response when listing the containers. We have to rely on translating
 		// the "Status" string into a state.
 		// TODO: Remove this once we determine not to support Docker 1.10.
-		switch c.Status {
-		case strings.HasPrefix(state, "Up"):
+		switch {
+		case strings.HasPrefix(c.Status, "Up"):
 			return runtimeApi.ContainerState_RUNNING
-		case strings.HasPrefix(state, "Exited"):
+		case strings.HasPrefix(c.Status, "Exited"):
 			return runtimeApi.ContainerState_EXITED
-		case strings.HasPrefix(state, "Created"):
+		case strings.HasPrefix(c.Status, "Created"):
 			return runtimeApi.ContainerState_CREATED
 		default:
 			return runtimeApi.ContainerState_UNKNOWN
