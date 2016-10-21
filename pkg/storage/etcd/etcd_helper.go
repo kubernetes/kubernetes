@@ -297,7 +297,7 @@ func (h *etcdHelper) extractObj(response *etcd.Response, inErr error, objPtr run
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) GetToList(ctx context.Context, key string, pred storage.SelectionPredicate, listObj runtime.Object) error {
+func (h *etcdHelper) GetToList(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate, listObj runtime.Object) error {
 	if ctx == nil {
 		glog.Errorf("Context is nil")
 	}
