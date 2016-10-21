@@ -227,6 +227,7 @@ pkg/util/netsh
 pkg/util/ratelimit
 pkg/util/replicaset
 pkg/util/validation/field
+pkg/util/version
 pkg/util/workqueue
 pkg/version/prometheus
 pkg/volume
