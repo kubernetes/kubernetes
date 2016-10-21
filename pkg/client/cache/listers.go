@@ -21,6 +21,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -430,4 +432,41 @@ func (s *StoreToPodDisruptionBudgetLister) GetPodPodDisruptionBudgets(pod *api.P
 		err = fmt.Errorf("could not find PodDisruptionBudget for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 	return
+}
+
+// StorageClassLister knows how to list storage classes
+type StorageClassLister interface {
+	List(selector labels.Selector) (ret []*storage.StorageClass, err error)
+	Get(name string) (*storage.StorageClass, error)
+}
+
+// storageClassLister implements StorageClassLister
+type storageClassLister struct {
+	indexer Indexer
+}
+
+// NewStorageClassLister returns a new lister.
+func NewStorageClassLister(indexer Indexer) StorageClassLister {
+	return &storageClassLister{indexer: indexer}
+}
+
+// List returns a list of storage classes
+func (s *storageClassLister) List(selector labels.Selector) (ret []*storage.StorageClass, err error) {
+	err = ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*storage.StorageClass))
+	})
+	return ret, err
+}
+
+// List returns a list of storage classes
+func (s *storageClassLister) Get(name string) (*storage.StorageClass, error) {
+	key := &storage.StorageClass{ObjectMeta: api.ObjectMeta{Name: name}}
+	obj, exists, err := s.indexer.Get(key)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(storage.Resource("storageclass"), name)
+	}
+	return obj.(*storage.StorageClass), nil
 }
