@@ -22,17 +22,17 @@ import (
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
-type FakeBatch struct {
+type FakeBatchV1 struct {
 	*core.Fake
 }
 
-func (c *FakeBatch) Jobs(namespace string) v1.JobInterface {
+func (c *FakeBatchV1) Jobs(namespace string) v1.JobInterface {
 	return &FakeJobs{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeBatch) RESTClient() restclient.Interface {
+func (c *FakeBatchV1) RESTClient() restclient.Interface {
 	var ret *restclient.RESTClient
 	return ret
 }

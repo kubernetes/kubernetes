@@ -43,11 +43,11 @@ type ComponentStatusInterface interface {
 
 // componentStatuses implements ComponentStatusInterface
 type componentStatuses struct {
-	client *CoreClient
+	client *CoreUnversionedClient
 }
 
 // newComponentStatuses returns a ComponentStatuses
-func newComponentStatuses(c *CoreClient) *componentStatuses {
+func newComponentStatuses(c *CoreUnversionedClient) *componentStatuses {
 	return &componentStatuses{
 		client: c,
 	}

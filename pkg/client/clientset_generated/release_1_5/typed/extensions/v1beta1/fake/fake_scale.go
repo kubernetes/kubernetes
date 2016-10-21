@@ -18,6 +18,6 @@ package fake
 
 // FakeScales implements ScaleInterface
 type FakeScales struct {
-	Fake *FakeExtensions
+	Fake *FakeExtensionsV1beta1
 	ns   string
 }

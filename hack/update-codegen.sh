@@ -38,18 +38,10 @@ setgen=$(kube::util::find-binary "set-gen")
 
 GROUP_VERSIONS=(${KUBE_AVAILABLE_GROUP_VERSIONS})
 GV_DIRS=()
-SEEN_GROUPS=","
 for gv in "${GROUP_VERSIONS[@]}"; do
 	# add items, but strip off any leading apis/ you find to match command expectations
 	api_dir=$(kube::util::group-version-to-pkg-path "${gv}")
 	pkg_dir=${api_dir#apis/}
-
-	# don't add a version for a group you've already seen
-	group=${pkg_dir%%/*}
-	if [[ "${SEEN_GROUPS}" == *",${group}."* ]]; then
-		continue
-	fi
-	SEEN_GROUPS="${SEEN_GROUPS},${group}."
 
 	# skip groups that aren't being served, clients for these don't matter
     if [[ " ${KUBE_NONSERVER_GROUP_VERSIONS} " == *" ${gv} "* ]]; then

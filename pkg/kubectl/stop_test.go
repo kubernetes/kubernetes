@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
+	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	testcore "k8s.io/kubernetes/pkg/client/testing/core"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -543,17 +543,17 @@ type reaperFake struct {
 	noSuchPod, noDeleteService bool
 }
 
-func (c *reaperFake) Core() coreclient.CoreInterface {
+func (c *reaperFake) Core() coreclient.CoreInternalVersionInterface {
 	return &reaperCoreFake{c.Clientset.Core(), c.noSuchPod, c.noDeleteService}
 }
 
 type reaperCoreFake struct {
-	coreclient.CoreInterface
+	coreclient.CoreInternalVersionInterface
 	noSuchPod, noDeleteService bool
 }
 
 func (c *reaperCoreFake) Pods(namespace string) coreclient.PodInterface {
-	pods := c.CoreInterface.Pods(namespace)
+	pods := c.CoreInternalVersionInterface.Pods(namespace)
 	if c.noSuchPod {
 		return &noSuchPod{pods}
 	}
@@ -561,7 +561,7 @@ func (c *reaperCoreFake) Pods(namespace string) coreclient.PodInterface {
 }
 
 func (c *reaperCoreFake) Services(namespace string) coreclient.ServiceInterface {
-	services := c.CoreInterface.Services(namespace)
+	services := c.CoreInternalVersionInterface.Services(namespace)
 	if c.noDeleteService {
 		return &noDeleteService{services}
 	}

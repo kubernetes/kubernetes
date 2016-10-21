@@ -44,12 +44,12 @@ type ServiceInterface interface {
 
 // services implements ServiceInterface
 type services struct {
-	client *CoreClient
+	client *CoreUnversionedClient
 	ns     string
 }
 
 // newServices returns a Services
-func newServices(c *CoreClient, namespace string) *services {
+func newServices(c *CoreUnversionedClient, namespace string) *services {
 	return &services{
 		client: c,
 		ns:     namespace,

@@ -44,12 +44,12 @@ type ReplicationControllerInterface interface {
 
 // replicationControllers implements ReplicationControllerInterface
 type replicationControllers struct {
-	client *CoreClient
+	client *CoreUnversionedClient
 	ns     string
 }
 
 // newReplicationControllers returns a ReplicationControllers
-func newReplicationControllers(c *CoreClient, namespace string) *replicationControllers {
+func newReplicationControllers(c *CoreUnversionedClient, namespace string) *replicationControllers {
 	return &replicationControllers{
 		client: c,
 		ns:     namespace,

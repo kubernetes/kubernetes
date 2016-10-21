@@ -44,11 +44,11 @@ type NamespaceInterface interface {
 
 // namespaces implements NamespaceInterface
 type namespaces struct {
-	client *CoreClient
+	client *CoreUnversionedClient
 }
 
 // newNamespaces returns a Namespaces
-func newNamespaces(c *CoreClient) *namespaces {
+func newNamespaces(c *CoreUnversionedClient) *namespaces {
 	return &namespaces{
 		client: c,
 	}

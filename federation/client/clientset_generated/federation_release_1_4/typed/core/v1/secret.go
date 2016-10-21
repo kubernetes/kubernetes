@@ -43,12 +43,12 @@ type SecretInterface interface {
 
 // secrets implements SecretInterface
 type secrets struct {
-	client *CoreClient
+	client *CoreUnversionedClient
 	ns     string
 }
 
 // newSecrets returns a Secrets
-func newSecrets(c *CoreClient, namespace string) *secrets {
+func newSecrets(c *CoreUnversionedClient, namespace string) *secrets {
 	return &secrets{
 		client: c,
 		ns:     namespace,

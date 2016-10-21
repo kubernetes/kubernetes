@@ -28,7 +28,7 @@ import (
 
 // FakeJobs implements JobInterface
 type FakeJobs struct {
-	Fake *FakeExtensions
+	Fake *FakeExtensionsV1beta1
 	ns   string
 }
 

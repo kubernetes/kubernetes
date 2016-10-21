@@ -44,11 +44,11 @@ type NodeInterface interface {
 
 // nodes implements NodeInterface
 type nodes struct {
-	client *CoreClient
+	client *CoreUnversionedClient
 }
 
 // newNodes returns a Nodes
-func newNodes(c *CoreClient) *nodes {
+func newNodes(c *CoreUnversionedClient) *nodes {
 	return &nodes{
 		client: c,
 	}

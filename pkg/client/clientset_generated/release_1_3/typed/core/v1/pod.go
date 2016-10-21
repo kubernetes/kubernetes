@@ -44,12 +44,12 @@ type PodInterface interface {
 
 // pods implements PodInterface
 type pods struct {
-	client *CoreClient
+	client *CoreUnversionedClient
 	ns     string
 }
 
 // newPods returns a Pods
-func newPods(c *CoreClient, namespace string) *pods {
+func newPods(c *CoreUnversionedClient, namespace string) *pods {
 	return &pods{
 		client: c,
 		ns:     namespace,

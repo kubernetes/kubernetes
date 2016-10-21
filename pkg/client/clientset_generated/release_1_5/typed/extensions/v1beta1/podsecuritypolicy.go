@@ -49,7 +49,7 @@ type podSecurityPolicies struct {
 }
 
 // newPodSecurityPolicies returns a PodSecurityPolicies
-func newPodSecurityPolicies(c *ExtensionsClient) *podSecurityPolicies {
+func newPodSecurityPolicies(c *ExtensionsV1beta1Client) *podSecurityPolicies {
 	return &podSecurityPolicies{
 		client: c.RESTClient(),
 	}
