@@ -49,6 +49,10 @@ type NodeInfo struct {
 	// explicitly as int, to avoid conversions and improve performance.
 	allowedPodNumber int
 
+	// Cached conditions of node for faster lookup.
+	memoryPressureCondition v1.ConditionStatus
+	diskPressureCondition   v1.ConditionStatus
+
 	// Whenever NodeInfo changes, generation is bumped.
 	// This is used to avoid cloning it if the object didn't change.
 	generation int64
@@ -122,6 +126,20 @@ func (n *NodeInfo) AllowedPodNumber() int {
 	return n.allowedPodNumber
 }
 
+func (n *NodeInfo) MemoryPressureCondition() v1.ConditionStatus {
+	if n == nil {
+		return v1.ConditionUnknown
+	}
+	return n.memoryPressureCondition
+}
+
+func (n *NodeInfo) DiskPressureCondition() v1.ConditionStatus {
+	if n == nil {
+		return v1.ConditionUnknown
+	}
+	return n.diskPressureCondition
+}
+
 // RequestedResource returns aggregated resource request of pods on this node.
 func (n *NodeInfo) RequestedResource() Resource {
 	if n == nil {
@@ -148,12 +166,14 @@ func (n *NodeInfo) AllocatableResource() Resource {
 
 func (n *NodeInfo) Clone() *NodeInfo {
 	clone := &NodeInfo{
-		node:                n.node,
-		requestedResource:   &(*n.requestedResource),
-		nonzeroRequest:      &(*n.nonzeroRequest),
-		allocatableResource: &(*n.allocatableResource),
-		allowedPodNumber:    n.allowedPodNumber,
-		generation:          n.generation,
+		node:                    n.node,
+		requestedResource:       &(*n.requestedResource),
+		nonzeroRequest:          &(*n.nonzeroRequest),
+		allocatableResource:     &(*n.allocatableResource),
+		allowedPodNumber:        n.allowedPodNumber,
+		memoryPressureCondition: n.memoryPressureCondition,
+		diskPressureCondition:   n.diskPressureCondition,
+		generation:              n.generation,
 	}
 	if len(n.pods) > 0 {
 		clone.pods = append([]*v1.Pod(nil), n.pods...)
@@ -306,6 +326,17 @@ func (n *NodeInfo) SetNode(node *v1.Node) error {
 			}
 		}
 	}
+	for i := range node.Status.Conditions {
+		cond := &node.Status.Conditions[i]
+		switch cond.Type {
+		case v1.NodeMemoryPressure:
+			n.memoryPressureCondition = cond.Status
+		case v1.NodeDiskPressure:
+			n.diskPressureCondition = cond.Status
+		default:
+			// We ignore other conditions.
+		}
+	}
 	n.generation++
 	return nil
 }
@@ -319,6 +350,8 @@ func (n *NodeInfo) RemoveNode(node *v1.Node) error {
 	n.node = nil
 	n.allocatableResource = &Resource{}
 	n.allowedPodNumber = 0
+	n.memoryPressureCondition = v1.ConditionUnknown
+	n.diskPressureCondition = v1.ConditionUnknown
 	n.generation++
 	return nil
 }
