@@ -91,6 +91,7 @@ type ServerRunOptions struct {
 	InsecureBindAddress       net.IP
 	InsecurePort              int
 	KeystoneURL               string
+	KeystoneInsecureTLS       bool
 	KubernetesServiceNodePort int
 	LongRunningRequestRE      string
 	MasterCount               int
@@ -374,6 +375,10 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&s.KeystoneURL, "experimental-keystone-url", s.KeystoneURL,
 		"If passed, activates the keystone authentication plugin.")
+
+	fs.BoolVar(&s.KeystoneInsecureTLS, "experimental-keystone-insecure-tls", s.KeystoneInsecureTLS,
+		"If passed, activates the keystone authentication plugin. Boolean value to indicate"+
+		"whether to skip the validity check of the keystone server's certificate.")
 
 	// See #14282 for details on how to test/try this option out.
 	// TODO: remove this comment once this option is tested in CI.
