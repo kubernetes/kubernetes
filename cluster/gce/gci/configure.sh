@@ -98,6 +98,15 @@ function split-commas {
   echo $1 | tr "," "\n"
 }
 
+function install-rkt {
+    local -r rkt_binary="rkt-v1.17.0"
+    local -r rkt_sha1="e9183dcae0683e345cc73fef98ffd80a253d371a"
+    download-or-bust "${rkt_sha1}" "https://storage.googleapis.com/kubernetes-release/rkt/${rkt_binary}"
+    local -r rkt_dst="${KUBE_HOME}/bin/rkt"
+    mv "${KUBE_HOME}/${rkt_binary}" "${rkt_dst}"
+    chmod a+x "${rkt_dst}"
+}
+
 # Downloads kubernetes binaries and kube-system manifest tarball, unpacks them,
 # and places them into suitable directories. Files are placed in /home/kubernetes.
 function install-kube-binary-config {
@@ -175,6 +184,9 @@ function install-kube-binary-config {
   cp "${dst_dir}/kubernetes/gci-trusty/health-monitor.sh" "${KUBE_HOME}/bin/health-monitor.sh"
   chmod -R 755 "${kube_bin}"
 
+  # Install rkt binary to allow mounting storage volumes in GCI
+  install-rkt
+  
   # Clean up.
   rm -rf "${KUBE_HOME}/kubernetes"
   rm -f "${KUBE_HOME}/${server_binary_tar}"
