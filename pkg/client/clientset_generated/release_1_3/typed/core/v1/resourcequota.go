@@ -44,12 +44,12 @@ type ResourceQuotaInterface interface {
 
 // resourceQuotas implements ResourceQuotaInterface
 type resourceQuotas struct {
-	client *CoreClient
+	client *CoreUnversionedClient
 	ns     string
 }
 
 // newResourceQuotas returns a ResourceQuotas
-func newResourceQuotas(c *CoreClient, namespace string) *resourceQuotas {
+func newResourceQuotas(c *CoreUnversionedClient, namespace string) *resourceQuotas {
 	return &resourceQuotas{
 		client: c,
 		ns:     namespace,

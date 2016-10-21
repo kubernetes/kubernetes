@@ -43,12 +43,12 @@ type ConfigMapInterface interface {
 
 // configMaps implements ConfigMapInterface
 type configMaps struct {
-	client *CoreClient
+	client *CoreUnversionedClient
 	ns     string
 }
 
 // newConfigMaps returns a ConfigMaps
-func newConfigMaps(c *CoreClient, namespace string) *configMaps {
+func newConfigMaps(c *CoreUnversionedClient, namespace string) *configMaps {
 	return &configMaps{
 		client: c,
 		ns:     namespace,

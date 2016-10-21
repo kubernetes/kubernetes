@@ -18,7 +18,7 @@ package test_internalclientset
 
 import (
 	"github.com/golang/glog"
-	unversionedtestgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup.k8s.io/unversioned"
+	internalversiontestgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup.k8s.io/internalversion"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	discovery "k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
@@ -27,22 +27,33 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
-	Testgroup() unversionedtestgroup.TestgroupInterface
+	TestgroupInternalVersion() internalversiontestgroup.TestgroupInternalVersionInterface
+	// Deprecated: please explicitly pick a version if possible.
+	Testgroup() internalversiontestgroup.TestgroupInternalVersionInterface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	*unversionedtestgroup.TestgroupClient
+	*internalversiontestgroup.TestgroupInternalVersionClient
 }
 
-// Testgroup retrieves the TestgroupClient
-func (c *Clientset) Testgroup() unversionedtestgroup.TestgroupInterface {
+// TestgroupInternalVersion retrieves the TestgroupInternalVersionClient
+func (c *Clientset) TestgroupInternalVersion() internalversiontestgroup.TestgroupInternalVersionInterface {
 	if c == nil {
 		return nil
 	}
-	return c.TestgroupClient
+	return c.TestgroupInternalVersionClient
+}
+
+// Deprecated: Testgroup retrieves the default version of TestgroupClient.
+// Please explicitly pick a version.
+func (c *Clientset) Testgroup() internalversiontestgroup.TestgroupInternalVersionInterface {
+	if c == nil {
+		return nil
+	}
+	return c.TestgroupInternalVersionClient
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -58,7 +69,7 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	}
 	var clientset Clientset
 	var err error
-	clientset.TestgroupClient, err = unversionedtestgroup.NewForConfig(&configShallowCopy)
+	clientset.TestgroupInternalVersionClient, err = internalversiontestgroup.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +86,7 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *restclient.Config) *Clientset {
 	var clientset Clientset
-	clientset.TestgroupClient = unversionedtestgroup.NewForConfigOrDie(c)
+	clientset.TestgroupInternalVersionClient = internalversiontestgroup.NewForConfigOrDie(c)
 
 	clientset.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &clientset
@@ -84,7 +95,7 @@ func NewForConfigOrDie(c *restclient.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c restclient.Interface) *Clientset {
 	var clientset Clientset
-	clientset.TestgroupClient = unversionedtestgroup.New(c)
+	clientset.TestgroupInternalVersionClient = internalversiontestgroup.New(c)
 
 	clientset.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &clientset

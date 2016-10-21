@@ -18,8 +18,8 @@ package fake
 
 import (
 	clientset "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset"
-	unversionedtestgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup.k8s.io/unversioned"
-	fakeunversionedtestgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup.k8s.io/unversioned/fake"
+	internalversiontestgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup.k8s.io/internalversion"
+	fakeinternalversiontestgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup.k8s.io/internalversion/fake"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/testing/core"
@@ -62,7 +62,12 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 
 var _ clientset.Interface = &Clientset{}
 
-// Testgroup retrieves the TestgroupClient
-func (c *Clientset) Testgroup() unversionedtestgroup.TestgroupInterface {
-	return &fakeunversionedtestgroup.FakeTestgroup{Fake: &c.Fake}
+// TestgroupInternalVersion retrieves the TestgroupInternalVersionClient
+func (c *Clientset) TestgroupInternalVersion() internalversiontestgroup.TestgroupInternalVersionInterface {
+	return &fakeinternalversiontestgroup.FakeTestgroupInternalVersion{Fake: &c.Fake}
+}
+
+// Testgroup retrieves the TestgroupInternalVersionClient
+func (c *Clientset) Testgroup() internalversiontestgroup.TestgroupInternalVersionInterface {
+	return &fakeinternalversiontestgroup.FakeTestgroupInternalVersion{Fake: &c.Fake}
 }

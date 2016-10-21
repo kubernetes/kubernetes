@@ -43,12 +43,12 @@ type EventInterface interface {
 
 // events implements EventInterface
 type events struct {
-	client *CoreClient
+	client *CoreUnversionedClient
 	ns     string
 }
 
 // newEvents returns a Events
-func newEvents(c *CoreClient, namespace string) *events {
+func newEvents(c *CoreUnversionedClient, namespace string) *events {
 	return &events{
 		client: c,
 		ns:     namespace,

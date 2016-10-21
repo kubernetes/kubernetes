@@ -39,18 +39,18 @@ type Interface interface {
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	*v1core.CoreClient
+	*v1core.CoreUnversionedClient
 	*v1beta1extensions.ExtensionsClient
 	*v1autoscaling.AutoscalingClient
 	*v1batch.BatchClient
 }
 
-// Core retrieves the CoreClient
+// Core retrieves the CoreUnversionedClient
 func (c *Clientset) Core() v1core.CoreInterface {
 	if c == nil {
 		return nil
 	}
-	return c.CoreClient
+	return c.CoreUnversionedClient
 }
 
 // Extensions retrieves the ExtensionsClient
@@ -90,7 +90,7 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	}
 	var clientset Clientset
 	var err error
-	clientset.CoreClient, err = v1core.NewForConfig(&configShallowCopy)
+	clientset.CoreUnversionedClient, err = v1core.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +119,7 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *restclient.Config) *Clientset {
 	var clientset Clientset
-	clientset.CoreClient = v1core.NewForConfigOrDie(c)
+	clientset.CoreUnversionedClient = v1core.NewForConfigOrDie(c)
 	clientset.ExtensionsClient = v1beta1extensions.NewForConfigOrDie(c)
 	clientset.AutoscalingClient = v1autoscaling.NewForConfigOrDie(c)
 	clientset.BatchClient = v1batch.NewForConfigOrDie(c)
@@ -131,7 +131,7 @@ func NewForConfigOrDie(c *restclient.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c *restclient.RESTClient) *Clientset {
 	var clientset Clientset
-	clientset.CoreClient = v1core.New(c)
+	clientset.CoreUnversionedClient = v1core.New(c)
 	clientset.ExtensionsClient = v1beta1extensions.New(c)
 	clientset.AutoscalingClient = v1autoscaling.New(c)
 	clientset.BatchClient = v1batch.New(c)

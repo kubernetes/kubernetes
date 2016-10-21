@@ -43,12 +43,12 @@ type LimitRangeInterface interface {
 
 // limitRanges implements LimitRangeInterface
 type limitRanges struct {
-	client *CoreClient
+	client *CoreUnversionedClient
 	ns     string
 }
 
 // newLimitRanges returns a LimitRanges
-func newLimitRanges(c *CoreClient, namespace string) *limitRanges {
+func newLimitRanges(c *CoreUnversionedClient, namespace string) *limitRanges {
 	return &limitRanges{
 		client: c,
 		ns:     namespace,

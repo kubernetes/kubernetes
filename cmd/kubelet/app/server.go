@@ -43,7 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/chaosclient"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
+	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	clientauth "k8s.io/kubernetes/pkg/client/unversioned/auth"
@@ -186,14 +186,14 @@ func getRemoteKubeletConfig(s *options.KubeletServer, kubeDeps *kubelet.KubeletD
 				return nil, err
 			}
 			// look for kubelet-<node-name> configmap from "kube-system"
-			configmap, err := kubeClient.CoreClient.ConfigMaps("kube-system").Get(fmt.Sprintf("kubelet-%s", nodename))
+			configmap, err := kubeClient.CoreInternalVersionClient.ConfigMaps("kube-system").Get(fmt.Sprintf("kubelet-%s", nodename))
 			if err != nil {
 				return nil, err
 			}
 			return configmap, nil
 		}
 		// No cloud provider yet, so can't get the nodename via Cloud.Instances().CurrentNodeName(hostname), try just using the hostname
-		configmap, err := kubeClient.CoreClient.ConfigMaps("kube-system").Get(fmt.Sprintf("kubelet-%s", hostname))
+		configmap, err := kubeClient.CoreInternalVersionClient.ConfigMaps("kube-system").Get(fmt.Sprintf("kubelet-%s", hostname))
 		if err != nil {
 			return nil, fmt.Errorf("cloud provider was nil, and attempt to use hostname to find config resulted in: %v", err)
 		}

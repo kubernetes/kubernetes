@@ -26,11 +26,11 @@ import (
 	"k8s.io/gengo/types"
 	clientgenargs "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/args"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/normalization"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	clientgentypes "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/types"
 )
 
-func PackageForGroup(gv unversioned.GroupVersion, typeList []*types.Type, packageBasePath string, srcTreePath string, inputPath string, boilerplate []byte, generatedBy string) generator.Package {
-	outputPackagePath := filepath.Join(packageBasePath, gv.Group, gv.Version, "fake")
+func PackageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, packageBasePath string, srcTreePath string, inputPath string, boilerplate []byte, generatedBy string) generator.Package {
+	outputPackagePath := strings.ToLower(filepath.Join(packageBasePath, gv.Group, gv.Version, "fake"))
 	// TODO: should make this a function, called by here and in client-generator.go
 	realClientPath := filepath.Join(packageBasePath, gv.Group, gv.Version)
 	return &generator.DefaultPackage{
@@ -57,8 +57,8 @@ func PackageForGroup(gv unversioned.GroupVersion, typeList []*types.Type, packag
 					},
 					outputPackage: outputPackagePath,
 					group:         normalization.BeforeFirstDot(gv.Group),
+					version:       normalization.Version(gv.Version),
 					inputPackage:  inputPath,
-					version:       gv.Version,
 					typeToMatch:   t,
 					imports:       generator.NewImportTracker(),
 				})
@@ -71,6 +71,7 @@ func PackageForGroup(gv unversioned.GroupVersion, typeList []*types.Type, packag
 				outputPackage:  outputPackagePath,
 				realClientPath: realClientPath,
 				group:          normalization.BeforeFirstDot(gv.Group),
+				version:        normalization.Version(gv.Version),
 				types:          typeList,
 				imports:        generator.NewImportTracker(),
 			})
@@ -112,7 +113,7 @@ func PackageForClientset(customArgs clientgenargs.Args, typedClientBasePath stri
 					DefaultGen: generator.DefaultGen{
 						OptionalName: "clientset_generated",
 					},
-					groupVersions:   customArgs.GroupVersions,
+					groups:          customArgs.Groups,
 					typedClientPath: typedClientBasePath,
 					outputPackage:   "fake",
 					imports:         generator.NewImportTracker(),

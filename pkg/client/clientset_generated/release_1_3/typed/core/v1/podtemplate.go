@@ -43,12 +43,12 @@ type PodTemplateInterface interface {
 
 // podTemplates implements PodTemplateInterface
 type podTemplates struct {
-	client *CoreClient
+	client *CoreUnversionedClient
 	ns     string
 }
 
 // newPodTemplates returns a PodTemplates
-func newPodTemplates(c *CoreClient, namespace string) *podTemplates {
+func newPodTemplates(c *CoreUnversionedClient, namespace string) *podTemplates {
 	return &podTemplates{
 		client: c,
 		ns:     namespace,
