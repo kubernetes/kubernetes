@@ -13,25 +13,19 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+package types
 
-package normalization
+import (
+	"reflect"
+	"sort"
+	"testing"
+)
 
-import "strings"
-
-func Group(group string) string {
-	if group == "api" {
-		return "core"
+func TestVersionSort(t *testing.T) {
+	unsortedVersions := []string{"v4beta1", "v2beta1", "v2alpha1", "v3", "v1"}
+	expected := []string{"v2alpha1", "v2beta1", "v4beta1", "v1", "v3"}
+	sort.Sort(sortableSliceOfVersions(unsortedVersions))
+	if !reflect.DeepEqual(unsortedVersions, expected) {
+		t.Errorf("expected %#v\ngot %#v", expected, unsortedVersions)
 	}
-	return group
-}
-
-func Version(version string) string {
-	if version == "" {
-		return "unversioned"
-	}
-	return version
-}
-
-func BeforeFirstDot(dotted string) string {
-	return strings.Split(dotted, ".")[0]
 }
