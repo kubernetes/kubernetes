@@ -33,24 +33,31 @@ import (
 
 func NewCmdToken(out io.Writer) *cobra.Command {
 	var skipPreFlight bool
-	cmd := &cobra.Command{
+	tokenCmd := &cobra.Command{
 		Use:   "token",
 		Short: "Manage bootstrap tokens",
-		Run: func(cmd *cobra.Command, args []string) {
-			err := RunToken(out, cmd, skipPreFlight)
-			kubeadmutil.CheckErr(err)
-		},
 	}
 
-	cmd.PersistentFlags().BoolVar(
+	tokenCmd.PersistentFlags().BoolVar(
 		&skipPreFlight, "skip-preflight-checks", false,
 		"skip preflight checks normally run before modifying the system",
 	)
 
-	return cmd
+	createCmd := &cobra.Command{
+		Use:   "create",
+		Short: "Create discovery tokens on the server.",
+		Run: func(tokenCmd *cobra.Command, args []string) {
+			err := RunCreateToken(out, tokenCmd, skipPreFlight)
+			kubeadmutil.CheckErr(err)
+		},
+	}
+	tokenCmd.AddCommand(createCmd)
+
+	return tokenCmd
 }
 
-func RunToken(out io.Writer, cmd *cobra.Command, skipPreFlight bool) error {
+// TODO: Add support for user specified tokens.
+func RunCreateToken(out io.Writer, cmd *cobra.Command, skipPreFlight bool) error {
 	if !skipPreFlight {
 		fmt.Println("Running pre-flight checks")
 		// TODO
@@ -75,16 +82,13 @@ func RunToken(out io.Writer, cmd *cobra.Command, skipPreFlight bool) error {
 	if err != nil {
 		return fmt.Errorf("<cmd/token> failed to create API client [%v]", err)
 	}
-	fmt.Println(client)
 
 	tokenSecret := &kubeadmapi.Secrets{}
 	err = kubeadmutil.GenerateToken(tokenSecret)
 	if err != nil {
 		return err
 	}
-	fmt.Println(tokenSecret.GivenToken)
 
-	fmt.Println("<cmd/token> Submitting token secret to server.")
 	secret := &api.Secret{
 		ObjectMeta: api.ObjectMeta{Name: tokenSecret.TokenID},
 		Type:       api.SecretTypeOpaque,
@@ -93,6 +97,7 @@ func RunToken(out io.Writer, cmd *cobra.Command, skipPreFlight bool) error {
 	if _, err := client.Secrets(api.NamespaceSystem).Create(secret); err != nil {
 		return fmt.Errorf("<cmd/token> failed to create token secret [%v]", err)
 	}
+	fmt.Printf("<cmd/token> Token secret created: %s\n", tokenSecret.GivenToken)
 
 	return nil
 }
