@@ -221,7 +221,7 @@ func TestAuthorizer(t *testing.T) {
 		},
 	}
 	for i, tt := range tests {
-		ruleResolver := validation.NewTestRuleResolver(tt.roles, tt.roleBindings, tt.clusterRoles, tt.clusterRoleBindings)
+		ruleResolver, _ := validation.NewTestRuleResolver(tt.roles, tt.roleBindings, tt.clusterRoles, tt.clusterRoleBindings)
 		a := RBACAuthorizer{tt.superUser, ruleResolver}
 		for _, attr := range tt.shouldPass {
 			if authorized, _, _ := a.Authorize(attr); !authorized {
