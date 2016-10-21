@@ -325,8 +325,21 @@ function setup-pod-routes {
   # identify the subnet assigned to the node by the kubernetes controller manager.
   KUBE_NODE_BRIDGE_NETWORK=()
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
-     printf " finding network of cbr0 bridge on node  ${NODE_NAMES[$i]}\n"
-     network=$(kube-ssh ${KUBE_NODE_IP_ADDRESSES[$i]} 'sudo ip route show | grep -E "dev cbr0" | cut -d     " " -f1')
+     printf " finding network of cbr0 bridge on node ${NODE_NAMES[$i]}"
+     counter=12 # give the cbr0 60 seconds to become configured 
+     network="172.18.0.0/16" # starting value until updated by call to kube-ssh
+     until [[ $counter -lt 1 ||  "$network" != "172.18.0.0/16" ]]; do
+	network=$(kube-ssh ${KUBE_NODE_IP_ADDRESSES[$i]} 'sudo ip route show | grep -E "dev cbr0" | cut -d     " " -f1')
+	let counter-=1
+	sleep 5 # back off for 5 seconds before we try again
+	printf "."
+     done
+     if [ "$network" == "172.18.0.0/16" ]; then
+	echo "${KUBE_NODE_IP_ADDRESSES[$i]} failed to return a non-default network address for cbr0 after 60 seconds"
+	echo " Your cluster is unlikely to work correctly. You may have to debug it by logging in." 
+	exit 1
+     fi
+     printf "\n"
      KUBE_NODE_BRIDGE_NETWORK+=("${network}")
   done
 
@@ -335,13 +348,16 @@ function setup-pod-routes {
   # The master needs have routes to the pods for the UI to work.
   local j
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
-     printf "setting up routes for ${NODE_NAMES[$i]}"
+     printf "setting up routes for ${NODE_NAMES[$i]}:\n"
+     printf " adding route to ${MASTER_NAME} for network ${KUBE_NODE_BRIDGE_NETWORK[${i}]} via ${KUBE_NODE_IP_ADDRESSES[${i}]}\n"
      kube-ssh "${KUBE_MASTER_IP}" "sudo route add -net ${KUBE_NODE_BRIDGE_NETWORK[${i}]} gw ${KUBE_NODE_IP_ADDRESSES[${i}]}"
      for (( j=0; j<${#NODE_NAMES[@]}; j++)); do
         if [[ $i != $j ]]; then
+	   printf " adding route to ${NODE_NAMES[$j]} for network ${KUBE_NODE_BRIDGE_NETWORK[${i}]} via ${KUBE_NODE_IP_ADDRESSES[${i}]}\n" 
            kube-ssh ${KUBE_NODE_IP_ADDRESSES[$i]} "sudo route add -net ${KUBE_NODE_BRIDGE_NETWORK[$j]} gw ${KUBE_NODE_IP_ADDRESSES[$j]}"
         fi
       done
+     printf "\n"
   done
 }
 
