@@ -271,6 +271,220 @@ NextTest:
 	}
 }
 
+func TestServerRunWithSNI(t *testing.T) {
+	tests := []struct {
+		Cert              TestCertSpec
+		SNICerts          []NamedTestCertSpec
+		ExpectedCertIndex int
+
+		// passed in the client hello info, "localhost" if unset
+		ServerName string
+	}{
+		{
+			// only one cert
+			Cert: TestCertSpec{
+				host: "localhost",
+			},
+			ExpectedCertIndex: -1,
+		},
+		{
+			// cert with multiple alternate names
+			Cert: TestCertSpec{
+				host:  "localhost",
+				names: []string{"test.com"},
+				ips:   []string{"127.0.0.1"},
+			},
+			ExpectedCertIndex: -1,
+			ServerName:        "test.com",
+		},
+		{
+			// one SNI and the default cert with the same name
+			Cert: TestCertSpec{
+				host: "localhost",
+			},
+			SNICerts: []NamedTestCertSpec{
+				{
+					TestCertSpec: TestCertSpec{
+						host: "localhost",
+					},
+				},
+			},
+			ExpectedCertIndex: 0,
+		},
+		{
+			// matching SNI cert
+			Cert: TestCertSpec{
+				host: "localhost",
+			},
+			SNICerts: []NamedTestCertSpec{
+				{
+					TestCertSpec: TestCertSpec{
+						host: "test.com",
+					},
+				},
+			},
+			ExpectedCertIndex: 0,
+			ServerName:        "test.com",
+		},
+		{
+			// matching IP in SNI cert and the server cert. But IPs must not be
+			// passed via SNI. Hence, the ServerName in the HELLO packet is empty
+			// and the server should select the non-SNI cert.
+			Cert: TestCertSpec{
+				host: "localhost",
+				ips:  []string{"10.0.0.1"},
+			},
+			SNICerts: []NamedTestCertSpec{
+				{
+					TestCertSpec: TestCertSpec{
+						host: "test.com",
+						ips:  []string{"10.0.0.1"},
+					},
+				},
+			},
+			ExpectedCertIndex: -1,
+			ServerName:        "10.0.0.1",
+		},
+		{
+			// wildcards
+			Cert: TestCertSpec{
+				host: "localhost",
+			},
+			SNICerts: []NamedTestCertSpec{
+				{
+					TestCertSpec: TestCertSpec{
+						host:  "test.com",
+						names: []string{"*.test.com"},
+					},
+				},
+			},
+			ExpectedCertIndex: 0,
+			ServerName:        "www.test.com",
+		},
+	}
+
+NextTest:
+	for i, test := range tests {
+		// create server cert
+		serverCertFile, serverKeyFile, err := createTestCerts(test.Cert)
+		if err != nil {
+			t.Errorf("%d - failed to create server cert: %v", i, err)
+		}
+		defer os.Remove(serverCertFile)
+		defer os.Remove(serverKeyFile)
+
+		// create SNI certs
+		var namedCertKeys []NamedCertKey
+		serverSig, err := certFileSignature(serverCertFile, serverKeyFile)
+		if err != nil {
+			t.Errorf("%d - failed to get server cert signature: %v", i, err)
+			continue NextTest
+		}
+		signatures := map[string]int{
+			serverSig: -1,
+		}
+		for j, c := range test.SNICerts {
+			certFile, keyFile, err := createTestCerts(c.TestCertSpec)
+			if err != nil {
+				t.Errorf("%d - failed to create SNI cert %d: %v", i, j, err)
+				continue NextTest
+			}
+			defer os.Remove(certFile)
+			defer os.Remove(keyFile)
+
+			namedCertKeys = append(namedCertKeys, NamedCertKey{
+				CertKey: CertKey{
+					KeyFile:  keyFile,
+					CertFile: certFile,
+				},
+				Names: c.explicitNames,
+			})
+
+			// store index in namedCertKeys with the signature as the key
+			sig, err := certFileSignature(certFile, keyFile)
+			if err != nil {
+				t.Errorf("%d - failed get SNI cert %d signature: %v", i, j, err)
+				continue NextTest
+			}
+			signatures[sig] = j
+		}
+
+		stopCh := make(chan struct{})
+
+		// launch server
+		etcdserver, config, _ := setUp(t)
+		defer etcdserver.Terminate(t)
+
+		config.EnableIndex = true
+		config.SecureServingInfo = &SecureServingInfo{
+			ServingInfo: ServingInfo{
+				BindAddress: "localhost:0",
+			},
+			ServerCert: GeneratableKeyCert{
+				CertKey: CertKey{
+					CertFile: serverCertFile,
+					KeyFile:  serverKeyFile,
+				},
+			},
+			SNICerts: namedCertKeys,
+		}
+		config.InsecureServingInfo = nil
+
+		s, err := config.Complete().New()
+		if err != nil {
+			t.Errorf("%d - failed creating the server: %v", i, err)
+			continue NextTest
+		}
+
+		if err := s.serveSecurely(stopCh); err != nil {
+			t.Errorf("%d - failed running the server: %v", i, err)
+			continue NextTest
+		}
+
+		// load certificates into a pool
+		roots := x509.NewCertPool()
+		certFiles := []string{serverCertFile}
+		for _, c := range namedCertKeys {
+			certFiles = append(certFiles, c.CertFile)
+		}
+		for _, certFile := range certFiles {
+			bs, err := ioutil.ReadFile(certFile)
+			if err != nil {
+				t.Errorf("%d - error reading %q: %v", i, certFile, err)
+				continue NextTest
+			}
+			if ok := roots.AppendCertsFromPEM(bs); !ok {
+				t.Errorf("%d - error adding cert %q to the pool", i, certFile)
+				continue NextTest
+			}
+		}
+
+		// try to dial
+		addr := fmt.Sprintf("localhost:%d", s.effectiveSecurePort)
+		t.Logf("Dialing %s as %q", addr, test.ServerName)
+		conn, err := tls.Dial("tcp", addr, &tls.Config{
+			RootCAs:    roots,
+			ServerName: test.ServerName, // used for SNI in the client HELLO packet
+		})
+		if err != nil {
+			t.Errorf("%d - failed to connect: %v", i, err)
+			continue NextTest
+		}
+
+		// check returned server certificate
+		sig := x509CertSignature(conn.ConnectionState().PeerCertificates[0])
+		gotCertIndex, found := signatures[sig]
+		if !found {
+			t.Errorf("%d - unknown signature returned from server: %s", i, sig)
+		}
+		if gotCertIndex != test.ExpectedCertIndex {
+			t.Errorf("%d - expected cert index %d, got cert index %d", i, test.ExpectedCertIndex, gotCertIndex)
+		}
+
+		conn.Close()
+	}
+}
+
 func x509CertSignature(cert *x509.Certificate) string {
 	return base64.StdEncoding.EncodeToString(cert.Signature)
 }
