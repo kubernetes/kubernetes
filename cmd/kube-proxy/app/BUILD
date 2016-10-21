@@ -21,7 +21,7 @@ go_library(
         "//cmd/kube-proxy/app/options:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset/typed/core/unversioned:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/client/unversioned/clientcmd/api:go_default_library",

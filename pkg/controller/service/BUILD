@@ -22,7 +22,7 @@ go_library(
         "//pkg/api/errors:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset/typed/core/unversioned:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",

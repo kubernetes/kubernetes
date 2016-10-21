@@ -50,7 +50,7 @@ type pods struct {
 }
 
 // newPods returns a Pods
-func newPods(c *CoreClient, namespace string) *pods {
+func newPods(c *CoreV1Client, namespace string) *pods {
 	return &pods{
 		client: c.RESTClient(),
 		ns:     namespace,

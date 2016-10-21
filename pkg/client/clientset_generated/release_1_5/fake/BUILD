@@ -31,6 +31,8 @@ go_library(
         "//pkg/client/clientset_generated/release_1_5/typed/autoscaling/v1/fake:go_default_library",
         "//pkg/client/clientset_generated/release_1_5/typed/batch/v1:go_default_library",
         "//pkg/client/clientset_generated/release_1_5/typed/batch/v1/fake:go_default_library",
+        "//pkg/client/clientset_generated/release_1_5/typed/batch/v2alpha1:go_default_library",
+        "//pkg/client/clientset_generated/release_1_5/typed/batch/v2alpha1/fake:go_default_library",
         "//pkg/client/clientset_generated/release_1_5/typed/certificates/v1alpha1:go_default_library",
         "//pkg/client/clientset_generated/release_1_5/typed/certificates/v1alpha1/fake:go_default_library",
         "//pkg/client/clientset_generated/release_1_5/typed/core/v1:go_default_library",

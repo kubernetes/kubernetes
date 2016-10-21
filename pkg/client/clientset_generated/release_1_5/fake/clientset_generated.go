@@ -30,6 +30,8 @@ import (
 	fakev1autoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/autoscaling/v1/fake"
 	v1batch "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/batch/v1"
 	fakev1batch "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/batch/v1/fake"
+	v2alpha1batch "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/batch/v2alpha1"
+	fakev2alpha1batch "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/batch/v2alpha1/fake"
 	v1alpha1certificates "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/certificates/v1alpha1"
 	fakev1alpha1certificates "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/certificates/v1alpha1/fake"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
@@ -82,57 +84,117 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 
 var _ clientset.Interface = &Clientset{}
 
-// Core retrieves the CoreClient
-func (c *Clientset) Core() v1core.CoreInterface {
-	return &fakev1core.FakeCore{Fake: &c.Fake}
+// CoreV1 retrieves the CoreV1Client
+func (c *Clientset) CoreV1() v1core.CoreV1Interface {
+	return &fakev1core.FakeCoreV1{Fake: &c.Fake}
 }
 
-// Apps retrieves the AppsClient
-func (c *Clientset) Apps() v1alpha1apps.AppsInterface {
-	return &fakev1alpha1apps.FakeApps{Fake: &c.Fake}
+// Core retrieves the CoreV1Client
+func (c *Clientset) Core() v1core.CoreV1Interface {
+	return &fakev1core.FakeCoreV1{Fake: &c.Fake}
 }
 
-// Authentication retrieves the AuthenticationClient
-func (c *Clientset) Authentication() v1beta1authentication.AuthenticationInterface {
-	return &fakev1beta1authentication.FakeAuthentication{Fake: &c.Fake}
+// AppsV1alpha1 retrieves the AppsV1alpha1Client
+func (c *Clientset) AppsV1alpha1() v1alpha1apps.AppsV1alpha1Interface {
+	return &fakev1alpha1apps.FakeAppsV1alpha1{Fake: &c.Fake}
 }
 
-// Authorization retrieves the AuthorizationClient
-func (c *Clientset) Authorization() v1beta1authorization.AuthorizationInterface {
-	return &fakev1beta1authorization.FakeAuthorization{Fake: &c.Fake}
+// Apps retrieves the AppsV1alpha1Client
+func (c *Clientset) Apps() v1alpha1apps.AppsV1alpha1Interface {
+	return &fakev1alpha1apps.FakeAppsV1alpha1{Fake: &c.Fake}
 }
 
-// Autoscaling retrieves the AutoscalingClient
-func (c *Clientset) Autoscaling() v1autoscaling.AutoscalingInterface {
-	return &fakev1autoscaling.FakeAutoscaling{Fake: &c.Fake}
+// AuthenticationV1beta1 retrieves the AuthenticationV1beta1Client
+func (c *Clientset) AuthenticationV1beta1() v1beta1authentication.AuthenticationV1beta1Interface {
+	return &fakev1beta1authentication.FakeAuthenticationV1beta1{Fake: &c.Fake}
 }
 
-// Batch retrieves the BatchClient
-func (c *Clientset) Batch() v1batch.BatchInterface {
-	return &fakev1batch.FakeBatch{Fake: &c.Fake}
+// Authentication retrieves the AuthenticationV1beta1Client
+func (c *Clientset) Authentication() v1beta1authentication.AuthenticationV1beta1Interface {
+	return &fakev1beta1authentication.FakeAuthenticationV1beta1{Fake: &c.Fake}
 }
 
-// Certificates retrieves the CertificatesClient
-func (c *Clientset) Certificates() v1alpha1certificates.CertificatesInterface {
-	return &fakev1alpha1certificates.FakeCertificates{Fake: &c.Fake}
+// AuthorizationV1beta1 retrieves the AuthorizationV1beta1Client
+func (c *Clientset) AuthorizationV1beta1() v1beta1authorization.AuthorizationV1beta1Interface {
+	return &fakev1beta1authorization.FakeAuthorizationV1beta1{Fake: &c.Fake}
 }
 
-// Extensions retrieves the ExtensionsClient
-func (c *Clientset) Extensions() v1beta1extensions.ExtensionsInterface {
-	return &fakev1beta1extensions.FakeExtensions{Fake: &c.Fake}
+// Authorization retrieves the AuthorizationV1beta1Client
+func (c *Clientset) Authorization() v1beta1authorization.AuthorizationV1beta1Interface {
+	return &fakev1beta1authorization.FakeAuthorizationV1beta1{Fake: &c.Fake}
 }
 
-// Policy retrieves the PolicyClient
-func (c *Clientset) Policy() v1alpha1policy.PolicyInterface {
-	return &fakev1alpha1policy.FakePolicy{Fake: &c.Fake}
+// AutoscalingV1 retrieves the AutoscalingV1Client
+func (c *Clientset) AutoscalingV1() v1autoscaling.AutoscalingV1Interface {
+	return &fakev1autoscaling.FakeAutoscalingV1{Fake: &c.Fake}
 }
 
-// Rbac retrieves the RbacClient
-func (c *Clientset) Rbac() v1alpha1rbac.RbacInterface {
-	return &fakev1alpha1rbac.FakeRbac{Fake: &c.Fake}
+// Autoscaling retrieves the AutoscalingV1Client
+func (c *Clientset) Autoscaling() v1autoscaling.AutoscalingV1Interface {
+	return &fakev1autoscaling.FakeAutoscalingV1{Fake: &c.Fake}
 }
 
-// Storage retrieves the StorageClient
-func (c *Clientset) Storage() v1beta1storage.StorageInterface {
-	return &fakev1beta1storage.FakeStorage{Fake: &c.Fake}
+// BatchV1 retrieves the BatchV1Client
+func (c *Clientset) BatchV1() v1batch.BatchV1Interface {
+	return &fakev1batch.FakeBatchV1{Fake: &c.Fake}
+}
+
+// Batch retrieves the BatchV1Client
+func (c *Clientset) Batch() v1batch.BatchV1Interface {
+	return &fakev1batch.FakeBatchV1{Fake: &c.Fake}
+}
+
+// BatchV2alpha1 retrieves the BatchV2alpha1Client
+func (c *Clientset) BatchV2alpha1() v2alpha1batch.BatchV2alpha1Interface {
+	return &fakev2alpha1batch.FakeBatchV2alpha1{Fake: &c.Fake}
+}
+
+// CertificatesV1alpha1 retrieves the CertificatesV1alpha1Client
+func (c *Clientset) CertificatesV1alpha1() v1alpha1certificates.CertificatesV1alpha1Interface {
+	return &fakev1alpha1certificates.FakeCertificatesV1alpha1{Fake: &c.Fake}
+}
+
+// Certificates retrieves the CertificatesV1alpha1Client
+func (c *Clientset) Certificates() v1alpha1certificates.CertificatesV1alpha1Interface {
+	return &fakev1alpha1certificates.FakeCertificatesV1alpha1{Fake: &c.Fake}
+}
+
+// ExtensionsV1beta1 retrieves the ExtensionsV1beta1Client
+func (c *Clientset) ExtensionsV1beta1() v1beta1extensions.ExtensionsV1beta1Interface {
+	return &fakev1beta1extensions.FakeExtensionsV1beta1{Fake: &c.Fake}
+}
+
+// Extensions retrieves the ExtensionsV1beta1Client
+func (c *Clientset) Extensions() v1beta1extensions.ExtensionsV1beta1Interface {
+	return &fakev1beta1extensions.FakeExtensionsV1beta1{Fake: &c.Fake}
+}
+
+// PolicyV1alpha1 retrieves the PolicyV1alpha1Client
+func (c *Clientset) PolicyV1alpha1() v1alpha1policy.PolicyV1alpha1Interface {
+	return &fakev1alpha1policy.FakePolicyV1alpha1{Fake: &c.Fake}
+}
+
+// Policy retrieves the PolicyV1alpha1Client
+func (c *Clientset) Policy() v1alpha1policy.PolicyV1alpha1Interface {
+	return &fakev1alpha1policy.FakePolicyV1alpha1{Fake: &c.Fake}
+}
+
+// RbacV1alpha1 retrieves the RbacV1alpha1Client
+func (c *Clientset) RbacV1alpha1() v1alpha1rbac.RbacV1alpha1Interface {
+	return &fakev1alpha1rbac.FakeRbacV1alpha1{Fake: &c.Fake}
+}
+
+// Rbac retrieves the RbacV1alpha1Client
+func (c *Clientset) Rbac() v1alpha1rbac.RbacV1alpha1Interface {
+	return &fakev1alpha1rbac.FakeRbacV1alpha1{Fake: &c.Fake}
+}
+
+// StorageV1beta1 retrieves the StorageV1beta1Client
+func (c *Clientset) StorageV1beta1() v1beta1storage.StorageV1beta1Interface {
+	return &fakev1beta1storage.FakeStorageV1beta1{Fake: &c.Fake}
+}
+
+// Storage retrieves the StorageV1beta1Client
+func (c *Clientset) Storage() v1beta1storage.StorageV1beta1Interface {
+	return &fakev1beta1storage.FakeStorageV1beta1{Fake: &c.Fake}
 }

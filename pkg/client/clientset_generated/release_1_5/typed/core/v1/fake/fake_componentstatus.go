@@ -27,7 +27,7 @@ import (
 
 // FakeComponentStatuses implements ComponentStatusInterface
 type FakeComponentStatuses struct {
-	Fake *FakeCore
+	Fake *FakeCoreV1
 }
 
 var componentstatusesResource = unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "componentstatuses"}
