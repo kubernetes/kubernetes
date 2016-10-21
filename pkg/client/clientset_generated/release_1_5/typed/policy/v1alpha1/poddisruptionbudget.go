@@ -20,6 +20,7 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	v1alpha1 "k8s.io/kubernetes/pkg/apis/policy/v1alpha1"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -45,14 +46,14 @@ type PodDisruptionBudgetInterface interface {
 
 // podDisruptionBudgets implements PodDisruptionBudgetInterface
 type podDisruptionBudgets struct {
-	client *PolicyClient
+	client restclient.Interface
 	ns     string
 }
 
 // newPodDisruptionBudgets returns a PodDisruptionBudgets
 func newPodDisruptionBudgets(c *PolicyClient, namespace string) *podDisruptionBudgets {
 	return &podDisruptionBudgets{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

@@ -20,6 +20,7 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	v1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -44,13 +45,13 @@ type ClusterRoleInterface interface {
 
 // clusterRoles implements ClusterRoleInterface
 type clusterRoles struct {
-	client *RbacClient
+	client restclient.Interface
 }
 
 // newClusterRoles returns a ClusterRoles
 func newClusterRoles(c *RbacClient) *clusterRoles {
 	return &clusterRoles{
-		client: c,
+		client: c.RESTClient(),
 	}
 }
 

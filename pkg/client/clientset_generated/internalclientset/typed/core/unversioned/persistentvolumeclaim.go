@@ -18,6 +18,7 @@ package unversioned
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -43,14 +44,14 @@ type PersistentVolumeClaimInterface interface {
 
 // persistentVolumeClaims implements PersistentVolumeClaimInterface
 type persistentVolumeClaims struct {
-	client *CoreClient
+	client restclient.Interface
 	ns     string
 }
 
 // newPersistentVolumeClaims returns a PersistentVolumeClaims
 func newPersistentVolumeClaims(c *CoreClient, namespace string) *persistentVolumeClaims {
 	return &persistentVolumeClaims{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

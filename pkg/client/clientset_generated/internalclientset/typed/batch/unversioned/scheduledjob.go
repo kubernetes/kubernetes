@@ -19,6 +19,7 @@ package unversioned
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -44,14 +45,14 @@ type ScheduledJobInterface interface {
 
 // scheduledJobs implements ScheduledJobInterface
 type scheduledJobs struct {
-	client *BatchClient
+	client restclient.Interface
 	ns     string
 }
 
 // newScheduledJobs returns a ScheduledJobs
 func newScheduledJobs(c *BatchClient, namespace string) *scheduledJobs {
 	return &scheduledJobs{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

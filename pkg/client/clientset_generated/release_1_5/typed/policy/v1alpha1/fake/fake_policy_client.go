@@ -30,8 +30,9 @@ func (c *FakePolicy) PodDisruptionBudgets(namespace string) v1alpha1.PodDisrupti
 	return &FakePodDisruptionBudgets{c, namespace}
 }
 
-// GetRESTClient returns a RESTClient that is used to communicate
+// RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakePolicy) GetRESTClient() *restclient.RESTClient {
-	return nil
+func (c *FakePolicy) RESTClient() restclient.Interface {
+	var ret *restclient.RESTClient
+	return ret
 }

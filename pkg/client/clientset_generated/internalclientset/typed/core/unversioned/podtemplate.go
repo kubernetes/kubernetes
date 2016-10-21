@@ -18,6 +18,7 @@ package unversioned
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -42,14 +43,14 @@ type PodTemplateInterface interface {
 
 // podTemplates implements PodTemplateInterface
 type podTemplates struct {
-	client *CoreClient
+	client restclient.Interface
 	ns     string
 }
 
 // newPodTemplates returns a PodTemplates
 func newPodTemplates(c *CoreClient, namespace string) *podTemplates {
 	return &podTemplates{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

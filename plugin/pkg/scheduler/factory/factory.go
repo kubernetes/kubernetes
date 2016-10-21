@@ -531,7 +531,7 @@ func getNodeConditionPredicate() cache.NodeConditionPredicate {
 // scheduled.
 func (factory *ConfigFactory) createUnassignedNonTerminatedPodLW() *cache.ListWatch {
 	selector := fields.ParseSelectorOrDie("spec.nodeName==" + "" + ",status.phase!=" + string(api.PodSucceeded) + ",status.phase!=" + string(api.PodFailed))
-	return cache.NewListWatchFromClient(factory.Client.Core().GetRESTClient(), "pods", api.NamespaceAll, selector)
+	return cache.NewListWatchFromClient(factory.Client.Core().RESTClient(), "pods", api.NamespaceAll, selector)
 }
 
 // Returns a cache.ListWatch that finds all pods that are
@@ -539,7 +539,7 @@ func (factory *ConfigFactory) createUnassignedNonTerminatedPodLW() *cache.ListWa
 // TODO: return a ListerWatcher interface instead?
 func (factory *ConfigFactory) createAssignedNonTerminatedPodLW() *cache.ListWatch {
 	selector := fields.ParseSelectorOrDie("spec.nodeName!=" + "" + ",status.phase!=" + string(api.PodSucceeded) + ",status.phase!=" + string(api.PodFailed))
-	return cache.NewListWatchFromClient(factory.Client.Core().GetRESTClient(), "pods", api.NamespaceAll, selector)
+	return cache.NewListWatchFromClient(factory.Client.Core().RESTClient(), "pods", api.NamespaceAll, selector)
 }
 
 // createNodeLW returns a cache.ListWatch that gets all changes to nodes.
@@ -547,32 +547,32 @@ func (factory *ConfigFactory) createNodeLW() *cache.ListWatch {
 	// all nodes are considered to ensure that the scheduler cache has access to all nodes for lookups
 	// the NodeCondition is used to filter out the nodes that are not ready or unschedulable
 	// the filtered list is used as the super set of nodes to consider for scheduling
-	return cache.NewListWatchFromClient(factory.Client.Core().GetRESTClient(), "nodes", api.NamespaceAll, fields.ParseSelectorOrDie(""))
+	return cache.NewListWatchFromClient(factory.Client.Core().RESTClient(), "nodes", api.NamespaceAll, fields.ParseSelectorOrDie(""))
 }
 
 // createPersistentVolumeLW returns a cache.ListWatch that gets all changes to persistentVolumes.
 func (factory *ConfigFactory) createPersistentVolumeLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client.Core().GetRESTClient(), "persistentVolumes", api.NamespaceAll, fields.ParseSelectorOrDie(""))
+	return cache.NewListWatchFromClient(factory.Client.Core().RESTClient(), "persistentVolumes", api.NamespaceAll, fields.ParseSelectorOrDie(""))
 }
 
 // createPersistentVolumeClaimLW returns a cache.ListWatch that gets all changes to persistentVolumeClaims.
 func (factory *ConfigFactory) createPersistentVolumeClaimLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client.Core().GetRESTClient(), "persistentVolumeClaims", api.NamespaceAll, fields.ParseSelectorOrDie(""))
+	return cache.NewListWatchFromClient(factory.Client.Core().RESTClient(), "persistentVolumeClaims", api.NamespaceAll, fields.ParseSelectorOrDie(""))
 }
 
 // Returns a cache.ListWatch that gets all changes to services.
 func (factory *ConfigFactory) createServiceLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client.Core().GetRESTClient(), "services", api.NamespaceAll, fields.ParseSelectorOrDie(""))
+	return cache.NewListWatchFromClient(factory.Client.Core().RESTClient(), "services", api.NamespaceAll, fields.ParseSelectorOrDie(""))
 }
 
 // Returns a cache.ListWatch that gets all changes to controllers.
 func (factory *ConfigFactory) createControllerLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client.Core().GetRESTClient(), "replicationControllers", api.NamespaceAll, fields.ParseSelectorOrDie(""))
+	return cache.NewListWatchFromClient(factory.Client.Core().RESTClient(), "replicationControllers", api.NamespaceAll, fields.ParseSelectorOrDie(""))
 }
 
 // Returns a cache.ListWatch that gets all changes to replicasets.
 func (factory *ConfigFactory) createReplicaSetLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client.Extensions().GetRESTClient(), "replicasets", api.NamespaceAll, fields.ParseSelectorOrDie(""))
+	return cache.NewListWatchFromClient(factory.Client.Extensions().RESTClient(), "replicasets", api.NamespaceAll, fields.ParseSelectorOrDie(""))
 }
 
 func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue *cache.FIFO) func(pod *api.Pod, err error) {
@@ -647,7 +647,7 @@ type binder struct {
 func (b *binder) Bind(binding *api.Binding) error {
 	glog.V(3).Infof("Attempting to bind %v to %v", binding.Name, binding.Target.Name)
 	ctx := api.WithNamespace(api.NewContext(), binding.Namespace)
-	return b.Client.Core().GetRESTClient().Post().Namespace(api.NamespaceValue(ctx)).Resource("bindings").Body(binding).Do().Error()
+	return b.Client.Core().RESTClient().Post().Namespace(api.NamespaceValue(ctx)).Resource("bindings").Body(binding).Do().Error()
 	// TODO: use Pods interface for binding once clusters are upgraded
 	// return b.Pods(binding.Namespace).Bind(binding)
 }

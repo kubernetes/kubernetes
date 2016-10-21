@@ -19,6 +19,7 @@ package unversioned
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -44,14 +45,14 @@ type DeploymentInterface interface {
 
 // deployments implements DeploymentInterface
 type deployments struct {
-	client *ExtensionsClient
+	client restclient.Interface
 	ns     string
 }
 
 // newDeployments returns a Deployments
 func newDeployments(c *ExtensionsClient, namespace string) *deployments {
 	return &deployments{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

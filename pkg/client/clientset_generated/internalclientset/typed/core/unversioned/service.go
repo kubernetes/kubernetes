@@ -18,6 +18,7 @@ package unversioned
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -43,14 +44,14 @@ type ServiceInterface interface {
 
 // services implements ServiceInterface
 type services struct {
-	client *CoreClient
+	client restclient.Interface
 	ns     string
 }
 
 // newServices returns a Services
 func newServices(c *CoreClient, namespace string) *services {
 	return &services{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

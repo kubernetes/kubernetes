@@ -38,8 +38,9 @@ func (c *FakeAuthorization) SubjectAccessReviews() unversioned.SubjectAccessRevi
 	return &FakeSubjectAccessReviews{c}
 }
 
-// GetRESTClient returns a RESTClient that is used to communicate
+// RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeAuthorization) GetRESTClient() *restclient.RESTClient {
-	return nil
+func (c *FakeAuthorization) RESTClient() restclient.Interface {
+	var ret *restclient.RESTClient
+	return ret
 }

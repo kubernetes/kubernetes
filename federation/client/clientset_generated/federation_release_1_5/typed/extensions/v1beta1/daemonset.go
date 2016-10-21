@@ -20,6 +20,7 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -45,14 +46,14 @@ type DaemonSetInterface interface {
 
 // daemonSets implements DaemonSetInterface
 type daemonSets struct {
-	client *ExtensionsClient
+	client restclient.Interface
 	ns     string
 }
 
 // newDaemonSets returns a DaemonSets
 func newDaemonSets(c *ExtensionsClient, namespace string) *daemonSets {
 	return &daemonSets{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

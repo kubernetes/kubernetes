@@ -19,6 +19,7 @@ package v1
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -44,13 +45,13 @@ type NamespaceInterface interface {
 
 // namespaces implements NamespaceInterface
 type namespaces struct {
-	client *CoreClient
+	client restclient.Interface
 }
 
 // newNamespaces returns a Namespaces
 func newNamespaces(c *CoreClient) *namespaces {
 	return &namespaces{
-		client: c,
+		client: c.RESTClient(),
 	}
 }
 

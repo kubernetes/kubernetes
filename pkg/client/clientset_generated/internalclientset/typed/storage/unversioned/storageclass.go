@@ -19,6 +19,7 @@ package unversioned
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	storage "k8s.io/kubernetes/pkg/apis/storage"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -43,13 +44,13 @@ type StorageClassInterface interface {
 
 // storageClasses implements StorageClassInterface
 type storageClasses struct {
-	client *StorageClient
+	client restclient.Interface
 }
 
 // newStorageClasses returns a StorageClasses
 func newStorageClasses(c *StorageClient) *storageClasses {
 	return &storageClasses{
-		client: c,
+		client: c.RESTClient(),
 	}
 }
 
