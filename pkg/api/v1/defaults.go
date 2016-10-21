@@ -311,6 +311,9 @@ func SetDefaults_ConfigMap(obj *ConfigMap) {
 	if obj.Data == nil {
 		obj.Data = make(map[string]string)
 	}
+	if obj.BinaryData == nil {
+		obj.BinaryData = make(map[string][]byte)
+	}
 }
 
 // With host networking default all container ports to host ports.

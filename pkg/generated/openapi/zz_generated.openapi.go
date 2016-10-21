@@ -6783,7 +6783,29 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							},
 						},
 					},
+					"binaryData": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Data contains the binary data. Each key must be a valid DNS_SUBDOMAIN with an optional leading dot.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type: []string{"array"},
+										Items: &spec.SchemaOrArray{
+											Schema: &spec.Schema{
+												SchemaProps: spec.SchemaProps{
+													Type:   []string{"integer"},
+													Format: "byte",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
 				},
+				Required: []string{"binaryData"},
 			},
 		},
 		Dependencies: []string{
