@@ -557,7 +557,6 @@ var map_ReplicaSetCondition = map[string]string{
 	"":                   "ReplicaSetCondition describes the state of a replica set at a certain point.",
 	"type":               "Type of replica set condition.",
 	"status":             "Status of the condition, one of True, False, Unknown.",
-	"lastProbeTime":      "Last time we probed the condition.",
 	"lastTransitionTime": "The last time the condition transitioned from one status to another.",
 	"reason":             "The reason for the condition's last transition.",
 	"message":            "A human readable message indicating details about the transition.",
