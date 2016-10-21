@@ -806,6 +806,16 @@ func (m *kubeGenericRuntimeManager) KillPod(pod *api.Pod, runningPod kubecontain
 	return err.Error()
 }
 
+// isSandboxReady checks whether the sandbox is in ready state.
+func (m *kubeGenericRuntimeManager) isSandboxReady(podSandBoxID string) (bool, error) {
+	sandboxStatus, err := m.runtimeService.PodSandboxStatus(podSandBoxID)
+	if err != nil {
+		return false, err
+	}
+
+	return sandboxStatus.GetState() == runtimeApi.PodSandBoxState_READY, nil
+}
+
 // killPodWithSyncResult kills a runningPod and returns SyncResult.
 // Note: The pod passed in could be *nil* when kubelet restarted.
 func (m *kubeGenericRuntimeManager) killPodWithSyncResult(pod *api.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) (result kubecontainer.PodSyncResult) {
@@ -826,7 +836,12 @@ func (m *kubeGenericRuntimeManager) killPodWithSyncResult(pod *api.Pod, runningP
 		result.Fail(err)
 		return
 	}
-	if !isHostNetwork {
+	isSandboxReady, err := m.isSandboxReady(sandboxID)
+	if err != nil {
+		result.Fail(err)
+		return
+	}
+	if !isHostNetwork && isSandboxReady {
 		teardownNetworkResult := kubecontainer.NewSyncResult(kubecontainer.TeardownNetwork, runningPod.ID)
 		result.AddSyncResult(teardownNetworkResult)
 		// Tear down network plugin with sandbox id
