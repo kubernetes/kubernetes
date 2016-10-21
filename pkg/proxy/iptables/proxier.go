@@ -165,11 +165,14 @@ type Proxier struct {
 	serviceMap                  map[proxy.ServicePortName]*serviceInfo
 	endpointsMap                map[proxy.ServicePortName][]*endpointsInfo
 	portsMap                    map[localPort]closeable
-	haveReceivedServiceUpdate   bool // true once we've seen an OnServiceUpdate event
-	haveReceivedEndpointsUpdate bool // true once we've seen an OnEndpointsUpdate event
+	haveReceivedServiceUpdate   bool        // true once we've seen an OnServiceUpdate event
+	haveReceivedEndpointsUpdate bool        // true once we've seen an OnEndpointsUpdate event
+	lastSync                    time.Time   // Time since last sync
+	timer                       *time.Timer // Timer used to sync
 
 	// These are effectively const and do not need the mutex to be held.
 	syncPeriod     time.Duration
+	minSyncPeriod  time.Duration
 	iptables       utiliptables.Interface
 	masqueradeAll  bool
 	masqueradeMark string
@@ -217,7 +220,7 @@ var _ proxy.ProxyProvider = &Proxier{}
 // An error will be returned if iptables fails to update or acquire the initial lock.
 // Once a proxier is created, it will keep iptables up to date in the background and
 // will not terminate if a particular iptables call fails.
-func NewProxier(ipt utiliptables.Interface, sysctl utilsysctl.Interface, exec utilexec.Interface, syncPeriod time.Duration, masqueradeAll bool, masqueradeBit int, clusterCIDR string, hostname string, nodeIP net.IP) (*Proxier, error) {
+func NewProxier(ipt utiliptables.Interface, sysctl utilsysctl.Interface, exec utilexec.Interface, syncPeriod time.Duration, minSyncPeriod time.Duration, masqueradeAll bool, masqueradeBit int, clusterCIDR string, hostname string, nodeIP net.IP) (*Proxier, error) {
 	// Set the route_localnet sysctl we need for
 	if err := sysctl.SetSysctl(sysctlRouteLocalnet, 1); err != nil {
 		return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlRouteLocalnet, err)
@@ -249,6 +252,7 @@ func NewProxier(ipt utiliptables.Interface, sysctl utilsysctl.Interface, exec ut
 		endpointsMap:   make(map[proxy.ServicePortName][]*endpointsInfo),
 		portsMap:       make(map[localPort]closeable),
 		syncPeriod:     syncPeriod,
+		minSyncPeriod:  minSyncPeriod,
 		iptables:       ipt,
 		masqueradeAll:  masqueradeAll,
 		masqueradeMark: masqueradeMark,
@@ -390,12 +394,13 @@ func (proxier *Proxier) Sync() {
 
 // SyncLoop runs periodic work.  This is expected to run as a goroutine or as the main loop of the app.  It does not return.
 func (proxier *Proxier) SyncLoop() {
-	t := time.NewTicker(proxier.syncPeriod)
-	defer t.Stop()
+	proxier.timer = time.NewTimer(proxier.syncPeriod)
+	defer proxier.timer.Stop()
 	for {
-		<-t.C
+		<-proxier.timer.C
 		glog.V(6).Infof("Periodic sync")
 		proxier.Sync()
+		proxier.timer.Reset(proxier.syncPeriod)
 	}
 }
 
@@ -495,7 +500,14 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 			}
 		}
 	}
-	proxier.syncProxyRules()
+	if expired := time.Since(proxier.lastSync); expired >= proxier.minSyncPeriod {
+		glog.V(4).Infof("Minimum sync window has passed (%v), service update syncing proxy rules", expired)
+		proxier.syncProxyRules()
+	} else if proxier.timer != nil {
+		remaining := proxier.minSyncPeriod - expired
+		glog.V(4).Infof("Service update resetting synch period %v", remaining)
+		proxier.timer.Reset(remaining)
+	}
 	proxier.deleteServiceConnections(staleUDPServices.List())
 
 }
@@ -610,7 +622,14 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 
 		proxier.updateHealthCheckEntries(svcPort.NamespacedName, svcPortToInfoMap[svcPort])
 	}
-	proxier.syncProxyRules()
+	if expired := time.Since(proxier.lastSync); expired >= proxier.minSyncPeriod {
+		glog.V(4).Infof("Minimum sync window has passed (%v), endpoint update syncing proxy rules", expired)
+		proxier.syncProxyRules()
+	} else if proxier.timer != nil {
+		remaining := proxier.minSyncPeriod - expired
+		glog.V(4).Infof("Endpoint update resetting synch period %v", remaining)
+		proxier.timer.Reset(remaining)
+	}
 	proxier.deleteEndpointConnections(staleConnections)
 }
 
@@ -766,6 +785,7 @@ func (proxier *Proxier) execConntrackTool(parameters ...string) error {
 // assumes proxier.mu is held
 func (proxier *Proxier) syncProxyRules() {
 	start := time.Now()
+	proxier.lastSync = start
 	defer func() {
 		glog.V(4).Infof("syncProxyRules took %v", time.Since(start))
 	}()
