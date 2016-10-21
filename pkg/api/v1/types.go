@@ -2350,9 +2350,6 @@ type ReplicationControllerCondition struct {
 	Type ReplicationControllerConditionType `json:"type"`
 	// Status of the condition, one of True, False, Unknown.
 	Status ConditionStatus `json:"status"`
-	// Last time we probed the condition.
-	// +optional
-	LastProbeTime unversioned.Time `json:"lastProbeTime,omitempty"`
 	// The last time the condition transitioned from one status to another.
 	// +optional
 	LastTransitionTime unversioned.Time `json:"lastTransitionTime,omitempty"`
