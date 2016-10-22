@@ -20,45 +20,21 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/coreos/go-semver/semver"
 	rktapi "github.com/coreos/rkt/api/v1alpha"
 	"golang.org/x/net/context"
+
+	utilversion "k8s.io/kubernetes/pkg/util/version"
 )
 
 type versions struct {
 	sync.RWMutex
-	binVersion     rktVersion
-	apiVersion     rktVersion
+	binVersion     *utilversion.Version
+	apiVersion     *utilversion.Version
 	systemdVersion systemdVersion
 }
 
-// rktVersion implementes kubecontainer.Version interface by implementing
-// Compare() and String() (which is implemented by the underlying semver.Version)
-type rktVersion struct {
-	*semver.Version
-}
-
-func newRktVersion(version string) (rktVersion, error) {
-	sem, err := semver.NewVersion(version)
-	if err != nil {
-		return rktVersion{}, err
-	}
-	return rktVersion{sem}, nil
-}
-
-func (r rktVersion) Compare(other string) (int, error) {
-	v, err := semver.NewVersion(other)
-	if err != nil {
-		return -1, err
-	}
-
-	if r.LessThan(*v) {
-		return -1, nil
-	}
-	if v.LessThan(*r.Version) {
-		return 1, nil
-	}
-	return 0, nil
+func newRktVersion(version string) (*utilversion.Version, error) {
+	return utilversion.ParseSemantic(version)
 }
 
 func (r *Runtime) getVersions() error {
