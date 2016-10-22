@@ -475,7 +475,10 @@ function start-kubelet {
   flags+=" --config=/etc/kubernetes/manifests"
   flags+=" --kubelet-cgroups=/kubelet"
   flags+=" --system-cgroups=/system"
-
+  flags+=" --experimental-mounter-path=${KUBE_HOME}/bin/mounter"
+  # Note: This patch must match the rootfs path in mounter/mounter
+  flags+=" --experimental-mounter-rootfs-path=/media/root"
+  
   if [[ -n "${KUBELET_PORT:-}" ]]; then
     flags+=" --port=${KUBELET_PORT}"
   fi
