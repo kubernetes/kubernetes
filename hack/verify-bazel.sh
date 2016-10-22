@@ -13,6 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This presubmit should be disabled until https://github.com/kubernetes/kubernetes/issues/35356
+# is resolved.
+exit 0
+
 set -o errexit
 set -o nounset
 set -o pipefail
