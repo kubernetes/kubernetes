@@ -31,6 +31,8 @@ import (
 	"os"
 
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+
+	config "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha"
 )
 
 const success = "\033[0;32mSUCESS\033[0m"
@@ -99,7 +101,7 @@ func containerRuntime() error {
 	}
 
 	// Setup cadvisor to check the container environment
-	c, err := cadvisor.New(0 /*don't start the http server*/, "docker")
+	c, err := cadvisor.New(0 /*don't start the http server*/, "docker", config.DefaultRootDir)
 	if err != nil {
 		return printError("Container Runtime Check: %s Could not start cadvisor %v", failed, err)
 	}

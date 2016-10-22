@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	defaultRootDir = "/var/lib/kubelet"
+	DefaultRootDir = "/var/lib/kubelet"
 
 	// When these values are updated, also update test/e2e/framework/util.go
 	defaultPodInfraContainerImageName    = "gcr.io/google_containers/pause"
@@ -292,13 +292,13 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		obj.RktAPIEndpoint = defaultRktAPIServiceEndpoint
 	}
 	if obj.RootDirectory == "" {
-		obj.RootDirectory = defaultRootDir
+		obj.RootDirectory = DefaultRootDir
 	}
 	if obj.SerializeImagePulls == nil {
 		obj.SerializeImagePulls = boolVar(true)
 	}
 	if obj.SeccompProfileRoot == "" {
-		filepath.Join(defaultRootDir, "seccomp")
+		filepath.Join(DefaultRootDir, "seccomp")
 	}
 	if obj.StreamingConnectionIdleTimeout == zeroDuration {
 		obj.StreamingConnectionIdleTimeout = unversioned.Duration{Duration: 4 * time.Hour}

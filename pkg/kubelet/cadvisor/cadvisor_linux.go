@@ -40,7 +40,7 @@ import (
 )
 
 type cadvisorClient struct {
-	runtime string
+	runtime  string
 	rootPath string
 	manager.Manager
 }
@@ -107,9 +107,9 @@ func New(port uint, runtime string, rootPath string) (Interface, error) {
 	}
 
 	cadvisorClient := &cadvisorClient{
-		runtime: runtime,
+		runtime:  runtime,
 		rootPath: rootPath,
-		Manager: m,
+		Manager:  m,
 	}
 
 	err = cadvisorClient.exportHTTP(port)
