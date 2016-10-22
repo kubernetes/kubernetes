@@ -41,6 +41,7 @@ import (
 
 type cadvisorClient struct {
 	runtime string
+	rootPath string
 	manager.Manager
 }
 
@@ -93,7 +94,7 @@ func containerLabels(c *cadvisorapi.ContainerInfo) map[string]string {
 }
 
 // New creates a cAdvisor and exports its API on the specified port if port > 0.
-func New(port uint, runtime string) (Interface, error) {
+func New(port uint, runtime string, rootPath string) (Interface, error) {
 	sysFs, err := sysfs.NewRealSysFs()
 	if err != nil {
 		return nil, err
@@ -107,6 +108,7 @@ func New(port uint, runtime string) (Interface, error) {
 
 	cadvisorClient := &cadvisorClient{
 		runtime: runtime,
+		rootPath: rootPath,
 		Manager: m,
 	}
 
@@ -202,7 +204,7 @@ func (cc *cadvisorClient) ImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
 }
 
 func (cc *cadvisorClient) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
-	return cc.getFsInfo(cadvisorfs.LabelSystemRoot)
+	return cc.GetDirFsInfo(cc.rootPath)
 }
 
 func (cc *cadvisorClient) getFsInfo(label string) (cadvisorapiv2.FsInfo, error) {
