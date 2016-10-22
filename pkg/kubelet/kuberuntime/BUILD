@@ -1,0 +1,85 @@
+package(default_visibility = ["//visibility:public"])
+
+licenses(["notice"])
+
+load(
+    "@io_bazel_rules_go//go:def.bzl",
+    "go_binary",
+    "go_library",
+    "go_test",
+    "cgo_library",
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "doc.go",
+        "fake_kuberuntime_manager.go",
+        "helpers.go",
+        "kuberuntime_container.go",
+        "kuberuntime_gc.go",
+        "kuberuntime_image.go",
+        "kuberuntime_manager.go",
+        "kuberuntime_sandbox.go",
+        "labels.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/api:go_default_library",
+        "//pkg/api/unversioned:go_default_library",
+        "//pkg/client/record:go_default_library",
+        "//pkg/credentialprovider:go_default_library",
+        "//pkg/kubelet/api:go_default_library",
+        "//pkg/kubelet/api/v1alpha1/runtime:go_default_library",
+        "//pkg/kubelet/container:go_default_library",
+        "//pkg/kubelet/dockershim:go_default_library",
+        "//pkg/kubelet/events:go_default_library",
+        "//pkg/kubelet/images:go_default_library",
+        "//pkg/kubelet/lifecycle:go_default_library",
+        "//pkg/kubelet/network:go_default_library",
+        "//pkg/kubelet/prober/results:go_default_library",
+        "//pkg/kubelet/qos:go_default_library",
+        "//pkg/kubelet/types:go_default_library",
+        "//pkg/kubelet/util/cache:go_default_library",
+        "//pkg/kubelet/util/format:go_default_library",
+        "//pkg/types:go_default_library",
+        "//pkg/util/errors:go_default_library",
+        "//pkg/util/flowcontrol:go_default_library",
+        "//pkg/util/parsers:go_default_library",
+        "//pkg/util/runtime:go_default_library",
+        "//pkg/util/sets:go_default_library",
+        "//pkg/util/term:go_default_library",
+        "//vendor:github.com/coreos/go-semver/semver",
+        "//vendor:github.com/golang/glog",
+        "//vendor:github.com/google/cadvisor/info/v1",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "helpers_test.go",
+        "kuberuntime_gc_test.go",
+        "kuberuntime_image_test.go",
+        "kuberuntime_manager_test.go",
+        "labels_test.go",
+    ],
+    library = "go_default_library",
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/api:go_default_library",
+        "//pkg/apis/componentconfig:go_default_library",
+        "//pkg/kubelet/api/testing:go_default_library",
+        "//pkg/kubelet/api/v1alpha1/runtime:go_default_library",
+        "//pkg/kubelet/container:go_default_library",
+        "//pkg/kubelet/container/testing:go_default_library",
+        "//pkg/kubelet/network:go_default_library",
+        "//pkg/kubelet/network/testing:go_default_library",
+        "//pkg/types:go_default_library",
+        "//pkg/util/flowcontrol:go_default_library",
+        "//pkg/util/intstr:go_default_library",
+        "//pkg/util/sets:go_default_library",
+        "//vendor:github.com/google/cadvisor/info/v1",
+        "//vendor:github.com/stretchr/testify/assert",
+    ],
+)
