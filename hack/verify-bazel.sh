@@ -19,7 +19,7 @@ set -o pipefail
 
 export KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
-go get -u github.com/mikedanese/gazel
+go get -u gopkg.in/mikedanese/gazel.v2/gazel
 if [[ $("${GOPATH}/bin/gazel" -dry-run -root="$(realpath ${KUBE_ROOT})" |& tee /dev/stderr | wc -l) != 0 ]]; then
   echo
   echo "BUILD files are not up to date"
