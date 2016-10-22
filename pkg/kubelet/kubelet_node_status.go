@@ -321,7 +321,7 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 	// specified name are handled efficiently by apiserver). Once
 	// apiserver supports GET from cache, change it here.
 	opts := api.ListOptions{
-		FieldSelector: fields.Set{"metadata.name": string(kl.nodeName)}.AsSelector(),
+		FieldSelector:   fields.Set{"metadata.name": string(kl.nodeName)}.AsSelector(),
 		ResourceVersion: "0",
 	}
 	nodes, err := kl.kubeClient.Core().Nodes().List(opts)
