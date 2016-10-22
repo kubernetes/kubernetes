@@ -68,6 +68,9 @@ type delayingType struct {
 	stopCh chan struct{}
 
 	// heartbeat ensures we wait no more than maxWait before firing
+	//
+	// TODO: replace with Ticker (and add to clock) so this can be cleaned up.
+	// clock.Tick will leak.
 	heartbeat <-chan time.Time
 
 	// waitingForAdd is an ordered slice of items to be added to the contained work queue
@@ -192,6 +195,9 @@ func (q *delayingType) waitingLoop() {
 // inserts the given entry into the sorted entries list
 // same semantics as append()... the given slice may be modified,
 // and the returned value should be used
+//
+// TODO: This should probably be converted to use container/heap to improve
+// running time for a large number of items.
 func insert(entries []waitFor, knownEntries map[t]time.Time, entry waitFor) []waitFor {
 	// if the entry is already in our retry list and the existing time is before the new one, just skip it
 	existingTime, exists := knownEntries[entry.data]

@@ -129,3 +129,33 @@ func TestLen(t *testing.T) {
 		t.Errorf("Expected %v, got %v", e, a)
 	}
 }
+
+func TestReinsert(t *testing.T) {
+	q := workqueue.New()
+	q.Add("foo")
+
+	// Start processing
+	i, _ := q.Get()
+	if i != "foo" {
+		t.Errorf("Expected %v, got %v", "foo", i)
+	}
+
+	// Add it back while processing
+	q.Add(i)
+
+	// Finish it up
+	q.Done(i)
+
+	// It should be back on the queue
+	i, _ = q.Get()
+	if i != "foo" {
+		t.Errorf("Expected %v, got %v", "foo", i)
+	}
+
+	// Finish that one up
+	q.Done(i)
+
+	if a := q.Len(); a != 0 {
+		t.Errorf("Expected queue to be empty. Has %v items", a)
+	}
+}
