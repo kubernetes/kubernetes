@@ -19,7 +19,16 @@ go_library(
         "pem.go",
     ],
     tags = ["automanaged"],
-    deps = ["//pkg/apis/certificates:go_default_library"],
+    deps = [
+        "//pkg/apis/certificates:go_default_library",
+        "//vendor:github.com/cloudflare/cfssl/config",
+        "//vendor:github.com/cloudflare/cfssl/csr",
+        "//vendor:github.com/cloudflare/cfssl/helpers",
+        "//vendor:github.com/cloudflare/cfssl/initca",
+        "//vendor:github.com/cloudflare/cfssl/signer",
+        "//vendor:github.com/cloudflare/cfssl/signer/local",
+        "//vendor:github.com/golang/glog",
+    ],
 )
 
 go_test(
