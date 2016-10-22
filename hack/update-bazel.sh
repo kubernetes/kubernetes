@@ -20,4 +20,6 @@ set -o pipefail
 export KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 go get -u github.com/mikedanese/gazel
+export GOOS=linux
+export GOARCH=amd64
 "${GOPATH}/bin/gazel" -root="$(realpath ${KUBE_ROOT})"
