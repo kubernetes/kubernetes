@@ -54,8 +54,8 @@ import (
 	uexec "k8s.io/kubernetes/pkg/util/exec"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/uuid"
+	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -100,39 +100,39 @@ var (
 	// that rely on extended pod logging options to work on clusters before that.
 	//
 	// TODO(ihmccreery): remove once we don't care about v1.0 anymore, (tentatively in v1.3).
-	extendedPodLogFilterVersion = version.MustParse("v1.1.0")
+	extendedPodLogFilterVersion = utilversion.MustParseSemantic("v1.1.0")
 
 	// NodePorts were made optional in #12831 (v1.1.0) so we don't expect tests that used to
 	// require NodePorts but no longer include them to work on clusters before that.
 	//
 	// TODO(ihmccreery): remove once we don't care about v1.0 anymore, (tentatively in v1.3).
-	nodePortsOptionalVersion = version.MustParse("v1.1.0")
+	nodePortsOptionalVersion = utilversion.MustParseSemantic("v1.1.0")
 
 	// Jobs were introduced in v1.1, so we don't expect tests that rely on jobs to work on
 	// clusters before that.
 	//
 	// TODO(ihmccreery): remove once we don't care about v1.0 anymore, (tentatively in v1.3).
-	jobsVersion = version.MustParse("v1.1.0")
+	jobsVersion = utilversion.MustParseSemantic("v1.1.0")
 
 	// Deployments were introduced by default in v1.2, so we don't expect tests that rely on
 	// deployments to work on clusters before that.
 	//
 	// TODO(ihmccreery): remove once we don't care about v1.1 anymore, (tentatively in v1.4).
-	deploymentsVersion = version.MustParse("v1.2.0-alpha.7.726")
+	deploymentsVersion = utilversion.MustParseSemantic("v1.2.0-alpha.7.726")
 
 	// Pod probe parameters were introduced in #15967 (v1.2) so we don't expect tests that use
 	// these probe parameters to work on clusters before that.
 	//
 	// TODO(ihmccreery): remove once we don't care about v1.1 anymore, (tentatively in v1.4).
-	podProbeParametersVersion = version.MustParse("v1.2.0-alpha.4")
+	podProbeParametersVersion = utilversion.MustParseSemantic("v1.2.0-alpha.4")
 
 	// 'kubectl create quota' was introduced in #28351 (v1.4) so we don't expect tests that use
 	// 'kubectl create quota' to work on kubectl clients before that.
-	kubectlCreateQuotaVersion = version.MustParse("v1.4.0-alpha.2")
+	kubectlCreateQuotaVersion = utilversion.MustParseSemantic("v1.4.0-alpha.2")
 
 	// Returning container command exit codes in kubectl run/exec was introduced in #26541 (v1.4)
 	// so we don't expect tests that verifies return code to work on kubectl clients before that.
-	kubectlContainerExitCodeVersion = version.MustParse("v1.4.0-alpha.3")
+	kubectlContainerExitCodeVersion = utilversion.MustParseSemantic("v1.4.0-alpha.3")
 )
 
 // Stops everything from filePath from namespace ns and checks if everything matching selectors from the given namespace is correctly stopped.
