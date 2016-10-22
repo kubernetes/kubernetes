@@ -2559,6 +2559,16 @@ go_library(
 )
 
 go_library(
+    name = "github.com/exponent-io/jsonpath",
+    srcs = [
+        "github.com/exponent-io/jsonpath/decoder.go",
+        "github.com/exponent-io/jsonpath/path.go",
+        "github.com/exponent-io/jsonpath/pathaction.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
     name = "github.com/fsnotify/fsnotify",
     srcs = [
         "github.com/fsnotify/fsnotify/fsnotify.go",
@@ -4175,6 +4185,34 @@ go_library(
     name = "github.com/jonboulle/clockwork",
     srcs = ["github.com/jonboulle/clockwork/clockwork.go"],
     tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/jteeuwen/go-bindata",
+    srcs = [
+        "github.com/jteeuwen/go-bindata/asset.go",
+        "github.com/jteeuwen/go-bindata/bytewriter.go",
+        "github.com/jteeuwen/go-bindata/config.go",
+        "github.com/jteeuwen/go-bindata/convert.go",
+        "github.com/jteeuwen/go-bindata/debug.go",
+        "github.com/jteeuwen/go-bindata/doc.go",
+        "github.com/jteeuwen/go-bindata/release.go",
+        "github.com/jteeuwen/go-bindata/restore.go",
+        "github.com/jteeuwen/go-bindata/stringwriter.go",
+        "github.com/jteeuwen/go-bindata/toc.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_binary(
+    name = "github.com/jteeuwen/go-bindata/go-bindata",
+    srcs = [
+        "github.com/jteeuwen/go-bindata/go-bindata/AppendSliceValue.go",
+        "github.com/jteeuwen/go-bindata/go-bindata/main.go",
+        "github.com/jteeuwen/go-bindata/go-bindata/version.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/jteeuwen/go-bindata"],
 )
 
 go_library(
@@ -7533,176 +7571,6 @@ go_library(
         "gopkg.in/yaml.v2/yaml.go",
         "gopkg.in/yaml.v2/yamlh.go",
         "gopkg.in/yaml.v2/yamlprivateh.go",
-    ],
-    tags = ["automanaged"],
-)
-
-go_library(
-    name = "k8s.io/gengo/args",
-    srcs = ["k8s.io/gengo/args/args.go"],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/spf13/pflag",
-        "//vendor:k8s.io/gengo/generator",
-        "//vendor:k8s.io/gengo/namer",
-        "//vendor:k8s.io/gengo/parser",
-        "//vendor:k8s.io/gengo/types",
-    ],
-)
-
-go_library(
-    name = "k8s.io/gengo/examples/deepcopy-gen/generators",
-    srcs = ["k8s.io/gengo/examples/deepcopy-gen/generators/deepcopy.go"],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/gengo/args",
-        "//vendor:k8s.io/gengo/examples/set-gen/sets",
-        "//vendor:k8s.io/gengo/generator",
-        "//vendor:k8s.io/gengo/namer",
-        "//vendor:k8s.io/gengo/types",
-    ],
-)
-
-go_library(
-    name = "k8s.io/gengo/examples/defaulter-gen/generators",
-    srcs = ["k8s.io/gengo/examples/defaulter-gen/generators/defaulter.go"],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/gengo/args",
-        "//vendor:k8s.io/gengo/generator",
-        "//vendor:k8s.io/gengo/namer",
-        "//vendor:k8s.io/gengo/types",
-    ],
-)
-
-go_library(
-    name = "k8s.io/gengo/examples/import-boss/generators",
-    srcs = ["k8s.io/gengo/examples/import-boss/generators/import_restrict.go"],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/gengo/args",
-        "//vendor:k8s.io/gengo/generator",
-        "//vendor:k8s.io/gengo/namer",
-        "//vendor:k8s.io/gengo/types",
-    ],
-)
-
-go_library(
-    name = "k8s.io/gengo/examples/set-gen/generators",
-    srcs = [
-        "k8s.io/gengo/examples/set-gen/generators/sets.go",
-        "k8s.io/gengo/examples/set-gen/generators/tags.go",
-    ],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/gengo/args",
-        "//vendor:k8s.io/gengo/generator",
-        "//vendor:k8s.io/gengo/namer",
-        "//vendor:k8s.io/gengo/types",
-    ],
-)
-
-go_library(
-    name = "k8s.io/gengo/examples/set-gen/sets",
-    srcs = [
-        "k8s.io/gengo/examples/set-gen/sets/byte.go",
-        "k8s.io/gengo/examples/set-gen/sets/doc.go",
-        "k8s.io/gengo/examples/set-gen/sets/empty.go",
-        "k8s.io/gengo/examples/set-gen/sets/int.go",
-        "k8s.io/gengo/examples/set-gen/sets/int64.go",
-        "k8s.io/gengo/examples/set-gen/sets/string.go",
-    ],
-    tags = ["automanaged"],
-)
-
-go_library(
-    name = "k8s.io/gengo/generator",
-    srcs = [
-        "k8s.io/gengo/generator/default_generator.go",
-        "k8s.io/gengo/generator/default_package.go",
-        "k8s.io/gengo/generator/doc.go",
-        "k8s.io/gengo/generator/error_tracker.go",
-        "k8s.io/gengo/generator/execute.go",
-        "k8s.io/gengo/generator/generator.go",
-        "k8s.io/gengo/generator/import_tracker.go",
-        "k8s.io/gengo/generator/snippet_writer.go",
-    ],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/gengo/namer",
-        "//vendor:k8s.io/gengo/parser",
-        "//vendor:k8s.io/gengo/types",
-    ],
-)
-
-go_library(
-    name = "k8s.io/gengo/namer",
-    srcs = [
-        "k8s.io/gengo/namer/doc.go",
-        "k8s.io/gengo/namer/import_tracker.go",
-        "k8s.io/gengo/namer/namer.go",
-        "k8s.io/gengo/namer/order.go",
-        "k8s.io/gengo/namer/plural_namer.go",
-    ],
-    tags = ["automanaged"],
-    deps = ["//vendor:k8s.io/gengo/types"],
-)
-
-go_library(
-    name = "k8s.io/gengo/parser",
-    srcs = [
-        "k8s.io/gengo/parser/doc.go",
-        "k8s.io/gengo/parser/parse.go",
-    ],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/gengo/types",
-    ],
-)
-
-go_library(
-    name = "k8s.io/gengo/types",
-    srcs = [
-        "k8s.io/gengo/types/comments.go",
-        "k8s.io/gengo/types/doc.go",
-        "k8s.io/gengo/types/flatten.go",
-        "k8s.io/gengo/types/types.go",
-    ],
-    tags = ["automanaged"],
-)
-
-go_library(
-    name = "k8s.io/heapster/metrics/api/v1/types",
-    srcs = [
-        "k8s.io/heapster/metrics/api/v1/types/historical_types.go",
-        "k8s.io/heapster/metrics/api/v1/types/model_types.go",
-        "k8s.io/heapster/metrics/api/v1/types/types.go",
-    ],
-    tags = ["automanaged"],
-)
-
-go_library(
-    name = "k8s.io/heapster/metrics/apis/metrics/v1alpha1",
-    srcs = ["k8s.io/heapster/metrics/apis/metrics/v1alpha1/types.go"],
-    tags = ["automanaged"],
-    deps = [
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/api/v1:go_default_library",
-    ],
-)
-
-go_library(
-    name = "github.com/exponent-io/jsonpath",
-    srcs = [
-        "github.com/exponent-io/jsonpath/decoder.go",
-        "github.com/exponent-io/jsonpath/path.go",
-        "github.com/exponent-io/jsonpath/pathaction.go",
     ],
     tags = ["automanaged"],
 )
@@ -11367,5 +11235,165 @@ go_library(
     deps = [
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/client-go/pkg/util/net",
+    ],
+)
+
+go_library(
+    name = "k8s.io/gengo/args",
+    srcs = ["k8s.io/gengo/args/args.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/spf13/pflag",
+        "//vendor:k8s.io/gengo/generator",
+        "//vendor:k8s.io/gengo/namer",
+        "//vendor:k8s.io/gengo/parser",
+        "//vendor:k8s.io/gengo/types",
+    ],
+)
+
+go_library(
+    name = "k8s.io/gengo/examples/deepcopy-gen/generators",
+    srcs = ["k8s.io/gengo/examples/deepcopy-gen/generators/deepcopy.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/gengo/args",
+        "//vendor:k8s.io/gengo/examples/set-gen/sets",
+        "//vendor:k8s.io/gengo/generator",
+        "//vendor:k8s.io/gengo/namer",
+        "//vendor:k8s.io/gengo/types",
+    ],
+)
+
+go_library(
+    name = "k8s.io/gengo/examples/defaulter-gen/generators",
+    srcs = ["k8s.io/gengo/examples/defaulter-gen/generators/defaulter.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/gengo/args",
+        "//vendor:k8s.io/gengo/generator",
+        "//vendor:k8s.io/gengo/namer",
+        "//vendor:k8s.io/gengo/types",
+    ],
+)
+
+go_library(
+    name = "k8s.io/gengo/examples/import-boss/generators",
+    srcs = ["k8s.io/gengo/examples/import-boss/generators/import_restrict.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/gengo/args",
+        "//vendor:k8s.io/gengo/generator",
+        "//vendor:k8s.io/gengo/namer",
+        "//vendor:k8s.io/gengo/types",
+    ],
+)
+
+go_library(
+    name = "k8s.io/gengo/examples/set-gen/generators",
+    srcs = [
+        "k8s.io/gengo/examples/set-gen/generators/sets.go",
+        "k8s.io/gengo/examples/set-gen/generators/tags.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/gengo/args",
+        "//vendor:k8s.io/gengo/generator",
+        "//vendor:k8s.io/gengo/namer",
+        "//vendor:k8s.io/gengo/types",
+    ],
+)
+
+go_library(
+    name = "k8s.io/gengo/examples/set-gen/sets",
+    srcs = [
+        "k8s.io/gengo/examples/set-gen/sets/byte.go",
+        "k8s.io/gengo/examples/set-gen/sets/doc.go",
+        "k8s.io/gengo/examples/set-gen/sets/empty.go",
+        "k8s.io/gengo/examples/set-gen/sets/int.go",
+        "k8s.io/gengo/examples/set-gen/sets/int64.go",
+        "k8s.io/gengo/examples/set-gen/sets/string.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "k8s.io/gengo/generator",
+    srcs = [
+        "k8s.io/gengo/generator/default_generator.go",
+        "k8s.io/gengo/generator/default_package.go",
+        "k8s.io/gengo/generator/doc.go",
+        "k8s.io/gengo/generator/error_tracker.go",
+        "k8s.io/gengo/generator/execute.go",
+        "k8s.io/gengo/generator/generator.go",
+        "k8s.io/gengo/generator/import_tracker.go",
+        "k8s.io/gengo/generator/snippet_writer.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/gengo/namer",
+        "//vendor:k8s.io/gengo/parser",
+        "//vendor:k8s.io/gengo/types",
+    ],
+)
+
+go_library(
+    name = "k8s.io/gengo/namer",
+    srcs = [
+        "k8s.io/gengo/namer/doc.go",
+        "k8s.io/gengo/namer/import_tracker.go",
+        "k8s.io/gengo/namer/namer.go",
+        "k8s.io/gengo/namer/order.go",
+        "k8s.io/gengo/namer/plural_namer.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:k8s.io/gengo/types"],
+)
+
+go_library(
+    name = "k8s.io/gengo/parser",
+    srcs = [
+        "k8s.io/gengo/parser/doc.go",
+        "k8s.io/gengo/parser/parse.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/gengo/types",
+    ],
+)
+
+go_library(
+    name = "k8s.io/gengo/types",
+    srcs = [
+        "k8s.io/gengo/types/comments.go",
+        "k8s.io/gengo/types/doc.go",
+        "k8s.io/gengo/types/flatten.go",
+        "k8s.io/gengo/types/types.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "k8s.io/heapster/metrics/api/v1/types",
+    srcs = [
+        "k8s.io/heapster/metrics/api/v1/types/historical_types.go",
+        "k8s.io/heapster/metrics/api/v1/types/model_types.go",
+        "k8s.io/heapster/metrics/api/v1/types/types.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "k8s.io/heapster/metrics/apis/metrics/v1alpha1",
+    srcs = ["k8s.io/heapster/metrics/apis/metrics/v1alpha1/types.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/api/unversioned:go_default_library",
+        "//pkg/api/v1:go_default_library",
     ],
 )
