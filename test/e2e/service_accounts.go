@@ -23,8 +23,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/util/uuid"
+	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -32,7 +32,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var serviceAccountTokenNamespaceVersion = version.MustParse("v1.2.0")
+var serviceAccountTokenNamespaceVersion = utilversion.MustParseSemantic("v1.2.0")
 
 var _ = framework.KubeDescribe("ServiceAccounts", func() {
 	f := framework.NewDefaultFramework("svcaccounts")

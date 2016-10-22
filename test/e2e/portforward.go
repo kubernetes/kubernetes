@@ -29,8 +29,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -43,7 +43,7 @@ const (
 // TODO support other ports besides 80
 var (
 	portForwardRegexp        = regexp.MustCompile("Forwarding from 127.0.0.1:([0-9]+) -> 80")
-	portForwardPortToStdOutV = version.MustParse("v1.3.0-alpha.4")
+	portForwardPortToStdOutV = utilversion.MustParseSemantic("v1.3.0-alpha.4")
 )
 
 func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string) *api.Pod {
