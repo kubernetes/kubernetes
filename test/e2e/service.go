@@ -239,7 +239,6 @@ var _ = framework.KubeDescribe("Services", func() {
 		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{})
 	})
 
-	// TODO: verify source IP preservation for LoadBalancer type services when applicable
 	It("should preserve source pod IP for traffic thru service cluster IP", func() {
 
 		serviceName := "sourceip-test"
@@ -2102,7 +2101,7 @@ func (j *ServiceTestJig) ChangeServiceType(namespace, name string, newType api.S
 // nodePort. If createPod is true, it also creates an RC with 1 replica of
 // the standard netexec container used everywhere in this test.
 func (j *ServiceTestJig) createOnlyLocalNodePortService(namespace, serviceName string, createPod bool) *api.Service {
-	By("creating a service " + namespace + "/" + namespace + " with type=NodePort and annotation for local-traffic-only")
+	By("creating a service " + namespace + "/" + serviceName + " with type=NodePort and annotation for local-traffic-only")
 	svc := j.CreateTCPServiceOrFail(namespace, func(svc *api.Service) {
 		svc.Spec.Type = api.ServiceTypeNodePort
 		svc.ObjectMeta.Annotations = map[string]string{
@@ -2122,7 +2121,7 @@ func (j *ServiceTestJig) createOnlyLocalNodePortService(namespace, serviceName s
 // acquire an ingress IP. If createPod is true, it also creates an RC with 1
 // replica of the standard netexec container used everywhere in this test.
 func (j *ServiceTestJig) createOnlyLocalLoadBalancerService(namespace, serviceName string, timeout time.Duration, createPod bool) *api.Service {
-	By("creating a service " + namespace + "/" + namespace + " with type=LoadBalancer and annotation for local-traffic-only")
+	By("creating a service " + namespace + "/" + serviceName + " with type=LoadBalancer and annotation for local-traffic-only")
 	svc := j.CreateTCPServiceOrFail(namespace, func(svc *api.Service) {
 		svc.Spec.Type = api.ServiceTypeLoadBalancer
 		// We need to turn affinity off for our LB distribution tests
