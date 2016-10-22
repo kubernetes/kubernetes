@@ -29,6 +29,7 @@ GODEP="${GODEP:-godep}"
 REQUIRED_BINS=(
   "github.com/ugorji/go/codec/codecgen"
   "github.com/onsi/ginkgo/ginkgo"
+  "github.com/jteeuwen/go-bindata/go-bindata"
   "./..."
 )
 

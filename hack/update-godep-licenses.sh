@@ -42,6 +42,7 @@ export LC_ALL=C
 process_content () {
   local package=$1
   local type=$2
+  echo ${package} ${type} >&2
 
   local package_root
   local ensure_pattern
@@ -85,10 +86,12 @@ process_content () {
     for dir_root in ${package} ${package_root}; do
       [[ -d ${DEPS_DIR}/${dir_root} ]] || continue
 
+      set -x
       # One (set) of these is fine
       find ${DEPS_DIR}/${dir_root} \
           -xdev -follow -maxdepth ${find_maxdepth} \
           -type f "${find_names[@]}"
+      set +x
     done | sort -u))
 
   local index
@@ -159,11 +162,13 @@ for PACKAGE in $(cat Godeps/Godeps.json | \
   echo
 
   file=""
+  set -x
   if [[ -n "${CONTENT[${PACKAGE}-LICENSE]-}" ]]; then
       file="${CONTENT[${PACKAGE}-LICENSE]-}"
   elif [[ -n "${CONTENT[${PACKAGE}-COPYRIGHT]-}" ]]; then
       file="${CONTENT[${PACKAGE}-COPYRIGHT]-}"
   fi
+  set +x
   if [[ -z "${file}" ]]; then
       cat > /dev/stderr << __EOF__
 No license could be found for ${PACKAGE} - aborting.
