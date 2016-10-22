@@ -32,7 +32,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/coreos/go-semver/semver"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -47,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/slice"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
+	utilversion "k8s.io/kubernetes/pkg/util/version"
 )
 
 const (
@@ -93,20 +93,19 @@ type KernelCompatTester interface {
 // an error if it fails to get the iptables version without error, in which
 // case it will also return false.
 func CanUseIPTablesProxier(iptver IPTablesVersioner, kcompat KernelCompatTester) (bool, error) {
-	minVersion, err := semver.NewVersion(iptablesMinVersion)
+	minVersion, err := utilversion.ParseGeneric(iptablesMinVersion)
 	if err != nil {
 		return false, err
 	}
-	// returns "X.Y.Z"
 	versionString, err := iptver.GetVersion()
 	if err != nil {
 		return false, err
 	}
-	version, err := semver.NewVersion(versionString)
+	version, err := utilversion.ParseGeneric(versionString)
 	if err != nil {
 		return false, err
 	}
-	if version.LessThan(*minVersion) {
+	if version.LessThan(minVersion) {
 		return false, nil
 	}
 
