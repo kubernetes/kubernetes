@@ -451,17 +451,22 @@ func gcloudList(resource, regex, project string, out interface{}) {
 	// so we only look at stdout.
 	command := []string{
 		"compute", resource, "list",
-		fmt.Sprintf("--regex=%v", regex),
+		fmt.Sprintf("--regexp=%v", regex),
 		fmt.Sprintf("--project=%v", project),
 		"-q", "--format=json",
 	}
 	output, err := exec.Command("gcloud", command...).Output()
 	if err != nil {
 		errCode := -1
+		errMsg := ""
 		if exitErr, ok := err.(utilexec.ExitError); ok {
 			errCode = exitErr.ExitStatus()
+			errMsg = exitErr.Error()
+			if osExitErr, ok := err.(*exec.ExitError); ok {
+				errMsg = fmt.Sprintf("%v, stderr %v", errMsg, string(osExitErr.Stderr))
+			}
 		}
-		framework.Logf("Error running gcloud command 'gcloud %s': err: %v, output: %v, status: %d", strings.Join(command, " "), err, string(output), errCode)
+		framework.Logf("Error running gcloud command 'gcloud %s': err: %v, output: %v, status: %d, msg: %v", strings.Join(command, " "), err, string(output), errCode, errMsg)
 	}
 	if err := json.Unmarshal([]byte(output), out); err != nil {
 		framework.Logf("Error unmarshalling gcloud output for %v: %v, output: %v", resource, err, string(output))
