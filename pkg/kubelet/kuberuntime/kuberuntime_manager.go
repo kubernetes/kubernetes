@@ -22,7 +22,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/coreos/go-semver/semver"
 	"github.com/golang/glog"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 
@@ -43,6 +42,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	utilversion "k8s.io/kubernetes/pkg/util/version"
 )
 
 const (
@@ -202,33 +202,8 @@ func (m *kubeGenericRuntimeManager) Type() string {
 	return m.runtimeName
 }
 
-// runtimeVersion implements kubecontainer.Version interface by implementing
-// Compare() and String()
-type runtimeVersion struct {
-	*semver.Version
-}
-
-func newRuntimeVersion(version string) (runtimeVersion, error) {
-	sem, err := semver.NewVersion(version)
-	if err != nil {
-		return runtimeVersion{}, err
-	}
-	return runtimeVersion{sem}, nil
-}
-
-func (r runtimeVersion) Compare(other string) (int, error) {
-	v, err := semver.NewVersion(other)
-	if err != nil {
-		return -1, err
-	}
-
-	if r.LessThan(*v) {
-		return -1, nil
-	}
-	if v.LessThan(*r.Version) {
-		return 1, nil
-	}
-	return 0, nil
+func newRuntimeVersion(version string) (*utilversion.Version, error) {
+	return utilversion.ParseSemantic(version)
 }
 
 func (m *kubeGenericRuntimeManager) getTypedVersion() (*runtimeApi.VersionResponse, error) {

@@ -34,7 +34,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/coreos/go-semver/semver"
 	dockertypes "github.com/docker/engine-api/types"
 	dockercontainer "github.com/docker/engine-api/types/container"
 	dockerstrslice "github.com/docker/engine-api/types/strslice"
@@ -73,6 +72,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/util/term"
+	utilversion "k8s.io/kubernetes/pkg/util/version"
 )
 
 const (
@@ -1033,37 +1033,9 @@ func getDockerNetworkMode(container *dockertypes.ContainerJSON) string {
 	return ""
 }
 
-// dockerVersion implements kubecontainer.Version interface by implementing
-// Compare() and String() (which is implemented by the underlying semver.Version)
-// TODO: this code is the same as rktVersion and may make sense to be moved to
-// somewhere shared.
-type dockerVersion struct {
-	*semver.Version
-}
-
 // newDockerVersion returns a semantically versioned docker version value
-func newDockerVersion(version string) (dockerVersion, error) {
-	sem, err := semver.NewVersion(version)
-	return dockerVersion{sem}, err
-}
-
-func (r dockerVersion) String() string {
-	return r.Version.String()
-}
-
-func (r dockerVersion) Compare(other string) (int, error) {
-	v, err := newDockerVersion(other)
-	if err != nil {
-		return -1, err
-	}
-
-	if r.LessThan(*v.Version) {
-		return -1, nil
-	}
-	if v.Version.LessThan(*r.Version) {
-		return 1, nil
-	}
-	return 0, nil
+func newDockerVersion(version string) (*utilversion.Version, error) {
+	return utilversion.ParseSemantic(version)
 }
 
 // apiVersion implements kubecontainer.Version interface by implementing
