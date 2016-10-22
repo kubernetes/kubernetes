@@ -25,7 +25,7 @@ go_library(
         "//pkg/util/sets:go_default_library",
         "//pkg/util/slice:go_default_library",
         "//pkg/util/sysctl:go_default_library",
-        "//vendor:github.com/coreos/go-semver/semver",
+        "//pkg/util/version:go_default_library",
         "//vendor:github.com/davecgh/go-spew/spew",
         "//vendor:github.com/golang/glog",
     ],
