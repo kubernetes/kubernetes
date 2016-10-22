@@ -78,10 +78,6 @@ func isValueKind(kind reflect.Kind) bool {
 	}
 }
 
-func zeroValue(value reflect.Value) bool {
-	return reflect.DeepEqual(reflect.Zero(value.Type()).Interface(), value.Interface())
-}
-
 func customMarshalValue(value reflect.Value) (reflect.Value, bool) {
 	// Return unless we implement a custom query marshaler
 	if !value.CanInterface() {
@@ -95,7 +91,7 @@ func customMarshalValue(value reflect.Value) (reflect.Value, bool) {
 
 	// Don't invoke functions on nil pointers
 	// If the type implements MarshalQueryParameter, AND the tag is not omitempty, AND the value is a nil pointer, "" seems like a reasonable response
-	if isPointerKind(value.Kind()) && zeroValue(value) {
+	if isPointerKind(value.Kind()) && value.IsValid() {
 		return reflect.ValueOf(""), true
 	}
 
@@ -108,7 +104,7 @@ func customMarshalValue(value reflect.Value) (reflect.Value, bool) {
 }
 
 func addParam(values url.Values, tag string, omitempty bool, value reflect.Value) {
-	if omitempty && zeroValue(value) {
+	if omitempty && value.IsValid() {
 		return
 	}
 	val := ""
@@ -177,7 +173,7 @@ func convertStruct(result url.Values, st reflect.Type, sv reflect.Value) {
 			if isValueKind(ft.Elem().Kind()) {
 				addListOfParams(result, tag, omitempty, field)
 			}
-		case isStructKind(kind) && !(zeroValue(field) && omitempty):
+		case isStructKind(kind) && !(field.IsValid() && omitempty):
 			if marshalValue, ok := customMarshalValue(field); ok {
 				addParam(result, tag, omitempty, marshalValue)
 			} else {
