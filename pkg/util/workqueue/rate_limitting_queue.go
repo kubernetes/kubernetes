@@ -16,10 +16,10 @@ limitations under the License.
 
 package workqueue
 
-// RateLimitingInterface is an Interface that can Add an item at a later time.  This makes it easier to
-// requeue items after failures without ending up in a hot-loop.
+// RateLimitingInterface is an interface that rate limits items being added to the queue.
 type RateLimitingInterface interface {
 	DelayingInterface
+
 	// AddRateLimited adds an item to the workqueue after the rate limiter says its ok
 	AddRateLimited(item interface{})
 
@@ -27,6 +27,7 @@ type RateLimitingInterface interface {
 	// or for success, we'll stop the rate limiter from tracking it.  This only clears the `rateLimiter`, you
 	// still have to call `Done` on the queue.
 	Forget(item interface{})
+
 	// NumRequeues returns back how many times the item was requeued
 	NumRequeues(item interface{}) int
 }
