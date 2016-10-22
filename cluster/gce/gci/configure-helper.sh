@@ -1170,6 +1170,9 @@ For Kubernetes copyright and licensing information, see:
 EOF
 }
 
+function pre-warm-mounter {
+    ${KUBE_HOME}/bin/mounter &> /dev/null
+}
 
 ########### Main Function ###########
 echo "Start to configure instance for kubernetes"
@@ -1204,6 +1207,8 @@ else
   create-kubeproxy-kubeconfig
 fi
 
+# Run the containerized mounter once to pre-cache the container image.
+pre-warm-mounter
 assemble-docker-flags
 load-docker-images
 start-kubelet
