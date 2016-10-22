@@ -42,10 +42,11 @@ var resultsDir = flag.String("results-dir", "/tmp/", "Directory to scp test resu
 var sshOptionsMap map[string]string
 
 const (
-	archiveName              = "e2e_node_test.tar.gz"
-	CNIRelease               = "07a8a28637e97b22eb8dfe710eeae1344f69d16e"
-	CNIDirectory             = "cni"
-	mounterRootfsPath string = "/"
+	archiveName  = "e2e_node_test.tar.gz"
+	CNIRelease   = "07a8a28637e97b22eb8dfe710eeae1344f69d16e"
+	CNIDirectory = "cni"
+	// Note: This path needs to be in sync with the "target" path for `/` in cluster/gce/gci/mounter/mounter
+	mounterRootfsPath string = "/media/root"
 )
 
 var CNIURL = fmt.Sprintf("https://storage.googleapis.com/kubernetes-release/network-plugins/cni-%s.tar.gz", CNIRelease)
@@ -264,8 +265,6 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 		return "", false, fmt.Errorf("Issue detecting node's OS via node's /etc/os-release. Err: %v, Output:\n%s", err, output)
 	}
 	if strings.Contains(output, "ID=gci") {
-		glog.Infof("GCI node and GCI mounter both detected, modifying --mounter-path & --experimental-mounter-rootfs-path accordingly")
-
 		// Note this implicitly requires the script to be where we expect in the tarball, so if that location changes the error
 		// here will tell us to update the remote test runner.
 		mounterPath := filepath.Join(tmp, "cluster/gce/gci/mounter/mounter")
@@ -277,6 +276,7 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 		// Insert args at beginning of testArgs, so any values from command line take precedence
 		testArgs = fmt.Sprintf("--experimental-mounter-rootfs-path=%s ", mounterRootfsPath) + testArgs
 		testArgs = fmt.Sprintf("--experimental-mounter-path=%s ", mounterPath) + testArgs
+		glog.Infof("GCI node and GCI mounter both detected, setting --experimental-mounter-path=%q and --experimental-mounter-rootfs-path=%q accordingly", mounterPath, mounterRootfsPath)
 	}
 
 	// Run the tests
