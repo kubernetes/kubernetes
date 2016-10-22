@@ -33,7 +33,7 @@ import (
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/node"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/version"
+	utilversion "k8s.io/kubernetes/pkg/util/version"
 
 	"github.com/golang/glog"
 )
@@ -178,13 +178,13 @@ func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
 	// guarantee backwards compatibility of master API to kubelets with
 	// versions less than 1.1.0
 	node := nodeObj.(*v1.Node)
-	v, err := version.Parse(node.Status.NodeInfo.KubeletVersion)
+	v, err := utilversion.ParseSemantic(node.Status.NodeInfo.KubeletVersion)
 	if err != nil {
 		glog.V(0).Infof("couldn't parse verions %q of minion: %v", node.Status.NodeInfo.KubeletVersion, err)
 		utilruntime.HandleError(nc.forcefullyDeletePod(pod))
 		return
 	}
-	if gracefulDeletionVersion.GT(v) {
+	if v.LessThan(gracefulDeletionVersion) {
 		utilruntime.HandleError(nc.forcefullyDeletePod(pod))
 		return
 	}
@@ -239,12 +239,12 @@ func markAllPodsNotReady(kubeClient clientset.Interface, node *v1.Node) error {
 // Older versions were inflexible and modifying pod.Status directly through
 // the apiserver would result in unexpected outcomes.
 func nodeRunningOutdatedKubelet(node *v1.Node) bool {
-	v, err := version.Parse(node.Status.NodeInfo.KubeletVersion)
+	v, err := utilversion.ParseSemantic(node.Status.NodeInfo.KubeletVersion)
 	if err != nil {
 		glog.Errorf("couldn't parse version %q of node %v", node.Status.NodeInfo.KubeletVersion, err)
 		return true
 	}
-	if podStatusReconciliationVersion.GT(v) {
+	if v.LessThan(podStatusReconciliationVersion) {
 		glog.Infof("Node %v running kubelet at (%v) which is less than the minimum version that allows nodecontroller to mark pods NotReady (%v).", node.Name, v, podStatusReconciliationVersion)
 		return true
 	}
