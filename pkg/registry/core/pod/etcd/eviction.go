@@ -107,7 +107,7 @@ func (r *EvictionREST) checkAndDecrement(namespace string, pdb policy.PodDisrupt
 		return false, nil
 	}
 	pdb.Status.PodDisruptionsAllowed--
-	if _, err := r.podDisruptionBudgetClient.PodDisruptionBudgets(namespace).Update(pdb); err != nil {
+	if _, err := r.podDisruptionBudgetClient.PodDisruptionBudgets(namespace).Update(&pdb); err != nil {
 		return false, err
 	}
 
