@@ -14,10 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/*
-Package populator implements interfaces that monitor and keep the states of the
-caches in sync with the "ground truth".
-*/
 package populator
 
 import (

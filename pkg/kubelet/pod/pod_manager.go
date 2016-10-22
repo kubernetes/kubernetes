@@ -92,7 +92,7 @@ type Manager interface {
 	MirrorClient
 }
 
-// basicManager is a functional Manger.
+// basicManager is a functional Manager.
 //
 // All fields in basicManager are read-only and are updated calling SetPods,
 // AddPod, UpdatePod, or DeletePod.

@@ -14,10 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/*
-Package cache implements data structures used by the kubelet volume manager to
-keep track of attached volumes and the pods that mounted them.
-*/
 package cache
 
 import (
