@@ -42,8 +42,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/flushwriter"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
+	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/pkg/util/wsstream"
-	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/emicklei/go-restful"
 	"github.com/golang/glog"
@@ -357,11 +357,11 @@ func isOldKubectl(userAgent string) bool {
 	if len(subs) != 2 {
 		return false
 	}
-	kubectlVersion, versionErr := version.Parse(subs[1])
+	kubectlVersion, versionErr := utilversion.ParseSemantic(subs[1])
 	if versionErr != nil {
 		return false
 	}
-	return kubectlVersion.LT(version.MustParse("v1.5.0"))
+	return kubectlVersion.LessThan(utilversion.MustParseSemantic("v1.5.0"))
 }
 
 // TODO: Remove in 1.6. This is for backward compatibility with 1.4 kubectl.

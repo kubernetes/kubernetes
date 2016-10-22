@@ -27,7 +27,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/blang/semver"
 	"github.com/golang/glog"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
@@ -44,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
+	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -63,7 +63,7 @@ const (
 
 var (
 	// The docker version in which containerd was introduced.
-	containerdVersion = semver.MustParse("1.11.0")
+	containerdVersion = utilversion.MustParseSemantic("1.11.0")
 )
 
 // A non-user container tracked by the Kubelet.
@@ -595,10 +595,10 @@ func getPidsForProcess(name, pidFile string) ([]int, error) {
 // Temporarily export the function to be used by dockershim.
 // TODO(yujuhong): Move this function to dockershim once kubelet migrates to
 // dockershim as the default.
-func EnsureDockerInContainer(dockerVersion semver.Version, oomScoreAdj int, manager *fs.Manager) error {
+func EnsureDockerInContainer(dockerVersion *utilversion.Version, oomScoreAdj int, manager *fs.Manager) error {
 	type process struct{ name, file string }
 	dockerProcs := []process{{dockerProcessName, dockerPidFile}}
-	if dockerVersion.GTE(containerdVersion) {
+	if dockerVersion.AtLeast(containerdVersion) {
 		dockerProcs = append(dockerProcs, process{containerdProcessName, containerdPidFile})
 	}
 	var errs []error
@@ -760,17 +760,16 @@ func isKernelPid(pid int) bool {
 }
 
 // Helper for getting the docker version.
-func getDockerVersion(cadvisor cadvisor.Interface) semver.Version {
-	var fallback semver.Version // Fallback to zero-value by default.
+func getDockerVersion(cadvisor cadvisor.Interface) *utilversion.Version {
 	versions, err := cadvisor.VersionInfo()
 	if err != nil {
 		glog.Errorf("Error requesting cAdvisor VersionInfo: %v", err)
-		return fallback
+		return utilversion.MustParseSemantic("0.0.0")
 	}
-	dockerVersion, err := semver.Parse(versions.DockerVersion)
+	dockerVersion, err := utilversion.ParseSemantic(versions.DockerVersion)
 	if err != nil {
 		glog.Errorf("Error parsing docker version %q: %v", versions.DockerVersion, err)
-		return fallback
+		return utilversion.MustParseSemantic("0.0.0")
 	}
 	return dockerVersion
 }
