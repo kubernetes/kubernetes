@@ -45,9 +45,15 @@ type Config struct {
 
 	// Info is general information about the API.
 	Info *spec.Info
+
 	// DefaultResponse will be used if an operation does not have any responses listed. It
 	// will show up as ... "responses" : {"default" : $DefaultResponse} in the spec.
 	DefaultResponse *spec.Response
+
+	// CommonResponses will be added as a response to all operation specs. This is a good place to add common
+	// responses such as authorization failed.
+	CommonResponses map[int]spec.Response
+
 	// List of webservice's path prefixes to ignore
 	IgnorePrefixes []string
 
@@ -57,6 +63,14 @@ type Config struct {
 
 	// GetOperationID returns operation id for a restful route. It is an optional function to customize operation IDs.
 	GetOperationID func(servePath string, r *restful.Route) (string, error)
+
+	// SecurityDefinitions is list of all security definitions for OpenAPI service. If this is not nil, the user of config
+	// is responsible to provide DefaultSecurity and (maybe) add unauthorized response to CommonResponses.
+	SecurityDefinitions *spec.SecurityDefinitions
+
+	// DefaultSecurity for all operations. This will pass as spec.SwaggerProps.Security to OpenAPI.
+	// For most cases, this will be list of acceptable definitions in SecurityDefinitions.
+	DefaultSecurity []map[string][]string
 }
 
 // This function is a reference for converting go (or any custom type) to a simple open API type,format pair. There are
