@@ -201,6 +201,7 @@ feature-gates
 federated-api-burst
 federated-api-qps
 federated-kube-context
+federation-dns-suffix
 federation-name
 file-check-frequency
 file_content_in_loop
