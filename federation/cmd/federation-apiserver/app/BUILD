@@ -37,7 +37,6 @@ go_library(
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/install:go_default_library",
         "//pkg/apiserver/authenticator:go_default_library",
-        "//pkg/apiserver/openapi:go_default_library",
         "//pkg/auth/authorizer/union:go_default_library",
         "//pkg/auth/user:go_default_library",
         "//pkg/cloudprovider/providers:go_default_library",
