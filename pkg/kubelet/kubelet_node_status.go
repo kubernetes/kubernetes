@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
@@ -309,13 +310,28 @@ func (kl *Kubelet) updateNodeStatus() error {
 // tryUpdateNodeStatus tries to update node status to master. If ReconcileCBR0
 // is set, this function will also confirm that cbr0 is configured correctly.
 func (kl *Kubelet) tryUpdateNodeStatus() error {
-	node, err := kl.kubeClient.Core().Nodes().Get(string(kl.nodeName))
+	// In large clusters, GET and PUT operations on Node objects coming
+	// from here are the majority of load on apiserver and etcd.
+	// To reduce the load on etcd, we are serving GET operations from
+	// apiserver cache (the data might be slightly delayed but it doesn't
+	// seem to cause more confilict - the delays are pretty small).
+	// TODO: Currently apiserver doesn't support serving GET operations
+	// from its cache. Thus we are hacking it by issuing LIST with
+	// field selector for the name of the node (field selectors with
+	// specified name are handled efficiently by apiserver). Once
+	// apiserver supports GET from cache, change it here.
+	opts := api.ListOptions{
+		FieldSelector:   fields.Set{"metadata.name": string(kl.nodeName)}.AsSelector(),
+		ResourceVersion: "0",
+	}
+	nodes, err := kl.kubeClient.Core().Nodes().List(opts)
 	if err != nil {
 		return fmt.Errorf("error getting node %q: %v", kl.nodeName, err)
 	}
-	if node == nil {
+	if len(nodes.Items) != 1 {
 		return fmt.Errorf("no node instance returned for %q", kl.nodeName)
 	}
+	node := &nodes.Items[0]
 
 	if kl.reconcileCIDR {
 		kl.updatePodCIDR(node.Spec.PodCIDR)
