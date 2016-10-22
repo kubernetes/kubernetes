@@ -373,6 +373,9 @@ function kube-up {
   ((octets[3]+=1))
   service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
   MASTER_EXTRA_SANS="IP:${service_ip},DNS:${MASTER_NAME},${MASTER_EXTRA_SANS}"
+  TMP_DIR=/tmp
+  HOSTS=hosts
+  ETC_HOSTS=/etc/${HOSTS}
 
   echo "Starting master VM (this can take a minute)..."
 
@@ -440,10 +443,11 @@ function kube-up {
 
     (
       kube-up-vm "${NODE_NAMES[$i]}" -c ${NODE_CPU-1} -m ${NODE_MEMORY_MB-1024}
-      add_to_hosts="${NODE_NAMES[$i]}    ${CURRENT_NODE_IP}"
+      add_to_hosts="${CURRENT_NODE_IP}    ${NODE_NAMES[$i]}"
       node_ip_file=${NODE_NAMES[$i]}-ip
       echo "sudo bash -c \"echo $add_to_hosts >> /etc/hosts\"" > ${KUBE_TEMP}/${node_ip_file}
-      kube-scp ${KUBE_MASTER_IP} ${KUBE_TEMP}/${node_ip_file} /tmp/
+      echo $add_to_hosts >> ${KUBE_TEMP}/${HOSTS}
+      kube-scp ${KUBE_MASTER_IP} ${KUBE_TEMP}/${node_ip_file} /${TMP_DIR}/
       kube-ssh ${KUBE_MASTER_IP} "bash /tmp/${node_ip_file}"
       kube-run "${NODE_NAMES[$i]}" "${KUBE_TEMP}/node-start-${i}.sh"
     ) &
@@ -461,6 +465,12 @@ function kube-up {
 
   # Print node IPs, so user can log in for debugging.
   detect-nodes
+
+  # Setup node to node vm-name resolution
+  for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
+      kube-scp ${KUBE_NODE_IP_ADDRESSES[$i]} ${KUBE_TEMP}/${HOSTS} ${TMP_DIR}
+      kube-ssh ${KUBE_NODE_IP_ADDRESSES[$i]} "sudo bash -c \"cat ${TMP_DIR}/${HOSTS} >> ${ETC_HOSTS}\""
+  done
 
   printf "Waiting for salt-master to be up on ${KUBE_MASTER} ...\n"
   remote-pgrep ${KUBE_MASTER_IP} "salt-master"
