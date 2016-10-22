@@ -168,10 +168,6 @@ func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opt
 }
 
 func RunEditOnCreate(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, options *resource.FilenameOptions) error {
-	outputFlag := cmdutil.GetFlagString(cmd, "output")
-	if outputFlag != "json" && outputFlag != "yaml" {
-		return cmdutil.UsageError(cmd, "--output must be one of json|yaml, when --edit is true")
-	}
 	return runEdit(f, out, errOut, cmd, []string{}, options, EditBeforeCreateMode)
 }
 

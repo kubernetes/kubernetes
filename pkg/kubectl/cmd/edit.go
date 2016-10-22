@@ -121,7 +121,7 @@ func RunEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 	return runEdit(f, out, errOut, cmd, args, options, NormalEditMode)
 }
 
-func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions, editMode string) error {
+func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions, editMode EditMode) error {
 	o, err := getPrinter(cmd)
 	if err != nil {
 		return err
@@ -328,7 +328,8 @@ func getPrinter(cmd *cobra.Command) (*editPrinterOptions, error) {
 			ext:       ".json",
 			addHeader: false,
 		}, nil
-	case "yaml":
+	// If flag -o is not specified, use yaml as default
+	case "yaml", "":
 		return &editPrinterOptions{
 			printer:   &kubectl.YAMLPrinter{},
 			ext:       ".yaml",
@@ -339,7 +340,7 @@ func getPrinter(cmd *cobra.Command) (*editPrinterOptions, error) {
 	}
 }
 
-func getMapperAndResult(f cmdutil.Factory, args []string, options *resource.FilenameOptions, editMode string) (meta.RESTMapper, *resource.Mapper, *resource.Result, string, error) {
+func getMapperAndResult(f cmdutil.Factory, args []string, options *resource.FilenameOptions, editMode EditMode) (meta.RESTMapper, *resource.Mapper, *resource.Result, string, error) {
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return nil, nil, nil, "", err
@@ -512,9 +513,11 @@ func visitAnnotation(cmd *cobra.Command, f cmdutil.Factory, updates *resource.In
 	return mutatedObjects, err
 }
 
+type EditMode string
+
 const (
-	NormalEditMode       = "normal_mode"
-	EditBeforeCreateMode = "edit_before_create_mode"
+	NormalEditMode       EditMode = "normal_mode"
+	EditBeforeCreateMode EditMode = "edit_before_create_mode"
 )
 
 // editReason preserves a message about the reason this file must be edited again
