@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiserverfilters "k8s.io/kubernetes/pkg/apiserver/filters"
+	apiserveropenapi "k8s.io/kubernetes/pkg/apiserver/openapi"
 	"k8s.io/kubernetes/pkg/apiserver/request"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
@@ -222,6 +223,7 @@ func NewConfig() *Config {
 					Description: "Default Response.",
 				},
 			},
+			GetOperationID: apiserveropenapi.GetOperationID,
 		},
 		LongRunningFunc: genericfilters.BasicLongRunningRequestCheck(longRunningRE, map[string]string{"watch": "true"}),
 	}
