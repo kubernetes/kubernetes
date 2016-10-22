@@ -122,7 +122,6 @@ go_test(
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/apis/rbac:go_default_library",
-        "//pkg/apiserver/openapi:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/testing/core:go_default_library",

@@ -19,6 +19,7 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
+        "//pkg/genericapiserver/mux:go_default_library",
         "//pkg/genericapiserver/openapi/common:go_default_library",
         "//pkg/util:go_default_library",
         "//pkg/util/json:go_default_library",

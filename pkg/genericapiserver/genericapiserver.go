@@ -30,10 +30,8 @@ import (
 
 	systemd "github.com/coreos/go-systemd/daemon"
 	"github.com/emicklei/go-restful"
-	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
 
-	"github.com/go-openapi/spec"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -43,8 +41,8 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	genericmux "k8s.io/kubernetes/pkg/genericapiserver/mux"
-	"k8s.io/kubernetes/pkg/genericapiserver/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
+	"k8s.io/kubernetes/pkg/genericapiserver/routes"
 	"k8s.io/kubernetes/pkg/runtime"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -151,9 +149,6 @@ type GenericAPIServer struct {
 
 	// See Config.$name for documentation of these flags:
 
-	openAPIInfo               spec.Info
-	openAPIDefaultResponse    spec.Response
-	openAPIDefinitions        *common.OpenAPIDefinitions
 	MasterCount               int
 	KubernetesServiceNodePort int // TODO(sttts): move into master
 	ServiceReadWriteIP        net.IP
@@ -179,15 +174,25 @@ func (s *GenericAPIServer) MinRequestTimeout() time.Duration {
 	return s.minRequestTimeout
 }
 
-func (s *GenericAPIServer) Run() {
+type preparedGenericAPIServer struct {
+	*GenericAPIServer
+}
+
+// PrepareRun does post API installation setup steps.
+func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	// install APIs which depend on other APIs to be installed
 	if s.enableSwaggerSupport {
-		s.InstallSwaggerAPI()
+		routes.Swagger{ExternalAddress: s.ExternalAddress}.Install(s.HandlerContainer)
 	}
 	if s.enableOpenAPISupport {
-		s.InstallOpenAPI()
+		routes.OpenAPI{
+			Config: s.openAPIConfig,
+		}.Install(s.HandlerContainer)
 	}
+	return preparedGenericAPIServer{s}
+}
 
+func (s preparedGenericAPIServer) Run() {
 	if s.SecureServingInfo != nil && s.Handler != nil {
 		secureServer := &http.Server{
 			Addr:           s.SecureServingInfo.BindAddress,
@@ -422,60 +427,6 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 		Context:           s.RequestContextMapper(),
 		MinRequestTimeout: s.minRequestTimeout,
 	}, nil
-}
-
-// getSwaggerConfig returns swagger config shared between SwaggerAPI and OpenAPI spec generators
-func (s *GenericAPIServer) getSwaggerConfig() *swagger.Config {
-	hostAndPort := s.ExternalAddress
-	protocol := "https://"
-	webServicesUrl := protocol + hostAndPort
-	return &swagger.Config{
-		WebServicesUrl:  webServicesUrl,
-		WebServices:     s.HandlerContainer.RegisteredWebServices(),
-		ApiPath:         "/swaggerapi/",
-		SwaggerPath:     "/swaggerui/",
-		SwaggerFilePath: "/swagger-ui/",
-		SchemaFormatHandler: func(typeName string) string {
-			switch typeName {
-			case "unversioned.Time", "*unversioned.Time":
-				return "date-time"
-			}
-			return ""
-		},
-	}
-}
-
-// InstallSwaggerAPI installs the /swaggerapi/ endpoint to allow schema discovery
-// and traversal. It is optional to allow consumers of the Kubernetes GenericAPIServer to
-// register their own web services into the Kubernetes mux prior to initialization
-// of swagger, so that other resource types show up in the documentation.
-func (s *GenericAPIServer) InstallSwaggerAPI() {
-	// Enable swagger UI and discovery API
-	swagger.RegisterSwaggerService(*s.getSwaggerConfig(), s.HandlerContainer.Container)
-}
-
-// InstallOpenAPI installs spec endpoints for each web service.
-func (s *GenericAPIServer) InstallOpenAPI() {
-	// Install one spec per web service, an ideal client will have a ClientSet containing one client
-	// per each of these specs.
-	for _, w := range s.HandlerContainer.RegisteredWebServices() {
-		if strings.HasPrefix(w.RootPath(), "/swaggerapi") {
-			continue
-		}
-		config := *s.openAPIConfig
-		config.Info = new(spec.Info)
-		*config.Info = *s.openAPIConfig.Info
-		config.Info.Title = config.Info.Title + " " + w.RootPath()
-		err := openapi.RegisterOpenAPIService(w.RootPath()+"/swagger.json", []*restful.WebService{w}, &config, s.HandlerContainer.Container)
-		if err != nil {
-			glog.Fatalf("Failed to register open api spec for %v: %v", w.RootPath(), err)
-		}
-	}
-	err := openapi.RegisterOpenAPIService("/swagger.json", s.HandlerContainer.RegisteredWebServices(), s.openAPIConfig, s.HandlerContainer.Container)
-
-	if err != nil {
-		glog.Fatalf("Failed to register open api spec for root: %v", err)
-	}
 }
 
 // DynamicApisDiscovery returns a webservice serving api group discovery.
