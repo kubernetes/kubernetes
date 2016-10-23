@@ -85,7 +85,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -295,8 +297,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -625,8 +628,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -704,7 +708,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -780,8 +786,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -1032,7 +1039,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -1242,8 +1251,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -1572,8 +1582,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -1651,7 +1662,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -1727,8 +1740,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -2205,7 +2219,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -2415,8 +2431,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -2745,8 +2762,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -2824,7 +2842,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -2900,8 +2920,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -3152,7 +3173,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -3362,8 +3385,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -3692,8 +3716,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -3771,7 +3796,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -3847,8 +3874,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -4099,7 +4127,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -4309,8 +4339,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -4639,8 +4670,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -4718,7 +4750,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -4794,8 +4828,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -5046,7 +5081,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -5256,8 +5293,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -5586,8 +5624,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -5665,7 +5704,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -5741,8 +5782,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -5828,7 +5870,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -6038,8 +6082,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -6368,8 +6413,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -6447,7 +6493,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -6523,8 +6571,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -7097,7 +7146,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -7283,8 +7334,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -7573,8 +7625,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
