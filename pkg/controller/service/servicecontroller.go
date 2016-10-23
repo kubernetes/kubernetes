@@ -225,10 +225,7 @@ func (s *ServiceController) init() error {
 // indicating whether processing should be retried; zero means no-retry; otherwise
 // we should retry in that Duration.
 func (s *ServiceController) processServiceUpdate(cachedService *cachedService, service *api.Service, key string) (error, time.Duration) {
-
-	// cache the service, we need the info for service deletion
-	cachedService.state = service
-	err, retry := s.createLoadBalancerIfNeeded(key, service)
+	err, retry := s.createLoadBalancerIfNeeded(key, cachedService, service)
 	if err != nil {
 		message := "Error creating load balancer"
 		if retry {
@@ -241,6 +238,10 @@ func (s *ServiceController) processServiceUpdate(cachedService *cachedService, s
 
 		return err, cachedService.nextRetryDelay()
 	}
+
+	// update the cached service
+	cachedService.state = service
+
 	// Always update the cache upon success.
 	// NOTE: Since we update the cached service if and only if we successfully
 	// processed it, a cached service being nil implies that it hasn't yet
@@ -251,17 +252,29 @@ func (s *ServiceController) processServiceUpdate(cachedService *cachedService, s
 	return nil, doNotRetry
 }
 
-// Returns whatever error occurred along with a boolean indicator of whether it
-// should be retried.
-func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *api.Service) (error, bool) {
-
-	// Note: It is safe to just call EnsureLoadBalancer.  But, on some clouds that requires a delete & create,
-	// which may involve service interruption.  Also, we would like user-friendly events.
+// createLoadBalancerIfNeeded ensures that the load balancer for the given
+// service is in the expected state, given the last seen and present states of
+// the service.  Returns whatever error occurred along with a boolean
+// indicator of whether it should be retried.
+func (s *ServiceController) createLoadBalancerIfNeeded(key string, cachedService *cachedService, service *api.Service) (error, bool) {
+	// Note: It is safe to just call EnsureLoadBalancer.  But, on some clouds
+	// that operation requires a delete & create, which may involve service
+	// interruption.  Also, we would like user-friendly events.
 
 	// Save the state so we can avoid a write if it doesn't change
 	previousState := api.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
 
 	if !wantsLoadBalancer(service) {
+		if cachedService == nil {
+			// There is no cached service, and therefore no prior state to
+			// diff against; NOP.
+			return nil, notRetryable
+		} else if !wantsLoadBalancer(cachedService.state) {
+			// The last seen state doesn't want a load balancer and the
+			// current state doesn't want a load balancer; NOP.
+			return nil, notRetryable
+		}
+
 		needDelete := true
 		_, exists, err := s.balancer.GetLoadBalancer(s.clusterName, service)
 		if err != nil {
@@ -714,9 +727,10 @@ func (s *cachedService) resetRetryDelay() {
 	s.lastRetryDelay = time.Duration(0)
 }
 
-// syncService will sync the Service with the given key if it has had its expectations fulfilled,
-// meaning it did not expect to see any more of its pods created or deleted. This function is not meant to be
-// invoked concurrently with the same key.
+// syncService will sync the Service with the given key if it has had its
+// expectations fulfilled, meaning it did not expect to see any more of its
+// pods created or deleted. This function is not meant to be invoked
+// concurrently with the same key.
 func (s *ServiceController) syncService(key string) error {
 	startTime := time.Now()
 	var cachedService *cachedService
