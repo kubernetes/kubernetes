@@ -60,18 +60,15 @@ kube::log::status "Starting federation-apiserver"
   --insecure-port="${API_PORT}" \
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --advertise-address="10.10.10.10" \
+  --cert-dir="${TMP_DIR}/certs" \
   --token-auth-file=$TMP_DIR/tokenauth.csv \
   --service-cluster-ip-range="10.0.0.0/24" >/tmp/openapi-federation-api-server.log 2>&1 &
 APISERVER_PID=$!
 kube::util::wait_for_url "${API_HOST}:${API_PORT}/" "apiserver: "
 
-OPENAPI_PATH="${API_HOST}:${API_PORT}/"
-DEFAULT_GROUP_VERSIONS="v1 extensions/v1beta1 federation/v1beta1"
-VERSIONS=${VERSIONS:-$DEFAULT_GROUP_VERSIONS}
-
 kube::log::status "Updating " ${OPENAPI_ROOT_DIR}
 
-OPENAPI_PATH="${OPENAPI_PATH}" OPENAPI_ROOT_DIR="${OPENAPI_ROOT_DIR}" VERSIONS="${VERSIONS}" kube::util::fetch-openapi-spec
+curl -w "\n" -fs "${API_HOST}:${API_PORT}/swagger.json" > "${OPENAPI_ROOT_DIR}/swagger.json"
 
 kube::log::status "SUCCESS"
 
