@@ -71,7 +71,7 @@ kube::util::wait_for_url "${API_HOST}:${API_PORT}/healthz" "apiserver: "
 
 kube::log::status "Updating " ${OPENAPI_ROOT_DIR}
 
-OPENAPI_PATH="${API_HOST}:${API_PORT}/" OPENAPI_ROOT_DIR="${OPENAPI_ROOT_DIR}" VERSIONS="${KUBE_AVAILABLE_GROUP_VERSIONS}" KUBE_NONSERVER_GROUP_VERSIONS="${KUBE_NONSERVER_GROUP_VERSIONS}" kube::util::fetch-openapi-spec
+curl -w "\n" -fs "${API_HOST}:${API_PORT}/swagger.json" > "${OPENAPI_ROOT_DIR}/swagger.json"
 
 kube::log::status "SUCCESS"
 

@@ -74,9 +74,9 @@ func RegisterOpenAPIService(servePath string, webServices []*restful.WebService,
 }
 
 func (o *openAPI) init(webServices []*restful.WebService) error {
-	if o.config.GetOperationID == nil {
-		o.config.GetOperationID = func(_ string, r *restful.Route) (string, error) {
-			return r.Operation, nil
+	if o.config.GetOperationIDAndTags == nil {
+		o.config.GetOperationIDAndTags = func(_ string, r *restful.Route) (string, []string, error) {
+			return r.Operation, nil, nil
 		}
 	}
 	if o.config.CommonResponses == nil {
@@ -217,7 +217,7 @@ func (o *openAPI) buildOperations(route restful.Route, inPathCommonParamsMap map
 			},
 		},
 	}
-	if ret.ID, err = o.config.GetOperationID(o.servePath, &route); err != nil {
+	if ret.ID, ret.Tags, err = o.config.GetOperationIDAndTags(o.servePath, &route); err != nil {
 		return ret, err
 	}
 
