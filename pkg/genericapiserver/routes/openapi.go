@@ -17,14 +17,10 @@ limitations under the License.
 package routes
 
 import (
-	"strings"
-
 	"k8s.io/kubernetes/pkg/genericapiserver/mux"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 
-	"github.com/emicklei/go-restful"
-	"github.com/go-openapi/spec"
 	"github.com/golang/glog"
 )
 
@@ -35,22 +31,6 @@ type OpenAPI struct {
 
 // Install adds the SwaggerUI webservice to the given mux.
 func (oa OpenAPI) Install(c *mux.APIContainer) {
-	// Install one spec per web service, an ideal client will have a ClientSet containing one client
-	// per each of these specs.
-	for _, w := range c.RegisteredWebServices() {
-		if strings.HasPrefix(w.RootPath(), "/swaggerapi") {
-			continue
-		}
-
-		config := *oa.Config
-		config.Info = new(spec.Info)
-		*config.Info = *oa.Config.Info
-		config.Info.Title = config.Info.Title + " " + w.RootPath()
-		err := openapi.RegisterOpenAPIService(w.RootPath()+"/swagger.json", []*restful.WebService{w}, &config, c)
-		if err != nil {
-			glog.Fatalf("Failed to register open api spec for %v: %v", w.RootPath(), err)
-		}
-	}
 	err := openapi.RegisterOpenAPIService("/swagger.json", c.RegisteredWebServices(), oa.Config, c)
 	if err != nil {
 		glog.Fatalf("Failed to register open api spec for root: %v", err)
