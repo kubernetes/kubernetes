@@ -52,6 +52,7 @@ func newKubeDNS() *KubeDNS {
 		servicesStore:       cache.NewStore(cache.MetaNamespaceKeyFunc),
 		cache:               NewTreeCache(),
 		reverseRecordMap:    make(map[string]*skymsg.Service),
+		fqdn2IPsMap:         make(map[string]map[string]bool),
 		clusterIPServiceMap: make(map[string]*kapi.Service),
 		cacheLock:           sync.RWMutex{},
 		domainPath:          reverseArray(strings.Split(strings.TrimRight(testDomain, "."), ".")),
@@ -279,8 +280,10 @@ func TestSimpleHeadlessService(t *testing.T) {
 	assert.NoError(t, kd.endpointsStore.Add(endpoints))
 	kd.newService(s)
 	assertDNSForHeadlessService(t, kd, endpoints)
+	assertReverseDNSForHeadlessService(t, kd, endpoints)
 	kd.removeService(s)
 	assertNoDNSForHeadlessService(t, kd, s)
+	assertNoReverseDNSForHeadlessService(t, kd, endpoints)
 }
 
 func TestHeadlessServiceWithNamedPorts(t *testing.T) {
@@ -306,9 +309,11 @@ func TestHeadlessServiceWithNamedPorts(t *testing.T) {
 	// We expect 6 records. 4 SRV records. 2 POD records.
 	assertDNSForHeadlessService(t, kd, endpoints)
 	assertSRVForHeadlessService(t, kd, service, endpoints)
+	assertReverseDNSForHeadlessService(t, kd, endpoints)
 
 	kd.removeService(service)
 	assertNoDNSForHeadlessService(t, kd, service)
+	assertNoReverseDNSForHeadlessService(t, kd, endpoints)
 }
 
 func TestHeadlessServiceEndpointsUpdate(t *testing.T) {
@@ -332,15 +337,18 @@ func TestHeadlessServiceEndpointsUpdate(t *testing.T) {
 	// expected DNSRecords = 4
 	kd.handleEndpointAdd(endpoints)
 	assertDNSForHeadlessService(t, kd, endpoints)
+	assertReverseDNSForHeadlessService(t, kd, endpoints)
 
 	// remove all endpoints
 	endpoints.Subsets = []kapi.EndpointSubset{}
 	kd.handleEndpointAdd(endpoints)
 	assertNoDNSForHeadlessService(t, kd, service)
+	assertNoReverseDNSForHeadlessService(t, kd, endpoints)
 
 	// remove service
 	kd.removeService(service)
 	assertNoDNSForHeadlessService(t, kd, service)
+	assertNoReverseDNSForHeadlessService(t, kd, endpoints)
 }
 
 func TestHeadlessServiceWithDelayedEndpointsAddition(t *testing.T) {
@@ -354,6 +362,7 @@ func TestHeadlessServiceWithDelayedEndpointsAddition(t *testing.T) {
 	// add service
 	kd.newService(service)
 	assertNoDNSForHeadlessService(t, kd, service)
+	assertNoReverseDNSForHeadlessService(t, kd, endpoints)
 
 	// create endpoints
 	endpoints := newEndpoints(service, newSubsetWithOnePort("", 80, "10.0.0.1", "10.0.0.2"))
@@ -365,10 +374,12 @@ func TestHeadlessServiceWithDelayedEndpointsAddition(t *testing.T) {
 	kd.handleEndpointAdd(endpoints)
 
 	assertDNSForHeadlessService(t, kd, endpoints)
+	assertReverseDNSForHeadlessService(t, kd, endpoints)
 
 	// remove service
 	kd.removeService(service)
 	assertNoDNSForHeadlessService(t, kd, service)
+	assertReverseDNSForHeadlessService(t, kd, endpoints)
 }
 
 // Verifies that a single record with host "a" is returned for query "q".
@@ -663,6 +674,23 @@ func assertDNSForHeadlessService(t *testing.T, kd *KubeDNS, e *kapi.Endpoints) {
 	for _, record := range records {
 		_, found := endpoints[record.Host]
 		assert.True(t, found)
+	}
+}
+
+func assertReverseDNSForHeadlessService(t *testing.T, kd *KubeDNS, e *kapi.Endpoints) {
+	for _, subset := range e.Subsets {
+		for _, endpointAddress := range subset.Addresses {
+			record := kd.reverseRecordMap[endpointAddress.IP]
+			assert.Equal(t, record.Host, getEndpointsFQDN(kd, e))
+		}
+	}
+}
+
+func assertNoReverseDNSForHeadlessService(t *testing.T, kd *KubeDNS, e *kapi.Endpoints) {
+	for _, subset := range e.Subsets {
+		for _, endpointAddress := range subset.Addresses {
+			assert.Nil(t, kd.reverseRecordMap[endpointAddress.IP])
+		}
 	}
 }
 
