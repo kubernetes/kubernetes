@@ -383,7 +383,9 @@ var _ = framework.KubeDescribe("Density", func() {
 		// Verify scheduler metrics.
 		// TODO: Reset metrics at the beginning of the test.
 		// We should do something similar to how we do it for APIserver.
-		framework.ExpectNoError(framework.VerifySchedulerLatency(c))
+		if err = framework.VerifySchedulerLatency(c); err != nil {
+			framework.Logf("Warning: Scheduler latency not calculated, %v", err)
+		}
 	})
 
 	// Explicitly put here, to delete namespace at the end of the test
