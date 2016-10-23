@@ -51,7 +51,7 @@ type petSets struct {
 }
 
 // newPetSets returns a PetSets
-func newPetSets(c *AppsClient, namespace string) *petSets {
+func newPetSets(c *AppsV1alpha1Client, namespace string) *petSets {
 	return &petSets{
 		client: c.RESTClient(),
 		ns:     namespace,

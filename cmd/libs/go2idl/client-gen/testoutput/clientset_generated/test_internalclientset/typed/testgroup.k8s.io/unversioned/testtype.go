@@ -50,7 +50,7 @@ type testTypes struct {
 }
 
 // newTestTypes returns a TestTypes
-func newTestTypes(c *TestgroupClient, namespace string) *testTypes {
+func newTestTypes(c *TestgroupUnversionedClient, namespace string) *testTypes {
 	return &testTypes{
 		client: c.RESTClient(),
 		ns:     namespace,

@@ -28,7 +28,7 @@ import (
 
 // FakeStorageClasses implements StorageClassInterface
 type FakeStorageClasses struct {
-	Fake *FakeStorage
+	Fake *FakeStorageV1beta1
 }
 
 var storageclassesResource = unversioned.GroupVersionResource{Group: "storage.k8s.io", Version: "v1beta1", Resource: "storageclasses"}

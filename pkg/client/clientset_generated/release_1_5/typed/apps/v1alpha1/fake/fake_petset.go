@@ -28,7 +28,7 @@ import (
 
 // FakePetSets implements PetSetInterface
 type FakePetSets struct {
-	Fake *FakeApps
+	Fake *FakeAppsV1alpha1
 	ns   string
 }
 

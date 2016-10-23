@@ -53,7 +53,7 @@ type Interface interface {
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	*v1core.CoreClient
+	*v1core.CoreUnversionedClient
 	*v1alpha1apps.AppsClient
 	*v1beta1authentication.AuthenticationClient
 	*v1beta1authorization.AuthorizationClient
@@ -66,12 +66,12 @@ type Clientset struct {
 	*v1beta1storage.StorageClient
 }
 
-// Core retrieves the CoreClient
+// Core retrieves the CoreUnversionedClient
 func (c *Clientset) Core() v1core.CoreInterface {
 	if c == nil {
 		return nil
 	}
-	return c.CoreClient
+	return c.CoreUnversionedClient
 }
 
 // Apps retrieves the AppsClient
@@ -167,7 +167,7 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	}
 	var clientset Clientset
 	var err error
-	clientset.CoreClient, err = v1core.NewForConfig(&configShallowCopy)
+	clientset.CoreUnversionedClient, err = v1core.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +224,7 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *restclient.Config) *Clientset {
 	var clientset Clientset
-	clientset.CoreClient = v1core.NewForConfigOrDie(c)
+	clientset.CoreUnversionedClient = v1core.NewForConfigOrDie(c)
 	clientset.AppsClient = v1alpha1apps.NewForConfigOrDie(c)
 	clientset.AuthenticationClient = v1beta1authentication.NewForConfigOrDie(c)
 	clientset.AuthorizationClient = v1beta1authorization.NewForConfigOrDie(c)
@@ -243,7 +243,7 @@ func NewForConfigOrDie(c *restclient.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c *restclient.RESTClient) *Clientset {
 	var clientset Clientset
-	clientset.CoreClient = v1core.New(c)
+	clientset.CoreUnversionedClient = v1core.New(c)
 	clientset.AppsClient = v1alpha1apps.New(c)
 	clientset.AuthenticationClient = v1beta1authentication.New(c)
 	clientset.AuthorizationClient = v1beta1authorization.New(c)

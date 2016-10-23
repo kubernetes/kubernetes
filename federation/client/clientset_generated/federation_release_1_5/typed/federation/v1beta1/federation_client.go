@@ -17,28 +17,30 @@ limitations under the License.
 package v1beta1
 
 import (
+	fmt "fmt"
 	api "k8s.io/kubernetes/pkg/api"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	registered "k8s.io/kubernetes/pkg/apimachinery/registered"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	serializer "k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
-type FederationInterface interface {
+type FederationV1beta1Interface interface {
 	RESTClient() restclient.Interface
 	ClustersGetter
 }
 
-// FederationClient is used to interact with features provided by the Federation group.
-type FederationClient struct {
+// FederationV1beta1Client is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
+type FederationV1beta1Client struct {
 	restClient restclient.Interface
 }
 
-func (c *FederationClient) Clusters() ClusterInterface {
+func (c *FederationV1beta1Client) Clusters() ClusterInterface {
 	return newClusters(c)
 }
 
-// NewForConfig creates a new FederationClient for the given config.
-func NewForConfig(c *restclient.Config) (*FederationClient, error) {
+// NewForConfig creates a new FederationV1beta1Client for the given config.
+func NewForConfig(c *restclient.Config) (*FederationV1beta1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -47,12 +49,12 @@ func NewForConfig(c *restclient.Config) (*FederationClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &FederationClient{client}, nil
+	return &FederationV1beta1Client{client}, nil
 }
 
-// NewForConfigOrDie creates a new FederationClient for the given config and
+// NewForConfigOrDie creates a new FederationV1beta1Client for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *FederationClient {
+func NewForConfigOrDie(c *restclient.Config) *FederationV1beta1Client {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -60,26 +62,26 @@ func NewForConfigOrDie(c *restclient.Config) *FederationClient {
 	return client
 }
 
-// New creates a new FederationClient for the given RESTClient.
-func New(c restclient.Interface) *FederationClient {
-	return &FederationClient{c}
+// New creates a new FederationV1beta1Client for the given RESTClient.
+func New(c restclient.Interface) *FederationV1beta1Client {
+	return &FederationV1beta1Client{c}
 }
 
 func setConfigDefaults(config *restclient.Config) error {
-	// if federation group is not registered, return an error
-	g, err := registered.Group("federation")
+	gv, err := unversioned.ParseGroupVersion("federation/v1beta1")
 	if err != nil {
 		return err
+	}
+	// if federation/v1beta1 is not enabled, return an error
+	if !registered.IsEnabledVersion(gv) {
+		return fmt.Errorf("federation/v1beta1 is not enabled")
 	}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = restclient.DefaultKubernetesUserAgent()
 	}
-	// TODO: Unconditionally set the config.Version, until we fix the config.
-	//if config.Version == "" {
-	copyGroupVersion := g.GroupVersion
+	copyGroupVersion := gv
 	config.GroupVersion = &copyGroupVersion
-	//}
 
 	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
 
@@ -88,7 +90,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FederationClient) RESTClient() restclient.Interface {
+func (c *FederationV1beta1Client) RESTClient() restclient.Interface {
 	if c == nil {
 		return nil
 	}

@@ -51,7 +51,7 @@ type podDisruptionBudgets struct {
 }
 
 // newPodDisruptionBudgets returns a PodDisruptionBudgets
-func newPodDisruptionBudgets(c *PolicyClient, namespace string) *podDisruptionBudgets {
+func newPodDisruptionBudgets(c *PolicyV1alpha1Client, namespace string) *podDisruptionBudgets {
 	return &podDisruptionBudgets{
 		client: c.RESTClient(),
 		ns:     namespace,

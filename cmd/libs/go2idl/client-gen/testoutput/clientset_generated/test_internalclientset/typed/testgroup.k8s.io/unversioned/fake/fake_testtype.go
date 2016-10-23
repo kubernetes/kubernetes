@@ -27,7 +27,7 @@ import (
 
 // FakeTestTypes implements TestTypeInterface
 type FakeTestTypes struct {
-	Fake *FakeTestgroup
+	Fake *FakeTestgroupUnversioned
 	ns   string
 }
 

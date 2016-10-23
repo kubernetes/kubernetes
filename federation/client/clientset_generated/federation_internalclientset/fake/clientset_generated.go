@@ -18,12 +18,12 @@ package fake
 
 import (
 	clientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
-	unversionedcore "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/core/unversioned"
-	fakeunversionedcore "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/core/unversioned/fake"
-	unversionedextensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/extensions/unversioned"
-	fakeunversionedextensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/extensions/unversioned/fake"
-	unversionedfederation "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/unversioned"
-	fakeunversionedfederation "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/unversioned/fake"
+	internalversioncore "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/core/internalversion"
+	fakeinternalversioncore "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/core/internalversion/fake"
+	internalversionextensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/extensions/internalversion"
+	fakeinternalversionextensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/extensions/internalversion/fake"
+	internalversionfederation "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/internalversion"
+	fakeinternalversionfederation "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/internalversion/fake"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/testing/core"
@@ -66,17 +66,32 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 
 var _ clientset.Interface = &Clientset{}
 
-// Federation retrieves the FederationClient
-func (c *Clientset) Federation() unversionedfederation.FederationInterface {
-	return &fakeunversionedfederation.FakeFederation{Fake: &c.Fake}
+// CoreInternalversion retrieves the CoreInternalversionClient
+func (c *Clientset) CoreInternalversion() internalversioncore.CoreInternalversionInterface {
+	return &fakeinternalversioncore.FakeCoreInternalversion{Fake: &c.Fake}
 }
 
-// Core retrieves the CoreClient
-func (c *Clientset) Core() unversionedcore.CoreInterface {
-	return &fakeunversionedcore.FakeCore{Fake: &c.Fake}
+// Core retrieves the CoreInternalversionClient
+func (c *Clientset) Core() internalversioncore.CoreInternalversionInterface {
+	return &fakeinternalversioncore.FakeCoreInternalversion{Fake: &c.Fake}
 }
 
-// Extensions retrieves the ExtensionsClient
-func (c *Clientset) Extensions() unversionedextensions.ExtensionsInterface {
-	return &fakeunversionedextensions.FakeExtensions{Fake: &c.Fake}
+// ExtensionsInternalversion retrieves the ExtensionsInternalversionClient
+func (c *Clientset) ExtensionsInternalversion() internalversionextensions.ExtensionsInternalversionInterface {
+	return &fakeinternalversionextensions.FakeExtensionsInternalversion{Fake: &c.Fake}
+}
+
+// Extensions retrieves the ExtensionsInternalversionClient
+func (c *Clientset) Extensions() internalversionextensions.ExtensionsInternalversionInterface {
+	return &fakeinternalversionextensions.FakeExtensionsInternalversion{Fake: &c.Fake}
+}
+
+// FederationInternalversion retrieves the FederationInternalversionClient
+func (c *Clientset) FederationInternalversion() internalversionfederation.FederationInternalversionInterface {
+	return &fakeinternalversionfederation.FakeFederationInternalversion{Fake: &c.Fake}
+}
+
+// Federation retrieves the FederationInternalversionClient
+func (c *Clientset) Federation() internalversionfederation.FederationInternalversionInterface {
+	return &fakeinternalversionfederation.FakeFederationInternalversion{Fake: &c.Fake}
 }

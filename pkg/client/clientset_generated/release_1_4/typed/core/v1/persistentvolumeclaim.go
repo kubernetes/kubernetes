@@ -44,12 +44,12 @@ type PersistentVolumeClaimInterface interface {
 
 // persistentVolumeClaims implements PersistentVolumeClaimInterface
 type persistentVolumeClaims struct {
-	client *CoreClient
+	client *CoreUnversionedClient
 	ns     string
 }
 
 // newPersistentVolumeClaims returns a PersistentVolumeClaims
-func newPersistentVolumeClaims(c *CoreClient, namespace string) *persistentVolumeClaims {
+func newPersistentVolumeClaims(c *CoreUnversionedClient, namespace string) *persistentVolumeClaims {
 	return &persistentVolumeClaims{
 		client: c,
 		ns:     namespace,

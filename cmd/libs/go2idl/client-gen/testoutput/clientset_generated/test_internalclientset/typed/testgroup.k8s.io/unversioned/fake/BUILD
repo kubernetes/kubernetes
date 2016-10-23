@@ -21,7 +21,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//cmd/libs/go2idl/client-gen/test_apis/testgroup.k8s.io:go_default_library",
-        "//cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup.k8s.io/unversioned:go_default_library",
+        "//cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup.k8s.io/internalversion:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/unversioned:go_default_library",
         "//pkg/client/restclient:go_default_library",

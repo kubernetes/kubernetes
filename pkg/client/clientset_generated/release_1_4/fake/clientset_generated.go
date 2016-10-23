@@ -82,7 +82,7 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 
 var _ clientset.Interface = &Clientset{}
 
-// Core retrieves the CoreClient
+// Core retrieves the CoreUnversionedClient
 func (c *Clientset) Core() v1core.CoreInterface {
 	return &fakev1core.FakeCore{Fake: &c.Fake}
 }

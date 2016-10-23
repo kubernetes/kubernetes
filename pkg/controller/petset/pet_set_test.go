@@ -26,8 +26,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/client/cache"
 	fake_internal "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/unversioned"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/unversioned/fake"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion/fake"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/errors"
 )

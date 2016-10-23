@@ -22,22 +22,22 @@ import (
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
-type TestgroupInterface interface {
+type TestgroupUnversionedInterface interface {
 	RESTClient() restclient.Interface
 	TestTypesGetter
 }
 
-// TestgroupClient is used to interact with features provided by the Testgroup group.
-type TestgroupClient struct {
+// TestgroupUnversionedClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
+type TestgroupUnversionedClient struct {
 	restClient restclient.Interface
 }
 
-func (c *TestgroupClient) TestTypes(namespace string) TestTypeInterface {
+func (c *TestgroupUnversionedClient) TestTypes(namespace string) TestTypeInterface {
 	return newTestTypes(c, namespace)
 }
 
-// NewForConfig creates a new TestgroupClient for the given config.
-func NewForConfig(c *restclient.Config) (*TestgroupClient, error) {
+// NewForConfig creates a new TestgroupUnversionedClient for the given config.
+func NewForConfig(c *restclient.Config) (*TestgroupUnversionedClient, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -46,12 +46,12 @@ func NewForConfig(c *restclient.Config) (*TestgroupClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &TestgroupClient{client}, nil
+	return &TestgroupUnversionedClient{client}, nil
 }
 
-// NewForConfigOrDie creates a new TestgroupClient for the given config and
+// NewForConfigOrDie creates a new TestgroupUnversionedClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *TestgroupClient {
+func NewForConfigOrDie(c *restclient.Config) *TestgroupUnversionedClient {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -59,9 +59,9 @@ func NewForConfigOrDie(c *restclient.Config) *TestgroupClient {
 	return client
 }
 
-// New creates a new TestgroupClient for the given RESTClient.
-func New(c restclient.Interface) *TestgroupClient {
-	return &TestgroupClient{c}
+// New creates a new TestgroupUnversionedClient for the given RESTClient.
+func New(c restclient.Interface) *TestgroupUnversionedClient {
+	return &TestgroupUnversionedClient{c}
 }
 
 func setConfigDefaults(config *restclient.Config) error {
@@ -91,7 +91,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *TestgroupClient) RESTClient() restclient.Interface {
+func (c *TestgroupUnversionedClient) RESTClient() restclient.Interface {
 	if c == nil {
 		return nil
 	}

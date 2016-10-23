@@ -59,7 +59,7 @@ go_library(
         "//pkg/apis/storage/install:go_default_library",
         "//pkg/apis/storage/v1beta1:go_default_library",
         "//pkg/apiserver:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset/typed/core/unversioned:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/genericapiserver:go_default_library",
         "//pkg/healthz:go_default_library",
         "//pkg/kubelet/client:go_default_library",

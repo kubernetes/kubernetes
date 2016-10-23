@@ -17,13 +17,15 @@ limitations under the License.
 package v1alpha1
 
 import (
+	fmt "fmt"
 	api "k8s.io/kubernetes/pkg/api"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	registered "k8s.io/kubernetes/pkg/apimachinery/registered"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	serializer "k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
-type RbacInterface interface {
+type RbacV1alpha1Interface interface {
 	RESTClient() restclient.Interface
 	ClusterRolesGetter
 	ClusterRoleBindingsGetter
@@ -31,29 +33,29 @@ type RbacInterface interface {
 	RoleBindingsGetter
 }
 
-// RbacClient is used to interact with features provided by the Rbac group.
-type RbacClient struct {
+// RbacV1alpha1Client is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
+type RbacV1alpha1Client struct {
 	restClient restclient.Interface
 }
 
-func (c *RbacClient) ClusterRoles() ClusterRoleInterface {
+func (c *RbacV1alpha1Client) ClusterRoles() ClusterRoleInterface {
 	return newClusterRoles(c)
 }
 
-func (c *RbacClient) ClusterRoleBindings() ClusterRoleBindingInterface {
+func (c *RbacV1alpha1Client) ClusterRoleBindings() ClusterRoleBindingInterface {
 	return newClusterRoleBindings(c)
 }
 
-func (c *RbacClient) Roles(namespace string) RoleInterface {
+func (c *RbacV1alpha1Client) Roles(namespace string) RoleInterface {
 	return newRoles(c, namespace)
 }
 
-func (c *RbacClient) RoleBindings(namespace string) RoleBindingInterface {
+func (c *RbacV1alpha1Client) RoleBindings(namespace string) RoleBindingInterface {
 	return newRoleBindings(c, namespace)
 }
 
-// NewForConfig creates a new RbacClient for the given config.
-func NewForConfig(c *restclient.Config) (*RbacClient, error) {
+// NewForConfig creates a new RbacV1alpha1Client for the given config.
+func NewForConfig(c *restclient.Config) (*RbacV1alpha1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -62,12 +64,12 @@ func NewForConfig(c *restclient.Config) (*RbacClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &RbacClient{client}, nil
+	return &RbacV1alpha1Client{client}, nil
 }
 
-// NewForConfigOrDie creates a new RbacClient for the given config and
+// NewForConfigOrDie creates a new RbacV1alpha1Client for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *RbacClient {
+func NewForConfigOrDie(c *restclient.Config) *RbacV1alpha1Client {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -75,26 +77,26 @@ func NewForConfigOrDie(c *restclient.Config) *RbacClient {
 	return client
 }
 
-// New creates a new RbacClient for the given RESTClient.
-func New(c restclient.Interface) *RbacClient {
-	return &RbacClient{c}
+// New creates a new RbacV1alpha1Client for the given RESTClient.
+func New(c restclient.Interface) *RbacV1alpha1Client {
+	return &RbacV1alpha1Client{c}
 }
 
 func setConfigDefaults(config *restclient.Config) error {
-	// if rbac group is not registered, return an error
-	g, err := registered.Group("rbac.authorization.k8s.io")
+	gv, err := unversioned.ParseGroupVersion("rbac.authorization.k8s.io/v1alpha1")
 	if err != nil {
 		return err
+	}
+	// if rbac.authorization.k8s.io/v1alpha1 is not enabled, return an error
+	if !registered.IsEnabledVersion(gv) {
+		return fmt.Errorf("rbac.authorization.k8s.io/v1alpha1 is not enabled")
 	}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = restclient.DefaultKubernetesUserAgent()
 	}
-	// TODO: Unconditionally set the config.Version, until we fix the config.
-	//if config.Version == "" {
-	copyGroupVersion := g.GroupVersion
+	copyGroupVersion := gv
 	config.GroupVersion = &copyGroupVersion
-	//}
 
 	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
 
@@ -103,7 +105,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *RbacClient) RESTClient() restclient.Interface {
+func (c *RbacV1alpha1Client) RESTClient() restclient.Interface {
 	if c == nil {
 		return nil
 	}

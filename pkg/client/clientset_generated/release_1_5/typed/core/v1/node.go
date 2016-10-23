@@ -49,7 +49,7 @@ type nodes struct {
 }
 
 // newNodes returns a Nodes
-func newNodes(c *CoreClient) *nodes {
+func newNodes(c *CoreV1Client) *nodes {
 	return &nodes{
 		client: c.RESTClient(),
 	}

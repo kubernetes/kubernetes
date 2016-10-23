@@ -520,7 +520,7 @@ k8s.io/kubernetes/cmd/kube-proxy/app,luxas,1
 k8s.io/kubernetes/cmd/kubelet/app,hurf,1
 k8s.io/kubernetes/cmd/kubernetes-discovery/discoverysummarizer,thockin,1
 k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset,bgrant0607,1
-k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup.k8s.io/unversioned,eparis,1
+k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup.k8s.io/internalversion,eparis,1
 k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/testgroup/unversioned,wojtek-t,1
 k8s.io/kubernetes/cmd/libs/go2idl/deepcopy-gen/generators,mwielgus,1
 k8s.io/kubernetes/cmd/libs/go2idl/generator,ixdy,1

@@ -19,7 +19,7 @@ go_library(
         "//pkg/api/resource:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset/typed/core/unversioned:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/util/workqueue:go_default_library",

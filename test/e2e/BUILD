@@ -123,7 +123,7 @@ go_library(
         "//pkg/apis/storage/util:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset/typed/core/unversioned:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/client/clientset_generated/release_1_5:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/transport:go_default_library",

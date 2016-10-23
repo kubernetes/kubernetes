@@ -44,11 +44,11 @@ type PersistentVolumeInterface interface {
 
 // persistentVolumes implements PersistentVolumeInterface
 type persistentVolumes struct {
-	client *CoreClient
+	client *CoreUnversionedClient
 }
 
 // newPersistentVolumes returns a PersistentVolumes
-func newPersistentVolumes(c *CoreClient) *persistentVolumes {
+func newPersistentVolumes(c *CoreUnversionedClient) *persistentVolumes {
 	return &persistentVolumes{
 		client: c,
 	}

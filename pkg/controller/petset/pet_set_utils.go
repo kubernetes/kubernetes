@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/client/cache"
-	appsclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/unversioned"
+	appsclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
 	"k8s.io/kubernetes/pkg/controller"
 
 	"github.com/golang/glog"

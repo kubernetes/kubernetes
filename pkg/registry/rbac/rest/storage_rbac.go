@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	rbacapiv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	rbacvalidation "k8s.io/kubernetes/pkg/apis/rbac/validation"
-	rbacclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/unversioned"
+	rbacclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/registry/rbac/clusterrole"
 	clusterroleetcd "k8s.io/kubernetes/pkg/registry/rbac/clusterrole/etcd"
