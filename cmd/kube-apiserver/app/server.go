@@ -85,7 +85,7 @@ func Run(s *options.APIServer) error {
 	genericapiserver.DefaultAndValidateRunOptions(s.ServerRunOptions)
 	genericConfig := genericapiserver.NewConfig(). // create the new config
 							ApplyOptions(s.ServerRunOptions). // apply the options selected
-							Complete()                        // set default values based on the known values
+							SkipComplete()                        // call Complete() after all customizations of the config have been done
 
 	if err := genericConfig.MaybeGenerateServingCerts(); err != nil {
 		glog.Fatalf("Failed to generate service certificate: %v", err)
