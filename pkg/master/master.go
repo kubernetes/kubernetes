@@ -164,7 +164,11 @@ func (c completedConfig) New() (*Master, error) {
 		return nil, fmt.Errorf("Master.New() called with empty config.KubeletClientConfig")
 	}
 
-	s, err := c.Config.GenericConfig.SkipComplete().New() // completion is done in Complete, no need for a second time
+	completedGenericConfig := c.Config.GenericConfig.SkipComplete() // completion is done in Complete, no need for a second time
+	if err := completedGenericConfig.MaybeGenerateServingCerts(); err != nil {
+		return nil, fmt.Errorf("Failed to generate service certificate: %v", err)
+	}
+	s, err := completedGenericConfig.New()
 	if err != nil {
 		return nil, err
 	}
