@@ -23,7 +23,6 @@ package mock_network
 import (
 	gomock "github.com/golang/mock/gomock"
 	componentconfig "k8s.io/kubernetes/pkg/apis/componentconfig"
-	container "k8s.io/kubernetes/pkg/kubelet/container"
 	network "k8s.io/kubernetes/pkg/kubelet/network"
 	sets "k8s.io/kubernetes/pkg/util/sets"
 )
@@ -67,7 +66,7 @@ func (_mr *_MockNetworkPluginRecorder) Event(arg0, arg1 interface{}) *gomock.Cal
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Event", arg0, arg1)
 }
 
-func (_m *MockNetworkPlugin) GetPodNetworkStatus(_param0 string, _param1 string, _param2 container.ContainerID) (*network.PodNetworkStatus, error) {
+func (_m *MockNetworkPlugin) GetPodNetworkStatus(_param0 string, _param1 string, _param2 string) (*network.PodNetworkStatus, error) {
 	ret := _m.ctrl.Call(_m, "GetPodNetworkStatus", _param0, _param1, _param2)
 	ret0, _ := ret[0].(*network.PodNetworkStatus)
 	ret1, _ := ret[1].(error)
@@ -98,7 +97,7 @@ func (_mr *_MockNetworkPluginRecorder) Name() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Name")
 }
 
-func (_m *MockNetworkPlugin) SetUpPod(_param0 string, _param1 string, _param2 container.ContainerID) error {
+func (_m *MockNetworkPlugin) SetUpPod(_param0 string, _param1 string, _param2 string) error {
 	ret := _m.ctrl.Call(_m, "SetUpPod", _param0, _param1, _param2)
 	ret0, _ := ret[0].(error)
 	return ret0
@@ -118,7 +117,7 @@ func (_mr *_MockNetworkPluginRecorder) Status() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Status")
 }
 
-func (_m *MockNetworkPlugin) TearDownPod(_param0 string, _param1 string, _param2 container.ContainerID) error {
+func (_m *MockNetworkPlugin) TearDownPod(_param0 string, _param1 string, _param2 string) error {
 	ret := _m.ctrl.Call(_m, "TearDownPod", _param0, _param1, _param2)
 	ret0, _ := ret[0].(error)
 	return ret0

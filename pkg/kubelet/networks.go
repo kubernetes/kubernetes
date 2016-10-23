@@ -17,9 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
 )
 
 // This just exports required functions from kubelet proper, for use by network
@@ -28,14 +26,14 @@ type networkHost struct {
 	kubelet *Kubelet
 }
 
-func (nh *networkHost) GetPodByName(name, namespace string) (*api.Pod, bool) {
-	return nh.kubelet.GetPodByName(name, namespace)
+func (nh *networkHost) GetPodSandboxNetNS(podSandboxID string) (string, error) {
+	return nh.kubelet.GetPodSandboxNetNS(podSandboxID)
 }
 
-func (nh *networkHost) GetKubeClient() clientset.Interface {
-	return nh.kubelet.kubeClient
+func (nh *networkHost) GetPodHostportMapping() ([]*hostport.PodPortMapping, error) {
+	return nh.kubelet.GetPodHostportMapping()
 }
 
-func (nh *networkHost) GetRuntime() kubecontainer.Runtime {
-	return nh.kubelet.GetRuntime()
+func (nh *networkHost) GetPodAnnotations(namespace, name, podSandboxID string) (map[string]string, error) {
+	return nh.kubelet.GetPodAnnotations(namespace, name, podSandboxID)
 }

@@ -24,9 +24,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"net"
 )
 
 // createPodSandbox creates a pod sandbox and returns (podSandBoxID, message, error).
@@ -169,28 +169,15 @@ func (m *kubeGenericRuntimeManager) getKubeletSandboxes(all bool) ([]*runtimeApi
 }
 
 // determinePodSandboxIP determines the IP address of the given pod sandbox.
-// TODO: remove determinePodSandboxIP after networking is delegated to the container runtime.
-func (m *kubeGenericRuntimeManager) determinePodSandboxIP(podNamespace, podName string, podSandbox *runtimeApi.PodSandboxStatus) string {
+func (m *kubeGenericRuntimeManager) determinePodSandboxIP(podSandbox *runtimeApi.PodSandboxStatus) (string, error) {
 	ip := ""
-
 	if podSandbox.Network != nil {
 		ip = podSandbox.Network.GetIp()
 	}
-
-	if m.networkPlugin.Name() != network.DefaultPluginName {
-		// TODO: podInfraContainerID in GetPodNetworkStatus() interface should be renamed to sandboxID
-		netStatus, err := m.networkPlugin.GetPodNetworkStatus(podNamespace, podName, kubecontainer.ContainerID{
-			Type: m.runtimeName,
-			ID:   podSandbox.GetId(),
-		})
-		if err != nil {
-			glog.Errorf("NetworkPlugin %s failed on the status hook for pod '%s' - %v", m.networkPlugin.Name(), kubecontainer.BuildPodFullName(podName, podNamespace), err)
-		} else if netStatus != nil {
-			ip = netStatus.IP.String()
-		}
+	if net.ParseIP(ip) == nil {
+		return "", fmt.Errorf("Failed to retrieve IP from podSandboxStatus")
 	}
-
-	return ip
+	return ip, nil
 }
 
 // getPodSandboxID gets the sandbox id by podUID and returns ([]sandboxID, error).

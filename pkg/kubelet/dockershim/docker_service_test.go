@@ -20,11 +20,12 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/util/clock"
 )
 
 func newTestDockerService() (*dockerService, *dockertools.FakeDockerClient, *clock.FakeClock) {
 	fakeClock := clock.NewFakeClock(time.Time{})
 	c := dockertools.NewFakeDockerClientWithClock(fakeClock)
-	return &dockerService{client: c}, c, fakeClock
+	return &dockerService{client: c, networkPlugin: &network.NoopNetworkPlugin{}}, c, fakeClock
 }

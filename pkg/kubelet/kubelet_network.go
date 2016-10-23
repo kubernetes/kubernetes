@@ -211,6 +211,10 @@ func (kl *Kubelet) updatePodCIDR(cidr string) {
 		details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = cidr
 		kl.networkPlugin.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, details)
 	}
+
+	if err := kl.GetRuntime().UpdatePodCIDR(cidr); err != nil {
+		glog.Errorf("Failed to update pod cidr in runtime: %v", err)
+	}
 }
 
 // shapingEnabled returns whether traffic shaping is enabled.

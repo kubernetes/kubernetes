@@ -21,10 +21,12 @@ import (
 	"io"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	internalApi "k8s.io/kubernetes/pkg/kubelet/api"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/util/term"
 )
 
@@ -54,12 +56,20 @@ const (
 var internalLabelKeys []string = []string{containerTypeLabelKey, sandboxIDLabelKey}
 
 // NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
-func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot string, podSandboxImage string) DockerLegacyService {
-	return &dockerService{
+func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot string, podSandboxImage string, networkPlugin network.NetworkPlugin, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) (DockerLegacyService, error) {
+	ds := &dockerService{
 		seccompProfileRoot: seccompProfileRoot,
 		client:             dockertools.NewInstrumentedDockerInterface(client),
 		podSandboxImage:    podSandboxImage,
 	}
+
+	// TODO: include probing and selection of network plugin here or in the dockershim server wrapper
+	err := networkPlugin.Init(&DockerNetworkHost{ds: ds}, hairpinMode, nonMasqueradeCIDR, mtu)
+	if err != nil {
+		return nil, err
+	}
+	ds.networkPlugin = networkPlugin
+	return ds, nil
 }
 
 // DockerLegacyService is an interface that embeds both the new
@@ -82,6 +92,7 @@ type dockerService struct {
 	seccompProfileRoot string
 	client             dockertools.DockerInterface
 	podSandboxImage    string
+	networkPlugin      network.NetworkPlugin
 }
 
 // Version returns the runtime name, runtime version and runtime API version
@@ -104,5 +115,10 @@ func (ds *dockerService) Version(_ string) (*runtimeApi.VersionResponse, error) 
 }
 
 func (ds *dockerService) UpdateRuntimeConfig(runtimeConfig *runtimeApi.RuntimeConfig) error {
+	if ds.networkPlugin != nil && runtimeConfig.NetworkConfig.PodCidr != nil {
+		details := make(map[string]interface{})
+		details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = *runtimeConfig.NetworkConfig.PodCidr
+		ds.networkPlugin.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, details)
+	}
 	return nil
 }

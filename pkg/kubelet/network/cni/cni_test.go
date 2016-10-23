@@ -29,16 +29,13 @@ import (
 	"testing"
 	"text/template"
 
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	"github.com/stretchr/testify/mock"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/cni/testing"
+	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
@@ -111,33 +108,6 @@ func tearDownPlugin(tmpDir string) {
 	}
 }
 
-type fakeNetworkHost struct {
-	kubeClient clientset.Interface
-	runtime    kubecontainer.Runtime
-}
-
-func NewFakeHost(kubeClient clientset.Interface, pods []*containertest.FakePod) *fakeNetworkHost {
-	host := &fakeNetworkHost{
-		kubeClient: kubeClient,
-		runtime: &containertest.FakeRuntime{
-			AllPodList: pods,
-		},
-	}
-	return host
-}
-
-func (fnh *fakeNetworkHost) GetPodByName(name, namespace string) (*api.Pod, bool) {
-	return nil, false
-}
-
-func (fnh *fakeNetworkHost) GetKubeClient() clientset.Interface {
-	return fnh.kubeClient
-}
-
-func (fnh *fakeNetworkHost) GetRuntime() kubecontainer.Runtime {
-	return fnh.runtime
-}
-
 func TestCNIPlugin(t *testing.T) {
 	// install some random plugin
 	pluginName := fmt.Sprintf("test%d", rand.Intn(1000))
@@ -174,14 +144,9 @@ func TestCNIPlugin(t *testing.T) {
 	installPluginUnderTest(t, testVendorCNIDirPrefix, testNetworkConfigPath, vendorName, pluginName)
 
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "test_infra_container"}
-	pods := []*containertest.FakePod{{
-		Pod: &kubecontainer.Pod{
-			Containers: []*kubecontainer.Container{
-				{ID: containerID},
-			},
-		},
-		NetnsPath: "/proc/12345/ns/net",
-	}}
+	netNSMap := map[string]string{
+		containerID.ID: "/proc/12345/ns/net",
+	}
 
 	plugins := probeNetworkPluginsWithVendorCNIDirPrefix(path.Join(testNetworkConfigPath, pluginName), "", testVendorCNIDirPrefix)
 	if len(plugins) != 1 {
@@ -200,13 +165,13 @@ func TestCNIPlugin(t *testing.T) {
 
 	mockLoCNI.On("AddNetwork", cniPlugin.loNetwork.NetworkConfig, mock.AnythingOfType("*libcni.RuntimeConf")).Return(&cnitypes.Result{IP4: &cnitypes.IPConfig{IP: net.IPNet{IP: []byte{127, 0, 0, 1}}}}, nil)
 
-	plug, err := network.InitNetworkPlugin(plugins, "cni", NewFakeHost(nil, pods), componentconfig.HairpinNone, "10.0.0.0/8", network.UseDefaultMTU)
+	plug, err := network.InitNetworkPlugin(plugins, "cni", nettest.NewFakeHost(netNSMap, nil, nil), componentconfig.HairpinNone, "10.0.0.0/8", network.UseDefaultMTU)
 	if err != nil {
 		t.Fatalf("Failed to select the desired plugin: %v", err)
 	}
 
 	// Set up the pod
-	err = plug.SetUpPod("podNamespace", "podName", containerID)
+	err = plug.SetUpPod("podNamespace", "podName", containerID.ID)
 	if err != nil {
 		t.Errorf("Expected nil: %v", err)
 	}
@@ -223,7 +188,7 @@ func TestCNIPlugin(t *testing.T) {
 	}
 
 	// Get its IP address
-	status, err := plug.GetPodNetworkStatus("podNamespace", "podName", containerID)
+	status, err := plug.GetPodNetworkStatus("podNamespace", "podName", containerID.ID)
 	if err != nil {
 		t.Errorf("Failed to read pod network status: %v", err)
 	}
@@ -232,7 +197,7 @@ func TestCNIPlugin(t *testing.T) {
 	}
 
 	// Tear it down
-	err = plug.TearDownPod("podNamespace", "podName", containerID)
+	err = plug.TearDownPod("podNamespace", "podName", containerID.ID)
 	if err != nil {
 		t.Errorf("Expected nil: %v", err)
 	}

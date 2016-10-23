@@ -23,7 +23,6 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
 
@@ -61,32 +60,30 @@ func TestOpenPodHostports(t *testing.T) {
 	}
 
 	tests := []struct {
-		pod     *api.Pod
-		ip      string
+		mapping *PodPortMapping
 		matches []*ruleMatch
 	}{
 		// New pod that we are going to add
 		{
-			&api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Name:      "test-pod",
-					Namespace: api.NamespaceDefault,
-				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{{
-						Ports: []api.ContainerPort{{
-							HostPort:      4567,
-							ContainerPort: 80,
-							Protocol:      api.ProtocolTCP,
-						}, {
-							HostPort:      5678,
-							ContainerPort: 81,
-							Protocol:      api.ProtocolUDP,
-						}},
-					}},
+			&PodPortMapping{
+				Name:         "test-pod",
+				Namespace:    api.NamespaceDefault,
+				IP:           net.ParseIP("10.1.1.2"),
+				HostNetwork:  false,
+				PodSandboxID: "id1",
+				PortMappings: []PortMapping{
+					{
+						HostPort:      4567,
+						ContainerPort: 80,
+						Protocol:      api.ProtocolTCP,
+					},
+					{
+						HostPort:      5678,
+						ContainerPort: 81,
+						Protocol:      api.ProtocolUDP,
+					},
 				},
 			},
-			"10.1.1.2",
 			[]*ruleMatch{
 				{
 					-1,
@@ -122,22 +119,20 @@ func TestOpenPodHostports(t *testing.T) {
 		},
 		// Already running pod
 		{
-			&api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Name:      "another-test-pod",
-					Namespace: api.NamespaceDefault,
-				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{{
-						Ports: []api.ContainerPort{{
-							HostPort:      123,
-							ContainerPort: 654,
-							Protocol:      api.ProtocolTCP,
-						}},
-					}},
+			&PodPortMapping{
+				Name:         "another-test-pod",
+				Namespace:    api.NamespaceDefault,
+				IP:           net.ParseIP("10.1.1.5"),
+				HostNetwork:  false,
+				PodSandboxID: "id2",
+				PortMappings: []PortMapping{
+					{
+						HostPort:      123,
+						ContainerPort: 654,
+						Protocol:      api.ProtocolTCP,
+					},
 				},
 			},
-			"10.1.1.5",
 			[]*ruleMatch{
 				{
 					-1,
@@ -158,20 +153,18 @@ func TestOpenPodHostports(t *testing.T) {
 		},
 	}
 
-	activePods := make([]*ActivePod, 0)
+	activePodPortMapping := make([]*PodPortMapping, 0)
 
 	// Fill in any match rules missing chain names
 	for _, test := range tests {
 		for _, match := range test.matches {
 			if match.hostport >= 0 {
 				found := false
-				for _, c := range test.pod.Spec.Containers {
-					for _, cp := range c.Ports {
-						if int(cp.HostPort) == match.hostport {
-							match.chain = string(hostportChainName(cp, kubecontainer.GetPodFullName(test.pod)))
-							found = true
-							break
-						}
+				for _, pm := range test.mapping.PortMappings {
+					if int(pm.HostPort) == match.hostport {
+						match.chain = string(hostportChainName(pm, getPodFullName(test.mapping)))
+						found = true
+						break
 					}
 				}
 				if !found {
@@ -179,13 +172,10 @@ func TestOpenPodHostports(t *testing.T) {
 				}
 			}
 		}
-		activePods = append(activePods, &ActivePod{
-			Pod: test.pod,
-			IP:  net.ParseIP(test.ip),
-		})
+		activePodPortMapping = append(activePodPortMapping, test.mapping)
 	}
 
-	err := h.OpenPodHostportsAndSync(&ActivePod{Pod: tests[0].pod, IP: net.ParseIP(tests[0].ip)}, "br0", activePods)
+	err := h.OpenPodHostportsAndSync(tests[0].mapping, "br0", activePodPortMapping)
 	if err != nil {
 		t.Fatalf("Failed to OpenPodHostportsAndSync: %v", err)
 	}

@@ -25,6 +25,7 @@ import (
 	"github.com/golang/glog"
 
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -72,12 +73,39 @@ func (ds *dockerService) RunPodSandbox(config *runtimeApi.PodSandboxConfig) (str
 	// Assume kubelet's garbage collector would remove the sandbox later, if
 	// startContainer failed.
 	err = ds.StartContainer(createResp.ID)
+	if err != nil {
+		return createResp.ID, fmt.Errorf("failed to start sandbox container for pod %q: %v", config.Metadata.GetName(), err)
+	}
+
+	// Step 4: Trigger network plugin to setup pod network
+	// skip if pod is using hostnetwork
+	if !config.GetLinux().GetNamespaceOptions().GetHostNetwork() {
+		glog.V(2).Infof("Calling network plugin %q to setup network for pod %s/%s", ds.networkPlugin.Name(), config.GetMetadata().GetNamespace(), config.GetMetadata().GetName())
+		err = ds.networkPlugin.SetUpPod(config.GetMetadata().GetNamespace(), config.GetMetadata().GetName(), createResp.ID)
+		if err != nil {
+			// Best Effort clean up sandbox
+			if cleanUpErr := ds.StopPodSandbox(createResp.ID); cleanUpErr != nil {
+				glog.Errorf("failed to clean up sandbox %q for pod %q: %v", createResp, config.Metadata.GetName(), cleanUpErr)
+			}
+			return createResp.ID, fmt.Errorf("failed to call network plugin %q to setup sandbox newtork for pod %q: %v", ds.networkPlugin.Name(), config.Metadata.GetName(), err)
+		}
+	}
 	return createResp.ID, err
 }
 
 // StopPodSandbox stops the sandbox. If there are any running containers in the
 // sandbox, they should be force terminated.
 func (ds *dockerService) StopPodSandbox(podSandboxID string) error {
+	status, err := ds.PodSandboxStatus(podSandboxID)
+	if err != nil {
+		glog.Errorf("failed to get pod sandbox status: %v", err)
+	}
+	if status != nil && !status.GetLinux().GetNamespaces().GetOptions().GetHostNetwork() {
+		glog.V(2).Infof("Calling network plugin %q to tear down network for pod %s/%s", ds.networkPlugin.Name(), status.GetMetadata().GetNamespace(), status.GetMetadata().GetName())
+		if err := ds.networkPlugin.TearDownPod(status.GetMetadata().GetNamespace(), status.GetMetadata().GetName(), podSandboxID); err != nil {
+			glog.Errorf("failed to tear down network for pod Sandbox %q: %v", podSandboxID, err)
+		}
+	}
 	return ds.client.StopContainer(podSandboxID, defaultSandboxGracePeriod)
 	// TODO: Stop all running containers in the sandbox.
 }
@@ -110,6 +138,11 @@ func (ds *dockerService) PodSandboxStatus(podSandboxID string) (*runtimeApi.PodS
 		state = runtimeApi.PodSandBoxState_READY
 	}
 
+	metadata, err := parseSandboxName(r.Name)
+	if err != nil {
+		return nil, err
+	}
+
 	// TODO: We can't really get the IP address from the network plugin, which
 	// is handled by kubelet as of now. Should we amend the interface? How is
 	// this handled in the new remote runtime integration?
@@ -118,7 +151,19 @@ func (ds *dockerService) PodSandboxStatus(podSandboxID string) (*runtimeApi.PodS
 	// Related issue: https://github.com/kubernetes/kubernetes/issues/28667
 	var IP string
 	if r.NetworkSettings != nil {
+		// Retrieve IP directly from runtime
 		IP = r.NetworkSettings.IPAddress
+
+		// Try to retrieve pod IP address from network plugin
+		if IP == "" {
+			networkStatus, err := ds.networkPlugin.GetPodNetworkStatus(*metadata.Namespace, *metadata.Name, r.ID)
+			if err != nil {
+				glog.Errorf("Error while calling network plugin %s to retrieve pod sandbox newtork status for %s/%s: %v", ds.networkPlugin.Name(), *metadata.Namespace, *metadata.Name, err)
+			} else {
+				IP = networkStatus.IP.String()
+			}
+		}
+
 		// Fall back to IPv6 address if no IPv4 address is present
 		if IP == "" {
 			IP = r.NetworkSettings.GlobalIPv6Address
@@ -126,11 +171,6 @@ func (ds *dockerService) PodSandboxStatus(podSandboxID string) (*runtimeApi.PodS
 	}
 	network := &runtimeApi.PodSandboxNetworkStatus{Ip: &IP}
 	netNS := getNetworkNamespace(r)
-
-	metadata, err := parseSandboxName(r.Name)
-	if err != nil {
-		return nil, err
-	}
 
 	labels, annotations := extractLabels(r.Config.Labels)
 	return &runtimeApi.PodSandboxStatus{
@@ -271,6 +311,30 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig,
 		return nil, fmt.Errorf("failed to generate sandbox security options for sandbox %q: %v", c.Metadata.GetName(), err)
 	}
 	return createConfig, nil
+}
+
+func (ds *dockerService) GetPodSandboxNetNS(podSandboxID string) (string, error) {
+	r, err := ds.client.InspectContainer(podSandboxID)
+	if err != nil {
+		return "", err
+	}
+
+	return getNetworkNamespace(r), nil
+}
+
+func (ds *dockerService) GetPodAnnotations(namespace, name, podSandboxID string) (map[string]string, error) {
+	r, err := ds.client.InspectContainer(podSandboxID)
+	if err != nil {
+		return nil, err
+	}
+	_, annotations := extractLabels(r.Config.Labels)
+	return annotations, nil
+}
+
+func (ds *dockerService) GetPodHostportMapping() ([]*hostport.PodPortMapping, error) {
+	//TODO: Extract container port mapping from docker container labels and constrcut PodPortMappings
+	ppm := []*hostport.PodPortMapping{}
+	return ppm, nil
 }
 
 func setSandboxResources(hc *dockercontainer.HostConfig) {

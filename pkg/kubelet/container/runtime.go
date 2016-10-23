@@ -112,6 +112,8 @@ type Runtime interface {
 	GetContainerLogs(pod *api.Pod, containerID ContainerID, logOptions *api.PodLogOptions, stdout, stderr io.Writer) (err error)
 	// Delete a container. If the container is still running, an error is returned.
 	DeleteContainer(containerID ContainerID) error
+	// UpdatePodCIDR allows kubelet to update pod CIDR
+	UpdatePodCIDR(podCIDR string) error
 	// ContainerCommandRunner encapsulates the command runner interfaces for testability.
 	ContainerCommandRunner
 	// ContainerAttach encapsulates the attaching to containers for testability

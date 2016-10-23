@@ -821,10 +821,10 @@ func TestGetPodStatus(t *testing.T) {
 
 		if tt.networkPluginName == kubenet.KubenetPluginName {
 			if tt.result.IP != "" {
-				fnp.EXPECT().GetPodNetworkStatus("default", "guestbook", kubecontainer.ContainerID{ID: "42"}).
+				fnp.EXPECT().GetPodNetworkStatus("default", "guestbook", "42").
 					Return(&network.PodNetworkStatus{IP: net.ParseIP(tt.result.IP)}, nil)
 			} else {
-				fnp.EXPECT().GetPodNetworkStatus("default", "guestbook", kubecontainer.ContainerID{ID: "42"}).
+				fnp.EXPECT().GetPodNetworkStatus("default", "guestbook", "42").
 					Return(nil, fmt.Errorf("no such network"))
 			}
 		}

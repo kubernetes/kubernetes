@@ -400,3 +400,7 @@ func (f *FakeRuntime) ImageStats() (*ImageStats, error) {
 	f.CalledFunctions = append(f.CalledFunctions, "ImageStats")
 	return nil, f.Err
 }
+
+func (f *FakeRuntime) UpdatePodCIDR(podCIDR string) error {
+	return nil
+}

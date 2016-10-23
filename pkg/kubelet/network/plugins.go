@@ -21,13 +21,10 @@ import (
 	"net"
 	"strings"
 
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	utilsets "k8s.io/kubernetes/pkg/util/sets"
@@ -68,16 +65,13 @@ type NetworkPlugin interface {
 	// SetUpPod is the method called after the infra container of
 	// the pod has been created but before the other containers of the
 	// pod are launched.
-	// TODO: rename podInfraContainerID to sandboxID
-	SetUpPod(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) error
+	SetUpPod(namespace string, name string, podSandboxID string) error
 
 	// TearDownPod is the method called before a pod's infra container will be deleted
-	// TODO: rename podInfraContainerID to sandboxID
-	TearDownPod(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) error
+	TearDownPod(namespace string, name string, podSandboxID string) error
 
 	// Status is the method called to obtain the ipv4 or ipv6 addresses of the container
-	// TODO: rename podInfraContainerID to sandboxID
-	GetPodNetworkStatus(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) (*PodNetworkStatus, error)
+	GetPodNetworkStatus(namespace string, name string, podSandboxID string) (*PodNetworkStatus, error)
 
 	// NetworkStatus returns error if the network plugin is in error state
 	Status() error
@@ -95,29 +89,25 @@ type PodNetworkStatus struct {
 	IP net.IP `json:"ip" description:"Primary IP address of the pod"`
 }
 
-// Host is an interface that plugins can use to access the kubelet.
+// Host is an interface that plugins can use to access the kubelet or runtime shims.
 type Host interface {
-	// Get the pod structure by its name, namespace
-	GetPodByName(namespace, name string) (*api.Pod, bool)
+	// GetPodSandboxNetNS returns the path of pod sandbox's network namespace
+	GetPodSandboxNetNS(podSandboxID string) (string, error)
 
-	// GetKubeClient returns a client interface
-	GetKubeClient() clientset.Interface
+	// GetPodHostportMapping returns all active and ready to run pod hostport mapping
+	GetPodHostportMapping() ([]*hostport.PodPortMapping, error)
 
-	// GetContainerRuntime returns the container runtime that implements the containers (e.g. docker/rkt)
-	GetRuntime() kubecontainer.Runtime
+	// GetPodAnnotations returns the pod annotations
+	GetPodAnnotations(namespace, name, podSandboxID string) (map[string]string, error)
 }
 
-// InitNetworkPlugin inits the plugin that matches networkPluginName. Plugins must have unique names.
-func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) (NetworkPlugin, error) {
+func PickNetworkPlugin(plugins []NetworkPlugin, networkPluginName string) (NetworkPlugin, error) {
 	if networkPluginName == "" {
 		// default to the no_op plugin
-		plug := &NoopNetworkPlugin{}
-		if err := plug.Init(host, hairpinMode, nonMasqueradeCIDR, mtu); err != nil {
-			return nil, err
-		}
-		return plug, nil
+		return &NoopNetworkPlugin{}, nil
 	}
 
+	var chosenPlugin NetworkPlugin
 	pluginMap := map[string]NetworkPlugin{}
 
 	allErrs := []error{}
@@ -135,19 +125,25 @@ func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host H
 		pluginMap[name] = plugin
 	}
 
-	chosenPlugin := pluginMap[networkPluginName]
-	if chosenPlugin != nil {
-		err := chosenPlugin.Init(host, hairpinMode, nonMasqueradeCIDR, mtu)
-		if err != nil {
-			allErrs = append(allErrs, fmt.Errorf("Network plugin %q failed init: %v", networkPluginName, err))
-		} else {
-			glog.V(1).Infof("Loaded network plugin %q", networkPluginName)
-		}
-	} else {
+	chosenPlugin = pluginMap[networkPluginName]
+	if chosenPlugin == nil {
 		allErrs = append(allErrs, fmt.Errorf("Network plugin %q not found.", networkPluginName))
 	}
-
 	return chosenPlugin, utilerrors.NewAggregate(allErrs)
+}
+
+// InitNetworkPlugin inits the plugin that matches networkPluginName. Plugins must have unique names.
+func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) (NetworkPlugin, error) {
+	networkPlugin, err := PickNetworkPlugin(plugins, networkPluginName)
+	if err != nil {
+		return nil, err
+	}
+
+	err = networkPlugin.Init(host, hairpinMode, nonMasqueradeCIDR, mtu)
+	if err == nil {
+		glog.V(1).Infof("Loaded network plugin %q", networkPluginName)
+	}
+	return networkPlugin, err
 }
 
 func UnescapePluginName(in string) string {
@@ -187,15 +183,15 @@ func (plugin *NoopNetworkPlugin) Capabilities() utilsets.Int {
 	return utilsets.NewInt()
 }
 
-func (plugin *NoopNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID) error {
+func (plugin *NoopNetworkPlugin) SetUpPod(namespace string, name string, podSandboxID string) error {
 	return nil
 }
 
-func (plugin *NoopNetworkPlugin) TearDownPod(namespace string, name string, id kubecontainer.ContainerID) error {
+func (plugin *NoopNetworkPlugin) TearDownPod(namespace string, name string, podSandboxID string) error {
 	return nil
 }
 
-func (plugin *NoopNetworkPlugin) GetPodNetworkStatus(namespace string, name string, id kubecontainer.ContainerID) (*PodNetworkStatus, error) {
+func (plugin *NoopNetworkPlugin) GetPodNetworkStatus(namespace string, name string, podSandboxID string) (*PodNetworkStatus, error) {
 	return nil, nil
 }
 
