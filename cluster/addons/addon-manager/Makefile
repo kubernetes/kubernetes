@@ -15,7 +15,7 @@
 IMAGE=gcr.io/google-containers/kube-addon-manager
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
-VERSION=v5.1
+VERSION=v5.2
 KUBECTL_VERSION?=v1.5.0-alpha.1
 
 # amd64 and arm has "stable" binaries pushed for v1.2, arm64 and ppc64le hasn't so they have to fetch the latest alpha
