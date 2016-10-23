@@ -263,10 +263,12 @@ func createService(clientset *fedclientset.Clientset, namespace, name string) (*
 			Ports: []v1.ServicePort{
 				{
 					Name:       "http",
+					Protocol:   v1.ProtocolTCP,
 					Port:       80,
 					TargetPort: intstr.FromInt(8080),
 				},
 			},
+			SessionAffinity: v1.ServiceAffinityNone,
 		},
 	}
 	By(fmt.Sprintf("Trying to create service %q in namespace %q", service.Name, namespace))
