@@ -5000,7 +5000,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 	"intstr.IntOrString": intstr.IntOrString{}.OpenAPIDefinition(), "policy.Eviction": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Eviction evicts a pod from its node subject to certain policies and safety constraints. This is a subresource of Pod.  A request to cause such an eviction is created by POSTing to .../pods/<pod name>/evictions.",
+				Description: "Eviction evicts a pod from its node subject to certain policies and safety constraints. This is a subresource of Pod.  A request to cause such an eviction is created by POSTing to .../pods/<pod name>/eviction.",
 				Properties: map[string]spec.Schema{
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
@@ -13381,7 +13381,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 	"v1alpha1.Eviction": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Eviction evicts a pod from its node subject to certain policies and safety constraints. This is a subresource of Pod.  A request to cause such an eviction is created by POSTing to .../pods/<pod name>/evictions.",
+				Description: "Eviction evicts a pod from its node subject to certain policies and safety constraints. This is a subresource of Pod.  A request to cause such an eviction is created by POSTing to .../pods/<pod name>/eviction.",
 				Properties: map[string]spec.Schema{
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
