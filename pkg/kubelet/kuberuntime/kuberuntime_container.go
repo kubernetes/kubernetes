@@ -22,7 +22,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
-	"path"
+	"path/filepath"
 	"sort"
 	"sync"
 	"time"
@@ -97,6 +97,19 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 	}
 	m.recorder.Eventf(ref, api.EventTypeNormal, events.StartedContainer, "Started container with id %v", containerID)
 
+	// Symlink container logs to the legacy container log location for cluster logging
+	// support.
+	// TODO(random-liu): Remove this after cluster logging supports CRI container log path.
+	containerMeta := containerConfig.GetMetadata()
+	sandboxMeta := podSandboxConfig.GetMetadata()
+	legacySymlink := legacyLogSymlink(containerID, containerMeta.GetName(), sandboxMeta.GetName(),
+		sandboxMeta.GetNamespace())
+	containerLog := filepath.Join(podSandboxConfig.GetLogDirectory(), containerConfig.GetLogPath())
+	if err := m.osInterface.Symlink(containerLog, legacySymlink); err != nil {
+		glog.Errorf("Failed to create legacy symbolic link %q to container %q log %q: %v",
+			legacySymlink, containerID, containerLog, err)
+	}
+
 	// Step 4: execute the post start hook.
 	if container.Lifecycle != nil && container.Lifecycle.PostStart != nil {
 		kubeContainerID := kubecontainer.ContainerID{
@@ -115,11 +128,6 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 	return "", nil
 }
 
-// getContainerLogsPath gets log path for container.
-func getContainerLogsPath(containerName string, podUID kubetypes.UID) string {
-	return path.Join(podLogsRootDirectory, string(podUID), fmt.Sprintf("%s.log", containerName))
-}
-
 // generateContainerConfig generates container config for kubelet runtime api.
 func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Container, pod *api.Pod, restartCount int, podIP string) (*runtimeApi.ContainerConfig, error) {
 	opts, err := m.runtimeHelper.GenerateRunContainerOptions(pod, container, podIP)
@@ -128,7 +136,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 	}
 
 	command, args := kubecontainer.ExpandContainerCommandAndArgs(container, opts.Envs)
-	containerLogsPath := getContainerLogsPath(container.Name, pod.UID)
+	containerLogsPath := buildContainerLogsPath(container.Name, restartCount)
 	podHasSELinuxLabel := pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SELinuxOptions != nil
 	restartCountUint32 := uint32(restartCount)
 	config := &runtimeApi.ContainerConfig{
@@ -269,7 +277,8 @@ func makeMounts(opts *kubecontainer.RunContainerOptions, container *api.Containe
 		// here we just add a random id to make the path unique for different instances
 		// of the same container.
 		cid := makeUID()
-		containerLogPath := path.Join(opts.PodContainerDir, cid)
+		containerLogPath := filepath.Join(opts.PodContainerDir, cid)
+		// TODO: We should try to use os interface here.
 		fs, err := os.Create(containerLogPath)
 		if err != nil {
 			glog.Errorf("Error on creating termination-log file %q: %v", containerLogPath, err)
@@ -690,7 +699,52 @@ func (m *kubeGenericRuntimeManager) ExecInContainer(containerID kubecontainer.Co
 	return fmt.Errorf("not implemented")
 }
 
+// removeContainer removes the container and the container logs.
+// Notice that we remove the container logs first, so that container will not be removed if
+// container logs are failed to be removed, and kubelet will retry this later. This guarantees
+// that container logs to be removed with the container.
+// Notice that we assume that the container should only be removed in non-running state, and
+// it will not write container logs anymore in that state.
+func (m *kubeGenericRuntimeManager) removeContainer(containerID string) error {
+	glog.V(4).Infof("Removing container %q", containerID)
+	// Remove the container log.
+	if err := m.removeContainerLog(containerID); err != nil {
+		return err
+	}
+	// Remove the container.
+	return m.runtimeService.RemoveContainer(containerID)
+}
+
+// removeContainerLog removes the container log.
+func (m *kubeGenericRuntimeManager) removeContainerLog(containerID string) error {
+	// Remove the container log.
+	status, err := m.runtimeService.ContainerStatus(containerID)
+	if err != nil {
+		glog.Errorf("ContainerStatus for %q error: %v", containerID, err)
+		return err
+	}
+	labeledInfo := getContainerInfoFromLabels(status.Labels)
+	annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
+	path := filepath.Join(buildPodLogsDirectory(labeledInfo.PodUID),
+		buildContainerLogsPath(labeledInfo.ContainerName, annotatedInfo.RestartCount))
+	if err := m.osInterface.Remove(path); err != nil && !os.IsNotExist(err) {
+		glog.Errorf("Failed to remove container %q log %q: %v", containerID, path, err)
+		return err
+	}
+
+	// Remove the legacy container log symlink.
+	// TODO(random-liu): Remove this after cluster logging supports CRI container log path.
+	legacySymlink := legacyLogSymlink(containerID, labeledInfo.ContainerName, labeledInfo.PodName,
+		labeledInfo.PodNamespace)
+	if err := m.osInterface.Remove(legacySymlink); err != nil && !os.IsNotExist(err) {
+		glog.Errorf("Failed to remove container %q log legacy symbolic link %q: %v",
+			containerID, legacySymlink, err)
+		return err
+	}
+	return nil
+}
+
 // DeleteContainer removes a container.
 func (m *kubeGenericRuntimeManager) DeleteContainer(containerID kubecontainer.ContainerID) error {
-	return m.runtimeService.RemoveContainer(containerID.ID)
+	return m.removeContainer(containerID.ID)
 }

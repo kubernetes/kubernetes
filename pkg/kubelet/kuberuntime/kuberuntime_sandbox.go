@@ -38,6 +38,14 @@ func (m *kubeGenericRuntimeManager) createPodSandbox(pod *api.Pod, attempt uint3
 		return "", message, err
 	}
 
+	// Create pod logs directory
+	err = m.osInterface.MkdirAll(podSandboxConfig.GetLogDirectory(), 0755)
+	if err != nil {
+		message := fmt.Sprintf("Create pod log directory for pod %q failed: %v", format.Pod(pod), err)
+		glog.Errorf(message)
+		return "", message, err
+	}
+
 	podSandBoxID, err := m.runtimeService.RunPodSandbox(podSandboxConfig)
 	if err != nil {
 		message := fmt.Sprintf("CreatePodSandbox for pod %q failed: %v", format.Pod(pod), err)
@@ -81,6 +89,9 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *api.Pod, attem
 		}
 		podSandboxConfig.Hostname = &hostname
 	}
+
+	logDir := buildPodLogsDirectory(pod.UID)
+	podSandboxConfig.LogDirectory = &logDir
 
 	cgroupParent := ""
 	portMappings := []*runtimeApi.PortMapping{}
