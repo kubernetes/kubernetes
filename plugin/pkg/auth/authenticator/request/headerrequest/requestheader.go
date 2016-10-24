@@ -31,6 +31,7 @@ import (
 )
 
 type requestHeaderAuthRequestHandler struct {
+	// nameHeaders are the headers to check (in order, case-insensitively) for an identity. The first header with a value wins.
 	nameHeaders []string
 }
 

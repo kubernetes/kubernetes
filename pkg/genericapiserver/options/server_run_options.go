@@ -67,46 +67,49 @@ type ServerRunOptions struct {
 	AuthorizationWebhookCacheUnauthorizedTTL time.Duration
 	AuthorizationRBACSuperUser               string
 
-	AnonymousAuth             bool
-	BasicAuthFile             string
-	BindAddress               net.IP
-	CertDirectory             string
-	ClientCAFile              string
-	CloudConfigFile           string
-	CloudProvider             string
-	CorsAllowedOriginList     []string
-	DefaultStorageMediaType   string
-	DeleteCollectionWorkers   int
-	AuditLogPath              string
-	AuditLogMaxAge            int
-	AuditLogMaxBackups        int
-	AuditLogMaxSize           int
-	EnableGarbageCollection   bool
-	EnableProfiling           bool
-	EnableSwaggerUI           bool
-	EnableWatchCache          bool
-	EtcdServersOverrides      []string
-	StorageConfig             storagebackend.Config
-	ExternalHost              string
-	InsecureBindAddress       net.IP
-	InsecurePort              int
-	KeystoneURL               string
-	KubernetesServiceNodePort int
-	LongRunningRequestRE      string
-	MasterCount               int
-	MasterServiceNamespace    string
-	MaxRequestsInFlight       int
-	MinRequestTimeout         int
-	OIDCCAFile                string
-	OIDCClientID              string
-	OIDCIssuerURL             string
-	OIDCUsernameClaim         string
-	OIDCGroupsClaim           string
-	RuntimeConfig             config.ConfigurationMap
-	SecurePort                int
-	ServiceClusterIPRange     net.IPNet // TODO: make this a list
-	ServiceNodePortRange      utilnet.PortRange
-	StorageVersions           string
+	AnonymousAuth                bool
+	BasicAuthFile                string
+	BindAddress                  net.IP
+	CertDirectory                string
+	ClientCAFile                 string
+	CloudConfigFile              string
+	CloudProvider                string
+	CorsAllowedOriginList        []string
+	DefaultStorageMediaType      string
+	DeleteCollectionWorkers      int
+	AuditLogPath                 string
+	AuditLogMaxAge               int
+	AuditLogMaxBackups           int
+	AuditLogMaxSize              int
+	EnableGarbageCollection      bool
+	EnableProfiling              bool
+	EnableSwaggerUI              bool
+	EnableWatchCache             bool
+	EtcdServersOverrides         []string
+	StorageConfig                storagebackend.Config
+	ExternalHost                 string
+	InsecureBindAddress          net.IP
+	InsecurePort                 int
+	KeystoneURL                  string
+	KubernetesServiceNodePort    int
+	LongRunningRequestRE         string
+	MasterCount                  int
+	MasterServiceNamespace       string
+	MaxRequestsInFlight          int
+	MinRequestTimeout            int
+	OIDCCAFile                   string
+	OIDCClientID                 string
+	OIDCIssuerURL                string
+	OIDCUsernameClaim            string
+	OIDCGroupsClaim              string
+	RequestHeaderUsernameHeaders []string
+	RequestHeaderClientCAFile    string
+	RequestHeaderAllowedNames    []string
+	RuntimeConfig                config.ConfigurationMap
+	SecurePort                   int
+	ServiceClusterIPRange        net.IPNet // TODO: make this a list
+	ServiceNodePortRange         utilnet.PortRange
+	StorageVersions              string
 	// The default values for StorageVersions. StorageVersions overrides
 	// these; you can change this if you want to change the defaults (e.g.,
 	// for testing). This is not actually exposed as a flag.
@@ -422,6 +425,16 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"If provided, the name of a custom OpenID Connect claim for specifying user groups. "+
 		"The claim value is expected to be a string or array of strings. This flag is experimental, "+
 		"please see the authentication documentation for further details.")
+
+	fs.StringSliceVar(&s.RequestHeaderUsernameHeaders, "requestheader-username-headers", s.RequestHeaderUsernameHeaders, ""+
+		"List of request headers to use a request usernames. X-Remote-User is common.")
+
+	fs.StringVar(&s.RequestHeaderClientCAFile, "requestheader-client-ca-file", s.RequestHeaderClientCAFile, ""+
+		"If set, any request presenting username headers must include a client certificate signed by one of "+
+		"the authorities in the client-ca-file.")
+
+	fs.StringSliceVar(&s.RequestHeaderAllowedNames, "requestheader-allowed-names", s.RequestHeaderAllowedNames, ""+
+		"List of proxy client common names from the client certificate allowed to set username header information.")
 
 	fs.Var(&s.RuntimeConfig, "runtime-config", ""+
 		"A set of key=value pairs that describe runtime configuration that may be passed "+
