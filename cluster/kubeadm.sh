@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,18 +17,6 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-
-# Stop the bleeding, turn off the warning until we fix token gen.
-# echo "-=-=-=-=-=-=-=-=-=-="
-# echo "NOTE:"
-# echo "kubeadm.sh is deprecated and will be removed soon."
-# echo "please replace all usage with calls to the kubeadm"
-# echo "binary and ensure that it is in your PATH." 
-# echo ""
-# echo "Please see 'kubeadm help config' for more details"
-# echo "about configuring kubeadm for your cluster."
-# echo "-=-=-=-=-=-=-=-=-=-="
-
 
 KUBE_ROOT=${KUBE_ROOT:-$(dirname "${BASH_SOURCE}")/..}
 source "${KUBE_ROOT}/cluster/kube-util.sh"
@@ -115,20 +103,4 @@ elif [[ ! -x "${KUBEADM_PATH}" ]]; then
 fi
 kubeadm="${KUBEADM_PATH:-${kubeadm}}"
 
-if [[ "$KUBERNETES_PROVIDER" == "gke" ]]; then
-  detect-project &> /dev/null
-elif [[ "$KUBERNETES_PROVIDER" == "ubuntu" ]]; then
-  detect-master > /dev/null
-  config=(
-    "--server=http://${KUBE_MASTER_IP}:8080"
-  )
-fi
-
-
-if false; then
-  # disable these debugging messages by default
-  echo "current-context: \"$(${kubeadm} "${config[@]:+${config[@]}}" config view -o template --template='{{index . "current-context"}}')\"" >&2
-  echo "Running:" "${kubeadm}" "${config[@]:+${config[@]}}" "${@+$@}" >&2
-fi
-
-"${kubeadm}" "${config[@]:+${config[@]}}" "${@+$@}"
+"${kubeadm}" "${@+$@}"
