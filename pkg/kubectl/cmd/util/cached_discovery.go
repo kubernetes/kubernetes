@@ -25,7 +25,7 @@ import (
 
 	"github.com/golang/glog"
 
-	kapi "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -50,7 +50,7 @@ func (d *CachedDiscoveryClient) ServerResourcesForGroupVersion(groupVersion stri
 	// don't fail on errors, we either don't have a file or won't be able to run the cached check. Either way we can fallback.
 	if err == nil {
 		cachedResources := &unversioned.APIResourceList{}
-		if err := runtime.DecodeInto(kapi.Codecs.UniversalDecoder(), cachedBytes, cachedResources); err == nil {
+		if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), cachedBytes, cachedResources); err == nil {
 			glog.V(6).Infof("returning cached discovery info from %v", filename)
 			return cachedResources, nil
 		}
@@ -92,7 +92,7 @@ func (d *CachedDiscoveryClient) ServerGroups() (*unversioned.APIGroupList, error
 	// don't fail on errors, we either don't have a file or won't be able to run the cached check. Either way we can fallback.
 	if err == nil {
 		cachedGroups := &unversioned.APIGroupList{}
-		if err := runtime.DecodeInto(kapi.Codecs.UniversalDecoder(), cachedBytes, cachedGroups); err == nil {
+		if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), cachedBytes, cachedGroups); err == nil {
 			glog.V(6).Infof("returning cached discovery info from %v", filename)
 			return cachedGroups, nil
 		}
@@ -138,7 +138,7 @@ func (d *CachedDiscoveryClient) writeCachedFile(filename string, obj runtime.Obj
 		return err
 	}
 
-	bytes, err := runtime.Encode(kapi.Codecs.LegacyCodec(), obj)
+	bytes, err := runtime.Encode(api.Codecs.LegacyCodec(), obj)
 	if err != nil {
 		return err
 	}
