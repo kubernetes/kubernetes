@@ -85,7 +85,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		canonicalGroup = ""
 	}
 	canonicalVersion := g.version
-	if canonicalVersion == "unversioned" {
+	if canonicalVersion == "internalversion" {
 		canonicalVersion = ""
 	}
 
@@ -138,7 +138,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		"ExtractFromListOptions":         c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "ExtractFromListOptions"}),
 	}
 
-	if g.version == "unversioned" {
+	if g.version == "internalversion" {
 		m["DeleteOptions"] = c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "DeleteOptions"})
 		m["ListOptions"] = c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ListOptions"})
 	} else {

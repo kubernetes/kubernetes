@@ -27,7 +27,7 @@ func Group(group string) string {
 
 func Version(version string) string {
 	if version == "" {
-		return "unversioned"
+		return "internalversion"
 	}
 	return version
 }

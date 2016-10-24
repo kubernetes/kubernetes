@@ -121,7 +121,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	sw.Do(newClientForConfigTemplate, m)
 	sw.Do(newClientForConfigOrDieTemplate, m)
 	sw.Do(newClientForRESTClientTemplate, m)
-	if g.version == "unversioned" {
+	if g.version == "internalversion" {
 		sw.Do(setInternalVersionClientDefaultsTemplate, m)
 	} else {
 		sw.Do(setClientDefaultsTemplate, m)
