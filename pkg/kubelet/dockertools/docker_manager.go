@@ -666,6 +666,13 @@ func (dm *DockerManager) runContainer(
 		} else {
 			fs.Close() // Close immediately; we're just doing a `touch` here
 			b := fmt.Sprintf("%s:%s", containerLogPath, container.TerminationMessagePath)
+
+			// Have docker relabel the termination log path if SELinux is
+			// enabled.
+			if selinux.SELinuxEnabled() {
+				b += ":Z"
+			}
+
 			binds = append(binds, b)
 		}
 	}
