@@ -131,7 +131,7 @@ type Client struct {
 	*PolicyClient
 	*RbacClient
 	*discovery.DiscoveryClient
-	*CertificatesClient
+	*CertificatesInternalversionClient
 	*StorageClient
 }
 
@@ -194,7 +194,7 @@ func (c *Client) Discovery() discovery.DiscoveryInterface {
 }
 
 func (c *Client) Certificates() CertificatesInterface {
-	return c.CertificatesClient
+	return c.CertificatesInternalversionClient
 }
 
 func (c *Client) Storage() StorageInterface {

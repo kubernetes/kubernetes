@@ -74,9 +74,9 @@ type SAControllerClientBuilder struct {
 	// ClientConfig is a skeleton config to clone and use as the basis for each controller client
 	ClientConfig *restclient.Config
 
-	// CoreClient is used to provision service accounts if needed and watch for their associated tokens
+	// CoreInternalversionClient is used to provision service accounts if needed and watch for their associated tokens
 	// to construct a controller client
-	CoreClient unversionedcore.CoreInterface
+	CoreInternalversionClient unversionedcore.CoreInternalversionInterface
 
 	// Namespace is the namespace used to host the service accounts that will back the
 	// controllers.  It must be highly privileged namespace which normal users cannot inspect.
@@ -89,20 +89,20 @@ func (b SAControllerClientBuilder) Config(name string) (*restclient.Config, erro
 	clientConfig := restclient.AnonymousClientConfig(b.ClientConfig)
 
 	// we need the SA UID to find a matching SA token
-	sa, err := b.CoreClient.ServiceAccounts(b.Namespace).Get(name)
+	sa, err := b.CoreInternalversionClient.ServiceAccounts(b.Namespace).Get(name)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
 	} else if apierrors.IsNotFound(err) {
 		// check to see if the namespace exists.  If it isn't a NotFound, just try to create the SA.
 		// It'll probably fail, but perhaps that will have a better message.
-		if _, err := b.CoreClient.Namespaces().Get(b.Namespace); apierrors.IsNotFound(err) {
-			_, err = b.CoreClient.Namespaces().Create(&api.Namespace{ObjectMeta: api.ObjectMeta{Name: b.Namespace}})
+		if _, err := b.CoreInternalversionClient.Namespaces().Get(b.Namespace); apierrors.IsNotFound(err) {
+			_, err = b.CoreInternalversionClient.Namespaces().Create(&api.Namespace{ObjectMeta: api.ObjectMeta{Name: b.Namespace}})
 			if err != nil && !apierrors.IsAlreadyExists(err) {
 				return nil, err
 			}
 		}
 
-		sa, err = b.CoreClient.ServiceAccounts(b.Namespace).Create(
+		sa, err = b.CoreInternalversionClient.ServiceAccounts(b.Namespace).Create(
 			&api.ServiceAccount{ObjectMeta: api.ObjectMeta{Namespace: b.Namespace, Name: name}})
 		if err != nil {
 			return nil, err
@@ -112,11 +112,11 @@ func (b SAControllerClientBuilder) Config(name string) (*restclient.Config, erro
 	lw := &cache.ListWatch{
 		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 			options.FieldSelector = fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(api.SecretTypeServiceAccountToken)})
-			return b.CoreClient.Secrets(b.Namespace).List(options)
+			return b.CoreInternalversionClient.Secrets(b.Namespace).List(options)
 		},
 		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 			options.FieldSelector = fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(api.SecretTypeServiceAccountToken)})
-			return b.CoreClient.Secrets(b.Namespace).Watch(options)
+			return b.CoreInternalversionClient.Secrets(b.Namespace).Watch(options)
 		},
 	}
 	_, err = watch.ListWatchUntil(30*time.Second, lw,

@@ -170,7 +170,7 @@ func Run(s *options.CMServer) error {
 		if len(s.ServiceAccountKeyFile) > 0 {
 			clientBuilder = controller.SAControllerClientBuilder{
 				ClientConfig: restclient.AnonymousClientConfig(kubeconfig),
-				CoreClient:   kubeClient.Core(),
+				CoreInternalversionClient:   kubeClient.Core(),
 				Namespace:    "kube-system",
 			}
 		} else {

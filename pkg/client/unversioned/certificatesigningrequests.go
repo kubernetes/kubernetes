@@ -36,11 +36,11 @@ type CertificateSigningRequestInterface interface {
 
 // certificateSigningRequests implements CertificateSigningRequestsNamespacer interface
 type certificateSigningRequests struct {
-	client *CertificatesClient
+	client *CertificatesInternalversionClient
 }
 
 // newCertificateSigningRequests returns a certificateSigningRequests
-func newCertificateSigningRequests(c *CertificatesClient) *certificateSigningRequests {
+func newCertificateSigningRequests(c *CertificatesInternalversionClient) *certificateSigningRequests {
 	return &certificateSigningRequests{
 		client: c,
 	}

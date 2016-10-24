@@ -26,16 +26,16 @@ type CertificatesInterface interface {
 	CertificateSigningRequests() CertificateSigningRequestInterface
 }
 
-type CertificatesClient struct {
+type CertificatesInternalversionClient struct {
 	*restclient.RESTClient
 }
 
-func (c *CertificatesClient) CertificateSigningRequests() CertificateSigningRequestInterface {
+func (c *CertificatesInternalversionClient) CertificateSigningRequests() CertificateSigningRequestInterface {
 	return newCertificateSigningRequests(c)
 }
 
-// NewCertificates creates a new CertificatesClient for the given config.
-func NewCertificates(c *restclient.Config) (*CertificatesClient, error) {
+// NewCertificates creates a new CertificatesInternalversionClient for the given config.
+func NewCertificates(c *restclient.Config) (*CertificatesInternalversionClient, error) {
 	config := *c
 	if err := setCertificatesDefaults(&config); err != nil {
 		return nil, err
@@ -44,12 +44,12 @@ func NewCertificates(c *restclient.Config) (*CertificatesClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &CertificatesClient{client}, nil
+	return &CertificatesInternalversionClient{client}, nil
 }
 
-// NewCertificatesOrDie creates a new CertificatesClient for the given config and
+// NewCertificatesOrDie creates a new CertificatesInternalversionClient for the given config and
 // panics if there is an error in the config.
-func NewCertificatesOrDie(c *restclient.Config) *CertificatesClient {
+func NewCertificatesOrDie(c *restclient.Config) *CertificatesInternalversionClient {
 	client, err := NewCertificates(c)
 	if err != nil {
 		panic(err)

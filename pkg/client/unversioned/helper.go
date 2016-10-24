@@ -117,7 +117,7 @@ func New(c *restclient.Config) (*Client, error) {
 			return nil, err
 		}
 	}
-	var certsClient *CertificatesClient
+	var certsClient *CertificatesInternalversionClient
 	if registered.IsRegistered(certificates.GroupName) {
 		certsConfig := *c
 		certsClient, err = NewCertificates(&certsConfig)
@@ -160,7 +160,7 @@ func New(c *restclient.Config) (*Client, error) {
 		AuthorizationClient:  authorizationClient,
 		AutoscalingClient:    autoscalingClient,
 		BatchClient:          batchClient,
-		CertificatesClient:   certsClient,
+		CertificatesInternalversionClient:   certsClient,
 		DiscoveryClient:      discoveryClient,
 		ExtensionsClient:     extensionsClient,
 		PolicyClient:         policyClient,
