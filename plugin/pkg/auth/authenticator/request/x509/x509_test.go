@@ -28,7 +28,9 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 const (
@@ -373,12 +375,12 @@ mFlG6tStAWz3TmydciZNdiEbeqHw5uaIYWj1zC5AdvFXBFue0ojIrJ5JtbTWccH9
 `
 
 	/*
-		openssl genrsa -out ca.key 4096
-		openssl req -new -x509 -days 36500 \
-		    -sha256 -key ca.key -extensions v3_ca \
-		    -out ca.crt \
-		    -subj "/C=US/ST=My State/L=My City/O=My Org/O=My Org 1/O=My Org 2/CN=ROOT CA WITH GROUPS"
-		openssl x509 -in ca.crt -text
+	   openssl genrsa -out ca.key 4096
+	   openssl req -new -x509 -days 36500 \
+	       -sha256 -key ca.key -extensions v3_ca \
+	       -out ca.crt \
+	       -subj "/C=US/ST=My State/L=My City/O=My Org/O=My Org 1/O=My Org 2/CN=ROOT CA WITH GROUPS"
+	   openssl x509 -in ca.crt -text
 	*/
 
 	// A certificate with multiple organizations.
@@ -718,6 +720,164 @@ func TestX509(t *testing.T) {
 			sort.Strings(groups)
 			if !reflect.DeepEqual(testCase.ExpectGroups, groups) {
 				t.Errorf("%s: Expected user.groups=%v, got %v", k, testCase.ExpectGroups, groups)
+			}
+		}
+	}
+}
+
+func TestX509Verifier(t *testing.T) {
+	multilevelOpts := DefaultVerifyOptions()
+	multilevelOpts.Roots = x509.NewCertPool()
+	multilevelOpts.Roots.AddCert(getCertsFromFile(t, "root")[0])
+
+	testCases := map[string]struct {
+		Insecure bool
+		Certs    []*x509.Certificate
+
+		Opts x509.VerifyOptions
+
+		AllowedCNs sets.String
+
+		ExpectOK  bool
+		ExpectErr bool
+	}{
+		"non-tls": {
+			Insecure: true,
+
+			ExpectOK:  false,
+			ExpectErr: false,
+		},
+
+		"tls, no certs": {
+			ExpectOK:  false,
+			ExpectErr: false,
+		},
+
+		"self signed": {
+			Opts:  getDefaultVerifyOptions(t),
+			Certs: getCerts(t, selfSignedCert),
+
+			ExpectErr: true,
+		},
+
+		"server cert disallowed": {
+			Opts:  getDefaultVerifyOptions(t),
+			Certs: getCerts(t, serverCert),
+
+			ExpectErr: true,
+		},
+		"server cert allowing non-client cert usages": {
+			Opts:  x509.VerifyOptions{Roots: getRootCertPool(t)},
+			Certs: getCerts(t, serverCert),
+
+			ExpectOK:  true,
+			ExpectErr: false,
+		},
+
+		"valid client cert": {
+			Opts:  getDefaultVerifyOptions(t),
+			Certs: getCerts(t, clientCNCert),
+
+			ExpectOK:  true,
+			ExpectErr: false,
+		},
+		"valid client cert with wrong CN": {
+			Opts:       getDefaultVerifyOptions(t),
+			AllowedCNs: sets.NewString("foo", "bar"),
+			Certs:      getCerts(t, clientCNCert),
+
+			ExpectOK:  false,
+			ExpectErr: true,
+		},
+		"valid client cert with right CN": {
+			Opts:       getDefaultVerifyOptions(t),
+			AllowedCNs: sets.NewString("client_cn"),
+			Certs:      getCerts(t, clientCNCert),
+
+			ExpectOK:  true,
+			ExpectErr: false,
+		},
+
+		"future cert": {
+			Opts: x509.VerifyOptions{
+				CurrentTime: time.Now().Add(-100 * time.Hour * 24 * 365),
+				Roots:       getRootCertPool(t),
+			},
+			Certs: getCerts(t, clientCNCert),
+
+			ExpectOK:  false,
+			ExpectErr: true,
+		},
+		"expired cert": {
+			Opts: x509.VerifyOptions{
+				CurrentTime: time.Now().Add(100 * time.Hour * 24 * 365),
+				Roots:       getRootCertPool(t),
+			},
+			Certs: getCerts(t, clientCNCert),
+
+			ExpectOK:  false,
+			ExpectErr: true,
+		},
+
+		"multi-level, valid": {
+			Opts:  multilevelOpts,
+			Certs: getCertsFromFile(t, "client-valid", "intermediate"),
+
+			ExpectOK:  true,
+			ExpectErr: false,
+		},
+		"multi-level, expired": {
+			Opts:  multilevelOpts,
+			Certs: getCertsFromFile(t, "client-expired", "intermediate"),
+
+			ExpectOK:  false,
+			ExpectErr: true,
+		},
+	}
+
+	for k, testCase := range testCases {
+		req, _ := http.NewRequest("GET", "/", nil)
+		if !testCase.Insecure {
+			req.TLS = &tls.ConnectionState{PeerCertificates: testCase.Certs}
+		}
+
+		authCall := false
+		auth := authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
+			authCall = true
+			return &user.DefaultInfo{Name: "innerauth"}, true, nil
+		})
+
+		a := NewVerifier(testCase.Opts, auth, testCase.AllowedCNs)
+
+		user, ok, err := a.AuthenticateRequest(req)
+
+		if testCase.ExpectErr && err == nil {
+			t.Errorf("%s: Expected error, got none", k)
+			continue
+		}
+		if !testCase.ExpectErr && err != nil {
+			t.Errorf("%s: Got unexpected error: %v", k, err)
+			continue
+		}
+
+		if testCase.ExpectOK != ok {
+			t.Errorf("%s: Expected ok=%v, got %v", k, testCase.ExpectOK, ok)
+			continue
+		}
+
+		if testCase.ExpectOK {
+			if !authCall {
+				t.Errorf("%s: Expected inner auth called, wasn't", k)
+				continue
+			}
+			if "innerauth" != user.GetName() {
+				t.Errorf("%s: Expected user.name=%v, got %v", k, "innerauth", user.GetName())
+				continue
+			}
+		} else {
+			if authCall {
+				t.Errorf("%s: Expected inner auth not to be called, was", k)
+				continue
 			}
 		}
 	}
