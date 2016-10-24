@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned_test
+package discovery_test
 
 import (
 	"bytes"
@@ -31,7 +31,7 @@ import (
 	uapi "k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -139,9 +139,9 @@ func TestNegotiateVersion(t *testing.T) {
 				return &http.Response{StatusCode: test.statusCode, Header: header, Body: objBody(&uapi.APIVersions{Versions: test.serverVersions})}, nil
 			}),
 		}
-		c := unversioned.NewOrDie(test.config)
-		c.DiscoveryClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-		response, err := unversioned.NegotiateVersion(c, test.config, test.version, test.clientVersions)
+		c := discovery.NewDiscoveryClientForConfigOrDie(test.config)
+		c.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
+		response, err := discovery.NegotiateVersion(c, test.config, test.version, test.clientVersions)
 		if err == nil && test.expectErr != nil {
 			t.Errorf("expected error, got nil for [%s].", test.name)
 		}

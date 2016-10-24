@@ -1793,14 +1793,6 @@ func LoadFederatedConfig(overrides *clientcmd.ConfigOverrides) (*restclient.Conf
 	return cfg, nil
 }
 
-func loadClientFromConfig(config *restclient.Config) (*client.Client, error) {
-	c, err := client.New(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating client: %v", err.Error())
-	}
-	return c, nil
-}
-
 func LoadFederationClientset_1_5() (*federation_release_1_5.Clientset, error) {
 	config, err := LoadFederatedConfig(&clientcmd.ConfigOverrides{})
 	if err != nil {
@@ -1812,14 +1804,6 @@ func LoadFederationClientset_1_5() (*federation_release_1_5.Clientset, error) {
 		return nil, fmt.Errorf("error creating federation clientset: %v", err.Error())
 	}
 	return c, nil
-}
-
-func LoadClient() (*client.Client, error) {
-	config, err := LoadConfig()
-	if err != nil {
-		return nil, fmt.Errorf("error creating client: %v", err.Error())
-	}
-	return loadClientFromConfig(config)
 }
 
 func LoadInternalClientset() (*clientset.Clientset, error) {
