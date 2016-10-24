@@ -23,18 +23,21 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/version"
 )
 
 // CachedDiscoveryClient implements the functions that discovery server-supported API groups,
 // versions and resources.
 type CachedDiscoveryClient struct {
-	discovery.DiscoveryInterface
+	delegate discovery.DiscoveryInterface
 
 	// cacheDirectory is the directory where discovery docs are held.  It must be unique per host:port combination to work well.
 	cacheDirectory string
@@ -42,6 +45,8 @@ type CachedDiscoveryClient struct {
 	// ttl is how long the cache should be considered valid
 	ttl time.Duration
 }
+
+var _ discovery.DiscoveryInterface = &CachedDiscoveryClient{}
 
 // ServerResourcesForGroupVersion returns the supported resources for a group and version.
 func (d *CachedDiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (*unversioned.APIResourceList, error) {
@@ -56,7 +61,7 @@ func (d *CachedDiscoveryClient) ServerResourcesForGroupVersion(groupVersion stri
 		}
 	}
 
-	liveResources, err := d.DiscoveryInterface.ServerResourcesForGroupVersion(groupVersion)
+	liveResources, err := d.delegate.ServerResourcesForGroupVersion(groupVersion)
 	if err != nil {
 		return liveResources, err
 	}
@@ -98,7 +103,7 @@ func (d *CachedDiscoveryClient) ServerGroups() (*unversioned.APIGroupList, error
 		}
 	}
 
-	liveGroups, err := d.DiscoveryInterface.ServerGroups()
+	liveGroups, err := d.delegate.ServerGroups()
 	if err != nil {
 		return liveGroups, err
 	}
@@ -146,7 +151,27 @@ func (d *CachedDiscoveryClient) writeCachedFile(filename string, obj runtime.Obj
 	return ioutil.WriteFile(filename, bytes, 0755)
 }
 
+func (d *CachedDiscoveryClient) RESTClient() restclient.Interface {
+	return d.delegate.RESTClient()
+}
+
+func (d *CachedDiscoveryClient) ServerPreferredResources() ([]unversioned.GroupVersionResource, error) {
+	return d.delegate.ServerPreferredResources()
+}
+
+func (d *CachedDiscoveryClient) ServerPreferredNamespacedResources() ([]unversioned.GroupVersionResource, error) {
+	return d.delegate.ServerPreferredNamespacedResources()
+}
+
+func (d *CachedDiscoveryClient) ServerVersion() (*version.Info, error) {
+	return d.delegate.ServerVersion()
+}
+
+func (d *CachedDiscoveryClient) SwaggerSchema(version unversioned.GroupVersion) (*swagger.ApiDeclaration, error) {
+	return d.delegate.SwaggerSchema()
+}
+
 // NewCachedDiscoveryClient creates a new DiscoveryClient.  cacheDirectory is the directory where discovery docs are held.  It must be unique per host:port combination to work well.
 func NewCachedDiscoveryClient(delegate discovery.DiscoveryInterface, cacheDirectory string, ttl time.Duration) *CachedDiscoveryClient {
-	return &CachedDiscoveryClient{DiscoveryInterface: delegate, cacheDirectory: cacheDirectory, ttl: ttl}
+	return &CachedDiscoveryClient{delegate: delegate, cacheDirectory: cacheDirectory, ttl: ttl}
 }
