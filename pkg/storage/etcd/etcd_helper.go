@@ -537,6 +537,11 @@ func (h *etcdHelper) GuaranteedUpdate(ctx context.Context, key string, ptrToType
 	}
 }
 
+func (h *etcdHelper) Xxx(ctx context.Context, key string, out runtime.Object, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, guess runtime.Object) error {
+	// Ignore the suggestion.
+	return h.GuaranteedUpdate(ctx, key, out, ignoreNotFound, preconditions, tryUpdate)
+}
+
 func (h *etcdHelper) prefixEtcdKey(key string) string {
 	if strings.HasPrefix(key, h.pathPrefix) {
 		return key

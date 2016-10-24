@@ -221,12 +221,44 @@ func (s *store) GuaranteedUpdate(ctx context.Context, key string, out runtime.Ob
 	if err != nil {
 		return err
 	}
-	for {
-		origState, err := s.getState(getResp, key, v, ignoreNotFound)
-		if err != nil {
-			return err
-		}
+	origState, err := s.getState(getResp, key, v, ignoreNotFound)
+	if err != nil {
+		return err
+	}
+	return s.guaranteedUpdate(ctx, key, out, ignoreNotFound, precondtions, tryUpdate, origState)
+}
 
+func (s *store) Xxx(ctx context.Context, key string, out runtime.Object, ignoreNotFound bool, precondtions *storage.Preconditions, tryUpdate storage.UpdateFunc, guess runtime.Object) error {
+	if guess == nil {
+		return s.GuaranteedUpdate(ctx, key, out, ignoreNotFound, precondtions, tryUpdate)
+	}
+
+	state := &objState{
+		obj:  guess,
+		meta: &storage.ResponseMeta{},
+	}
+	rv, err := s.versioner.ObjectResourceVersion(guess)
+	if err != nil {
+		return fmt.Errorf("couldn't get resource version: %v", err)
+	}
+	state.rev = int64(rv)
+	state.meta.ResourceVersion = uint64(state.rev)
+
+	// Since update object may have a resourceVersion set, we need to clear it here.
+	if err := s.versioner.UpdateObject(guess, 0); err != nil {
+		return errors.New("resourceVersion cannot be set on objects store in etcd")
+	}
+	state.data, err = runtime.Encode(s.codec, guess)
+	if err != nil {
+		return err
+	}
+	return s.guaranteedUpdate(ctx, key, out, ignoreNotFound, precondtions, tryUpdate, state)
+}
+
+func (s *store) guaranteedUpdate(
+	ctx context.Context, key string, out runtime.Object, ignoreNotFound bool,
+	precondtions *storage.Preconditions, tryUpdate storage.UpdateFunc, origState *objState) error {
+	for {
 		if err := checkPreconditions(key, precondtions, origState.obj); err != nil {
 			return err
 		}
@@ -260,8 +292,16 @@ func (s *store) GuaranteedUpdate(ctx context.Context, key string, out runtime.Ob
 			return err
 		}
 		if !txnResp.Succeeded {
-			getResp = (*clientv3.GetResponse)(txnResp.Responses[0].GetResponseRange())
+			getResp := (*clientv3.GetResponse)(txnResp.Responses[0].GetResponseRange())
 			glog.V(4).Infof("GuaranteedUpdate of %s failed because of a conflict, going to retry", key)
+			v, err := conversion.EnforcePtr(out)
+			if err != nil {
+				panic("unable to convert output object to pointer")
+			}
+			origState, err = s.getState(getResp, key, v, ignoreNotFound)
+			if err != nil {
+				return err
+			}
 			continue
 		}
 		putResp := txnResp.Responses[0].GetResponsePut()

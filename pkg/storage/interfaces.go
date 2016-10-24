@@ -167,4 +167,6 @@ type Interface interface {
 	//    }
 	// })
 	GuaranteedUpdate(ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool, precondtions *Preconditions, tryUpdate UpdateFunc) error
+
+	Xxx(ctx context.Context, key string, out runtime.Object, ignoreNotFound bool, precondtions *Preconditions, tryUpdate UpdateFunc, guess runtime.Object) error
 }

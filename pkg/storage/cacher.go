@@ -463,7 +463,21 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 
 // Implements storage.Interface.
 func (c *Cacher) GuaranteedUpdate(ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool, preconditions *Preconditions, tryUpdate UpdateFunc) error {
-	return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate)
+	var currObj runtime.Object
+	if elem, exists, err := c.watchCache.GetByKey(key); err == nil && exists {
+		var err error
+		currObj, err = api.Scheme.Copy(elem.(*storeElement).Object)
+		if err != nil {
+			glog.Errorf("couldn't copy object: %v", err)
+			currObj = nil
+		}
+	}
+	return c.storage.Xxx(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, currObj)
+}
+
+// Implements storage.Interface.
+func (c *Cacher) Xxx(ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool, preconditions *Preconditions, tryUpdate UpdateFunc, _ runtime.Object) error {
+	return c.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate)
 }
 
 func (c *Cacher) triggerValues(event *watchCacheEvent) ([]string, bool) {
