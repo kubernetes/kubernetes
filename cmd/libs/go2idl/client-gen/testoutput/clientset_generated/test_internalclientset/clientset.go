@@ -28,6 +28,7 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	TestgroupInternalversion() internalversiontestgroup.TestgroupInternalversionInterface
+	// Deprecated: please explicitly pick a version if possible.
 	Testgroup() internalversiontestgroup.TestgroupInternalversionInterface
 }
 
@@ -46,7 +47,8 @@ func (c *Clientset) TestgroupInternalversion() internalversiontestgroup.Testgrou
 	return c.TestgroupInternalversionClient
 }
 
-// Testgroup retrieves the TestgroupInternalversionClient
+// Deprecated: Testgroup retrieves the default version of TestgroupClient.
+// Please explicitly pick a version.
 func (c *Clientset) Testgroup() internalversiontestgroup.TestgroupInternalversionInterface {
 	if c == nil {
 		return nil

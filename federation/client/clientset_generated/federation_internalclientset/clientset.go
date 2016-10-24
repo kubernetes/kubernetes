@@ -30,10 +30,13 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	CoreInternalversion() internalversioncore.CoreInternalversionInterface
+	// Deprecated: please explicitly pick a version if possible.
 	Core() internalversioncore.CoreInternalversionInterface
 	ExtensionsInternalversion() internalversionextensions.ExtensionsInternalversionInterface
+	// Deprecated: please explicitly pick a version if possible.
 	Extensions() internalversionextensions.ExtensionsInternalversionInterface
 	FederationInternalversion() internalversionfederation.FederationInternalversionInterface
+	// Deprecated: please explicitly pick a version if possible.
 	Federation() internalversionfederation.FederationInternalversionInterface
 }
 
@@ -54,7 +57,8 @@ func (c *Clientset) CoreInternalversion() internalversioncore.CoreInternalversio
 	return c.CoreInternalversionClient
 }
 
-// Core retrieves the CoreInternalversionClient
+// Deprecated: Core retrieves the default version of CoreClient.
+// Please explicitly pick a version.
 func (c *Clientset) Core() internalversioncore.CoreInternalversionInterface {
 	if c == nil {
 		return nil
@@ -70,7 +74,8 @@ func (c *Clientset) ExtensionsInternalversion() internalversionextensions.Extens
 	return c.ExtensionsInternalversionClient
 }
 
-// Extensions retrieves the ExtensionsInternalversionClient
+// Deprecated: Extensions retrieves the default version of ExtensionsClient.
+// Please explicitly pick a version.
 func (c *Clientset) Extensions() internalversionextensions.ExtensionsInternalversionInterface {
 	if c == nil {
 		return nil
@@ -86,7 +91,8 @@ func (c *Clientset) FederationInternalversion() internalversionfederation.Federa
 	return c.FederationInternalversionClient
 }
 
-// Federation retrieves the FederationInternalversionClient
+// Deprecated: Federation retrieves the default version of FederationClient.
+// Please explicitly pick a version.
 func (c *Clientset) Federation() internalversionfederation.FederationInternalversionInterface {
 	if c == nil {
 		return nil

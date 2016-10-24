@@ -111,7 +111,8 @@ var clientsetInterfaceTemplate = `
 type Interface interface {
 	Discovery() $.DiscoveryInterface|raw$
     $range .allGroups$$.GroupVersion$() $.PackageName$.$.GroupVersion$Interface
-	$if .IsDefaultVersion$$.Group$() $.PackageName$.$.GroupVersion$Interface$end$
+	$if .IsDefaultVersion$// Deprecated: please explicitly pick a version if possible.
+	$.Group$() $.PackageName$.$.GroupVersion$Interface$end$
     $end$
 }
 `
@@ -137,7 +138,8 @@ func (c *Clientset) $.GroupVersion$() $.PackageName$.$.GroupVersion$Interface {
 `
 
 var clientsetInterfaceDefaultVersionImpl = `
-// $.Group$ retrieves the $.GroupVersion$Client
+// Deprecated: $.Group$ retrieves the default version of $.Group$Client.
+// Please explicitly pick a version.
 func (c *Clientset) $.Group$() $.PackageName$.$.GroupVersion$Interface {
 	if c == nil {
 		return nil

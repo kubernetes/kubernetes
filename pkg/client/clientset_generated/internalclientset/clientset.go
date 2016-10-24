@@ -38,26 +38,37 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	CoreInternalversion() internalversioncore.CoreInternalversionInterface
+	// Deprecated: please explicitly pick a version if possible.
 	Core() internalversioncore.CoreInternalversionInterface
 	AppsInternalversion() internalversionapps.AppsInternalversionInterface
+	// Deprecated: please explicitly pick a version if possible.
 	Apps() internalversionapps.AppsInternalversionInterface
 	AuthenticationInternalversion() internalversionauthentication.AuthenticationInternalversionInterface
+	// Deprecated: please explicitly pick a version if possible.
 	Authentication() internalversionauthentication.AuthenticationInternalversionInterface
 	AuthorizationInternalversion() internalversionauthorization.AuthorizationInternalversionInterface
+	// Deprecated: please explicitly pick a version if possible.
 	Authorization() internalversionauthorization.AuthorizationInternalversionInterface
 	AutoscalingInternalversion() internalversionautoscaling.AutoscalingInternalversionInterface
+	// Deprecated: please explicitly pick a version if possible.
 	Autoscaling() internalversionautoscaling.AutoscalingInternalversionInterface
 	BatchInternalversion() internalversionbatch.BatchInternalversionInterface
+	// Deprecated: please explicitly pick a version if possible.
 	Batch() internalversionbatch.BatchInternalversionInterface
 	CertificatesInternalversion() internalversioncertificates.CertificatesInternalversionInterface
+	// Deprecated: please explicitly pick a version if possible.
 	Certificates() internalversioncertificates.CertificatesInternalversionInterface
 	ExtensionsInternalversion() internalversionextensions.ExtensionsInternalversionInterface
+	// Deprecated: please explicitly pick a version if possible.
 	Extensions() internalversionextensions.ExtensionsInternalversionInterface
 	PolicyInternalversion() internalversionpolicy.PolicyInternalversionInterface
+	// Deprecated: please explicitly pick a version if possible.
 	Policy() internalversionpolicy.PolicyInternalversionInterface
 	RbacInternalversion() internalversionrbac.RbacInternalversionInterface
+	// Deprecated: please explicitly pick a version if possible.
 	Rbac() internalversionrbac.RbacInternalversionInterface
 	StorageInternalversion() internalversionstorage.StorageInternalversionInterface
+	// Deprecated: please explicitly pick a version if possible.
 	Storage() internalversionstorage.StorageInternalversionInterface
 }
 
@@ -86,7 +97,8 @@ func (c *Clientset) CoreInternalversion() internalversioncore.CoreInternalversio
 	return c.CoreInternalversionClient
 }
 
-// Core retrieves the CoreInternalversionClient
+// Deprecated: Core retrieves the default version of CoreClient.
+// Please explicitly pick a version.
 func (c *Clientset) Core() internalversioncore.CoreInternalversionInterface {
 	if c == nil {
 		return nil
@@ -102,7 +114,8 @@ func (c *Clientset) AppsInternalversion() internalversionapps.AppsInternalversio
 	return c.AppsInternalversionClient
 }
 
-// Apps retrieves the AppsInternalversionClient
+// Deprecated: Apps retrieves the default version of AppsClient.
+// Please explicitly pick a version.
 func (c *Clientset) Apps() internalversionapps.AppsInternalversionInterface {
 	if c == nil {
 		return nil
@@ -118,7 +131,8 @@ func (c *Clientset) AuthenticationInternalversion() internalversionauthenticatio
 	return c.AuthenticationInternalversionClient
 }
 
-// Authentication retrieves the AuthenticationInternalversionClient
+// Deprecated: Authentication retrieves the default version of AuthenticationClient.
+// Please explicitly pick a version.
 func (c *Clientset) Authentication() internalversionauthentication.AuthenticationInternalversionInterface {
 	if c == nil {
 		return nil
@@ -134,7 +148,8 @@ func (c *Clientset) AuthorizationInternalversion() internalversionauthorization.
 	return c.AuthorizationInternalversionClient
 }
 
-// Authorization retrieves the AuthorizationInternalversionClient
+// Deprecated: Authorization retrieves the default version of AuthorizationClient.
+// Please explicitly pick a version.
 func (c *Clientset) Authorization() internalversionauthorization.AuthorizationInternalversionInterface {
 	if c == nil {
 		return nil
@@ -150,7 +165,8 @@ func (c *Clientset) AutoscalingInternalversion() internalversionautoscaling.Auto
 	return c.AutoscalingInternalversionClient
 }
 
-// Autoscaling retrieves the AutoscalingInternalversionClient
+// Deprecated: Autoscaling retrieves the default version of AutoscalingClient.
+// Please explicitly pick a version.
 func (c *Clientset) Autoscaling() internalversionautoscaling.AutoscalingInternalversionInterface {
 	if c == nil {
 		return nil
@@ -166,7 +182,8 @@ func (c *Clientset) BatchInternalversion() internalversionbatch.BatchInternalver
 	return c.BatchInternalversionClient
 }
 
-// Batch retrieves the BatchInternalversionClient
+// Deprecated: Batch retrieves the default version of BatchClient.
+// Please explicitly pick a version.
 func (c *Clientset) Batch() internalversionbatch.BatchInternalversionInterface {
 	if c == nil {
 		return nil
@@ -182,7 +199,8 @@ func (c *Clientset) CertificatesInternalversion() internalversioncertificates.Ce
 	return c.CertificatesInternalversionClient
 }
 
-// Certificates retrieves the CertificatesInternalversionClient
+// Deprecated: Certificates retrieves the default version of CertificatesClient.
+// Please explicitly pick a version.
 func (c *Clientset) Certificates() internalversioncertificates.CertificatesInternalversionInterface {
 	if c == nil {
 		return nil
@@ -198,7 +216,8 @@ func (c *Clientset) ExtensionsInternalversion() internalversionextensions.Extens
 	return c.ExtensionsInternalversionClient
 }
 
-// Extensions retrieves the ExtensionsInternalversionClient
+// Deprecated: Extensions retrieves the default version of ExtensionsClient.
+// Please explicitly pick a version.
 func (c *Clientset) Extensions() internalversionextensions.ExtensionsInternalversionInterface {
 	if c == nil {
 		return nil
@@ -214,7 +233,8 @@ func (c *Clientset) PolicyInternalversion() internalversionpolicy.PolicyInternal
 	return c.PolicyInternalversionClient
 }
 
-// Policy retrieves the PolicyInternalversionClient
+// Deprecated: Policy retrieves the default version of PolicyClient.
+// Please explicitly pick a version.
 func (c *Clientset) Policy() internalversionpolicy.PolicyInternalversionInterface {
 	if c == nil {
 		return nil
@@ -230,7 +250,8 @@ func (c *Clientset) RbacInternalversion() internalversionrbac.RbacInternalversio
 	return c.RbacInternalversionClient
 }
 
-// Rbac retrieves the RbacInternalversionClient
+// Deprecated: Rbac retrieves the default version of RbacClient.
+// Please explicitly pick a version.
 func (c *Clientset) Rbac() internalversionrbac.RbacInternalversionInterface {
 	if c == nil {
 		return nil
@@ -246,7 +267,8 @@ func (c *Clientset) StorageInternalversion() internalversionstorage.StorageInter
 	return c.StorageInternalversionClient
 }
 
-// Storage retrieves the StorageInternalversionClient
+// Deprecated: Storage retrieves the default version of StorageClient.
+// Please explicitly pick a version.
 func (c *Clientset) Storage() internalversionstorage.StorageInternalversionInterface {
 	if c == nil {
 		return nil

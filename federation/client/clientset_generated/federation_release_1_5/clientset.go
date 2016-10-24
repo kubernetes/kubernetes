@@ -30,10 +30,13 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	CoreV1() v1core.CoreV1Interface
+	// Deprecated: please explicitly pick a version if possible.
 	Core() v1core.CoreV1Interface
 	ExtensionsV1beta1() v1beta1extensions.ExtensionsV1beta1Interface
+	// Deprecated: please explicitly pick a version if possible.
 	Extensions() v1beta1extensions.ExtensionsV1beta1Interface
 	FederationV1beta1() v1beta1federation.FederationV1beta1Interface
+	// Deprecated: please explicitly pick a version if possible.
 	Federation() v1beta1federation.FederationV1beta1Interface
 }
 
@@ -54,7 +57,8 @@ func (c *Clientset) CoreV1() v1core.CoreV1Interface {
 	return c.CoreV1Client
 }
 
-// Core retrieves the CoreV1Client
+// Deprecated: Core retrieves the default version of CoreClient.
+// Please explicitly pick a version.
 func (c *Clientset) Core() v1core.CoreV1Interface {
 	if c == nil {
 		return nil
@@ -70,7 +74,8 @@ func (c *Clientset) ExtensionsV1beta1() v1beta1extensions.ExtensionsV1beta1Inter
 	return c.ExtensionsV1beta1Client
 }
 
-// Extensions retrieves the ExtensionsV1beta1Client
+// Deprecated: Extensions retrieves the default version of ExtensionsClient.
+// Please explicitly pick a version.
 func (c *Clientset) Extensions() v1beta1extensions.ExtensionsV1beta1Interface {
 	if c == nil {
 		return nil
@@ -86,7 +91,8 @@ func (c *Clientset) FederationV1beta1() v1beta1federation.FederationV1beta1Inter
 	return c.FederationV1beta1Client
 }
 
-// Federation retrieves the FederationV1beta1Client
+// Deprecated: Federation retrieves the default version of FederationClient.
+// Please explicitly pick a version.
 func (c *Clientset) Federation() v1beta1federation.FederationV1beta1Interface {
 	if c == nil {
 		return nil

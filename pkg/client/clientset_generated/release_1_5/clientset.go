@@ -39,28 +39,39 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	CoreV1() v1core.CoreV1Interface
+	// Deprecated: please explicitly pick a version if possible.
 	Core() v1core.CoreV1Interface
 	AppsV1alpha1() v1alpha1apps.AppsV1alpha1Interface
+	// Deprecated: please explicitly pick a version if possible.
 	Apps() v1alpha1apps.AppsV1alpha1Interface
 	AuthenticationV1beta1() v1beta1authentication.AuthenticationV1beta1Interface
+	// Deprecated: please explicitly pick a version if possible.
 	Authentication() v1beta1authentication.AuthenticationV1beta1Interface
 	AuthorizationV1beta1() v1beta1authorization.AuthorizationV1beta1Interface
+	// Deprecated: please explicitly pick a version if possible.
 	Authorization() v1beta1authorization.AuthorizationV1beta1Interface
 	AutoscalingV1() v1autoscaling.AutoscalingV1Interface
+	// Deprecated: please explicitly pick a version if possible.
 	Autoscaling() v1autoscaling.AutoscalingV1Interface
 	BatchV2alpha1() v2alpha1batch.BatchV2alpha1Interface
 
 	BatchV1() v1batch.BatchV1Interface
+	// Deprecated: please explicitly pick a version if possible.
 	Batch() v1batch.BatchV1Interface
 	CertificatesV1alpha1() v1alpha1certificates.CertificatesV1alpha1Interface
+	// Deprecated: please explicitly pick a version if possible.
 	Certificates() v1alpha1certificates.CertificatesV1alpha1Interface
 	ExtensionsV1beta1() v1beta1extensions.ExtensionsV1beta1Interface
+	// Deprecated: please explicitly pick a version if possible.
 	Extensions() v1beta1extensions.ExtensionsV1beta1Interface
 	PolicyV1alpha1() v1alpha1policy.PolicyV1alpha1Interface
+	// Deprecated: please explicitly pick a version if possible.
 	Policy() v1alpha1policy.PolicyV1alpha1Interface
 	RbacV1alpha1() v1alpha1rbac.RbacV1alpha1Interface
+	// Deprecated: please explicitly pick a version if possible.
 	Rbac() v1alpha1rbac.RbacV1alpha1Interface
 	StorageV1beta1() v1beta1storage.StorageV1beta1Interface
+	// Deprecated: please explicitly pick a version if possible.
 	Storage() v1beta1storage.StorageV1beta1Interface
 }
 
@@ -90,7 +101,8 @@ func (c *Clientset) CoreV1() v1core.CoreV1Interface {
 	return c.CoreV1Client
 }
 
-// Core retrieves the CoreV1Client
+// Deprecated: Core retrieves the default version of CoreClient.
+// Please explicitly pick a version.
 func (c *Clientset) Core() v1core.CoreV1Interface {
 	if c == nil {
 		return nil
@@ -106,7 +118,8 @@ func (c *Clientset) AppsV1alpha1() v1alpha1apps.AppsV1alpha1Interface {
 	return c.AppsV1alpha1Client
 }
 
-// Apps retrieves the AppsV1alpha1Client
+// Deprecated: Apps retrieves the default version of AppsClient.
+// Please explicitly pick a version.
 func (c *Clientset) Apps() v1alpha1apps.AppsV1alpha1Interface {
 	if c == nil {
 		return nil
@@ -122,7 +135,8 @@ func (c *Clientset) AuthenticationV1beta1() v1beta1authentication.Authentication
 	return c.AuthenticationV1beta1Client
 }
 
-// Authentication retrieves the AuthenticationV1beta1Client
+// Deprecated: Authentication retrieves the default version of AuthenticationClient.
+// Please explicitly pick a version.
 func (c *Clientset) Authentication() v1beta1authentication.AuthenticationV1beta1Interface {
 	if c == nil {
 		return nil
@@ -138,7 +152,8 @@ func (c *Clientset) AuthorizationV1beta1() v1beta1authorization.AuthorizationV1b
 	return c.AuthorizationV1beta1Client
 }
 
-// Authorization retrieves the AuthorizationV1beta1Client
+// Deprecated: Authorization retrieves the default version of AuthorizationClient.
+// Please explicitly pick a version.
 func (c *Clientset) Authorization() v1beta1authorization.AuthorizationV1beta1Interface {
 	if c == nil {
 		return nil
@@ -154,7 +169,8 @@ func (c *Clientset) AutoscalingV1() v1autoscaling.AutoscalingV1Interface {
 	return c.AutoscalingV1Client
 }
 
-// Autoscaling retrieves the AutoscalingV1Client
+// Deprecated: Autoscaling retrieves the default version of AutoscalingClient.
+// Please explicitly pick a version.
 func (c *Clientset) Autoscaling() v1autoscaling.AutoscalingV1Interface {
 	if c == nil {
 		return nil
@@ -178,7 +194,8 @@ func (c *Clientset) BatchV1() v1batch.BatchV1Interface {
 	return c.BatchV1Client
 }
 
-// Batch retrieves the BatchV1Client
+// Deprecated: Batch retrieves the default version of BatchClient.
+// Please explicitly pick a version.
 func (c *Clientset) Batch() v1batch.BatchV1Interface {
 	if c == nil {
 		return nil
@@ -194,7 +211,8 @@ func (c *Clientset) CertificatesV1alpha1() v1alpha1certificates.CertificatesV1al
 	return c.CertificatesV1alpha1Client
 }
 
-// Certificates retrieves the CertificatesV1alpha1Client
+// Deprecated: Certificates retrieves the default version of CertificatesClient.
+// Please explicitly pick a version.
 func (c *Clientset) Certificates() v1alpha1certificates.CertificatesV1alpha1Interface {
 	if c == nil {
 		return nil
@@ -210,7 +228,8 @@ func (c *Clientset) ExtensionsV1beta1() v1beta1extensions.ExtensionsV1beta1Inter
 	return c.ExtensionsV1beta1Client
 }
 
-// Extensions retrieves the ExtensionsV1beta1Client
+// Deprecated: Extensions retrieves the default version of ExtensionsClient.
+// Please explicitly pick a version.
 func (c *Clientset) Extensions() v1beta1extensions.ExtensionsV1beta1Interface {
 	if c == nil {
 		return nil
@@ -226,7 +245,8 @@ func (c *Clientset) PolicyV1alpha1() v1alpha1policy.PolicyV1alpha1Interface {
 	return c.PolicyV1alpha1Client
 }
 
-// Policy retrieves the PolicyV1alpha1Client
+// Deprecated: Policy retrieves the default version of PolicyClient.
+// Please explicitly pick a version.
 func (c *Clientset) Policy() v1alpha1policy.PolicyV1alpha1Interface {
 	if c == nil {
 		return nil
@@ -242,7 +262,8 @@ func (c *Clientset) RbacV1alpha1() v1alpha1rbac.RbacV1alpha1Interface {
 	return c.RbacV1alpha1Client
 }
 
-// Rbac retrieves the RbacV1alpha1Client
+// Deprecated: Rbac retrieves the default version of RbacClient.
+// Please explicitly pick a version.
 func (c *Clientset) Rbac() v1alpha1rbac.RbacV1alpha1Interface {
 	if c == nil {
 		return nil
@@ -258,7 +279,8 @@ func (c *Clientset) StorageV1beta1() v1beta1storage.StorageV1beta1Interface {
 	return c.StorageV1beta1Client
 }
 
-// Storage retrieves the StorageV1beta1Client
+// Deprecated: Storage retrieves the default version of StorageClient.
+// Please explicitly pick a version.
 func (c *Clientset) Storage() v1beta1storage.StorageV1beta1Interface {
 	if c == nil {
 		return nil
