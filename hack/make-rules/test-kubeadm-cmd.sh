@@ -28,5 +28,4 @@ make -C "${KUBE_ROOT}" WHAT=cmd/kubeadm
 
 make -C "${KUBE_ROOT}" test \
   WHAT=cmd/kubeadm/app/cmd \
-  KUBE_GOFLAGS="-tags cmd" \
-  KUBE_TEST_ARGS="--kubeadm-path '${KUBEADM_PATH}'"
+  KUBE_TEST_ARGS="-run Cmd --kubeadm-path '${KUBEADM_PATH}'"
