@@ -18,7 +18,7 @@ limitations under the License.
 // Edited to include required boilerplate
 // Source: os (interfaces: FileInfo)
 
-package mock_os
+package testing
 
 import (
 	os "os"

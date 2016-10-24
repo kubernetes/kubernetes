@@ -19,6 +19,7 @@ package container
 import (
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -35,6 +36,7 @@ type OSInterface interface {
 	Chtimes(path string, atime time.Time, mtime time.Time) error
 	Pipe() (r *os.File, w *os.File, err error)
 	ReadDir(dirname string) ([]os.FileInfo, error)
+	Glob(pattern string) ([]string, error)
 }
 
 // RealOS is used to dispatch the real system level operations.
@@ -89,4 +91,10 @@ func (RealOS) Pipe() (r *os.File, w *os.File, err error) {
 // ReadDir will call ioutil.ReadDir to return the files under the directory.
 func (RealOS) ReadDir(dirname string) ([]os.FileInfo, error) {
 	return ioutil.ReadDir(dirname)
+}
+
+// Glob will call filepath.Glob to return the names of all files matching
+// pattern.
+func (RealOS) Glob(pattern string) ([]string, error) {
+	return filepath.Glob(pattern)
 }
