@@ -31,12 +31,12 @@ type ShortcutExpander struct {
 
 	All []unversioned.GroupResource
 
-	discoveryClient *discovery.DiscoveryClient
+	discoveryClient discovery.DiscoveryInterface
 }
 
 var _ meta.RESTMapper = &ShortcutExpander{}
 
-func NewShortcutExpander(delegate meta.RESTMapper, client *discovery.DiscoveryClient) ShortcutExpander {
+func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInterface) ShortcutExpander {
 	return ShortcutExpander{All: userResources, RESTMapper: delegate, discoveryClient: client}
 }
 
