@@ -27,7 +27,7 @@ kubectl:
 	cp ../../_output/local/bin/$(GOOS)/$(GOARCH)/kubectl .
 
 .tag: kubectl
-	./kubectl version --client | grep -o 'GitVersion:"[^"]*"' | sed 's/[^"]*"\([^"+]*\).*/\1/' > .tag
+	./kubectl version --verbose --client | grep -o 'GitVersion:"[^"]*"' | sed 's/[^"]*"\([^"+]*\).*/\1/' > .tag
 
 tag: .tag
 	@echo "Suggest using TAG=$(shell cat .tag)"
