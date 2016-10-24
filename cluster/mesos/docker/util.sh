@@ -169,7 +169,7 @@ function prepare-e2e {
 function test-build-release {
   # Make a release
   export KUBE_RELEASE_RUN_TESTS=N
-  "${KUBE_ROOT}/build/release.sh"
+  "${KUBE_ROOT}/build-tools/release.sh"
 }
 
 # Must ensure that the following ENV vars are set

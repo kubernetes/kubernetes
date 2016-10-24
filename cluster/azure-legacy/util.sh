@@ -522,7 +522,7 @@ function kube-down {
 #   KUBE_ROOT
 function test-build-release {
     # Make a release
-    "${KUBE_ROOT}/build/release.sh"
+    "${KUBE_ROOT}/build-tools/release.sh"
 }
 
 # SSH to a node by name ($1) and run a command ($2).

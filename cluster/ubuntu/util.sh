@@ -28,7 +28,7 @@ NODE_IPS=""
 #   KUBE_ROOT
 function test-build-release() {
   # Make a release
-  "${KUBE_ROOT}/build/release.sh"
+  "${KUBE_ROOT}/build-tools/release.sh"
 }
 
 # From user input set the necessary k8s and etcd configuration information
