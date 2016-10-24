@@ -163,30 +163,35 @@ func RegisterFakeCopyOnCreate(resource string, client *core.Fake, watcher *Watch
 	objChan := make(chan runtime.Object, 100)
 	client.AddReactor("create", resource, func(action core.Action) (bool, runtime.Object, error) {
 		createAction := action.(core.CreateAction)
-		obj := createAction.GetObject()
+		originalObj := createAction.GetObject()
+		// Create a copy of the object here to prevent data races while reading the object in go routine.
+		obj := copy(originalObj)
 		go func() {
+			glog.V(4).Infof("Object created. Writing to channel: %v", obj)
 			watcher.Add(obj)
-			objChan <- copy(obj)
+			objChan <- obj
 		}()
-		return true, obj, nil
+		return true, originalObj, nil
 	})
 	return objChan
 }
 
-// RegisterFakeCopyOnCreate registers a reactor in the given fake client that passes
+// RegisterFakeCopyOnUpdate registers a reactor in the given fake client that passes
 // all updated objects to the given watcher and also copies them to a channel for
 // in-test inspection.
 func RegisterFakeCopyOnUpdate(resource string, client *core.Fake, watcher *WatcherDispatcher) chan runtime.Object {
 	objChan := make(chan runtime.Object, 100)
 	client.AddReactor("update", resource, func(action core.Action) (bool, runtime.Object, error) {
 		updateAction := action.(core.UpdateAction)
-		obj := updateAction.GetObject()
+		originalObj := updateAction.GetObject()
+		// Create a copy of the object here to prevent data races while reading the object in go routine.
+		obj := copy(originalObj)
 		go func() {
 			glog.V(4).Infof("Object updated. Writing to channel: %v", obj)
 			watcher.Modify(obj)
-			objChan <- copy(obj)
+			objChan <- obj
 		}()
-		return true, obj, nil
+		return true, originalObj, nil
 	})
 	return objChan
 }
