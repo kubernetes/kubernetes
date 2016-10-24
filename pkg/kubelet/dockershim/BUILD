@@ -60,6 +60,7 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/kubelet/api/v1alpha1/runtime:go_default_library",
+        "//pkg/kubelet/container/testing:go_default_library",
         "//pkg/kubelet/dockertools:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/security/apparmor:go_default_library",

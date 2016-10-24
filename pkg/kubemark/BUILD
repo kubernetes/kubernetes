@@ -26,7 +26,6 @@ go_library(
         "//pkg/apis/componentconfig/v1alpha1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/record:go_default_library",
-        "//pkg/client/unversioned:go_default_library",
         "//pkg/kubelet:go_default_library",
         "//pkg/kubelet/cadvisor:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
