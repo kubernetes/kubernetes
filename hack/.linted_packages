@@ -204,6 +204,8 @@ test/images/fakegitserver
 test/images/goproxy
 test/images/mount-tester
 test/images/n-way-http
+test/images/net
+test/images/net/common
 test/images/port-forward-tester
 test/images/porter
 test/images/resource-consumer/consume-cpu
