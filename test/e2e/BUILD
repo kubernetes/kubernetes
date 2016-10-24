@@ -208,7 +208,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/client/unversioned:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/metrics:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//vendor:github.com/onsi/ginkgo",

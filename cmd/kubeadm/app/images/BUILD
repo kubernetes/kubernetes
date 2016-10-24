@@ -16,3 +16,11 @@ go_library(
     tags = ["automanaged"],
     deps = ["//cmd/kubeadm/app/apis/kubeadm:go_default_library"],
 )
+
+go_test(
+    name = "go_default_test",
+    srcs = ["images_test.go"],
+    library = "go_default_library",
+    tags = ["automanaged"],
+    deps = ["//cmd/kubeadm/app/apis/kubeadm:go_default_library"],
+)

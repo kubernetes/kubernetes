@@ -28,7 +28,6 @@ go_library(
         "//pkg/apis/extensions:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/client/unversioned:go_default_library",
         "//pkg/fields:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/runtime:go_default_library",

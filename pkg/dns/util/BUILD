@@ -12,7 +12,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["mockfileinfo.go"],
+    srcs = ["util.go"],
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/golang/mock/gomock"],
+    deps = [
+        "//vendor:github.com/golang/glog",
+        "//vendor:github.com/skynetservices/skydns/msg",
+    ],
 )
