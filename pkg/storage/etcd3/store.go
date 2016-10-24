@@ -211,22 +211,33 @@ func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.O
 }
 
 // GuaranteedUpdate implements storage.Interface.GuaranteedUpdate.
-func (s *store) GuaranteedUpdate(ctx context.Context, key string, out runtime.Object, ignoreNotFound bool, precondtions *storage.Preconditions, tryUpdate storage.UpdateFunc) error {
+func (s *store) GuaranteedUpdate(
+	ctx context.Context, key string, out runtime.Object, ignoreNotFound bool,
+	precondtions *storage.Preconditions, tryUpdate storage.UpdateFunc, suggestion ...runtime.Object) error {
 	v, err := conversion.EnforcePtr(out)
 	if err != nil {
 		panic("unable to convert output object to pointer")
 	}
 	key = keyWithPrefix(s.pathPrefix, key)
-	getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
-	if err != nil {
-		return err
-	}
-	for {
-		origState, err := s.getState(getResp, key, v, ignoreNotFound)
+
+	var origState *objState
+	if len(suggestion) == 1 && suggestion[0] != nil {
+		origState, err = s.getStateFromObject(suggestion[0])
 		if err != nil {
 			return err
 		}
+	} else {
+		getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
+		if err != nil {
+			return err
+		}
+		origState, err = s.getState(getResp, key, v, ignoreNotFound)
+		if err != nil {
+			return err
+		}
+	}
 
+	for {
 		if err := checkPreconditions(key, precondtions, origState.obj); err != nil {
 			return err
 		}
@@ -260,8 +271,12 @@ func (s *store) GuaranteedUpdate(ctx context.Context, key string, out runtime.Ob
 			return err
 		}
 		if !txnResp.Succeeded {
-			getResp = (*clientv3.GetResponse)(txnResp.Responses[0].GetResponseRange())
+			getResp := (*clientv3.GetResponse)(txnResp.Responses[0].GetResponseRange())
 			glog.V(4).Infof("GuaranteedUpdate of %s failed because of a conflict, going to retry", key)
+			origState, err = s.getState(getResp, key, v, ignoreNotFound)
+			if err != nil {
+				return err
+			}
 			continue
 		}
 		putResp := txnResp.Responses[0].GetResponsePut()
@@ -366,6 +381,32 @@ func (s *store) getState(getResp *clientv3.GetResponse, key string, v reflect.Va
 			return nil, err
 		}
 	}
+	return state, nil
+}
+
+func (s *store) getStateFromObject(obj runtime.Object) (*objState, error) {
+	state := &objState{
+		obj:  obj,
+		meta: &storage.ResponseMeta{},
+	}
+
+	rv, err := s.versioner.ObjectResourceVersion(obj)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't get resource version: %v", err)
+	}
+	state.rev = int64(rv)
+	state.meta.ResourceVersion = uint64(state.rev)
+
+	// Compute the serialized form - for that we need to temporarily clean
+	// its resource version field (those are not stored in etcd).
+	if err := s.versioner.UpdateObject(obj, 0); err != nil {
+		return nil, errors.New("resourceVersion cannot be set on objects store in etcd")
+	}
+	state.data, err = runtime.Encode(s.codec, obj)
+	if err != nil {
+		return nil, err
+	}
+	s.versioner.UpdateObject(state.obj, uint64(rv))
 	return state, nil
 }
 
