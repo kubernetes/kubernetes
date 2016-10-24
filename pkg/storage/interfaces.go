@@ -147,6 +147,9 @@ type Interface interface {
 	// or zero value in 'ptrToType' parameter otherwise.
 	// If the object to update has the same value as previous, it won't do any update
 	// but will return the object in 'ptrToType' parameter.
+	// If 'suggestion' can contain zero or one element - in such case this can be used as
+	// a suggestion about the current version of the object to avoid read operation from
+	// storage to get it.
 	//
 	// Example:
 	//
@@ -166,5 +169,7 @@ type Interface interface {
 	//       return cur, nil, nil
 	//    }
 	// })
-	GuaranteedUpdate(ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool, precondtions *Preconditions, tryUpdate UpdateFunc) error
+	GuaranteedUpdate(
+		ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool,
+		precondtions *Preconditions, tryUpdate UpdateFunc, suggestion ...runtime.Object) error
 }
