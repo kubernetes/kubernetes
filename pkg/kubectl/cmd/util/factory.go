@@ -178,6 +178,9 @@ type Factory interface {
 	PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (kubectl.ResourcePrinter, error)
 	// One stop shopping for a Builder
 	NewBuilder() *resource.Builder
+
+	// SuggestedPodTemplateResources returns a list of resource types that declare a pod template
+	SuggestedPodTemplateResources() []unversioned.GroupResource
 }
 
 const (
@@ -1333,6 +1336,16 @@ func (f *factory) NewBuilder() *resource.Builder {
 	return resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true))
 }
 
+func (f *factory) SuggestedPodTemplateResources() []unversioned.GroupResource {
+	return []unversioned.GroupResource{
+		{Resource: "replicationcontroller"},
+		{Resource: "deployment"},
+		{Resource: "daemonset"},
+		{Resource: "job"},
+		{Resource: "replicaset"},
+	}
+}
+
 // registerThirdPartyResources inspects the discovery endpoint to find thirdpartyresources in the discovery doc
 // and then registers them with the apimachinery code.  I think this is done so that scheme/codec stuff works,
 // but I really don't know.  Feels like this code should go away once kubectl is completely generic for generic
@@ -1382,21 +1395,4 @@ func registerThirdPartyResources(discoveryClient discovery.DiscoveryInterface) e
 	}
 
 	return nil
-}
-
-func ResourcesWithPodSpecs() []*meta.RESTMapping {
-	restMaps := []*meta.RESTMapping{}
-	resourcesWithTemplates := []string{"ReplicationController", "Deployment", "DaemonSet", "Job", "ReplicaSet"}
-	mapper, _ := NewFactory(nil).Object()
-
-	for _, resource := range resourcesWithTemplates {
-		restmap, err := mapper.RESTMapping(unversioned.GroupKind{Kind: resource})
-		if err == nil {
-			restMaps = append(restMaps, restmap)
-		} else {
-			mapping, _ := mapper.RESTMapping(extensions.Kind(resource))
-			restMaps = append(restMaps, mapping)
-		}
-	}
-	return restMaps
 }

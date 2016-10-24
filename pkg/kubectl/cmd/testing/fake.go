@@ -340,6 +340,10 @@ func (f *FakeFactory) DefaultResourceFilterFunc() kubectl.Filters {
 	return nil
 }
 
+func (f *FakeFactory) SuggestedPodTemplateResources() []unversioned.GroupResource {
+	return []unversioned.GroupResource{}
+}
+
 type fakeMixedFactory struct {
 	cmdutil.Factory
 	tf        *TestFactory
@@ -505,6 +509,10 @@ func (f *fakeAPIFactory) NewBuilder() *resource.Builder {
 	mapper, typer := f.Object()
 
 	return resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true))
+}
+
+func (f *fakeAPIFactory) SuggestedPodTemplateResources() []unversioned.GroupResource {
+	return []unversioned.GroupResource{}
 }
 
 func NewAPIFactory() (cmdutil.Factory, *TestFactory, runtime.Codec, runtime.NegotiatedSerializer) {
