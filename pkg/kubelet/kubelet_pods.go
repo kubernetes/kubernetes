@@ -133,10 +133,11 @@ func makeHostsMount(podDir, podIP, hostName, hostDomainName string) (*kubecontai
 		return nil, err
 	}
 	return &kubecontainer.Mount{
-		Name:          "k8s-managed-etc-hosts",
-		ContainerPath: etcHostsPath,
-		HostPath:      hostsFilePath,
-		ReadOnly:      false,
+		Name:           "k8s-managed-etc-hosts",
+		ContainerPath:  etcHostsPath,
+		HostPath:       hostsFilePath,
+		ReadOnly:       false,
+		SELinuxRelabel: true,
 	}, nil
 }
 
