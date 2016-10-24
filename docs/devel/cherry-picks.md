@@ -79,7 +79,7 @@ tracking the tool to automate the batching procedure.
 #### Cherrypicking a doc change
 
 If you are cherrypicking a change which adds a doc, then you also need to run
-`build/versionize-docs.sh` in the release branch to versionize that doc.
+`build-tools/versionize-docs.sh` in the release branch to versionize that doc.
 Ideally, just running `hack/cherry_pick_pull.sh` should be enough, but we are
 not there yet: [#18861](https://github.com/kubernetes/kubernetes/issues/18861)
 
@@ -89,7 +89,7 @@ running `hack/cherry_pick_pull.sh` and before merging the PR:
 ```
 $ git checkout -b automated-cherry-pick-of-#123456-upstream-release-3.14
 origin/automated-cherry-pick-of-#123456-upstream-release-3.14
-$ ./build/versionize-docs.sh release-3.14
+$ ./build-tools/versionize-docs.sh release-3.14
 $ git commit -a -m "Running versionize docs"
 $ git push origin automated-cherry-pick-of-#123456-upstream-release-3.14
 ```

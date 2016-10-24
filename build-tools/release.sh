@@ -26,8 +26,8 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/build/common.sh"
-source "${KUBE_ROOT}/build/lib/release.sh"
+source "${KUBE_ROOT}/build-tools/common.sh"
+source "${KUBE_ROOT}/build-tools/lib/release.sh"
 
 KUBE_RELEASE_RUN_TESTS=${KUBE_RELEASE_RUN_TESTS-y}
 
@@ -44,7 +44,7 @@ kube::build::copy_output
 
 if [[ "${FEDERATION:-}" == "true" ]];then
     (
-	source "${KUBE_ROOT}/build/util.sh"
+	source "${KUBE_ROOT}/build-tools/util.sh"
 	# Write federated docker image tag to workspace
 	kube::release::semantic_image_tag_version > "${KUBE_ROOT}/federation/manifests/federated-image.tag"
     )

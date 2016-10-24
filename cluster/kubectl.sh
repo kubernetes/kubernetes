@@ -97,7 +97,7 @@ if [[ -z "${KUBECTL_PATH:-}" ]]; then
       echo "It looks as if you don't have a compiled kubectl binary"
       echo
       echo "If you are running from a clone of the git repo, please run"
-      echo "'./build/run.sh make cross'. Note that this requires having"
+      echo "'./build-tools/run.sh make cross'. Note that this requires having"
       echo "Docker installed."
       echo
       echo "If you are running from a binary release tarball, something is wrong. "

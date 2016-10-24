@@ -26,4 +26,4 @@ $ make push ARCH=ppc64le
 If you don't want to push the images, run `make` or `make build` instead
 
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/build/debian-iptables/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/build-tools/debian-iptables/README.md?pixel)]()

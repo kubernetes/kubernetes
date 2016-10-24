@@ -19,21 +19,21 @@ While it is possible to build Kubernetes using a local golang installation, we h
 
 ## Key scripts
 
-The following scripts are found in the `build/` directory. Note that all scripts must be run from the Kubernetes root directory.
+The following scripts are found in the `build-tools/` directory. Note that all scripts must be run from the Kubernetes root directory.
 
-* `build/run.sh`: Run a command in a build docker container.  Common invocations:
-  *  `build/run.sh make`: Build just linux binaries in the container.  Pass options and packages as necessary.
-  *  `build/run.sh make cross`: Build all binaries for all platforms
-  *  `build/run.sh make test`: Run all unit tests
-  *  `build/run.sh make test-integration`: Run integration test
-  *  `build/run.sh make test-cmd`: Run CLI tests
-* `build/copy-output.sh`: This will copy the contents of `_output/dockerized/bin` from the Docker container to the local `_output/dockerized/bin`. It will also copy out specific file patterns that are generated as part of the build process. This is run automatically as part of `build/run.sh`.
-* `build/make-clean.sh`: Clean out the contents of `_output`, remove any locally built container images and remove the data container.
-* `/build/shell.sh`: Drop into a `bash` shell in a build container with a snapshot of the current repo code.
+* `build-tools/run.sh`: Run a command in a build docker container.  Common invocations:
+  *  `build-tools/run.sh make`: Build just linux binaries in the container.  Pass options and packages as necessary.
+  *  `build-tools/run.sh make cross`: Build all binaries for all platforms
+  *  `build-tools/run.sh make test`: Run all unit tests
+  *  `build-tools/run.sh make test-integration`: Run integration test
+  *  `build-tools/run.sh make test-cmd`: Run CLI tests
+* `build-tools/copy-output.sh`: This will copy the contents of `_output/dockerized/bin` from the Docker container to the local `_output/dockerized/bin`. It will also copy out specific file patterns that are generated as part of the build process. This is run automatically as part of `build-tools/run.sh`.
+* `build-tools/make-clean.sh`: Clean out the contents of `_output`, remove any locally built container images and remove the data container.
+* `/build-tools/shell.sh`: Drop into a `bash` shell in a build container with a snapshot of the current repo code.
 
 ## Basic Flow
 
-The scripts directly under `build/` are used to build and test.  They will ensure that the `kube-build` Docker image is built (based on `build/build-image/Dockerfile`) and then execute the appropriate command in that container.  These scripts will both ensure that the right data is cached from run to run for incremental builds and will copy the results back out of the container.
+The scripts directly under `build-tools/` are used to build and test.  They will ensure that the `kube-build` Docker image is built (based on `build-tools/build-image/Dockerfile`) and then execute the appropriate command in that container.  These scripts will both ensure that the right data is cached from run to run for incremental builds and will copy the results back out of the container.
 
 The `kube-build` container image is built by first creating a "context" directory in `_output/images/build-image`.  It is done there instead of at the root of the Kubernetes repo to minimize the amount of data we need to package up when building the image.
 
@@ -92,7 +92,7 @@ Look at `docker-machine stop`, `docker-machine start` and `docker-machine rm` to
 
 ## Releasing
 
-The `build/release.sh` script will build a release.  It will build binaries, run tests, (optionally) build runtime Docker images.
+The `build-tools/release.sh` script will build a release.  It will build binaries, run tests, (optionally) build runtime Docker images.
 
 The main output is a tar file: `kubernetes.tar.gz`.  This includes:
 * Cross compiled client utilities.
@@ -109,4 +109,4 @@ In addition, there are some other tar files that are created:
 
 When building final release tars, they are first staged into `_output/release-stage` before being tar'd up and put into `_output/release-tars`.
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/build/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/build-tools/README.md?pixel)]()
