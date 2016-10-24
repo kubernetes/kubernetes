@@ -148,7 +148,7 @@ set:
 ```
 
 Second, you need to start the DNS server ReplicationController and Service. See
-the example files ([ReplicationController](../../cluster/addns/dns/skydns-rc.yaml.in) and
+the example files ([ReplicationController](../../cluster/addons/dns/skydns-rc.yaml.in) and
 [Service](../../cluster/addons/dns/skydns-svc.yaml.in)), but keep in mind that these are templated for
 Salt.  You will need to replace the `{{ <param> }}` blocks with your own values
 for the config variables mentioned above.  Other than the templating, these are
