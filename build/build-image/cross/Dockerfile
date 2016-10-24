@@ -53,13 +53,15 @@ RUN mkdir -p /usr/local/src/protobuf \
 
 # Use dynamic cgo linking for architectures other than amd64 for the server platforms
 # More info here: https://wiki.debian.org/CrossToolchains
-RUN echo "deb http://emdebian.org/tools/debian/ jessie main" > /etc/apt/sources.list.d/cgocrosscompiling.list \
-  && curl -s http://emdebian.org/tools/debian/emdebian-toolchain-archive.key | apt-key add - \
+RUN echo "deb http://ftp.de.debian.org/debian sid main" > /etc/apt/sources.list.d/cgocrosscompiling.list \
   && for platform in ${KUBE_DYNAMIC_CROSSPLATFORMS}; do dpkg --add-architecture ${platform}; done \
   && apt-get update \
   && apt-get install -y build-essential \
+  && apt-get install -y gcc-s390x-linux-gnu linux-libc-dev-s390x-cross \
   && for platform in ${KUBE_DYNAMIC_CROSSPLATFORMS}; do apt-get install -y crossbuild-essential-${platform}; done \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
+  
+ENV KUBE_DYNAMIC_CROSSPLATFORMS $KUBE_DYNAMIC_CROSSPLATFORMS s390x  
 
 # work around 64MB tmpfs size in Docker 1.6
 ENV TMPDIR /tmp.k8s
