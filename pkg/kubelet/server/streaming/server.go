@@ -36,7 +36,7 @@ import (
 )
 
 // The library interface to serve the stream requests.
-type StreamServer interface {
+type Server interface {
 	http.Handler
 
 	// Get the serving URL for the requests. Server must be started before these are called.
@@ -83,7 +83,7 @@ var DefaultConfig = Config{
 }
 
 // TODO(timstclair): Add auth(n/z) interface & handling.
-func NewServer(config Config, runtime Runtime) (StreamServer, error) {
+func NewServer(config Config, runtime Runtime) (Server, error) {
 	s := &server{
 		config:  config,
 		runtime: &criAdapter{runtime},
