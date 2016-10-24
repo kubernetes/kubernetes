@@ -168,7 +168,7 @@ func SyncOne(sj batch.ScheduledJob, js []batch.Job, now time.Time, jc jobControl
 		return
 	}
 	if len(times) > 1 {
-		glog.Errorf("Multiple unmet start times for %s so only starting last one", nameForLog)
+		glog.V(4).Infof("Multiple unmet start times for %s so only starting last one", nameForLog)
 	}
 	scheduledTime := times[len(times)-1]
 	tooLate := false
@@ -176,7 +176,7 @@ func SyncOne(sj batch.ScheduledJob, js []batch.Job, now time.Time, jc jobControl
 		tooLate = scheduledTime.Add(time.Second * time.Duration(*sj.Spec.StartingDeadlineSeconds)).Before(now)
 	}
 	if tooLate {
-		glog.Errorf("Missed starting window for %s", nameForLog)
+		glog.V(4).Infof("Missed starting window for %s", nameForLog)
 		// TODO: generate an event for a miss.  Use a warning level event because it indicates a
 		// problem with the controller (restart or long queue), and is not expected by user either.
 		// Since we don't set LastScheduleTime when not scheduling, we are going to keep noticing
@@ -198,14 +198,15 @@ func SyncOne(sj batch.ScheduledJob, js []batch.Job, now time.Time, jc jobControl
 		// TODO: for Forbid, we could use the same name for every execution, as a lock.
 		// With replace, we could use a name that is deterministic per execution time.
 		// But that would mean that you could not inspect prior successes or failures of Forbid jobs.
-		glog.V(4).Infof("Not starting job for %s because of prior execution still running and concurrency policy is Forbid.", nameForLog)
+		glog.V(4).Infof("Not starting job for %s because of prior execution still running and concurrency policy is Forbid", nameForLog)
 		return
 	}
 	if sj.Spec.ConcurrencyPolicy == batch.ReplaceConcurrent {
-		for _, j := range sj.Status.Active {
+		for i := range sj.Status.Active {
+			j := sj.Status.Active[i]
 			// TODO: this should be replaced with server side job deletion
 			// currently this mimics JobReaper from pkg/kubectl/stop.go
-			glog.V(4).Infof("Deleting job %s of %s s that was still running at next scheduled start time", j.Name, nameForLog)
+			glog.V(4).Infof("Deleting job %s of %s that was still running at next scheduled start time", j.Name, nameForLog)
 			job, err := jc.GetJob(j.Namespace, j.Name)
 			if err != nil {
 				recorder.Eventf(&sj, api.EventTypeWarning, "FailedGet", "Get job: %v", err)
@@ -241,11 +242,14 @@ func SyncOne(sj batch.ScheduledJob, js []batch.Job, now time.Time, jc jobControl
 				recorder.Eventf(&sj, api.EventTypeWarning, "FailedDelete", "Deleted job-pods: %v", utilerrors.NewAggregate(errList))
 				return
 			}
-			// ... and the job itself
+			// ... the job itself...
 			if err := jc.DeleteJob(job.Namespace, job.Name); err != nil {
 				recorder.Eventf(&sj, api.EventTypeWarning, "FailedDelete", "Deleted job: %v", err)
+				glog.Errorf("Error deleting job %s from %s: %v", job.Name, nameForLog, err)
 				return
 			}
+			// ... and its reference from active list
+			deleteFromActiveList(&sj, job.ObjectMeta.UID)
 			recorder.Eventf(&sj, api.EventTypeNormal, "SuccessfulDelete", "Deleted job %v", j.Name)
 		}
 	}
@@ -260,6 +264,7 @@ func SyncOne(sj batch.ScheduledJob, js []batch.Job, now time.Time, jc jobControl
 		recorder.Eventf(&sj, api.EventTypeWarning, "FailedCreate", "Error creating job: %v", err)
 		return
 	}
+	glog.V(4).Infof("Created Job %s for %s", jobResp.Name, nameForLog)
 	recorder.Eventf(&sj, api.EventTypeNormal, "SuccessfulCreate", "Created job %v", jobResp.Name)
 
 	// ------------------------------------------------------------------ //

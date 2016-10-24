@@ -79,7 +79,7 @@ func scheduledJob() batch.ScheduledJob {
 			Name:              "myscheduledjob",
 			Namespace:         "snazzycats",
 			UID:               types.UID("1a2b3c"),
-			SelfLink:          "/apis/batch/v2alpha1/namespaces/snazzycats/jobs/myscheduledjob",
+			SelfLink:          "/apis/batch/v2alpha1/namespaces/snazzycats/scheduledjobs/myscheduledjob",
 			CreationTimestamp: unversioned.Time{Time: justBeforeTheHour()},
 		},
 		Spec: batch.ScheduledJobSpec{
@@ -140,7 +140,6 @@ var (
 )
 
 func TestSyncOne_RunOrNot(t *testing.T) {
-
 	testCases := map[string]struct {
 		// sj spec
 		concurrencyPolicy batch.ConcurrencyPolicy
@@ -158,39 +157,39 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 		// expectations
 		expectCreate bool
 		expectDelete bool
+		expectActive int
 	}{
-		"never ran, not time, A":                {A, F, onTheHour, noDead, F, F, justBeforeTheHour(), F, F},
-		"never ran, not time, F":                {f, F, onTheHour, noDead, F, F, justBeforeTheHour(), F, F},
-		"never ran, not time, R":                {R, F, onTheHour, noDead, F, F, justBeforeTheHour(), F, F},
-		"never ran, is time, A":                 {A, F, onTheHour, noDead, F, F, justAfterTheHour(), T, F},
-		"never ran, is time, F":                 {f, F, onTheHour, noDead, F, F, justAfterTheHour(), T, F},
-		"never ran, is time, R":                 {R, F, onTheHour, noDead, F, F, justAfterTheHour(), T, F},
-		"never ran, is time, suspended":         {A, T, onTheHour, noDead, F, F, justAfterTheHour(), F, F},
-		"never ran, is time, past deadline":     {A, F, onTheHour, shortDead, F, F, justAfterTheHour(), F, F},
-		"never ran, is time, not past deadline": {A, F, onTheHour, longDead, F, F, justAfterTheHour(), T, F},
+		"never ran, not time, A":                {A, F, onTheHour, noDead, F, F, justBeforeTheHour(), F, F, 0},
+		"never ran, not time, F":                {f, F, onTheHour, noDead, F, F, justBeforeTheHour(), F, F, 0},
+		"never ran, not time, R":                {R, F, onTheHour, noDead, F, F, justBeforeTheHour(), F, F, 0},
+		"never ran, is time, A":                 {A, F, onTheHour, noDead, F, F, justAfterTheHour(), T, F, 1},
+		"never ran, is time, F":                 {f, F, onTheHour, noDead, F, F, justAfterTheHour(), T, F, 1},
+		"never ran, is time, R":                 {R, F, onTheHour, noDead, F, F, justAfterTheHour(), T, F, 1},
+		"never ran, is time, suspended":         {A, T, onTheHour, noDead, F, F, justAfterTheHour(), F, F, 0},
+		"never ran, is time, past deadline":     {A, F, onTheHour, shortDead, F, F, justAfterTheHour(), F, F, 0},
+		"never ran, is time, not past deadline": {A, F, onTheHour, longDead, F, F, justAfterTheHour(), T, F, 1},
 
-		"prev ran but done, not time, A":                {A, F, onTheHour, noDead, T, F, justBeforeTheHour(), F, F},
-		"prev ran but done, not time, F":                {f, F, onTheHour, noDead, T, F, justBeforeTheHour(), F, F},
-		"prev ran but done, not time, R":                {R, F, onTheHour, noDead, T, F, justBeforeTheHour(), F, F},
-		"prev ran but done, is time, A":                 {A, F, onTheHour, noDead, T, F, justAfterTheHour(), T, F},
-		"prev ran but done, is time, F":                 {f, F, onTheHour, noDead, T, F, justAfterTheHour(), T, F},
-		"prev ran but done, is time, R":                 {R, F, onTheHour, noDead, T, F, justAfterTheHour(), T, F},
-		"prev ran but done, is time, suspended":         {A, T, onTheHour, noDead, T, F, justAfterTheHour(), F, F},
-		"prev ran but done, is time, past deadline":     {A, F, onTheHour, shortDead, T, F, justAfterTheHour(), F, F},
-		"prev ran but done, is time, not past deadline": {A, F, onTheHour, longDead, T, F, justAfterTheHour(), T, F},
+		"prev ran but done, not time, A":                {A, F, onTheHour, noDead, T, F, justBeforeTheHour(), F, F, 0},
+		"prev ran but done, not time, F":                {f, F, onTheHour, noDead, T, F, justBeforeTheHour(), F, F, 0},
+		"prev ran but done, not time, R":                {R, F, onTheHour, noDead, T, F, justBeforeTheHour(), F, F, 0},
+		"prev ran but done, is time, A":                 {A, F, onTheHour, noDead, T, F, justAfterTheHour(), T, F, 1},
+		"prev ran but done, is time, F":                 {f, F, onTheHour, noDead, T, F, justAfterTheHour(), T, F, 1},
+		"prev ran but done, is time, R":                 {R, F, onTheHour, noDead, T, F, justAfterTheHour(), T, F, 1},
+		"prev ran but done, is time, suspended":         {A, T, onTheHour, noDead, T, F, justAfterTheHour(), F, F, 0},
+		"prev ran but done, is time, past deadline":     {A, F, onTheHour, shortDead, T, F, justAfterTheHour(), F, F, 0},
+		"prev ran but done, is time, not past deadline": {A, F, onTheHour, longDead, T, F, justAfterTheHour(), T, F, 1},
 
-		"still active, not time, A":                {A, F, onTheHour, noDead, T, T, justBeforeTheHour(), F, F},
-		"still active, not time, F":                {f, F, onTheHour, noDead, T, T, justBeforeTheHour(), F, F},
-		"still active, not time, R":                {R, F, onTheHour, noDead, T, T, justBeforeTheHour(), F, F},
-		"still active, is time, A":                 {A, F, onTheHour, noDead, T, T, justAfterTheHour(), T, F},
-		"still active, is time, F":                 {f, F, onTheHour, noDead, T, T, justAfterTheHour(), F, F},
-		"still active, is time, R":                 {R, F, onTheHour, noDead, T, T, justAfterTheHour(), T, T},
-		"still active, is time, suspended":         {A, T, onTheHour, noDead, T, T, justAfterTheHour(), F, F},
-		"still active, is time, past deadline":     {A, F, onTheHour, shortDead, T, T, justAfterTheHour(), F, F},
-		"still active, is time, not past deadline": {A, F, onTheHour, longDead, T, T, justAfterTheHour(), T, F},
+		"still active, not time, A":                {A, F, onTheHour, noDead, T, T, justBeforeTheHour(), F, F, 1},
+		"still active, not time, F":                {f, F, onTheHour, noDead, T, T, justBeforeTheHour(), F, F, 1},
+		"still active, not time, R":                {R, F, onTheHour, noDead, T, T, justBeforeTheHour(), F, F, 1},
+		"still active, is time, A":                 {A, F, onTheHour, noDead, T, T, justAfterTheHour(), T, F, 2},
+		"still active, is time, F":                 {f, F, onTheHour, noDead, T, T, justAfterTheHour(), F, F, 1},
+		"still active, is time, R":                 {R, F, onTheHour, noDead, T, T, justAfterTheHour(), T, T, 1},
+		"still active, is time, suspended":         {A, T, onTheHour, noDead, T, T, justAfterTheHour(), F, F, 1},
+		"still active, is time, past deadline":     {A, F, onTheHour, shortDead, T, T, justAfterTheHour(), F, F, 1},
+		"still active, is time, not past deadline": {A, F, onTheHour, longDead, T, T, justAfterTheHour(), T, F, 2},
 	}
 	for name, tc := range testCases {
-		t.Log("Test case:", name)
 		sj := scheduledJob()
 		sj.Spec.ConcurrencyPolicy = tc.concurrencyPolicy
 		sj.Spec.Suspend = &tc.suspend
@@ -209,7 +208,7 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 			sj.Status.LastScheduleTime = &unversioned.Time{Time: justAfterThePriorHour()}
 			job, err = getJobFromTemplate(&sj, sj.Status.LastScheduleTime.Time)
 			if err != nil {
-				t.Fatalf("Unexpected error creating a job from template: %v", err)
+				t.Fatalf("%s: nexpected error creating a job from template: %v", name, err)
 			}
 			job.UID = "1234"
 			job.Namespace = ""
@@ -220,7 +219,7 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 		} else {
 			sj.ObjectMeta.CreationTimestamp = unversioned.Time{Time: justBeforeTheHour()}
 			if tc.stillActive {
-				t.Errorf("Test setup error: this case makes no sense.")
+				t.Errorf("%s: test setup error: this case makes no sense", name)
 			}
 		}
 
@@ -235,7 +234,7 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 			expectedCreates = 1
 		}
 		if len(jc.Jobs) != expectedCreates {
-			t.Errorf("Expected %d job started, actually %v", expectedCreates, len(jc.Jobs))
+			t.Errorf("%s: expected %d job started, actually %v", name, expectedCreates, len(jc.Jobs))
 		}
 
 		expectedDeletes := 0
@@ -243,18 +242,25 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 			expectedDeletes = 1
 		}
 		if len(jc.DeleteJobName) != expectedDeletes {
-			t.Errorf("Expected %d job deleted, actually %v", expectedDeletes, len(jc.DeleteJobName))
+			t.Errorf("%s: expected %d job deleted, actually %v", name, expectedDeletes, len(jc.DeleteJobName))
 		}
 
+		// Status update happens once when ranging through job list, and another one if create jobs.
+		expectUpdates := 1
 		expectedEvents := 0
 		if tc.expectCreate {
-			expectedEvents += 1
+			expectedEvents++
+			expectUpdates++
 		}
 		if tc.expectDelete {
-			expectedEvents += 1
+			expectedEvents++
 		}
 		if len(recorder.Events) != expectedEvents {
-			t.Errorf("Expected %d event, actually %v", expectedEvents, len(recorder.Events))
+			t.Errorf("%s: expected %d event, actually %v", name, expectedEvents, len(recorder.Events))
+		}
+
+		if tc.expectActive != len(sjc.Updates[expectUpdates-1].Status.Active) {
+			t.Errorf("%s: expected Active size %d, got %d", name, tc.expectActive, len(sjc.Updates[expectUpdates-1].Status.Active))
 		}
 	}
 }
@@ -331,7 +337,6 @@ func TestSyncOne_Status(t *testing.T) {
 	}
 
 	for name, tc := range testCases {
-		t.Log("Test case:", name)
 		// Setup the test
 		sj := scheduledJob()
 		sj.Spec.ConcurrencyPolicy = tc.concurrencyPolicy
@@ -345,7 +350,7 @@ func TestSyncOne_Status(t *testing.T) {
 			sj.Status.LastScheduleTime = &unversioned.Time{Time: justAfterThePriorHour()}
 		} else {
 			if tc.hasFinishedJob || tc.hasUnexpectedJob {
-				t.Errorf("Test setup error: this case makes no sense.")
+				t.Errorf("%s: test setup error: this case makes no sense", name)
 			}
 			sj.ObjectMeta.CreationTimestamp = unversioned.Time{Time: justBeforeTheHour()}
 		}
@@ -353,7 +358,7 @@ func TestSyncOne_Status(t *testing.T) {
 		if tc.hasFinishedJob {
 			ref, err := getRef(&finishedJob)
 			if err != nil {
-				t.Errorf("Test setup error: failed to get job's ref: %v.", err)
+				t.Errorf("%s: test setup error: failed to get job's ref: %v.", name, err)
 			}
 			sj.Status.Active = []api.ObjectReference{*ref}
 			jobs = append(jobs, finishedJob)
@@ -389,23 +394,23 @@ func TestSyncOne_Status(t *testing.T) {
 		}
 
 		if len(recorder.Events) != expectedEvents {
-			t.Errorf("Expected %d event, actually %v: %#v", expectedEvents, len(recorder.Events), recorder.Events)
+			t.Errorf("%s: expected %d event, actually %v: %#v", name, expectedEvents, len(recorder.Events), recorder.Events)
 		}
 
 		if expectUpdates != len(sjc.Updates) {
-			t.Errorf("expected %d status updates, actually %d", expectUpdates, len(sjc.Updates))
+			t.Errorf("%s: expected %d status updates, actually %d", name, expectUpdates, len(sjc.Updates))
 		}
 
 		if tc.hasFinishedJob && inActiveList(sjc.Updates[0], finishedJob.UID) {
-			t.Errorf("Expected finished job removed from active list, actually active list = %#v.", sjc.Updates[0].Status.Active)
+			t.Errorf("%s: expected finished job removed from active list, actually active list = %#v", name, sjc.Updates[0].Status.Active)
 		}
 
 		if tc.hasUnexpectedJob && inActiveList(sjc.Updates[0], unexpectedJob.UID) {
-			t.Errorf("Expected unexpected job not added to active list, actually active list = %#v.", sjc.Updates[0].Status.Active)
+			t.Errorf("%s: expected unexpected job not added to active list, actually active list = %#v", name, sjc.Updates[0].Status.Active)
 		}
 
 		if tc.expectCreate && !sjc.Updates[1].Status.LastScheduleTime.Time.Equal(topOfTheHour()) {
-			t.Errorf("Expected LastScheduleTime updated to %s, got %s.", topOfTheHour(), sjc.Updates[1].Status.LastScheduleTime)
+			t.Errorf("%s: expected LastScheduleTime updated to %s, got %s", name, topOfTheHour(), sjc.Updates[1].Status.LastScheduleTime)
 		}
 	}
 }
