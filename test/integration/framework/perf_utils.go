@@ -32,11 +32,11 @@ const (
 
 type IntegrationTestNodePreparer struct {
 	client          clientset.Interface
-	countToStrategy map[int]testutils.PrepareNodeStrategy
+	countToStrategy []testutils.CountToStrategy
 	nodeNamePrefix  string
 }
 
-func NewIntegrationTestNodePreparer(client clientset.Interface, countToStrategy map[int]testutils.PrepareNodeStrategy, nodeNamePrefix string) testutils.TestNodePreparer {
+func NewIntegrationTestNodePreparer(client clientset.Interface, countToStrategy []testutils.CountToStrategy, nodeNamePrefix string) testutils.TestNodePreparer {
 	return &IntegrationTestNodePreparer{
 		client:          client,
 		countToStrategy: countToStrategy,
@@ -46,8 +46,8 @@ func NewIntegrationTestNodePreparer(client clientset.Interface, countToStrategy 
 
 func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 	numNodes := 0
-	for k := range p.countToStrategy {
-		numNodes += k
+	for _, v := range p.countToStrategy {
+		numNodes += v.Count
 	}
 
 	glog.Infof("Making %d nodes", numNodes)
@@ -80,10 +80,10 @@ func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 	nodes := e2eframework.GetReadySchedulableNodesOrDie(p.client)
 	index := 0
 	sum := 0
-	for k, strategy := range p.countToStrategy {
-		sum += k
+	for _, v := range p.countToStrategy {
+		sum += v.Count
 		for ; index < sum; index++ {
-			if err := testutils.DoPrepareNode(p.client, &nodes.Items[index], strategy); err != nil {
+			if err := testutils.DoPrepareNode(p.client, &nodes.Items[index], v.Strategy); err != nil {
 				glog.Errorf("Aborting node preparation: %v", err)
 				return err
 			}
