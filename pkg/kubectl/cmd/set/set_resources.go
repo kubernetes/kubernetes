@@ -62,9 +62,7 @@ type ResourcesOptions struct {
 const (
 	resources_long = `Specify compute resource requirements (cpu, memory) for any resource that defines a pod template.  If a pod is successfully scheduled, it is guaranteed the amount of resource requested, but may burst up to its specified limits.
 
-for each compute resource, if a limit is specified and a request is omitted, the request will default to the limit.
-
-Possible resources include (case insensitive):`
+for each compute resource, if a limit is specified and a request is omitted, the request will default to the limit.`
 
 	resources_example = `
 # Set a deployments nginx container cpu limits to "200m and memory to "512Mi"
