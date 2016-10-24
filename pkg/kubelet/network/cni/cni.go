@@ -19,6 +19,7 @@ package cni
 import (
 	"errors"
 	"fmt"
+	"net"
 	"sort"
 	"sync"
 	"time"
@@ -54,6 +55,10 @@ type cniNetworkPlugin struct {
 	pluginDir          string
 	binDir             string
 	vendorCNIDirPrefix string
+
+	podCIDR     string
+	podGW       net.IP
+	podNetCfgMU sync.RWMutex
 }
 
 type cniNetwork struct {
@@ -198,13 +203,15 @@ func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubec
 		return fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
 	}
 
-	_, err = plugin.loNetwork.addToNetwork(name, namespace, id, netnsPath)
+	plugin.podNetCfgMU.RLock()
+	defer plugin.podNetCfgMU.RUnlock()
+	_, err = plugin.loNetwork.addToNetwork(name, namespace, id, netnsPath, plugin.podCIDR, plugin.podGW)
 	if err != nil {
 		glog.Errorf("Error while adding to cni lo network: %s", err)
 		return err
 	}
 
-	_, err = plugin.getDefaultNetwork().addToNetwork(name, namespace, id, netnsPath)
+	_, err = plugin.getDefaultNetwork().addToNetwork(name, namespace, id, netnsPath, plugin.podCIDR, plugin.podGW)
 	if err != nil {
 		glog.Errorf("Error while adding to cni network: %s", err)
 		return err
@@ -222,7 +229,10 @@ func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, id ku
 		return fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
 	}
 
-	return plugin.getDefaultNetwork().deleteFromNetwork(name, namespace, id, netnsPath)
+	plugin.podNetCfgMU.RLock()
+	defer plugin.podNetCfgMU.RUnlock()
+
+	return plugin.getDefaultNetwork().deleteFromNetwork(name, namespace, id, netnsPath, plugin.podCIDR, plugin.podGW)
 }
 
 // TODO: Use the addToNetwork function to obtain the IP of the Pod. That will assume idempotent ADD call to the plugin.
@@ -241,8 +251,8 @@ func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name strin
 	return &network.PodNetworkStatus{IP: ip}, nil
 }
 
-func (network *cniNetwork) addToNetwork(podName string, podNamespace string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) (*cnitypes.Result, error) {
-	rt, err := buildCNIRuntimeConf(podName, podNamespace, podInfraContainerID, podNetnsPath)
+func (network *cniNetwork) addToNetwork(podName string, podNamespace string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath, podcidr string, gw net.IP) (*cnitypes.Result, error) {
+	rt, err := buildCNIRuntimeConf(podName, podNamespace, podInfraContainerID, podNetnsPath, podcidr, gw)
 	if err != nil {
 		glog.Errorf("Error adding network: %v", err)
 		return nil, err
@@ -259,8 +269,8 @@ func (network *cniNetwork) addToNetwork(podName string, podNamespace string, pod
 	return res, nil
 }
 
-func (network *cniNetwork) deleteFromNetwork(podName string, podNamespace string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) error {
-	rt, err := buildCNIRuntimeConf(podName, podNamespace, podInfraContainerID, podNetnsPath)
+func (network *cniNetwork) deleteFromNetwork(podName string, podNamespace string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath, podcidr string, gw net.IP) error {
+	rt, err := buildCNIRuntimeConf(podName, podNamespace, podInfraContainerID, podNetnsPath, podcidr, gw)
 	if err != nil {
 		glog.Errorf("Error deleting network: %v", err)
 		return err
@@ -276,7 +286,7 @@ func (network *cniNetwork) deleteFromNetwork(podName string, podNamespace string
 	return nil
 }
 
-func buildCNIRuntimeConf(podName string, podNs string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath string) (*libcni.RuntimeConf, error) {
+func buildCNIRuntimeConf(podName string, podNs string, podInfraContainerID kubecontainer.ContainerID, podNetnsPath, podcidr string, gw net.IP) (*libcni.RuntimeConf, error) {
 	glog.V(4).Infof("Got netns path %v", podNetnsPath)
 	glog.V(4).Infof("Using netns path %v", podNs)
 
@@ -289,8 +299,41 @@ func buildCNIRuntimeConf(podName string, podNs string, podInfraContainerID kubec
 			{"K8S_POD_NAMESPACE", podNs},
 			{"K8S_POD_NAME", podName},
 			{"K8S_POD_INFRA_CONTAINER_ID", podInfraContainerID.ID},
+			{"K8S_POD_CIDR", podcidr},
+			{"K8S_POD_GW", gw.String()},
 		},
 	}
 
 	return rt, nil
+}
+
+func (plugin *cniNetworkPlugin) Event(name string, details map[string]interface{}) {
+	if name != network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE {
+		return
+	}
+
+	podCIDR, ok := details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR].(string)
+	if !ok {
+		glog.Warningf("%s event didn't contain pod CIDR", network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE)
+		return
+	}
+
+	glog.V(5).Infof("PodCIDR is set to %q", podCIDR)
+	_, cidr, err := net.ParseCIDR(podCIDR)
+	if err == nil {
+		// Set gw address to first address in IPNet
+		if cidr.IP.To4() != nil {
+			cidr.IP.To4()[3] += 1
+		} else {
+			cidr.IP.To16()[15] += 1
+		}
+		plugin.podNetCfgMU.Lock()
+		plugin.podCIDR = podCIDR
+		plugin.podGW = cidr.IP
+		plugin.podNetCfgMU.Unlock()
+	}
+
+	if err != nil {
+		glog.Warningf("Failed to generate CNI network config: %v", err)
+	}
 }
