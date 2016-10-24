@@ -17,8 +17,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-exit 0
-
 export KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 go get -u github.com/mikedanese/gazel
