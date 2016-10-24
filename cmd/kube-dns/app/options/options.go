@@ -23,6 +23,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/pkg/api"
@@ -31,9 +32,10 @@ import (
 )
 
 type KubeDNSConfig struct {
-	ClusterDomain  string
-	KubeConfigFile string
-	KubeMasterURL  string
+	ClusterDomain      string
+	KubeConfigFile     string
+	KubeMasterURL      string
+	InitialSyncTimeout time.Duration
 
 	HealthzPort    int
 	DNSBindAddress string
@@ -47,10 +49,11 @@ type KubeDNSConfig struct {
 
 func NewKubeDNSConfig() *KubeDNSConfig {
 	return &KubeDNSConfig{
-		ClusterDomain:  "cluster.local.",
-		HealthzPort:    8081,
-		DNSBindAddress: "0.0.0.0",
-		DNSPort:        53,
+		ClusterDomain:      "cluster.local.",
+		HealthzPort:        8081,
+		DNSBindAddress:     "0.0.0.0",
+		DNSPort:            53,
+		InitialSyncTimeout: 60 * time.Second,
 
 		Federations: make(map[string]string),
 
@@ -160,4 +163,6 @@ func (s *KubeDNSConfig) AddFlags(fs *pflag.FlagSet) {
 		"config-map name. If empty, then the config-map will not used. Cannot be "+
 			" used in conjunction with federations flag. config-map contains "+
 			"dynamically adjustable configuration.")
+	fs.DurationVar(&s.InitialSyncTimeout, "initial-sync-timeout", s.InitialSyncTimeout,
+		"Timeout for initial resource sync.")
 }

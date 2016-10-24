@@ -275,6 +275,7 @@ image-service-endpoint
 include-extended-apis
 include-extended-apis
 included-types-overrides
+initial-sync-timeout
 input-base
 input-dirs
 insecure-allow-any-token
