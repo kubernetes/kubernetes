@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"path"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -160,7 +161,7 @@ func (h *HTTPExtender) send(action string, args interface{}, result interface{})
 		return err
 	}
 
-	url := h.extenderURL + "/" + h.apiVersion + "/" + action
+	url := path.Join(h.extenderURL, h.apiVersion, action)
 
 	req, err := http.NewRequest("POST", url, bytes.NewReader(out))
 	if err != nil {
