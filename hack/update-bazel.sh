@@ -21,5 +21,5 @@ exit 0
 
 export KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
-go get -u github.com/mikedanese/gazel
+go get -u gopkg.in/mikedanese/gazel.v2/gazel
 "${GOPATH}/bin/gazel" -root="$(realpath ${KUBE_ROOT})"
