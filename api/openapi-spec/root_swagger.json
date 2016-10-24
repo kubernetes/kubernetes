@@ -13527,7 +13527,7 @@
      }
     }
    },
-   "/apis/apps/v1alpha1/": {
+   "/apis/apps/v1beta1/": {
     "get": {
      "description": "get available resources",
      "consumes": [
@@ -13543,7 +13543,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "getAppsV1alpha1APIResources",
+     "operationId": "getAppsV1beta1APIResources",
      "responses": {
       "200": {
        "description": "OK",
@@ -13557,7 +13557,7 @@
      }
     }
    },
-   "/apis/apps/v1alpha1/namespaces/{namespace}/petsets": {
+   "/apis/apps/v1beta1/namespaces/{namespace}/petsets": {
     "get": {
      "description": "list or watch objects of kind PetSet",
      "consumes": [
@@ -13571,7 +13571,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listAppsV1alpha1NamespacedPetSet",
+     "operationId": "listAppsV1beta1NamespacedPetSet",
      "parameters": [
       {
        "uniqueItems": true,
@@ -13613,7 +13613,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PetSetList"
+        "$ref": "#/definitions/v1beta1.PetSetList"
        }
       },
       "401": {
@@ -13634,14 +13634,14 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createAppsV1alpha1NamespacedPetSet",
+     "operationId": "createAppsV1beta1NamespacedPetSet",
      "parameters": [
       {
        "name": "body",
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PetSet"
+        "$ref": "#/definitions/v1beta1.PetSet"
        }
       }
      ],
@@ -13649,7 +13649,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PetSet"
+        "$ref": "#/definitions/v1beta1.PetSet"
        }
       },
       "401": {
@@ -13670,7 +13670,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteAppsV1alpha1CollectionNamespacedPetSet",
+     "operationId": "deleteAppsV1beta1CollectionNamespacedPetSet",
      "parameters": [
       {
        "uniqueItems": true,
@@ -13738,7 +13738,7 @@
      }
     ]
    },
-   "/apis/apps/v1alpha1/namespaces/{namespace}/petsets/{name}": {
+   "/apis/apps/v1beta1/namespaces/{namespace}/petsets/{name}": {
     "get": {
      "description": "read the specified PetSet",
      "consumes": [
@@ -13752,7 +13752,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readAppsV1alpha1NamespacedPetSet",
+     "operationId": "readAppsV1beta1NamespacedPetSet",
      "parameters": [
       {
        "uniqueItems": true,
@@ -13773,7 +13773,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PetSet"
+        "$ref": "#/definitions/v1beta1.PetSet"
        }
       },
       "401": {
@@ -13794,14 +13794,14 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceAppsV1alpha1NamespacedPetSet",
+     "operationId": "replaceAppsV1beta1NamespacedPetSet",
      "parameters": [
       {
        "name": "body",
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PetSet"
+        "$ref": "#/definitions/v1beta1.PetSet"
        }
       }
      ],
@@ -13809,7 +13809,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PetSet"
+        "$ref": "#/definitions/v1beta1.PetSet"
        }
       },
       "401": {
@@ -13830,7 +13830,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteAppsV1alpha1NamespacedPetSet",
+     "operationId": "deleteAppsV1beta1NamespacedPetSet",
      "parameters": [
       {
        "name": "body",
@@ -13868,7 +13868,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchAppsV1alpha1NamespacedPetSet",
+     "operationId": "patchAppsV1beta1NamespacedPetSet",
      "parameters": [
       {
        "name": "body",
@@ -13883,7 +13883,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PetSet"
+        "$ref": "#/definitions/v1beta1.PetSet"
        }
       },
       "401": {
@@ -13917,7 +13917,7 @@
      }
     ]
    },
-   "/apis/apps/v1alpha1/namespaces/{namespace}/petsets/{name}/status": {
+   "/apis/apps/v1beta1/namespaces/{namespace}/petsets/{name}/status": {
     "get": {
      "description": "read status of the specified PetSet",
      "consumes": [
@@ -13931,12 +13931,12 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readAppsV1alpha1NamespacedPetSetStatus",
+     "operationId": "readAppsV1beta1NamespacedPetSetStatus",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PetSet"
+        "$ref": "#/definitions/v1beta1.PetSet"
        }
       },
       "401": {
@@ -13957,14 +13957,14 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceAppsV1alpha1NamespacedPetSetStatus",
+     "operationId": "replaceAppsV1beta1NamespacedPetSetStatus",
      "parameters": [
       {
        "name": "body",
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PetSet"
+        "$ref": "#/definitions/v1beta1.PetSet"
        }
       }
      ],
@@ -13972,7 +13972,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PetSet"
+        "$ref": "#/definitions/v1beta1.PetSet"
        }
       },
       "401": {
@@ -13995,7 +13995,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchAppsV1alpha1NamespacedPetSetStatus",
+     "operationId": "patchAppsV1beta1NamespacedPetSetStatus",
      "parameters": [
       {
        "name": "body",
@@ -14010,7 +14010,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PetSet"
+        "$ref": "#/definitions/v1beta1.PetSet"
        }
       },
       "401": {
@@ -14044,7 +14044,7 @@
      }
     ]
    },
-   "/apis/apps/v1alpha1/petsets": {
+   "/apis/apps/v1beta1/petsets": {
     "get": {
      "description": "list or watch objects of kind PetSet",
      "consumes": [
@@ -14058,12 +14058,12 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listAppsV1alpha1PetSetForAllNamespaces",
+     "operationId": "listAppsV1beta1PetSetForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PetSetList"
+        "$ref": "#/definitions/v1beta1.PetSetList"
        }
       },
       "401": {
@@ -14116,7 +14116,7 @@
      }
     ]
    },
-   "/apis/apps/v1alpha1/watch/namespaces/{namespace}/petsets": {
+   "/apis/apps/v1beta1/watch/namespaces/{namespace}/petsets": {
     "get": {
      "description": "watch individual changes to a list of PetSet",
      "consumes": [
@@ -14131,7 +14131,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchAppsV1alpha1NamespacedPetSetList",
+     "operationId": "watchAppsV1beta1NamespacedPetSetList",
      "responses": {
       "200": {
        "description": "OK",
@@ -14197,7 +14197,7 @@
      }
     ]
    },
-   "/apis/apps/v1alpha1/watch/namespaces/{namespace}/petsets/{name}": {
+   "/apis/apps/v1beta1/watch/namespaces/{namespace}/petsets/{name}": {
     "get": {
      "description": "watch changes to an object of kind PetSet",
      "consumes": [
@@ -14212,7 +14212,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchAppsV1alpha1NamespacedPetSet",
+     "operationId": "watchAppsV1beta1NamespacedPetSet",
      "responses": {
       "200": {
        "description": "OK",
@@ -14286,7 +14286,7 @@
      }
     ]
    },
-   "/apis/apps/v1alpha1/watch/petsets": {
+   "/apis/apps/v1beta1/watch/petsets": {
     "get": {
      "description": "watch individual changes to a list of PetSet",
      "consumes": [
@@ -14301,7 +14301,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchAppsV1alpha1PetSetListForAllNamespaces",
+     "operationId": "watchAppsV1beta1PetSetListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -30659,90 +30659,6 @@
      }
     }
    },
-   "v1alpha1.PetSet": {
-    "description": "PetSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe PetSet guarantees that a given network identity will always map to the same storage identity. PetSet is currently in alpha and subject to change without notice.",
-    "properties": {
-     "metadata": {
-      "$ref": "#/definitions/v1.ObjectMeta"
-     },
-     "spec": {
-      "description": "Spec defines the desired identities of pets in this set.",
-      "$ref": "#/definitions/v1alpha1.PetSetSpec"
-     },
-     "status": {
-      "description": "Status is the current status of Pets in this PetSet. This data may be out of date by some window of time.",
-      "$ref": "#/definitions/v1alpha1.PetSetStatus"
-     }
-    }
-   },
-   "v1alpha1.PetSetList": {
-    "description": "PetSetList is a collection of PetSets.",
-    "required": [
-     "items"
-    ],
-    "properties": {
-     "items": {
-      "type": "array",
-      "items": {
-       "$ref": "#/definitions/v1alpha1.PetSet"
-      }
-     },
-     "metadata": {
-      "$ref": "#/definitions/unversioned.ListMeta"
-     }
-    }
-   },
-   "v1alpha1.PetSetSpec": {
-    "description": "A PetSetSpec is the specification of a PetSet.",
-    "required": [
-     "template",
-     "serviceName"
-    ],
-    "properties": {
-     "replicas": {
-      "description": "Replicas is the desired number of replicas of the given Template. These are replicas in the sense that they are instantiations of the same Template, but individual replicas also have a consistent identity. If unspecified, defaults to 1.",
-      "type": "integer",
-      "format": "int32"
-     },
-     "selector": {
-      "description": "Selector is a label query over pods that should match the replica count. If empty, defaulted to labels on the pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
-      "$ref": "#/definitions/unversioned.LabelSelector"
-     },
-     "serviceName": {
-      "description": "ServiceName is the name of the service that governs this PetSet. This service must exist before the PetSet, and is responsible for the network identity of the set. Pets get DNS/hostnames that follow the pattern: pet-specific-string.serviceName.default.svc.cluster.local where \"pet-specific-string\" is managed by the PetSet controller.",
-      "type": "string"
-     },
-     "template": {
-      "description": "Template is the object that describes the pod that will be created if insufficient replicas are detected. Each pod stamped out by the PetSet will fulfill this Template, but have a unique identity from the rest of the PetSet.",
-      "$ref": "#/definitions/v1.PodTemplateSpec"
-     },
-     "volumeClaimTemplates": {
-      "description": "VolumeClaimTemplates is a list of claims that pets are allowed to reference. The PetSet controller is responsible for mapping network identities to claims in a way that maintains the identity of a pet. Every claim in this list must have at least one matching (by name) volumeMount in one container in the template. A claim in this list takes precedence over any volumes in the template, with the same name.",
-      "type": "array",
-      "items": {
-       "$ref": "#/definitions/v1.PersistentVolumeClaim"
-      }
-     }
-    }
-   },
-   "v1alpha1.PetSetStatus": {
-    "description": "PetSetStatus represents the current state of a PetSet.",
-    "required": [
-     "replicas"
-    ],
-    "properties": {
-     "observedGeneration": {
-      "description": "most recent generation observed by this autoscaler.",
-      "type": "integer",
-      "format": "int64"
-     },
-     "replicas": {
-      "description": "Replicas is the number of actual replicas.",
-      "type": "integer",
-      "format": "int32"
-     }
-    }
-   },
    "v1alpha1.PodDisruptionBudget": {
     "description": "PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods",
     "properties": {
@@ -31753,6 +31669,90 @@
      "verb": {
       "description": "Verb is the standard HTTP verb",
       "type": "string"
+     }
+    }
+   },
+   "v1beta1.PetSet": {
+    "description": "PetSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe PetSet guarantees that a given network identity will always map to the same storage identity. PetSet is currently in alpha and subject to change without notice.",
+    "properties": {
+     "metadata": {
+      "$ref": "#/definitions/v1.ObjectMeta"
+     },
+     "spec": {
+      "description": "Spec defines the desired identities of pets in this set.",
+      "$ref": "#/definitions/v1beta1.PetSetSpec"
+     },
+     "status": {
+      "description": "Status is the current status of Pets in this PetSet. This data may be out of date by some window of time.",
+      "$ref": "#/definitions/v1beta1.PetSetStatus"
+     }
+    }
+   },
+   "v1beta1.PetSetList": {
+    "description": "PetSetList is a collection of PetSets.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1beta1.PetSet"
+      }
+     },
+     "metadata": {
+      "$ref": "#/definitions/unversioned.ListMeta"
+     }
+    }
+   },
+   "v1beta1.PetSetSpec": {
+    "description": "A PetSetSpec is the specification of a PetSet.",
+    "required": [
+     "template",
+     "serviceName"
+    ],
+    "properties": {
+     "replicas": {
+      "description": "Replicas is the desired number of replicas of the given Template. These are replicas in the sense that they are instantiations of the same Template, but individual replicas also have a consistent identity. If unspecified, defaults to 1.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "selector": {
+      "description": "Selector is a label query over pods that should match the replica count. If empty, defaulted to labels on the pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
+      "$ref": "#/definitions/unversioned.LabelSelector"
+     },
+     "serviceName": {
+      "description": "ServiceName is the name of the service that governs this PetSet. This service must exist before the PetSet, and is responsible for the network identity of the set. Pets get DNS/hostnames that follow the pattern: pet-specific-string.serviceName.default.svc.cluster.local where \"pet-specific-string\" is managed by the PetSet controller.",
+      "type": "string"
+     },
+     "template": {
+      "description": "Template is the object that describes the pod that will be created if insufficient replicas are detected. Each pod stamped out by the PetSet will fulfill this Template, but have a unique identity from the rest of the PetSet.",
+      "$ref": "#/definitions/v1.PodTemplateSpec"
+     },
+     "volumeClaimTemplates": {
+      "description": "VolumeClaimTemplates is a list of claims that pets are allowed to reference. The PetSet controller is responsible for mapping network identities to claims in a way that maintains the identity of a pet. Every claim in this list must have at least one matching (by name) volumeMount in one container in the template. A claim in this list takes precedence over any volumes in the template, with the same name.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1.PersistentVolumeClaim"
+      }
+     }
+    }
+   },
+   "v1beta1.PetSetStatus": {
+    "description": "PetSetStatus represents the current state of a PetSet.",
+    "required": [
+     "replicas"
+    ],
+    "properties": {
+     "observedGeneration": {
+      "description": "most recent generation observed by this autoscaler.",
+      "type": "integer",
+      "format": "int64"
+     },
+     "replicas": {
+      "description": "Replicas is the number of actual replicas.",
+      "type": "integer",
+      "format": "int32"
      }
     }
    },
