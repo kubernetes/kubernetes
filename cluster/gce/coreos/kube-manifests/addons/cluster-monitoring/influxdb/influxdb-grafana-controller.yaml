@@ -20,7 +20,7 @@ spec:
         kubernetes.io/cluster-service: "true"
     spec: 
       containers: 
-        - image: gcr.io/google_containers/heapster_influxdb:v0.5
+        - image: gcr.io/google_containers/heapster_influxdb:v0.7
           name: influxdb
           resources:
             # keep request = limit to keep this container in guaranteed class
@@ -36,7 +36,7 @@ spec:
           volumeMounts:
           - name: influxdb-persistent-storage
             mountPath: /data
-        - image: gcr.io/google_containers/heapster_grafana:v2.6.0-2
+        - image: gcr.io/google_containers/heapster_grafana:v3.1.1
           name: grafana
           env:
           resources:
