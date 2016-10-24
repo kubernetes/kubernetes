@@ -57,7 +57,7 @@ func ServeImageOrFail(f *framework.Framework, test string, image string) {
 	// The source for the Docker containter kubernetes/serve_hostname is
 	// in contrib/for-demos/serve_hostname
 	By(fmt.Sprintf("Creating replication controller %s", name))
-	controller, err := f.Client.ReplicationControllers(f.Namespace.Name).Create(&api.ReplicationController{
+	controller, err := f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Create(&api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
 		},
@@ -86,7 +86,7 @@ func ServeImageOrFail(f *framework.Framework, test string, image string) {
 	// Cleanup the replication controller when we are done.
 	defer func() {
 		// Resize the replication controller to zero to get rid of pods.
-		if err := framework.DeleteRCAndPods(f.Client, f.ClientSet, f.Namespace.Name, controller.Name); err != nil {
+		if err := framework.DeleteRCAndPods(f.ClientSet, f.Namespace.Name, controller.Name); err != nil {
 			framework.Logf("Failed to cleanup replication controller %v: %v.", controller.Name, err)
 		}
 	}()
@@ -94,7 +94,7 @@ func ServeImageOrFail(f *framework.Framework, test string, image string) {
 	// List the pods, making sure we observe all the replicas.
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 
-	pods, err := framework.PodsCreated(f.Client, f.Namespace.Name, name, replicas)
+	pods, err := framework.PodsCreated(f.ClientSet, f.Namespace.Name, name, replicas)
 
 	By("Ensuring each pod is running")
 
@@ -112,7 +112,7 @@ func ServeImageOrFail(f *framework.Framework, test string, image string) {
 	By("Trying to dial each unique pod")
 	retryTimeout := 2 * time.Minute
 	retryInterval := 5 * time.Second
-	err = wait.Poll(retryInterval, retryTimeout, framework.PodProxyResponseChecker(f.Client, f.Namespace.Name, label, name, true, pods).CheckAllResponses)
+	err = wait.Poll(retryInterval, retryTimeout, framework.PodProxyResponseChecker(f.ClientSet, f.Namespace.Name, label, name, true, pods).CheckAllResponses)
 	if err != nil {
 		framework.Failf("Did not get expected responses within the timeout period of %.2f seconds.", retryTimeout.Seconds())
 	}

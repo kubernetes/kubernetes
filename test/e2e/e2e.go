@@ -94,7 +94,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		framework.Failf("Failed to setup provider config: %v", err)
 	}
 
-	c, err := framework.LoadClient()
+	c, err := framework.LoadInternalClientset()
 	if err != nil {
 		glog.Fatal("Error loading client: ", err)
 	}

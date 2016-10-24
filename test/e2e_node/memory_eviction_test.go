@@ -42,10 +42,10 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 	Context("", func() {
 		AfterEach(func() {
 			glog.Infof("Summary of node events during the memory eviction test:")
-			err := framework.ListNamespaceEvents(f.Client, f.Namespace.Name)
+			err := framework.ListNamespaceEvents(f.ClientSet, f.Namespace.Name)
 			framework.ExpectNoError(err)
 			glog.Infof("Summary of pod events during the memory eviction test:")
-			err = framework.ListNamespaceEvents(f.Client, "")
+			err = framework.ListNamespaceEvents(f.ClientSet, "")
 			framework.ExpectNoError(err)
 		})
 
@@ -54,7 +54,7 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 				// Wait for the memory pressure condition to disappear from the node status before continuing.
 				By("waiting for the memory pressure condition on the node to disappear before ending the test.")
 				Eventually(func() error {
-					nodeList, err := f.Client.Nodes().List(api.ListOptions{})
+					nodeList, err := f.ClientSet.Core().Nodes().List(api.ListOptions{})
 					if err != nil {
 						return fmt.Errorf("tried to get node list but got error: %v", err)
 					}
@@ -154,15 +154,15 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 				By("polling the Status.Phase of each pod and checking for violations of the eviction order.")
 				Eventually(func() error {
 
-					gteed, gtErr := f.Client.Pods(f.Namespace.Name).Get(guaranteed.Name)
+					gteed, gtErr := f.ClientSet.Core().Pods(f.Namespace.Name).Get(guaranteed.Name)
 					framework.ExpectNoError(gtErr, fmt.Sprintf("getting pod %s", guaranteed.Name))
 					gteedPh := gteed.Status.Phase
 
-					burst, buErr := f.Client.Pods(f.Namespace.Name).Get(burstable.Name)
+					burst, buErr := f.ClientSet.Core().Pods(f.Namespace.Name).Get(burstable.Name)
 					framework.ExpectNoError(buErr, fmt.Sprintf("getting pod %s", burstable.Name))
 					burstPh := burst.Status.Phase
 
-					best, beErr := f.Client.Pods(f.Namespace.Name).Get(besteffort.Name)
+					best, beErr := f.ClientSet.Core().Pods(f.Namespace.Name).Get(besteffort.Name)
 					framework.ExpectNoError(beErr, fmt.Sprintf("getting pod %s", besteffort.Name))
 					bestPh := best.Status.Phase
 
@@ -178,7 +178,7 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 					//                     see the eviction manager reporting a pressure condition for a while without the besteffort failing,
 					//                     and we see that the manager did in fact evict the besteffort (this should be in the Kubelet log), we
 					//                     will have more reason to believe the phase is out of date.
-					nodeList, err := f.Client.Nodes().List(api.ListOptions{})
+					nodeList, err := f.ClientSet.Core().Nodes().List(api.ListOptions{})
 					if err != nil {
 						glog.Errorf("tried to get node list but got error: %v", err)
 					}

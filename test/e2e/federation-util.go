@@ -385,7 +385,7 @@ func podExitCodeDetector(f *framework.Framework, name, namespace string, code in
 	}
 
 	return func() error {
-		pod, err := f.Client.Pods(namespace).Get(name)
+		pod, err := f.ClientSet.Core().Pods(namespace).Get(name)
 		if err != nil {
 			return logerr(err)
 		}
@@ -394,7 +394,7 @@ func podExitCodeDetector(f *framework.Framework, name, namespace string, code in
 		}
 
 		// Best effort attempt to grab pod logs for debugging
-		logs, err = framework.GetPodLogs(f.Client, namespace, name, pod.Spec.Containers[0].Name)
+		logs, err = framework.GetPodLogs(f.ClientSet, namespace, name, pod.Spec.Containers[0].Name)
 		if err != nil {
 			framework.Logf("Cannot fetch pod logs: %v", err)
 		}
@@ -433,12 +433,12 @@ func discoverService(f *framework.Framework, name string, exists bool, podName s
 
 	nsName := f.FederationNamespace.Name
 	By(fmt.Sprintf("Creating pod %q in namespace %q", pod.Name, nsName))
-	_, err := f.Client.Pods(nsName).Create(pod)
+	_, err := f.ClientSet.Core().Pods(nsName).Create(pod)
 	framework.ExpectNoError(err, "Trying to create pod to run %q", command)
 	By(fmt.Sprintf("Successfully created pod %q in namespace %q", pod.Name, nsName))
 	defer func() {
 		By(fmt.Sprintf("Deleting pod %q from namespace %q", podName, nsName))
-		err := f.Client.Pods(nsName).Delete(podName, api.NewDeleteOptions(0))
+		err := f.ClientSet.Core().Pods(nsName).Delete(podName, api.NewDeleteOptions(0))
 		framework.ExpectNoError(err, "Deleting pod %q from namespace %q", podName, nsName)
 		By(fmt.Sprintf("Deleted pod %q from namespace %q", podName, nsName))
 	}()

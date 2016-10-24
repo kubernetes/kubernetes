@@ -25,14 +25,14 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func deleteSecretOrErrorf(t *testing.T, c *client.Client, ns, name string) {
-	if err := c.Secrets(ns).Delete(name); err != nil {
+func deleteSecretOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
+	if err := c.Core().Secrets(ns).Delete(name, nil); err != nil {
 		t.Errorf("unable to delete secret %v: %v", name, err)
 	}
 }
@@ -42,7 +42,7 @@ func TestSecrets(t *testing.T) {
 	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
-	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
 
 	ns := framework.CreateTestingNamespace("secret", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -51,7 +51,7 @@ func TestSecrets(t *testing.T) {
 }
 
 // DoTestSecrets test secrets for one api version.
-func DoTestSecrets(t *testing.T, client *client.Client, ns *api.Namespace) {
+func DoTestSecrets(t *testing.T, client clientset.Interface, ns *api.Namespace) {
 	// Make a secret object.
 	s := api.Secret{
 		ObjectMeta: api.ObjectMeta{
@@ -63,7 +63,7 @@ func DoTestSecrets(t *testing.T, client *client.Client, ns *api.Namespace) {
 		},
 	}
 
-	if _, err := client.Secrets(s.Namespace).Create(&s); err != nil {
+	if _, err := client.Core().Secrets(s.Namespace).Create(&s); err != nil {
 		t.Errorf("unable to create test secret: %v", err)
 	}
 	defer deleteSecretOrErrorf(t, client, s.Namespace, s.Name)
@@ -103,14 +103,14 @@ func DoTestSecrets(t *testing.T, client *client.Client, ns *api.Namespace) {
 
 	// Create a pod to consume secret.
 	pod.ObjectMeta.Name = "uses-secret"
-	if _, err := client.Pods(ns.Name).Create(pod); err != nil {
+	if _, err := client.Core().Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod: %v", err)
 	}
 	defer integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
 
 	// Create a pod that consumes non-existent secret.
 	pod.ObjectMeta.Name = "uses-non-existent-secret"
-	if _, err := client.Pods(ns.Name).Create(pod); err != nil {
+	if _, err := client.Core().Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod: %v", err)
 	}
 	defer integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)

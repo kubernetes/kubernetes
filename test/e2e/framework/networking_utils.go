@@ -27,7 +27,7 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	coreclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/rand"
@@ -372,7 +372,7 @@ func (config *NetworkingTestConfig) createNodePortService(selector map[string]st
 }
 
 func (config *NetworkingTestConfig) DeleteNodePortService() {
-	err := config.getServiceClient().Delete(config.NodePortService.Name)
+	err := config.getServiceClient().Delete(config.NodePortService.Name, nil)
 	Expect(err).NotTo(HaveOccurred(), "error while deleting NodePortService. err:%v)", err)
 	time.Sleep(15 * time.Second) // wait for kube-proxy to catch up with the service being deleted.
 }
@@ -403,7 +403,7 @@ func (config *NetworkingTestConfig) createService(serviceSpec *api.Service) *api
 	_, err := config.getServiceClient().Create(serviceSpec)
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create %s service: %v", serviceSpec.Name, err))
 
-	err = WaitForService(config.f.Client, config.Namespace, serviceSpec.Name, true, 5*time.Second, 45*time.Second)
+	err = WaitForService(config.f.ClientSet, config.Namespace, serviceSpec.Name, true, 5*time.Second, 45*time.Second)
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("error while waiting for service:%s err: %v", serviceSpec.Name, err))
 
 	createdService, err := config.getServiceClient().Get(serviceSpec.Name)
@@ -431,7 +431,7 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 	config.setupCore(selector)
 
 	By("Getting node addresses")
-	ExpectNoError(WaitForAllNodesSchedulable(config.f.Client))
+	ExpectNoError(WaitForAllNodesSchedulable(config.f.ClientSet))
 	nodeList := GetReadySchedulableNodesOrDie(config.f.ClientSet)
 	config.ExternalAddrs = NodeAddresses(nodeList, api.NodeExternalIP)
 	if len(config.ExternalAddrs) < 2 {
@@ -464,7 +464,7 @@ func (config *NetworkingTestConfig) cleanup() {
 	if err == nil {
 		for _, ns := range nsList.Items {
 			if strings.Contains(ns.Name, config.f.BaseName) && ns.Name != config.Namespace {
-				nsClient.Delete(ns.Name)
+				nsClient.Delete(ns.Name, nil)
 			}
 		}
 	}
@@ -482,7 +482,7 @@ func shuffleNodes(nodes []api.Node) []api.Node {
 }
 
 func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector map[string]string) []*api.Pod {
-	ExpectNoError(WaitForAllNodesSchedulable(config.f.Client))
+	ExpectNoError(WaitForAllNodesSchedulable(config.f.ClientSet))
 	nodeList := GetReadySchedulableNodesOrDie(config.f.ClientSet)
 
 	// To make this test work reasonably fast in large clusters,
@@ -520,12 +520,12 @@ func (config *NetworkingTestConfig) DeleteNetProxyPod() {
 	config.getPodClient().Delete(pod.Name, api.NewDeleteOptions(0))
 	config.EndpointPods = config.EndpointPods[1:]
 	// wait for pod being deleted.
-	err := WaitForPodToDisappear(config.f.Client, config.Namespace, pod.Name, labels.Everything(), time.Second, wait.ForeverTestTimeout)
+	err := WaitForPodToDisappear(config.f.ClientSet, config.Namespace, pod.Name, labels.Everything(), time.Second, wait.ForeverTestTimeout)
 	if err != nil {
 		Failf("Failed to delete %s pod: %v", pod.Name, err)
 	}
 	// wait for endpoint being removed.
-	err = WaitForServiceEndpointsNum(config.f.Client, config.Namespace, nodePortServiceName, len(config.EndpointPods), time.Second, wait.ForeverTestTimeout)
+	err = WaitForServiceEndpointsNum(config.f.ClientSet, config.Namespace, nodePortServiceName, len(config.EndpointPods), time.Second, wait.ForeverTestTimeout)
 	if err != nil {
 		Failf("Failed to remove endpoint from service: %s", nodePortServiceName)
 	}
@@ -544,10 +544,10 @@ func (config *NetworkingTestConfig) getPodClient() *PodClient {
 	return config.podClient
 }
 
-func (config *NetworkingTestConfig) getServiceClient() client.ServiceInterface {
-	return config.f.Client.Services(config.Namespace)
+func (config *NetworkingTestConfig) getServiceClient() coreclientset.ServiceInterface {
+	return config.f.ClientSet.Core().Services(config.Namespace)
 }
 
-func (config *NetworkingTestConfig) getNamespacesClient() client.NamespaceInterface {
-	return config.f.Client.Namespaces()
+func (config *NetworkingTestConfig) getNamespacesClient() coreclientset.NamespaceInterface {
+	return config.f.ClientSet.Core().Namespaces()
 }

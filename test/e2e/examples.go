@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -56,10 +56,10 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	forEachPod := func(selectorKey string, selectorValue string, fn func(api.Pod)) {
 		clusterState(selectorKey, selectorValue).ForEach(fn)
 	}
-	var c *client.Client
+	var c clientset.Interface
 	var ns string
 	BeforeEach(func() {
-		c = f.Client
+		c = f.ClientSet
 		ns = f.Namespace.Name
 	})
 
@@ -281,7 +281,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"app": "cassandra"}))
 			err = wait.PollImmediate(petsetPoll, petsetTimeout,
 				func() (bool, error) {
-					podList, err := c.Pods(ns).List(api.ListOptions{LabelSelector: label})
+					podList, err := c.Core().Pods(ns).List(api.ListOptions{LabelSelector: label})
 					if err != nil {
 						return false, fmt.Errorf("Unable to get list of pods in petset %s", label)
 					}
@@ -396,7 +396,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 				err := framework.WaitForPodNameRunningInNamespace(c, podName, ns)
 				Expect(err).NotTo(HaveOccurred())
 				for t := time.Now(); time.Since(t) < timeout; time.Sleep(framework.Poll) {
-					pod, err := c.Pods(ns).Get(podName)
+					pod, err := c.Core().Pods(ns).Get(podName)
 					framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", podName))
 					stat := api.GetExistingContainerStatus(pod.Status.ContainerStatuses, podName)
 					framework.Logf("Pod: %s, restart count:%d", stat.Name, stat.RestartCount)
@@ -504,7 +504,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("scaling rethinkdb")
-			framework.ScaleRC(c, f.ClientSet, ns, "rethinkdb-rc", 2, true)
+			framework.ScaleRC(f.ClientSet, ns, "rethinkdb-rc", 2, true)
 			checkDbInstances()
 
 			By("starting admin")
@@ -547,7 +547,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("scaling hazelcast")
-			framework.ScaleRC(c, f.ClientSet, ns, "hazelcast", 2, true)
+			framework.ScaleRC(f.ClientSet, ns, "hazelcast", 2, true)
 			forEachPod("name", "hazelcast", func(pod api.Pod) {
 				_, err := framework.LookForStringInLog(ns, pod.Name, "hazelcast", "Members [2]", serverStartTimeout)
 				Expect(err).NotTo(HaveOccurred())
@@ -556,11 +556,11 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	})
 })
 
-func makeHttpRequestToService(c *client.Client, ns, service, path string, timeout time.Duration) (string, error) {
+func makeHttpRequestToService(c clientset.Interface, ns, service, path string, timeout time.Duration) (string, error) {
 	var result []byte
 	var err error
 	for t := time.Now(); time.Since(t) < timeout; time.Sleep(framework.Poll) {
-		proxyRequest, errProxy := framework.GetServicesProxyRequest(c, c.Get())
+		proxyRequest, errProxy := framework.GetServicesProxyRequest(c, c.Core().RESTClient().Get())
 		if errProxy != nil {
 			break
 		}

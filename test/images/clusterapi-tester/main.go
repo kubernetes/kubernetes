@@ -25,18 +25,24 @@ import (
 	"net/http"
 
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
 func main() {
-	kubeClient, err := client.NewInCluster()
+	cc, err := restclient.InClusterConfig()
+	if err != nil {
+		log.Fatalf("Failed to create client: %v", err)
+	}
+
+	kubeClient, err := clientset.NewForConfig(cc)
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)
 	}
 	listAll := api.ListOptions{LabelSelector: labels.Everything(), FieldSelector: fields.Everything()}
-	nodes, err := kubeClient.Nodes().List(listAll)
+	nodes, err := kubeClient.Core().Nodes().List(listAll)
 	if err != nil {
 		log.Fatalf("Failed to list nodes: %v", err)
 	}
@@ -44,7 +50,7 @@ func main() {
 	for _, node := range nodes.Items {
 		log.Printf("\t%v", node.Name)
 	}
-	services, err := kubeClient.Services(api.NamespaceDefault).List(listAll)
+	services, err := kubeClient.Core().Services(api.NamespaceDefault).List(listAll)
 	if err != nil {
 		log.Fatalf("Failed to list services: %v", err)
 	}

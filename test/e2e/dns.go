@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -171,23 +171,23 @@ func createTargetedProbeCommand(nameToResolve string, lookup string, fileNamePre
 	return probeCmd, fileName
 }
 
-func assertFilesExist(fileNames []string, fileDir string, pod *api.Pod, client *client.Client) {
+func assertFilesExist(fileNames []string, fileDir string, pod *api.Pod, client clientset.Interface) {
 	assertFilesContain(fileNames, fileDir, pod, client, false, "")
 }
 
-func assertFilesContain(fileNames []string, fileDir string, pod *api.Pod, client *client.Client, check bool, expected string) {
+func assertFilesContain(fileNames []string, fileDir string, pod *api.Pod, client clientset.Interface, check bool, expected string) {
 	var failed []string
 
 	framework.ExpectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
 		failed = []string{}
-		subResourceProxyAvailable, err := framework.ServerVersionGTE(framework.SubResourcePodProxyVersion, client)
+		subResourceProxyAvailable, err := framework.ServerVersionGTE(framework.SubResourcePodProxyVersion, client.Discovery())
 		if err != nil {
 			return false, err
 		}
 		var contents []byte
 		for _, fileName := range fileNames {
 			if subResourceProxyAvailable {
-				contents, err = client.Get().
+				contents, err = client.Core().RESTClient().Get().
 					Namespace(pod.Namespace).
 					Resource("pods").
 					SubResource("proxy").
@@ -195,7 +195,7 @@ func assertFilesContain(fileNames []string, fileDir string, pod *api.Pod, client
 					Suffix(fileDir, fileName).
 					Do().Raw()
 			} else {
-				contents, err = client.Get().
+				contents, err = client.Core().RESTClient().Get().
 					Prefix("proxy").
 					Resource("pods").
 					Namespace(pod.Namespace).
@@ -223,7 +223,7 @@ func assertFilesContain(fileNames []string, fileDir string, pod *api.Pod, client
 func validateDNSResults(f *framework.Framework, pod *api.Pod, fileNames []string) {
 
 	By("submitting the pod to kubernetes")
-	podClient := f.Client.Pods(f.Namespace.Name)
+	podClient := f.ClientSet.Core().Pods(f.Namespace.Name)
 	defer func() {
 		By("deleting the pod")
 		defer GinkgoRecover()
@@ -242,7 +242,7 @@ func validateDNSResults(f *framework.Framework, pod *api.Pod, fileNames []string
 	}
 	// Try to find results for each expected name.
 	By("looking for the results for each expected name from probers")
-	assertFilesExist(fileNames, "results", pod, f.Client)
+	assertFilesExist(fileNames, "results", pod, f.ClientSet)
 
 	// TODO: probe from the host, too.
 
@@ -252,7 +252,7 @@ func validateDNSResults(f *framework.Framework, pod *api.Pod, fileNames []string
 func validateTargetedProbeOutput(f *framework.Framework, pod *api.Pod, fileNames []string, value string) {
 
 	By("submitting the pod to kubernetes")
-	podClient := f.Client.Pods(f.Namespace.Name)
+	podClient := f.ClientSet.Core().Pods(f.Namespace.Name)
 	defer func() {
 		By("deleting the pod")
 		defer GinkgoRecover()
@@ -271,13 +271,13 @@ func validateTargetedProbeOutput(f *framework.Framework, pod *api.Pod, fileNames
 	}
 	// Try to find the expected value for each expected name.
 	By("looking for the results for each expected name from probers")
-	assertFilesContain(fileNames, "results", pod, f.Client, true, value)
+	assertFilesContain(fileNames, "results", pod, f.ClientSet, true, value)
 
 	framework.Logf("DNS probes using %s succeeded\n", pod.Name)
 }
 
 func verifyDNSPodIsRunning(f *framework.Framework) {
-	systemClient := f.Client.Pods(api.NamespaceSystem)
+	systemClient := f.ClientSet.Core().Pods(api.NamespaceSystem)
 	By("Waiting for DNS Service to be Running")
 	options := api.ListOptions{LabelSelector: dnsServiceLabelSelector}
 	dnsPods, err := systemClient.List(options)
@@ -288,7 +288,7 @@ func verifyDNSPodIsRunning(f *framework.Framework) {
 		framework.Failf("No pods match the label selector %v", dnsServiceLabelSelector.String())
 	}
 	pod := dnsPods.Items[0]
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, &pod))
+	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.ClientSet, &pod))
 }
 
 func createServiceSpec(serviceName, externalName string, isHeadless bool, selector map[string]string) *api.Service {
@@ -358,21 +358,21 @@ var _ = framework.KubeDescribe("DNS", func() {
 			"dns-test": "true",
 		}
 		headlessService := createServiceSpec(dnsTestServiceName, "", true, testServiceSelector)
-		_, err := f.Client.Services(f.Namespace.Name).Create(headlessService)
+		_, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(headlessService)
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			By("deleting the test headless service")
 			defer GinkgoRecover()
-			f.Client.Services(f.Namespace.Name).Delete(headlessService.Name)
+			f.ClientSet.Core().Services(f.Namespace.Name).Delete(headlessService.Name, nil)
 		}()
 
 		regularService := createServiceSpec("test-service-2", "", false, testServiceSelector)
-		regularService, err = f.Client.Services(f.Namespace.Name).Create(regularService)
+		regularService, err = f.ClientSet.Core().Services(f.Namespace.Name).Create(regularService)
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			By("deleting the test service")
 			defer GinkgoRecover()
-			f.Client.Services(f.Namespace.Name).Delete(regularService.Name)
+			f.ClientSet.Core().Services(f.Namespace.Name).Delete(regularService.Name, nil)
 		}()
 
 		// All the names we need to be able to resolve.
@@ -408,12 +408,12 @@ var _ = framework.KubeDescribe("DNS", func() {
 		serviceName := "dns-test-service-2"
 		podHostname := "dns-querier-2"
 		headlessService := createServiceSpec(serviceName, "", true, testServiceSelector)
-		_, err := f.Client.Services(f.Namespace.Name).Create(headlessService)
+		_, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(headlessService)
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			By("deleting the test headless service")
 			defer GinkgoRecover()
-			f.Client.Services(f.Namespace.Name).Delete(headlessService.Name)
+			f.ClientSet.Core().Services(f.Namespace.Name).Delete(headlessService.Name, nil)
 		}()
 
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.cluster.local", podHostname, serviceName, f.Namespace.Name)
@@ -441,12 +441,12 @@ var _ = framework.KubeDescribe("DNS", func() {
 		By("Creating a test externalName service")
 		serviceName := "dns-test-service-3"
 		externalNameService := createServiceSpec(serviceName, "foo.example.com", false, nil)
-		_, err := f.Client.Services(f.Namespace.Name).Create(externalNameService)
+		_, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(externalNameService)
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			By("deleting the test externalName service")
 			defer GinkgoRecover()
-			f.Client.Services(f.Namespace.Name).Delete(externalNameService.Name)
+			f.ClientSet.Core().Services(f.Namespace.Name).Delete(externalNameService.Name, nil)
 		}()
 
 		hostFQDN := fmt.Sprintf("%s.%s.svc.cluster.local", serviceName, f.Namespace.Name)
@@ -463,7 +463,7 @@ var _ = framework.KubeDescribe("DNS", func() {
 
 		// Test changing the externalName field
 		By("changing the externalName to bar.example.com")
-		_, err = updateService(f.Client, f.Namespace.Name, serviceName, func(s *api.Service) {
+		_, err = updateService(f.ClientSet, f.Namespace.Name, serviceName, func(s *api.Service) {
 			s.Spec.ExternalName = "bar.example.com"
 		})
 		Expect(err).NotTo(HaveOccurred())
@@ -480,7 +480,7 @@ var _ = framework.KubeDescribe("DNS", func() {
 
 		// Test changing type from ExternalName to ClusterIP
 		By("changing the service to type=ClusterIP")
-		_, err = updateService(f.Client, f.Namespace.Name, serviceName, func(s *api.Service) {
+		_, err = updateService(f.ClientSet, f.Namespace.Name, serviceName, func(s *api.Service) {
 			s.Spec.Type = api.ServiceTypeClusterIP
 			s.Spec.ClusterIP = "127.1.2.3"
 			s.Spec.Ports = []api.ServicePort{

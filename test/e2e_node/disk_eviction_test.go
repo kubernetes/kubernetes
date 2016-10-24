@@ -28,7 +28,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 const (
@@ -50,11 +49,11 @@ const (
 var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("kubelet-eviction-manager")
 	var podClient *framework.PodClient
-	var c *client.Client
+	var c clientset.Interface
 
 	BeforeEach(func() {
 		podClient = f.PodClient()
-		c = f.Client
+		c = f.ClientSet
 	})
 
 	Describe("hard eviction test", func() {

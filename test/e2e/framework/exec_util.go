@@ -47,7 +47,7 @@ func (f *Framework) ExecCommandInContainerWithFullOutput(podName, containerName 
 	var stdout, stderr bytes.Buffer
 	var stdin io.Reader
 	tty := false
-	req := f.Client.RESTClient.Post().
+	req := f.ClientSet.Core().RESTClient().Post().
 		Resource("pods").
 		Name(podName).
 		Namespace(f.Namespace.Name).

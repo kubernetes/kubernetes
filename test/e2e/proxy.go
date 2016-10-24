@@ -71,7 +71,7 @@ var _ = framework.KubeDescribe("Proxy", func() {
 		It("should proxy through a service and a pod [Conformance]", func() {
 			start := time.Now()
 			labels := map[string]string{"proxy-service-target": "true"}
-			service, err := f.Client.Services(f.Namespace.Name).Create(&api.Service{
+			service, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(&api.Service{
 				ObjectMeta: api.ObjectMeta{
 					GenerateName: "proxy-service-",
 				},
@@ -109,7 +109,7 @@ var _ = framework.KubeDescribe("Proxy", func() {
 			By("starting an echo server on multiple ports")
 			pods := []*api.Pod{}
 			cfg := testutils.RCConfig{
-				Client:       f.Client,
+				Client:       f.ClientSet,
 				Image:        "gcr.io/google_containers/porter:cd5cb5791ebaa8641955f0e8c2a9bed669b1eaab",
 				Name:         service.Name,
 				Namespace:    f.Namespace.Name,
@@ -146,7 +146,7 @@ var _ = framework.KubeDescribe("Proxy", func() {
 				CreatedPods: &pods,
 			}
 			Expect(framework.RunRC(cfg)).NotTo(HaveOccurred())
-			defer framework.DeleteRCAndPods(f.Client, f.ClientSet, f.Namespace.Name, cfg.Name)
+			defer framework.DeleteRCAndPods(f.ClientSet, f.Namespace.Name, cfg.Name)
 
 			Expect(f.WaitForAnEndpoint(service.Name)).NotTo(HaveOccurred())
 
@@ -260,7 +260,7 @@ var _ = framework.KubeDescribe("Proxy", func() {
 			}
 
 			if len(errs) != 0 {
-				body, err := f.Client.Pods(f.Namespace.Name).GetLogs(pods[0].Name, &api.PodLogOptions{}).Do().Raw()
+				body, err := f.ClientSet.Core().Pods(f.Namespace.Name).GetLogs(pods[0].Name, &api.PodLogOptions{}).Do().Raw()
 				if err != nil {
 					framework.Logf("Error getting logs for pod %s: %v", pods[0].Name, err)
 				} else {
@@ -281,7 +281,7 @@ func doProxy(f *framework.Framework, path string, i int) (body []byte, statusCod
 	//   chance of the things we are talking to being confused for an error
 	//   that apiserver would have emitted.
 	start := time.Now()
-	body, err = f.Client.Get().AbsPath(path).Do().StatusCode(&statusCode).Raw()
+	body, err = f.ClientSet.Core().RESTClient().Get().AbsPath(path).Do().StatusCode(&statusCode).Raw()
 	d = time.Since(start)
 	if len(body) > 0 {
 		framework.Logf("(%v) %v: %s (%v; %v)", i, path, truncate(body, maxDisplayBodyLen), statusCode, d)

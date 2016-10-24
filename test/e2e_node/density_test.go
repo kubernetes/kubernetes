@@ -495,11 +495,12 @@ func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes m
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": podType})
-				return f.Client.Pods(ns).List(options)
+				obj, err := f.ClientSet.Core().Pods(ns).List(options)
+				return runtime.Object(obj), err
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
 				options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": podType})
-				return f.Client.Pods(ns).Watch(options)
+				return f.ClientSet.Core().Pods(ns).Watch(options)
 			},
 		},
 		&api.Pod{},

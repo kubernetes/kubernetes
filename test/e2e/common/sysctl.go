@@ -58,7 +58,7 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 	waitForPodErrorEventOrStarted := func(pod *api.Pod) (*api.Event, error) {
 		var ev *api.Event
 		err := wait.Poll(framework.Poll, framework.PodStartTimeout, func() (bool, error) {
-			evnts, err := f.Client.Events(pod.Namespace).Search(pod)
+			evnts, err := f.ClientSet.Core().Events(pod.Namespace).Search(pod)
 			if err != nil {
 				return false, fmt.Errorf("error in listing events: %s", err)
 			}
@@ -114,7 +114,7 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 		Expect(pod.Status.Phase).To(Equal(api.PodSucceeded))
 
 		By("Getting logs from the pod")
-		log, err := framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
+		log, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Checking that the sysctl is actually updated")
@@ -155,7 +155,7 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 		Expect(pod.Status.Phase).To(Equal(api.PodSucceeded))
 
 		By("Getting logs from the pod")
-		log, err := framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
+		log, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Checking that the sysctl is actually updated")
@@ -194,7 +194,7 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 		})
 
 		By("Creating a pod with one valid and two invalid sysctls")
-		client := f.Client.Pods(f.Namespace.Name)
+		client := f.ClientSet.Core().Pods(f.Namespace.Name)
 		_, err := client.Create(pod)
 
 		Expect(err).NotTo(BeNil())

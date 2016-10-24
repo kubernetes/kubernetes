@@ -30,7 +30,7 @@ import (
 
 	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/system"
 )
@@ -129,7 +129,7 @@ func leftMergeData(left, right map[int]ResourceUsagePerContainer) map[int]Resour
 }
 
 type resourceGatherWorker struct {
-	c                    *client.Client
+	c                    clientset.Interface
 	nodeName             string
 	wg                   *sync.WaitGroup
 	containerIDToNameMap map[string]string
@@ -204,7 +204,7 @@ func getKubemarkMasterComponentsResourceUsage() ResourceUsagePerContainer {
 	return result
 }
 
-func (g *containerResourceGatherer) getKubeSystemContainersResourceUsage(c *client.Client) {
+func (g *containerResourceGatherer) getKubeSystemContainersResourceUsage(c clientset.Interface) {
 	if len(g.workers) == 0 {
 		return
 	}
@@ -218,7 +218,7 @@ func (g *containerResourceGatherer) getKubeSystemContainersResourceUsage(c *clie
 }
 
 type containerResourceGatherer struct {
-	client               *client.Client
+	client               clientset.Interface
 	stopCh               chan struct{}
 	workers              []resourceGatherWorker
 	workerWg             sync.WaitGroup
@@ -232,7 +232,7 @@ type ResourceGathererOptions struct {
 	masterOnly bool
 }
 
-func NewResourceUsageGatherer(c *client.Client, options ResourceGathererOptions) (*containerResourceGatherer, error) {
+func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOptions) (*containerResourceGatherer, error) {
 	g := containerResourceGatherer{
 		client:               c,
 		stopCh:               make(chan struct{}),
@@ -250,7 +250,7 @@ func NewResourceUsageGatherer(c *client.Client, options ResourceGathererOptions)
 			finished:   false,
 		})
 	} else {
-		pods, err := c.Pods("kube-system").List(api.ListOptions{})
+		pods, err := c.Core().Pods("kube-system").List(api.ListOptions{})
 		if err != nil {
 			Logf("Error while listing Pods: %v", err)
 			return nil, err
@@ -262,7 +262,7 @@ func NewResourceUsageGatherer(c *client.Client, options ResourceGathererOptions)
 				g.containerIDs = append(g.containerIDs, containerID)
 			}
 		}
-		nodeList, err := c.Nodes().List(api.ListOptions{})
+		nodeList, err := c.Core().Nodes().List(api.ListOptions{})
 		if err != nil {
 			Logf("Error while listing Nodes: %v", err)
 			return nil, err

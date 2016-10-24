@@ -128,7 +128,7 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 				Containers: []api.Container{
 					{
 						Name:  "run1",
-						Image: framework.GetPauseImageName(f.Client),
+						Image: framework.GetPauseImageName(f.ClientSet),
 						Resources: api.ResourceRequirements{
 							Limits: api.ResourceList{
 								api.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
@@ -191,7 +191,7 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 				Containers: []api.Container{
 					{
 						Name:  "run1",
-						Image: framework.GetPauseImageName(f.Client),
+						Image: framework.GetPauseImageName(f.ClientSet),
 						Resources: api.ResourceRequirements{
 							Limits: api.ResourceList{
 								api.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
