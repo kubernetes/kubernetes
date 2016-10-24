@@ -262,4 +262,4 @@ of the version number for the `kube-dns` replication controller and well as the
 `version` label. This will permit a rolling update of `kube-dns`.
 
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/build/kube-dns/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/build-tools/kube-dns/README.md?pixel)]()

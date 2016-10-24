@@ -8,7 +8,7 @@ are ready, not on every PR.
 
 ```
 make release
-cd build/kube-dns
+cd build-tools/kube-dns
 make container PREFIX=<your-docker-hub> TAG=rc
 ```
 
@@ -45,4 +45,4 @@ make container PREFIX=<your-docker-hub> TAG=rc
 8. Allow the PR to be merged.
 
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/build/kube-dns/RELEASES.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/build-tools/kube-dns/RELEASES.md?pixel)]()
