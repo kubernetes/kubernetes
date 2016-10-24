@@ -1,35 +1,52 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
 
-- [v1.4.3](#v143)
-  - [Changelog since v1.4.2-beta.1](#changelog-since-v142-beta1)
+- [v1.2.7](#v127)
+  - [Downloads for v1.2.7](#downloads-for-v127)
+    - [Client Binaries](#client-binaries)
+    - [Server Binaries](#server-binaries)
+  - [Changelog since v1.2.6](#changelog-since-v126)
     - [Other notable changes](#other-notable-changes)
-- [v1.4.2](#v142)
-  - [Downloads](#downloads)
-  - [Changelog since v1.4.2-beta.1](#changelog-since-v142-beta1-1)
+- [v1.4.4](#v144)
+  - [Downloads for v1.4.4](#downloads-for-v144)
+    - [Client Binaries](#client-binaries-1)
+    - [Server Binaries](#server-binaries-1)
+  - [Changelog since v1.4.3](#changelog-since-v143)
     - [Other notable changes](#other-notable-changes-1)
-- [v1.5.0-alpha.1](#v150-alpha1)
+- [v1.3.9](#v139)
+  - [Downloads](#downloads)
+  - [Changelog since v1.3.8](#changelog-since-v138)
+    - [Other notable changes](#other-notable-changes-2)
+- [v1.4.3](#v143)
   - [Downloads](#downloads-1)
+  - [Changelog since v1.4.2-beta.1](#changelog-since-v142-beta1)
+    - [Other notable changes](#other-notable-changes-3)
+- [v1.4.2](#v142)
+  - [Downloads](#downloads-2)
+  - [Changelog since v1.4.2-beta.1](#changelog-since-v142-beta1-1)
+    - [Other notable changes](#other-notable-changes-4)
+- [v1.5.0-alpha.1](#v150-alpha1)
+  - [Downloads](#downloads-3)
   - [Changelog since v1.4.0-alpha.3](#changelog-since-v140-alpha3)
     - [Experimental Features](#experimental-features)
     - [Action Required](#action-required)
-    - [Other notable changes](#other-notable-changes-2)
+    - [Other notable changes](#other-notable-changes-5)
 - [v1.4.2-beta.1](#v142-beta1)
-  - [Downloads](#downloads-2)
+  - [Downloads](#downloads-4)
   - [Changelog since v1.4.1](#changelog-since-v141)
-    - [Other notable changes](#other-notable-changes-3)
+    - [Other notable changes](#other-notable-changes-6)
 - [v1.4.1](#v141)
-  - [Downloads](#downloads-3)
+  - [Downloads](#downloads-5)
   - [Changelog since v1.4.1-beta.2](#changelog-since-v141-beta2)
 - [v1.4.1-beta.2](#v141-beta2)
-  - [Downloads](#downloads-4)
-  - [Changelog since v1.4.0](#changelog-since-v140)
-    - [Other notable changes](#other-notable-changes-4)
-- [v1.3.8](#v138)
-  - [Downloads](#downloads-5)
-  - [Changelog since v1.3.7](#changelog-since-v137)
-    - [Other notable changes](#other-notable-changes-5)
-- [v1.4.0](#v140)
   - [Downloads](#downloads-6)
+  - [Changelog since v1.4.0](#changelog-since-v140)
+    - [Other notable changes](#other-notable-changes-7)
+- [v1.3.8](#v138)
+  - [Downloads](#downloads-7)
+  - [Changelog since v1.3.7](#changelog-since-v137)
+    - [Other notable changes](#other-notable-changes-8)
+- [v1.4.0](#v140)
+  - [Downloads](#downloads-8)
   - [Major Themes](#major-themes)
   - [Features](#features)
   - [Known Issues](#known-issues)
@@ -41,94 +58,94 @@
   - [Action Required Before Upgrading](#action-required-before-upgrading)
   - [Previous Releases Included in v1.4.0](#previous-releases-included-in-v140)
 - [v1.4.0-beta.11](#v140-beta11)
-  - [Downloads](#downloads-7)
+  - [Downloads](#downloads-9)
   - [Changelog since v1.4.0-beta.10](#changelog-since-v140-beta10)
 - [v1.4.0-beta.10](#v140-beta10)
-  - [Downloads](#downloads-8)
+  - [Downloads](#downloads-10)
   - [Changelog since v1.4.0-beta.8](#changelog-since-v140-beta8)
-    - [Other notable changes](#other-notable-changes-6)
+    - [Other notable changes](#other-notable-changes-9)
 - [v1.4.0-beta.8](#v140-beta8)
-  - [Downloads](#downloads-9)
+  - [Downloads](#downloads-11)
   - [Changelog since v1.4.0-beta.7](#changelog-since-v140-beta7)
 - [v1.4.0-beta.7](#v140-beta7)
-  - [Downloads](#downloads-10)
-  - [Changelog since v1.4.0-beta.6](#changelog-since-v140-beta6)
-    - [Other notable changes](#other-notable-changes-7)
-- [v1.4.0-beta.6](#v140-beta6)
-  - [Downloads](#downloads-11)
-  - [Changelog since v1.4.0-beta.5](#changelog-since-v140-beta5)
-    - [Other notable changes](#other-notable-changes-8)
-- [v1.4.0-beta.5](#v140-beta5)
   - [Downloads](#downloads-12)
-  - [Changelog since v1.4.0-beta.3](#changelog-since-v140-beta3)
-    - [Other notable changes](#other-notable-changes-9)
-- [v1.3.7](#v137)
-  - [Downloads](#downloads-13)
-  - [Changelog since v1.3.6](#changelog-since-v136)
+  - [Changelog since v1.4.0-beta.6](#changelog-since-v140-beta6)
     - [Other notable changes](#other-notable-changes-10)
-- [v1.4.0-beta.3](#v140-beta3)
+- [v1.4.0-beta.6](#v140-beta6)
+  - [Downloads](#downloads-13)
+  - [Changelog since v1.4.0-beta.5](#changelog-since-v140-beta5)
+    - [Other notable changes](#other-notable-changes-11)
+- [v1.4.0-beta.5](#v140-beta5)
   - [Downloads](#downloads-14)
+  - [Changelog since v1.4.0-beta.3](#changelog-since-v140-beta3)
+    - [Other notable changes](#other-notable-changes-12)
+- [v1.3.7](#v137)
+  - [Downloads](#downloads-15)
+  - [Changelog since v1.3.6](#changelog-since-v136)
+    - [Other notable changes](#other-notable-changes-13)
+- [v1.4.0-beta.3](#v140-beta3)
+  - [Downloads](#downloads-16)
   - [Changelog since v1.4.0-beta.2](#changelog-since-v140-beta2)
   - [Behavior changes caused by enabling the garbage collector](#behavior-changes-caused-by-enabling-the-garbage-collector)
     - [kubectl rolling-update](#kubectl-rolling-update)
     - [kubectl delete](#kubectl-delete)
     - [DELETE operation in REST API](#delete-operation-in-rest-api-1)
 - [v1.4.0-beta.2](#v140-beta2)
-  - [Downloads](#downloads-15)
+  - [Downloads](#downloads-17)
   - [Changelog since v1.4.0-beta.1](#changelog-since-v140-beta1)
-    - [Other notable changes](#other-notable-changes-11)
+    - [Other notable changes](#other-notable-changes-14)
 - [v1.4.0-beta.1](#v140-beta1)
-  - [Downloads](#downloads-16)
+  - [Downloads](#downloads-18)
   - [Changelog since v1.4.0-alpha.3](#changelog-since-v140-alpha3-1)
     - [Action Required](#action-required-1)
-    - [Other notable changes](#other-notable-changes-12)
+    - [Other notable changes](#other-notable-changes-15)
 - [v1.3.6](#v136)
-  - [Downloads](#downloads-17)
+  - [Downloads](#downloads-19)
   - [Changelog since v1.3.5](#changelog-since-v135)
-    - [Other notable changes](#other-notable-changes-13)
+    - [Other notable changes](#other-notable-changes-16)
 - [v1.4.0-alpha.3](#v140-alpha3)
-  - [Downloads](#downloads-18)
+  - [Downloads](#downloads-20)
   - [Changelog since v1.4.0-alpha.2](#changelog-since-v140-alpha2)
     - [Action Required](#action-required-2)
-    - [Other notable changes](#other-notable-changes-14)
+    - [Other notable changes](#other-notable-changes-17)
 - [v1.3.5](#v135)
-  - [Downloads](#downloads-19)
-  - [Changelog since v1.3.4](#changelog-since-v134)
-    - [Other notable changes](#other-notable-changes-15)
-- [v1.3.4](#v134)
-  - [Downloads](#downloads-20)
-  - [Changelog since v1.3.3](#changelog-since-v133)
-    - [Other notable changes](#other-notable-changes-16)
-- [v1.4.0-alpha.2](#v140-alpha2)
   - [Downloads](#downloads-21)
+  - [Changelog since v1.3.4](#changelog-since-v134)
+    - [Other notable changes](#other-notable-changes-18)
+- [v1.3.4](#v134)
+  - [Downloads](#downloads-22)
+  - [Changelog since v1.3.3](#changelog-since-v133)
+    - [Other notable changes](#other-notable-changes-19)
+- [v1.4.0-alpha.2](#v140-alpha2)
+  - [Downloads](#downloads-23)
   - [Changelog since v1.4.0-alpha.1](#changelog-since-v140-alpha1)
     - [Action Required](#action-required-3)
-    - [Other notable changes](#other-notable-changes-17)
+    - [Other notable changes](#other-notable-changes-20)
 - [v1.3.3](#v133)
-  - [Downloads](#downloads-22)
+  - [Downloads](#downloads-24)
   - [Changelog since v1.3.2](#changelog-since-v132)
-    - [Other notable changes](#other-notable-changes-18)
+    - [Other notable changes](#other-notable-changes-21)
   - [Known Issues](#known-issues-1)
 - [v1.3.2](#v132)
-  - [Downloads](#downloads-23)
-  - [Changelog since v1.3.1](#changelog-since-v131)
-    - [Other notable changes](#other-notable-changes-19)
-- [v1.3.1](#v131)
-  - [Downloads](#downloads-24)
-  - [Changelog since v1.3.0](#changelog-since-v130)
-    - [Other notable changes](#other-notable-changes-20)
-- [v1.2.6](#v126)
   - [Downloads](#downloads-25)
-  - [Changelog since v1.2.5](#changelog-since-v125)
-    - [Other notable changes](#other-notable-changes-21)
-- [v1.4.0-alpha.1](#v140-alpha1)
+  - [Changelog since v1.3.1](#changelog-since-v131)
+    - [Other notable changes](#other-notable-changes-22)
+- [v1.3.1](#v131)
   - [Downloads](#downloads-26)
+  - [Changelog since v1.3.0](#changelog-since-v130)
+    - [Other notable changes](#other-notable-changes-23)
+- [v1.2.6](#v126)
+  - [Downloads](#downloads-27)
+  - [Changelog since v1.2.5](#changelog-since-v125)
+    - [Other notable changes](#other-notable-changes-24)
+- [v1.4.0-alpha.1](#v140-alpha1)
+  - [Downloads](#downloads-28)
   - [Changelog since v1.3.0](#changelog-since-v130-1)
     - [Experimental Features](#experimental-features-1)
     - [Action Required](#action-required-4)
-    - [Other notable changes](#other-notable-changes-22)
+    - [Other notable changes](#other-notable-changes-25)
 - [v1.3.0](#v130)
-  - [Downloads](#downloads-27)
+  - [Downloads](#downloads-29)
   - [Highlights](#highlights)
   - [Known Issues and Important Steps before Upgrading](#known-issues-and-important-steps-before-upgrading)
       - [ThirdPartyResource](#thirdpartyresource)
@@ -139,67 +156,67 @@
   - [Provider-specific Notes](#provider-specific-notes)
   - [Previous Releases Included in v1.3.0](#previous-releases-included-in-v130)
 - [v1.3.0-beta.3](#v130-beta3)
-  - [Downloads](#downloads-28)
+  - [Downloads](#downloads-30)
   - [Changelog since v1.3.0-beta.2](#changelog-since-v130-beta2)
     - [Action Required](#action-required-5)
-    - [Other notable changes](#other-notable-changes-23)
+    - [Other notable changes](#other-notable-changes-26)
 - [v1.2.5](#v125)
-  - [Downloads](#downloads-29)
+  - [Downloads](#downloads-31)
   - [Changes since v1.2.4](#changes-since-v124)
-    - [Other notable changes](#other-notable-changes-24)
+    - [Other notable changes](#other-notable-changes-27)
 - [v1.3.0-beta.2](#v130-beta2)
-  - [Downloads](#downloads-30)
+  - [Downloads](#downloads-32)
   - [Changes since v1.3.0-beta.1](#changes-since-v130-beta1)
     - [Experimental Features](#experimental-features-2)
-    - [Other notable changes](#other-notable-changes-25)
+    - [Other notable changes](#other-notable-changes-28)
 - [v1.3.0-beta.1](#v130-beta1)
-  - [Downloads](#downloads-31)
+  - [Downloads](#downloads-33)
   - [Changes since v1.3.0-alpha.5](#changes-since-v130-alpha5)
     - [Action Required](#action-required-6)
-    - [Other notable changes](#other-notable-changes-26)
+    - [Other notable changes](#other-notable-changes-29)
 - [v1.3.0-alpha.5](#v130-alpha5)
-  - [Downloads](#downloads-32)
+  - [Downloads](#downloads-34)
   - [Changes since v1.3.0-alpha.4](#changes-since-v130-alpha4)
     - [Action Required](#action-required-7)
-    - [Other notable changes](#other-notable-changes-27)
+    - [Other notable changes](#other-notable-changes-30)
 - [v1.3.0-alpha.4](#v130-alpha4)
-  - [Downloads](#downloads-33)
+  - [Downloads](#downloads-35)
   - [Changes since v1.3.0-alpha.3](#changes-since-v130-alpha3)
     - [Action Required](#action-required-8)
-    - [Other notable changes](#other-notable-changes-28)
+    - [Other notable changes](#other-notable-changes-31)
 - [v1.2.4](#v124)
-  - [Downloads](#downloads-34)
+  - [Downloads](#downloads-36)
   - [Changes since v1.2.3](#changes-since-v123)
-    - [Other notable changes](#other-notable-changes-29)
+    - [Other notable changes](#other-notable-changes-32)
 - [v1.3.0-alpha.3](#v130-alpha3)
-  - [Downloads](#downloads-35)
+  - [Downloads](#downloads-37)
   - [Changes since v1.3.0-alpha.2](#changes-since-v130-alpha2)
     - [Action Required](#action-required-9)
-    - [Other notable changes](#other-notable-changes-30)
+    - [Other notable changes](#other-notable-changes-33)
 - [v1.2.3](#v123)
-  - [Downloads](#downloads-36)
+  - [Downloads](#downloads-38)
   - [Changes since v1.2.2](#changes-since-v122)
     - [Action Required](#action-required-10)
-    - [Other notable changes](#other-notable-changes-31)
-- [v1.3.0-alpha.2](#v130-alpha2)
-  - [Downloads](#downloads-37)
-  - [Changes since v1.3.0-alpha.1](#changes-since-v130-alpha1)
-    - [Other notable changes](#other-notable-changes-32)
-- [v1.2.2](#v122)
-  - [Downloads](#downloads-38)
-  - [Changes since v1.2.1](#changes-since-v121)
-    - [Other notable changes](#other-notable-changes-33)
-- [v1.2.1](#v121)
-  - [Downloads](#downloads-39)
-  - [Changes since v1.2.0](#changes-since-v120)
     - [Other notable changes](#other-notable-changes-34)
-- [v1.3.0-alpha.1](#v130-alpha1)
+- [v1.3.0-alpha.2](#v130-alpha2)
+  - [Downloads](#downloads-39)
+  - [Changes since v1.3.0-alpha.1](#changes-since-v130-alpha1)
+    - [Other notable changes](#other-notable-changes-35)
+- [v1.2.2](#v122)
   - [Downloads](#downloads-40)
+  - [Changes since v1.2.1](#changes-since-v121)
+    - [Other notable changes](#other-notable-changes-36)
+- [v1.2.1](#v121)
+  - [Downloads](#downloads-41)
+  - [Changes since v1.2.0](#changes-since-v120)
+    - [Other notable changes](#other-notable-changes-37)
+- [v1.3.0-alpha.1](#v130-alpha1)
+  - [Downloads](#downloads-42)
   - [Changes since v1.2.0](#changes-since-v120-1)
     - [Action Required](#action-required-11)
-    - [Other notable changes](#other-notable-changes-35)
+    - [Other notable changes](#other-notable-changes-38)
 - [v1.2.0](#v120)
-  - [Downloads](#downloads-41)
+  - [Downloads](#downloads-43)
   - [Changes since v1.1.1](#changes-since-v111)
     - [Major Themes](#major-themes-1)
     - [Other notable improvements](#other-notable-improvements)
@@ -218,9 +235,123 @@
 <!-- NEW RELEASE NOTES ENTRY -->
 
 
+# v1.2.7
+
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.2/examples)
+
+## Downloads for v1.2.7
+
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.2.7/kubernetes.tar.gz) | `53db157923c17fa7a0addb3e4dfe7d1b9194b9266a87d371a251d5bb790a1832`
+[kubernetes-src.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.2.7/kubernetes-src.tar.gz) | `e6e46831706743d8263581d0575507cf5ffc265096d22e5e84cf1c3ae925db5e`
+
+### Client Binaries
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes-client-darwin-386.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.2.7/kubernetes-client-darwin-386.tar.gz) | `8418767e45c62c2ef5f9b4479ed02af64e190ce07dcbafa1920e93e71f419c55`
+[kubernetes-client-darwin-amd64.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.2.7/kubernetes-client-darwin-amd64.tar.gz) | `41d742c2c55e7686311978eaaddee3844b990a0fe49fa8597158bcb0ee4c05c9`
+[kubernetes-client-linux-386.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.2.7/kubernetes-client-linux-386.tar.gz) | `619e0a450cddf10ed1d42ed1d6330d41a75b9c1e00eb654cbe4b0422cd6099c5`
+[kubernetes-client-linux-amd64.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.2.7/kubernetes-client-linux-amd64.tar.gz) | `9a5fcd87514b88eb25173e574aef5b5343816c07ab5947d06787c9f12c40f54a`
+[kubernetes-client-linux-arm.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.2.7/kubernetes-client-linux-arm.tar.gz) | `fd6e39b4a56e03448382825f27f4f30a2e981a8d20f4a8cedbd084bbb4577d42`
+[kubernetes-client-windows-386.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.2.7/kubernetes-client-windows-386.tar.gz) | `862625cb3d9445cff1b09e4ebcdb60dd93b5b2dc34bb6022d2eeed7c8d8bc5d8`
+[kubernetes-client-windows-amd64.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.2.7/kubernetes-client-windows-amd64.tar.gz) | `054337e41187e39950de93e4670bc78a95b6901cc2f95c50ff437d9825ae94c5`
+
+### Server Binaries
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes-server-linux-amd64.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.2.7/kubernetes-server-linux-amd64.tar.gz) | `fef041e9cbe5bcf8fd708f81ee2e2783429af1ab9cfb151d645ef9be96e19b73`
+[kubernetes-server-linux-arm.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.2.7/kubernetes-server-linux-arm.tar.gz) | `ce02d7bcd75c31db4f7b9922c19ea2a3312b0ba579b0dcd96b279b661eca18a8`
+
+## Changelog since v1.2.6
+
+### Other notable changes
+
+* Test x509 intermediates correctly ([#34524](https://github.com/kubernetes/kubernetes/pull/34524), [@liggitt](https://github.com/liggitt))
+
+
+
+# v1.4.4
+
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.4/examples)
+
+## Downloads for v1.4.4
+
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.4.4/kubernetes.tar.gz) | `2732bfc56ceabc872b6af3f460cbda68c2384c95a1c0c72eb33e5ff0e03dc9da`
+[kubernetes-src.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.4.4/kubernetes-src.tar.gz) | `29c6cf1567e6b7f6c3ecb71acead083b7535b22ac20bd8166b29074e8a0f6441`
+
+### Client Binaries
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes-client-darwin-386.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.4.4/kubernetes-client-darwin-386.tar.gz) | `e983b1837e4165e4bc8e361000468421f16dbd5ae90b0c49af6280dbcecf57b1`
+[kubernetes-client-darwin-amd64.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.4.4/kubernetes-client-darwin-amd64.tar.gz) | `8c58231c8340e546336b70d86b6a76285b9f7a0c13b802b350b68610dfaedb35`
+[kubernetes-client-linux-386.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.4.4/kubernetes-client-linux-386.tar.gz) | `33e5d2da52325367db08bcc80791cef2e21fdae176b496b063b3a37115f3f075`
+[kubernetes-client-linux-amd64.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.4.4/kubernetes-client-linux-amd64.tar.gz) | `5fd6215ef0673f5a8e385660cf233d67d26dd79568c69e2328b103fbf1bd752a`
+[kubernetes-client-linux-arm64.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.4.4/kubernetes-client-linux-arm64.tar.gz) | `2d6d0400cd59b042e2da074cbd3b13b9dc61da1dbba04468d67119294cf72435`
+[kubernetes-client-linux-arm.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.4.4/kubernetes-client-linux-arm.tar.gz) | `ff99f26082a77e37caa66aa07ec56bfc7963e6ac782550be5090a8b158f7e89a`
+[kubernetes-client-windows-386.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.4.4/kubernetes-client-windows-386.tar.gz) | `82e762727a8f607180a1e339e058cc9739ad55960d3517c5170bcd5b64179f13`
+[kubernetes-client-windows-amd64.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.4.4/kubernetes-client-windows-amd64.tar.gz) | `4de735ba72c729589efbcd2b8fc4920786fffd96850173c13cbf469819d00808`
+
+### Server Binaries
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes-server-linux-amd64.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.4.4/kubernetes-server-linux-amd64.tar.gz) | `6d5ff37941328df33c0efc5876bb7b82722bc584f1976fe632915db7bf3f316a`
+[kubernetes-server-linux-arm64.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.4.4/kubernetes-server-linux-arm64.tar.gz) | `6ec40848ea29c0982b89c746d716b0958438a6eb774aea20a5ef7885a7060aed`
+[kubernetes-server-linux-arm.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.4.4/kubernetes-server-linux-arm.tar.gz) | `43d6a3260d73cfe652af2ffa7b7092444fe57429cb45e90eb99f0a70012ee033`
+
+## Changelog since v1.4.3
+
+### Other notable changes
+
+* Update the GCI image to gci-dev-55-8872-18-0 ([#35243](https://github.com/kubernetes/kubernetes/pull/35243), [@maisem](https://github.com/maisem))
+* Change merge key for VolumeMount to mountPath ([#35071](https://github.com/kubernetes/kubernetes/pull/35071), [@thockin](https://github.com/thockin))
+* Turned-off etcd listening on public ports as potentially insecure. Removed ([#35192](https://github.com/kubernetes/kubernetes/pull/35192), [@jszczepkowski](https://github.com/jszczepkowski))
+    * experimental support for master replication.
+* Add support for vSphere Cloud Provider when deploying via kubeup on vSphere. ([#31467](https://github.com/kubernetes/kubernetes/pull/31467), [@kerneltime](https://github.com/kerneltime))
+* Fix kube vsphere.kerneltime ([#34997](https://github.com/kubernetes/kubernetes/pull/34997), [@kerneltime](https://github.com/kerneltime))
+* HPA: fixed wrong count for target replicas calculations ([#34821](https://github.com/kubernetes/kubernetes/pull/34821)). ([#34955](https://github.com/kubernetes/kubernetes/pull/34955), [@jszczepkowski](https://github.com/jszczepkowski))
+* Fix leaking ingress resources in federated ingress e2e test. ([#34652](https://github.com/kubernetes/kubernetes/pull/34652), [@quinton-hoole](https://github.com/quinton-hoole))
+* azure: add PrimaryAvailabilitySet to config, only use nodes in that set in the loadbalancer pool ([#34526](https://github.com/kubernetes/kubernetes/pull/34526), [@colemickens](https://github.com/colemickens))
+* azure: lower log priority for skipped nic update message ([#34730](https://github.com/kubernetes/kubernetes/pull/34730), [@colemickens](https://github.com/colemickens))
+
+
+
+# v1.3.9
+
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.3/examples)
+
+## Downloads
+
+binary | sha256 hash
+------ | -----------
+[kubernetes.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.3.9/kubernetes.tar.gz) | `a994c732d2b852bbee55a78601d50d046323021a99b0801aea07dacf64c2c59a`
+
+## Changelog since v1.3.8
+
+### Other notable changes
+
+* Test x509 intermediates correctly ([#34524](https://github.com/kubernetes/kubernetes/pull/34524), [@liggitt](https://github.com/liggitt))
+* Remove headers that are unnecessary for proxy target ([#34076](https://github.com/kubernetes/kubernetes/pull/34076), [@mbohlool](https://github.com/mbohlool))
+
+
+
 # v1.4.3
 
 [Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.4/examples)
+
+## Downloads
+
+binary | sha256 hash
+------ | -----------
+[kubernetes.tar.gz](https://storage.googleapis.com/kubernetes-release/release/v1.4.3/kubernetes.tar.gz) | `c3dccccc005bc22eaf814ccb8e72b4f876167ab38ac594bb7e44c98f162a0f1c`
 
 ## Changelog since v1.4.2-beta.1
 

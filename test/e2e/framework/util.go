@@ -2336,11 +2336,11 @@ func getNodeEvents(c *client.Client, nodeName string) []api.Event {
 }
 
 // waitListSchedulableNodesOrDie is a wrapper around listing nodes supporting retries.
-func waitListSchedulableNodesOrDie(c *client.Client) *api.NodeList {
+func waitListSchedulableNodesOrDie(c clientset.Interface) *api.NodeList {
 	var nodes *api.NodeList
 	var err error
 	if wait.PollImmediate(Poll, SingleCallTimeout, func() (bool, error) {
-		nodes, err = c.Nodes().List(api.ListOptions{FieldSelector: fields.Set{
+		nodes, err = c.Core().Nodes().List(api.ListOptions{FieldSelector: fields.Set{
 			"spec.unschedulable": "false",
 		}.AsSelector()})
 		return err == nil, nil
@@ -2365,7 +2365,7 @@ func isNodeSchedulable(node *api.Node) bool {
 // 1) Needs to be schedulable.
 // 2) Needs to be ready.
 // If EITHER 1 or 2 is not true, most tests will want to ignore the node entirely.
-func GetReadySchedulableNodesOrDie(c *client.Client) (nodes *api.NodeList) {
+func GetReadySchedulableNodesOrDie(c clientset.Interface) (nodes *api.NodeList) {
 	nodes = waitListSchedulableNodesOrDie(c)
 	// previous tests may have cause failures of some nodes. Let's skip
 	// 'Not Ready' nodes, just in case (there is no need to fail the test).
@@ -3254,7 +3254,7 @@ func NodeAddresses(nodelist *api.NodeList, addrType api.NodeAddressType) []strin
 // NodeSSHHosts returns SSH-able host names for all schedulable nodes - this excludes master node.
 // It returns an error if it can't find an external IP for every node, though it still returns all
 // hosts that it found in that case.
-func NodeSSHHosts(c *client.Client) ([]string, error) {
+func NodeSSHHosts(c clientset.Interface) ([]string, error) {
 	nodelist := waitListSchedulableNodesOrDie(c)
 
 	// TODO(roberthbailey): Use the "preferred" address for the node, once such a thing is defined (#2462).
@@ -4513,4 +4513,64 @@ func ListNamespaceEvents(c *client.Client, ns string) error {
 		glog.Infof("Event(%#v): type: '%v' reason: '%v' %v", event.InvolvedObject, event.Type, event.Reason, event.Message)
 	}
 	return nil
+}
+
+// E2ETestNodePreparer implements testutils.TestNodePreparer interface, which is used
+// to create/modify Nodes before running a test.
+type E2ETestNodePreparer struct {
+	client clientset.Interface
+	// Specifies how many nodes should be modified using the given strategy.
+	// Only one strategy can be applied to a single Node, so there needs to
+	// be at least <sum_of_keys> Nodes in the cluster.
+	countToStrategy       []testutils.CountToStrategy
+	nodeToAppliedStrategy map[string]testutils.PrepareNodeStrategy
+}
+
+func NewE2ETestNodePreparer(client clientset.Interface, countToStrategy []testutils.CountToStrategy) testutils.TestNodePreparer {
+	return &E2ETestNodePreparer{
+		client:                client,
+		countToStrategy:       countToStrategy,
+		nodeToAppliedStrategy: make(map[string]testutils.PrepareNodeStrategy),
+	}
+}
+
+func (p *E2ETestNodePreparer) PrepareNodes() error {
+	nodes := GetReadySchedulableNodesOrDie(p.client)
+	numTemplates := 0
+	for k := range p.countToStrategy {
+		numTemplates += k
+	}
+	if numTemplates > len(nodes.Items) {
+		return fmt.Errorf("Can't prepare Nodes. Got more templates than existing Nodes.")
+	}
+	index := 0
+	sum := 0
+	for _, v := range p.countToStrategy {
+		sum += v.Count
+		for ; index < sum; index++ {
+			if err := testutils.DoPrepareNode(p.client, &nodes.Items[index], v.Strategy); err != nil {
+				glog.Errorf("Aborting node preparation: %v", err)
+				return err
+			}
+			p.nodeToAppliedStrategy[nodes.Items[index].Name] = v.Strategy
+		}
+	}
+	return nil
+}
+
+func (p *E2ETestNodePreparer) CleanupNodes() error {
+	var encounteredError error
+	nodes := GetReadySchedulableNodesOrDie(p.client)
+	for i := range nodes.Items {
+		var err error
+		name := nodes.Items[i].Name
+		strategy, found := p.nodeToAppliedStrategy[name]
+		if found {
+			if err = testutils.DoCleanupNode(p.client, name, strategy); err != nil {
+				glog.Errorf("Skipping cleanup of Node: failed update of %v: %v", name, err)
+				encounteredError = err
+			}
+		}
+	}
+	return encounteredError
 }

@@ -21,6 +21,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -28,7 +29,9 @@ import (
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // AppendFunc is used to add a matching item to whatever list the caller is using
@@ -88,6 +91,79 @@ func ListAllByNamespace(indexer Indexer, namespace string, selector labels.Selec
 	}
 
 	return nil
+}
+
+// GenericLister is a lister skin on a generic Indexer
+type GenericLister interface {
+	// List will return all objects across namespaces
+	List(selector labels.Selector) (ret []runtime.Object, err error)
+	// Get will attempt to retrieve assuming that name==key
+	Get(name string) (runtime.Object, error)
+	// ByNamespace will give you a GenericNamespaceLister for one namespace
+	ByNamespace(namespace string) GenericNamespaceLister
+}
+
+// GenericNamespaceLister is a lister skin on a generic Indexer
+type GenericNamespaceLister interface {
+	// List will return all objects in this namespace
+	List(selector labels.Selector) (ret []runtime.Object, err error)
+	// Get will attempt to retrieve by namespace and name
+	Get(name string) (runtime.Object, error)
+}
+
+func NewGenericLister(indexer Indexer, resource unversioned.GroupResource) GenericLister {
+	return &genericLister{indexer: indexer, resource: resource}
+}
+
+type genericLister struct {
+	indexer  Indexer
+	resource unversioned.GroupResource
+}
+
+func (s *genericLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
+	err = ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(runtime.Object))
+	})
+	return ret, err
+}
+
+func (s *genericLister) ByNamespace(namespace string) GenericNamespaceLister {
+	return &genericNamespaceLister{indexer: s.indexer, namespace: namespace, resource: s.resource}
+}
+
+func (s *genericLister) Get(name string) (runtime.Object, error) {
+	obj, exists, err := s.indexer.GetByKey(name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(s.resource, name)
+	}
+	return obj.(runtime.Object), nil
+}
+
+type genericNamespaceLister struct {
+	indexer   Indexer
+	namespace string
+	resource  unversioned.GroupResource
+}
+
+func (s *genericNamespaceLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
+	err = ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(runtime.Object))
+	})
+	return ret, err
+}
+
+func (s *genericNamespaceLister) Get(name string) (runtime.Object, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(s.resource, name)
+	}
+	return obj.(runtime.Object), nil
 }
 
 //  TODO: generate these classes and methods for all resources of interest using
@@ -288,25 +364,6 @@ func (s *StoreToPVFetcher) GetPersistentVolumeInfo(id string) (*api.PersistentVo
 	return o.(*api.PersistentVolume), nil
 }
 
-// Typed wrapper around a store of PersistentVolumeClaims
-type StoreToPVCFetcher struct {
-	Store
-}
-
-// GetPersistentVolumeClaimInfo returns cached data for the PersistentVolumeClaim 'id'.
-func (s *StoreToPVCFetcher) GetPersistentVolumeClaimInfo(namespace string, id string) (*api.PersistentVolumeClaim, error) {
-	o, exists, err := s.Get(&api.PersistentVolumeClaim{ObjectMeta: api.ObjectMeta{Namespace: namespace, Name: id}})
-	if err != nil {
-		return nil, fmt.Errorf("error retrieving PersistentVolumeClaim '%s/%s' from cache: %v", namespace, id, err)
-	}
-
-	if !exists {
-		return nil, fmt.Errorf("PersistentVolumeClaim '%s/%s' not found", namespace, id)
-	}
-
-	return o.(*api.PersistentVolumeClaim), nil
-}
-
 // StoreToPetSetLister gives a store List and Exists methods. The store must contain only PetSets.
 type StoreToPetSetLister struct {
 	Store
@@ -449,4 +506,41 @@ func (s *StoreToPodDisruptionBudgetLister) GetPodPodDisruptionBudgets(pod *api.P
 		err = fmt.Errorf("could not find PodDisruptionBudget for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 	return
+}
+
+// StorageClassLister knows how to list storage classes
+type StorageClassLister interface {
+	List(selector labels.Selector) (ret []*storage.StorageClass, err error)
+	Get(name string) (*storage.StorageClass, error)
+}
+
+// storageClassLister implements StorageClassLister
+type storageClassLister struct {
+	indexer Indexer
+}
+
+// NewStorageClassLister returns a new lister.
+func NewStorageClassLister(indexer Indexer) StorageClassLister {
+	return &storageClassLister{indexer: indexer}
+}
+
+// List returns a list of storage classes
+func (s *storageClassLister) List(selector labels.Selector) (ret []*storage.StorageClass, err error) {
+	err = ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*storage.StorageClass))
+	})
+	return ret, err
+}
+
+// List returns a list of storage classes
+func (s *storageClassLister) Get(name string) (*storage.StorageClass, error) {
+	key := &storage.StorageClass{ObjectMeta: api.ObjectMeta{Name: name}}
+	obj, exists, err := s.indexer.Get(key)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(storage.Resource("storageclass"), name)
+	}
+	return obj.(*storage.StorageClass), nil
 }

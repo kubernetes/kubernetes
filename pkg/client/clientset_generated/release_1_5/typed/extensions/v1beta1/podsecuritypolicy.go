@@ -20,6 +20,7 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -44,13 +45,13 @@ type PodSecurityPolicyInterface interface {
 
 // podSecurityPolicies implements PodSecurityPolicyInterface
 type podSecurityPolicies struct {
-	client *ExtensionsClient
+	client restclient.Interface
 }
 
 // newPodSecurityPolicies returns a PodSecurityPolicies
 func newPodSecurityPolicies(c *ExtensionsClient) *podSecurityPolicies {
 	return &podSecurityPolicies{
-		client: c,
+		client: c.RESTClient(),
 	}
 }
 

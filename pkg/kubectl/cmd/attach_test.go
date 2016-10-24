@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
+	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/util/term"
 )
 
@@ -96,7 +97,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		f, tf, _, ns := NewAPIFactory()
+		f, tf, _, ns := cmdtesting.NewAPIFactory()
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: ns,
 			Client:               fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) { return nil, nil }),
@@ -162,7 +163,7 @@ func TestAttach(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		f, tf, codec, ns := NewAPIFactory()
+		f, tf, codec, ns := cmdtesting.NewAPIFactory()
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -242,7 +243,7 @@ func TestAttachWarnings(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		f, tf, codec, ns := NewAPIFactory()
+		f, tf, codec, ns := cmdtesting.NewAPIFactory()
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {

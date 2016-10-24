@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
-	apiserveropenapi "k8s.io/kubernetes/pkg/apiserver/openapi"
 	authorizerunion "k8s.io/kubernetes/pkg/auth/authorizer/union"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/controller/informers"
@@ -117,7 +116,7 @@ func Run(s *options.ServerRunOptions) error {
 		storageFactory.SetEtcdLocation(groupResource, servers)
 	}
 
-	apiAuthenticator, err := authenticator.New(authenticator.AuthenticatorConfig{
+	apiAuthenticator, securityDefinitions, err := authenticator.New(authenticator.AuthenticatorConfig{
 		Anonymous:         s.AnonymousAuth,
 		AnyToken:          s.EnableAnyToken,
 		BasicAuthFile:     s.BasicAuthFile,
@@ -196,10 +195,8 @@ func Run(s *options.ServerRunOptions) error {
 	genericConfig.APIResourceConfigSource = storageFactory.APIResourceConfigSource
 	genericConfig.MasterServiceNamespace = s.MasterServiceNamespace
 	genericConfig.OpenAPIConfig.Definitions = openapi.OpenAPIDefinitions
-	// Reusing api-server's GetOperationID function. if federation and api-server spec diverge and
-	// this method does not provide good operation IDs for federation, we should create federation's own GetOperationID.
-	genericConfig.OpenAPIConfig.GetOperationID = apiserveropenapi.GetOperationID
 	genericConfig.EnableOpenAPISupport = true
+	genericConfig.OpenAPIConfig.SecurityDefinitions = securityDefinitions
 
 	// TODO: Move this to generic api server (Need to move the command line flag).
 	if s.EnableWatchCache {
@@ -230,7 +227,7 @@ func Run(s *options.ServerRunOptions) error {
 	installExtensionsAPIs(m, restOptionsFactory)
 
 	sharedInformers.Start(wait.NeverStop)
-	m.Run()
+	m.PrepareRun().Run()
 	return nil
 }
 

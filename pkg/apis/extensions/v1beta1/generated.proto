@@ -895,21 +895,17 @@ message ReplicaSetCondition {
   // Status of the condition, one of True, False, Unknown.
   optional string status = 2;
 
-  // Last time we probed the condition.
-  // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.Time lastProbeTime = 3;
-
   // The last time the condition transitioned from one status to another.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.Time lastTransitionTime = 4;
+  optional k8s.io.kubernetes.pkg.api.unversioned.Time lastTransitionTime = 3;
 
   // The reason for the condition's last transition.
   // +optional
-  optional string reason = 5;
+  optional string reason = 4;
 
   // A human readable message indicating details about the transition.
   // +optional
-  optional string message = 6;
+  optional string message = 5;
 }
 
 // ReplicaSetList is a collection of ReplicaSets.

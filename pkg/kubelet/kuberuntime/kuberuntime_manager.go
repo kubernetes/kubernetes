@@ -471,17 +471,18 @@ func (m *kubeGenericRuntimeManager) computePodContainerChanges(pod *api.Pod, pod
 
 	// check the status of containers.
 	for index, container := range pod.Spec.Containers {
-		if sandboxChanged {
-			message := fmt.Sprintf("Container %+v's pod sandbox is dead, the container will be recreated.", container)
-			glog.Info(message)
-			changes.ContainersToStart[index] = message
-			continue
-		}
-
 		containerStatus := podStatus.FindContainerStatusByName(container.Name)
 		if containerStatus == nil || containerStatus.State != kubecontainer.ContainerStateRunning {
 			if kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus) {
 				message := fmt.Sprintf("Container %+v is dead, but RestartPolicy says that we should restart it.", container)
+				glog.Info(message)
+				changes.ContainersToStart[index] = message
+			}
+			continue
+		}
+		if sandboxChanged {
+			if pod.Spec.RestartPolicy != api.RestartPolicyNever {
+				message := fmt.Sprintf("Container %+v's pod sandbox is dead, the container will be recreated.", container)
 				glog.Info(message)
 				changes.ContainersToStart[index] = message
 			}

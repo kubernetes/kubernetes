@@ -25,6 +25,7 @@ import (
 	"github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
 
+	genericmux "k8s.io/kubernetes/pkg/genericapiserver/mux"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/json"
@@ -42,7 +43,7 @@ type openAPI struct {
 }
 
 // RegisterOpenAPIService registers a handler to provides standard OpenAPI specification.
-func RegisterOpenAPIService(servePath string, webServices []*restful.WebService, config *common.Config, containers *restful.Container) (err error) {
+func RegisterOpenAPIService(servePath string, webServices []*restful.WebService, config *common.Config, container *genericmux.APIContainer) (err error) {
 	o := openAPI{
 		config:    config,
 		servePath: servePath,
@@ -61,7 +62,7 @@ func RegisterOpenAPIService(servePath string, webServices []*restful.WebService,
 		return err
 	}
 
-	containers.ServeMux.HandleFunc(servePath, func(w http.ResponseWriter, r *http.Request) {
+	container.SecretRoutes.HandleFunc(servePath, func(w http.ResponseWriter, r *http.Request) {
 		resp := restful.NewResponse(w)
 		if r.URL.Path != servePath {
 			resp.WriteErrorString(http.StatusNotFound, "Path not found!")
@@ -78,9 +79,16 @@ func (o *openAPI) init(webServices []*restful.WebService) error {
 			return r.Operation, nil
 		}
 	}
+	if o.config.CommonResponses == nil {
+		o.config.CommonResponses = map[int]spec.Response{}
+	}
 	err := o.buildPaths(webServices)
 	if err != nil {
 		return err
+	}
+	if o.config.SecurityDefinitions != nil {
+		o.swagger.SecurityDefinitions = *o.config.SecurityDefinitions
+		o.swagger.Security = o.config.DefaultSecurity
 	}
 	return nil
 }
@@ -225,6 +233,11 @@ func (o *openAPI) buildOperations(route restful.Route, inPathCommonParamsMap map
 		ret.Responses.StatusCodeResponses[http.StatusOK], err = o.buildResponse(route.WriteSample, "OK")
 		if err != nil {
 			return ret, err
+		}
+	}
+	for code, resp := range o.config.CommonResponses {
+		if _, exists := ret.Responses.StatusCodeResponses[code]; !exists {
+			ret.Responses.StatusCodeResponses[code] = resp
 		}
 	}
 	// If there is still no response, use default response provided.

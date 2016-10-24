@@ -128,7 +128,9 @@ type Interface interface {
 
 	// GetToList unmarshals json found at key and opaque it into *List api object
 	// (an object that satisfies the runtime.IsList definition).
-	GetToList(ctx context.Context, key string, p SelectionPredicate, listObj runtime.Object) error
+	// The returned contents may be delayed, but it is guaranteed that they will
+	// be have at least 'resourceVersion'.
+	GetToList(ctx context.Context, key string, resourceVersion string, p SelectionPredicate, listObj runtime.Object) error
 
 	// List unmarshalls jsons found at directory defined by key and opaque them
 	// into *List api object (an object that satisfies runtime.IsList definition).

@@ -894,6 +894,10 @@
 			"Rev": "465937c80b3c07a7c7ad20cc934898646a91c1de"
 		},
 		{
+			"ImportPath": "github.com/exponent-io/jsonpath",
+			"Rev": "d6023ce2651d8eafb5c75bb0c7167536102ec9f5"
+		},
+		{
 			"ImportPath": "github.com/fsnotify/fsnotify",
 			"Comment": "v1.3.1-1-gf12c623",
 			"Rev": "f12c6236fe7b5cf6bcf30e5935d08cb079d78334"

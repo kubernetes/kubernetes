@@ -5583,9 +5583,6 @@ func Convert_api_ReplicationController_To_v1_ReplicationController(in *api.Repli
 func autoConvert_v1_ReplicationControllerCondition_To_api_ReplicationControllerCondition(in *ReplicationControllerCondition, out *api.ReplicationControllerCondition, s conversion.Scope) error {
 	out.Type = api.ReplicationControllerConditionType(in.Type)
 	out.Status = api.ConditionStatus(in.Status)
-	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastProbeTime, &out.LastProbeTime, s); err != nil {
-		return err
-	}
 	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastTransitionTime, &out.LastTransitionTime, s); err != nil {
 		return err
 	}
@@ -5601,9 +5598,6 @@ func Convert_v1_ReplicationControllerCondition_To_api_ReplicationControllerCondi
 func autoConvert_api_ReplicationControllerCondition_To_v1_ReplicationControllerCondition(in *api.ReplicationControllerCondition, out *ReplicationControllerCondition, s conversion.Scope) error {
 	out.Type = ReplicationControllerConditionType(in.Type)
 	out.Status = ConditionStatus(in.Status)
-	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastProbeTime, &out.LastProbeTime, s); err != nil {
-		return err
-	}
 	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastTransitionTime, &out.LastTransitionTime, s); err != nil {
 		return err
 	}

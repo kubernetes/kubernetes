@@ -455,18 +455,20 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 			info.loadBalancerStatus = *api.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
 			info.sessionAffinityType = service.Spec.SessionAffinity
 			info.loadBalancerSourceRanges = service.Spec.LoadBalancerSourceRanges
-			info.onlyNodeLocalEndpoints = apiservice.NeedsHealthCheck(service) && featuregate.DefaultFeatureGate.ExternalTrafficLocalOnly()
+			info.onlyNodeLocalEndpoints = apiservice.NeedsHealthCheck(service) && featuregate.DefaultFeatureGate.ExternalTrafficLocalOnly() && (service.Spec.Type == api.ServiceTypeLoadBalancer || service.Spec.Type == api.ServiceTypeNodePort)
 			if info.onlyNodeLocalEndpoints {
 				p := apiservice.GetServiceHealthCheckNodePort(service)
 				if p == 0 {
 					glog.Errorf("Service does not contain necessary annotation %v",
-						apiservice.AnnotationHealthCheckNodePort)
+						apiservice.BetaAnnotationHealthCheckNodePort)
 				} else {
+					glog.V(4).Infof("Adding health check for %+v, port %v", serviceName.NamespacedName, p)
 					info.healthCheckNodePort = int(p)
 					// Turn on healthcheck responder to listen on the health check nodePort
 					healthcheck.AddServiceListener(serviceName.NamespacedName, info.healthCheckNodePort)
 				}
 			} else {
+				glog.V(4).Infof("Deleting health check for %+v", serviceName.NamespacedName)
 				// Delete healthcheck responders, if any, previously listening for this service
 				healthcheck.DeleteServiceListener(serviceName.NamespacedName, 0)
 			}
@@ -488,6 +490,7 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 			if info.onlyNodeLocalEndpoints && info.healthCheckNodePort > 0 {
 				// Remove ServiceListener health check nodePorts from the health checker
 				// TODO - Stats
+				glog.V(4).Infof("Deleting health check for %+v, port %v", name.NamespacedName, info.healthCheckNodePort)
 				healthcheck.DeleteServiceListener(name.NamespacedName, info.healthCheckNodePort)
 			}
 		}

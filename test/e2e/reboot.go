@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -89,32 +90,32 @@ var _ = framework.KubeDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 	It("each node by ordering clean reboot and ensure they function upon restart", func() {
 		// clean shutdown and restart
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before the node is rebooted.
-		testReboot(f.Client, "nohup sh -c 'sleep 10 && sudo reboot' >/dev/null 2>&1 &")
+		testReboot(f.Client, f.ClientSet, "nohup sh -c 'sleep 10 && sudo reboot' >/dev/null 2>&1 &")
 	})
 
 	It("each node by ordering unclean reboot and ensure they function upon restart", func() {
 		// unclean shutdown and restart
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before the node is shutdown.
-		testReboot(f.Client, "nohup sh -c 'sleep 10 && echo b | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &")
+		testReboot(f.Client, f.ClientSet, "nohup sh -c 'sleep 10 && echo b | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &")
 	})
 
 	It("each node by triggering kernel panic and ensure they function upon restart", func() {
 		// kernel panic
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before kernel panic is triggered.
-		testReboot(f.Client, "nohup sh -c 'sleep 10 && echo c | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &")
+		testReboot(f.Client, f.ClientSet, "nohup sh -c 'sleep 10 && echo c | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &")
 	})
 
 	It("each node by switching off the network interface and ensure they function upon switch on", func() {
 		// switch the network interface off for a while to simulate a network outage
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before network is down.
-		testReboot(f.Client, "nohup sh -c 'sleep 10 && (sudo ifdown eth0 || sudo ip link set eth0 down) && sleep 120 && (sudo ifup eth0 || sudo ip link set eth0 up)' >/dev/null 2>&1 &")
+		testReboot(f.Client, f.ClientSet, "nohup sh -c 'sleep 10 && (sudo ifdown eth0 || sudo ip link set eth0 down) && sleep 120 && (sudo ifup eth0 || sudo ip link set eth0 up)' >/dev/null 2>&1 &")
 	})
 
 	It("each node by dropping all inbound packets for a while and ensure they function afterwards", func() {
 		// tell the firewall to drop all inbound packets for a while
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before starting dropping inbound packets.
 		// We still accept packages send from localhost to prevent monit from restarting kubelet.
-		testReboot(f.Client, "nohup sh -c 'sleep 10 && sudo iptables -I INPUT 1 -s 127.0.0.1 -j ACCEPT && sudo iptables -I INPUT 2 -j DROP && "+
+		testReboot(f.Client, f.ClientSet, "nohup sh -c 'sleep 10 && sudo iptables -I INPUT 1 -s 127.0.0.1 -j ACCEPT && sudo iptables -I INPUT 2 -j DROP && "+
 			" sleep 120 && sudo iptables -D INPUT -j DROP && sudo iptables -D INPUT -s 127.0.0.1 -j ACCEPT' >/dev/null 2>&1 &")
 	})
 
@@ -122,14 +123,14 @@ var _ = framework.KubeDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 		// tell the firewall to drop all outbound packets for a while
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before starting dropping outbound packets.
 		// We still accept packages send to localhost to prevent monit from restarting kubelet.
-		testReboot(f.Client, "nohup sh -c 'sleep 10 &&  sudo iptables -I OUTPUT 1 -s 127.0.0.1 -j ACCEPT && sudo iptables -I OUTPUT 2 -j DROP && "+
+		testReboot(f.Client, f.ClientSet, "nohup sh -c 'sleep 10 &&  sudo iptables -I OUTPUT 1 -s 127.0.0.1 -j ACCEPT && sudo iptables -I OUTPUT 2 -j DROP && "+
 			" sleep 120 && sudo iptables -D OUTPUT -j DROP && sudo iptables -D OUTPUT -s 127.0.0.1 -j ACCEPT' >/dev/null 2>&1 &")
 	})
 })
 
-func testReboot(c *client.Client, rebootCmd string) {
+func testReboot(c *client.Client, cs clientset.Interface, rebootCmd string) {
 	// Get all nodes, and kick off the test on each.
-	nodelist := framework.GetReadySchedulableNodesOrDie(c)
+	nodelist := framework.GetReadySchedulableNodesOrDie(cs)
 	result := make([]bool, len(nodelist.Items))
 	wg := sync.WaitGroup{}
 	wg.Add(len(nodelist.Items))

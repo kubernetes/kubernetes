@@ -107,14 +107,12 @@ metadata:
   name: slow
 provisioner: kubernetes.io/glusterfs
 parameters:
-  endpoint: "glusterfs-cluster"
   resturl: "http://127.0.0.1:8081"
   restuser: "admin"
   secretNamespace: "default"
   secretName: "heketi-secret"
 ```
 
-* `endpoint`: `glusterfs-cluster` is the endpoint name which includes GlusterFS trusted pool IP addresses. This parameter is mandatory. We need to also create a service for this endpoint, so that the endpoint will be persisted. This service can be without a selector to tell Kubernetes we want to add its endpoints manually.  Please note that, glusterfs plugin looks for the endpoint in the pod namespace, so it is mandatory that the endpoint and service have to be created in Pod's namespace for successful mount of gluster volumes in the pod.
 * `resturl` : Gluster REST service/Heketi service url which provision gluster volumes on demand. The general format should be `IPaddress:Port` and this is a mandatory parameter for GlusterFS dynamic provisioner. If Heketi service is exposed as a routable service in openshift/kubernetes setup, this can have a format similar to
 `http://heketi-storage-project.cloudapps.mystorage.com` where the fqdn is a resolvable heketi service url.
 * `restauthenabled` : Gluster REST service authentication boolean that enables authentication to the REST server. If this value is 'true', `restuser` and `restuserkey` or `secretNamespace` + `secretName` have to be filled. This option is deprecated, authentication is enabled when any of `restuser`, `restuserkey`, `secretName` or `secretNamespace` is specified.
@@ -128,31 +126,8 @@ Example of a secret can be found in [glusterfs-provisioning-secret.yaml](gluster
 
 Reference : ([How to configure Heketi](https://github.com/heketi/heketi/wiki/Setting-up-the-topology))
 
-Create endpoints
+When the persistent volumes are dynamically provisioned, the Gluster plugin automatically create an endpoint and a headless service in the name `gluster-dynamic-<claimname>`. This dynamic endpoint and service will be deleted automatically when the persistent volume claim is deleted.
 
-As in example [glusterfs-endpoints.json](../../volumes/glusterfs/glusterfs-endpoints.json) file, the "IP" field should be filled with the address of a node in the Glusterfs server cluster. It is fine to give any valid value (from 1 to 65535) to the "port" field.
-
-Create the endpoints,
-
-```sh
-$ kubectl create -f examples/volumes/glusterfs/glusterfs-endpoints.json
-```
-
-You can verify that the endpoints are successfully created by running
-
-```sh
-$ kubectl get endpoints
-NAME                ENDPOINTS
-glusterfs-cluster   10.240.106.152:1,10.240.79.157:1
-```
-
-We need also create a service for this endpoints, so that the endpoints will be persisted. It is possible to create `service` without a selector to tell Kubernetes we want to add its endpoints manually. For an example service file refer [glusterfs-service.json](../../volumes/glusterfs/glusterfs-service.json).
-
-Use this command to create the service:
-
-```sh
-$ kubectl create -f examples/volumes/glusterfs/glusterfs-service.json
-```
 
 #### OpenStack Cinder
 

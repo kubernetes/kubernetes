@@ -28,6 +28,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.APIResourceList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     }
@@ -90,6 +93,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.CertificateSigningRequestList"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -123,6 +129,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.CertificateSigningRequest"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -183,6 +192,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -233,6 +245,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.CertificateSigningRequest"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -266,6 +281,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.CertificateSigningRequest"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -299,6 +317,9 @@
        "schema": {
         "$ref": "#/definitions/unversioned.Status"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -334,6 +355,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.CertificateSigningRequest"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -376,6 +400,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.CertificateSigningRequest"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -426,6 +453,9 @@
        "schema": {
         "$ref": "#/definitions/v1alpha1.CertificateSigningRequest"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -477,6 +507,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -547,6 +580,9 @@
        "schema": {
         "$ref": "#/definitions/versioned.Event"
        }
+      },
+      "401": {
+       "description": "Unauthorized"
       }
      }
     },
@@ -1006,5 +1042,18 @@
      }
     }
    }
-  }
+  },
+  "securityDefinitions": {
+   "BearerToken": {
+    "description": "Bearer Token authentication",
+    "type": "apiKey",
+    "name": "authorization",
+    "in": "header"
+   }
+  },
+  "security": [
+   {
+    "BearerToken": []
+   }
+  ]
  }

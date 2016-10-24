@@ -43,7 +43,6 @@ import (
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/storage/storagebackend/factory"
 	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
-	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -109,7 +108,7 @@ func NewTestGenericStoreRegistry(t *testing.T) (factory.DestroyFunc, *Store) {
 func matchPodName(names ...string) storage.SelectionPredicate {
 	// Note: even if pod name is a field, we have to use labels,
 	// because field selector doesn't support "IN" operator.
-	l, err := labels.NewRequirement("name", selection.In, sets.NewString(names...))
+	l, err := labels.NewRequirement("name", selection.In, names)
 	if err != nil {
 		panic("Labels requirement must validate successfully")
 	}

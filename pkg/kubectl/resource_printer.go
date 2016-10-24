@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -1100,6 +1101,9 @@ func makePortString(ports []api.ServicePort) string {
 	for ix := range ports {
 		port := &ports[ix]
 		pieces[ix] = fmt.Sprintf("%d/%s", port.Port, port.Protocol)
+		if port.NodePort > 0 {
+			pieces[ix] = fmt.Sprintf("%d:%d/%s", port.Port, port.NodePort, port.Protocol)
+		}
 	}
 	return strings.Join(pieces, ",")
 }
@@ -2082,6 +2086,10 @@ func printNetworkPolicyList(list *extensions.NetworkPolicyList, w io.Writer, opt
 
 func printStorageClass(sc *storage.StorageClass, w io.Writer, options PrintOptions) error {
 	name := sc.Name
+
+	if storageutil.IsDefaultAnnotation(sc.ObjectMeta) {
+		name += " (default)"
+	}
 	provtype := sc.Provisioner
 
 	if _, err := fmt.Fprintf(w, "%s\t%s\t", name, provtype); err != nil {

@@ -590,24 +590,22 @@ func (cont *GCEIngressController) init() {
 	}
 }
 
+// staticIP allocates a random static ip with the given name. Returns a string
+// representation of the ip. Caller is expected to manage cleanup of the ip.
 func (cont *GCEIngressController) staticIP(name string) string {
-	ExpectNoError(gcloudCreate("addresses", name, cont.cloud.ProjectID, "--global"))
-	cont.staticIPName = name
-	ipList := []compute.Address{}
-	if pollErr := wait.PollImmediate(5*time.Second, cloudResourcePollTimeout, func() (bool, error) {
-		gcloudList("addresses", name, cont.cloud.ProjectID, &ipList)
-		if len(ipList) != 1 {
-			framework.Logf("Failed to find static ip %v even though create call succeeded, found ips %+v", name, ipList)
-			return false, nil
+	gceCloud := cont.cloud.Provider.(*gcecloud.GCECloud)
+	ip, err := gceCloud.ReserveGlobalStaticIP(name, "")
+	if err != nil {
+		if delErr := gceCloud.DeleteGlobalStaticIP(name); delErr != nil {
+			if cont.isHTTPErrorCode(delErr, http.StatusNotFound) {
+				framework.Logf("Static ip with name %v was not allocated, nothing to delete", name)
+			} else {
+				framework.Logf("Failed to delete static ip %v: %v", name, delErr)
+			}
 		}
-		return true, nil
-	}); pollErr != nil {
-		if err := gcloudDelete("addresses", name, cont.cloud.ProjectID, "--global"); err == nil {
-			framework.Logf("Failed to get AND delete address %v even though create call succeeded", name)
-		}
-		framework.Failf("Failed to find static ip %v even though create call succeeded, found ips %+v", name, ipList)
+		framework.Failf("Failed to allocated static ip %v: %v", name, err)
 	}
-	return ipList[0].Address
+	return ip.Address
 }
 
 // gcloudList unmarshals json output of gcloud into given out interface.
@@ -616,17 +614,22 @@ func gcloudList(resource, regex, project string, out interface{}) {
 	// so we only look at stdout.
 	command := []string{
 		"compute", resource, "list",
-		fmt.Sprintf("--regex=%v", regex),
+		fmt.Sprintf("--regexp=%v", regex),
 		fmt.Sprintf("--project=%v", project),
 		"-q", "--format=json",
 	}
 	output, err := exec.Command("gcloud", command...).Output()
 	if err != nil {
 		errCode := -1
+		errMsg := ""
 		if exitErr, ok := err.(utilexec.ExitError); ok {
 			errCode = exitErr.ExitStatus()
+			errMsg = exitErr.Error()
+			if osExitErr, ok := err.(*exec.ExitError); ok {
+				errMsg = fmt.Sprintf("%v, stderr %v", errMsg, string(osExitErr.Stderr))
+			}
 		}
-		framework.Logf("Error running gcloud command 'gcloud %s': err: %v, output: %v, status: %d", strings.Join(command, " "), err, string(output), errCode)
+		framework.Logf("Error running gcloud command 'gcloud %s': err: %v, output: %v, status: %d, msg: %v", strings.Join(command, " "), err, string(output), errCode, errMsg)
 	}
 	if err := json.Unmarshal([]byte(output), out); err != nil {
 		framework.Logf("Error unmarshalling gcloud output for %v: %v, output: %v", resource, err, string(output))

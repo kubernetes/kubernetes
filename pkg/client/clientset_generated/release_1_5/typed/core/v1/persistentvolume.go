@@ -19,6 +19,7 @@ package v1
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -44,13 +45,13 @@ type PersistentVolumeInterface interface {
 
 // persistentVolumes implements PersistentVolumeInterface
 type persistentVolumes struct {
-	client *CoreClient
+	client restclient.Interface
 }
 
 // newPersistentVolumes returns a PersistentVolumes
 func newPersistentVolumes(c *CoreClient) *persistentVolumes {
 	return &persistentVolumes{
-		client: c,
+		client: c.RESTClient(),
 	}
 }
 

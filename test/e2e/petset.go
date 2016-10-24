@@ -57,6 +57,9 @@ const (
 	// Should the test restart petset clusters?
 	// TODO: enable when we've productionzed bringup of pets in this e2e.
 	restartCluster = false
+
+	// Timeout for reads from databases running on pets.
+	readTimeout = 60 * time.Second
 )
 
 // Time: 25m, slow by design.
@@ -157,8 +160,6 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 			By("Waiting for pet at index 1 to enter running.")
 			pst.waitForRunning(2, ps)
 
-			// TODO: verify petset status.replicas
-
 			// Now we have 1 healthy and 1 unhealthy pet. Deleting the healthy pet should *not*
 			// create a new pet till the remaining pet becomes healthy, which won't happen till
 			// we set the healthy bit.
@@ -202,8 +203,8 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 			}
 
 			By("Reading value under foo from member with index 2")
-			if v := pet.read(2, "foo"); v != "bar" {
-				framework.Failf("Read unexpected value %v, expected bar under key foo", v)
+			if err := pollReadWithTimeout(pet, 2, "foo", "bar"); err != nil {
+				framework.Failf("%v", err)
 			}
 		})
 
@@ -223,8 +224,8 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 			}
 
 			By("Reading value under foo from member with index 2")
-			if v := pet.read(2, "foo"); v != "bar" {
-				framework.Failf("Read unexpected value %v, expected bar under key foo", v)
+			if err := pollReadWithTimeout(pet, 2, "foo", "bar"); err != nil {
+				framework.Failf("%v", err)
 			}
 		})
 
@@ -244,8 +245,8 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 			}
 
 			By("Reading value under foo from member with index 2")
-			if v := pet.read(2, "foo"); v != "bar" {
-				framework.Failf("Read unexpected value %v, expected bar under key foo", v)
+			if err := pollReadWithTimeout(pet, 2, "foo", "bar"); err != nil {
+				framework.Failf("%v", err)
 			}
 		})
 	})
@@ -285,7 +286,7 @@ var _ = framework.KubeDescribe("Pet set recreate [Slow] [Feature:PetSet]", func(
 
 	It("should recreate evicted petset", func() {
 		By("looking for a node to schedule pet set and pod")
-		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
+		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		node := nodes.Items[0]
 
 		By("creating pod with conflicting port in namespace " + f.Namespace.Name)
@@ -580,8 +581,6 @@ func (p *petSetTester) saturate(ps *apps.PetSet) {
 		framework.Logf("Marking pet at index " + fmt.Sprintf("%v", i) + " healthy")
 		p.setHealthy(ps)
 	}
-	framework.Logf("Waiting for pet set status.replicas updated to %d", ps.Spec.Replicas)
-	p.waitForStatus(ps, ps.Spec.Replicas)
 }
 
 func (p *petSetTester) deletePetAtIndex(index int, ps *apps.PetSet) {
@@ -689,6 +688,8 @@ func (p *petSetTester) waitForRunning(numPets int32, ps *apps.PetSet) {
 	if pollErr != nil {
 		framework.Failf("Failed waiting for pods to enter running: %v", pollErr)
 	}
+
+	p.waitForStatus(ps, numPets)
 }
 
 func (p *petSetTester) setHealthy(ps *apps.PetSet) {
@@ -714,6 +715,8 @@ func (p *petSetTester) setHealthy(ps *apps.PetSet) {
 }
 
 func (p *petSetTester) waitForStatus(ps *apps.PetSet, expectedReplicas int32) {
+	framework.Logf("Waiting for petset status.replicas updated to %d", expectedReplicas)
+
 	ns, name := ps.Namespace, ps.Name
 	pollErr := wait.PollImmediate(petsetPoll, petsetTimeout,
 		func() (bool, error) {
@@ -722,13 +725,13 @@ func (p *petSetTester) waitForStatus(ps *apps.PetSet, expectedReplicas int32) {
 				return false, err
 			}
 			if psGet.Status.Replicas != expectedReplicas {
-				framework.Logf("Waiting for pet set status to become %d, currently %d", expectedReplicas, ps.Status.Replicas)
+				framework.Logf("Waiting for pet set status to become %d, currently %d", expectedReplicas, psGet.Status.Replicas)
 				return false, nil
 			}
 			return true, nil
 		})
 	if pollErr != nil {
-		framework.Failf("Failed waiting for pet set status.replicas updated to %d, got %d: %v", expectedReplicas, ps.Status.Replicas, pollErr)
+		framework.Failf("Failed waiting for pet set status.replicas updated to %d: %v", expectedReplicas, pollErr)
 	}
 }
 
@@ -745,6 +748,7 @@ func deleteAllPetSets(c *client.Client, ns string) {
 		if err := pst.scale(&ps, 0); err != nil {
 			errList = append(errList, fmt.Sprintf("%v", err))
 		}
+		pst.waitForStatus(&ps, 0)
 		framework.Logf("Deleting petset %v", ps.Name)
 		if err := c.Apps().PetSets(ps.Namespace).Delete(ps.Name, nil); err != nil {
 			errList = append(errList, fmt.Sprintf("%v", err))
@@ -802,6 +806,23 @@ func deleteAllPetSets(c *client.Client, ns string) {
 
 func ExpectNoError(err error) {
 	Expect(err).NotTo(HaveOccurred())
+}
+
+func pollReadWithTimeout(pet petTester, petNumber int, key, expectedVal string) error {
+	err := wait.PollImmediate(time.Second, readTimeout, func() (bool, error) {
+		val := pet.read(petNumber, key)
+		if val == "" {
+			return false, nil
+		} else if val != expectedVal {
+			return false, fmt.Errorf("expected value %v, found %v", expectedVal, val)
+		}
+		return true, nil
+	})
+
+	if err == wait.ErrWaitTimeout {
+		return fmt.Errorf("timed out when trying to read value for key %v from pet %d", key, petNumber)
+	}
+	return err
 }
 
 func isInitialized(pod api.Pod) bool {

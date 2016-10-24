@@ -1572,3 +1572,53 @@ func TestPrintPodShowLabels(t *testing.T) {
 		buf.Reset()
 	}
 }
+
+func TestPrintService(t *testing.T) {
+	tests := []struct {
+		service api.Service
+		expect  string
+	}{
+		{
+			// Test name, cluster ip, port with protocol
+			api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "test1"},
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeClusterIP,
+					Ports: []api.ServicePort{
+						{Protocol: "tcp",
+							Port: 2233},
+					},
+					ClusterIP: "0.0.0.0",
+				},
+			},
+			"test1\t0.0.0.0\t<none>\t2233/tcp\t<unknown>\n",
+		},
+		{
+			// Test name, cluster ip, port:nodePort with protocol
+			api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "test2"},
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeClusterIP,
+					Ports: []api.ServicePort{
+						{Protocol: "tcp",
+							Port:     8888,
+							NodePort: 9999,
+						},
+					},
+					ClusterIP: "10.9.8.7",
+				},
+			},
+			"test2\t10.9.8.7\t<none>\t8888:9999/tcp\t<unknown>\n",
+		},
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		printService(&test.service, buf, PrintOptions{false, false, false, false, true, false, false, "", []string{}})
+		// We ignore time
+		if buf.String() != test.expect {
+			t.Fatalf("Expected: %s, got: %s %d", test.expect, buf.String(), strings.Compare(test.expect, buf.String()))
+		}
+		buf.Reset()
+	}
+}

@@ -776,6 +776,8 @@ function create-master() {
   create-static-ip "${MASTER_NAME}-ip" "${REGION}"
   MASTER_RESERVED_IP=$(gcloud compute addresses describe "${MASTER_NAME}-ip" \
     --project "${PROJECT}" --region "${REGION}" -q --format='value(address)')
+  KUBELET_APISERVER="${MASTER_RESERVED_IP}"
+  KUBERNETES_MASTER_NAME="${MASTER_RESERVED_IP}"
 
   create-certs "${MASTER_RESERVED_IP}"
 
@@ -1165,8 +1167,10 @@ function remove-replica-from-etcd() {
     --project "${PROJECT}" \
     --zone "${EXISTING_MASTER_ZONE}" \
     --command \
-    "curl -s localhost:${port}/v2/members/\$(curl -s localhost:${port}/v2/members -XGET | sed 's/{\\\"id/\n/g' | grep ${REPLICA_NAME} | cut -f 3 -d \\\") -XDELETE -L 2>/dev/null"
-  return $?
+    "curl -s localhost:${port}/v2/members/\$(curl -s localhost:${port}/v2/members -XGET | sed 's/{\\\"id/\n/g' | grep ${REPLICA_NAME}\\\" | cut -f 3 -d \\\") -XDELETE -L 2>/dev/null"
+  local -r res=$?
+  echo "Removing etcd replica, name: ${REPLICA_NAME}, port: ${port}, result: ${res}"
+  return "${res}"
 }
 
 # Delete a kubernetes cluster. This is called from test-teardown.
@@ -1276,14 +1280,15 @@ function kube-down() {
   if [[ "${REMAINING_MASTER_COUNT}" == "1" ]]; then
     if gcloud compute forwarding-rules describe "${MASTER_NAME}" --region "${REGION}" --project "${PROJECT}" &>/dev/null; then
       detect-master
-      local EXISTING_MASTER_ZONE=$(gcloud compute instances list "${MASTER_NAME}" \
+      local REMAINING_REPLICA_NAME="$(get-replica-name)"
+      local REMAINING_REPLICA_ZONE=$(gcloud compute instances list "${REMAINING_REPLICA_NAME}" \
         --project "${PROJECT}" --format="value(zone)")
       gcloud compute forwarding-rules delete \
         --project "${PROJECT}" \
         --region "${REGION}" \
         --quiet \
         "${MASTER_NAME}"
-      attach-external-ip "${MASTER_NAME}" "${EXISTING_MASTER_ZONE}" "${KUBE_MASTER_IP}"
+      attach-external-ip "${REMAINING_REPLICA_NAME}" "${REMAINING_REPLICA_ZONE}" "${KUBE_MASTER_IP}"
       gcloud compute target-pools delete \
         --project "${PROJECT}" \
         --region "${REGION}" \
@@ -1326,47 +1331,48 @@ function kube-down() {
     done
   fi
 
-  # Delete routes.
-  local -a routes
-  # Clean up all routes w/ names like "<cluster-name>-<node-GUID>"
-  # e.g. "kubernetes-12345678-90ab-cdef-1234-567890abcdef". The name is
-  # determined by the node controller on the master.
-  # Note that this is currently a noop, as synchronously deleting the node MIG
-  # first allows the master to cleanup routes itself.
-  local TRUNCATED_PREFIX="${INSTANCE_PREFIX:0:26}"
-  routes=( $(gcloud compute routes list --project "${PROJECT}" \
-    --regexp "${TRUNCATED_PREFIX}-.{8}-.{4}-.{4}-.{4}-.{12}"  \
-    --format='value(name)') )
-  while (( "${#routes[@]}" > 0 )); do
-    echo Deleting routes "${routes[*]::${batch}}"
-    gcloud compute routes delete \
-      --project "${PROJECT}" \
-      --quiet \
-      "${routes[@]::${batch}}"
-    routes=( "${routes[@]:${batch}}" )
-  done
-
-  # Delete persistent disk for influx-db.
-  if gcloud compute disks describe "${INSTANCE_PREFIX}"-influxdb-pd --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
-    gcloud compute disks delete \
-      --project "${PROJECT}" \
-      --quiet \
-      --zone "${ZONE}" \
-      "${INSTANCE_PREFIX}"-influxdb-pd
-  fi
-
-  # Delete all remaining firewall rules and network.
-  delete-firewall-rules \
-    "${NETWORK}-default-internal-master" \
-    "${NETWORK}-default-internal-node" \
-    "${NETWORK}-default-ssh" \
-    "${NETWORK}-default-internal"  # Pre-1.5 clusters
-  if [[ "${KUBE_DELETE_NETWORK}" == "true" ]]; then
-    delete-network || true  # might fail if there are leaked firewall rules
-  fi
-
-  # If there are no more remaining master replicas, we should update kubeconfig.
+  # If there are no more remaining master replicas: delete routes, pd for influxdb and update kubeconfig
   if [[ "${REMAINING_MASTER_COUNT}" == "0" ]]; then
+    # Delete routes.
+    local -a routes
+    # Clean up all routes w/ names like "<cluster-name>-<node-GUID>"
+    # e.g. "kubernetes-12345678-90ab-cdef-1234-567890abcdef". The name is
+    # determined by the node controller on the master.
+    # Note that this is currently a noop, as synchronously deleting the node MIG
+    # first allows the master to cleanup routes itself.
+    local TRUNCATED_PREFIX="${INSTANCE_PREFIX:0:26}"
+    routes=( $(gcloud compute routes list --project "${PROJECT}" \
+      --regexp "${TRUNCATED_PREFIX}-.{8}-.{4}-.{4}-.{4}-.{12}"  \
+      --format='value(name)') )
+    while (( "${#routes[@]}" > 0 )); do
+      echo Deleting routes "${routes[*]::${batch}}"
+      gcloud compute routes delete \
+        --project "${PROJECT}" \
+        --quiet \
+        "${routes[@]::${batch}}"
+      routes=( "${routes[@]:${batch}}" )
+    done
+
+    # Delete persistent disk for influx-db.
+    if gcloud compute disks describe "${INSTANCE_PREFIX}"-influxdb-pd --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
+      gcloud compute disks delete \
+        --project "${PROJECT}" \
+        --quiet \
+        --zone "${ZONE}" \
+        "${INSTANCE_PREFIX}"-influxdb-pd
+    fi
+
+    # Delete all remaining firewall rules and network.
+    delete-firewall-rules \
+      "${NETWORK}-default-internal-master" \
+      "${NETWORK}-default-internal-node" \
+      "${NETWORK}-default-ssh" \
+      "${NETWORK}-default-internal"  # Pre-1.5 clusters
+    if [[ "${KUBE_DELETE_NETWORK}" == "true" ]]; then
+      delete-network || true  # might fail if there are leaked firewall rules
+    fi
+
+    # If there are no more remaining master replicas, we should update kubeconfig.
     export CONTEXT="${PROJECT}_${INSTANCE_PREFIX}"
     clear-kubeconfig
   fi

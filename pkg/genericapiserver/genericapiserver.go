@@ -30,10 +30,8 @@ import (
 
 	systemd "github.com/coreos/go-systemd/daemon"
 	"github.com/emicklei/go-restful"
-	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
 
-	"github.com/go-openapi/spec"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -43,8 +41,8 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	genericmux "k8s.io/kubernetes/pkg/genericapiserver/mux"
-	"k8s.io/kubernetes/pkg/genericapiserver/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
+	"k8s.io/kubernetes/pkg/genericapiserver/routes"
 	"k8s.io/kubernetes/pkg/runtime"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -101,9 +99,6 @@ type GenericAPIServer struct {
 	// TODO eventually we should be able to factor this out to take place during initialization.
 	enableSwaggerSupport bool
 
-	// apiPrefix is the prefix where API groups live, usually /apis
-	apiPrefix string
-
 	// legacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
 	// to InstallLegacyAPIGroup
 	legacyAPIGroupPrefixes sets.String
@@ -135,9 +130,6 @@ type GenericAPIServer struct {
 	Handler         http.Handler
 	InsecureHandler http.Handler
 
-	// Used for custom proxy dialing, and proxy TLS options
-	ProxyTransport http.RoundTripper
-
 	// Map storing information about all groups to be exposed in discovery response.
 	// The map is from name to the group.
 	apiGroupsForDiscoveryLock sync.RWMutex
@@ -157,9 +149,6 @@ type GenericAPIServer struct {
 
 	// See Config.$name for documentation of these flags:
 
-	openAPIInfo               spec.Info
-	openAPIDefaultResponse    spec.Response
-	openAPIDefinitions        *common.OpenAPIDefinitions
 	MasterCount               int
 	KubernetesServiceNodePort int // TODO(sttts): move into master
 	ServiceReadWriteIP        net.IP
@@ -185,15 +174,25 @@ func (s *GenericAPIServer) MinRequestTimeout() time.Duration {
 	return s.minRequestTimeout
 }
 
-func (s *GenericAPIServer) Run() {
+type preparedGenericAPIServer struct {
+	*GenericAPIServer
+}
+
+// PrepareRun does post API installation setup steps.
+func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	// install APIs which depend on other APIs to be installed
 	if s.enableSwaggerSupport {
-		s.InstallSwaggerAPI()
+		routes.Swagger{ExternalAddress: s.ExternalAddress}.Install(s.HandlerContainer)
 	}
 	if s.enableOpenAPISupport {
-		s.InstallOpenAPI()
+		routes.OpenAPI{
+			Config: s.openAPIConfig,
+		}.Install(s.HandlerContainer)
 	}
+	return preparedGenericAPIServer{s}
+}
 
+func (s preparedGenericAPIServer) Run() {
 	if s.SecureServingInfo != nil && s.Handler != nil {
 		secureServer := &http.Server{
 			Addr:           s.SecureServingInfo.BindAddress,
@@ -331,7 +330,7 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 		return fmt.Errorf("cannot register handler with an empty version for %#v", *apiGroupInfo)
 	}
 
-	if err := s.installAPIResources(s.apiPrefix, apiGroupInfo); err != nil {
+	if err := s.installAPIResources(APIGroupPrefix, apiGroupInfo); err != nil {
 		return err
 	}
 
@@ -360,7 +359,7 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 	}
 
 	s.AddAPIGroupForDiscovery(apiGroup)
-	s.HandlerContainer.Add(apiserver.NewGroupWebService(s.Serializer, s.apiPrefix+"/"+apiGroup.Name, apiGroup))
+	s.HandlerContainer.Add(apiserver.NewGroupWebService(s.Serializer, APIGroupPrefix+"/"+apiGroup.Name, apiGroup))
 
 	return nil
 }
@@ -430,64 +429,10 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 	}, nil
 }
 
-// getSwaggerConfig returns swagger config shared between SwaggerAPI and OpenAPI spec generators
-func (s *GenericAPIServer) getSwaggerConfig() *swagger.Config {
-	hostAndPort := s.ExternalAddress
-	protocol := "https://"
-	webServicesUrl := protocol + hostAndPort
-	return &swagger.Config{
-		WebServicesUrl:  webServicesUrl,
-		WebServices:     s.HandlerContainer.RegisteredWebServices(),
-		ApiPath:         "/swaggerapi/",
-		SwaggerPath:     "/swaggerui/",
-		SwaggerFilePath: "/swagger-ui/",
-		SchemaFormatHandler: func(typeName string) string {
-			switch typeName {
-			case "unversioned.Time", "*unversioned.Time":
-				return "date-time"
-			}
-			return ""
-		},
-	}
-}
-
-// InstallSwaggerAPI installs the /swaggerapi/ endpoint to allow schema discovery
-// and traversal. It is optional to allow consumers of the Kubernetes GenericAPIServer to
-// register their own web services into the Kubernetes mux prior to initialization
-// of swagger, so that other resource types show up in the documentation.
-func (s *GenericAPIServer) InstallSwaggerAPI() {
-	// Enable swagger UI and discovery API
-	swagger.RegisterSwaggerService(*s.getSwaggerConfig(), s.HandlerContainer.Container)
-}
-
-// InstallOpenAPI installs spec endpoints for each web service.
-func (s *GenericAPIServer) InstallOpenAPI() {
-	// Install one spec per web service, an ideal client will have a ClientSet containing one client
-	// per each of these specs.
-	for _, w := range s.HandlerContainer.RegisteredWebServices() {
-		if strings.HasPrefix(w.RootPath(), "/swaggerapi") {
-			continue
-		}
-		config := *s.openAPIConfig
-		config.Info = new(spec.Info)
-		*config.Info = *s.openAPIConfig.Info
-		config.Info.Title = config.Info.Title + " " + w.RootPath()
-		err := openapi.RegisterOpenAPIService(w.RootPath()+"/swagger.json", []*restful.WebService{w}, &config, s.HandlerContainer.Container)
-		if err != nil {
-			glog.Fatalf("Failed to register open api spec for %v: %v", w.RootPath(), err)
-		}
-	}
-	err := openapi.RegisterOpenAPIService("/swagger.json", s.HandlerContainer.RegisteredWebServices(), s.openAPIConfig, s.HandlerContainer.Container)
-
-	if err != nil {
-		glog.Fatalf("Failed to register open api spec for root: %v", err)
-	}
-}
-
 // DynamicApisDiscovery returns a webservice serving api group discovery.
 // Note: during the server runtime apiGroupsForDiscovery might change.
 func (s *GenericAPIServer) DynamicApisDiscovery() *restful.WebService {
-	return apiserver.NewApisWebService(s.Serializer, s.apiPrefix, func(req *restful.Request) []unversioned.APIGroup {
+	return apiserver.NewApisWebService(s.Serializer, APIGroupPrefix, func(req *restful.Request) []unversioned.APIGroup {
 		s.apiGroupsForDiscoveryLock.RLock()
 		defer s.apiGroupsForDiscoveryLock.RUnlock()
 

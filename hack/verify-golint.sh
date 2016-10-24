@@ -39,12 +39,12 @@ array_contains () {
 
 # Check that the file is in alphabetical order
 linted_file="${KUBE_ROOT}/hack/.linted_packages"
-if ! diff -u "${linted_file}" <(LANG=C sort "${linted_file}"); then
+if ! diff -u "${linted_file}" <(LC_ALL=C sort "${linted_file}"); then
 	{
 		echo
 		echo "hack/.linted_packages is not in alphabetical order. Please sort it:"
 		echo
-		echo "  LANG=C sort -o hack/.linted_packages hack/.linted_packages"
+		echo "  LC_ALL=C sort -o hack/.linted_packages hack/.linted_packages"
 		echo
 	} >&2
 	false
@@ -104,7 +104,7 @@ else
 		for p in "${linted[@]}"; do
 			echo "  echo $p >> hack/.linted_packages"
 		done
-		echo "  LANG=C sort -o hack/.linted_packages hack/.linted_packages"
+		echo "  LC_ALL=C sort -o hack/.linted_packages hack/.linted_packages"
 		echo
 		echo 'You can test via this script and commit the result.'
 		echo

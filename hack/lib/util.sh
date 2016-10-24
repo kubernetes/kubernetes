@@ -32,7 +32,7 @@ kube::util::wait_for_url() {
   local i
   for i in $(seq 1 $times); do
     local out
-    if out=$(curl -gfs $url 2>/dev/null); then
+    if out=$(curl -gkfs $url 2>/dev/null); then
       kube::log::status "On try ${i}, ${prefix}: ${out}"
       return 0
     fi
@@ -475,6 +475,25 @@ kube::util::has_changes_against_upstream_branch() {
     return 0
   fi
   echo "No '${pattern}' changes detected."
+  return 1
+}
+
+kube::util::download_file() {
+  local -r url=$1
+  local -r destination_file=$2
+
+  rm  ${destination_file} 2&> /dev/null || true
+
+  for i in $(seq 5)
+  do
+    if ! curl -fsSL --retry 3 --keepalive-time 2 ${url} -o ${destination_file}; then
+      echo "Downloading ${url} failed. $((5-i)) retries left."
+      sleep 1
+    else
+      echo "Downloading ${url} succeed"
+      return 0
+    fi
+  done
   return 1
 }
 

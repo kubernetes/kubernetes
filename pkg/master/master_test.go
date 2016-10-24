@@ -19,7 +19,6 @@ package master
 import (
 	"crypto/tls"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -44,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/apiserver/openapi"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
@@ -90,14 +88,15 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	config.GenericConfig.APIResourceConfigSource = DefaultAPIResourceConfigSource()
 	config.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
 	config.GenericConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
-	config.GenericConfig.APIGroupPrefix = "/apis"
 	config.GenericConfig.APIResourceConfigSource = DefaultAPIResourceConfigSource()
-	config.GenericConfig.ProxyDialer = func(network, addr string) (net.Conn, error) { return nil, nil }
-	config.GenericConfig.ProxyTLSClientConfig = &tls.Config{}
 	config.GenericConfig.RequestContextMapper = api.NewRequestContextMapper()
 	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs}}
 	config.EnableCoreControllers = false
 	config.KubeletClientConfig = kubeletclient.KubeletClientConfig{Port: 10250}
+	config.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{
+		Dial:            func(network, addr string) (net.Conn, error) { return nil, nil },
+		TLSClientConfig: &tls.Config{},
+	})
 
 	master, err := config.Complete().New()
 	if err != nil {
@@ -150,7 +149,7 @@ func newLimitedMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Confi
 // TestNew verifies that the New function returns a Master
 // using the configuration properly.
 func TestNew(t *testing.T) {
-	master, etcdserver, config, assert := newMaster(t)
+	master, etcdserver, _, assert := newMaster(t)
 	defer etcdserver.Terminate(t)
 
 	// these values get defaulted
@@ -158,14 +157,6 @@ func TestNew(t *testing.T) {
 	serviceReadWriteIP, _ := ipallocator.GetIndexedIP(serviceClusterIPRange, 1)
 	assert.Equal(master.GenericAPIServer.MasterCount, 1)
 	assert.Equal(master.GenericAPIServer.ServiceReadWriteIP, serviceReadWriteIP)
-
-	// These functions should point to the same memory location
-	masterDialer, _ := utilnet.Dialer(master.GenericAPIServer.ProxyTransport)
-	masterDialerFunc := fmt.Sprintf("%p", masterDialer)
-	configDialerFunc := fmt.Sprintf("%p", config.GenericConfig.ProxyDialer)
-	assert.Equal(masterDialerFunc, configDialerFunc)
-
-	assert.Equal(master.GenericAPIServer.ProxyTransport.(*http.Transport).TLSClientConfig, config.GenericConfig.ProxyTLSClientConfig)
 }
 
 // TestVersion tests /version
@@ -441,12 +432,10 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 	}
 
 	thirdPartyGV := unversioned.GroupVersionForDiscovery{GroupVersion: "company.com/v1", Version: "v1"}
-	master.addThirdPartyResourceStorage("/apis/company.com/v1", "foos", nil,
-		unversioned.APIGroup{
-			Name:             "company.com",
-			Versions:         []unversioned.GroupVersionForDiscovery{thirdPartyGV},
-			PreferredVersion: thirdPartyGV,
-		})
+	master.thirdPartyResourceServer.InstallThirdPartyResource(&extensions.ThirdPartyResource{
+		ObjectMeta: api.ObjectMeta{Name: "foo.company.com"},
+		Versions:   []extensions.APIVersion{{Name: "v1"}},
+	})
 
 	resp, err = http.Get(server.URL + "/apis")
 	if !assert.NoError(err) {
@@ -497,21 +486,22 @@ func TestValidOpenAPISpec(t *testing.T) {
 			Version: "unversioned",
 		},
 	}
-	config.GenericConfig.OpenAPIConfig.GetOperationID = openapi.GetOperationID
 	master, err := config.Complete().New()
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}
 
-	// make sure swagger.json is not registered before calling install api.
+	// make sure swagger.json is not registered before calling PrepareRun.
 	server := httptest.NewServer(master.GenericAPIServer.HandlerContainer.ServeMux)
+	defer server.Close()
 	resp, err := http.Get(server.URL + "/swagger.json")
 	if !assert.NoError(err) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	assert.Equal(http.StatusNotFound, resp.StatusCode)
 
-	master.GenericAPIServer.InstallOpenAPI()
+	master.GenericAPIServer.PrepareRun()
+
 	resp, err = http.Get(server.URL + "/swagger.json")
 	if !assert.NoError(err) {
 		t.Errorf("unexpected error: %v", err)

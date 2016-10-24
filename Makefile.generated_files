@@ -205,7 +205,7 @@ endif
 DEEPCOPY_DIRS := $(shell                                             \
     grep --color=never -l '+k8s:deepcopy-gen=' $(ALL_K8S_TAG_FILES)  \
         | xargs -n1 dirname                                          \
-        | sort -u                                                    \
+        | LC_ALL=C sort -u                                           \
 )
 DEEPCOPY_FILES := $(addsuffix /$(DEEPCOPY_FILENAME), $(DEEPCOPY_DIRS))
 
@@ -318,7 +318,7 @@ endif
 DEFAULTER_DIRS := $(shell                                            \
     grep --color=never -l '+k8s:defaulter-gen=' $(ALL_K8S_TAG_FILES) \
         | xargs -n1 dirname                                          \
-        | sort -u                                                    \
+        | LC_ALL=C sort -u                                           \
 )
 
 DEFAULTER_FILES := $(addsuffix /$(DEFAULTER_FILENAME), $(DEFAULTER_DIRS))
@@ -448,7 +448,7 @@ endif
 OPENAPI_DIRS := $(shell                                             \
     grep --color=never -l '+k8s:openapi-gen=' $(ALL_K8S_TAG_FILES)  \
         | xargs -n1 dirname                                         \
-        | sort -u                                                   \
+        | LC_ALL=C sort -u                                          \
 )
 
 OPENAPI_OUTFILE := $(OPENAPI_OUTPUT_PKG)/$(OPENAPI_FILENAME)
@@ -555,7 +555,7 @@ CONVERSION_DIRS := $(shell                                              \
     grep --color=never '^// *+k8s:conversion-gen=' $(ALL_K8S_TAG_FILES) \
         | cut -f1 -d:                                                   \
         | xargs -n1 dirname                                             \
-        | sort -u                                                       \
+        | LC_ALL=C sort -u                                              \
 )
 
 CONVERSION_FILES := $(addsuffix /$(CONVERSION_FILENAME), $(CONVERSION_DIRS))

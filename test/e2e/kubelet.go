@@ -137,7 +137,7 @@ var _ = framework.KubeDescribe("kubelet", func() {
 
 	BeforeEach(func() {
 		c = f.Client
-		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
+		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		numNodes = len(nodes.Items)
 		nodeNames = sets.NewString()
 		// If there are a lot of nodes, we don't want to use all of them

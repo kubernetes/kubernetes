@@ -19,6 +19,7 @@ package testing
 import (
 	"fmt"
 	"io"
+	"reflect"
 	"sync"
 	"time"
 
@@ -75,6 +76,16 @@ func (r *FakeRuntimeService) SetFakeContainers(containers []*FakeContainer) {
 		r.Containers[containerID] = c
 	}
 
+}
+
+func (r *FakeRuntimeService) AssertCalls(calls []string) error {
+	r.Lock()
+	defer r.Unlock()
+
+	if !reflect.DeepEqual(calls, r.Called) {
+		return fmt.Errorf("expected %#v, got %#v", calls, r.Called)
+	}
+	return nil
 }
 
 func NewFakeRuntimeService() *FakeRuntimeService {

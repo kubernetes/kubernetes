@@ -17,7 +17,6 @@ limitations under the License.
 package genericapiserver
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -37,13 +36,13 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
-	genericmux "k8s.io/kubernetes/pkg/genericapiserver/mux"
+	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
 	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
 
+	"github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -54,10 +53,17 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	config := NewConfig()
 	config.PublicAddress = net.ParseIP("192.168.10.4")
 	config.RequestContextMapper = api.NewRequestContextMapper()
-	config.ProxyDialer = func(network, addr string) (net.Conn, error) { return nil, nil }
-	config.ProxyTLSClientConfig = &tls.Config{}
 	config.LegacyAPIGroupPrefixes = sets.NewString("/api")
-	config.APIGroupPrefix = "/apis"
+
+	config.EnableOpenAPISupport = true
+	config.EnableSwaggerSupport = true
+	config.OpenAPIConfig.Definitions = openapigen.OpenAPIDefinitions
+	config.OpenAPIConfig.Info = &spec.Info{
+		InfoProps: spec.InfoProps{
+			Title:   "Kubernetes",
+			Version: "unversioned",
+		},
+	}
 
 	return etcdServer, *config, assert.New(t)
 }
@@ -81,7 +87,6 @@ func TestNew(t *testing.T) {
 	// Verify many of the variables match their config counterparts
 	assert.Equal(s.enableSwaggerSupport, config.EnableSwaggerSupport)
 	assert.Equal(s.legacyAPIGroupPrefixes, config.LegacyAPIGroupPrefixes)
-	assert.Equal(s.apiPrefix, config.APIGroupPrefix)
 	assert.Equal(s.admissionControl, config.AdmissionControl)
 	assert.Equal(s.RequestContextMapper(), config.RequestContextMapper)
 
@@ -90,14 +95,6 @@ func TestNew(t *testing.T) {
 	serviceReadWriteIP, _ := ipallocator.GetIndexedIP(serviceClusterIPRange, 1)
 	assert.Equal(s.ServiceReadWriteIP, serviceReadWriteIP)
 	assert.Equal(s.ExternalAddress, net.JoinHostPort(config.PublicAddress.String(), "6443"))
-
-	// These functions should point to the same memory location
-	serverDialer, _ := utilnet.Dialer(s.ProxyTransport)
-	serverDialerFunc := fmt.Sprintf("%p", serverDialer)
-	configDialerFunc := fmt.Sprintf("%p", config.ProxyDialer)
-	assert.Equal(serverDialerFunc, configDialerFunc)
-
-	assert.Equal(s.ProxyTransport.(*http.Transport).TLSClientConfig, config.ProxyTLSClientConfig)
 }
 
 // Verifies that AddGroupVersions works as expected.
@@ -106,7 +103,6 @@ func TestInstallAPIGroups(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	config.LegacyAPIGroupPrefixes = sets.NewString("/apiPrefix")
-	config.APIGroupPrefix = "/apiGroupPrefix"
 
 	s, err := config.SkipComplete().New()
 	if err != nil {
@@ -145,9 +141,9 @@ func TestInstallAPIGroups(t *testing.T) {
 		// "/api/v1"
 		config.LegacyAPIGroupPrefixes.List()[0] + "/" + apiGroupMeta.GroupVersion.Version,
 		// "/apis/extensions"
-		config.APIGroupPrefix + "/" + extensionsGroupMeta.GroupVersion.Group,
+		APIGroupPrefix + "/" + extensionsGroupMeta.GroupVersion.Group,
 		// "/apis/extensions/v1beta1"
-		config.APIGroupPrefix + "/" + extensionsGroupMeta.GroupVersion.String(),
+		APIGroupPrefix + "/" + extensionsGroupMeta.GroupVersion.String(),
 	}
 	for _, path := range validPaths {
 		_, err := http.Get(server.URL + path)
@@ -155,6 +151,29 @@ func TestInstallAPIGroups(t *testing.T) {
 			t.Errorf("unexpected error: %v, for path: %s", err, path)
 		}
 	}
+}
+
+func TestPrepareRun(t *testing.T) {
+	s, etcdserver, config, assert := newMaster(t)
+	defer etcdserver.Terminate(t)
+
+	assert.True(config.EnableSwaggerSupport)
+	assert.True(config.EnableOpenAPISupport)
+
+	server := httptest.NewServer(s.HandlerContainer.ServeMux)
+	defer server.Close()
+
+	s.PrepareRun()
+
+	// openapi is installed in PrepareRun
+	resp, err := http.Get(server.URL + "/swagger.json")
+	assert.NoError(err)
+	assert.Equal(http.StatusOK, resp.StatusCode)
+
+	// swagger is installed in PrepareRun
+	resp, err = http.Get(server.URL + "/swaggerapi/")
+	assert.NoError(err)
+	assert.Equal(http.StatusOK, resp.StatusCode)
 }
 
 // TestCustomHandlerChain verifies the handler chain with custom handler chain builder functions.
@@ -224,7 +243,6 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 	authz := mockAuthorizer{}
 
 	config.LegacyAPIGroupPrefixes = sets.NewString("/apiPrefix")
-	config.APIGroupPrefix = "/apiGroupPrefix"
 	config.Authorizer = &authz
 
 	config.EnableSwaggerUI = true
@@ -280,41 +298,6 @@ func (authn *mockAuthenticator) AuthenticateRequest(req *http.Request) (user.Inf
 	return &user.DefaultInfo{
 		Name: "foo",
 	}, true, nil
-}
-
-// TestInstallSwaggerAPI verifies that the swagger api is added
-// at the proper endpoint.
-func TestInstallSwaggerAPI(t *testing.T) {
-	etcdserver, _, assert := setUp(t)
-	defer etcdserver.Terminate(t)
-
-	mux := http.NewServeMux()
-	server := &GenericAPIServer{}
-	server.HandlerContainer = genericmux.NewAPIContainer(mux, nil)
-
-	// Ensure swagger isn't installed without the call
-	ws := server.HandlerContainer.RegisteredWebServices()
-	if !assert.Equal(len(ws), 0) {
-		for x := range ws {
-			assert.NotEqual("/swaggerapi", ws[x].RootPath(), "SwaggerAPI was installed without a call to InstallSwaggerAPI()")
-		}
-	}
-
-	// Install swagger and test
-	server.InstallSwaggerAPI()
-	ws = server.HandlerContainer.RegisteredWebServices()
-	if assert.NotEqual(0, len(ws), "SwaggerAPI not installed.") {
-		assert.Equal("/swaggerapi/", ws[0].RootPath(), "SwaggerAPI did not install to the proper path. %s != /swaggerapi", ws[0].RootPath())
-	}
-
-	// Empty externalHost verification
-	mux = http.NewServeMux()
-	server.HandlerContainer = genericmux.NewAPIContainer(mux, nil)
-	server.ExternalAddress = ""
-	server.InstallSwaggerAPI()
-	if assert.NotEqual(0, len(ws), "SwaggerAPI not installed.") {
-		assert.Equal("/swaggerapi/", ws[0].RootPath(), "SwaggerAPI did not install to the proper path. %s != /swaggerapi", ws[0].RootPath())
-	}
 }
 
 func decodeResponse(resp *http.Response, obj interface{}) error {
@@ -401,8 +384,7 @@ func TestGetServerAddressByClientCIDRs(t *testing.T) {
 
 	publicAddressCIDRMap := []unversioned.ServerAddressByClientCIDR{
 		{
-			ClientCIDR: "0.0.0.0/0",
-
+			ClientCIDR:    "0.0.0.0/0",
 			ServerAddress: s.ExternalAddress,
 		},
 	}

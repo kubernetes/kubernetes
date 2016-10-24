@@ -255,6 +255,19 @@ func (s *StoreToLimitRangeLister) List(selector labels.Selector) (ret []*api.Lim
 	return ret, err
 }
 
+// StoreToPersistentVolumeClaimLister helps list pvcs
+type StoreToPersistentVolumeClaimLister struct {
+	Indexer Indexer
+}
+
+// List returns all persistentvolumeclaims that match the specified selector
+func (s *StoreToPersistentVolumeClaimLister) List(selector labels.Selector) (ret []*api.PersistentVolumeClaim, err error) {
+	err = ListAll(s.Indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*api.PersistentVolumeClaim))
+	})
+	return ret, err
+}
+
 func (s *StoreToLimitRangeLister) LimitRanges(namespace string) storeLimitRangesNamespacer {
 	return storeLimitRangesNamespacer{s.Indexer, namespace}
 }
@@ -280,4 +293,32 @@ func (s storeLimitRangesNamespacer) Get(name string) (*api.LimitRange, error) {
 		return nil, errors.NewNotFound(api.Resource("limitrange"), name)
 	}
 	return obj.(*api.LimitRange), nil
+}
+
+// PersistentVolumeClaims returns all claims in a specified namespace.
+func (s *StoreToPersistentVolumeClaimLister) PersistentVolumeClaims(namespace string) storePersistentVolumeClaimsNamespacer {
+	return storePersistentVolumeClaimsNamespacer{Indexer: s.Indexer, namespace: namespace}
+}
+
+type storePersistentVolumeClaimsNamespacer struct {
+	Indexer   Indexer
+	namespace string
+}
+
+func (s storePersistentVolumeClaimsNamespacer) List(selector labels.Selector) (ret []*api.PersistentVolumeClaim, err error) {
+	err = ListAllByNamespace(s.Indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*api.PersistentVolumeClaim))
+	})
+	return ret, err
+}
+
+func (s storePersistentVolumeClaimsNamespacer) Get(name string) (*api.PersistentVolumeClaim, error) {
+	obj, exists, err := s.Indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(api.Resource("persistentvolumeclaims"), name)
+	}
+	return obj.(*api.PersistentVolumeClaim), nil
 }

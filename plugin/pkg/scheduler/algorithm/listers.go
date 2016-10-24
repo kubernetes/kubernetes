@@ -76,7 +76,7 @@ func (f FakeServiceLister) List(labels.Selector) ([]*api.Service, error) {
 	return f, nil
 }
 
-// GetPodServices gets the services that have the selector that match the labels on the given pod
+// GetPodServices gets the services that have the selector that match the labels on the given pod.
 func (f FakeServiceLister) GetPodServices(pod *api.Pod) (services []*api.Service, err error) {
 	var selector labels.Selector
 
@@ -91,10 +91,6 @@ func (f FakeServiceLister) GetPodServices(pod *api.Pod) (services []*api.Service
 			services = append(services, service)
 		}
 	}
-	if len(services) == 0 {
-		err = fmt.Errorf("Could not find service for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
-	}
-
 	return
 }
 

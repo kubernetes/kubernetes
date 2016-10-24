@@ -19,6 +19,7 @@ package unversioned
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -43,14 +44,14 @@ type RoleInterface interface {
 
 // roles implements RoleInterface
 type roles struct {
-	client *RbacClient
+	client restclient.Interface
 	ns     string
 }
 
 // newRoles returns a Roles
 func newRoles(c *RbacClient, namespace string) *roles {
 	return &roles{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

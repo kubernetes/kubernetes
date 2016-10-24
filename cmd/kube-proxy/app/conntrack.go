@@ -55,7 +55,7 @@ func (realConntracker) SetMax(max int) error {
 	}
 	// TODO: generify this and sysctl to a new sysfs.WriteInt()
 	glog.Infof("Setting conntrack hashsize to %d", max/4)
-	return ioutil.WriteFile("/sys/module/nf_conntrack/parameters/hashsize", []byte(strconv.Itoa(max/4)), 0640)
+	return writeIntStringFile("/sys/module/nf_conntrack/parameters/hashsize", max/4)
 }
 
 func (realConntracker) SetTCPEstablishedTimeout(seconds int) error {
@@ -67,7 +67,7 @@ func (realConntracker) SetTCPEstablishedTimeout(seconds int) error {
 func isSysFSWritable() (bool, error) {
 	const permWritable = "rw"
 	const sysfsDevice = "sysfs"
-	m := mount.New()
+	m := mount.New("" /* default mount path */)
 	mountPoints, err := m.List()
 	if err != nil {
 		glog.Errorf("failed to list mount points: %v", err)
@@ -85,4 +85,8 @@ func isSysFSWritable() (bool, error) {
 		break
 	}
 	return false, nil
+}
+
+func writeIntStringFile(filename string, value int) error {
+	return ioutil.WriteFile(filename, []byte(strconv.Itoa(value)), 0640)
 }
