@@ -129,8 +129,11 @@ backward-compatibly.
 ## On compatibility
 
 Before talking about how to make API changes, it is worthwhile to clarify what
-we mean by API compatibility.  An API change is considered backward-compatible
-if it:
+we mean by API compatibility.  Kubernetes considers forwards and backwards
+compatibility of its APIs a top priority.
+
+An API change is considered forward and backward-compatible if it:
+
    * adds new functionality that is not required for correct behavior (e.g.,
 does not add a new required field)
    * does not change existing semantics, including:
@@ -150,7 +153,8 @@ versions and back) with no loss of information.
 continue to function as they did previously, even when your change is utilized.
 
 If your change does not meet these criteria, it is not considered strictly
-compatible.
+compatible, and may break older clients, or result in newer clients causing
+undefined behavior.
 
 Let's consider some examples. In a hypothetical API (assume we're at version
 v6), the `Frobber` struct looks something like this:
