@@ -18,7 +18,7 @@ go_binary(
         "//pkg/api:go_default_library",
         "//pkg/api/errors:go_default_library",
         "//pkg/api/unversioned:go_default_library",
-        "//pkg/client/unversioned:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/util/intstr:go_default_library",

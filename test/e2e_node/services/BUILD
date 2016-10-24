@@ -32,7 +32,7 @@ go_library(
         "//pkg/controller/namespace:go_default_library",
         "//pkg/util/config:go_default_library",
         "//test/e2e/framework:go_default_library",
-        "//test/e2e_node/build:go_default_library",
+        "//test/e2e_node/builder:go_default_library",
         "//vendor:github.com/coreos/etcd/etcdserver",
         "//vendor:github.com/coreos/etcd/etcdserver/api/v2http",
         "//vendor:github.com/coreos/etcd/pkg/transport",
