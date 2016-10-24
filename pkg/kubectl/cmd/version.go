@@ -22,8 +22,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/version"
 )
 
 func NewCmdVersion(f cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -36,12 +36,18 @@ func NewCmdVersion(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolP("client", "c", false, "Client version only (no server required).")
+	cmd.Flags().BoolP("short", "", false, "Print just the version number.")
 	cmd.Flags().MarkShorthandDeprecated("client", "please use --client instead.")
 	return cmd
 }
 
 func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
-	kubectl.GetClientVersion(out)
+	v := fmt.Sprintf("%#v", version.Get())
+	if cmdutil.GetFlagBool(cmd, "short") {
+		v = version.Get().GitVersion
+	}
+
+	fmt.Fprintf(out, "Client Version: %s\n", v)
 	if cmdutil.GetFlagBool(cmd, "client") {
 		return nil
 	}
@@ -56,6 +62,11 @@ func RunVersion(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 		return err
 	}
 
-	fmt.Fprintf(out, "Server Version: %#v\n", *serverVersion)
+	v = fmt.Sprintf("%#v", *serverVersion)
+	if cmdutil.GetFlagBool(cmd, "short") {
+		v = serverVersion.GitVersion
+	}
+
+	fmt.Fprintf(out, "Server Version: %s\n", v)
 	return nil
 }
