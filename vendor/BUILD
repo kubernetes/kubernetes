@@ -6807,14 +6807,14 @@ go_library(
     name = "golang.org/x/net/context",
     srcs = [
         "golang.org/x/net/context/context.go",
-        "golang.org/x/net/context/pre_go17.go",
+        "golang.org/x/net/context/go17.go",
     ],
     tags = ["automanaged"],
 )
 
 go_library(
     name = "golang.org/x/net/context/ctxhttp",
-    srcs = ["golang.org/x/net/context/ctxhttp/ctxhttp_pre17.go"],
+    srcs = ["golang.org/x/net/context/ctxhttp/ctxhttp.go"],
     tags = ["automanaged"],
     deps = ["//vendor:golang.org/x/net/context"],
 )
@@ -6856,10 +6856,10 @@ go_library(
         "golang.org/x/net/http2/flow.go",
         "golang.org/x/net/http2/frame.go",
         "golang.org/x/net/http2/go16.go",
+        "golang.org/x/net/http2/go17.go",
         "golang.org/x/net/http2/gotrack.go",
         "golang.org/x/net/http2/headermap.go",
         "golang.org/x/net/http2/http2.go",
-        "golang.org/x/net/http2/not_go17.go",
         "golang.org/x/net/http2/pipe.go",
         "golang.org/x/net/http2/server.go",
         "golang.org/x/net/http2/transport.go",
@@ -7385,7 +7385,7 @@ go_library(
     name = "google.golang.org/grpc/credentials",
     srcs = [
         "google.golang.org/grpc/credentials/credentials.go",
-        "google.golang.org/grpc/credentials/credentials_util_pre_go17.go",
+        "google.golang.org/grpc/credentials/credentials_util_go17.go",
     ],
     tags = ["automanaged"],
     deps = ["//vendor:golang.org/x/net/context"],
@@ -7430,7 +7430,7 @@ go_library(
     name = "google.golang.org/grpc/transport",
     srcs = [
         "google.golang.org/grpc/transport/control.go",
-        "google.golang.org/grpc/transport/go16.go",
+        "google.golang.org/grpc/transport/go17.go",
         "google.golang.org/grpc/transport/handler_server.go",
         "google.golang.org/grpc/transport/http2_client.go",
         "google.golang.org/grpc/transport/http2_server.go",
