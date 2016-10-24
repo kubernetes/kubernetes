@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-TAG = 0.7
+TAG = 0.8
 PREFIX = gcr.io/google_containers
 
 all: push
