@@ -36,9 +36,7 @@ var (
 	resources_long = templates.LongDesc(`
 		Specify compute resource requirements (cpu, memory) for any resource that defines a pod template.  If a pod is successfully scheduled, it is guaranteed the amount of resource requested, but may burst up to its specified limits.
 
-		for each compute resource, if a limit is specified and a request is omitted, the request will default to the limit.
-
-		Possible resources include (case insensitive):`)
+		for each compute resource, if a limit is specified and a request is omitted, the request will default to the limit.`)
 
 	resources_example = templates.Examples(`
 		# Set a deployments nginx container cpu limits to "200m" and memory to "512Mi"
@@ -87,17 +85,11 @@ func NewCmdResources(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.
 		Out: out,
 		Err: errOut,
 	}
-	var pod_specs string
-	RESTMappings := cmdutil.ResourcesWithPodSpecs()
-	for _, Map := range RESTMappings {
-		pod_specs = pod_specs + ", " + Map.Resource
-
-	}
 
 	cmd := &cobra.Command{
 		Use:     "resources (-f FILENAME | TYPE NAME)  ([--limits=LIMITS & --requests=REQUESTS]",
 		Short:   "update resource requests/limits on objects with pod templates",
-		Long:    resources_long + " " + pod_specs[2:],
+		Long:    resources_long,
 		Example: resources_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(f, cmd, args))
