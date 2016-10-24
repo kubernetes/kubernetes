@@ -174,6 +174,10 @@ spec:
     ...
 ```
 
+> For users upgrading Kubernetes to a version that contain these features all existing ConfigMaps will be base-lined
+version to 1.0.0
+
+
 ## Securing Pods' Pause Containers to api server.
 The following can be used to secure pods (traffic from pause container) to ConfigMap api.
     
