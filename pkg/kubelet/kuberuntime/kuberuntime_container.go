@@ -668,7 +668,7 @@ func (m *kubeGenericRuntimeManager) AttachContainer(id kubecontainer.ContainerID
 	// now to unblock other tests.
 	// TODO: remove this hack after attach is defined in CRI.
 	if ds, ok := m.runtimeService.(dockershim.DockerLegacyService); ok {
-		return ds.AttachContainer(id, stdin, stdout, stderr, tty, resize)
+		return ds.LegacyAttach(id, stdin, stdout, stderr, tty, resize)
 	}
 	return fmt.Errorf("not implemented")
 }
@@ -694,7 +694,7 @@ func (m *kubeGenericRuntimeManager) ExecInContainer(containerID kubecontainer.Co
 	// now to unblock other tests.
 	// TODO: remove this hack after exec is defined in CRI.
 	if ds, ok := m.runtimeService.(dockershim.DockerLegacyService); ok {
-		return ds.ExecInContainer(containerID, cmd, stdin, stdout, stderr, tty, resize)
+		return ds.LegacyExec(containerID, cmd, stdin, stdout, stderr, tty, resize)
 	}
 	return fmt.Errorf("not implemented")
 }
