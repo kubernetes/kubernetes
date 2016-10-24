@@ -27,6 +27,7 @@ import (
 	"os/user"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -50,6 +51,7 @@ import (
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
+	clientdiscovery "k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -61,6 +63,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/json"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
+	"k8s.io/kubernetes/pkg/util/homedir"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -333,18 +336,21 @@ func (f *factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
 	}
 
 	mapper := registered.RESTMapper()
-	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
-	if err == nil {
+	var cachedDiscoveryClient clientdiscovery.DiscoveryInterface
+	if discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg); err == nil {
+		cacheDir := computeDiscoverCacheDir(filepath.Join(homedir.HomeDir(), ".kube"), cfg.Host)
+		cachedDiscoveryClient = NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute))
 		mapper = meta.FirstHitRESTMapper{
 			MultiRESTMapper: meta.MultiRESTMapper{
-				discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, registered.InterfacesFor),
+				discovery.NewDeferredDiscoveryRESTMapper(cachedDiscoveryClient, registered.InterfacesFor),
 				registered.RESTMapper(), // hardcoded fall back
 			},
 		}
 	}
 
 	// wrap with shortcuts
-	mapper = NewShortcutExpander(mapper, discoveryClient)
+	mapper = NewShortcutExpander(mapper, cachedDiscoveryClient)
+
 	// wrap with output preferences
 	mapper = kubectl.OutputVersionMapper{RESTMapper: mapper, OutputVersions: []unversioned.GroupVersion{cmdApiVersion}}
 	return mapper, api.Scheme
@@ -1315,4 +1321,17 @@ func (f *factory) SuggestedPodTemplateResources() []unversioned.GroupResource {
 		{Resource: "job"},
 		{Resource: "replicaset"},
 	}
+}
+
+// overlyCautiousIllegalFileCharacters matches characters that *might* not be supported.  Windows is really restrictive, so this is really restrictive
+var overlyCautiousIllegalFileCharacters = regexp.MustCompile(`[^(\w/\.)]`)
+
+// computeDiscoverCacheDir takes the parentDir and the host and comes up with a "usually non-colliding" name.
+func computeDiscoverCacheDir(parentDir, host string) string {
+	// strip the optional scheme from host if its there:
+	schemelessHost := strings.Replace(strings.Replace(host, "https://", "", 1), "http://", "", 1)
+	// now do a simple collapse of non-AZ09 characters.  Collisions are possible but unlikely.  Even if we do collide the problem is short lived
+	safeHost := overlyCautiousIllegalFileCharacters.ReplaceAllString(schemelessHost, "_")
+
+	return filepath.Join(parentDir, safeHost)
 }
