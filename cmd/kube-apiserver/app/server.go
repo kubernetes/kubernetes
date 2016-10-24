@@ -232,6 +232,7 @@ func Run(s *options.APIServer) error {
 		KeystoneURL:                 s.KeystoneURL,
 		WebhookTokenAuthnConfigFile: s.WebhookTokenAuthnConfigFile,
 		WebhookTokenAuthnCacheTTL:   s.WebhookTokenAuthnCacheTTL,
+		RequestHeaderConfig:         s.AuthenticationRequestHeaderConfig(),
 	})
 
 	if err != nil {

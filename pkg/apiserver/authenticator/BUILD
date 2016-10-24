@@ -25,6 +25,7 @@ go_library(
         "//plugin/pkg/auth/authenticator/password/passwordfile:go_default_library",
         "//plugin/pkg/auth/authenticator/request/anonymous:go_default_library",
         "//plugin/pkg/auth/authenticator/request/basicauth:go_default_library",
+        "//plugin/pkg/auth/authenticator/request/headerrequest:go_default_library",
         "//plugin/pkg/auth/authenticator/request/union:go_default_library",
         "//plugin/pkg/auth/authenticator/request/x509:go_default_library",
         "//plugin/pkg/auth/authenticator/token/anytoken:go_default_library",

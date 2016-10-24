@@ -464,6 +464,9 @@ replication-controller-lookup-cache-size
 repo-root
 report-dir
 report-prefix
+requestheader-allowed-names
+requestheader-client-ca-file
+requestheader-username-headers
 require-kubeconfig
 required-contexts
 resolv-conf
