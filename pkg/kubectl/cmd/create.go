@@ -130,7 +130,7 @@ func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *re
 		}
 
 		if cmdutil.ShouldRecord(cmd, info) {
-			if err := cmdutil.RecordChangeCause(info.Object, f.Command()); err != nil {
+			if err := cmdutil.RecordChangeCause(info.Object, f.Command(false)); err != nil {
 				return cmdutil.AddSourceToErr("creating", info.Source, err)
 			}
 		}

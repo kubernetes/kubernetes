@@ -160,7 +160,7 @@ type Factory interface {
 
 	// Command will stringify and return all environment arguments ie. a command run by a client
 	// using the factory.
-	Command() string
+	Command(enableSecret bool) string
 	// BindFlags adds any flags that are common to all kubectl sub commands.
 	BindFlags(flags *pflag.FlagSet)
 	// BindExternalFlags adds any flags defined by external projects (not part of pflags)
@@ -940,35 +940,42 @@ func GetFirstPod(client coreclient.PodsGetter, namespace string, selector labels
 	return pod, 1, nil
 }
 
-func (f *factory) Command() string {
+func (f *factory) Command(enableSecret bool) string {
 	if len(os.Args) == 0 {
 		return ""
 	}
 	base := filepath.Base(os.Args[0])
 	args := append([]string{base}, os.Args[1:]...)
 
-	if len(f.flags.Lookup("token").Value.String()) > 0 {
-		FilterOutSecrets(args, "--token=")
-	}
-	if len(f.flags.Lookup("username").Value.String()) > 0 {
-		FilterOutSecrets(args, "--username=")
-	}
-	if len(f.flags.Lookup("password").Value.String()) > 0 {
-		FilterOutSecrets(args, "--password=")
+	for i := 0; i < len(args); i++ {
+		if strings.HasPrefix(args[i], "--") {
+			name := (args[i])[2:]
+			if len(name) == 0 || name[0] == '-' || name[0] == '=' {
+				return ""
+			}
+
+			split := strings.SplitN(name, "=", 2)
+			name = split[0]
+
+			flag := f.flags.Lookup(name)
+			if flag != nil && flag.Secret {
+				value, err := GetFlagValue(f.flags, name, enableSecret)
+				if err != nil {
+					return ""
+				}
+				args[i] = "--" + name + "=" + value
+			}
+		}
 	}
 	return strings.Join(args, " ")
 }
 
-// Hide sensitive data
-func FilterOutSecrets(args []string, name string) {
-	secretValue := "******"
-	for i := 0; i < len(args); i++ {
-		if strings.HasPrefix(args[i], name) {
-			args[i] = name + secretValue
-			return
-		}
+func GetFlagValue(flags *pflag.FlagSet, name string, enableSecret bool) (string, error) {
+	if enableSecret {
+		return flags.SecretDecode(name)
+	} else {
+		return flags.SecretEncode(name)
 	}
-	return
 }
 
 func (f *factory) BindFlags(flags *pflag.FlagSet) {

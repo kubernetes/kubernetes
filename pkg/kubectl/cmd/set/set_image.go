@@ -113,7 +113,7 @@ func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	o.Encoder = f.JSONEncoder()
 	o.ShortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
 	o.Record = cmdutil.GetRecordFlag(cmd)
-	o.ChangeCause = f.Command()
+	o.ChangeCause = f.Command(false)
 	o.PrintObject = f.PrintObject
 	o.Cmd = cmd
 
@@ -199,7 +199,6 @@ func (o *ImageOptions) Run() error {
 		}
 
 		if o.Local {
-			fmt.Fprintln(o.Out, "running in local mode...")
 			return o.PrintObject(o.Cmd, o.Mapper, info.Object, o.Out)
 		}
 

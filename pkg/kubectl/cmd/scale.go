@@ -164,7 +164,7 @@ func RunScale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			return err
 		}
 		if cmdutil.ShouldRecord(cmd, info) {
-			patchBytes, err := cmdutil.ChangeResourcePatch(info, f.Command())
+			patchBytes, err := cmdutil.ChangeResourcePatch(info, f.Command(false))
 			if err != nil {
 				return err
 			}

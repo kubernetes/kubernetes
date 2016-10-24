@@ -193,7 +193,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *App
 			}
 
 			if cmdutil.ShouldRecord(cmd, info) {
-				if err := cmdutil.RecordChangeCause(info.Object, f.Command()); err != nil {
+				if err := cmdutil.RecordChangeCause(info.Object, f.Command(false)); err != nil {
 					return cmdutil.AddSourceToErr("creating", info.Source, err)
 				}
 			}
@@ -226,7 +226,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *App
 			}
 
 			if cmdutil.ShouldRecord(cmd, info) {
-				patch, err := cmdutil.ChangeResourcePatch(info, f.Command())
+				patch, err := cmdutil.ChangeResourcePatch(info, f.Command(false))
 				if err != nil {
 					return err
 				}

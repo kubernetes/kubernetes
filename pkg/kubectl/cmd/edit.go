@@ -456,7 +456,7 @@ func visitAnnotation(cmd *cobra.Command, f cmdutil.Factory, updates *resource.In
 			return err
 		}
 		if cmdutil.ShouldRecord(cmd, info) {
-			if err := cmdutil.RecordChangeCause(info.Object, f.Command()); err != nil {
+			if err := cmdutil.RecordChangeCause(info.Object, f.Command(false)); err != nil {
 				return err
 			}
 		}
