@@ -37,6 +37,7 @@ func GetEnvParams() map[string]string {
 		"discovery_image":    fmt.Sprintf("gcr.io/google_containers/kube-discovery-%s:%s", runtime.GOARCH, "1.0"),
 		"etcd_image":         "",
 		"component_loglevel": "--v=4",
+		"proxy_flags":        "",
 	}
 
 	for k := range envParams {
