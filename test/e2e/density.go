@@ -463,7 +463,7 @@ var _ = framework.KubeDescribe("Density", func() {
 		It(name, func() {
 			nodePreparer := framework.NewE2ETestNodePreparer(
 				f.ClientSet,
-				map[int]testutils.PrepareNodeStrategy{nodeCount: &testutils.TrivialNodePrepareStrategy{}},
+				[]testutils.CountToStrategy{{Count: nodeCount, Strategy: &testutils.TrivialNodePrepareStrategy{}}},
 			)
 			framework.ExpectNoError(nodePreparer.PrepareNodes())
 			defer nodePreparer.CleanupNodes()
