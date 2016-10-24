@@ -4522,11 +4522,11 @@ type E2ETestNodePreparer struct {
 	// Specifies how many nodes should be modified using the given strategy.
 	// Only one strategy can be applied to a single Node, so there needs to
 	// be at least <sum_of_keys> Nodes in the cluster.
-	countToStrategy       map[int]testutils.PrepareNodeStrategy
+	countToStrategy       []testutils.CountToStrategy
 	nodeToAppliedStrategy map[string]testutils.PrepareNodeStrategy
 }
 
-func NewE2ETestNodePreparer(client clientset.Interface, countToStrategy map[int]testutils.PrepareNodeStrategy) testutils.TestNodePreparer {
+func NewE2ETestNodePreparer(client clientset.Interface, countToStrategy []testutils.CountToStrategy) testutils.TestNodePreparer {
 	return &E2ETestNodePreparer{
 		client:                client,
 		countToStrategy:       countToStrategy,
@@ -4545,14 +4545,14 @@ func (p *E2ETestNodePreparer) PrepareNodes() error {
 	}
 	index := 0
 	sum := 0
-	for k, strategy := range p.countToStrategy {
-		sum += k
+	for _, v := range p.countToStrategy {
+		sum += v.Count
 		for ; index < sum; index++ {
-			if err := testutils.DoPrepareNode(p.client, &nodes.Items[index], strategy); err != nil {
+			if err := testutils.DoPrepareNode(p.client, &nodes.Items[index], v.Strategy); err != nil {
 				glog.Errorf("Aborting node preparation: %v", err)
 				return err
 			}
-			p.nodeToAppliedStrategy[nodes.Items[index].Name] = strategy
+			p.nodeToAppliedStrategy[nodes.Items[index].Name] = v.Strategy
 		}
 	}
 	return nil

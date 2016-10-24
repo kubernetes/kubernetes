@@ -608,6 +608,11 @@ waitLoop:
 	return nil
 }
 
+type CountToStrategy struct {
+	Count    int
+	Strategy PrepareNodeStrategy
+}
+
 type TestNodePreparer interface {
 	PrepareNodes() error
 	CleanupNodes() error

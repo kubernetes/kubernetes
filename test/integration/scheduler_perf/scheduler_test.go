@@ -83,7 +83,7 @@ func schedulePods(numNodes, numPods int) int32 {
 
 	nodePreparer := framework.NewIntegrationTestNodePreparer(
 		c,
-		map[int]testutils.PrepareNodeStrategy{numNodes: &testutils.TrivialNodePrepareStrategy{}},
+		[]testutils.CountToStrategy{{Count: numNodes, Strategy: &testutils.TrivialNodePrepareStrategy{}}},
 		"scheduler-perf-",
 	)
 	if err := nodePreparer.PrepareNodes(); err != nil {
