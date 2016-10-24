@@ -112,9 +112,11 @@ type KubeDNS struct {
 	// cluster zone annotation from the cached node instead of getting it from the API server
 	// every time.
 	nodesStore kcache.Store
+
+	initialSyncTimeout time.Duration
 }
 
-func NewKubeDNS(client clientset.Interface, domain string, federations map[string]string) (*KubeDNS, error) {
+func NewKubeDNS(client clientset.Interface, domain string, federations map[string]string, timeout time.Duration) (*KubeDNS, error) {
 	// Verify that federation names should not contain dots ('.')
 	// We can not allow dots since we use that as separator for path segments (svcname.nsname.fedname.svc.domain)
 	for key := range federations {
@@ -132,6 +134,7 @@ func NewKubeDNS(client clientset.Interface, domain string, federations map[strin
 		clusterIPServiceMap: make(map[string]*kapi.Service),
 		domainPath:          util.ReverseArray(strings.Split(strings.TrimRight(domain, "."), ".")),
 		federations:         federations,
+		initialSyncTimeout:  timeout,
 	}
 	kd.setEndpointsStore()
 	kd.setServicesStore()
@@ -141,29 +144,22 @@ func NewKubeDNS(client clientset.Interface, domain string, federations map[strin
 func (kd *KubeDNS) Start() {
 	go kd.endpointsController.Run(wait.NeverStop)
 	go kd.serviceController.Run(wait.NeverStop)
-	// Wait synchronously for the Kubernetes service and add a DNS record for it.
-	// This ensures that the Start function returns only after having received Service objects
-	// from APIServer.
-	// TODO: we might not have to wait for kubernetes service specifically. We should just wait
-	// for a list operation to be complete from APIServer.
-	kd.waitForKubernetesService()
-}
-
-func (kd *KubeDNS) waitForKubernetesService() (svc *kapi.Service) {
-	name := fmt.Sprintf("%v/%v", kapi.NamespaceDefault, kubernetesSvcName)
-	glog.Infof("Waiting for service: %v", name)
-	var err error
-	servicePollInterval := 1 * time.Second
+	// wait for both controllers have completed an initial resource listing
+	timeout := time.After(kd.initialSyncTimeout)
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
 	for {
-		svc, err = kd.kubeClient.Core().Services(kapi.NamespaceDefault).Get(kubernetesSvcName)
-		if err != nil || svc == nil {
-			glog.Infof("Ignoring error while waiting for service %v: %v. Sleeping %v before retrying.", name, err, servicePollInterval)
-			time.Sleep(servicePollInterval)
-			continue
+		select {
+		case <-timeout:
+			glog.Fatalf("timeout waiting for initialization")
+		case <-ticker.C:
+			if kd.endpointsController.HasSynced() && kd.serviceController.HasSynced() {
+				glog.V(0).Infof("Initialized services and endpoints from apiserver")
+				return
+			}
+			glog.V(0).Infof("DNS server not ready, retry in 500 milliseconds")
 		}
-		break
 	}
-	return
 }
 
 func (kd *KubeDNS) GetCacheAsJSON() (string, error) {

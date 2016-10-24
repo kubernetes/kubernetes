@@ -18,37 +18,39 @@ limitations under the License.
 package options
 
 import (
-	"net/url"
-	"os"
-
 	"fmt"
 	_ "net/http/pprof"
+	"net/url"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/pkg/util/validation"
 )
 
 type KubeDNSConfig struct {
-	ClusterDomain  string
-	KubeConfigFile string
-	KubeMasterURL  string
-	HealthzPort    int
-	DNSBindAddress string
-	DNSPort        int
+	ClusterDomain      string
+	KubeConfigFile     string
+	KubeMasterURL      string
+	HealthzPort        int
+	DNSBindAddress     string
+	DNSPort            int
+	InitialSyncTimeout time.Duration
 	// Federations maps federation names to their registered domain names.
 	Federations map[string]string
 }
 
 func NewKubeDNSConfig() *KubeDNSConfig {
 	return &KubeDNSConfig{
-		ClusterDomain:  "cluster.local.",
-		KubeConfigFile: "",
-		KubeMasterURL:  "",
-		HealthzPort:    8081,
-		DNSBindAddress: "0.0.0.0",
-		DNSPort:        53,
-		Federations:    make(map[string]string),
+		ClusterDomain:      "cluster.local.",
+		KubeConfigFile:     "",
+		KubeMasterURL:      "",
+		HealthzPort:        8081,
+		DNSBindAddress:     "0.0.0.0",
+		DNSPort:            53,
+		InitialSyncTimeout: 60 * time.Second,
+		Federations:        make(map[string]string),
 	}
 }
 
@@ -141,11 +143,41 @@ func (fv federationsVar) Type() string {
 }
 
 func (s *KubeDNSConfig) AddFlags(fs *pflag.FlagSet) {
-	fs.Var(clusterDomainVar{&s.ClusterDomain}, "domain", "domain under which to create names")
-	fs.StringVar(&s.KubeConfigFile, "kubecfg-file", s.KubeConfigFile, "Location of kubecfg file for access to kubernetes master service; --kube-master-url overrides the URL part of this; if neither this nor --kube-master-url are provided, defaults to service account tokens")
-	fs.Var(kubeMasterURLVar{&s.KubeMasterURL}, "kube-master-url", "URL to reach kubernetes master. Env variables in this flag will be expanded.")
-	fs.IntVar(&s.HealthzPort, "healthz-port", s.HealthzPort, "port on which to serve a kube-dns HTTP readiness probe.")
-	fs.StringVar(&s.DNSBindAddress, "dns-bind-address", s.DNSBindAddress, "address on which to serve DNS requests.")
-	fs.IntVar(&s.DNSPort, "dns-port", s.DNSPort, "port on which to serve DNS requests.")
-	fs.Var(federationsVar{s.Federations}, "federations", "a comma separated list of the federation names and their corresponding domain names to which this cluster belongs. Example: \"myfederation1=example.com,myfederation2=example2.com,myfederation3=example.com\"")
+	fs.Var(
+		clusterDomainVar{&s.ClusterDomain},
+		"domain",
+		"domain under which to create names")
+	fs.StringVar(
+		&s.KubeConfigFile,
+		"kubecfg-file",
+		s.KubeConfigFile,
+		"Location of kubecfg file for access to kubernetes master service; --kube-master-url overrides the URL part of this; if neither this nor --kube-master-url are provided, defaults to service account tokens")
+	fs.Var(
+		kubeMasterURLVar{&s.KubeMasterURL},
+		"kube-master-url",
+		"URL to reach kubernetes master. Env variables in this flag will be expanded.")
+	fs.IntVar(
+		&s.HealthzPort,
+		"healthz-port",
+		s.HealthzPort,
+		"port on which to serve a kube-dns HTTP readiness probe.")
+	fs.StringVar(
+		&s.DNSBindAddress,
+		"dns-bind-address",
+		s.DNSBindAddress,
+		"address on which to serve DNS requests.")
+	fs.IntVar(
+		&s.DNSPort,
+		"dns-port",
+		s.DNSPort,
+		"port on which to serve DNS requests.")
+	fs.Var(
+		federationsVar{s.Federations},
+		"federations",
+		"a comma separated list of the federation names and their corresponding domain names to which this cluster belongs. Example: \"myfederation1=example.com,myfederation2=example2.com,myfederation3=example.com\"")
+	fs.DurationVar(
+		&s.InitialSyncTimeout,
+		"initial-sync-timeout",
+		s.InitialSyncTimeout,
+		"Timeout for initial resource sync. Default to 60 seconds.")
 }

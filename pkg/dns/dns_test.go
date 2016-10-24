@@ -23,6 +23,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	etcd "github.com/coreos/etcd/client"
 	"github.com/miekg/dns"
@@ -63,7 +64,7 @@ func newKubeDNS() *KubeDNS {
 
 func TestNewKubeDNS(t *testing.T) {
 	// Verify that it returns an error for invalid federation names.
-	_, err := NewKubeDNS(nil, "domainName", map[string]string{"invalid.name.with.dot": "example.come"})
+	_, err := NewKubeDNS(nil, "domainName", map[string]string{"invalid.name.with.dot": "example.come"}, 60*time.Second)
 	if err == nil {
 		t.Errorf("Expected an error due to invalid federation name")
 	}
