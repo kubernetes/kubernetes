@@ -327,13 +327,13 @@ func (podStatus *PodStatus) FindContainerStatusByName(containerName string) *Con
 
 // Get container status of all the running containers in a pod
 func (podStatus *PodStatus) GetRunningContainerStatuses() []*ContainerStatus {
-	runnningContainerStatues := []*ContainerStatus{}
+	runningContainerStatus := []*ContainerStatus{}
 	for _, containerStatus := range podStatus.ContainerStatuses {
 		if containerStatus.State == ContainerStateRunning {
-			runnningContainerStatues = append(runnningContainerStatues, containerStatus)
+			runningContainerStatus = append(runningContainerStatus, containerStatus)
 		}
 	}
-	return runnningContainerStatues
+	return runningContainerStatus
 }
 
 // Basic information about a container image.
