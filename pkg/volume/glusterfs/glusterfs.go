@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strconv"
 	dstrings "strings"
 
 	"github.com/golang/glog"
@@ -60,6 +61,7 @@ const (
 	dynamicEpSvcPrefix        = "gluster-dynamic-"
 	replicaCount              = 3
 	durabilityType            = "replicate"
+	defaultGid                = 0
 	secretKeyName             = "key" // key name used in secret
 	annGlusterURL             = "glusterfs.kubernetes.io/url"
 	annGlusterSecretName      = "glusterfs.kubernetes.io/secretname"
@@ -364,6 +366,7 @@ func (plugin *glusterfsPlugin) newProvisionerInternal(options volume.VolumeOptio
 
 type provisioningConfig struct {
 	url             string
+	gid             int64
 	user            string
 	userKey         string
 	secretNamespace string
@@ -510,7 +513,7 @@ func (p *glusterfsVolumeProvisioner) CreateVolume() (r *api.GlusterfsVolumeSourc
 		glog.Errorf("glusterfs: failed to create gluster rest client")
 		return nil, 0, fmt.Errorf("failed to create gluster REST client, REST server authentication failed")
 	}
-	volumeReq := &gapi.VolumeCreateRequest{Size: sz, Durability: gapi.VolumeDurabilityInfo{Type: durabilityType, Replicate: gapi.ReplicaDurability{Replica: replicaCount}}}
+	volumeReq := &gapi.VolumeCreateRequest{Size: sz, Gid: p.provisioningConfig.gid, Durability: gapi.VolumeDurabilityInfo{Type: durabilityType, Replicate: gapi.ReplicaDurability{Replica: replicaCount}}}
 	volume, err := cli.VolumeCreate(volumeReq)
 	if err != nil {
 		glog.Errorf("glusterfs: error creating volume %v ", err)
@@ -646,7 +649,7 @@ func parseSecret(namespace, secretName string, kubeClient clientset.Interface) (
 func parseClassParameters(params map[string]string, kubeClient clientset.Interface) (*provisioningConfig, error) {
 	var cfg provisioningConfig
 	var err error
-
+	var reqGid int
 	authEnabled := true
 	for k, v := range params {
 		switch dstrings.ToLower(k) {
@@ -656,6 +659,12 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 			cfg.user = v
 		case "restuserkey":
 			cfg.userKey = v
+		case "gid":
+			reqGid, err = strconv.Atoi(v)
+			if err != nil {
+				return nil, fmt.Errorf("glusterfs: invalid value %q for option %q for volume plugin %s", v, k, glusterfsPluginName)
+			}
+			cfg.gid = int64(reqGid)
 		case "secretname":
 			cfg.secretName = v
 		case "secretnamespace":
@@ -669,6 +678,10 @@ func parseClassParameters(params map[string]string, kubeClient clientset.Interfa
 
 	if len(cfg.url) == 0 {
 		return nil, fmt.Errorf("StorageClass for provisioner %s must contain 'resturl' parameter", glusterfsPluginName)
+	}
+
+	if cfg.gid == 0 {
+		cfg.gid = defaultGid
 	}
 
 	if !authEnabled {
