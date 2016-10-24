@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dnsmasq
+  namespace: kube-system
+  labels:
+    name: dnsmasq
+spec:
+  hostNetwork: true
+  containers:
+  - name: dnsmasq
+    resources:
+      requests:
+        cpu: 100m
+      limits:
+        cpu: 100m
+    # TODO:
+    # Push this to gcr
+    # Make it consume a config map
+    # Figure out reload
+    image: bprashanth/kube-dnsmasq-amd64:0.1
+    securityContext:
+      privileged: true
+    ports:
+    - containerPort: 53

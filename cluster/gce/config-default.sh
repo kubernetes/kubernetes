@@ -170,5 +170,6 @@ else
     EVICTION_HARD="${EVICTION_HARD:-memory.available<100Mi,imagefs.available<10%,imagefs.inodesFree<5%}"
 fi
 
+ENABLE_DNSMASQ="${ENABLE_DNSMASQ:-true}"
 # Optional: custom scheduling algorithm
 SCHEDULING_ALGORITHM_PROVIDER="${SCHEDULING_ALGORITHM_PROVIDER:-}"

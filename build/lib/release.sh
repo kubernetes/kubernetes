@@ -318,6 +318,7 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${salt_dir}/l7-gcp/glbc.manifest" "${dst_dir}"
   cp "${salt_dir}/rescheduler/rescheduler.manifest" "${dst_dir}/"
   cp "${salt_dir}/e2e-image-puller/e2e-image-puller.manifest" "${dst_dir}/"
+  cp "${salt_dir}/dnsmasq/dnsmasq.manifest" "${dst_dir}/"
   cp "${KUBE_ROOT}/cluster/gce/trusty/configure-helper.sh" "${dst_dir}/trusty-configure-helper.sh"
   cp "${KUBE_ROOT}/cluster/gce/gci/configure-helper.sh" "${dst_dir}/gci-configure-helper.sh"
   cp "${KUBE_ROOT}/cluster/gce/gci/mounter/mounter" "${dst_dir}/gci-mounter"

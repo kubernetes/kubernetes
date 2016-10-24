@@ -1729,12 +1729,12 @@ func validateRestartPolicy(restartPolicy *api.RestartPolicy, fldPath *field.Path
 func validateDNSPolicy(dnsPolicy *api.DNSPolicy, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
 	switch *dnsPolicy {
-	case api.DNSClusterFirst, api.DNSDefault:
+	case api.DNSClusterFirst, api.DNSDefault, api.DNSNodeFirst:
 		break
 	case "":
 		allErrors = append(allErrors, field.Required(fldPath, ""))
 	default:
-		validValues := []string{string(api.DNSClusterFirst), string(api.DNSDefault)}
+		validValues := []string{string(api.DNSClusterFirst), string(api.DNSDefault), string(api.DNSNodeFirst)}
 		allErrors = append(allErrors, field.NotSupported(fldPath, dnsPolicy, validValues))
 	}
 	return allErrors

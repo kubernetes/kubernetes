@@ -1086,6 +1086,13 @@ function start-fluentd {
   fi
 }
 
+# Starts dnsmasq - used in test clusters.
+function start-dnsmasq {
+  echo "Start dnsmasq"
+  cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/dnsmasq.manifest" \
+    /etc/kubernetes/manifests/
+}
+
 # Starts an image-puller - used in test clusters.
 function start-image-puller {
   echo "Start image-puller"
@@ -1221,6 +1228,10 @@ else
   if [[ "${PREPULL_E2E_IMAGES:-}" == "true" ]]; then
     start-image-puller
   fi
+ if [[ "${ENABLE_DNSMASQ:-}" == "true" ]]; then
+    start-dnsmasq
+  fi
+
 fi
 start-fluentd
 reset-motd
