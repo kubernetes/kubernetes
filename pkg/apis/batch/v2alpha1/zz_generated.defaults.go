@@ -64,6 +64,9 @@ func SetObjectDefaults_Job(in *Job) {
 		if a.VolumeSource.ConfigMap != nil {
 			v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
 		}
+		if a.VolumeSource.Quobyte != nil {
+			v1.SetDefaults_QuobyteVolumeSource(a.VolumeSource.Quobyte)
+		}
 		if a.VolumeSource.AzureDisk != nil {
 			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
@@ -183,6 +186,9 @@ func SetObjectDefaults_JobTemplate(in *JobTemplate) {
 		if a.VolumeSource.ConfigMap != nil {
 			v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
 		}
+		if a.VolumeSource.Quobyte != nil {
+			v1.SetDefaults_QuobyteVolumeSource(a.VolumeSource.Quobyte)
+		}
 		if a.VolumeSource.AzureDisk != nil {
 			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
@@ -295,6 +301,9 @@ func SetObjectDefaults_ScheduledJob(in *ScheduledJob) {
 		}
 		if a.VolumeSource.ConfigMap != nil {
 			v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
+		}
+		if a.VolumeSource.Quobyte != nil {
+			v1.SetDefaults_QuobyteVolumeSource(a.VolumeSource.Quobyte)
 		}
 		if a.VolumeSource.AzureDisk != nil {
 			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)

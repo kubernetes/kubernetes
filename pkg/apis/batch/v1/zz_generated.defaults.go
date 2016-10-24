@@ -61,6 +61,9 @@ func SetObjectDefaults_Job(in *Job) {
 		if a.VolumeSource.ConfigMap != nil {
 			api_v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
 		}
+		if a.VolumeSource.Quobyte != nil {
+			api_v1.SetDefaults_QuobyteVolumeSource(a.VolumeSource.Quobyte)
+		}
 		if a.VolumeSource.AzureDisk != nil {
 			api_v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}

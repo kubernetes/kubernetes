@@ -158,21 +158,10 @@ func (plugin *quobytePlugin) newMounterInternal(spec *volume.Spec, pod *api.Pod,
 		return nil, err
 	}
 
-	if pod != nil {
-		// We use the service account if it's not the default service account
-		if len(pod.Spec.ServiceAccountName) != 0 && pod.Spec.ServiceAccountName != "default" {
-			source.User = pod.Spec.ServiceAccountName
-			source.Group = pod.Spec.ServiceAccountName
-		} else {
-			// If the default service account is used or none is specified we use the specified user and group or default to root#nfsnobody
-			if len(source.User) == 0 {
-				source.User = "root"
-			}
-
-			if len(source.Group) == 0 {
-				source.Group = "nfsnobody"
-			}
-		}
+	// We use the service account if it's not the default service account
+	if pod != nil && len(pod.Spec.ServiceAccountName) != 0 && pod.Spec.ServiceAccountName != "default" {
+		source.User = pod.Spec.ServiceAccountName
+		source.Group = pod.Spec.ServiceAccountName
 	}
 
 	return &quobyteMounter{
