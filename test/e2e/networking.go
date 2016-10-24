@@ -64,7 +64,7 @@ var _ = framework.KubeDescribe("Networking", func() {
 		}
 		for _, test := range tests {
 			By(fmt.Sprintf("testing: %s", test.path))
-			data, err := f.Client.RESTClient.Get().
+			data, err := f.ClientSet.Core().RESTClient().Get().
 				AbsPath(test.path).
 				DoRaw()
 			if err != nil {

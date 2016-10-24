@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -41,7 +41,7 @@ var _ = framework.KubeDescribe("Multi-AZ Clusters", func() {
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("gce", "gke", "aws")
 		if zoneCount <= 0 {
-			zoneCount, err = getZoneCount(f.Client)
+			zoneCount, err = getZoneCount(f.ClientSet)
 			Expect(err).NotTo(HaveOccurred())
 		}
 		By(fmt.Sprintf("Checking for multi-zone cluster.  Zone count = %d", zoneCount))
@@ -76,7 +76,7 @@ func SpreadServiceOrFail(f *framework.Framework, replicaCount int, image string)
 			}},
 		},
 	}
-	_, err := f.Client.Services(f.Namespace.Name).Create(serviceSpec)
+	_, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(serviceSpec)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Now create some pods behind the service
@@ -89,7 +89,7 @@ func SpreadServiceOrFail(f *framework.Framework, replicaCount int, image string)
 			Containers: []api.Container{
 				{
 					Name:  "test",
-					Image: framework.GetPauseImageName(f.Client),
+					Image: framework.GetPauseImageName(f.ClientSet),
 				},
 			},
 		},
@@ -99,17 +99,17 @@ func SpreadServiceOrFail(f *framework.Framework, replicaCount int, image string)
 	// Based on the callers, replicas is always positive number: zoneCount >= 0 implies (2*zoneCount)+1 > 0.
 	// Thus, no need to test for it. Once the precondition changes to zero number of replicas,
 	// test for replicaCount > 0. Otherwise, StartPods panics.
-	framework.ExpectNoError(testutils.StartPods(f.Client, replicaCount, f.Namespace.Name, serviceName, *podSpec, false, framework.Logf))
+	framework.ExpectNoError(testutils.StartPods(f.ClientSet, replicaCount, f.Namespace.Name, serviceName, *podSpec, false, framework.Logf))
 
 	// Wait for all of them to be scheduled
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{"service": serviceName}))
-	pods, err := framework.WaitForPodsWithLabelScheduled(f.Client, f.Namespace.Name, selector)
+	pods, err := framework.WaitForPodsWithLabelScheduled(f.ClientSet, f.Namespace.Name, selector)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Now make sure they're spread across zones
-	zoneNames, err := getZoneNames(f.Client)
+	zoneNames, err := getZoneNames(f.ClientSet)
 	Expect(err).NotTo(HaveOccurred())
-	Expect(checkZoneSpreading(f.Client, pods, zoneNames)).To(Equal(true))
+	Expect(checkZoneSpreading(f.ClientSet, pods, zoneNames)).To(Equal(true))
 }
 
 // Find the name of the zone in which a Node is running
@@ -124,9 +124,9 @@ func getZoneNameForNode(node api.Node) (string, error) {
 }
 
 // Find the names of all zones in which we have nodes in this cluster.
-func getZoneNames(c *client.Client) ([]string, error) {
+func getZoneNames(c clientset.Interface) ([]string, error) {
 	zoneNames := sets.NewString()
-	nodes, err := c.Nodes().List(api.ListOptions{})
+	nodes, err := c.Core().Nodes().List(api.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +139,7 @@ func getZoneNames(c *client.Client) ([]string, error) {
 }
 
 // Return the number of zones in which we have nodes in this cluster.
-func getZoneCount(c *client.Client) (int, error) {
+func getZoneCount(c clientset.Interface) (int, error) {
 	zoneNames, err := getZoneNames(c)
 	if err != nil {
 		return -1, err
@@ -148,16 +148,16 @@ func getZoneCount(c *client.Client) (int, error) {
 }
 
 // Find the name of the zone in which the pod is scheduled
-func getZoneNameForPod(c *client.Client, pod api.Pod) (string, error) {
+func getZoneNameForPod(c clientset.Interface, pod api.Pod) (string, error) {
 	By(fmt.Sprintf("Getting zone name for pod %s, on node %s", pod.Name, pod.Spec.NodeName))
-	node, err := c.Nodes().Get(pod.Spec.NodeName)
+	node, err := c.Core().Nodes().Get(pod.Spec.NodeName)
 	Expect(err).NotTo(HaveOccurred())
 	return getZoneNameForNode(*node)
 }
 
 // Determine whether a set of pods are approximately evenly spread
 // across a given set of zones
-func checkZoneSpreading(c *client.Client, pods *api.PodList, zoneNames []string) (bool, error) {
+func checkZoneSpreading(c clientset.Interface, pods *api.PodList, zoneNames []string) (bool, error) {
 	podsPerZone := make(map[string]int)
 	for _, zoneName := range zoneNames {
 		podsPerZone[zoneName] = 0
@@ -190,7 +190,7 @@ func checkZoneSpreading(c *client.Client, pods *api.PodList, zoneNames []string)
 func SpreadRCOrFail(f *framework.Framework, replicaCount int32, image string) {
 	name := "ubelite-spread-rc-" + string(uuid.NewUUID())
 	By(fmt.Sprintf("Creating replication controller %s", name))
-	controller, err := f.Client.ReplicationControllers(f.Namespace.Name).Create(&api.ReplicationController{
+	controller, err := f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Create(&api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
 			Namespace: f.Namespace.Name,
 			Name:      name,
@@ -220,22 +220,22 @@ func SpreadRCOrFail(f *framework.Framework, replicaCount int32, image string) {
 	// Cleanup the replication controller when we are done.
 	defer func() {
 		// Resize the replication controller to zero to get rid of pods.
-		if err := framework.DeleteRCAndPods(f.Client, f.ClientSet, f.Namespace.Name, controller.Name); err != nil {
+		if err := framework.DeleteRCAndPods(f.ClientSet, f.Namespace.Name, controller.Name); err != nil {
 			framework.Logf("Failed to cleanup replication controller %v: %v.", controller.Name, err)
 		}
 	}()
 	// List the pods, making sure we observe all the replicas.
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-	pods, err := framework.PodsCreated(f.Client, f.Namespace.Name, name, replicaCount)
+	pods, err := framework.PodsCreated(f.ClientSet, f.Namespace.Name, name, replicaCount)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Wait for all of them to be scheduled
 	By(fmt.Sprintf("Waiting for %d replicas of %s to be scheduled.  Selector: %v", replicaCount, name, selector))
-	pods, err = framework.WaitForPodsWithLabelScheduled(f.Client, f.Namespace.Name, selector)
+	pods, err = framework.WaitForPodsWithLabelScheduled(f.ClientSet, f.Namespace.Name, selector)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Now make sure they're spread across zones
-	zoneNames, err := getZoneNames(f.Client)
+	zoneNames, err := getZoneNames(f.ClientSet)
 	Expect(err).NotTo(HaveOccurred())
-	Expect(checkZoneSpreading(f.Client, pods, zoneNames)).To(Equal(true))
+	Expect(checkZoneSpreading(f.ClientSet, pods, zoneNames)).To(Equal(true))
 }

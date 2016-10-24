@@ -68,7 +68,7 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 		}
 
 		var err error
-		if secret, err = f.Client.Secrets(f.Namespace.Name).Create(secret); err != nil {
+		if secret, err = f.ClientSet.Core().Secrets(f.Namespace.Name).Create(secret); err != nil {
 			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 		}
 
@@ -124,11 +124,11 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 
 		defer func() {
 			By("Cleaning up the secret")
-			if err := f.Client.Secrets(f.Namespace.Name).Delete(secret.Name); err != nil {
+			if err := f.ClientSet.Core().Secrets(f.Namespace.Name).Delete(secret.Name, nil); err != nil {
 				framework.Failf("unable to delete secret %v: %v", secret.Name, err)
 			}
 			By("Cleaning up the git vol pod")
-			if err = f.Client.Pods(f.Namespace.Name).Delete(pod.Name, api.NewDeleteOptions(0)); err != nil {
+			if err = f.ClientSet.Core().Pods(f.Namespace.Name).Delete(pod.Name, api.NewDeleteOptions(0)); err != nil {
 				framework.Failf("unable to delete git vol pod %v: %v", pod.Name, err)
 			}
 		}()
@@ -216,17 +216,17 @@ func createGitServer(f *framework.Framework) (gitURL string, gitRepo string, cle
 		},
 	}
 
-	if gitServerSvc, err = f.Client.Services(f.Namespace.Name).Create(gitServerSvc); err != nil {
+	if gitServerSvc, err = f.ClientSet.Core().Services(f.Namespace.Name).Create(gitServerSvc); err != nil {
 		framework.Failf("unable to create test git server service %s: %v", gitServerSvc.Name, err)
 	}
 
 	return "http://" + gitServerSvc.Spec.ClusterIP + ":" + strconv.Itoa(httpPort), "test", func() {
 		By("Cleaning up the git server pod")
-		if err := f.Client.Pods(f.Namespace.Name).Delete(gitServerPod.Name, api.NewDeleteOptions(0)); err != nil {
+		if err := f.ClientSet.Core().Pods(f.Namespace.Name).Delete(gitServerPod.Name, api.NewDeleteOptions(0)); err != nil {
 			framework.Failf("unable to delete git server pod %v: %v", gitServerPod.Name, err)
 		}
 		By("Cleaning up the git server svc")
-		if err := f.Client.Services(f.Namespace.Name).Delete(gitServerSvc.Name); err != nil {
+		if err := f.ClientSet.Core().Services(f.Namespace.Name).Delete(gitServerSvc.Name, nil); err != nil {
 			framework.Failf("unable to delete git server svc %v: %v", gitServerSvc.Name, err)
 		}
 	}
@@ -266,7 +266,7 @@ func createConfigmapsForRace(f *framework.Framework) (configMapNames []string) {
 				"data-1": "value-1",
 			},
 		}
-		_, err := f.Client.ConfigMaps(f.Namespace.Name).Create(configMap)
+		_, err := f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(configMap)
 		framework.ExpectNoError(err)
 	}
 	return
@@ -275,7 +275,7 @@ func createConfigmapsForRace(f *framework.Framework) (configMapNames []string) {
 func deleteConfigMaps(f *framework.Framework, configMapNames []string) {
 	By("Cleaning up the configMaps")
 	for _, configMapName := range configMapNames {
-		err := f.Client.ConfigMaps(f.Namespace.Name).Delete(configMapName)
+		err := f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Delete(configMapName, nil)
 		Expect(err).NotTo(HaveOccurred(), "unable to delete configMap %v", configMapName)
 	}
 }
@@ -361,15 +361,15 @@ func testNoWrappedVolumeRace(f *framework.Framework, volumes []api.Volume, volum
 			},
 		},
 	}
-	_, err := f.Client.ReplicationControllers(f.Namespace.Name).Create(rc)
+	_, err := f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Create(rc)
 	Expect(err).NotTo(HaveOccurred(), "error creating replication controller")
 
 	defer func() {
-		err := framework.DeleteRCAndPods(f.Client, f.ClientSet, f.Namespace.Name, rcName)
+		err := framework.DeleteRCAndPods(f.ClientSet, f.Namespace.Name, rcName)
 		framework.ExpectNoError(err)
 	}()
 
-	pods, err := framework.PodsCreated(f.Client, f.Namespace.Name, rcName, podCount)
+	pods, err := framework.PodsCreated(f.ClientSet, f.Namespace.Name, rcName, podCount)
 
 	By("Ensuring each pod is running")
 

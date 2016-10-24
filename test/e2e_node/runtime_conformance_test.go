@@ -251,9 +251,9 @@ while true; do sleep 1; done
 					if testCase.secret {
 						secret.Name = "image-pull-secret-" + string(uuid.NewUUID())
 						By("create image pull secret")
-						_, err := f.Client.Secrets(f.Namespace.Name).Create(secret)
+						_, err := f.ClientSet.Core().Secrets(f.Namespace.Name).Create(secret)
 						Expect(err).NotTo(HaveOccurred())
-						defer f.Client.Secrets(f.Namespace.Name).Delete(secret.Name)
+						defer f.ClientSet.Core().Secrets(f.Namespace.Name).Delete(secret.Name, nil)
 						container.ImagePullSecrets = []string{secret.Name}
 					}
 					// checkContainerStatus checks whether the container status matches expectation.

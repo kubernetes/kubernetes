@@ -63,7 +63,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 		})
 
 		It("should be created and deleted successfully", func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 			framework.SkipUnlessProviderIs("gce", "gke") // TODO: Federated ingress is not yet supported on non-GCP platforms.
 			nsName := f.FederationNamespace.Name
 			ingress := createIngressOrFail(f.FederationClientset_1_5, nsName)
@@ -85,7 +85,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 
 		// register clusters in federation apiserver
 		BeforeEach(func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 			framework.SkipUnlessProviderIs("gce", "gke") // TODO: Federated ingress is not yet supported on non-GCP platforms.
 			if federationName = os.Getenv("FEDERATION_NAME"); federationName == "" {
 				federationName = DefaultFederationName
@@ -124,7 +124,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 			)
 
 			BeforeEach(func() {
-				framework.SkipUnlessFederated(f.Client)
+				framework.SkipUnlessFederated(f.ClientSet)
 				// create backend pod
 				createBackendPodsOrFail(clusters, ns, FederatedIngressServicePodName)
 				// create backend service

@@ -126,7 +126,7 @@ func getThroughputPerfData(batchLag time.Duration, e2eLags []framework.PodLatenc
 // getTestNodeInfo fetches the capacity of a node from API server and returns a map of labels.
 func getTestNodeInfo(f *framework.Framework, testName string) map[string]string {
 	nodeName := framework.TestContext.NodeName
-	node, err := f.Client.Nodes().Get(nodeName)
+	node, err := f.ClientSet.Core().Nodes().Get(nodeName)
 	Expect(err).NotTo(HaveOccurred())
 
 	cpu, ok := node.Status.Capacity["cpu"]

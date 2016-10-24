@@ -135,7 +135,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "test",
-						Image: framework.GetPauseImageName(f.Client),
+						Image: framework.GetPauseImageName(f.ClientSet),
 					},
 				},
 			},
@@ -211,7 +211,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 		By("verifying the kubelet observed the termination notice")
 		Expect(wait.Poll(time.Second*5, time.Second*30, func() (bool, error) {
-			podList, err := framework.GetKubeletPods(f.Client, pod.Spec.NodeName)
+			podList, err := framework.GetKubeletPods(f.ClientSet, pod.Spec.NodeName)
 			if err != nil {
 				framework.Logf("Unable to retrieve kubelet pods for node %v: %v", pod.Spec.NodeName, err)
 				return false, nil
@@ -396,7 +396,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				},
 			},
 		}
-		_, err := f.Client.Services(f.Namespace.Name).Create(svc)
+		_, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(svc)
 		Expect(err).NotTo(HaveOccurred(), "failed to create service")
 
 		// Make a client pod that verifies that it has the service environment variables.
@@ -460,7 +460,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		By("submitting the pod to kubernetes")
 		pod = podClient.CreateSync(pod)
 
-		req := f.Client.Get().
+		req := f.ClientSet.Core().RESTClient().Get().
 			Namespace(f.Namespace.Name).
 			Resource("pods").
 			Name(pod.Name).
@@ -530,7 +530,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		By("submitting the pod to kubernetes")
 		podClient.CreateSync(pod)
 
-		req := f.Client.Get().
+		req := f.ClientSet.Core().RESTClient().Get().
 			Namespace(f.Namespace.Name).
 			Resource("pods").
 			Name(pod.Name).

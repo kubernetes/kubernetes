@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/client/unversioned"
+	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -43,13 +43,13 @@ var ImageWhiteList sets.String
 func (f *Framework) PodClient() *PodClient {
 	return &PodClient{
 		f:            f,
-		PodInterface: f.Client.Pods(f.Namespace.Name),
+		PodInterface: f.ClientSet.Core().Pods(f.Namespace.Name),
 	}
 }
 
 type PodClient struct {
 	f *Framework
-	unversioned.PodInterface
+	unversionedcore.PodInterface
 }
 
 // Create creates a new pod according to the framework specifications (don't wait for it to start).
@@ -116,7 +116,7 @@ func (c *PodClient) DeleteSync(name string, options *api.DeleteOptions, timeout 
 	if err != nil && !errors.IsNotFound(err) {
 		Failf("Failed to delete pod %q: %v", name, err)
 	}
-	Expect(WaitForPodToDisappear(c.f.Client, c.f.Namespace.Name, name, labels.Everything(),
+	Expect(WaitForPodToDisappear(c.f.ClientSet, c.f.Namespace.Name, name, labels.Everything(),
 		2*time.Second, timeout)).To(Succeed(), "wait for pod %q to disappear", name)
 }
 
@@ -156,7 +156,7 @@ func (c *PodClient) mungeSpec(pod *api.Pod) {
 // WaitForSuccess waits for pod to success.
 func (c *PodClient) WaitForSuccess(name string, timeout time.Duration) {
 	f := c.f
-	Expect(waitForPodCondition(f.Client, f.Namespace.Name, name, "success or failure", timeout,
+	Expect(waitForPodCondition(f.ClientSet, f.Namespace.Name, name, "success or failure", timeout,
 		func(pod *api.Pod) (bool, error) {
 			switch pod.Status.Phase {
 			case api.PodFailed:

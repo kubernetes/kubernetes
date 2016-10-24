@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/uuid"
@@ -50,7 +50,7 @@ type resourceTest struct {
 	memLimits   framework.ResourceUsagePerContainer
 }
 
-func logPodsOnNodes(c *client.Client, nodeNames []string) {
+func logPodsOnNodes(c clientset.Interface, nodeNames []string) {
 	for _, n := range nodeNames {
 		podList, err := framework.GetKubeletRunningPods(c, n)
 		if err != nil {
@@ -70,10 +70,10 @@ func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames 
 
 	// TODO: Use a more realistic workload
 	Expect(framework.RunRC(testutils.RCConfig{
-		Client:    f.Client,
+		Client:    f.ClientSet,
 		Name:      rcName,
 		Namespace: f.Namespace.Name,
-		Image:     framework.GetPauseImageName(f.Client),
+		Image:     framework.GetPauseImageName(f.ClientSet),
 		Replicas:  totalPods,
 	})).NotTo(HaveOccurred())
 
@@ -96,18 +96,18 @@ func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames 
 		} else {
 			time.Sleep(reportingPeriod)
 		}
-		logPodsOnNodes(f.Client, nodeNames.List())
+		logPodsOnNodes(f.ClientSet, nodeNames.List())
 	}
 
 	By("Reporting overall resource usage")
-	logPodsOnNodes(f.Client, nodeNames.List())
+	logPodsOnNodes(f.ClientSet, nodeNames.List())
 	usageSummary, err := rm.GetLatest()
 	Expect(err).NotTo(HaveOccurred())
 	// TODO(random-liu): Remove the original log when we migrate to new perfdash
 	framework.Logf("%s", rm.FormatResourceUsage(usageSummary))
 	// Log perf result
 	framework.PrintPerfData(framework.ResourceUsageToPerfData(rm.GetMasterNodeLatest(usageSummary)))
-	verifyMemoryLimits(f.Client, expectedMemory, usageSummary)
+	verifyMemoryLimits(f.ClientSet, expectedMemory, usageSummary)
 
 	cpuSummary := rm.GetCPUSummary()
 	framework.Logf("%s", rm.FormatCPUSummary(cpuSummary))
@@ -116,10 +116,10 @@ func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames 
 	verifyCPULimits(expectedCPU, cpuSummary)
 
 	By("Deleting the RC")
-	framework.DeleteRCAndPods(f.Client, f.ClientSet, f.Namespace.Name, rcName)
+	framework.DeleteRCAndPods(f.ClientSet, f.Namespace.Name, rcName)
 }
 
-func verifyMemoryLimits(c *client.Client, expected framework.ResourceUsagePerContainer, actual framework.ResourceUsagePerNode) {
+func verifyMemoryLimits(c clientset.Interface, expected framework.ResourceUsagePerContainer, actual framework.ResourceUsagePerNode) {
 	if expected == nil {
 		return
 	}
@@ -200,16 +200,16 @@ var _ = framework.KubeDescribe("Kubelet [Serial] [Slow]", func() {
 		// Wait until image prepull pod has completed so that they wouldn't
 		// affect the runtime cpu usage. Fail the test if prepulling cannot
 		// finish in time.
-		if err := framework.WaitForPodsSuccess(f.Client, api.NamespaceSystem, framework.ImagePullerLabels, imagePrePullingLongTimeout); err != nil {
-			framework.Failf("Image puller didn't complete in %v, not running resource usage test since the metrics might be adulterated", imagePrePullingLongTimeout)
+		if err := framework.WaitForPodsSuccess(f.ClientSet, api.NamespaceSystem, framework.ImagePullerLabels, imagePrePullingLongTimeout); err != nil {
+			framework.Failf("Image puller didn't complete in %v, not running resource usage test since the metrics might be adultrated", imagePrePullingLongTimeout)
 		}
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		nodeNames = sets.NewString()
 		for _, node := range nodes.Items {
 			nodeNames.Insert(node.Name)
 		}
-		om = framework.NewRuntimeOperationMonitor(f.Client)
-		rm = framework.NewResourceMonitor(f.Client, framework.TargetContainers(), containerStatsPollingPeriod)
+		om = framework.NewRuntimeOperationMonitor(f.ClientSet)
+		rm = framework.NewResourceMonitor(f.ClientSet, framework.TargetContainers(), containerStatsPollingPeriod)
 		rm.Start()
 	})
 
