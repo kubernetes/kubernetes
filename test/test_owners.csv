@@ -839,6 +839,7 @@ k8s.io/kubernetes/plugin/pkg/auth/authenticator/password/allow,liggitt,0
 k8s.io/kubernetes/plugin/pkg/auth/authenticator/password/passwordfile,liggitt,0
 k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/anonymous,ixdy,1
 k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/basicauth,liggitt,0
+k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/headerrequest,deads2k,0
 k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union,liggitt,0
 k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/x509,liggitt,0
 k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/anytoken,timstclair,1
