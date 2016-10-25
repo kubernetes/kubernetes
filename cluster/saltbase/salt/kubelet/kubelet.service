@@ -8,7 +8,7 @@ ExecStart=/usr/local/bin/kubelet "$DAEMON_ARGS"
 Restart=always
 RestartSec=2s
 StartLimitInterval=0
-KillMode=process
+KillMode=control-group
 
 [Install]
 WantedBy=multi-user.target
