@@ -77,10 +77,6 @@ func (ctrl *PersistentVolumeController) GetHostIP() (net.IP, error) {
 	return nil, fmt.Errorf("PersistentVolumeController.GetHostIP() is not implemented")
 }
 
-func (ctrl *PersistentVolumeController) GetRootContext() string {
-	return ""
-}
-
 func (ctrl *PersistentVolumeController) GetNodeAllocatable() (api.ResourceList, error) {
 	return api.ResourceList{}, nil
 }

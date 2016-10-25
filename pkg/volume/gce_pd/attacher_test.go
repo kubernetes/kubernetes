@@ -202,8 +202,7 @@ func newPlugin() *gcePersistentDiskPlugin {
 	host := volumetest.NewFakeVolumeHost(
 		"/tmp", /* rootDir */
 		nil,    /* kubeClient */
-		nil,    /* plugins */
-		"" /* rootContext */)
+		nil /* plugins */)
 	plugins := ProbeVolumePlugins()
 	plugin := plugins[0]
 	plugin.Init(host)

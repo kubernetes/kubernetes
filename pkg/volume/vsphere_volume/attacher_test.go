@@ -165,7 +165,7 @@ func TestAttachDetach(t *testing.T) {
 // newPlugin creates a new vsphereVolumePlugin with fake cloud, NewAttacher
 // and NewDetacher won't work.
 func newPlugin() *vsphereVolumePlugin {
-	host := volumetest.NewFakeVolumeHost("/tmp", nil, nil, "")
+	host := volumetest.NewFakeVolumeHost("/tmp", nil, nil)
 	plugins := ProbeVolumePlugins()
 	plugin := plugins[0]
 	plugin.Init(host)
