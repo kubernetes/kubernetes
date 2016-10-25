@@ -136,6 +136,8 @@ ROLLBACK="${ROLLBACK:-/usr/local/bin/rollback}"
 # Do the roll-forward migration if needed.
 SKIP_STEP=true
 for step in ${SUPPORTED_VERSIONS}; do
+  echo "step: ${step}"
+  echo "curr: ${CURRENT_VERSION}"
   if [ "${step}" == "${CURRENT_VERSION}" ]; then
     SKIP_STEP=false
   elif [ "${SKIP_STEP}" != "true" ]; then
