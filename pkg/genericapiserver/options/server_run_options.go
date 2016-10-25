@@ -91,6 +91,7 @@ type ServerRunOptions struct {
 	InsecureBindAddress          net.IP
 	InsecurePort                 int
 	KeystoneURL                  string
+	KeystoneCAFile               string
 	KubernetesServiceNodePort    int
 	LongRunningRequestRE         string
 	MasterCount                  int
@@ -378,6 +379,10 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&s.KeystoneURL, "experimental-keystone-url", s.KeystoneURL,
 		"If passed, activates the keystone authentication plugin.")
+
+	fs.StringVar(&s.KeystoneCAFile, "experimental-keystone-ca-file", s.KeystoneCAFile, ""+
+		"If set, the Keystone server's certificate will be verified by one of the authorities "+
+		"in the experimental-keystone-ca-file, otherwise the host's root CA set will be used.")
 
 	// See #14282 for details on how to test/try this option out.
 	// TODO: remove this comment once this option is tested in CI.
