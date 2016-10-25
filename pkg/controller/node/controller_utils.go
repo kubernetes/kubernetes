@@ -135,12 +135,6 @@ func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
 		return
 	}
 
-	// delete terminating pods that have not yet been scheduled
-	if len(pod.Spec.NodeName) == 0 {
-		utilruntime.HandleError(nc.forcefullyDeletePod(pod))
-		return
-	}
-
 	nodeObj, found, err := nc.nodeStore.Store.GetByKey(pod.Spec.NodeName)
 	if err != nil {
 		// this can only happen if the Store.KeyFunc has a problem creating
@@ -150,11 +144,8 @@ func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
 		return
 	}
 
-	// delete terminating pods that have been scheduled on
-	// nonexistent nodes
+	// if there is no such node, do nothing and let the podGC clean it up.
 	if !found {
-		glog.Warningf("Unable to find Node: %v, deleting all assigned Pods.", pod.Spec.NodeName)
-		utilruntime.HandleError(nc.forcefullyDeletePod(pod))
 		return
 	}
 
