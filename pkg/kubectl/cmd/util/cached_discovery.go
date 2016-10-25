@@ -168,7 +168,7 @@ func (d *CachedDiscoveryClient) ServerVersion() (*version.Info, error) {
 }
 
 func (d *CachedDiscoveryClient) SwaggerSchema(version unversioned.GroupVersion) (*swagger.ApiDeclaration, error) {
-	return d.delegate.SwaggerSchema()
+	return d.delegate.SwaggerSchema(version)
 }
 
 // NewCachedDiscoveryClient creates a new DiscoveryClient.  cacheDirectory is the directory where discovery docs are held.  It must be unique per host:port combination to work well.
