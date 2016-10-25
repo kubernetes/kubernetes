@@ -416,9 +416,9 @@ func (rc *reconciler) reconstructStates(podsDir string) {
 		if rc.operationExecutor.IsOperationPending(volumeToMount.VolumeName, volumeToMount.PodName) {
 			continue
 		}
-		desiredPods := rc.desiredStateOfWorld.GetPods()
-		actualPods := rc.actualStateOfWorld.GetPods()
-		if desiredPods[volume.podName] || actualPods[volume.podName] {
+		dswExist := rc.desiredStateOfWorld.PodExistsInVolume(volumeToMount.PodName, volumeToMount.VolumeName)
+		aswExist, _, _ := rc.actualStateOfWorld.PodExistsInVolume(volumeToMount.PodName, volumeToMount.VolumeName)
+		if dswExist || aswExist {
 			continue
 		}
 
