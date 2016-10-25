@@ -1062,7 +1062,7 @@
      {
       "type": "v1.Endpoints",
       "method": "POST",
-      "summary": "create a Endpoints",
+      "summary": "create Endpoints",
       "nickname": "createNamespacedEndpoints",
       "parameters": [
        {
@@ -1456,7 +1456,7 @@
      {
       "type": "unversioned.Status",
       "method": "DELETE",
-      "summary": "delete a Endpoints",
+      "summary": "delete Endpoints",
       "nickname": "deleteNamespacedEndpoints",
       "parameters": [
        {
@@ -1851,7 +1851,7 @@
      {
       "type": "v1.Event",
       "method": "POST",
-      "summary": "create a Event",
+      "summary": "create an Event",
       "nickname": "createNamespacedEvent",
       "parameters": [
        {
@@ -2245,7 +2245,7 @@
      {
       "type": "unversioned.Status",
       "method": "DELETE",
-      "summary": "delete a Event",
+      "summary": "delete an Event",
       "nickname": "deleteNamespacedEvent",
       "parameters": [
        {
@@ -8615,7 +8615,7 @@
      {
       "type": "v1alpha1.Eviction",
       "method": "POST",
-      "summary": "create eviction of a Eviction",
+      "summary": "create eviction of an Eviction",
       "nickname": "createNamespacedEvictionEviction",
       "parameters": [
        {

@@ -1197,7 +1197,7 @@
      }
     },
     "post": {
-     "description": "create a Endpoints",
+     "description": "create Endpoints",
      "consumes": [
       "*/*"
      ],
@@ -1405,7 +1405,7 @@
      }
     },
     "delete": {
-     "description": "delete a Endpoints",
+     "description": "delete Endpoints",
      "consumes": [
       "*/*"
      ],
@@ -1580,7 +1580,7 @@
      }
     },
     "post": {
-     "description": "create a Event",
+     "description": "create an Event",
      "consumes": [
       "*/*"
      ],
@@ -1788,7 +1788,7 @@
      }
     },
     "delete": {
-     "description": "delete a Event",
+     "description": "delete an Event",
      "consumes": [
       "*/*"
      ],
@@ -3353,7 +3353,7 @@
    },
    "/api/v1/namespaces/{namespace}/pods/{name}/eviction": {
     "post": {
-     "description": "create eviction of a Eviction",
+     "description": "create eviction of an Eviction",
      "consumes": [
       "*/*"
      ],
@@ -20515,7 +20515,7 @@
      }
     },
     "post": {
-     "description": "create a Ingress",
+     "description": "create an Ingress",
      "consumes": [
       "*/*"
      ],
@@ -20723,7 +20723,7 @@
      }
     },
     "delete": {
-     "description": "delete a Ingress",
+     "description": "delete an Ingress",
      "consumes": [
       "*/*"
      ],
