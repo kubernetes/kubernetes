@@ -83,7 +83,6 @@ func TestRunOnce(t *testing.T) {
 		kubeClient:          &fake.Clientset{},
 		hostname:            testKubeletHostname,
 		nodeName:            testKubeletHostname,
-		runtimeState:        newRuntimeState(time.Second),
 	}
 	kb.containerManager = cm.NewStubContainerManager()
 
