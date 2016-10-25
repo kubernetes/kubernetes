@@ -49,7 +49,6 @@ const (
 	nodeStatusPollTime  = 1 * time.Second
 	gcePDRetryTimeout   = 5 * time.Minute
 	gcePDRetryPollTime  = 5 * time.Second
-	maxReadRetry        = 3
 )
 
 var _ = framework.KubeDescribe("Pod Disks", func() {
@@ -451,25 +450,18 @@ func deletePDWithRetry(diskName string) {
 
 func verifyPDContentsViaContainer(f *framework.Framework, podName, containerName string, fileAndContentToVerify map[string]string) {
 	for filePath, expectedContents := range fileAndContentToVerify {
-		var v string
-		// Add a retry to avoid temporal failure in reading the content
-		for i := 0; i < maxReadRetry; i++ {
-			v, err := f.ReadFileViaContainer(podName, containerName, filePath)
+		v, err := f.ReadFileViaContainer(podName, containerName, filePath)
+		if err != nil {
+			framework.Logf("Error reading file: %v", err)
+		}
+		framework.ExpectNoError(err)
+		framework.Logf("Read file %q with content: %v", filePath, v)
+		if strings.TrimSpace(v) != strings.TrimSpace(expectedContents) {
+			size, err := f.CheckFileSizeViaContainer(podName, containerName, filePath)
 			if err != nil {
 				framework.Logf("Error reading file: %v", err)
 			}
-			framework.ExpectNoError(err)
-			framework.Logf("Read file %q with content: %v", filePath, v)
-			if strings.TrimSpace(v) != strings.TrimSpace(expectedContents) {
-				framework.Logf("Warning: read content <%q> does not match execpted content <%q>.", v, expectedContents)
-				size, err := f.CheckFileSizeViaContainer(podName, containerName, filePath)
-				if err != nil {
-					framework.Logf("Error checking file size: %v", err)
-				}
-				framework.Logf("Check file %q size: %q", filePath, size)
-			} else {
-				break
-			}
+			framework.Logf("Check file %q size: %q", filePath, size)
 		}
 		Expect(strings.TrimSpace(v)).To(Equal(strings.TrimSpace(expectedContents)))
 	}
