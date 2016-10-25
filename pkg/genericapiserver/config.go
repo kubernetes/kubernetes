@@ -273,6 +273,7 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 		c.InsecureServingInfo = insecureServingInfo
 	}
 
+	c.AuthorizerRBACSuperUser = options.AuthorizationRBACSuperUser
 	c.CorsAllowedOriginList = options.CorsAllowedOriginList
 	c.EnableGarbageCollection = options.EnableGarbageCollection
 	c.EnableProfiling = options.EnableProfiling
@@ -284,6 +285,7 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 	c.PublicAddress = options.AdvertiseAddress
 	c.ServiceClusterIPRange = &options.ServiceClusterIPRange
 	c.ServiceNodePortRange = options.ServiceNodePortRange
+	c.SupportsBasicAuth = len(options.BasicAuthFile) > 0
 
 	return c
 }
