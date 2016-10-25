@@ -238,6 +238,7 @@ hard-pod-affinity-symmetric-weight
 healthz-bind-address
 healthz-port
 horizontal-pod-autoscaler-sync-period
+host-cluster-context
 host-ipc-sources
 host-network-sources
 host-pid-sources
