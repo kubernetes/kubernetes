@@ -37,7 +37,7 @@ go_library(
         "//pkg/storage/storagebackend/factory:go_default_library",
         "//pkg/util/runtime:go_default_library",
         "//pkg/util/validation/field:go_default_library",
-        "//pkg/version:go_default_library",
+        "//pkg/util/version:go_default_library",
         "//pkg/watch:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:golang.org/x/net/context",
