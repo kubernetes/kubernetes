@@ -19,3 +19,9 @@ options:
     description: |
       The domain name to use for the Kubernetes cluster by the
       skydns service.
+  dns_ndots:
+    type: int
+    default: 5
+    description: |
+      The ndots threshold to use for the Kubernetes cluster by the
+      skydns service.

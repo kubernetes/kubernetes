@@ -219,6 +219,7 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	out.ClusterDomain = in.ClusterDomain
 	out.MasterServiceNamespace = in.MasterServiceNamespace
 	out.ClusterDNS = in.ClusterDNS
+	out.ClusterDNSNdots = in.ClusterDNSNdots
 	out.StreamingConnectionIdleTimeout = in.StreamingConnectionIdleTimeout
 	out.NodeStatusUpdateFrequency = in.NodeStatusUpdateFrequency
 	out.ImageMinimumGCAge = in.ImageMinimumGCAge
@@ -397,6 +398,7 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	out.ClusterDomain = in.ClusterDomain
 	out.MasterServiceNamespace = in.MasterServiceNamespace
 	out.ClusterDNS = in.ClusterDNS
+	out.ClusterDNSNdots = in.ClusterDNSNdots
 	out.StreamingConnectionIdleTimeout = in.StreamingConnectionIdleTimeout
 	out.NodeStatusUpdateFrequency = in.NodeStatusUpdateFrequency
 	out.ImageMinimumGCAge = in.ImageMinimumGCAge

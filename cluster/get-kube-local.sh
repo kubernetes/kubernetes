@@ -75,6 +75,7 @@ function create_cluster {
       --config=/etc/kubernetes/manifests \
       --allow-privileged=true \
       --cluster-dns=10.0.0.10 \
+      --cluster-dns-ndots=5 \
       --cluster-domain=cluster.local \
       --v=2"
 

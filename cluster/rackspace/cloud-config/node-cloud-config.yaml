@@ -154,6 +154,7 @@ coreos:
         --address=$private_ipv4 \
         --api-servers=${FIRST_APISERVER_URL} \
         --cluster-dns=DNS_SERVER_IP \
+        --cluster-dns-ndots=DNS_NDOTS \
         --cluster-domain=DNS_DOMAIN \
         --healthz-bind-address=$private_ipv4 \
         --hostname-override=$private_ipv4 \

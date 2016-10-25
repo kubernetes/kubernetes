@@ -393,6 +393,7 @@ function kube-up {
     echo "readonly ENABLE_CLUSTER_UI='${ENABLE_CLUSTER_UI:-false}'"
     echo "readonly DNS_SERVER_IP='${DNS_SERVER_IP:-}'"
     echo "readonly DNS_DOMAIN='${DNS_DOMAIN:-}'"
+    echo "readonly DNS_NDOTS='${DNS_NDOTS:-}'"
     echo "readonly KUBE_USER='${KUBE_USER:-}'"
     echo "readonly KUBE_PASSWORD='${KUBE_PASSWORD:-}'"
     echo "readonly SERVER_BINARY_TAR='${SERVER_BINARY_TAR##*/}'"

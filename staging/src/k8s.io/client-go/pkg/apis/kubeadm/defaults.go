@@ -18,6 +18,7 @@ package kubeadm
 
 const (
 	DefaultServiceDNSDomain  = "cluster.local"
+	DefaultServiceDNSNdots   = 5
 	DefaultServicesSubnet    = "10.12.0.0/12"
 	DefaultKubernetesVersion = "v1.4.1"
 	DefaultAPIBindPort       = 6443

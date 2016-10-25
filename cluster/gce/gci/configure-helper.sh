@@ -471,6 +471,7 @@ function start-kubelet {
   flags+=" --cgroup-root=/"
   flags+=" --cloud-provider=gce"
   flags+=" --cluster-dns=${DNS_SERVER_IP}"
+  flags+=" --cluster-dns-ndots=${DNS_NDOTS}"
   flags+=" --cluster-domain=${DNS_DOMAIN}"
   flags+=" --config=/etc/kubernetes/manifests"
   flags+=" --kubelet-cgroups=/kubelet"
@@ -1026,6 +1027,7 @@ function start-kube-addons {
     # Replace the salt configurations with variable values.
     sed -i -e "s@{{ *pillar\['dns_replicas'\] *}}@${DNS_REPLICAS}@g" "${dns_rc_file}"
     sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${dns_rc_file}"
+    sed -i -e "s@{{ *pillar\['dns_ndots'\] *}}@${DNS_NDOTS}@g" "${dns_rc_file}"
     sed -i -e "s@{{ *pillar\['dns_server'\] *}}@${DNS_SERVER_IP}@g" "${dns_svc_file}"
 
     if [[ "${FEDERATION:-}" == "true" ]]; then

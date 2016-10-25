@@ -44,6 +44,7 @@ type Networking struct {
 	ServiceSubnet string
 	PodSubnet     string
 	DNSDomain     string
+	DNSNdots      int32
 }
 
 type Etcd struct {

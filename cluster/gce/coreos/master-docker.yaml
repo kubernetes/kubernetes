@@ -119,6 +119,7 @@ coreos:
         --allow-privileged=true \
         --v=2 \
         --cluster-dns=${DNS_SERVER_IP} \
+        --cluster-dns-ndots=${DNS_NDOTS} \
         --cluster-domain=${DNS_DOMAIN} \
         --logtostderr=true \
         --container-runtime=docker \

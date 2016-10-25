@@ -85,6 +85,10 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		&cfg.Networking.DNSDomain, "service-dns-domain", kubeadmapi.DefaultServiceDNSDomain,
 		`Use alternative domain for services, e.g. "myorg.internal"`,
 	)
+	cmd.PersistentFlags().Int32Var(
+		&cfg.Networking.DNSNdots, "service-dns-ndots", kubeadmapi.DefaultServiceDNSNdots,
+		`Configure SkyDNS ndots for services, e.g. 5`,
+	)
 	cmd.PersistentFlags().StringVar(
 		&cfg.CloudProvider, "cloud-provider", "",
 		`Enable cloud provider features (external load-balancers, storage, etc), e.g. "gce"`,

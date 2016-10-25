@@ -30,25 +30,27 @@ import (
 )
 
 type KubeDNSConfig struct {
-	ClusterDomain  string
-	KubeConfigFile string
-	KubeMasterURL  string
-	HealthzPort    int
-	DNSBindAddress string
-	DNSPort        int
+	ClusterDomain   string
+	ClusterDNSNdots int
+	KubeConfigFile  string
+	KubeMasterURL   string
+	HealthzPort     int
+	DNSBindAddress  string
+	DNSPort         int
 	// Federations maps federation names to their registered domain names.
 	Federations map[string]string
 }
 
 func NewKubeDNSConfig() *KubeDNSConfig {
 	return &KubeDNSConfig{
-		ClusterDomain:  "cluster.local.",
-		KubeConfigFile: "",
-		KubeMasterURL:  "",
-		HealthzPort:    8081,
-		DNSBindAddress: "0.0.0.0",
-		DNSPort:        53,
-		Federations:    make(map[string]string),
+		ClusterDomain:   "cluster.local.",
+		ClusterDNSNdots: 5,
+		KubeConfigFile:  "",
+		KubeMasterURL:   "",
+		HealthzPort:     8081,
+		DNSBindAddress:  "0.0.0.0",
+		DNSPort:         53,
+		Federations:     make(map[string]string),
 	}
 }
 
@@ -147,5 +149,6 @@ func (s *KubeDNSConfig) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.HealthzPort, "healthz-port", s.HealthzPort, "port on which to serve a kube-dns HTTP readiness probe.")
 	fs.StringVar(&s.DNSBindAddress, "dns-bind-address", s.DNSBindAddress, "address on which to serve DNS requests.")
 	fs.IntVar(&s.DNSPort, "dns-port", s.DNSPort, "port on which to serve DNS requests.")
+	fs.IntVar(&s.ClusterDNSNdots, "ndots", s.ClusterDNSNdots, "How many dots a FQDN should have before to allow forwarding. It is the minimum number of dots that a domain name	must contain for the resolver to consider it as FQDN")
 	fs.Var(federationsVar{s.Federations}, "federations", "a comma separated list of the federation names and their corresponding domain names to which this cluster belongs. Example: \"myfederation1=example.com,myfederation2=example2.com,myfederation3=example.com\"")
 }

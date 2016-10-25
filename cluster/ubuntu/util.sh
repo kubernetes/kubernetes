@@ -283,6 +283,7 @@ EOF
 # $5: Pathname of the kubelet config file or directory.
 # $6: Whether or not we run kubelet in privileged mode
 # $7: If empty then flannel is used otherwise CNI is used.
+# TODO(bogdando) add support for custom cluster-dns-ndots values
 function create-kubelet-opts() {
   if [ -n "$7" ] ; then
       cni_opts=" --network-plugin=cni --network-plugin-dir=/etc/cni/net.d"

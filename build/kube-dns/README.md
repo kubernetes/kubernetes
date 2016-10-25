@@ -132,11 +132,13 @@ example, see `cluster/gce/config-default.sh`.
 ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
 DNS_SERVER_IP="10.0.0.10"
 DNS_DOMAIN="cluster.local"
+DNS_NDOTS=5
 DNS_REPLICAS=1
 ```
 
 This enables DNS with a DNS Service IP of `10.0.0.10` and a local domain of
-`cluster.local`, served by a single copy of SkyDNS.
+`cluster.local`, served by a single copy of SkyDNS with the given ndots
+threshold of `5`.
 
 If you are not using a supported cluster setup, you will have to replicate some
 of this yourself.  First, each kubelet needs to run with the following flags
@@ -144,6 +146,7 @@ set:
 
 ```
 --cluster-dns=<DNS service ip>
+--cluster-dns-ndots=<ndots threshold>
 --cluster-domain=<default local domain>
 ```
 

@@ -103,11 +103,12 @@ Here's a diagram of what the final result will look like:
           --api-servers=http://localhost:8080 \
           --config=/etc/kubernetes/manifests \
           --cluster-dns=10.0.0.10 \
+          --cluster-dns-ndots=5 \
           --cluster-domain=cluster.local \
           --allow-privileged --v=2
   ```
 
-  > Note that `--cluster-dns` and `--cluster-domain` is used to deploy dns, feel free to discard them if dns is not needed.
+  > Note that `--cluster-dns`, `--cluster-dns-ndots` and `--cluster-domain` is used to deploy dns, feel free to discard them if dns is not needed.
 
   > If you would like to mount an external device as a volume, add `--volume=/dev:/dev` to the command above. It may however, cause some problems described in [#18230](https://github.com/kubernetes/kubernetes/issues/18230)
 

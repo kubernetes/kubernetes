@@ -43,6 +43,8 @@ Changing the version causes the all the Kubernetes containers to be restarted.
 
 **dns_domain**: Set the DNS domain for the Kubernetes cluster.
 
+**dns_ndots**: Set the ndots threshold for SkyDNS service.
+
 # Storage
 The kubernetes charm is built to handle multiple storage devices if the cloud
 provider works with

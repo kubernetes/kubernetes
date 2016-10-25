@@ -282,6 +282,11 @@ type KubeletConfiguration struct {
 	// will configure all containers to use this for DNS resolution in
 	// addition to the host's DNS servers
 	ClusterDNS string `json:"clusterDNS"`
+	// clusterDNSNdots defines how many dots an FQDN should have before SkyDNS
+	// allows forwarding. It is the minimum number of dots that a domain name
+	// must contain for the resolver to consider it as FQDN (fully-qualified).
+	// If set, kubelet configures all containers to use it for DNS resolution.
+	ClusterDNSNdots int32 `json:"clusterDNSNdots"`
 	// streamingConnectionIdleTimeout is the maximum time a streaming connection
 	// can be idle before the connection is automatically closed.
 	StreamingConnectionIdleTimeout unversioned.Duration `json:"streamingConnectionIdleTimeout"`

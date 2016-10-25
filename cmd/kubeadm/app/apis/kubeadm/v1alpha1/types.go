@@ -44,6 +44,7 @@ type Networking struct {
 	ServiceSubnet string `json:"serviceSubnet"`
 	PodSubnet     string `json:"podSubnet"`
 	DNSDomain     string `json:"dnsDomain"`
+	DNSNdots      int32  `json:"dnsNdots"`
 }
 
 type Etcd struct {

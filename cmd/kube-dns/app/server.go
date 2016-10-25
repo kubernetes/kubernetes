@@ -40,6 +40,7 @@ import (
 type KubeDNSServer struct {
 	// DNS domain name.
 	domain         string
+	ndots          int
 	healthzPort    int
 	dnsBindAddress string
 	dnsPort        int
@@ -49,6 +50,7 @@ type KubeDNSServer struct {
 func NewKubeDNSServerDefault(config *options.KubeDNSConfig) *KubeDNSServer {
 	ks := KubeDNSServer{
 		domain: config.ClusterDomain,
+		ndots:  config.ClusterDNSNdots,
 	}
 
 	kubeClient, err := newKubeClient(config)
@@ -138,7 +140,7 @@ func setupSignalHandlers() {
 
 func (d *KubeDNSServer) startSkyDNSServer() {
 	glog.Infof("Starting SkyDNS server. Listening on %s:%d", d.dnsBindAddress, d.dnsPort)
-	skydnsConfig := &server.Config{Domain: d.domain, DnsAddr: fmt.Sprintf("%s:%d", d.dnsBindAddress, d.dnsPort)}
+	skydnsConfig := &server.Config{Domain: d.domain, Ndots: d.ndots, DnsAddr: fmt.Sprintf("%s:%d", d.dnsBindAddress, d.dnsPort)}
 	server.SetDefaults(skydnsConfig)
 	s := server.New(d.kd, skydnsConfig)
 	if err := metrics.Metrics(); err != nil {

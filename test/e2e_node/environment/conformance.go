@@ -120,11 +120,17 @@ func containerRuntime() error {
 }
 
 const kubeletClusterDnsRegexStr = `\/kubelet.*--cluster-dns=(\S+) `
+const kubeletClusterDnsNdotsRegexStr = `\/kubelet.*--cluster-dns-ndots=(\d+) `
 const kubeletClusterDomainRegexStr = `\/kubelet.*--cluster-domain=(\S+)`
 
 // dns checks that cluster dns has been properly configured and can resolve the kubernetes.default service
 func dns() error {
 	dnsRegex, err := regexp.Compile(kubeletClusterDnsRegexStr)
+	if err != nil {
+		// This should never happen and can only be fixed by changing the code
+		panic(err)
+	}
+	dnsNdotsRegex, err := regexp.Compile(kubeletClusterDnsNdotsRegexStr)
 	if err != nil {
 		// This should never happen and can only be fixed by changing the code
 		panic(err)
@@ -148,6 +154,14 @@ func dns() error {
 	// look for the dns flag and parse the value
 	dns := dnsRegex.FindStringSubmatch(string(kubecmd))
 	if len(dns) < 2 {
+		return printSuccess(
+			"Dns Check (Optional): %s No hosts resolve to kubernetes.default.  kubelet will need to set "+
+				"--cluster-dns and --cluster-domain when run", notConfigured)
+	}
+
+	// look for the dns ndots flag and parse the value
+	dns_ndots := dnsNdotsRegex.FindStringSubmatch(string(kubecmd))
+	if len(dns_ndots) < 2 {
 		return printSuccess(
 			"Dns Check (Optional): %s No hosts resolve to kubernetes.default.  kubelet will need to set "+
 				"--cluster-dns and --cluster-domain when run", notConfigured)

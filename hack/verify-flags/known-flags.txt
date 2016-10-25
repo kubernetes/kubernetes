@@ -74,6 +74,7 @@ cloud-config
 cloud-provider
 cluster-cidr
 cluster-dns
+cluster-dns-ndots
 cluster-domain
 cluster-ip
 cluster-monitor-period
@@ -499,6 +500,7 @@ service-address
 service-cidr
 service-cluster-ip-range
 service-dns-domain
+service-dns-ndots
 service-generator
 service-node-port-range
 service-node-ports

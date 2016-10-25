@@ -20,6 +20,7 @@
 #         --api-servers=http://localhost:8080 \
 #         --config=/etc/kubernetes/manifests-multi \
 #         --cluster-dns=10.0.0.10 \
+#         --cluster-dns-ndots=5 \
 #         --cluster-domain=cluster.local \
 #         --containerized \
 #         --v=2
@@ -44,6 +45,7 @@ master:
     --allow-privileged=true
     --api-servers=http://localhost:8080
     --cluster-dns={{ pillar['dns_server'] }}
+    --cluster-dns-ndots={{ pillar['dns_ndots'] }}
     --cluster-domain={{ pillar['dns_domain'] }}
     --config=/etc/kubernetes/manifests
     --containerized
@@ -96,6 +98,7 @@ kubelet:
     --allow-privileged=true
     --api-servers=https://{{ master_address }}:6443
     --cluster-dns={{ pillar['dns_server'] }}
+    --cluster-dns-ndots={{ pillar['dns_ndots'] }}
     --cluster-domain={{ pillar['dns_domain'] }}
     --containerized
     --hostname-override="{{ private_address }}"

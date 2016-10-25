@@ -125,6 +125,7 @@ func GetHollowKubeletConfig(
 	c.MaxPods = int32(maxPods)
 	c.PodsPerCore = int32(podsPerCore)
 	c.ClusterDNS = ""
+	c.ClusterDNSNdots = 5
 	c.DockerExecHandlerName = "native"
 	c.ImageGCHighThresholdPercent = 90
 	c.ImageGCLowThresholdPercent = 80

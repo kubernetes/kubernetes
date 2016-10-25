@@ -332,8 +332,9 @@ def gather_sdn_data():
         pillar['dns_server'] = get_dns_ip(hookenv.config().get('cidr'))
     # The pillar['dns_server'] value is used the kubedns-svc.yaml file.
     pillar['dns_replicas'] = 1
-    # The pillar['dns_domain'] value is used in the kubedns-rc.yaml
+    # The pillar['dns_domain'/'dns_ndots'] values are used in the kubedns-rc.yaml
     pillar['dns_domain'] = hookenv.config().get('dns_domain')
+    pillar['dns_ndots'] = hookenv.config().get('dns_ndots')
     # Use a 'pillar' dictionary so we can reuse the upstream kubedns templates.
     sdn_data['pillar'] = pillar
     return sdn_data

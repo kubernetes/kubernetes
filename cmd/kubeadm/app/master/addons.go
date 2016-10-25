@@ -123,6 +123,7 @@ func createKubeDNSPodSpec(cfg *kubeadmapi.MasterConfiguration) api.PodSpec {
 				Args: []string{
 					fmt.Sprintf("--domain=%s", cfg.Networking.DNSDomain),
 					fmt.Sprintf("--dns-port=%d", kubeDNSPort),
+					fmt.Sprintf("--ndots=%d", cfg.Networking.DNSNdots),
 					// TODO __PILLAR__FEDERATIONS__DOMAIN__MAP__
 				},
 				LivenessProbe: &api.Probe{

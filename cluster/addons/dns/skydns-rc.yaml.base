@@ -74,6 +74,7 @@ spec:
         # command = "/kube-dns"
         - --domain=__PILLAR__DNS__DOMAIN__.
         - --dns-port=10053
+        - --ndots=__PILLAR__DNS__NDOTS__
         __PILLAR__FEDERATIONS__DOMAIN__MAP__
         ports:
         - containerPort: 10053

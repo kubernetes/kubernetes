@@ -141,6 +141,7 @@ scheduler:
     --mesos-master=mesosmaster1:5050
     --allow-privileged
     --cluster-dns=10.10.10.10
+    --cluster-dns-ndots=5
     --cluster-domain=cluster.local
     --mesos-executor-cpus=1.0
     --mesos-sandbox-overlay=/opt/sandbox-overlay.tar.gz

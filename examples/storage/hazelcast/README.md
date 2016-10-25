@@ -130,6 +130,8 @@ spec:
           env:
           - name: "DNS_DOMAIN"
             value: "cluster.local"
+          - name: "DNS_NDOTS"
+            value: 5
           - name: POD_NAMESPACE
             valueFrom:
               fieldRef:
@@ -148,7 +150,7 @@ You may also note that we tell Kubernetes that the container exposes the `hazelc
 
 The bulk of the replication controller config is actually identical to the Hazelcast pod declaration above, it simply gives the controller a recipe to use when creating new pods.  The other parts are the `selector` which contains the controller's selector query, and the `replicas` parameter which specifies the desired number of replicas, in this case 1.
 
-Last but not least, we set `DNS_DOMAIN` environment variable according to your Kubernetes clusters DNS configuration.
+Last but not least, we set `DNS_DOMAIN` and `DNS_NDOTS` environment variable according to your Kubernetes clusters DNS configuration.
 
 Create this controller:
 

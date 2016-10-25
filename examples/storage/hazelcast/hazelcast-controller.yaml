@@ -22,6 +22,8 @@ spec:
           env:
           - name: "DNS_DOMAIN"
             value: "cluster.local"
+          - name: "DNS_NDOTS"
+            value: 5
           - name: POD_NAMESPACE
             valueFrom:
               fieldRef:
