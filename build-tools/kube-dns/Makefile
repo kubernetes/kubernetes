@@ -48,7 +48,7 @@ all: container
 container:
 	# Copy the content in this dir to the temp dir
 	cp $(KUBE_ROOT)/_output/dockerized/bin/$(PLATFORM)/$(ARCH)/kube-dns $(TEMP_DIR)
-	cp $(KUBE_ROOT)/build/kube-dns/Dockerfile $(TEMP_DIR)
+	cp $(KUBE_ROOT)/build-tools/kube-dns/Dockerfile $(TEMP_DIR)
 
 	# Replace BASEIMAGE with the real base image
 	cd $(TEMP_DIR) && sed -i "s|BASEIMAGE|$(BASEIMAGE)|g" Dockerfile

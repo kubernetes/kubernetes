@@ -20,7 +20,7 @@ readonly KUBE_GOPATH="${KUBE_OUTPUT}/go"
 
 # The set of server targets that we are only building for Linux
 # Note: if you are adding something here, you might need to add it to
-# kube::build::source_targets in build/common.sh as well.
+# kube::build::source_targets in build-tools/common.sh as well.
 kube::golang::server_targets() {
   local targets=(
     cmd/kube-dns
@@ -68,7 +68,7 @@ else
   readonly KUBE_SERVER_PLATFORMS
 
   # If we update this we should also update the set of golang compilers we build
-  # in 'build/build-image/cross/Dockerfile'. However, it's only a bit faster since go 1.5, not mandatory
+  # in 'build-tools/build-image/cross/Dockerfile'. However, it's only a bit faster since go 1.5, not mandatory
   KUBE_CLIENT_PLATFORMS=(
     linux/amd64
     linux/386

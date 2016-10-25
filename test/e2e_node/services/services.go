@@ -31,7 +31,7 @@ import (
 
 	utilconfig "k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e_node/build"
+	"k8s.io/kubernetes/test/e2e_node/builder"
 )
 
 // E2EServices starts and stops e2e services in a separate process. The test
@@ -179,7 +179,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		// Since kubelet will typically be run as a service it also makes more
 		// sense to test it that way
 		unitName := fmt.Sprintf("kubelet-%d.service", rand.Int31())
-		cmdArgs = append(cmdArgs, systemdRun, "--unit="+unitName, "--remain-after-exit", build.GetKubeletServerBin())
+		cmdArgs = append(cmdArgs, systemdRun, "--unit="+unitName, "--remain-after-exit", builder.GetKubeletServerBin())
 		killCommand = exec.Command("sudo", "systemctl", "kill", unitName)
 		restartCommand = exec.Command("sudo", "systemctl", "restart", unitName)
 		e.logFiles["kubelet.log"] = logFileData{
@@ -187,7 +187,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		}
 		framework.TestContext.EvictionHard = adjustConfigForSystemd(framework.TestContext.EvictionHard)
 	} else {
-		cmdArgs = append(cmdArgs, build.GetKubeletServerBin())
+		cmdArgs = append(cmdArgs, builder.GetKubeletServerBin())
 		cmdArgs = append(cmdArgs,
 			"--runtime-cgroups=/docker-daemon",
 			"--kubelet-cgroups=/kubelet",

@@ -20,7 +20,6 @@ go_binary(
         "//pkg/client/metrics/prometheus:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/client/restclient:go_default_library",
-        "//pkg/client/unversioned:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/kubelet/cadvisor/testing:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
