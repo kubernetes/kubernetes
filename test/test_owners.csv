@@ -366,6 +366,7 @@ ResourceQuota should create a ResourceQuota and capture the life of a service.,t
 ResourceQuota should create a ResourceQuota and ensure its status is promptly calculated.,krousey,1
 ResourceQuota should verify ResourceQuota with best effort scope.,mml,1
 ResourceQuota should verify ResourceQuota with terminating scopes.,ncdc,1
+Restart Docker Daemon Network should recover from ip leak,bprashanth,0
 Restart should restart all nodes and ensure all nodes and pods recover,andyzheng0831,1
 RethinkDB should create and stop rethinkdb servers,kargakis,1
 SSH should SSH to all nodes and run commands,quinton-hoole,0
