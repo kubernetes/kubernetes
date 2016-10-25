@@ -33,6 +33,7 @@ cmd/libs/go2idl/generator
 cmd/libs/go2idl/go-to-protobuf
 cmd/libs/go2idl/go-to-protobuf/protoc-gen-gogo
 cmd/libs/go2idl/import-boss
+cmd/libs/go2idl/lister-gen
 cmd/libs/go2idl/openapi-gen
 cmd/libs/go2idl/parser
 cmd/libs/go2idl/set-gen
