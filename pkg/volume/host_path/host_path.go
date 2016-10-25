@@ -35,7 +35,6 @@ func ProbeVolumePlugins(volumeConfig volume.VolumeConfig) []volume.VolumePlugin 
 	return []volume.VolumePlugin{
 		&hostPathPlugin{
 			host:               nil,
-			newDeleterFunc:     newDeleter,
 			newProvisionerFunc: newProvisioner,
 			config:             volumeConfig,
 		},
@@ -45,7 +44,6 @@ func ProbeVolumePlugins(volumeConfig volume.VolumeConfig) []volume.VolumePlugin 
 type hostPathPlugin struct {
 	host volume.VolumeHost
 	// decouple creating Recyclers/Deleters/Provisioners by deferring to a function.  Allows for easier testing.
-	newDeleterFunc     func(spec *volume.Spec, host volume.VolumeHost) (volume.Deleter, error)
 	newProvisionerFunc func(options volume.VolumeOptions, host volume.VolumeHost, plugin *hostPathPlugin) (volume.Provisioner, error)
 	config             volume.VolumeConfig
 }
@@ -115,7 +113,7 @@ func (plugin *hostPathPlugin) NewRecycler(pvName string, spec *volume.Spec, even
 }
 
 func (plugin *hostPathPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
-	return plugin.newDeleterFunc(spec, plugin.host)
+	return newDeleter(spec, plugin.host)
 }
 
 func (plugin *hostPathPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
