@@ -2576,7 +2576,7 @@ type AttachedVolume struct {
 	// Name of the attached volume
 	Name UniqueVolumeName `json:"name" protobuf:"bytes,1,rep,name=name"`
 
-	// DevicePath represents the device path where the volume should be avilable
+	// DevicePath represents the device path where the volume should be available
 	DevicePath string `json:"devicePath" protobuf:"bytes,2,rep,name=devicePath"`
 }
 

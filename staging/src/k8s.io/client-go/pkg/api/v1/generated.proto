@@ -76,7 +76,7 @@ message AttachedVolume {
   // Name of the attached volume
   optional string name = 1;
 
-  // DevicePath represents the device path where the volume should be avilable
+  // DevicePath represents the device path where the volume should be available
   optional string devicePath = 2;
 }
 
