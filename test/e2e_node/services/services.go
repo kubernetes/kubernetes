@@ -218,6 +218,9 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		cmdArgs = append(cmdArgs, "--experimental-runtime-integration-type",
 			framework.TestContext.RuntimeIntegrationType) // Whether to use experimental cri integration.
 	}
+	if framework.TestContext.ContainerRuntimeEndpoint != "" {
+		cmdArgs = append(cmdArgs, "--container-runtime-endpoint", framework.TestContext.ContainerRuntimeEndpoint)
+	}
 	if framework.TestContext.CgroupsPerQOS {
 		// TODO: enable this when the flag is stable and available in kubelet.
 		// cmdArgs = append(cmdArgs,
