@@ -10,3 +10,10 @@ filegroup(
         "pod",
     ],
 )
+
+filegroup(
+    name = "sources",
+    srcs = glob([
+        "**/*",
+    ]),
+)

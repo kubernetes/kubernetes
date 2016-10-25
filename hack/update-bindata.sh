@@ -40,7 +40,6 @@ BINDATA_OUTPUT="${KUBE_ROOT}/test/e2e/generated/bindata.go"
 go-bindata -nometadata -prefix "${KUBE_ROOT}" -o "${BINDATA_OUTPUT}.tmp" -pkg generated \
 	-ignore .jpg -ignore .png -ignore .md \
 	"${KUBE_ROOT}/examples/..." \
-	"${KUBE_ROOT}/docs/user-guide/..." \
 	"${KUBE_ROOT}/test/e2e/testing-manifests/..." \
 	"${KUBE_ROOT}/test/images/..." \
 	"${KUBE_ROOT}/test/fixtures/..."
