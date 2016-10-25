@@ -65,7 +65,7 @@ var _ = framework.KubeDescribe("ContainerLogPath", func() {
 				}
 
 				podClient.Create(logPod)
-				err := framework.WaitForPodSuccessInNamespace(f.Client, logPodName, ns)
+				err := framework.WaitForPodSuccessInNamespace(f.ClientSet, logPodName, ns)
 				framework.ExpectNoError(err, "Failed waiting for pod: %s to enter success state", logPodName)
 
 				// get containerID from created Pod
@@ -86,8 +86,9 @@ var _ = framework.KubeDescribe("ContainerLogPath", func() {
 							{
 								Image: "gcr.io/google_containers/busybox:1.24",
 								Name:  checkContName,
-								// if we find expected log file and contains right content, exit 0
+								// 1. If we find expected log file and contains right content, exit 0
 								// else, keep checking until test timeout
+								// 2. We have to mount `/` as rootfs since log file is symblink, container will try to get src of link.
 								Command: []string{"sh", "-c", "chroot " + rootfsDir + " while true; do if [ -e " + expectedlogFile + " ] && grep -q " + logString + " " + expectedlogFile + "; then exit 0; fi; sleep 1; done"},
 								VolumeMounts: []api.VolumeMount{
 									{
@@ -112,7 +113,7 @@ var _ = framework.KubeDescribe("ContainerLogPath", func() {
 				}
 
 				podClient.Create(checkPod)
-				err = framework.WaitForPodSuccessInNamespace(f.Client, checkPodName, ns)
+				err = framework.WaitForPodSuccessInNamespace(f.ClientSet, checkPodName, ns)
 				framework.ExpectNoError(err, "Failed waiting for pod: %s to enter success state", checkPodName)
 			})
 		})
