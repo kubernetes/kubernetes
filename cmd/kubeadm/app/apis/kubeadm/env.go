@@ -23,20 +23,25 @@ import (
 	"strings"
 )
 
+const (
+	// EnvParamNameHostPkiPath denotes name of the environment parameter 'host_pki_path'
+	EnvParamNameHostPkiPath = "host_pki_path"
+)
+
 // TODO(phase2) use componentconfig
 // we need some params for testing etc, let's keep these hidden for now
 func GetEnvParams() map[string]string {
 
 	envParams := map[string]string{
-		// TODO(phase1+): Mode prefix and host_pki_path to another place as constants, and use them everywhere
-		// Right now they're used here and there, but not consequently
-		"kubernetes_dir":     "/etc/kubernetes",
-		"host_pki_path":      "/etc/kubernetes/pki",
-		"host_etcd_path":     "/var/lib/etcd",
-		"hyperkube_image":    "",
-		"discovery_image":    fmt.Sprintf("gcr.io/google_containers/kube-discovery-%s:%s", runtime.GOARCH, "1.0"),
-		"etcd_image":         "",
-		"component_loglevel": "--v=4",
+		// TODO(phase1+): Move prefix to another place as constants, and use it everywhere
+		// Right now it's used here and there, but not consequently
+		"kubernetes_dir":        "/etc/kubernetes",
+		EnvParamNameHostPkiPath: "/etc/kubernetes/pki",
+		"host_etcd_path":        "/var/lib/etcd",
+		"hyperkube_image":       "",
+		"discovery_image":       fmt.Sprintf("gcr.io/google_containers/kube-discovery-%s:%s", runtime.GOARCH, "1.0"),
+		"etcd_image":            "",
+		"component_loglevel":    "--v=4",
 	}
 
 	for k := range envParams {

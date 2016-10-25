@@ -158,7 +158,7 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) (*rsa.PrivateKey, *x50
 	}
 	altNames.DNSNames = append(altNames.DNSNames, cfg.API.ExternalDNSNames...)
 
-	pkiPath := path.Join(kubeadmapi.GetEnvParams()["host_pki_path"])
+	pkiPath := path.Join(kubeadmapi.GetEnvParams()[kubeadmapi.EnvParamNameHostPkiPath])
 
 	caKey, caCert, err := newCertificateAuthority()
 	if err != nil {
