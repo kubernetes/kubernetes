@@ -112,7 +112,7 @@ go_test(
         "//pkg/api/v1:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
         "//pkg/apis/apps:go_default_library",
-        "//pkg/apis/apps/v1alpha1:go_default_library",
+        "//pkg/apis/apps/v1beta1:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/autoscaling/v1:go_default_library",
         "//pkg/apis/batch:go_default_library",

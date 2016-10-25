@@ -21,7 +21,6 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/unversioned:go_default_library",
-        "//pkg/apis/apps/v1alpha1:go_default_library",
         "//pkg/client/clientset_generated/release_1_4/typed/apps/v1alpha1:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/testing/core:go_default_library",
