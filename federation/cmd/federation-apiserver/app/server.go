@@ -189,12 +189,9 @@ func Run(s *options.ServerRunOptions) error {
 	genericConfig.Version = &kubeVersion
 	genericConfig.LoopbackClientConfig = selfClientConfig
 	genericConfig.Authenticator = apiAuthenticator
-	genericConfig.SupportsBasicAuth = len(s.BasicAuthFile) > 0
 	genericConfig.Authorizer = apiAuthorizer
-	genericConfig.AuthorizerRBACSuperUser = s.AuthorizationRBACSuperUser
 	genericConfig.AdmissionControl = admissionController
 	genericConfig.APIResourceConfigSource = storageFactory.APIResourceConfigSource
-	genericConfig.MasterServiceNamespace = s.MasterServiceNamespace
 	genericConfig.OpenAPIConfig.Definitions = openapi.OpenAPIDefinitions
 	genericConfig.EnableOpenAPISupport = true
 	genericConfig.OpenAPIConfig.SecurityDefinitions = securityDefinitions
