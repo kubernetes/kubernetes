@@ -1274,7 +1274,7 @@ func (x *KubeletConfiguration) CodecEncodeSelf(e *codec1978.Encoder) {
 			yyq135[60] = x.CgroupRoot != ""
 			yyq135[64] = true
 			yyq135[65] = x.RktPath != ""
-			yyq135[66] = x.MounterPath != ""
+			yyq135[66] = x.ExperimentalMounterPath != ""
 			yyq135[67] = x.RktAPIEndpoint != ""
 			yyq135[68] = x.RktStage1Image != ""
 			yyq135[88] = true
@@ -2729,7 +2729,7 @@ func (x *KubeletConfiguration) CodecEncodeSelf(e *codec1978.Encoder) {
 					_ = yym353
 					if false {
 					} else {
-						r.EncodeString(codecSelferC_UTF81234, string(x.MounterPath))
+						r.EncodeString(codecSelferC_UTF81234, string(x.ExperimentalMounterPath))
 					}
 				} else {
 					r.EncodeString(codecSelferC_UTF81234, "")
@@ -2737,13 +2737,13 @@ func (x *KubeletConfiguration) CodecEncodeSelf(e *codec1978.Encoder) {
 			} else {
 				if yyq135[66] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("mounterPath"))
+					r.EncodeString(codecSelferC_UTF81234, string("experimentalMounterPath"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
 					yym354 := z.EncBinary()
 					_ = yym354
 					if false {
 					} else {
-						r.EncodeString(codecSelferC_UTF81234, string(x.MounterPath))
+						r.EncodeString(codecSelferC_UTF81234, string(x.ExperimentalMounterPath))
 					}
 				}
 			}
@@ -4225,11 +4225,11 @@ func (x *KubeletConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 			} else {
 				x.RktPath = string(r.DecodeString())
 			}
-		case "mounterPath":
+		case "experimentalMounterPath":
 			if r.TryDecodeAsNil() {
-				x.MounterPath = ""
+				x.ExperimentalMounterPath = ""
 			} else {
-				x.MounterPath = string(r.DecodeString())
+				x.ExperimentalMounterPath = string(r.DecodeString())
 			}
 		case "rktAPIEndpoint":
 			if r.TryDecodeAsNil() {
@@ -5708,9 +5708,9 @@ func (x *KubeletConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.MounterPath = ""
+		x.ExperimentalMounterPath = ""
 	} else {
-		x.MounterPath = string(r.DecodeString())
+		x.ExperimentalMounterPath = string(r.DecodeString())
 	}
 	yyj615++
 	if yyhl615 {

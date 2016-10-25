@@ -187,6 +187,7 @@ exit-on-lock-contention
 experimental-allowed-unsafe-sysctls
 experimental-bootstrap-kubeconfig
 experimental-keystone-url
+experimental-mounter-path
 experimental-nvidia-gpus
 experimental-prefix
 experimental-runtime-integration-type
@@ -372,7 +373,6 @@ minion-max-log-age
 minion-max-log-backups
 minion-max-log-size
 minion-path-override
-mounter-path
 namespace-sync-period
 network-plugin
 network-plugin-dir
