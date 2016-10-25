@@ -53,7 +53,7 @@ func (Affinity) SwaggerDoc() map[string]string {
 var map_AttachedVolume = map[string]string{
 	"":           "AttachedVolume describes a volume attached to a node",
 	"name":       "Name of the attached volume",
-	"devicePath": "DevicePath represents the device path where the volume should be avilable",
+	"devicePath": "DevicePath represents the device path where the volume should be available",
 }
 
 func (AttachedVolume) SwaggerDoc() map[string]string {
