@@ -216,6 +216,7 @@ func RegisterNodeFlags() {
 	flag.StringVar(&TestContext.RuntimeIntegrationType, "runtime-integration-type", "", "Choose the integration path for the container runtime, mainly used for CRI validation.")
 	flag.StringVar(&TestContext.ContainerRuntimeEndpoint, "container-runtime-endpoint", "", "The endpoint of remote container runtime grpc server, mainly used for Remote CRI validation.")
 	flag.StringVar(&TestContext.MounterPath, "mounter-path", "", "Path of mounter binary. Leave empty to use the default mount.")
+	flag.StringVar(&TestContext.MounterPath, "experimental-mounter-path", "", "Path of mounter binary. Leave empty to use the default mount.")
 }
 
 // overwriteFlagsWithViperConfig finds and writes values to flags using viper as input.
