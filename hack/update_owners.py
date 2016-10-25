@@ -14,12 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 import collections
 import csv
 import re
 import json
 import os
 import random
+import subprocess
 import sys
 import time
 import urllib2
@@ -33,6 +35,13 @@ SKIP_MAINTAINERS = {
     'a-robinson', 'aronchick', 'bgrant0607-nocc', 'david-mcmahon',
     'goltermann', 'sarahnovotny'}
 
+
+def normalize(name):
+    name = re.sub(r'\[.*?\]|\{.*?\}', '', name)
+    name = re.sub(r'\s+', ' ', name)
+    return name.strip()
+
+
 def get_test_history(days_ago):
     url = time.strftime(GCS_URL_BASE + 'logs/%Y-%m-%d.json',
                         time.gmtime(time.time() - days_ago * 24 * 60 * 60))
@@ -43,10 +52,19 @@ def get_test_history(days_ago):
     return json.loads(content)
 
 
-def normalize(name):
-    name = re.sub(r'\[.*?\]|\{.*?\}', '', name)
-    name = re.sub(r'\s+', ' ', name)
-    return name.strip()
+def get_test_names_from_test_history():
+    test_names = set()
+    for days_ago in range(4):
+        test_history = get_test_history(days_ago)
+        test_names.update(normalize(name) for name in test_history['test_names'])
+    return test_names
+
+
+def get_test_names_from_local_files():
+    tests_json = subprocess.check_output(['go', 'run', 'test/list/main.go', '-json'])
+    tests = json.loads(tests_json)
+    return {normalize(t['Name'] + (' ' + t['TestName'] if 'k8s.io/' not in t['Name'] else ''))
+            for t in tests}
 
 
 def load_owners(fname):
@@ -98,10 +116,16 @@ def get_maintainers():
 
 
 def main():
-    test_names = set()
-    for days_ago in range(4):
-        test_history = get_test_history(days_ago)
-        test_names.update(normalize(name) for name in test_history['test_names'])
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--history', action='store_true', help='Generate test list from result history.')
+    parser.add_argument('--user', help='User to assign new tests to (RANDOM for random assignment).')
+    parser.add_argument('--check', action='store_true', help='Exit with a nonzero status if the test list has changed.')
+    options = parser.parse_args()
+
+    if options.history:
+        test_names = get_test_names_from_test_history()
+    else:
+        test_names = get_test_names_from_local_files()
     test_names.add('DEFAULT')
     test_names = sorted(test_names)
     owners = load_owners(OWNERS_PATH)
@@ -114,6 +138,13 @@ def main():
     print  '\n'.join(outdated_tests)
     print '# NEW TESTS (%d):' % len(new_tests)
     print  '\n'.join(new_tests)
+
+    if options.check:
+        if new_tests or outdated_tests:
+            print
+            print 'ERROR: the test list has changed'
+            sys.exit(1)
+        sys.exit(0)
 
     for name in outdated_tests:
         owners.pop(name)
@@ -130,7 +161,12 @@ def main():
         owner for name, (owner, random) in owners.iteritems()
         if owner in maintainers)
     for test_name in set(test_names) - set(owners):
-        new_owner, _count = random.choice(owner_counts.most_common()[-4:])
+        if options.user == 'RANDOM':
+            new_owner, _count = random.choice(owner_counts.most_common()[-4:])
+        elif options.user:
+            new_owner = options.user
+        else:
+            raise AssertionError('--user must be specified for new tests')
         owner_counts[new_owner] += 1
         owners[test_name] = (new_owner, True)
 
