@@ -34,7 +34,14 @@ import (
 )
 
 const (
-	FinalizerDeleteFederatedDependents string = "federation.kubernetes.io/delete-federated-dependents"
+	// Add this finalizer to a federation resource if the resource should be
+	// deleted from all underlying clusters before being deleted from
+	// federation control plane.
+	// This is ignored if FinalizerOrphan is also present on the resource.
+	// In that case, both finalizers are removed from the resource and the
+	// resource is deleted from federation control plane without affecting
+	// the underlying clusters.
+	FinalizerDeleteFromUnderlyingClusters string = "federation.kubernetes.io/delete-from-underlying-clusters"
 )
 
 type HasFinalizerFunc func(runtime.Object, string) bool
@@ -72,28 +79,29 @@ func NewDeletionHelper(
 }
 
 // Ensures that the given object has the required finalizer to ensure that
-// dependent objects are deleted when this object is deleted.
-// This method should be called before creating any federated dependents of the given object.
-func (dh *DeletionHelper) EnsureDeleteDependentsFinalizer(obj runtime.Object) (
+// objects are deleted in underlying clusters when this object is deleted
+// from federation control plane.
+// This method should be called before creating objects in underlying clusters.
+func (dh *DeletionHelper) EnsureDeleteFromUnderlyingClustersFinalizer(obj runtime.Object) (
 	runtime.Object, error) {
-	if dh.hasFinalizerFunc(obj, FinalizerDeleteFederatedDependents) {
+	if dh.hasFinalizerFunc(obj, FinalizerDeleteFromUnderlyingClusters) {
 		return obj, nil
 	}
-	return dh.addFinalizerFunc(obj, FinalizerDeleteFederatedDependents)
+	return dh.addFinalizerFunc(obj, FinalizerDeleteFromUnderlyingClusters)
 }
 
 // Deletes the resources corresponding to the given federated resource from
 // all underlying clusters, unless it has the FinalizerOrphan finalizer.
-// Removes FinalizerOrphan and FinalizerDeleteFederatedDependents finalizers
+// Removes FinalizerOrphan and FinalizerDeleteFromUnderlyingClusters finalizers
 // when done.
 // Callers are expected to keep calling this (with appropriate backoff) until
 // it succeeds.
-func (dh *DeletionHelper) HandleFederatedDependents(obj runtime.Object) (
+func (dh *DeletionHelper) HandleObjectInUnderlyingClusters(obj runtime.Object) (
 	runtime.Object, error) {
 	objName := dh.objNameFunc(obj)
 	glog.V(2).Infof("Handling deletion of federated dependents for object: %s", objName)
-	if !dh.hasFinalizerFunc(obj, FinalizerDeleteFederatedDependents) {
-		glog.V(2).Infof("obj does not have %s finalizer. Nothing to do", FinalizerDeleteFederatedDependents)
+	if !dh.hasFinalizerFunc(obj, FinalizerDeleteFromUnderlyingClusters) {
+		glog.V(2).Infof("obj does not have %s finalizer. Nothing to do", FinalizerDeleteFromUnderlyingClusters)
 		return obj, nil
 	}
 	hasOrphanFinalizer := dh.hasFinalizerFunc(obj, api_v1.FinalizerOrphan)
@@ -106,7 +114,7 @@ func (dh *DeletionHelper) HandleFederatedDependents(obj runtime.Object) (
 		if err != nil {
 			return obj, err
 		}
-		return dh.removeFinalizerFunc(obj, FinalizerDeleteFederatedDependents)
+		return dh.removeFinalizerFunc(obj, FinalizerDeleteFromUnderlyingClusters)
 	}
 
 	// Else, we need to delete the obj from all underlying clusters.
@@ -159,5 +167,5 @@ func (dh *DeletionHelper) HandleFederatedDependents(obj runtime.Object) (
 	}
 
 	// All done. Just remove the finalizer.
-	return dh.removeFinalizerFunc(obj, FinalizerDeleteFederatedDependents)
+	return dh.removeFinalizerFunc(obj, FinalizerDeleteFromUnderlyingClusters)
 }

@@ -351,11 +351,11 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 	}
 
 	glog.V(3).Infof("Ensuring delete dependents finalizer for namespace: %s", baseNamespace.Name)
-	// Add the DeleteFederatedDependents finalizer before creating a namespace in
+	// Add the DeleteFromUnderlyingClusters finalizer before creating a namespace in
 	// underlying clusters.
 	// This ensures that the dependent namespaces are deleted in underlying
 	// clusters when the federated namespace is deleted.
-	updatedNamespaceObj, err := nc.deletionHelper.EnsureDeleteDependentsFinalizer(baseNamespace)
+	updatedNamespaceObj, err := nc.deletionHelper.EnsureDeleteFromUnderlyingClustersFinalizer(baseNamespace)
 	if err != nil {
 		glog.Errorf("Failed to ensure delete dependents finalizer in namespace %s: %v", baseNamespace.Name, err)
 		nc.deliverNamespace(namespace, 0, false)
@@ -460,13 +460,13 @@ func (nc *NamespaceController) delete(namespace *api_v1.Namespace) error {
 	}
 
 	// Delete the namespace from all underlying clusters.
-	updatedNamespaceObj, err := nc.deletionHelper.HandleFederatedDependents(updatedNamespace)
+	updatedNamespaceObj, err := nc.deletionHelper.HandleObjectInUnderlyingClusters(updatedNamespace)
 	if err != nil {
 		return err
 	}
 
 	updatedNamespace = updatedNamespaceObj.(*api_v1.Namespace)
-	err = nc.federatedApiClient.Core().Namespaces().Delete(updatedNamespace.Name, &api_v1.DeleteOptions{})
+	err = nc.federatedApiClient.Core().Namespaces().Delete(updatedNamespace.Name, nil)
 	if err != nil {
 		// Its all good if the error is not found error. That means it is deleted already and we do not have to do anything.
 		// This is expected when we are processing an update as a result of namespace finalizer deletion.

@@ -114,11 +114,11 @@ func TestNamespaceController(t *testing.T) {
 
 	// Test add federated namespace.
 	namespaceWatch.Add(&ns1)
-	// Verify that the DeleteFederatedDependents finalizer is added to the namespace.
+	// Verify that the DeleteFromUnderlyingClusters finalizer is added to the namespace.
 	// Note: finalize invokes the create action in Fake client.
 	// TODO: Seems like a bug. Should invoke update. Fix it.
 	updatedNamespace := GetNamespaceFromChan(namespaceCreateChan)
-	assert.True(t, namespaceController.hasFinalizerFunc(updatedNamespace, deletionhelper.FinalizerDeleteFederatedDependents))
+	assert.True(t, namespaceController.hasFinalizerFunc(updatedNamespace, deletionhelper.FinalizerDeleteFromUnderlyingClusters))
 	ns1 = *updatedNamespace
 
 	// Verify that the namespace is created in underlying cluster1.
