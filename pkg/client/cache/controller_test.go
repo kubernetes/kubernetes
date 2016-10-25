@@ -221,7 +221,11 @@ func TestHammerController(t *testing.T) {
 
 	// Run the controller and run it until we close stop.
 	stop := make(chan struct{})
-	go controller.Run(stop)
+	runCompleted := make(chan struct{})
+	go func() {
+		controller.Run(stop)
+		close(runCompleted)
+	}()
 
 	// Let's wait for the controller to do its initial sync
 	wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
@@ -282,6 +286,11 @@ func TestHammerController(t *testing.T) {
 	// TODO: look in the queue to see how many items need to be processed.
 	time.Sleep(100 * time.Millisecond)
 	close(stop)
+	select {
+	case <-runCompleted:
+	case <-time.After(2 * time.Second):
+		t.Errorf("Run did not complete")
+	}
 
 	outputSetLock.Lock()
 	t.Logf("got: %#v", outputSet)
@@ -379,7 +388,11 @@ func TestUpdate(t *testing.T) {
 	// Once Run() is called, calls to testDoneWG.Done() might start, so
 	// all testDoneWG.Add() calls must happen before this point
 	stop := make(chan struct{})
-	go controller.Run(stop)
+	runCompleted := make(chan struct{})
+	go func() {
+		controller.Run(stop)
+		close(runCompleted)
+	}()
 	<-watchCh
 
 	// run every test a few times, in parallel
@@ -398,4 +411,9 @@ func TestUpdate(t *testing.T) {
 	// Let's wait for the controller to process the things we just added.
 	testDoneWG.Wait()
 	close(stop)
+	select {
+	case <-runCompleted:
+	case <-time.After(2 * time.Second):
+		t.Errorf("Run did not complete")
+	}
 }

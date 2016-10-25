@@ -25,6 +25,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
+const stopMarker ExplicitKey = "stopMe"
+
 // Config contains all the settings for a Controller.
 type Config struct {
 	// The queue for your objects; either a FIFO or
@@ -99,6 +101,7 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 
 	r.RunUntil(stopCh)
 
+	c.config.Queue.Add(stopMarker)
 	wait.Until(c.processLoop, time.Second, stopCh)
 }
 
@@ -123,14 +126,25 @@ func (c *Controller) Requeue(obj interface{}) error {
 // concurrently.
 func (c *Controller) processLoop() {
 	for {
-		obj, err := c.config.Queue.Pop(PopProcessFunc(c.config.Process))
+		obj, err := c.config.Queue.Pop(PopProcessFunc(c.popProcess))
 		if err != nil {
 			if c.config.RetryOnError {
 				// This is the safe way to re-enqueue.
 				c.config.Queue.AddIfNotPresent(obj)
 			}
 		}
+		if d := obj.(Deltas); len(d) == 1 && d[0].Object == stopMarker {
+			c.config.Queue.Add(stopMarker)
+			break
+		}
 	}
+}
+
+func (c *Controller) popProcess(obj interface{}) error {
+	if d := obj.(Deltas); len(d) == 1 && d[0].Object == stopMarker {
+		return nil
+	}
+	return c.config.Process(obj)
 }
 
 // ResourceEventHandler can handle notifications for events that happen to a
