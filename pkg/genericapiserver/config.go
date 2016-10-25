@@ -281,6 +281,7 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 	c.ExternalHost = options.ExternalHost
 	c.KubernetesServiceNodePort = options.KubernetesServiceNodePort
 	c.MasterCount = options.MasterCount
+	c.MaxRequestsInFlight = options.MaxRequestsInFlight
 	c.MinRequestTimeout = options.MinRequestTimeout
 	c.PublicAddress = options.AdvertiseAddress
 	c.ServiceClusterIPRange = &options.ServiceClusterIPRange
