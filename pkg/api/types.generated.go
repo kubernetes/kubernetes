@@ -32567,7 +32567,7 @@ func (x *ReplicationControllerCondition) CodecEncodeSelf(e *codec1978.Encoder) {
 			if yyr2477 || yy2arr2477 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if yyq2477[2] {
-					yy2481 := &x.LastTransitionTime
+					yy2481 := &x.LastUpdateTime
 					yym2482 := z.EncBinary()
 					_ = yym2482
 					if false {
@@ -32585,9 +32585,9 @@ func (x *ReplicationControllerCondition) CodecEncodeSelf(e *codec1978.Encoder) {
 			} else {
 				if yyq2477[2] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
-					r.EncodeString(codecSelferC_UTF81234, string("lastTransitionTime"))
+					r.EncodeString(codecSelferC_UTF81234, string("lastUpdateTime"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yy2483 := &x.LastTransitionTime
+					yy2483 := &x.LastUpdateTime
 					yym2484 := z.EncBinary()
 					_ = yym2484
 					if false {
@@ -32724,11 +32724,11 @@ func (x *ReplicationControllerCondition) codecDecodeSelfFromMap(l int, d *codec1
 			} else {
 				x.Status = ConditionStatus(r.DecodeString())
 			}
-		case "lastTransitionTime":
+		case "lastUpdateTime":
 			if r.TryDecodeAsNil() {
-				x.LastTransitionTime = pkg2_unversioned.Time{}
+				x.LastUpdateTime = pkg2_unversioned.Time{}
 			} else {
-				yyv2496 := &x.LastTransitionTime
+				yyv2496 := &x.LastUpdateTime
 				yym2497 := z.DecBinary()
 				_ = yym2497
 				if false {
@@ -32811,9 +32811,9 @@ func (x *ReplicationControllerCondition) codecDecodeSelfFromArray(l int, d *code
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.LastTransitionTime = pkg2_unversioned.Time{}
+		x.LastUpdateTime = pkg2_unversioned.Time{}
 	} else {
-		yyv2503 := &x.LastTransitionTime
+		yyv2503 := &x.LastUpdateTime
 		yym2504 := z.DecBinary()
 		_ = yym2504
 		if false {

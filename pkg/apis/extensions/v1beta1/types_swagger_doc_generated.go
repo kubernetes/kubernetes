@@ -554,12 +554,12 @@ func (ReplicaSet) SwaggerDoc() map[string]string {
 }
 
 var map_ReplicaSetCondition = map[string]string{
-	"":                   "ReplicaSetCondition describes the state of a replica set at a certain point.",
-	"type":               "Type of replica set condition.",
-	"status":             "Status of the condition, one of True, False, Unknown.",
-	"lastTransitionTime": "The last time the condition transitioned from one status to another.",
-	"reason":             "The reason for the condition's last transition.",
-	"message":            "A human readable message indicating details about the transition.",
+	"":               "ReplicaSetCondition describes the state of a replica set at a certain point.",
+	"type":           "Type of replica set condition.",
+	"status":         "Status of the condition, one of True, False, Unknown.",
+	"lastUpdateTime": "The last time we updated this condition.",
+	"reason":         "The reason for the condition's last transition.",
+	"message":        "A human readable message indicating details about the transition.",
 }
 
 func (ReplicaSetCondition) SwaggerDoc() map[string]string {

@@ -29862,8 +29862,8 @@
      "status"
     ],
     "properties": {
-     "lastTransitionTime": {
-      "description": "The last time the condition transitioned from one status to another.",
+     "lastUpdateTime": {
+      "description": "The last time we updated this condition.",
       "$ref": "#/definitions/unversioned.Time"
      },
      "message": {
@@ -31780,8 +31780,8 @@
      "status"
     ],
     "properties": {
-     "lastTransitionTime": {
-      "description": "The last time the condition transitioned from one status to another.",
+     "lastUpdateTime": {
+      "description": "The last time we updated this condition.",
       "$ref": "#/definitions/unversioned.Time"
      },
      "message": {

@@ -2145,7 +2145,7 @@ func Convert_extensions_ReplicaSet_To_v1beta1_ReplicaSet(in *extensions.ReplicaS
 func autoConvert_v1beta1_ReplicaSetCondition_To_extensions_ReplicaSetCondition(in *ReplicaSetCondition, out *extensions.ReplicaSetCondition, s conversion.Scope) error {
 	out.Type = extensions.ReplicaSetConditionType(in.Type)
 	out.Status = api.ConditionStatus(in.Status)
-	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastTransitionTime, &out.LastTransitionTime, s); err != nil {
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastUpdateTime, &out.LastUpdateTime, s); err != nil {
 		return err
 	}
 	out.Reason = in.Reason
@@ -2160,7 +2160,7 @@ func Convert_v1beta1_ReplicaSetCondition_To_extensions_ReplicaSetCondition(in *R
 func autoConvert_extensions_ReplicaSetCondition_To_v1beta1_ReplicaSetCondition(in *extensions.ReplicaSetCondition, out *ReplicaSetCondition, s conversion.Scope) error {
 	out.Type = ReplicaSetConditionType(in.Type)
 	out.Status = v1.ConditionStatus(in.Status)
-	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastTransitionTime, &out.LastTransitionTime, s); err != nil {
+	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastUpdateTime, &out.LastUpdateTime, s); err != nil {
 		return err
 	}
 	out.Reason = in.Reason

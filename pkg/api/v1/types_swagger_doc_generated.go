@@ -1444,12 +1444,12 @@ func (ReplicationController) SwaggerDoc() map[string]string {
 }
 
 var map_ReplicationControllerCondition = map[string]string{
-	"":                   "ReplicationControllerCondition describes the state of a replication controller at a certain point.",
-	"type":               "Type of replication controller condition.",
-	"status":             "Status of the condition, one of True, False, Unknown.",
-	"lastTransitionTime": "The last time the condition transitioned from one status to another.",
-	"reason":             "The reason for the condition's last transition.",
-	"message":            "A human readable message indicating details about the transition.",
+	"":               "ReplicationControllerCondition describes the state of a replication controller at a certain point.",
+	"type":           "Type of replication controller condition.",
+	"status":         "Status of the condition, one of True, False, Unknown.",
+	"lastUpdateTime": "The last time we updated this condition.",
+	"reason":         "The reason for the condition's last transition.",
+	"message":        "A human readable message indicating details about the transition.",
 }
 
 func (ReplicationControllerCondition) SwaggerDoc() map[string]string {
