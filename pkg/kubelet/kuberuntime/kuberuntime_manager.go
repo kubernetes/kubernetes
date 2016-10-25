@@ -138,8 +138,8 @@ func NewKubeGenericRuntimeManager(
 		osInterface:         osInterface,
 		networkPlugin:       networkPlugin,
 		runtimeHelper:       runtimeHelper,
-		runtimeService:      NewInstrumentedRuntimeService(runtimeService),
-		imageService:        NewInstrumentedImageManagerService(imageService),
+		runtimeService:      runtimeService,
+		imageService:        imageService,
 		keyring:             credentialprovider.NewDockerKeyring(),
 	}
 

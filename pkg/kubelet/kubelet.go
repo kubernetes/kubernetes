@@ -491,43 +491,32 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			// Use the new CRI shim for docker. This is needed for testing the
 			// docker integration through CRI, and may be removed in the future.
 			dockerService := dockershim.NewDockerService(klet.dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage)
-			klet.containerRuntime, err = kuberuntime.NewKubeGenericRuntimeManager(
-				kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
-				klet.livenessManager,
-				containerRefManager,
-				machineInfo,
-				klet.podManager,
-				kubeDeps.OSInterface,
-				klet.networkPlugin,
-				klet,
-				klet.httpClient,
-				imageBackOff,
-				kubeCfg.SerializeImagePulls,
-				float32(kubeCfg.RegistryPullQPS),
-				int(kubeCfg.RegistryBurst),
-				klet.cpuCFSQuota,
-				dockerService,
-				dockerService,
-			)
-			if err != nil {
-				return nil, err
-			}
-		case "remote":
-			// kubelet will talk to the shim over a unix socket using grpc. This may become the default in the near future.
-			dockerService := dockershim.NewDockerService(klet.dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage)
-			// Start the in process dockershim grpc server.
-			server := dockerremote.NewDockerServer(kubeCfg.RemoteRuntimeEndpoint, dockerService)
-			if err := server.Start(); err != nil {
-				return nil, err
-			}
-			// Start the remote kuberuntime manager.
-			remoteRuntimeService, err := remote.NewRemoteRuntimeService(kubeCfg.RemoteRuntimeEndpoint, kubeCfg.RuntimeRequestTimeout.Duration)
-			if err != nil {
-				return nil, err
-			}
-			remoteImageService, err := remote.NewRemoteImageService(kubeCfg.RemoteImageEndpoint, kubeCfg.RuntimeRequestTimeout.Duration)
-			if err != nil {
-				return nil, err
+			runtimeService := dockerService.(internalApi.RuntimeService)
+			imageService := dockerService.(internalApi.ImageManagerService)
+
+			// This is a temporary knob to easily switch between grpc and non-grpc integration. grpc
+			// will be enabled if this is not empty.
+			// TODO(random-liu): Remove the temporary knob after grpc integration is stabilized and
+			// pass the runtime endpoint through kubelet flags.
+			remoteEndpoint := "/var/run/dockershim.sock"
+
+			// If the remote runtime endpoint is set, use the grpc integration.
+			if remoteEndpoint != "" {
+				// Start the in process dockershim grpc server.
+				server := dockerremote.NewDockerServer(remoteEndpoint, dockerService)
+				err := server.Start()
+				if err != nil {
+					return nil, err
+				}
+				// Start the remote kuberuntime manager.
+				runtimeService, err = remote.NewRemoteRuntimeService(remoteEndpoint, kubeCfg.RuntimeRequestTimeout.Duration)
+				if err != nil {
+					return nil, err
+				}
+				imageService, err = remote.NewRemoteImageService(remoteEndpoint, kubeCfg.RuntimeRequestTimeout.Duration)
+				if err != nil {
+					return nil, err
+				}
 			}
 			klet.containerRuntime, err = kuberuntime.NewKubeGenericRuntimeManager(
 				kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
@@ -547,14 +536,15 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 				// Use DockerLegacyService directly to workaround unimplemented functions.
 				// We add short hack here to keep other code clean.
 				// TODO: Remove this hack after CRI is fully designed and implemented.
+				// TODO: Move the instrumented interface wrapping into kuberuntime.
 				&struct {
 					internalApi.RuntimeService
 					dockershim.DockerLegacyService
 				}{
-					RuntimeService:      remoteRuntimeService,
+					RuntimeService:      kuberuntime.NewInstrumentedRuntimeService(runtimeService),
 					DockerLegacyService: dockerService,
 				},
-				remoteImageService,
+				kuberuntime.NewInstrumentedImageManagerService(imageService),
 			)
 			if err != nil {
 				return nil, err
