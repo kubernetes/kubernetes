@@ -34,18 +34,15 @@ import (
 func ProbeVolumePlugins(volumeConfig volume.VolumeConfig) []volume.VolumePlugin {
 	return []volume.VolumePlugin{
 		&hostPathPlugin{
-			host:               nil,
-			newProvisionerFunc: newProvisioner,
-			config:             volumeConfig,
+			host:   nil,
+			config: volumeConfig,
 		},
 	}
 }
 
 type hostPathPlugin struct {
-	host volume.VolumeHost
-	// decouple creating Recyclers/Deleters/Provisioners by deferring to a function.  Allows for easier testing.
-	newProvisionerFunc func(options volume.VolumeOptions, host volume.VolumeHost, plugin *hostPathPlugin) (volume.Provisioner, error)
-	config             volume.VolumeConfig
+	host   volume.VolumeHost
+	config volume.VolumeConfig
 }
 
 var _ volume.VolumePlugin = &hostPathPlugin{}
@@ -120,7 +117,7 @@ func (plugin *hostPathPlugin) NewProvisioner(options volume.VolumeOptions) (volu
 	if !plugin.config.ProvisioningEnabled {
 		return nil, fmt.Errorf("Provisioning in volume plugin %q is disabled", plugin.GetPluginName())
 	}
-	return plugin.newProvisionerFunc(options, plugin.host, plugin)
+	return newProvisioner(options, plugin.host, plugin)
 }
 
 func (plugin *hostPathPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
