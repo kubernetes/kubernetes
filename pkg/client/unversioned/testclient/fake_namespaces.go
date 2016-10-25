@@ -73,8 +73,8 @@ func (c *FakeNamespaces) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 func (c *FakeNamespaces) Finalize(namespace *api.Namespace) (*api.Namespace, error) {
-	action := CreateActionImpl{}
-	action.Verb = "create"
+	action := UpdateActionImpl{}
+	action.Verb = "update"
 	action.Resource = "namespaces"
 	action.Subresource = "finalize"
 	action.Object = namespace
@@ -88,11 +88,10 @@ func (c *FakeNamespaces) Finalize(namespace *api.Namespace) (*api.Namespace, err
 }
 
 func (c *FakeNamespaces) Status(namespace *api.Namespace) (*api.Namespace, error) {
-	action := CreateActionImpl{}
-	action.Verb = "create"
+	action := GetActionImpl{}
+	action.Verb = "get"
 	action.Resource = "namespaces"
 	action.Subresource = "status"
-	action.Object = namespace
 
 	obj, err := c.Fake.Invokes(action, namespace)
 	if obj == nil {
