@@ -352,6 +352,18 @@ func SkipIfMissingResource(clientPool dynamic.ClientPool, gvr unversioned.GroupV
 	}
 }
 
+func RunWithCapability(capability string) {
+	if !TestContext.Capabilities.Has(capability) {
+		Skipf("Capability %q not present, skipping test", capability)
+	}
+}
+
+func RunWithoutCapability(capability string) {
+	if TestContext.Capabilities.Has(capability) {
+		Skipf("Capability %q present, skipping test", capability)
+	}
+}
+
 // ProvidersWithSSH are those providers where each node is accessible with SSH
 var ProvidersWithSSH = []string{"gce", "gke", "aws"}
 

@@ -19,12 +19,14 @@ package framework
 import (
 	"flag"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/config"
 	"github.com/spf13/viper"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type TestContextType struct {
@@ -78,6 +80,9 @@ type TestContextType struct {
 	FeatureGates string
 	// Node e2e specific test context
 	NodeTestContextType
+	// Capabilities are the supported capabilities by the testing environment, for testing features
+	// that depend on specific system configurations, such as AppArmor or SELinux.
+	Capabilities sets.String
 
 	// Viper-only parameters.  These will in time replace all flags.
 
@@ -158,6 +163,7 @@ func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
 	flag.StringVar(&TestContext.FeatureGates, "feature-gates", "", "A set of key=value pairs that describe feature gates for alpha/experimental features.")
 	flag.StringVar(&TestContext.Viper, "viper-config", "e2e", "The name of the viper config i.e. 'e2e' will read values from 'e2e.json' locally.  All e2e parameters are meant to be configurable by viper.")
+	flag.Var((*csv)(&TestContext.Capabilities), "capabilities", "Comma-separated list of capabilities supported by the testing environment, such as 'AppArmor,Seccomp'")
 }
 
 // Register flags specific to the cluster e2e test suite.
@@ -242,4 +248,16 @@ func ViperizeFlags() {
 
 	// TODO Consider wether or not we want to use overwriteFlagsWithViperConfig().
 	viper.Unmarshal(&TestContext)
+}
+
+// Helper for parsing comma separated values into a string set
+type csv sets.String
+
+func (v *csv) Set(value string) error {
+	*v = csv(sets.NewString(strings.Split(value, ",")...))
+	return nil
+}
+
+func (v *csv) String() string {
+	return strings.Join(sets.String(*v).List(), ",")
 }

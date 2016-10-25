@@ -5,9 +5,11 @@ images:
   ubuntu-docker9:
     image: e2e-node-ubuntu-trusty-docker9-v1-image
     project: kubernetes-node-e2e-images
+    capabilities: AppArmor
   ubuntu-docker10:
     image: e2e-node-ubuntu-trusty-docker10-v1-image
     project: kubernetes-node-e2e-images
+    capabilities: AppArmor
   coreos-alpha:
     image: coreos-alpha-1122-0-0-v20160727
     project: coreos-cloud
@@ -19,3 +21,4 @@ images:
     image_regex: gci-dev-55-8872-18-0
     project: google-containers
     metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml"
+    capabilities: AppArmor

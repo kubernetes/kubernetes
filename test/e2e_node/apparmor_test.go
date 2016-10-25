@@ -22,8 +22,6 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"regexp"
-	"strconv"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -37,19 +35,13 @@ import (
 )
 
 var _ = framework.KubeDescribe("AppArmor [Feature:AppArmor]", func() {
-	if isAppArmorEnabled() {
-		testAppArmorNode()
-	} else {
-		testNonAppArmorNode()
-	}
-})
-
-func testAppArmorNode() {
-	BeforeEach(func() {
-		By("Loading AppArmor profiles for testing")
-		framework.ExpectNoError(loadTestProfiles(), "Could not load AppArmor test profiles")
-	})
 	Context("when running with AppArmor", func() {
+		BeforeEach(func() {
+			framework.RunWithCapability("AppArmor")
+
+			By("Loading AppArmor profiles for testing")
+			framework.ExpectNoError(loadTestProfiles(), "Could not load AppArmor test profiles")
+		})
 		f := framework.NewDefaultFramework("apparmor-test")
 
 		It("should reject an unloaded profile", func() {
@@ -77,19 +69,18 @@ func testAppArmorNode() {
 			Expect(state.ExitCode).To(BeZero(), "ContainerStateTerminated: %+v", state)
 		})
 	})
-}
-
-func testNonAppArmorNode() {
 	Context("when running without AppArmor", func() {
 		f := framework.NewDefaultFramework("apparmor-test")
 
 		It("should reject a pod with an AppArmor profile", func() {
+			framework.RunWithoutCapability("AppArmor")
+
 			status := runAppArmorTest(f, apparmor.ProfileRuntimeDefault)
 			Expect(status.Phase).To(Equal(api.PodFailed), "PodStatus: %+v", status)
 			Expect(status.Reason).To(Equal("AppArmor"), "PodStatus: %+v", status)
 		})
 	})
-}
+})
 
 const apparmorProfilePrefix = "e2e-node-apparmor-test-"
 const testProfiles = `
@@ -172,25 +163,4 @@ func createPodWithAppArmor(f *framework.Framework, profile string) *api.Pod {
 		},
 	}
 	return f.PodClient().Create(pod)
-}
-
-func isAppArmorEnabled() bool {
-	// TODO(timstclair): Pass this through the image setup rather than hardcoding.
-	if strings.Contains(framework.TestContext.NodeName, "-gci-dev-") {
-		gciVersionRe := regexp.MustCompile("-gci-dev-([0-9]+)-")
-		matches := gciVersionRe.FindStringSubmatch(framework.TestContext.NodeName)
-		if len(matches) == 2 {
-			version, err := strconv.Atoi(matches[1])
-			if err != nil {
-				glog.Errorf("Error parsing GCI version from NodeName %q: %v", framework.TestContext.NodeName, err)
-				return false
-			}
-			return version >= 54
-		}
-		return false
-	}
-	if strings.Contains(framework.TestContext.NodeName, "-ubuntu-") {
-		return true
-	}
-	return apparmor.IsAppArmorEnabled()
 }
