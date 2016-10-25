@@ -85,7 +85,7 @@ eval $(docker-machine env ${KUBE_BUILD_VM})
 export KUBE_RSYNC_PORT=8370
 
 # forward local 8730 to that machine so that rsync works
-docker-machine ssh ${KUBE_BUILD_VM} -L ${KUBE_RSYNC_PORT}:localhost:8730 -N &
+docker-machine ssh ${KUBE_BUILD_VM} -L ${KUBE_RSYNC_PORT}:localhost:${KUBE_RSYNC_PORT} -N &
 ```
 
 Look at `docker-machine stop`, `docker-machine start` and `docker-machine rm` to manage this VM.
