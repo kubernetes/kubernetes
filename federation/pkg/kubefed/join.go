@@ -56,7 +56,7 @@ var (
 		# Join a cluster to a federation by specifying the
 		# cluster context name and the context name of the
 		# federation control plane's host cluster.
-		kubectl join foo --host=bar`)
+		kubectl join foo --host-cluster-context=bar`)
 )
 
 // JoinFederationConfig provides a filesystem based kubeconfig (via
@@ -106,7 +106,7 @@ func (j *joinFederationConfig) HostFactory(host, kubeconfigPath string) cmdutil.
 // federation.
 func NewCmdJoin(f cmdutil.Factory, cmdOut io.Writer, config JoinFederationConfig) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "join CLUSTER_CONTEXT --host=HOST_CONTEXT",
+		Use:     "join CLUSTER_CONTEXT --host-cluster-context=HOST_CONTEXT",
 		Short:   "Join a cluster to a federation",
 		Long:    join_long,
 		Example: join_example,
@@ -130,7 +130,7 @@ func joinFederation(f cmdutil.Factory, cmdOut io.Writer, config JoinFederationCo
 	if err != nil {
 		return err
 	}
-	host := cmdutil.GetFlagString(cmd, "host")
+	host := cmdutil.GetFlagString(cmd, "host-cluster-context")
 	hostSystemNamespace := cmdutil.GetFlagString(cmd, "host-system-namespace")
 	kubeconfig := cmdutil.GetFlagString(cmd, "kubeconfig")
 	dryRun := cmdutil.GetDryRunFlag(cmd)
@@ -183,7 +183,7 @@ func joinFederation(f cmdutil.Factory, cmdOut io.Writer, config JoinFederationCo
 
 func addJoinFlags(cmd *cobra.Command) {
 	cmd.Flags().String("kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
-	cmd.Flags().String("host", "", "Host cluster context")
+	cmd.Flags().String("host-cluster-context", "", "Host cluster context")
 	cmd.Flags().String("host-system-namespace", "federation-system", "Namespace in the host cluster where the federation system components are installed")
 }
 
