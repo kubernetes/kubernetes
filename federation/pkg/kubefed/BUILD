@@ -14,6 +14,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "join.go",
+        "kubefed.go",
         "unjoin.go",
     ],
     tags = ["automanaged"],
@@ -30,6 +31,7 @@ go_library(
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/resource:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/util/flag:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/spf13/cobra",
     ],
