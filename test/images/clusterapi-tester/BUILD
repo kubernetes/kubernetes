@@ -16,7 +16,8 @@ go_binary(
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/client/unversioned:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset:go_default_library",
+        "//pkg/client/restclient:go_default_library",
         "//pkg/fields:go_default_library",
         "//pkg/labels:go_default_library",
     ],

@@ -67,7 +67,7 @@ function detect-project() {
 #   KUBE_ROOT
 function test-build-release() {
   echo "... in gke:test-build-release()" >&2
-  "${KUBE_ROOT}/build/release.sh"
+  "${KUBE_ROOT}/build-tools/release.sh"
 }
 
 # Verify needed binaries exist.

@@ -31,7 +31,7 @@ import (
 
 	"github.com/golang/glog"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
-	"k8s.io/kubernetes/test/e2e_node/build"
+	"k8s.io/kubernetes/test/e2e_node/builder"
 )
 
 var sshOptions = flag.String("ssh-options", "", "Commandline options passed to ssh.")
@@ -83,12 +83,12 @@ func GetHostnameOrIp(hostname string) string {
 // the binaries k8s required for node e2e tests
 func CreateTestArchive() (string, error) {
 	// Build the executables
-	if err := build.BuildGo(); err != nil {
+	if err := builder.BuildGo(); err != nil {
 		return "", fmt.Errorf("failed to build the depedencies: %v", err)
 	}
 
 	// Make sure we can find the newly built binaries
-	buildOutputDir, err := build.GetK8sBuildOutputDir()
+	buildOutputDir, err := builder.GetK8sBuildOutputDir()
 	if err != nil {
 		return "", fmt.Errorf("failed to locate kubernetes build output directory %v", err)
 	}
@@ -114,7 +114,7 @@ func CreateTestArchive() (string, error) {
 	}
 
 	// Include the GCI mounter in the deployed tarball
-	k8sDir, err := build.GetK8sRootDir()
+	k8sDir, err := builder.GetK8sRootDir()
 	if err != nil {
 		return "", fmt.Errorf("Could not find K8s root dir! Err: %v", err)
 	}
@@ -244,7 +244,7 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 	// We do this here because the local var `tmp` tells us which /tmp/gcloud-e2e-%d is relevant to the current test run.
 
 	// Determine if the GCI mounter script exists locally.
-	k8sDir, err := build.GetK8sRootDir()
+	k8sDir, err := builder.GetK8sRootDir()
 	if err != nil {
 		return "", false, fmt.Errorf("Could not find K8s root dir! Err: %v", err)
 	}

@@ -41,15 +41,15 @@ readonly KUBE_BUILD_PPC64LE="${KUBE_BUILD_PPC64LE:-n}"
 
 # Constants
 readonly KUBE_BUILD_IMAGE_REPO=kube-build
-readonly KUBE_BUILD_IMAGE_CROSS_TAG="$(cat ${KUBE_ROOT}/build/build-image/cross/VERSION)"
+readonly KUBE_BUILD_IMAGE_CROSS_TAG="$(cat ${KUBE_ROOT}/build-tools/build-image/cross/VERSION)"
 
 # This version number is used to cause everyone to rebuild their data containers
 # and build image.  This is especially useful for automated build systems like
 # Jenkins.
 #
 # Increment/change this number if you change the build image (anything under
-# build/build-image) or change the set of volumes in the data container.
-readonly KUBE_BUILD_IMAGE_VERSION_BASE="$(cat ${KUBE_ROOT}/build/build-image/VERSION)"
+# build-tools/build-image) or change the set of volumes in the data container.
+readonly KUBE_BUILD_IMAGE_VERSION_BASE="$(cat ${KUBE_ROOT}/build-tools/build-image/VERSION)"
 readonly KUBE_BUILD_IMAGE_VERSION="${KUBE_BUILD_IMAGE_VERSION_BASE}-${KUBE_BUILD_IMAGE_CROSS_TAG}"
 
 # Here we map the output directories across both the local and remote _output
@@ -421,8 +421,8 @@ function kube::build::build_image() {
 
     cp /etc/localtime "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
 
-    cp build/build-image/Dockerfile "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
-    cp build/build-image/rsyncd.sh "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
+    cp build-tools/build-image/Dockerfile "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
+    cp build-tools/build-image/rsyncd.sh "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
     dd if=/dev/urandom bs=512 count=1 2>/dev/null | LC_ALL=C tr -dc 'A-Za-z0-9' | dd bs=32 count=1 2>/dev/null > "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
     chmod go= "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
 
@@ -640,7 +640,7 @@ function kube::build::start_rsyncd_container() {
     return 0
   fi
 
-  kube::log::error "Could not connect to rsync container. See build/README.md for setting up remote Docker engine."
+  kube::log::error "Could not connect to rsync container. See build-tools/README.md for setting up remote Docker engine."
   return 1
 }
 

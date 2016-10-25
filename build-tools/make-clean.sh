@@ -14,18 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Run a bash script in the Docker build image.
-#
-# This container will have a snapshot of the current sources.
-
+# Clean out the output directory on the docker host.
 set -o errexit
 set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/build/common.sh"
-source "${KUBE_ROOT}/build/lib/release.sh"
+source "${KUBE_ROOT}/build-tools/common.sh"
 
 kube::build::verify_prereqs
-kube::build::build_image
-kube::build::run_build_command bash || true
+kube::build::clean
