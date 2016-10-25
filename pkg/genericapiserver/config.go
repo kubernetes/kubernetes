@@ -84,7 +84,6 @@ type Config struct {
 	EnableGarbageCollection bool
 
 	Version               *version.Info
-	APIGroupPrefix        string
 	CorsAllowedOriginList []string
 	Authenticator         authenticator.Request
 	// TODO(roberthbailey): Remove once the server no longer supports http basic auth.
