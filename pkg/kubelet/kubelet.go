@@ -482,6 +482,20 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		}
 	}
 
+	binDir := kubeCfg.CNIBinDir
+	if binDir == "" {
+		binDir = kubeCfg.NetworkPluginDir
+	}
+	pluginSettings := dockershim.NetworkPluginSettings{
+		HairpinMode:       klet.hairpinMode,
+		NonMasqueradeCIDR: klet.nonMasqueradeCIDR,
+		PluginName:        kubeCfg.NetworkPluginName,
+		PluginConfDir:     kubeCfg.CNIConfDir,
+		PluginBinDir:      binDir,
+		MTU:               int(kubeCfg.NetworkPluginMTU),
+		RuntimeHost:       &networkHost{klet},
+	}
+
 	// Initialize the runtime.
 	switch kubeCfg.ContainerRuntime {
 	case "docker":
@@ -489,10 +503,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		case "cri":
 			// Use the new CRI shim for docker. This is needed for testing the
 			// docker integration through CRI, and may be removed in the future.
-			dockerService, err := dockershim.NewDockerService(klet.dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage, nil)
-			if err != nil {
-				return nil, err
-			}
+			dockerService, err := dockershim.NewDockerService(klet.dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage, nil, &pluginSettings)
 			runtimeService := dockerService.(internalApi.RuntimeService)
 			imageService := dockerService.(internalApi.ImageManagerService)
 
@@ -520,6 +531,13 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 					return nil, err
 				}
 			}
+
+			// kubelet defers to the runtime shim to setup networking. Setting
+			// this to nil will prevent it from trying to invoke the plugin.
+			// It's easier to always probe and initialize plugins till cri
+			// becomes the default.
+			klet.networkPlugin = nil
+
 			klet.containerRuntime, err = kuberuntime.NewKubeGenericRuntimeManager(
 				kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
 				klet.livenessManager,
@@ -1200,6 +1218,13 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	// Start the pod lifecycle event generator.
 	kl.pleg.Start()
 	kl.syncLoop(updates, kl)
+}
+
+// GetKubeClient returns the Kubernetes client.
+// TODO: This is currently only required by network plugins. Replace
+// with more specific methods.
+func (kl *Kubelet) GetKubeClient() clientset.Interface {
+	return kl.kubeClient
 }
 
 // GetClusterDNS returns a list of the DNS servers and a list of the DNS search
