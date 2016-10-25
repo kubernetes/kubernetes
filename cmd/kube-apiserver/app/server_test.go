@@ -24,7 +24,7 @@ import (
 )
 
 func TestLongRunningRequestRegexp(t *testing.T) {
-	regexp := regexp.MustCompile(options.NewAPIServer().LongRunningRequestRE)
+	regexp := regexp.MustCompile(options.NewServerRunOptions().LongRunningRequestRE)
 	dontMatch := []string{
 		"/api/v1/watch-namespace/",
 		"/api/v1/namespace-proxy/",

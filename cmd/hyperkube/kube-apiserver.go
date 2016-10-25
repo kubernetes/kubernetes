@@ -24,7 +24,7 @@ import (
 // NewKubeAPIServer creates a new hyperkube Server object that includes the
 // description and flags.
 func NewKubeAPIServer() *Server {
-	s := options.NewAPIServer()
+	s := options.NewServerRunOptions()
 
 	hks := Server{
 		SimpleUsage: "apiserver",

@@ -63,7 +63,7 @@ import (
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
 func NewAPIServerCommand() *cobra.Command {
-	s := options.NewAPIServer()
+	s := options.NewServerRunOptions()
 	s.AddFlags(pflag.CommandLine)
 	cmd := &cobra.Command{
 		Use: "kube-apiserver",
@@ -79,7 +79,7 @@ cluster's shared state through which all other components interact.`,
 }
 
 // Run runs the specified APIServer.  This should never exit.
-func Run(s *options.APIServer) error {
+func Run(s *options.ServerRunOptions) error {
 	genericvalidation.VerifyEtcdServersList(s.ServerRunOptions)
 	genericapiserver.DefaultAndValidateRunOptions(s.ServerRunOptions)
 	genericConfig := genericapiserver.NewConfig(). // create the new config

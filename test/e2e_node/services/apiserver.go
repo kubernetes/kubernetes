@@ -40,7 +40,7 @@ func NewAPIServer() *APIServer {
 
 // Start starts the apiserver, returns when apiserver is ready.
 func (a *APIServer) Start() error {
-	config := options.NewAPIServer()
+	config := options.NewServerRunOptions()
 	config.StorageConfig.ServerList = []string{getEtcdClientURL()}
 	_, ipnet, err := net.ParseCIDR(clusterIPRange)
 	if err != nil {

@@ -28,8 +28,8 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// APIServer runs a kubernetes api server.
-type APIServer struct {
+// ServerRunOptions runs a kubernetes api server.
+type ServerRunOptions struct {
 	*genericoptions.ServerRunOptions
 	AllowPrivileged             bool
 	EventTTL                    time.Duration
@@ -43,9 +43,9 @@ type APIServer struct {
 	WebhookTokenAuthnCacheTTL   time.Duration
 }
 
-// NewAPIServer creates a new APIServer object with default parameters
-func NewAPIServer() *APIServer {
-	s := APIServer{
+// NewServerRunOptions creates a new ServerRunOptions object with default parameters
+func NewServerRunOptions() *ServerRunOptions {
+	s := ServerRunOptions{
 		ServerRunOptions: genericoptions.NewServerRunOptions().WithEtcdOptions(),
 		EventTTL:         1 * time.Hour,
 		KubeletConfig: kubeletclient.KubeletClientConfig{
@@ -59,7 +59,7 @@ func NewAPIServer() *APIServer {
 }
 
 // AddFlags adds flags for a specific APIServer to the specified FlagSet
-func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
+func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	// Add the generic flags.
 	s.ServerRunOptions.AddUniversalFlags(fs)
 	//Add etcd specific flags.
