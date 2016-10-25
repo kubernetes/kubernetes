@@ -87,9 +87,9 @@ type Config struct {
 	CorsAllowedOriginList []string
 	Authenticator         authenticator.Request
 	// TODO(roberthbailey): Remove once the server no longer supports http basic auth.
-	SupportsBasicAuth      bool
-	Authorizer             authorizer.Authorizer
-	AdmissionControl       admission.Interface
+	SupportsBasicAuth bool
+	Authorizer        authorizer.Authorizer
+	AdmissionControl  admission.Interface
 	// TODO(ericchiang): Determine if policy escalation checks should be an admission controller.
 	AuthorizerRBACSuperUser string
 
