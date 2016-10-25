@@ -479,7 +479,6 @@ function start-kubelet {
   if [[ -n "${KUBELET_PORT:-}" ]]; then
     flags+=" --port=${KUBELET_PORT}"
   fi
-  local reconcile_cidr="true"
   if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
     flags+=" --enable-debugging-handlers=false"
     flags+=" --hairpin-mode=none"
@@ -508,7 +507,6 @@ function start-kubelet {
     fi
     flags+=" --network-plugin=${NETWORK_PROVIDER}"
   fi
-  flags+=" --reconcile-cidr=${reconcile_cidr}"
   if [[ -n "${NON_MASQUERADE_CIDR:-}" ]]; then
     flag+=" --non-masquerade-cidr=${NON_MASQUERADE_CIDR}"
   fi
