@@ -271,11 +271,9 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 	).Run(int(s.ConcurrentRCSyncs), wait.NeverStop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
-	if s.TerminatedPodGCThreshold > 0 {
-		go podgc.NewPodGC(client("pod-garbage-collector"), sharedInformers.Pods().Informer(),
-			int(s.TerminatedPodGCThreshold)).Run(wait.NeverStop)
-		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
-	}
+	go podgc.NewPodGC(client("pod-garbage-collector"), sharedInformers.Pods().Informer(),
+		int(s.TerminatedPodGCThreshold)).Run(wait.NeverStop)
+	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
 	if err != nil {
