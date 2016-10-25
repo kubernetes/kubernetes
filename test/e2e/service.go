@@ -266,7 +266,7 @@ var _ = framework.KubeDescribe("Services", func() {
 			Expect(err).NotTo(HaveOccurred())
 		}()
 
-		// Waiting for service to expose endpoint
+		// Waiting for service to expose endpoint.
 		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{serverPodName: {servicePort}})
 
 		By("Retrieve sourceip from a pod on the same node")
@@ -2331,11 +2331,16 @@ func execSourceipTest(f *framework.Framework, c *client.Client, ns, nodeName, se
 	timeout := 2 * time.Minute
 	framework.Logf("Waiting up to %v for sourceIp test to be executed", timeout)
 	cmd := fmt.Sprintf(`wget -T 30 -qO- %s:%d | grep client_address`, serviceIp, servicePort)
-	// need timeout mechanism because it may takes more times for iptables to be populated
+	// Need timeout mechanism because it may takes more times for iptables to be populated.
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2) {
 		stdout, err = framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 		if err != nil {
 			framework.Logf("got err: %v, retry until timeout", err)
+			continue
+		}
+		// Need to check output because wget -q might omit the error.
+		if strings.TrimSpace(stdout) == "" {
+			framework.Logf("got empty stdout, retry until timeout")
 			continue
 		}
 		break
@@ -2343,10 +2348,15 @@ func execSourceipTest(f *framework.Framework, c *client.Client, ns, nodeName, se
 
 	ExpectNoError(err)
 
-	// the stdout return from RunHostCmd seems to come with "\n", so TrimSpace is needed
-	// desired stdout in this format: client_address=x.x.x.x
+	// The stdout return from RunHostCmd seems to come with "\n", so TrimSpace is needed.
+	// Desired stdout in this format: client_address=x.x.x.x
 	outputs := strings.Split(strings.TrimSpace(stdout), "=")
-	sourceIp := outputs[1]
-
+	sourceIp := ""
+	if len(outputs) != 2 {
+		// Fail the test if output format is unexpected.
+		framework.Failf("exec pod returned unexpected stdout format: [%v]\n", stdout)
+	} else {
+		sourceIp = outputs[1]
+	}
 	return execPodIp, sourceIp
 }
