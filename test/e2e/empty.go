@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var _ = framework.KubeDescribe("[Feature:Empty]", func() {
+var _ = framework.KubeDescribe("Empty [Feature:Empty]", func() {
 	f := framework.NewDefaultFramework("empty")
 
 	BeforeEach(func() {
@@ -39,5 +39,5 @@ var _ = framework.KubeDescribe("[Feature:Empty]", func() {
 		framework.ExpectNoError(err)
 	})
 
-	It("Does nothing", func() {})
+	It("does nothing", func() {})
 })
