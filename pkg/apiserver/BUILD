@@ -51,6 +51,7 @@ go_library(
         "//pkg/util/proxy:go_default_library",
         "//pkg/util/runtime:go_default_library",
         "//pkg/util/strategicpatch:go_default_library",
+        "//pkg/util/strings:go_default_library",
         "//pkg/util/wsstream:go_default_library",
         "//pkg/watch:go_default_library",
         "//pkg/watch/versioned:go_default_library",

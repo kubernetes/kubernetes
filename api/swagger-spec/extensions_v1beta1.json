@@ -3184,7 +3184,7 @@
      {
       "type": "v1beta1.Ingress",
       "method": "POST",
-      "summary": "create a Ingress",
+      "summary": "create an Ingress",
       "nickname": "createNamespacedIngress",
       "parameters": [
        {
@@ -3578,7 +3578,7 @@
      {
       "type": "unversioned.Status",
       "method": "DELETE",
-      "summary": "delete a Ingress",
+      "summary": "delete an Ingress",
       "nickname": "deleteNamespacedIngress",
       "parameters": [
        {
