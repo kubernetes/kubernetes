@@ -128,6 +128,7 @@ func Run(s *options.ServerRunOptions) error {
 		OIDCUsernameClaim: s.OIDCUsernameClaim,
 		OIDCGroupsClaim:   s.OIDCGroupsClaim,
 		KeystoneURL:       s.KeystoneURL,
+		KeystoneCAFile:    s.KeystoneCAFile,
 	})
 	if err != nil {
 		glog.Fatalf("Invalid Authentication Config: %v", err)
