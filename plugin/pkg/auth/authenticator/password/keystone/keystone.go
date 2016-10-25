@@ -19,17 +19,21 @@ package keystone
 import (
 	"errors"
 	"strings"
+	"crypto/tls"
+	"net/http"
 
 	"github.com/golang/glog"
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/openstack"
 	"k8s.io/kubernetes/pkg/auth/user"
+	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
 
 // KeystoneAuthenticator contacts openstack keystone to validate user's credentials passed in the request.
 // The keystone endpoint is passed during apiserver startup
 type KeystoneAuthenticator struct {
 	authURL string
+	caFile  string
 }
 
 // AuthenticatePassword checks the username, password via keystone call
@@ -40,17 +44,43 @@ func (keystoneAuthenticator *KeystoneAuthenticator) AuthenticatePassword(usernam
 		Password:         password,
 	}
 
-	_, err := openstack.AuthenticatedClient(opts)
+	_, err := AuthenticatedClient(opts, keystoneAuthenticator.caFile)
 	if err != nil {
-		glog.Info("Failed: Starting openstack authenticate client")
+		glog.Info("Failed: Starting openstack authenticate client:" + err.Error())
 		return nil, false, errors.New("Failed to authenticate")
 	}
 
 	return &user.DefaultInfo{Name: username}, true, nil
 }
 
+// AuthenticatedClient logs in to an OpenStack cloud found at the identity endpoint specified by options, acquires a
+// token, and returns a Client instance that's ready to operate.
+func AuthenticatedClient(options gophercloud.AuthOptions, caFile string) (*gophercloud.ProviderClient, error) {
+	client, err := openstack.NewClient(options.IdentityEndpoint)
+	if err != nil {
+		return nil, err
+	}
+
+	config := &tls.Config{}
+	if caFile !="" {
+		roots, err := certutil.NewPool(caFile)
+		if err != nil {
+			return nil, err
+		}
+		config.RootCAs = roots
+	}
+	client.HTTPClient.Transport = &http.Transport{TLSClientConfig: config, }
+
+	err = openstack.Authenticate(client, options)
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
+}
+
+
 // NewKeystoneAuthenticator returns a password authenticator that validates credentials using openstack keystone
-func NewKeystoneAuthenticator(authURL string) (*KeystoneAuthenticator, error) {
+func NewKeystoneAuthenticator(authURL string, caFile string) (*KeystoneAuthenticator, error) {
 	if !strings.HasPrefix(authURL, "https") {
 		return nil, errors.New("Auth URL should be secure and start with https")
 	}
@@ -58,5 +88,5 @@ func NewKeystoneAuthenticator(authURL string) (*KeystoneAuthenticator, error) {
 		return nil, errors.New("Auth URL is empty")
 	}
 
-	return &KeystoneAuthenticator{authURL}, nil
+	return &KeystoneAuthenticator{authURL, caFile}, nil
 }
