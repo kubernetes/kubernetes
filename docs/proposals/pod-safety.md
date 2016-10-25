@@ -18,11 +18,6 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.4/docs/proposals/pod-termination.md).
-
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
 </strong>
@@ -56,7 +51,7 @@ containing a pet is partitioned, the Pet Set must remain consistent (no new
 entity will be spawned) but may become unavailable (cluster no longer has
 a sufficient number of members). The Pet Set guarante must be strong enough
 for an administrator to reason about the state of the cluster by observing
-the Kubrenetes API.
+the Kubernetes API.
 
 In order to reconcile partitions, an actor (human or automated) must decide
 when the partition is unrecoverable. The actor may be informed of the failure
@@ -147,13 +142,13 @@ at-most-one guarantee we wish to offer for pet sets.
 
 ### Guarantees provided by replica sets and replication controllers
 
-ReplicaSets and ReplicationControllers both attempt to preserve availability
-of their constituent pods over ensuring **at most one** semantics. So a
+ReplicaSets and ReplicationControllers both attempt to **preserve availability**
+of their constituent pods over ensuring at most one (of a pod) semantics. So a
 replica set to scale 1 will immediately create a new pod when it observes an
-old pod has been deleted, and as a result at many points in the lifetime of
-a replica set there will be 2 copies of a pod's processes running concurrently.
-Only access to exclusive resources like storage can prevent that simultaneous
-execution.
+old pod has begun graceful deletion, and as a result at many points in the
+lifetime of a replica set there will be 2 copies of a pod's processes running
+concurrently. Only access to exclusive resources like storage can prevent that
+simultaneous execution.
 
 Deployments, being based on replica sets, can offer no stronger guarantee.
 
@@ -194,6 +189,8 @@ To do that, we will:
 * Application owners must be free to force delete pods, but they *must*
   understand the implications of doing so, and all client UI must be able
   to communicate those implications.
+  * Force deleting a pod may cause data loss (two instances of the same
+    pod process may be running at the same time)
 * All existing controllers in the system must be limited to signaling pod
   termination (starting graceful deletion), and are not allowed to force
   delete a pod.
@@ -210,12 +207,15 @@ To do that, we will:
     pods.
 * It must be possible for an administrator to effectively resolve partitions
   manually to allow namespace deletion.
-* Deleting a node from etcd can be seen as a signal to the cluster that
+* Deleting a node from etcd should be seen as a signal to the cluster that
   the node is permanently partitioned. We must audit existing components
   to verify this is the case.
-  * Alternatively, we could require that pods must be individually
-    terminated. Complicates cloud controller interactions, but may be
-    easier for admins to reason about.
+  * The PodGC controller has primary responsibility for this - it already
+    owns the responsibility to delete pods on nodes that do not exist, and
+    so is allowed to force delete pods on nodes that do not exist.
+  * The PodGC controller must therefore always be running and will be
+    changed to always be running for this responsibility in a >=1.5
+    cluster.
 
 In the above scheme, force deleting a pod releases the lock on that pod and
 allows higher level components to proceed to create a replacement.
@@ -231,6 +231,9 @@ delete pet 2 and the pet set controller will be able to recreate that pet on
 another node and have it join the cluster safely (pets 0 and 1 constitute a
 quorum for membership change).
 
+This proposal does not alter the behavior of finalizers - instead, it makes
+finalizers unnecessary for common application cases (because the cluster only
+deletes pods when safe).
 
 ### Fencing
 
@@ -396,6 +399,12 @@ A test suite that can perform these tests in combination with real world pet set
 would be desirable, although possibly non-blocking for this proposal.
 
 
+## Documentation
+
+We should document the lifecycle guarantees provided by the cluster in a clear
+and unambiguous way to end users.
+
+
 ## Deferred issues
 
 * Live migration continues to be unsupported on Kubernetes for the foreseeable
@@ -413,7 +422,10 @@ would be desirable, although possibly non-blocking for this proposal.
   * Implies we must alter the pod GC controller to only signal graceful deletion,
     and only to flag pods on nodes that don't exist as partitioned, rather than
     force deleting them.
+  * Decision: YES - captured above.
+
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/pod-termination.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/pod-safety.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
