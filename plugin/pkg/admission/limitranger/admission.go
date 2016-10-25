@@ -164,22 +164,6 @@ func NewLimitRanger(client clientset.Interface, actions LimitRangerActions) (adm
 	}, nil
 }
 
-// Min returns the lesser of its 2 arguments
-func Min(a int64, b int64) int64 {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-// Max returns the greater of its 2 arguments
-func Max(a int64, b int64) int64 {
-	if a > b {
-		return a
-	}
-	return b
-}
-
 // defaultContainerResourceRequirements returns the default requirements for a container
 // the requirement.Limits are taken from the LimitRange defaults (if specified)
 // the requirement.Requests are taken from the LimitRange default request (if specified)
