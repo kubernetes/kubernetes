@@ -292,7 +292,6 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.CPUCFSQuota = in.CPUCFSQuota
 		out.Containerized = in.Containerized
 		out.MaxOpenFiles = in.MaxOpenFiles
-		out.ReconcileCIDR = in.ReconcileCIDR
 		out.RegisterSchedulable = in.RegisterSchedulable
 		out.ContentType = in.ContentType
 		out.KubeAPIQPS = in.KubeAPIQPS
