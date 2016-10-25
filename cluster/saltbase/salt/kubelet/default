@@ -35,6 +35,7 @@
     {% if grains.kubelet_api_servers is defined -%}
       {% set api_servers_with_port = "--api-servers=https://" + grains.kubelet_api_servers -%}
       {% set master_kubelet_args = master_kubelet_args + "--register-schedulable=false" -%}
+      {% set reconcile_cidr_args =  "--reconcile-cidr=false" -%}
     {% else -%}
       {% set api_servers_with_port = "" -%}
     {% endif -%}
