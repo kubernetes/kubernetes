@@ -29,7 +29,7 @@ go_library(
         "//pkg/api/v1:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
         "//pkg/apis/apps/install:go_default_library",
-        "//pkg/apis/apps/v1alpha1:go_default_library",
+        "//pkg/apis/apps/v1beta1:go_default_library",
         "//pkg/apis/authentication/install:go_default_library",
         "//pkg/apis/authentication/v1beta1:go_default_library",
         "//pkg/apis/authorization:go_default_library",
