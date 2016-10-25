@@ -46,6 +46,8 @@ const BetaStorageClassAnnotation = "volume.beta.kubernetes.io/storage-class"
 //TODO: Update this to final annotation value as it matches BetaStorageClassAnnotation for now
 const StorageClassAnnotation = "volume.beta.kubernetes.io/storage-class"
 
+const StorageClassNamespaces = "volume.beta.kubernetes.io/namespaces-can-use"
+
 // GetVolumeStorageClass returns value of StorageClassAnnotation or empty string in case
 // the annotation does not exist.
 // TODO: change to PersistentVolume.Spec.Class value when this attribute is
@@ -83,6 +85,15 @@ func GetStorageClassAnnotation(obj api.ObjectMeta) string {
 		return class
 	}
 	if class, ok := obj.Annotations[AlphaStorageClassAnnotation]; ok {
+		return class
+	}
+
+	return ""
+}
+
+// GetStorageClassProjects
+func GetStorageClassNamespaces(obj api.ObjectMeta) string {
+	if class, ok := obj.Annotations[StorageClassNamespaces]; ok {
 		return class
 	}
 
