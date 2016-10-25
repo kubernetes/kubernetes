@@ -200,7 +200,6 @@ func NewConfig() *Config {
 		Serializer:             api.Codecs,
 		MasterCount:            1,
 		ReadWritePort:          6443,
-		ServiceReadWritePort:   443,
 		RequestContextMapper:   api.NewRequestContextMapper(),
 		BuildHandlerChainsFunc: DefaultBuildHandlerChain,
 		LegacyAPIGroupPrefixes: sets.NewString(DefaultLegacyAPIPrefix),

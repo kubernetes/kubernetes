@@ -318,6 +318,7 @@ func Run(s *options.APIServer) error {
 		EnableUISupport:         true,
 		EnableLogsSupport:       true,
 		ProxyTransport:          proxyTransport,
+		ServiceReadWritePort:    443,
 
 		Tunneler: tunneler,
 	}

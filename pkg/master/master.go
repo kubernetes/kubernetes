@@ -101,6 +101,8 @@ type Config struct {
 	EnableUISupport   bool
 	EnableLogsSupport bool
 	ProxyTransport    http.RoundTripper
+	// Port for the apiserver service.
+	ServiceReadWritePort int
 }
 
 // EndpointReconcilerConfig holds the endpoint reconciler and endpoint reconciliation interval to be
