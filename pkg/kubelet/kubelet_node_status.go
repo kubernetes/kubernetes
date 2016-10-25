@@ -568,8 +568,7 @@ func (kl *Kubelet) setNodeReadyCondition(node *api.Node) {
 	// ref: https://github.com/kubernetes/kubernetes/issues/16961
 	currentTime := unversioned.NewTime(kl.clock.Now())
 	var newNodeReadyCondition api.NodeCondition
-	rs := append(kl.runtimeState.runtimeErrors(), kl.runtimeState.networkErrors()...)
-	if len(rs) == 0 {
+	if rs := kl.runtimeState.errors(); len(rs) == 0 {
 		newNodeReadyCondition = api.NodeCondition{
 			Type:              api.NodeReady,
 			Status:            api.ConditionTrue,
