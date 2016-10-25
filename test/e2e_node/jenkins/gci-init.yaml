@@ -3,3 +3,8 @@
 runcmd:
   - mount /tmp /tmp -o remount,exec,suid
   - usermod -a -G docker jenkins
+  - mkdir -p /home/kubernetes/bin/
+  - mount -B /home/kubernetes/bin /home/kubernetes/bin
+  - mount -B -o remount,exec /home/kubernetes/bin 
+  - wget https://storage.googleapis.com/kubernetes-release/rkt/rkt-v1.17.0 -O /home/kubernetes/bin/rkt
+  - chmod a+x /home/kubernetes/bin/rkt
