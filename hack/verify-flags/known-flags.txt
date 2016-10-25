@@ -242,6 +242,7 @@ host-ipc-sources
 host-network-sources
 host-pid-sources
 host-port-endpoints
+host-system-namespace
 hostname-override
 http-check-frequency
 http-port
