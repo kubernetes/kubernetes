@@ -41,7 +41,7 @@ func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.Vo
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
-	return tempDir, volumetest.NewFakeVolumeHost(tempDir, clientset, empty_dir.ProbeVolumePlugins(), "" /* rootContext */)
+	return tempDir, volumetest.NewFakeVolumeHost(tempDir, clientset, empty_dir.ProbeVolumePlugins())
 }
 
 func TestCanSupport(t *testing.T) {
