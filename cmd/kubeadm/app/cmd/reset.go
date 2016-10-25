@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -66,6 +67,33 @@ func NewReset(skipPreFlight bool) (*Reset, error) {
 	return &Reset{}, nil
 }
 
+// resetConfigDir is used to cleanup the files kubeadm writes in /etc/kubernetes/.
+func resetConfigDir(configDirPath string) {
+	dirsToClean := []string{
+		filepath.Join(configDirPath, "manifests"),
+		filepath.Join(configDirPath, "pki"),
+	}
+	fmt.Printf("Deleting config directories: %v\n", dirsToClean)
+	for _, dir := range dirsToClean {
+		err := os.RemoveAll(dir)
+		if err != nil {
+			fmt.Printf("failed to remove directory: [%v]\n", err)
+		}
+	}
+
+	filesToClean := []string{
+		filepath.Join(configDirPath, "admin.conf"),
+		filepath.Join(configDirPath, "kubelet.conf"),
+	}
+	fmt.Printf("Deleting files: %v\n", filesToClean)
+	for _, path := range filesToClean {
+		err := os.RemoveAll(path)
+		if err != nil {
+			fmt.Printf("failed to remove file: [%v]\n", err)
+		}
+	}
+}
+
 // Run reverts any changes made to this host by "kubeadm init" or "kubeadm join".
 func (r *Reset) Run(out io.Writer) error {
 	serviceToStop := "kubelet"
@@ -81,9 +109,11 @@ func (r *Reset) Run(out io.Writer) error {
 	// Don't check for errors here, since umount will return a non-zero exit code if there is no directories to umount
 	exec.Command("sh", "-c", "cat /proc/mounts | awk '{print $2}' | grep '/var/lib/kubelet' | xargs umount").Run()
 
-	dirsToRemove := []string{"/var/lib/kubelet", "/var/lib/etcd", "/etc/kubernetes"}
-	fmt.Printf("Deleting the stateful directories: %v\n", dirsToRemove)
-	for _, dir := range dirsToRemove {
+	resetConfigDir("/etc/kubernetes/")
+
+	dirsToClean := []string{"/var/lib/kubelet", "/var/lib/etcd"}
+	fmt.Printf("Deleting stateful directories: %v\n", dirsToClean)
+	for _, dir := range dirsToClean {
 		err := os.RemoveAll(dir)
 		if err != nil {
 			fmt.Printf("failed to remove directory: [%v]\n", err)
