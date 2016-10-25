@@ -480,6 +480,7 @@ k8s.io/kubernetes/federation/pkg/federation-controller/util,bgrant0607,1
 k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink,luxas,1
 k8s.io/kubernetes/federation/pkg/federation-controller/util/planner,Q-Lee,1
 k8s.io/kubernetes/federation/pkg/federation-controller/util/podanalyzer,caesarxuchao,1
+k8s.io/kubernetes/federation/pkg/kubefed,madhusudancs,0
 k8s.io/kubernetes/federation/registry/cluster,nikhiljindal,0
 k8s.io/kubernetes/federation/registry/cluster/etcd,nikhiljindal,0
 k8s.io/kubernetes/hack/cmd/teststale,thockin,1
