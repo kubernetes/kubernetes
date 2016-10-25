@@ -486,6 +486,17 @@ runTests() {
   # Post-condition: valid-pod POD doesn't exist
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
+  ### Delete POD valid-pod by id with --grace-period=0
+  # Pre-condition: valid-pod POD exists
+  kubectl create "${kube_flags[@]}" -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
+  # Command fails without --force
+  ! kubectl delete pod valid-pod "${kube_flags[@]}" --grace-period=0
+  # Command succeds with --force
+  kubectl delete pod valid-pod "${kube_flags[@]}" --grace-period=0 --force
+  # Post-condition: valid-pod POD doesn't exist
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+
   ### Create POD valid-pod from dumped YAML
   # Pre-condition: no POD exists
   create_and_use_new_namespace
