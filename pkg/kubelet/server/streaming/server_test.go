@@ -70,7 +70,7 @@ func TestGetExec(t *testing.T) {
 
 	containerID := testContainerID
 	for _, test := range testcases {
-		request := runtimeapi.ExecRequest{
+		request := &runtimeapi.ExecRequest{
 			ContainerId: &containerID,
 			Cmd:         test.cmd,
 			Tty:         &test.tty,
@@ -114,7 +114,7 @@ func TestGetAttach(t *testing.T) {
 
 	containerID := testContainerID
 	for _, test := range testcases {
-		request := runtimeapi.AttachRequest{
+		request := &runtimeapi.AttachRequest{
 			ContainerId: &containerID,
 			Stdin:       &test.stdin,
 		}
@@ -134,7 +134,7 @@ func TestGetAttach(t *testing.T) {
 
 func TestGetPortForward(t *testing.T) {
 	podSandboxID := testPodSandboxID
-	request := runtimeapi.PortForwardRequest{
+	request := &runtimeapi.PortForwardRequest{
 		PodSandboxId: &podSandboxID,
 		Port:         []int32{1, 2, 3, 4},
 	}
