@@ -413,6 +413,8 @@ func NewMixedFactory(apiClient resource.RESTClient) (cmdutil.Factory, *TestFacto
 type fakeAPIFactory struct {
 	cmdutil.Factory
 	tf *TestFactory
+
+	encoder runtime.Encoder
 }
 
 func (f *fakeAPIFactory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
@@ -432,7 +434,7 @@ func (f *fakeAPIFactory) Decoder(bool) runtime.Decoder {
 }
 
 func (f *fakeAPIFactory) JSONEncoder() runtime.Encoder {
-	return testapi.Default.Codec()
+	return f.encoder
 }
 
 func (f *fakeAPIFactory) ClientSet() (*internalclientset.Clientset, error) {
@@ -559,6 +561,19 @@ func NewAPIFactory() (cmdutil.Factory, *TestFactory, runtime.Codec, runtime.Nego
 	rf := cmdutil.NewFactory(nil)
 	return &fakeAPIFactory{
 		Factory: rf,
+		encoder: testapi.Default.Codec(),
+		tf:      t,
+	}, t, testapi.Default.Codec(), testapi.Default.NegotiatedSerializer()
+}
+
+func NewExtensionsAPIFactory() (cmdutil.Factory, *TestFactory, runtime.Codec, runtime.NegotiatedSerializer) {
+	t := &TestFactory{
+		Validator: validation.NullSchema{},
+	}
+	rf := cmdutil.NewFactory(nil)
+	return &fakeAPIFactory{
+		Factory: rf,
+		encoder: testapi.Extensions.Codec(),
 		tf:      t,
 	}, t, testapi.Default.Codec(), testapi.Default.NegotiatedSerializer()
 }

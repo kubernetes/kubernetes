@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -401,5 +403,89 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 	expectTwo := expectSVC + expectRC
 	if buf.String() != expectOne && buf.String() != expectTwo {
 		t.Fatalf("unexpected output: %s\nexpected: %s OR %s", buf.String(), expectOne, expectTwo)
+	}
+}
+
+const (
+	filenameDeployObjServerside = "../../../test/fixtures/pkg/kubectl/cmd/apply/deploy-serverside.yaml"
+	filenameDeployObjClientside = "../../../test/fixtures/pkg/kubectl/cmd/apply/deploy-clientside.yaml"
+)
+
+func validateNULLPatchApplication(t *testing.T, req *http.Request) {
+	patch, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	patchMap := map[string]interface{}{}
+	if err := json.Unmarshal(patch, &patchMap); err != nil {
+		t.Fatal(err)
+	}
+
+	annotationsMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
+	if _, ok := annotationsMap[annotations.LastAppliedConfigAnnotation]; !ok {
+		t.Fatalf("patch does not contain annotation:\n%s\n", patch)
+	}
+
+	labelMap := walkMapPath(t, patchMap, []string{"spec", "strategy"})
+	if deleteMe, ok := labelMap["rollingUpdate"]; !ok || deleteMe != nil {
+		t.Fatalf("patch did not retain null value in key: rollingUpdate:\n%s\n", patch)
+	}
+}
+
+func getServersideObject(t *testing.T) io.ReadCloser {
+	raw := readBytesFromFile(t, filenameDeployObjServerside)
+	obj := &extensions.Deployment{}
+	if err := runtime.DecodeInto(testapi.Extensions.Codec(), raw, obj); err != nil {
+		t.Fatal(err)
+	}
+	objJSON, err := runtime.Encode(testapi.Extensions.Codec(), obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ioutil.NopCloser(bytes.NewReader(objJSON))
+}
+
+func TestApplyNULLPreservation(t *testing.T) {
+	deploymentName := "nginx-deployment"
+	deploymentPath := "/namespaces/test/deployments/" + deploymentName
+
+	f, tf, _, ns := cmdtesting.NewExtensionsAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.Client = &fake.RESTClient{
+		NegotiatedSerializer: ns,
+		GroupName:            "extensions",
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/version" && m == "GET":
+				resp, err := genResponseWithJsonEncodedBody(serverVersion_1_5_0)
+				if err != nil {
+					t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
+				}
+				return resp, nil
+			case p == deploymentPath && m == "GET":
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: getServersideObject(t)}, nil
+			case p == deploymentPath && m == "PATCH":
+				validateNULLPatchApplication(t, req)
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: getServersideObject(t)}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+	tf.ClientConfig = defaultClientConfig()
+	buf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdApply(f, buf)
+	cmd.Flags().Set("filename", filenameDeployObjClientside)
+	cmd.Flags().Set("output", "name")
+
+	cmd.Run(cmd, []string{})
+
+	expected := "deployment/" + deploymentName + "\n"
+	if buf.String() != expected {
+		t.Fatalf("unexpected output: %s\nexpected: %s", buf.String(), expected)
 	}
 }
