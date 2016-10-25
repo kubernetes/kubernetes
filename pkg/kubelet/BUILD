@@ -106,7 +106,6 @@ go_library(
         "//pkg/util/oom:go_default_library",
         "//pkg/util/procfs:go_default_library",
         "//pkg/util/runtime:go_default_library",
-        "//pkg/util/selinux:go_default_library",
         "//pkg/util/sets:go_default_library",
         "//pkg/util/term:go_default_library",
         "//pkg/util/validation:go_default_library",
