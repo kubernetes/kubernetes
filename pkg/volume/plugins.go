@@ -212,12 +212,6 @@ type VolumeHost interface {
 	// Returns host IP or nil in the case of error.
 	GetHostIP() (net.IP, error)
 
-	// Returns the rootcontext to use when performing mounts for a volume.
-	// This is a temporary measure in order to set the rootContext of tmpfs
-	// mounts correctly. It will be replaced and expanded on by future
-	// SecurityContext work.
-	GetRootContext() string
-
 	// Returns node allocatable
 	GetNodeAllocatable() (api.ResourceList, error)
 }
