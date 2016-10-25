@@ -133,6 +133,7 @@ func addRunFlags(cmd *cobra.Command) {
 	cmd.Flags().String("service-overrides", "", "An inline JSON override for the generated service object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.  Only used if --expose is true.")
 	cmd.Flags().Bool("quiet", false, "If true, suppress prompt messages.")
 	cmd.Flags().String("schedule", "", "A schedule in the Cron format the job should be run with.")
+	cmd.Flags().Int64("uid", -1, "The UID to run the entrypoint of the container process. The 'SecurityContextDeny' admission controller must be disabled from apiserver side while using this flag.")
 }
 
 func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobra.Command, args []string, argsLenAtDash int) error {

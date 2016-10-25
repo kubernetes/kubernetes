@@ -167,6 +167,9 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 		if securityContext.ReadOnlyRootFilesystem != nil {
 			config.ReadonlyRootfs = securityContext.ReadOnlyRootFilesystem
 		}
+		if securityContext.RunAsUser != nil {
+			config.RunAsUser = securityContext.RunAsUser
+		}
 	}
 
 	// set environment variables

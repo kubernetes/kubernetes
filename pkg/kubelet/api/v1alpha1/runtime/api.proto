@@ -486,6 +486,9 @@ message ContainerConfig {
 
     // Linux contains configuration specific to Linux containers.
     optional LinuxContainerConfig linux = 16;
+
+    // The UID to run the entrypoint of the container process.
+    optional int64 RunAsUser = 17;
 }
 
 message CreateContainerRequest {
