@@ -230,6 +230,7 @@ func Run(s *options.APIServer) error {
 		ServiceAccountLookup:        s.ServiceAccountLookup,
 		ServiceAccountTokenGetter:   serviceAccountGetter,
 		KeystoneURL:                 s.KeystoneURL,
+		KeystoneInsecureTLS:         s.KeystoneInsecureTLS,
 		WebhookTokenAuthnConfigFile: s.WebhookTokenAuthnConfigFile,
 		WebhookTokenAuthnCacheTTL:   s.WebhookTokenAuthnCacheTTL,
 	})

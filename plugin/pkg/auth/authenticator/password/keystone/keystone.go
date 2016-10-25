@@ -19,6 +19,8 @@ package keystone
 import (
 	"errors"
 	"strings"
+	"crypto/tls"
+	"net/http"
 
 	"github.com/golang/glog"
 	"github.com/rackspace/gophercloud"
@@ -30,6 +32,7 @@ import (
 // The keystone endpoint is passed during apiserver startup
 type KeystoneAuthenticator struct {
 	authURL string
+	insecureTLS bool
 }
 
 // AuthenticatePassword checks the username, password via keystone call
@@ -40,17 +43,36 @@ func (keystoneAuthenticator *KeystoneAuthenticator) AuthenticatePassword(usernam
 		Password:         password,
 	}
 
-	_, err := openstack.AuthenticatedClient(opts)
+	_, err := AuthenticatedClient(opts, keystoneAuthenticator.insecureTLS)
 	if err != nil {
-		glog.Info("Failed: Starting openstack authenticate client")
+		glog.Info("Failed: Starting openstack authenticate client: "+ err.Error())
 		return nil, false, errors.New("Failed to authenticate")
 	}
 
 	return &user.DefaultInfo{Name: username}, true, nil
 }
 
+// AuthenticatedClient logs in to an OpenStack cloud found at the identity endpoint specified by options, acquires a
+// token, and returns a Client instance that's ready to operate.
+func AuthenticatedClient(options gophercloud.AuthOptions, insecureTLS bool) (*gophercloud.ProviderClient, error) {
+
+	client, err := openstack.NewClient(options.IdentityEndpoint)
+	if err != nil {
+		return nil, err
+	}
+
+	client.HTTPClient.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: insecureTLS}, }
+
+	err = openstack.Authenticate(client, options)
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
+
+}
+
 // NewKeystoneAuthenticator returns a password authenticator that validates credentials using openstack keystone
-func NewKeystoneAuthenticator(authURL string) (*KeystoneAuthenticator, error) {
+func NewKeystoneAuthenticator(authURL string, insecureTLS bool) (*KeystoneAuthenticator, error) {
 	if !strings.HasPrefix(authURL, "https") {
 		return nil, errors.New("Auth URL should be secure and start with https")
 	}
@@ -58,5 +80,5 @@ func NewKeystoneAuthenticator(authURL string) (*KeystoneAuthenticator, error) {
 		return nil, errors.New("Auth URL is empty")
 	}
 
-	return &KeystoneAuthenticator{authURL}, nil
+	return &KeystoneAuthenticator{authURL, insecureTLS}, nil
 }
