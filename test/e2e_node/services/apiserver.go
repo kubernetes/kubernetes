@@ -41,12 +41,12 @@ func NewAPIServer() *APIServer {
 // Start starts the apiserver, returns when apiserver is ready.
 func (a *APIServer) Start() error {
 	config := options.NewServerRunOptions()
-	config.StorageConfig.ServerList = []string{getEtcdClientURL()}
+	config.GenericServerRunOptions.StorageConfig.ServerList = []string{getEtcdClientURL()}
 	_, ipnet, err := net.ParseCIDR(clusterIPRange)
 	if err != nil {
 		return err
 	}
-	config.ServiceClusterIPRange = *ipnet
+	config.GenericServerRunOptions.ServiceClusterIPRange = *ipnet
 	config.AllowPrivileged = true
 	errCh := make(chan error)
 	go func() {

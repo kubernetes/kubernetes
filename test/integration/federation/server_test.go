@@ -37,7 +37,7 @@ import (
 )
 
 func TestLongRunningRequestRegexp(t *testing.T) {
-	regexp := regexp.MustCompile(options.NewServerRunOptions().LongRunningRequestRE)
+	regexp := regexp.MustCompile(options.NewServerRunOptions().GenericServerRunOptions.LongRunningRequestRE)
 	dontMatch := []string{
 		"/api/v1/watch-namespace/",
 		"/api/v1/namespace-proxy/",
@@ -86,10 +86,10 @@ var groupVersions = []unversioned.GroupVersion{
 
 func TestRun(t *testing.T) {
 	s := options.NewServerRunOptions()
-	s.InsecurePort = insecurePort
+	s.GenericServerRunOptions.InsecurePort = insecurePort
 	_, ipNet, _ := net.ParseCIDR("10.10.10.0/24")
-	s.ServiceClusterIPRange = *ipNet
-	s.StorageConfig.ServerList = []string{"http://localhost:2379"}
+	s.GenericServerRunOptions.ServiceClusterIPRange = *ipNet
+	s.GenericServerRunOptions.StorageConfig.ServerList = []string{"http://localhost:2379"}
 	go func() {
 		if err := app.Run(s); err != nil {
 			t.Fatalf("Error in bringing up the server: %v", err)
