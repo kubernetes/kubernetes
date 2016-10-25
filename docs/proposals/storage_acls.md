@@ -27,24 +27,24 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-## Abstract
+# Abstract
 
 Today in kubernetes, the limits around storage assets is fairly limited and does not provide a means to restrict per namespace the type
 of stoarge a user may request or limits around each request. This abstract proposes to provide ACLs for storage through the use of Quotas and 
 Limits.
 
-## Motivation
+# Motivation
 
 The traditional method for storage security, outside kubernetes, provides granularity down to specifc users and groups
 in a system and the permissions on the filesystem at directory and file levels. By restircting the storage consumption first at the namespace,
 storage can be allocated to specific groups and users in each namespace. In addition, the flexibility of this design can support both
 shared storage and block storage use cases.
 
-## Design
+# Design
 Defining how we access and use storage in Kubernetes is no different. And in some ways is more complicated. 
 For simplicity we will distill storage security into two separate categories: access and use.
 
-# Access
+## Access
 
 Access defines the authorization today done by the system to allow a user to authenticate and 
 therefore have access to specific features in the system. This process today is not necessarily tailored to storage security. 
@@ -52,7 +52,7 @@ It is the outer layer of the onion that allows an admin to create users and serv
 It does not consider storage specific security features when it does this validation. 
 
 
-# Use Cases for ‘ACCESS’
+### Use Cases for ‘ACCESS’
 
 1. Use Case: Administrator wishes to creaxte user and permit the use of certain storage classes
 2. Use Case: Administrator wishes to create group and permit the use of storage classes
@@ -63,7 +63,7 @@ It does not consider storage specific security features when it does this valida
 Use is the actual act of leveraging the storage feature once it’s enabled in your namespace. Use will be restricted by two methods. The SCC (Security Context Constraint) which as it is merged upstream will become the PSP (Pod Security Policy) and the use of ACLs controlled by Quota and Limits. 
 Kubernetes controls are managed differently than traditional storage in that we can restrict down to a file level if necessary. Though, it embraces the method of hierarchical permissions, it depends on administrators management of first and foremost, namespaces, to restrict users and functions. Therefore, the need to provide the same file system level security is eliminated by only granting users specific functions in that namespace.
 
-# Access to Physical Storage
+### Access to Physical Storage
 There are features of storage access we do wish to control at a more granular level. Today three characteristics of the file systems that controls user access:
 
 * FSGroups: This is the filesystem group permissions for block storage. The Storag or Cluster administrator is responsible for allocating the GID for the storage asset at creation
@@ -76,21 +76,21 @@ Range should not be so widely defined to enable users to access storage outside 
 
 In addition to applying GIDs some storage plugins require credentials for certain administrative functions.
 
-## Access to Storage Features
+### Access to Storage Features
 Once the user is restricted based on the methods provided in “ACCESS” we want to further limit access to certain features. This has two distinct pieces. We want to limit:
 
 1. What a user is allowed to do:
-   Quotas: provides constraints that limit aggregate resource consumption per project
-     Persistent Volume Claims
+   * Quotas: provides constraints that limit aggregate resource consumption per project
+     * Persistent Volume Claims
 2. Ability to request specific storage 
-     Storage Selectors
+     * Storage Selectors
 3. Ability to provision storage dynamically:
-     Storage Classes
+     * Storage Classes
 4. How much storage the user may consume: 
-      Limits: enumerates resource constraints per project 
-      *Size of request
-      *Enforcement by Quota that calculates usage
-      *Number of requests/claims
+      * Limits: enumerates resource constraints per project 
+       * Size of request
+       * Enforcement by Quota that calculates usage
+       * Number of requests/claims
 
 This PR will focus on providing a means  of Access Control Lists (ACLs) based on leveraging and extending Resource Quotas:
 ```
@@ -125,7 +125,7 @@ spec:
 
 ```
 
-## Use Cases for ‘USE’:
+### Use Cases for ‘USE’:
 
 1. Use Case: Administrator wishes to create non-default provisioner and restrict it’s use to a specific namespace
    * Default behavior: Disabled for ALL users
@@ -150,7 +150,7 @@ spec:
 9. Use Case: Administrator updates GID in SCC for block storage to new GID, access to the storage should continue to work with the current pod spec 
 10. Use Case: PV having GID that isn’t part of the range defined in the SCC and binding to a PV but not usable by the pod (Important customer use case this doesn’t address today)
 
-## Special considerations for ‘USE’
+### Special considerations for ‘USE’
 * Augment Quotas to include Storage with sub-classification for Storage Classes
 * Update default SCC to include binary value to enable/disable Storage Selectors
 * Augment Limits to include storage with sub-limits per Storage Class
@@ -164,6 +164,10 @@ spec:
   non-specification means unlimited
 
 
-## Alternate Design consideration
+### Alternate Design consideration
 
 https://github.com/kubernetes/kubernetes/pull/35538
+
+### Depends on:
+
+https://github.com/kubernetes/kubernetes/pull/34554
