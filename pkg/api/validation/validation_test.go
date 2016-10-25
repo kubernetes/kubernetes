@@ -7410,12 +7410,16 @@ func TestValidateResourceQuota(t *testing.T) {
 func TestValidateNamespace(t *testing.T) {
 	validLabels := map[string]string{"a": "b"}
 	invalidLabels := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
+	validNodeSelectorAnnotations := map[string]string{api.NodeSelectorsAnnotationKey: "k1=v1, k2 =v2, k3 = v3"}
 	successCases := []api.Namespace{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Labels: validLabels},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "abc-123"},
+			ObjectMeta: api.ObjectMeta{Name: "abc1", Annotations: validNodeSelectorAnnotations},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "abc-123"},
 			Spec: api.NamespaceSpec{
 				Finalizers: []api.FinalizerName{"example.com/something", "example.com/other"},
 			},
@@ -7440,6 +7444,34 @@ func TestValidateNamespace(t *testing.T) {
 		},
 		"invalid-labels": {
 			api.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "abc", Labels: invalidLabels}},
+			"",
+		},
+		"invalid-node-selector-annotations-1": {
+			api.Namespace{ObjectMeta: api.ObjectMeta{
+				Name:        "abc",
+				Annotations: map[string]string{api.NodeSelectorsAnnotationKey: "keyvalue"},
+			}},
+			"",
+		},
+		"invalid-node-selector-annotations-2": {
+			api.Namespace{ObjectMeta: api.ObjectMeta{
+				Name:        "abc",
+				Annotations: map[string]string{api.NodeSelectorsAnnotationKey: "key=value="},
+			}},
+			"",
+		},
+		"invalid-node-selector-annotations-3": {
+			api.Namespace{ObjectMeta: api.ObjectMeta{
+				Name:        "abc",
+				Annotations: map[string]string{api.NodeSelectorsAnnotationKey: "region#=xyz%"},
+			}},
+			"",
+		},
+		"invalid-node-selector-annotations-4": {
+			api.Namespace{ObjectMeta: api.ObjectMeta{
+				Name:        "abc",
+				Annotations: map[string]string{api.NodeSelectorsAnnotationKey: "region#=xyz%|=|country=test||"},
+			}},
 			"",
 		},
 	}
@@ -7496,6 +7528,34 @@ func TestValidateNamespaceFinalizeUpdate(t *testing.T) {
 					Finalizers: []api.FinalizerName{"", "foo.com/bar", "what.com/bar"},
 				},
 			}, false},
+		{api.Namespace{
+			ObjectMeta: api.ObjectMeta{
+				Name:        "foo1",
+				Annotations: map[string]string{},
+			},
+		}, api.Namespace{
+			ObjectMeta: api.ObjectMeta{
+				Name:        "foo1",
+				Annotations: map[string]string{api.NodeSelectorsAnnotationKey: "key=value"},
+			},
+			Spec: api.NamespaceSpec{
+				Finalizers: []api.FinalizerName{"kubernetes"},
+			},
+		}, true},
+		{api.Namespace{
+			ObjectMeta: api.ObjectMeta{
+				Name:        "foo2",
+				Annotations: map[string]string{},
+			},
+		}, api.Namespace{
+			ObjectMeta: api.ObjectMeta{
+				Name:        "foo2",
+				Annotations: map[string]string{api.NodeSelectorsAnnotationKey: "error"},
+			},
+			Spec: api.NamespaceSpec{
+				Finalizers: []api.FinalizerName{"kubernetes"},
+			},
+		}, false},
 	}
 	for i, test := range tests {
 		test.namespace.ObjectMeta.ResourceVersion = "1"
@@ -7565,6 +7625,32 @@ func TestValidateNamespaceStatusUpdate(t *testing.T) {
 			api.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "bar"},
+				Status: api.NamespaceStatus{
+					Phase: api.NamespaceTerminating,
+				},
+			}, false},
+		{api.Namespace{
+			ObjectMeta: api.ObjectMeta{
+				Name:              "foo1",
+				DeletionTimestamp: &now}},
+			api.Namespace{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "foo1",
+					DeletionTimestamp: &now,
+					Annotations:       map[string]string{api.NodeSelectorsAnnotationKey: "key=value"}},
+				Status: api.NamespaceStatus{
+					Phase: api.NamespaceTerminating,
+				},
+			}, true},
+		{api.Namespace{
+			ObjectMeta: api.ObjectMeta{
+				Name:              "foo1",
+				DeletionTimestamp: &now}},
+			api.Namespace{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "foo1",
+					DeletionTimestamp: &now,
+					Annotations:       map[string]string{api.NodeSelectorsAnnotationKey: "error"}},
 				Status: api.NamespaceStatus{
 					Phase: api.NamespaceTerminating,
 				},
@@ -7658,6 +7744,40 @@ func TestValidateNamespaceUpdate(t *testing.T) {
 				Phase: api.NamespaceTerminating,
 			},
 		}, true},
+		{api.Namespace{
+			ObjectMeta: api.ObjectMeta{
+				Name:        "foo7",
+				Annotations: map[string]string{},
+			},
+		}, api.Namespace{
+			ObjectMeta: api.ObjectMeta{
+				Name:        "foo7",
+				Annotations: map[string]string{api.NodeSelectorsAnnotationKey: "key=value"},
+			},
+			Spec: api.NamespaceSpec{
+				Finalizers: []api.FinalizerName{"kubernetes"},
+			},
+			Status: api.NamespaceStatus{
+				Phase: api.NamespaceTerminating,
+			},
+		}, true},
+		{api.Namespace{
+			ObjectMeta: api.ObjectMeta{
+				Name:        "foo8",
+				Annotations: map[string]string{},
+			},
+		}, api.Namespace{
+			ObjectMeta: api.ObjectMeta{
+				Name:        "foo8",
+				Annotations: map[string]string{api.NodeSelectorsAnnotationKey: "error"},
+			},
+			Spec: api.NamespaceSpec{
+				Finalizers: []api.FinalizerName{"kubernetes"},
+			},
+			Status: api.NamespaceStatus{
+				Phase: api.NamespaceTerminating,
+			},
+		}, false},
 	}
 	for i, test := range tests {
 		test.namespace.ObjectMeta.ResourceVersion = "1"
