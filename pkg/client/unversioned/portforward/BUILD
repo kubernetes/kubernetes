@@ -33,7 +33,7 @@ go_test(
     deps = [
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/unversioned/remotecommand:go_default_library",
-        "//pkg/kubelet/server:go_default_library",
+        "//pkg/kubelet/server/portforward:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util/httpstream:go_default_library",
     ],
