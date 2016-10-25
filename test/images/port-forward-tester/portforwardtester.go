@@ -48,8 +48,12 @@ func getEnvInt(name string) int {
 }
 
 func main() {
+	bindAddress := os.Getenv("BIND_ADDRESS")
+	if bindAddress == "" {
+		bindAddress = "localhost"
+	}
 	bindPort := os.Getenv("BIND_PORT")
-	listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%s", bindPort))
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%s", bindAddress, bindPort))
 	if err != nil {
 		fmt.Printf("Error listening: %v\n", err)
 		os.Exit(1)
