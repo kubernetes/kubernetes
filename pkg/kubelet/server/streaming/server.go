@@ -40,9 +40,10 @@ type Server interface {
 	http.Handler
 
 	// Get the serving URL for the requests. Server must be started before these are called.
-	GetExec(runtimeapi.ExecRequest) (runtimeapi.ExecResponse, error)
-	GetAttach(req runtimeapi.AttachRequest, tty bool) (runtimeapi.AttachResponse, error)
-	GetPortForward(runtimeapi.PortForwardRequest) (runtimeapi.PortForwardResponse, error)
+	// Requests must not be nil. Responses may be nil iff an error is returned.
+	GetExec(*runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error)
+	GetAttach(req *runtimeapi.AttachRequest, tty bool) (*runtimeapi.AttachResponse, error)
+	GetPortForward(*runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error)
 
 	// Start the server.
 	// addr is the address to serve on (address:port) stayUp indicates whether the server should
@@ -119,7 +120,7 @@ type server struct {
 	handler http.Handler
 }
 
-func (s *server) GetExec(req runtimeapi.ExecRequest) (runtimeapi.ExecResponse, error) {
+func (s *server) GetExec(req *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
 	url := s.buildURL("exec", req.GetContainerId(), streamOpts{
 		stdin:   req.GetStdin(),
 		stdout:  true,
@@ -127,26 +128,26 @@ func (s *server) GetExec(req runtimeapi.ExecRequest) (runtimeapi.ExecResponse, e
 		tty:     req.GetTty(),
 		command: req.GetCmd(),
 	})
-	return runtimeapi.ExecResponse{
+	return &runtimeapi.ExecResponse{
 		Url: &url,
 	}, nil
 }
 
-func (s *server) GetAttach(req runtimeapi.AttachRequest, tty bool) (runtimeapi.AttachResponse, error) {
+func (s *server) GetAttach(req *runtimeapi.AttachRequest, tty bool) (*runtimeapi.AttachResponse, error) {
 	url := s.buildURL("attach", req.GetContainerId(), streamOpts{
 		stdin:  req.GetStdin(),
 		stdout: true,
 		stderr: !tty, // For TTY connections, both stderr is combined with stdout.
 		tty:    tty,
 	})
-	return runtimeapi.AttachResponse{
+	return &runtimeapi.AttachResponse{
 		Url: &url,
 	}, nil
 }
 
-func (s *server) GetPortForward(req runtimeapi.PortForwardRequest) (runtimeapi.PortForwardResponse, error) {
+func (s *server) GetPortForward(req *runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error) {
 	url := s.buildURL("portforward", req.GetPodSandboxId(), streamOpts{})
-	return runtimeapi.PortForwardResponse{
+	return &runtimeapi.PortForwardResponse{
 		Url: &url,
 	}, nil
 }
