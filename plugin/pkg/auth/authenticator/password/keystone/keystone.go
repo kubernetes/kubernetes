@@ -27,13 +27,15 @@ import (
 	"github.com/rackspace/gophercloud/openstack"
 	"k8s.io/kubernetes/pkg/auth/user"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
+	netutil "k8s.io/kubernetes/pkg/util/net"
 )
 
 // KeystoneAuthenticator contacts openstack keystone to validate user's credentials passed in the request.
 // The keystone endpoint is passed during apiserver startup
 type KeystoneAuthenticator struct {
 	authURL string
-	caFile  string
+	TLSClientConfig *tls.Config
+	caFile string
 }
 
 // AuthenticatePassword checks the username, password via keystone call
@@ -44,7 +46,7 @@ func (keystoneAuthenticator *KeystoneAuthenticator) AuthenticatePassword(usernam
 		Password:         password,
 	}
 
-	_, err := AuthenticatedClient(opts, keystoneAuthenticator.caFile)
+	_, err := keystoneAuthenticator.AuthenticatedClient(opts)
 	if err != nil {
 		glog.Info("Failed: Starting openstack authenticate client:" + err.Error())
 		return nil, false, errors.New("Failed to authenticate")
@@ -55,29 +57,19 @@ func (keystoneAuthenticator *KeystoneAuthenticator) AuthenticatePassword(usernam
 
 // AuthenticatedClient logs in to an OpenStack cloud found at the identity endpoint specified by options, acquires a
 // token, and returns a Client instance that's ready to operate.
-func AuthenticatedClient(options gophercloud.AuthOptions, caFile string) (*gophercloud.ProviderClient, error) {
+func (keystoneAuthenticator *KeystoneAuthenticator) AuthenticatedClient(options gophercloud.AuthOptions) (*gophercloud.ProviderClient, error) {
 	client, err := openstack.NewClient(options.IdentityEndpoint)
 	if err != nil {
 		return nil, err
 	}
 
-	config := &tls.Config{}
-	if caFile !="" {
-		roots, err := certutil.NewPool(caFile)
-		if err != nil {
-			return nil, err
-		}
-		config.RootCAs = roots
+	if keystoneAuthenticator.caFile != "" {
+		client.HTTPClient.Transport = netutil.SetOldTransportDefaults(&http.Transport{TLSClientConfig: keystoneAuthenticator.TLSClientConfig})
 	}
-	client.HTTPClient.Transport = &http.Transport{TLSClientConfig: config, }
 
 	err = openstack.Authenticate(client, options)
-	if err != nil {
-		return nil, err
-	}
-	return client, nil
+	return client, err
 }
-
 
 // NewKeystoneAuthenticator returns a password authenticator that validates credentials using openstack keystone
 func NewKeystoneAuthenticator(authURL string, caFile string) (*KeystoneAuthenticator, error) {
@@ -87,6 +79,15 @@ func NewKeystoneAuthenticator(authURL string, caFile string) (*KeystoneAuthentic
 	if authURL == "" {
 		return nil, errors.New("Auth URL is empty")
 	}
+	if caFile != "" {
+		roots, err := certutil.NewPool(caFile)
+		if err != nil {
+			return nil, err
+		}
+		config := &tls.Config{}
+		config.RootCAs = roots
+		return &KeystoneAuthenticator{authURL, config, caFile}, nil
+	}
 
-	return &KeystoneAuthenticator{authURL, caFile}, nil
+	return &KeystoneAuthenticator{authURL: authURL}, nil
 }
