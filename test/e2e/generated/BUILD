@@ -22,7 +22,6 @@ genrule(
     name = "bindata",
     srcs = [
         "//examples:sources",
-        "//docs/user-guide:sources",
         "//test/images:sources",
         "//test/fixtures:sources",
         "//test/e2e/testing-manifests:sources",
