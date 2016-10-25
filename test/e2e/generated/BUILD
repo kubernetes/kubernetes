@@ -13,28 +13,8 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "bindata.go",
         "main.go",
-        ":bindata",
     ],
-)
-
-genrule(
-    name = "bindata",
-    srcs = [
-        "//examples:sources",
-        "//test/images:sources",
-        "//test/fixtures:sources",
-        "//test/e2e/testing-manifests:sources",
-    ],
-    outs = ["bindata.go"],
-    cmd = """
-$(location //vendor:github.com/jteeuwen/go-bindata/go-bindata) \
-  -nometadata -o "$(OUTS)" -pkg generated \
-  -prefix $$(pwd) \
-  -ignore .jpg -ignore .png -ignore .md \
-  $(SRCS)
-""",
-    tools = [
-        "//vendor:github.com/jteeuwen/go-bindata/go-bindata",
-    ],
+    tags = ["automanaged"],
 )

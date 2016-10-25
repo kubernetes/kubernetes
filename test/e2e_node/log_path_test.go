@@ -36,10 +36,7 @@ var _ = framework.KubeDescribe("ContainerLogPath", func() {
 				podClient := f.PodClient()
 				ns := f.Namespace.Name
 
-				rootfsDirVolumeName := "docker-dir-vol"
-
-				rootfsDir := "/root"
-				rootDir := "/"
+				logDirVolumeName := "log-dir-vol"
 				logDir := kubelet.ContainerLogsDir
 
 				logPodName := "logger-" + string(uuid.NewUUID())
@@ -65,7 +62,7 @@ var _ = framework.KubeDescribe("ContainerLogPath", func() {
 				}
 
 				podClient.Create(logPod)
-				err := framework.WaitForPodSuccessInNamespace(f.Client, logPodName, ns)
+				err := framework.WaitForPodSuccessInNamespace(f.ClientSet, logPodName, ns)
 				framework.ExpectNoError(err, "Failed waiting for pod: %s to enter success state", logPodName)
 
 				// get containerID from created Pod
@@ -86,13 +83,14 @@ var _ = framework.KubeDescribe("ContainerLogPath", func() {
 							{
 								Image: "gcr.io/google_containers/busybox:1.24",
 								Name:  checkContName,
-								// if we find expected log file and contains right content, exit 0
+								// If we find expected log file and contains right content, exit 0
 								// else, keep checking until test timeout
-								Command: []string{"sh", "-c", "chroot " + rootfsDir + " while true; do if [ -e " + expectedlogFile + " ] && grep -q " + logString + " " + expectedlogFile + "; then exit 0; fi; sleep 1; done"},
+								Command: []string{"sh", "-c", "while true; do if [ -e " + expectedlogFile + " ] && grep -q " + logString + " " + expectedlogFile + "; then exit 0; fi; sleep 1; done"},
 								VolumeMounts: []api.VolumeMount{
 									{
-										Name:      rootfsDirVolumeName,
-										MountPath: rootfsDir,
+										Name: logDirVolumeName,
+										// mount ContainerLogsDir to the same path in container
+										MountPath: expectedlogFile,
 										ReadOnly:  true,
 									},
 								},
@@ -100,10 +98,10 @@ var _ = framework.KubeDescribe("ContainerLogPath", func() {
 						},
 						Volumes: []api.Volume{
 							{
-								Name: rootfsDirVolumeName,
+								Name: logDirVolumeName,
 								VolumeSource: api.VolumeSource{
 									HostPath: &api.HostPathVolumeSource{
-										Path: rootDir,
+										Path: expectedlogFile,
 									},
 								},
 							},
@@ -112,7 +110,7 @@ var _ = framework.KubeDescribe("ContainerLogPath", func() {
 				}
 
 				podClient.Create(checkPod)
-				err = framework.WaitForPodSuccessInNamespace(f.Client, checkPodName, ns)
+				err = framework.WaitForPodSuccessInNamespace(f.ClientSet, checkPodName, ns)
 				framework.ExpectNoError(err, "Failed waiting for pod: %s to enter success state", checkPodName)
 			})
 		})
