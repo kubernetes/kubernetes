@@ -212,14 +212,6 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *App
 			visitedNamespaces.Insert(info.Namespace)
 		}
 
-		// Get the modified configuration of the object. Embed the result
-		// as an annotation in the modified configuration, so that it will appear
-		// in the patch sent to the server.
-		modified, err := kubectl.GetModifiedConfiguration(info, true, encoder)
-		if err != nil {
-			return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving modified configuration from:\n%v\nfor:", info), info.Source, err)
-		}
-
 		if err := info.Get(); err != nil {
 			if !errors.IsNotFound(err) {
 				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%v\nfrom server for:", info), info.Source, err)
@@ -268,6 +260,14 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *App
 				cascade:       options.Cascade,
 				timeout:       options.Timeout,
 				gracePeriod:   options.GracePeriod,
+			}
+
+			// Get the modified configuration of the object. Embed the result
+			// as an annotation in the modified configuration, so that it will appear
+			// in the patch sent to the server.
+			modified, err := kubectl.GetModifiedConfiguration(info, true, encoder)
+			if err != nil {
+				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving modified configuration from:\n%v\nfor:", info), info.Source, err)
 			}
 
 			// During Unmarshaling of the user's JSON to a Go struct, explicit null values are not preserved
