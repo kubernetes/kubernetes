@@ -19,7 +19,6 @@ for Kubernetes.*
     - [Headings](#headings)
   - [What Are Mungers?](#what-are-mungers)
   - [Auto-added Mungers](#auto-added-mungers)
-    - [Is Versioned](#is-versioned)
     - [Generate Analytics](#generate-analytics)
 - [Generated documentation](#generated-documentation)
 
@@ -180,18 +179,6 @@ After running `hack/update-munge-docs.sh`, you may see some code / mungers in
 your md file that are auto-added. You don't have to add them manually. It's
 recommended to just read this section as a reference instead of messing up with
 the following mungers.
-
-
-### Is Versioned
-
-IS_VERSIONED munger inserts `IS_VERSIONED` tag in documents in each release,
-which stops UNVERSIONED_WARNING munger from inserting warning messages.
-
-```
-<!-- BEGIN MUNGE: IS_VERSIONED -->
-<!-- TAG IS_VERSIONED -->
-<!-- END MUNGE: IS_VERSIONED -->
-```
 
 ### Generate Analytics
 
