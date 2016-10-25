@@ -34,22 +34,15 @@ import (
 func ProbeVolumePlugins(volumeConfig volume.VolumeConfig) []volume.VolumePlugin {
 	return []volume.VolumePlugin{
 		&hostPathPlugin{
-			host:               nil,
-			newRecyclerFunc:    newRecycler,
-			newDeleterFunc:     newDeleter,
-			newProvisionerFunc: newProvisioner,
-			config:             volumeConfig,
+			host:   nil,
+			config: volumeConfig,
 		},
 	}
 }
 
 type hostPathPlugin struct {
-	host volume.VolumeHost
-	// decouple creating Recyclers/Deleters/Provisioners by deferring to a function.  Allows for easier testing.
-	newRecyclerFunc    func(pvName string, spec *volume.Spec, eventRecorder volume.RecycleEventRecorder, host volume.VolumeHost, volumeConfig volume.VolumeConfig) (volume.Recycler, error)
-	newDeleterFunc     func(spec *volume.Spec, host volume.VolumeHost) (volume.Deleter, error)
-	newProvisionerFunc func(options volume.VolumeOptions, host volume.VolumeHost, plugin *hostPathPlugin) (volume.Provisioner, error)
-	config             volume.VolumeConfig
+	host   volume.VolumeHost
+	config volume.VolumeConfig
 }
 
 var _ volume.VolumePlugin = &hostPathPlugin{}
@@ -113,18 +106,18 @@ func (plugin *hostPathPlugin) NewUnmounter(volName string, podUID types.UID) (vo
 }
 
 func (plugin *hostPathPlugin) NewRecycler(pvName string, spec *volume.Spec, eventRecorder volume.RecycleEventRecorder) (volume.Recycler, error) {
-	return plugin.newRecyclerFunc(pvName, spec, eventRecorder, plugin.host, plugin.config)
+	return newRecycler(pvName, spec, eventRecorder, plugin.host, plugin.config)
 }
 
 func (plugin *hostPathPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
-	return plugin.newDeleterFunc(spec, plugin.host)
+	return newDeleter(spec, plugin.host)
 }
 
 func (plugin *hostPathPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
 	if !plugin.config.ProvisioningEnabled {
 		return nil, fmt.Errorf("Provisioning in volume plugin %q is disabled", plugin.GetPluginName())
 	}
-	return plugin.newProvisionerFunc(options, plugin.host, plugin)
+	return newProvisioner(options, plugin.host, plugin)
 }
 
 func (plugin *hostPathPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
