@@ -72,6 +72,7 @@ go_library(
         "networking_perf.go",
         "node_problem_detector.go",
         "nodeoutofdisk.go",
+        "opaque_resource.go",
         "pd.go",
         "persistent_volumes.go",
         "petset.go",
