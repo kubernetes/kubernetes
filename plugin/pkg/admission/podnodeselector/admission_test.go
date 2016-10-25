@@ -143,7 +143,7 @@ func TestPodAdmission(t *testing.T) {
 	}
 	for _, test := range tests {
 		if !test.ignoreTestNamespaceNodeSelector {
-			namespace.ObjectMeta.Annotations = map[string]string{"scheduler.alpha.kubernetes.io/node-selector": test.namespaceNodeSelector}
+			namespace.ObjectMeta.Annotations = map[string]string{api.NodeSelectorsAnnotationKey: test.namespaceNodeSelector}
 			handler.namespaceInformer.GetStore().Update(namespace)
 		}
 		handler.clusterNodeSelectors = make(map[string]string)

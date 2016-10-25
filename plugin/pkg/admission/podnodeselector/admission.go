@@ -35,9 +35,9 @@ import (
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
-// The annotation key scheduler.alpha.kubernetes.io/node-selector is for assigning
-// node selectors labels to namespaces
-var NamespaceNodeSelectors = []string{"scheduler.alpha.kubernetes.io/node-selector"}
+// The annotation key NodeSelectorsAnnotationKey (scheduler.alpha.kubernetes.io/node-selector)
+// is for assigning node selectors labels to namespaces
+var NamespaceNodeSelectors = []string{api.NodeSelectorsAnnotationKey}
 
 func init() {
 	admission.RegisterPlugin("PodNodeSelector", func(config io.Reader) (admission.Interface, error) {

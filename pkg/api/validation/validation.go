@@ -102,6 +102,40 @@ func ValidateDNS1123Subdomain(value string, fldPath *field.Path) field.ErrorList
 	return allErrs
 }
 
+// ValidateNamespaceAnnotations validates annotations of a namespace
+func ValidateNamespaceAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if annotations[api.NodeSelectorsAnnotationKey] != "" {
+		allErrs = append(allErrs, validateNamespaceNodeSelectors(annotations[api.NodeSelectorsAnnotationKey], fldPath)...)
+	}
+	return allErrs
+}
+
+// validateNamespaceNodeSelectors validates node selectors assigned to a namespace
+func validateNamespaceNodeSelectors(nodeSelectors string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(nodeSelectors) != 0 {
+		selectors := strings.Split(nodeSelectors, ",")
+		for _, selector := range selectors {
+			s := strings.Split(selector, "=")
+			if len(s) != 2 {
+				allErrs = append(allErrs, field.Invalid(fldPath, selector, "invalid selector: does not seem to be in \"key=value\" format"))
+				continue
+			}
+			key := strings.TrimSpace(s[0])
+			for _, msg := range validation.IsQualifiedName(key) {
+				allErrs = append(allErrs, field.Invalid(fldPath, key, msg))
+			}
+			value := strings.TrimSpace(s[1])
+			for _, msg := range validation.IsValidLabelValue(value) {
+				allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
+			}
+		}
+	}
+	return allErrs
+}
+
 func ValidatePodSpecificAnnotations(annotations map[string]string, spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if annotations[api.TolerationsAnnotationKey] != "" {
@@ -3344,6 +3378,7 @@ func ValidateResourceQuotaStatusUpdate(newResourceQuota, oldResourceQuota *api.R
 // ValidateNamespace tests if required fields are set.
 func ValidateNamespace(namespace *api.Namespace) field.ErrorList {
 	allErrs := ValidateObjectMeta(&namespace.ObjectMeta, false, ValidateNamespaceName, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateNamespaceAnnotations(namespace.Annotations, field.NewPath("annotations"))...)
 	for i := range namespace.Spec.Finalizers {
 		allErrs = append(allErrs, validateFinalizerName(string(namespace.Spec.Finalizers[i]), field.NewPath("spec", "finalizers"))...)
 	}
@@ -3359,6 +3394,7 @@ func validateFinalizerName(stringValue string, fldPath *field.Path) field.ErrorL
 // newNamespace is updated with fields that cannot be changed
 func ValidateNamespaceUpdate(newNamespace *api.Namespace, oldNamespace *api.Namespace) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newNamespace.ObjectMeta, &oldNamespace.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateNamespaceAnnotations(newNamespace.Annotations, field.NewPath("annotations"))...)
 	newNamespace.Spec.Finalizers = oldNamespace.Spec.Finalizers
 	newNamespace.Status = oldNamespace.Status
 	return allErrs
@@ -3368,6 +3404,7 @@ func ValidateNamespaceUpdate(newNamespace *api.Namespace, oldNamespace *api.Name
 // that cannot be changed.
 func ValidateNamespaceStatusUpdate(newNamespace, oldNamespace *api.Namespace) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newNamespace.ObjectMeta, &oldNamespace.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateNamespaceAnnotations(newNamespace.Annotations, field.NewPath("annotations"))...)
 	newNamespace.Spec = oldNamespace.Spec
 	if newNamespace.DeletionTimestamp.IsZero() {
 		if newNamespace.Status.Phase != api.NamespaceActive {
@@ -3385,7 +3422,7 @@ func ValidateNamespaceStatusUpdate(newNamespace, oldNamespace *api.Namespace) fi
 // newNamespace is updated with fields that cannot be changed.
 func ValidateNamespaceFinalizeUpdate(newNamespace, oldNamespace *api.Namespace) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newNamespace.ObjectMeta, &oldNamespace.ObjectMeta, field.NewPath("metadata"))
-
+	allErrs = append(allErrs, ValidateNamespaceAnnotations(newNamespace.Annotations, field.NewPath("annotations"))...)
 	fldPath := field.NewPath("spec", "finalizers")
 	for i := range newNamespace.Spec.Finalizers {
 		idxPath := fldPath.Index(i)

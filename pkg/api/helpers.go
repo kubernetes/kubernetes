@@ -470,6 +470,10 @@ const (
 	// is at-your-own-risk. Pods that attempt to set an unsafe sysctl that is not enabled for a kubelet
 	// will fail to launch.
 	UnsafeSysctlsPodAnnotationKey string = "security.alpha.kubernetes.io/unsafe-sysctls"
+
+	// NodeSelectorsAnnotationKey represents the key of node selectors in
+	// the Annotations of a namespace
+	NodeSelectorsAnnotationKey string = "scheduler.alpha.kubernetes.io/node-selector"
 )
 
 // TolerationToleratesTaint checks if the toleration tolerates the taint.
