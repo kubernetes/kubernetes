@@ -34,7 +34,7 @@ Drivers run on every Kubernetes node (except master nodes) and create correspond
 Also, it is recommended to activate the plugins using systemd or some other socket activation models.
 
 ### Upgrade
-In most cases upgrade is as simple as upgrading a daemon-set. But in some cases (e.g. fuse based drivers), driver pod cannot be restarted as long as it is in use by a Pod. In those cases, it is recommended to separate out the pod running the server/fuse backend into a separate dameon-set
+In most cases upgrade is as simple as upgrading a daemon-set. But in some cases (e.g. fuse based drivers), driver pod cannot be restarted when it is in use by a Pod. In those cases, it is recommended to separate out the pod running the server/fuse backend into a separate dameon-set
 
 ###Example workflow:
 #### Installation
