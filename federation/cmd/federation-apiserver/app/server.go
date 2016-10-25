@@ -193,7 +193,6 @@ func Run(s *options.ServerRunOptions) error {
 	genericConfig.AuthorizerRBACSuperUser = s.AuthorizationRBACSuperUser
 	genericConfig.AdmissionControl = admissionController
 	genericConfig.APIResourceConfigSource = storageFactory.APIResourceConfigSource
-	genericConfig.MasterServiceNamespace = s.MasterServiceNamespace
 	genericConfig.OpenAPIConfig.Definitions = openapi.OpenAPIDefinitions
 	genericConfig.EnableOpenAPISupport = true
 	genericConfig.OpenAPIConfig.SecurityDefinitions = securityDefinitions

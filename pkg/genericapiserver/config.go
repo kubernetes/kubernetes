@@ -91,7 +91,6 @@ type Config struct {
 	SupportsBasicAuth      bool
 	Authorizer             authorizer.Authorizer
 	AdmissionControl       admission.Interface
-	MasterServiceNamespace string
 	// TODO(ericchiang): Determine if policy escalation checks should be an admission controller.
 	AuthorizerRBACSuperUser string
 
@@ -286,7 +285,6 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 	c.PublicAddress = options.AdvertiseAddress
 	c.ServiceClusterIPRange = &options.ServiceClusterIPRange
 	c.ServiceNodePortRange = options.ServiceNodePortRange
-	c.MaxRequestsInFlight = options.MaxRequestsInFlight
 
 	return c
 }
