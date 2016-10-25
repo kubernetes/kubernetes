@@ -422,11 +422,13 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 		// Container that are running, restarting and paused
 		status.State = kubecontainer.ContainerStateRunning
 		status.StartedAt = startedAt
-		ip, err = dm.determineContainerIP(podNamespace, podName, iResult)
-		// Kubelet doesn't handle the network error scenario
-		if err != nil {
-			status.State = kubecontainer.ContainerStateUnknown
-			status.Message = fmt.Sprintf("Network error: %#v", err)
+		if containerProvidesPodIP(dockerName) {
+			ip, err = dm.determineContainerIP(podNamespace, podName, iResult)
+			// Kubelet doesn't handle the network error scenario
+			if err != nil {
+				status.State = kubecontainer.ContainerStateUnknown
+				status.Message = fmt.Sprintf("Network error: %#v", err)
+			}
 		}
 		return &status, ip, nil
 	}
