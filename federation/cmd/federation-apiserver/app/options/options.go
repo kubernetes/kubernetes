@@ -27,15 +27,15 @@ import (
 
 // Runtime options for the federation-apiserver.
 type ServerRunOptions struct {
-	*genericoptions.ServerRunOptions
-	EventTTL time.Duration
+	GenericServerRunOptions *genericoptions.ServerRunOptions
+	EventTTL                time.Duration
 }
 
 // NewServerRunOptions creates a new ServerRunOptions object with default values.
 func NewServerRunOptions() *ServerRunOptions {
 	s := ServerRunOptions{
-		ServerRunOptions: genericoptions.NewServerRunOptions().WithEtcdOptions(),
-		EventTTL:         1 * time.Hour,
+		GenericServerRunOptions: genericoptions.NewServerRunOptions().WithEtcdOptions(),
+		EventTTL:                1 * time.Hour,
 	}
 	return &s
 }
@@ -43,9 +43,9 @@ func NewServerRunOptions() *ServerRunOptions {
 // AddFlags adds flags for ServerRunOptions fields to be specified via FlagSet.
 func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	// Add the generic flags.
-	s.ServerRunOptions.AddUniversalFlags(fs)
+	s.GenericServerRunOptions.AddUniversalFlags(fs)
 	//Add etcd specific flags.
-	s.ServerRunOptions.AddEtcdStorageFlags(fs)
+	s.GenericServerRunOptions.AddEtcdStorageFlags(fs)
 
 	fs.DurationVar(&s.EventTTL, "event-ttl", s.EventTTL,
 		"Amount of time to retain events. Default is 1h.")
