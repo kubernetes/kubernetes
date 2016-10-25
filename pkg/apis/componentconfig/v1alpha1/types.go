@@ -364,9 +364,9 @@ type KubeletConfiguration struct {
 	// rktPath is the  path of rkt binary. Leave empty to use the first rkt in
 	// $PATH.
 	RktPath string `json:"rktPath"`
-	// mounterPath is the path to mounter binary. If not set, kubelet will attempt to use mount
+	// experimentalMounterPath is the path to mounter binary. If not set, kubelet will attempt to use mount
 	// binary that is available via $PATH,
-	MounterPath string `json:"mounterPath,omitempty"`
+	ExperimentalMounterPath string `json:"experimentalMounterPath,omitempty"`
 	// rktApiEndpoint is the endpoint of the rkt API service to communicate with.
 	RktAPIEndpoint string `json:"rktAPIEndpoint"`
 	// rktStage1Image is the image to use as stage1. Local paths and
