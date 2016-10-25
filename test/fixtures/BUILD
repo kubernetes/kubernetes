@@ -8,3 +8,10 @@ filegroup(
         "**/*.json",
     ]),
 )
+
+filegroup(
+    name = "sources",
+    srcs = glob([
+        "**/*",
+    ]),
+)
