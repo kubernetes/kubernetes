@@ -960,6 +960,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			http.StatusOK,
 			http.StatusMovedPermanently,
 			http.StatusTemporaryRedirect,
+			http.StatusBadRequest,
 			http.StatusNotFound,
 			http.StatusSwitchingProtocols,
 		),
