@@ -101,9 +101,10 @@ func isBind(options []string) (bool, []string) {
 
 // doMount runs the mount command.
 func doMount(mountCmd string, source string, target string, fstype string, options []string) error {
-	glog.V(5).Infof("Mounting %s %s %s %v with command: %q", source, target, fstype, options, mountCmd)
+	glog.V(4).Infof("Mounting %s %s %s %v with command: %q", source, target, fstype, options, mountCmd)
 	mountArgs := makeMountArgs(source, target, fstype, options)
 
+	glog.V(4).Infof("Mounting cmd (%s) with arguments (%s)", mountCmd, mountArgs)
 	command := exec.Command(mountCmd, mountArgs...)
 	output, err := command.CombinedOutput()
 	if err != nil {
@@ -135,7 +136,7 @@ func makeMountArgs(source, target, fstype string, options []string) []string {
 
 // Unmount unmounts the target.
 func (mounter *Mounter) Unmount(target string) error {
-	glog.V(5).Infof("Unmounting %s", target)
+	glog.V(4).Infof("Unmounting %s", target)
 	command := exec.Command("umount", target)
 	output, err := command.CombinedOutput()
 	if err != nil {
@@ -156,6 +157,10 @@ func (*Mounter) List() ([]MountPoint, error) {
 // will return true. When in fact /tmp/b is a mount point. If this situation
 // if of interest to you, don't use this function...
 func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
+	return IsNotMountPoint(file)
+}
+
+func IsNotMountPoint(file string) (bool, error) {
 	stat, err := os.Stat(file)
 	if err != nil {
 		return true, err
@@ -173,9 +178,10 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 }
 
 // DeviceOpened checks if block device in use by calling Open with O_EXCL flag.
-// Returns true if open returns errno EBUSY, and false if errno is nil.
-// Returns an error if errno is any error other than EBUSY.
-// Returns with error if pathname is not a device.
+// If pathname is not a device, log and return false with nil error.
+// If open returns errno EBUSY, return true with nil error.
+// If open returns nil, return false with nil error.
+// Otherwise, return false with error
 func (mounter *Mounter) DeviceOpened(pathname string) (bool, error) {
 	return exclusiveOpenFailsOnDevice(pathname)
 }
@@ -187,11 +193,16 @@ func (mounter *Mounter) PathIsDevice(pathname string) (bool, error) {
 }
 
 func exclusiveOpenFailsOnDevice(pathname string) (bool, error) {
-	if isDevice, err := pathIsDevice(pathname); !isDevice {
+	isDevice, err := pathIsDevice(pathname)
+	if err != nil {
 		return false, fmt.Errorf(
 			"PathIsDevice failed for path %q: %v",
 			pathname,
 			err)
+	}
+	if !isDevice {
+		glog.Errorf("Path %q is not refering to a device.", pathname)
+		return false, nil
 	}
 	fd, errno := syscall.Open(pathname, syscall.O_RDONLY|syscall.O_EXCL, 0)
 	// If the device is in use, open will return an invalid fd.
