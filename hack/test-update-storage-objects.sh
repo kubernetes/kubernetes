@@ -100,6 +100,7 @@ function cleanup() {
 trap cleanup EXIT SIGINT
 
 make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
+make -C "${KUBE_ROOT}" WHAT=cmd/kubectl
 make -C "${KUBE_ROOT}" WHAT=cluster/images/etcd/attachlease
 
 kube::etcd::start
