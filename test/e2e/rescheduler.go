@@ -52,8 +52,8 @@ var _ = framework.KubeDescribe("Rescheduler [Serial]", func() {
 		defer framework.DeleteRCAndPods(f.ClientSet, ns, "reserve-all-cpu")
 		framework.ExpectNoError(err)
 
-		By("creating a new instance of DNS and waiting for DNS to be scheduled")
-		label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": "kube-dns"}))
+		By("creating a new instance of Dashboard and waiting for Dashboard to be scheduled")
+		label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": "kubernetes-dashboard"}))
 		listOpts := api.ListOptions{LabelSelector: label}
 		rcs, err := f.ClientSet.Core().ReplicationControllers(api.NamespaceSystem).List(listOpts)
 		framework.ExpectNoError(err)
