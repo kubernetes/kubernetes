@@ -565,7 +565,12 @@ func waitForAllCaPodsReadyInNamespace(f *framework.Framework, c clientset.Interf
 					ready = true
 				}
 			}
-			if !ready {
+			// Failed pods in this context generally mean that they have been
+			// double scheduled onto a node, but then failed a constraint check.
+			if pod.Status.Phase == api.PodFailed {
+				glog.Warningf("Pod has failed: %v", pod)
+			}
+			if !ready && pod.Status.Phase != api.PodFailed {
 				notready = append(notready, pod.Name)
 			}
 		}
