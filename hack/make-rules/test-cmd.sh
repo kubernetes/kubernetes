@@ -2162,6 +2162,9 @@ __EOF__
   ## Set resource limits/request of a deployment
   # Pre-condition: no deployment exists
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Set resources of a local file without talking to the server
+  kubectl set resources -f hack/testdata/deployment-multicontainer.yaml -c=perl --limits=cpu=300m --requests=cpu=300m --local -o yaml "${kube_flags[@]}"
+  ! kubectl set resources -f hack/testdata/deployment-multicontainer.yaml -c=perl --limits=cpu=300m --requests=cpu=300m --dry-run -o yaml "${kube_flags[@]}"
   # Create a deployment
   kubectl create -f hack/testdata/deployment-multicontainer.yaml "${kube_flags[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx-deployment:'
@@ -2196,7 +2199,9 @@ __EOF__
   kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 1).resources.limits.cpu}}:{{end}}" "300m:"
   kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 1).resources.requests.cpu}}:{{end}}" "300m:"
   # Set limits on a local file without talking to the server
-  kubectl set resources deployment -f hack/testdata/deployment-multicontainer.yaml -c=perl --limits=cpu=300m --requests=cpu=300m --dry-run -o yaml "${kube_flags[@]}"
+  kubectl set resources -f hack/testdata/deployment-multicontainer.yaml -c=perl --limits=cpu=500m --requests=cpu=500m --dry-run -o yaml "${kube_flags[@]}"
+  kubectl set resources deployment nginx-deployment -c=perl --limits=cpu=500m --requests=cpu=500m --dry-run -o yaml "${kube_flags[@]}"
+  ! kubectl set resources deployment nginx-deployment -c=perl --limits=cpu=500m --requests=cpu=500m --local -o yaml "${kube_flags[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 0).resources.limits.cpu}}:{{end}}" "200m:"
   kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 1).resources.limits.cpu}}:{{end}}" "300m:"
   kube::test::get_object_assert deployment "{{range.items}}{{(index .spec.template.spec.containers 1).resources.requests.cpu}}:{{end}}" "300m:"
