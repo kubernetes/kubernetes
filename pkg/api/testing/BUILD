@@ -27,6 +27,7 @@ go_library(
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/extensions:go_default_library",
+        "//pkg/apis/policy:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//pkg/fields:go_default_library",
         "//pkg/labels:go_default_library",

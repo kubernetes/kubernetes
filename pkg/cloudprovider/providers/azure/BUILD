@@ -40,7 +40,6 @@ go_library(
         "//vendor:github.com/Azure/go-autorest/autorest/to",
         "//vendor:github.com/ghodss/yaml",
         "//vendor:github.com/golang/glog",
-        "//vendor:github.com/rubiojr/go-vhd/vhd",
     ],
 )
 
