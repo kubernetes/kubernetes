@@ -321,7 +321,7 @@ func (psc *StatefulSetController) Sync(key string) error {
 
 // syncStatefulSet syncs a tuple of (statefulset, pets).
 func (psc *StatefulSetController) syncStatefulSet(ps *apps.StatefulSet, pets []*api.Pod) (int, error) {
-	glog.Infof("Syncing StatefulSet %v/%v with %d pods", ps.Namespace, ps.Name, len(pets))
+	glog.V(2).Infof("Syncing StatefulSet %v/%v with %d pods", ps.Namespace, ps.Name, len(pets))
 
 	it := NewStatefulSetIterator(ps, pets)
 	blockingPet, err := psc.blockingPetStore.Get(ps, pets)
