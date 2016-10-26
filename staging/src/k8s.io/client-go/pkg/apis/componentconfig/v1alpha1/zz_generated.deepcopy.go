@@ -263,6 +263,7 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		out.RemoteImageEndpoint = in.RemoteImageEndpoint
 		out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 		out.RktPath = in.RktPath
+		out.MounterPath = in.MounterPath
 		out.RktAPIEndpoint = in.RktAPIEndpoint
 		out.RktStage1Image = in.RktStage1Image
 		if in.LockFilePath != nil {
@@ -273,13 +274,6 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 			out.LockFilePath = nil
 		}
 		out.ExitOnLockContention = in.ExitOnLockContention
-		if in.ConfigureCBR0 != nil {
-			in, out := &in.ConfigureCBR0, &out.ConfigureCBR0
-			*out = new(bool)
-			**out = **in
-		} else {
-			out.ConfigureCBR0 = nil
-		}
 		out.HairpinMode = in.HairpinMode
 		out.BabysitDaemons = in.BabysitDaemons
 		out.MaxPods = in.MaxPods

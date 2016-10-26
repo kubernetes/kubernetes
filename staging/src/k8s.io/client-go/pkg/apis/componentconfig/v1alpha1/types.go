@@ -343,8 +343,10 @@ type KubeletConfiguration struct {
 	// Enable QoS based Cgroup hierarchy: top level cgroups for QoS Classes
 	// And all Burstable and BestEffort pods are brought up under their
 	// specific top level QoS cgroup.
+	// +optional
 	CgroupsPerQOS *bool `json:"cgroupsPerQOS,omitempty"`
 	// driver that the kubelet uses to manipulate cgroups on the host (cgroupfs or systemd)
+	// +optional
 	CgroupDriver string `json:"cgroupDriver,omitempty"`
 	// containerRuntime is the container runtime to use.
 	ContainerRuntime string `json:"containerRuntime"`
@@ -358,6 +360,9 @@ type KubeletConfiguration struct {
 	// rktPath is the  path of rkt binary. Leave empty to use the first rkt in
 	// $PATH.
 	RktPath string `json:"rktPath"`
+	// mounterPath is the path to mounter binary. If not set, kubelet will attempt to use mount
+	// binary that is available via $PATH,
+	MounterPath string `json:"mounterPath,omitempty"`
 	// rktApiEndpoint is the endpoint of the rkt API service to communicate with.
 	RktAPIEndpoint string `json:"rktAPIEndpoint"`
 	// rktStage1Image is the image to use as stage1. Local paths and
@@ -372,18 +377,14 @@ type KubeletConfiguration struct {
 	// This will cause the kubelet to listen to inotify events on the lock file,
 	// releasing it and exiting when another process tries to open that file.
 	ExitOnLockContention bool `json:"exitOnLockContention"`
-	// configureCBR0 enables the kublet to configure cbr0 based on
-	// Node.Spec.PodCIDR.
-	ConfigureCBR0 *bool `json:"configureCbr0"`
 	// How should the kubelet configure the container bridge for hairpin packets.
 	// Setting this flag allows endpoints in a Service to loadbalance back to
 	// themselves if they should try to access their own Service. Values:
 	//   "promiscuous-bridge": make the container bridge promiscuous.
 	//   "hairpin-veth":       set the hairpin flag on container veth interfaces.
 	//   "none":               do nothing.
-	// Setting --configure-cbr0 to false implies that to achieve hairpin NAT
-	// one must set --hairpin-mode=veth-flag, because bridge assumes the
-	// existence of a container bridge named cbr0.
+	// Generally, one must set --hairpin-mode=veth-flag to achieve hairpin NAT,
+	// because promiscous-bridge assumes the existence of a container bridge named cbr0.
 	HairpinMode string `json:"hairpinMode"`
 	// The node has babysitter process monitoring docker and kubelet.
 	BabysitDaemons bool `json:"babysitDaemons"`
@@ -409,10 +410,10 @@ type KubeletConfiguration struct {
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
 	MaxOpenFiles int64 `json:"maxOpenFiles"`
 	// reconcileCIDR is Reconcile node CIDR with the CIDR specified by the
-	// API server. No-op if register-node or configure-cbr0 is false.
+	// API server. Won't have any effect if register-node is false.
 	ReconcileCIDR *bool `json:"reconcileCIDR"`
 	// registerSchedulable tells the kubelet to register the node as
-	// schedulable. No-op if register-node is false.
+	// schedulable. Won't have any effect if register-node is false.
 	RegisterSchedulable *bool `json:"registerSchedulable"`
 	// contentType is contentType of requests sent to apiserver.
 	ContentType string `json:"contentType"`
@@ -482,8 +483,10 @@ type KubeletConfiguration struct {
 	IPTablesDropBit *int32 `json:"iptablesDropBit"`
 	// Whitelist of unsafe sysctls or sysctl patterns (ending in *). Use these at your own risk.
 	// Resource isolation might be lacking and pod might influence each other on the same node.
+	// +optional
 	AllowedUnsafeSysctls []string `json:"allowedUnsafeSysctls,omitempty"`
 	// How to integrate with runtime. If set to CRI, kubelet will switch to
 	// using the new Container Runtine Interface.
+	// +optional
 	ExperimentalRuntimeIntegrationType string `json:"experimentalRuntimeIntegrationType,omitempty"`
 }

@@ -20,6 +20,7 @@ import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // ComponentStatusesGetter has a method to return a ComponentStatusInterface.
@@ -43,13 +44,13 @@ type ComponentStatusInterface interface {
 
 // componentStatuses implements ComponentStatusInterface
 type componentStatuses struct {
-	client *CoreClient
+	client rest.Interface
 }
 
 // newComponentStatuses returns a ComponentStatuses
 func newComponentStatuses(c *CoreClient) *componentStatuses {
 	return &componentStatuses{
-		client: c,
+		client: c.RESTClient(),
 	}
 }
 

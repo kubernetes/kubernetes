@@ -51,6 +51,7 @@ const (
 var zeroDuration = unversioned.Duration{}
 
 func addDefaultingFuncs(scheme *kruntime.Scheme) error {
+	RegisterDefaults(scheme)
 	return scheme.AddDefaultingFuncs(
 		SetDefaults_KubeProxyConfiguration,
 		SetDefaults_KubeSchedulerConfiguration,
@@ -160,9 +161,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	}
 	if obj.CertDirectory == "" {
 		obj.CertDirectory = "/var/run/kubernetes"
-	}
-	if obj.ConfigureCBR0 == nil {
-		obj.ConfigureCBR0 = boolVar(false)
 	}
 	if obj.CgroupsPerQOS == nil {
 		obj.CgroupsPerQOS = boolVar(false)

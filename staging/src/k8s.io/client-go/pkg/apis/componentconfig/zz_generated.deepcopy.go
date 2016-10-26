@@ -277,11 +277,11 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.RemoteImageEndpoint = in.RemoteImageEndpoint
 		out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 		out.RktPath = in.RktPath
+		out.MounterPath = in.MounterPath
 		out.RktAPIEndpoint = in.RktAPIEndpoint
 		out.RktStage1Image = in.RktStage1Image
 		out.LockFilePath = in.LockFilePath
 		out.ExitOnLockContention = in.ExitOnLockContention
-		out.ConfigureCBR0 = in.ConfigureCBR0
 		out.HairpinMode = in.HairpinMode
 		out.BabysitDaemons = in.BabysitDaemons
 		out.MaxPods = in.MaxPods
