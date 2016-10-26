@@ -728,7 +728,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent) {
 	trace := util.NewTrace(
 		fmt.Sprintf("cacheWatcher %v: waiting for add (initial result size %v)",
 			reflect.TypeOf(event.Object).String(), len(c.result)))
-	defer trace.LogIfLong(5 * time.Millisecond)
+	defer trace.LogIfLong(50 * time.Millisecond)
 
 	const timeout = 5 * time.Second
 	t, ok := timerPool.Get().(*time.Timer)
