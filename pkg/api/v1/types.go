@@ -3376,6 +3376,15 @@ type PodExecOptions struct {
 	Command []string `json:"command" protobuf:"bytes,6,rep,name=command"`
 }
 
+// PodPortForwardOptions is the query options to a Pod's port forward call.
+type PodPortForwardOptions struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// List of ports to forward
+	// +optional
+	Ports []int32 `json:"ports,omitempty" protobuf:"varint,1,rep,name=ports"`
+}
+
 // PodProxyOptions is the query options to a Pod's proxy call.
 type PodProxyOptions struct {
 	metav1.TypeMeta `json:",inline"`

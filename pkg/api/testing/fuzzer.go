@@ -116,6 +116,9 @@ func FuzzerFor(t *testing.T, version schema.GroupVersion, src rand.Source) *fuzz
 			j.Stdout = true
 			j.Stderr = true
 		},
+		func(j *api.PodPortForwardOptions, c fuzz.Continue) {
+			j.Ports = make([]int32, 0)
+		},
 		func(s *api.PodSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(s)
 			// has a default value

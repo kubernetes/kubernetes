@@ -89,7 +89,7 @@ type Config struct {
 var DefaultConfig = Config{
 	StreamIdleTimeout:     4 * time.Hour,
 	StreamCreationTimeout: remotecommand.DefaultStreamCreationTimeout,
-	SupportedProtocols:    remotecommand.SupportedStreamingProtocols,
+	SupportedProtocols:    append(remotecommand.SupportedStreamingProtocols, portforward.SupportedProtocols...),
 }
 
 // TODO(timstclair): Add auth(n/z) interface & handling.
@@ -312,7 +312,8 @@ func (s *server) servePortForward(req *restful.Request, resp *restful.Response) 
 		podSandboxID,
 		"", // unused: podUID
 		s.config.StreamIdleTimeout,
-		s.config.StreamCreationTimeout)
+		s.config.StreamCreationTimeout,
+		s.config.SupportedProtocols)
 }
 
 // criAdapter wraps the Runtime functions to conform to the remotecommand interfaces.

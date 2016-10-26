@@ -2907,6 +2907,15 @@ type PodExecOptions struct {
 	Command []string
 }
 
+// PodPortForwardOptions is the query options to a Pod's port forward call
+type PodPortForwardOptions struct {
+	metav1.TypeMeta
+
+	// The list of ports to forward
+	// +optional
+	Ports []int32 `json:"ports,omitempty"`
+}
+
 // PodProxyOptions is the query options to a Pod's proxy call
 type PodProxyOptions struct {
 	metav1.TypeMeta

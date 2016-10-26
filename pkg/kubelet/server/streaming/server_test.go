@@ -204,7 +204,7 @@ func TestServePortForward(t *testing.T) {
 	loc.Path = fmt.Sprintf("/%s/%s", "portforward", testPodSandboxID)
 	exec, err := remotecommand.NewExecutor(&restclient.Config{}, "POST", loc)
 	require.NoError(t, err)
-	streamConn, _, err := exec.Dial(kubeletportforward.PortForwardProtocolV1Name)
+	streamConn, _, err := exec.Dial(kubeletportforward.ProtocolV1Name)
 	require.NoError(t, err)
 	defer streamConn.Close()
 
