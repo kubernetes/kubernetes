@@ -64,7 +64,7 @@ type Runtime interface {
 
 // Config defines the options used for running the stream server.
 type Config struct {
-	// The address the to serve on.
+	// The host:port address the server will listen on.
 	Addr string
 
 	StreamIdleTimeout     time.Duration
