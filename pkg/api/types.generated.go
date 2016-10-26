@@ -26573,7 +26573,7 @@ func (x *WeightedPodAffinityTerm) codecDecodeSelfFromMap(l int, d *codec1978.Dec
 			if r.TryDecodeAsNil() {
 				x.Weight = 0
 			} else {
-				x.Weight = int(r.DecodeInt(codecSelferBitsize1234))
+				x.Weight = int32(r.DecodeInt(32))
 			}
 		case "podAffinityTerm":
 			if r.TryDecodeAsNil() {
@@ -26610,7 +26610,7 @@ func (x *WeightedPodAffinityTerm) codecDecodeSelfFromArray(l int, d *codec1978.D
 	if r.TryDecodeAsNil() {
 		x.Weight = 0
 	} else {
-		x.Weight = int(r.DecodeInt(codecSelferBitsize1234))
+		x.Weight = int32(r.DecodeInt(32))
 	}
 	yyj1969++
 	if yyhl1969 {
