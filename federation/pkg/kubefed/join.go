@@ -21,8 +21,7 @@ import (
 	"io"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/kubectl"
 	kubectlcmd "k8s.io/kubernetes/pkg/kubectl/cmd"
@@ -35,10 +34,6 @@ import (
 )
 
 const (
-	// KubeconfigSecretDataKey is the key name used in the secret to
-	// stores a cluster's credentials.
-	KubeconfigSecretDataKey = "kubeconfig"
-
 	// defaultClusterCIDR is the default CIDR range accepted by the
 	// joining API server. See `apis/federation.ClusterSpec` for
 	// details.
@@ -59,52 +54,9 @@ var (
 		kubectl join foo --host-cluster-context=bar`)
 )
 
-// JoinFederationConfig provides a filesystem based kubeconfig (via
-// `PathOptions()`) and a mechanism to talk to the federation host
-// cluster.
-type JoinFederationConfig interface {
-	// PathOptions provides filesystem based kubeconfig access.
-	PathOptions() *clientcmd.PathOptions
-	// HostFactory provides a mechanism to communicate with the
-	// cluster where federation control plane is hosted.
-	HostFactory(host, kubeconfigPath string) cmdutil.Factory
-}
-
-// joinFederationConfig implements JoinFederationConfig interface.
-type joinFederationConfig struct {
-	pathOptions *clientcmd.PathOptions
-}
-
-// Assert that `joinFederationConfig` implements the
-// `JoinFederationConfig` interface.
-var _ JoinFederationConfig = &joinFederationConfig{}
-
-func NewJoinFederationConfig(pathOptions *clientcmd.PathOptions) JoinFederationConfig {
-	return &joinFederationConfig{
-		pathOptions: pathOptions,
-	}
-}
-
-func (j *joinFederationConfig) PathOptions() *clientcmd.PathOptions {
-	return j.pathOptions
-}
-
-func (j *joinFederationConfig) HostFactory(host, kubeconfigPath string) cmdutil.Factory {
-	loadingRules := *j.pathOptions.LoadingRules
-	loadingRules.Precedence = j.pathOptions.GetLoadingPrecedence()
-	loadingRules.ExplicitPath = kubeconfigPath
-	overrides := &clientcmd.ConfigOverrides{
-		CurrentContext: host,
-	}
-
-	hostClientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(&loadingRules, overrides)
-
-	return cmdutil.NewFactory(hostClientConfig)
-}
-
 // NewCmdJoin defines the `join` command that joins a cluster to a
 // federation.
-func NewCmdJoin(f cmdutil.Factory, cmdOut io.Writer, config JoinFederationConfig) *cobra.Command {
+func NewCmdJoin(f cmdutil.Factory, cmdOut io.Writer, config util.AdminConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "join CLUSTER_CONTEXT --host-cluster-context=HOST_CONTEXT",
 		Short:   "Join a cluster to a federation",
@@ -120,35 +72,34 @@ func NewCmdJoin(f cmdutil.Factory, cmdOut io.Writer, config JoinFederationConfig
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.ClusterV1Beta1GeneratorName)
-	addJoinFlags(cmd)
+	util.AddSubcommandFlags(cmd)
 	return cmd
 }
 
 // joinFederation is the implementation of the `join federation` command.
-func joinFederation(f cmdutil.Factory, cmdOut io.Writer, config JoinFederationConfig, cmd *cobra.Command, args []string) error {
-	name, err := kubectlcmd.NameFromCommandArgs(cmd, args)
+func joinFederation(f cmdutil.Factory, cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Command, args []string) error {
+	joinFlags, err := util.GetSubcommandFlags(cmd, args)
 	if err != nil {
 		return err
 	}
-	host := cmdutil.GetFlagString(cmd, "host-cluster-context")
-	hostSystemNamespace := cmdutil.GetFlagString(cmd, "host-system-namespace")
-	kubeconfig := cmdutil.GetFlagString(cmd, "kubeconfig")
 	dryRun := cmdutil.GetDryRunFlag(cmd)
 
-	glog.V(2).Infof("Args and flags: name %s, host: %s, host-system-namespace: %s, kubeconfig: %s, dry-run: %s", name, host, hostSystemNamespace, kubeconfig, dryRun)
+	glog.V(2).Infof("Args and flags: name %s, host: %s, host-system-namespace: %s, kubeconfig: %s, dry-run: %s", joinFlags.Name, joinFlags.Host, joinFlags.HostSystemNamespace, joinFlags.Kubeconfig, dryRun)
 
 	po := config.PathOptions()
-	po.LoadingRules.ExplicitPath = kubeconfig
+	po.LoadingRules.ExplicitPath = joinFlags.Kubeconfig
 	clientConfig, err := po.GetStartingConfig()
 	if err != nil {
 		return err
 	}
-	generator, err := clusterGenerator(clientConfig, name)
+	generator, err := clusterGenerator(clientConfig, joinFlags.Name)
 	if err != nil {
 		glog.V(2).Infof("Failed creating cluster generator: %v", err)
 		return err
 	}
 	glog.V(2).Infof("Created cluster generator: %#v", generator)
+
+	hostFactory := config.HostFactory(joinFlags.Host, joinFlags.Kubeconfig)
 
 	// We are not using the `kubectl create secret` machinery through
 	// `RunCreateSubcommand` as we do to the cluster resource below
@@ -165,8 +116,7 @@ func joinFederation(f cmdutil.Factory, cmdOut io.Writer, config JoinFederationCo
 	//    don't have to print the created secret in the default case.
 	// Having said that, secret generation machinery could be altered to
 	// suit our needs, but it is far less invasive and readable this way.
-	hostFactory := config.HostFactory(host, kubeconfig)
-	_, err = createSecret(hostFactory, clientConfig, hostSystemNamespace, name, dryRun)
+	_, err = createSecret(hostFactory, clientConfig, joinFlags.HostSystemNamespace, joinFlags.Name, dryRun)
 	if err != nil {
 		glog.V(2).Infof("Failed creating the cluster credentials secret: %v", err)
 		return err
@@ -174,17 +124,11 @@ func joinFederation(f cmdutil.Factory, cmdOut io.Writer, config JoinFederationCo
 	glog.V(2).Infof("Cluster credentials secret created")
 
 	return kubectlcmd.RunCreateSubcommand(f, cmd, cmdOut, &kubectlcmd.CreateSubcommandOptions{
-		Name:                name,
+		Name:                joinFlags.Name,
 		StructuredGenerator: generator,
 		DryRun:              dryRun,
 		OutputFormat:        cmdutil.GetFlagString(cmd, "output"),
 	})
-}
-
-func addJoinFlags(cmd *cobra.Command) {
-	cmd.Flags().String("kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
-	cmd.Flags().String("host-cluster-context", "", "Host cluster context")
-	cmd.Flags().String("host-system-namespace", "federation-system", "Namespace in the host cluster where the federation system components are installed")
 }
 
 // minifyConfig is a wrapper around `clientcmdapi.MinifyConfig()` that
@@ -223,34 +167,14 @@ func createSecret(hostFactory cmdutil.Factory, clientConfig *clientcmdapi.Config
 		return nil, err
 	}
 
-	configBytes, err := clientcmd.Write(*newClientConfig)
+	// Boilerplate to create the secret in the host cluster.
+	clientset, err := hostFactory.ClientSet()
 	if err != nil {
 		glog.V(2).Infof("Failed to serialize the kubeconfig for the given context %q: %v", name, err)
 		return nil, err
 	}
 
-	// Build the secret object with the minified and flattened
-	// kubeconfig content.
-	secret := &api.Secret{
-		ObjectMeta: api.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-		Data: map[string][]byte{
-			KubeconfigSecretDataKey: configBytes,
-		},
-	}
-
-	if !dryRun {
-		// Boilerplate to create the secret in the host cluster.
-		clientset, err := hostFactory.ClientSet()
-		if err != nil {
-			glog.V(2).Infof("Failed to retrieve the cluster clientset: %v", err)
-			return nil, err
-		}
-		return clientset.Core().Secrets(namespace).Create(secret)
-	}
-	return secret, nil
+	return util.CreateKubeconfigSecret(clientset, newClientConfig, namespace, name, dryRun)
 }
 
 // clusterGenerator extracts the cluster information from the supplied

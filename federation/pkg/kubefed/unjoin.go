@@ -22,10 +22,10 @@ import (
 	"net/url"
 
 	federationapi "k8s.io/kubernetes/federation/apis/federation"
+	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	kubectlcmd "k8s.io/kubernetes/pkg/kubectl/cmd"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -49,7 +49,7 @@ var (
 
 // NewCmdUnjoin defines the `unjoin` command that removes a cluster
 // from a federation.
-func NewCmdUnjoin(f cmdutil.Factory, cmdOut, cmdErr io.Writer, config JoinFederationConfig) *cobra.Command {
+func NewCmdUnjoin(f cmdutil.Factory, cmdOut, cmdErr io.Writer, config util.AdminConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "unjoin CLUSTER_NAME --host-cluster-context=HOST_CONTEXT",
 		Short:   "Unjoins a cluster from a federation",
@@ -61,42 +61,41 @@ func NewCmdUnjoin(f cmdutil.Factory, cmdOut, cmdErr io.Writer, config JoinFedera
 		},
 	}
 
-	addJoinFlags(cmd)
+	util.AddSubcommandFlags(cmd)
 	return cmd
 }
 
 // unjoinFederation is the implementation of the `unjoin` command.
-func unjoinFederation(f cmdutil.Factory, cmdOut, cmdErr io.Writer, config JoinFederationConfig, cmd *cobra.Command, args []string) error {
-	name, err := kubectlcmd.NameFromCommandArgs(cmd, args)
+func unjoinFederation(f cmdutil.Factory, cmdOut, cmdErr io.Writer, config util.AdminConfig, cmd *cobra.Command, args []string) error {
+	unjoinFlags, err := util.GetSubcommandFlags(cmd, args)
 	if err != nil {
 		return err
 	}
-	host := cmdutil.GetFlagString(cmd, "host-cluster-context")
-	hostSystemNamespace := cmdutil.GetFlagString(cmd, "host-system-namespace")
-	kubeconfig := cmdutil.GetFlagString(cmd, "kubeconfig")
 
-	cluster, err := popCluster(f, name)
+	cluster, err := popCluster(f, unjoinFlags.Name)
 	if err != nil {
 		return err
 	}
 	if cluster == nil {
-		fmt.Fprintf(cmdErr, "WARNING: cluster %q not found in federation, so its credentials' secret couldn't be deleted", name)
+		fmt.Fprintf(cmdErr, "WARNING: cluster %q not found in federation, so its credentials' secret couldn't be deleted", unjoinFlags.Name)
 		return nil
 	}
 
 	// We want a separate client factory to communicate with the
 	// federation host cluster. See join_federation.go for details.
-	hostFactory := config.HostFactory(host, kubeconfig)
-	err = deleteSecret(hostFactory, cluster.Spec.SecretRef.Name, hostSystemNamespace)
+	hostFactory := config.HostFactory(unjoinFlags.Host, unjoinFlags.Kubeconfig)
+	err = deleteSecret(hostFactory, cluster.Spec.SecretRef.Name, unjoinFlags.HostSystemNamespace)
 	if isNotFound(err) {
 		fmt.Fprintf(cmdErr, "WARNING: secret %q not found in the host cluster, so it couldn't be deleted", cluster.Spec.SecretRef.Name)
 	} else if err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(cmdOut, "Successfully removed cluster %q from federation\n", name)
+	_, err = fmt.Fprintf(cmdOut, "Successfully removed cluster %q from federation\n", unjoinFlags.Name)
 	return err
 }
 
+// popCluster fetches the cluster object with the given name, deletes
+// it and returns the deleted cluster object.
 func popCluster(f cmdutil.Factory, name string) (*federationapi.Cluster, error) {
 	// Boilerplate to create the secret in the host cluster.
 	mapper, typer := f.Object()
@@ -133,6 +132,8 @@ func popCluster(f cmdutil.Factory, name string) (*federationapi.Cluster, error) 
 	return cluster, rh.Delete("", name)
 }
 
+// deleteSecret deletes the secret with the given name from the host
+// cluster.
 func deleteSecret(hostFactory cmdutil.Factory, name, namespace string) error {
 	clientset, err := hostFactory.ClientSet()
 	if err != nil {
@@ -141,6 +142,7 @@ func deleteSecret(hostFactory cmdutil.Factory, name, namespace string) error {
 	return clientset.Core().Secrets(namespace).Delete(name, &api.DeleteOptions{})
 }
 
+// isNotFound checks if the given error is a NotFound status error.
 func isNotFound(err error) bool {
 	statusErr := err
 	if urlErr, ok := err.(*url.Error); ok {
