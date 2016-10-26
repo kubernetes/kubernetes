@@ -67,11 +67,17 @@ type Config struct {
 	// The host:port address the server will listen on.
 	Addr string
 
-	StreamIdleTimeout     time.Duration
+	// How long to leave idle connections open for.
+	StreamIdleTimeout time.Duration
+	// How long to wait for clients to create streams. Only used for SPDY streaming.
 	StreamCreationTimeout time.Duration
 
+	// The streaming protocols the server supports (understands and permits).  See
+	// k8s.io/kubernetes/pkg/kubelet/server/remotecommand/constants.go for available protocols.
+	// Only used for SPDY streaming.
 	SupportedProtocols []string
 
+	// The config for serving over TLS. If nil, TLS will not be used.
 	TLSConfig *tls.Config
 }
 
