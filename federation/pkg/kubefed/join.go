@@ -84,7 +84,7 @@ func joinFederation(f cmdutil.Factory, cmdOut io.Writer, config util.AdminConfig
 	}
 	dryRun := cmdutil.GetDryRunFlag(cmd)
 
-	glog.V(2).Infof("Args and flags: name %s, host: %s, host-system-namespace: %s, kubeconfig: %s, dry-run: %s", joinFlags.Name, joinFlags.Host, joinFlags.HostSystemNamespace, joinFlags.Kubeconfig, dryRun)
+	glog.V(2).Infof("Args and flags: name %s, host: %s, host-system-namespace: %s, kubeconfig: %s, dry-run: %s", joinFlags.Name, joinFlags.Host, joinFlags.FederationSystemNamespace, joinFlags.Kubeconfig, dryRun)
 
 	po := config.PathOptions()
 	po.LoadingRules.ExplicitPath = joinFlags.Kubeconfig
@@ -116,7 +116,7 @@ func joinFederation(f cmdutil.Factory, cmdOut io.Writer, config util.AdminConfig
 	//    don't have to print the created secret in the default case.
 	// Having said that, secret generation machinery could be altered to
 	// suit our needs, but it is far less invasive and readable this way.
-	_, err = createSecret(hostFactory, clientConfig, joinFlags.HostSystemNamespace, joinFlags.Name, dryRun)
+	_, err = createSecret(hostFactory, clientConfig, joinFlags.FederationSystemNamespace, joinFlags.Name, dryRun)
 	if err != nil {
 		glog.V(2).Infof("Failed creating the cluster credentials secret: %v", err)
 		return err
