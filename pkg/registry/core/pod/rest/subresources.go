@@ -70,7 +70,7 @@ func (r *ProxyREST) Connect(ctx api.Context, id string, opts runtime.Object, res
 	}
 	location.Path = path.Join(location.Path, proxyOpts.Path)
 	// Return a proxy handler that uses the desired transport, wrapped with additional proxy handling (to get URL rewriting, X-Forwarded-* headers, etc)
-	return newThrottledUpgradeAwareProxyHandler(location, transport, true, false, responder), nil
+	return newThrottledUpgradeAwareProxyHandler(location, transport, true, false, false, responder), nil
 }
 
 // Support both GET and POST methods. We must support GET for browsers that want to use WebSockets.
@@ -100,7 +100,7 @@ func (r *AttachREST) Connect(ctx api.Context, name string, opts runtime.Object, 
 	if err != nil {
 		return nil, err
 	}
-	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder), nil
+	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, true, responder), nil
 }
 
 // NewConnectOptions returns the versioned object that represents exec parameters
@@ -137,7 +137,7 @@ func (r *ExecREST) Connect(ctx api.Context, name string, opts runtime.Object, re
 	if err != nil {
 		return nil, err
 	}
-	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder), nil
+	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, true, responder), nil
 }
 
 // NewConnectOptions returns the versioned object that represents exec parameters
@@ -180,11 +180,12 @@ func (r *PortForwardREST) Connect(ctx api.Context, name string, opts runtime.Obj
 	if err != nil {
 		return nil, err
 	}
-	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder), nil
+	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, true, responder), nil
 }
 
-func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, wrapTransport, upgradeRequired bool, responder rest.Responder) *genericrest.UpgradeAwareProxyHandler {
+func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, wrapTransport, upgradeRequired, interceptRedirects bool, responder rest.Responder) *genericrest.UpgradeAwareProxyHandler {
 	handler := genericrest.NewUpgradeAwareProxyHandler(location, transport, wrapTransport, upgradeRequired, responder)
+	handler.InterceptRedirects = interceptRedirects
 	handler.MaxBytesPerSec = capabilities.Get().PerConnectionBandwidthLimitBytesPerSec
 	return handler
 }
