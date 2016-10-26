@@ -21,7 +21,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
 	imagepolicy "k8s.io/kubernetes/pkg/apis/imagepolicy"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
@@ -47,9 +46,6 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha1_ImageReview_To_imagepolicy_ImageReview(in *ImageReview, out *imagepolicy.ImageReview, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
 	// TODO: Inefficient conversion - can we improve it?
 	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
 		return err
@@ -68,9 +64,6 @@ func Convert_v1alpha1_ImageReview_To_imagepolicy_ImageReview(in *ImageReview, ou
 }
 
 func autoConvert_imagepolicy_ImageReview_To_v1alpha1_ImageReview(in *imagepolicy.ImageReview, out *ImageReview, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
 	// TODO: Inefficient conversion - can we improve it?
 	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
 		return err
