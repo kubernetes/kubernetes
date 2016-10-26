@@ -26,13 +26,13 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	coreinternallisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	"k8s.io/kubernetes/pkg/controller/informers"
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -53,7 +53,7 @@ type limitRanger struct {
 	*admission.Handler
 	client  clientset.Interface
 	actions LimitRangerActions
-	lister  *cache.StoreToLimitRangeLister
+	lister  coreinternallisters.LimitRangeLister
 
 	// liveLookups holds the last few live lookups we've done to help ammortize cost on repeated lookup failures.
 	// This let's us handle the case of latent caches, by looking up actual results for a namespace on cache miss/no results.

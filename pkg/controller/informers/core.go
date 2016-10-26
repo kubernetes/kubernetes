@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	coreinternallisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -211,7 +212,7 @@ func (f *pvInformer) Lister() *cache.StoreToPVFetcher {
 // Interface provides constructor for informer and lister for limit ranges.
 type LimitRangeInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() *cache.StoreToLimitRangeLister
+	Lister() coreinternallisters.LimitRangeLister
 }
 
 type limitRangeInformer struct {
@@ -236,9 +237,9 @@ func (f *limitRangeInformer) Informer() cache.SharedIndexInformer {
 }
 
 // Lister returns lister for limitRangeInformer
-func (f *limitRangeInformer) Lister() *cache.StoreToLimitRangeLister {
+func (f *limitRangeInformer) Lister() coreinternallisters.LimitRangeLister {
 	informer := f.Informer()
-	return &cache.StoreToLimitRangeLister{Indexer: informer.GetIndexer()}
+	return coreinternallisters.NewLimitRangeLister(informer.GetIndexer())
 }
 
 // NewPodInformer returns a SharedIndexInformer that lists and watches all pods
