@@ -118,7 +118,7 @@ def get_maintainers():
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--history', action='store_true', help='Generate test list from result history.')
-    parser.add_argument('--user', help='User to assign new tests to (RANDOM for random assignment).')
+    parser.add_argument('--user', help='User to assign new tests to (default: random).')
     parser.add_argument('--check', action='store_true', help='Exit with a nonzero status if the test list has changed.')
     options = parser.parse_args()
 
@@ -135,7 +135,9 @@ def main():
     maintainers = get_maintainers()
 
     print '# OUTDATED TESTS (%d):' % len(outdated_tests)
-    print  '\n'.join(outdated_tests)
+    print  '\n'.join('%s -- %s%s' %
+                     (t, owners[t][0], ['', ' (random)'][owners[t][1]])
+                      for t in outdated_tests)
     print '# NEW TESTS (%d):' % len(new_tests)
     print  '\n'.join(new_tests)
 
@@ -161,14 +163,14 @@ def main():
         owner for name, (owner, random) in owners.iteritems()
         if owner in maintainers)
     for test_name in set(test_names) - set(owners):
-        if options.user == 'RANDOM':
-            new_owner, _count = random.choice(owner_counts.most_common()[-4:])
-        elif options.user:
+        random_assignment = True
+        if options.user:
             new_owner = options.user
+            random_assignment = False
         else:
-            raise AssertionError('--user must be specified for new tests')
+            new_owner, _count = random.choice(owner_counts.most_common()[-4:])
         owner_counts[new_owner] += 1
-        owners[test_name] = (new_owner, True)
+        owners[test_name] = (new_owner, random_assignment)
 
     print '# Tests per maintainer:'
     for owner, count in owner_counts.most_common():
