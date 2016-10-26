@@ -101,7 +101,16 @@ func (g *genericScheduler) Schedule(pod *api.Pod, nodeLister algorithm.NodeListe
 		return "", err
 	}
 
-	// TODO(harryz) Check if equivalenceCache is enabled and call scheduleWithEquivalenceClass here
+	//Check if equivalenceCache is enabled and call scheduleWithEquivalenceClass here
+
+	fitNodes, failedPredicates, noCacheNodes := g.equivalenceCache.GetCachedPredicates(pod, nodes)
+
+	if len(fitNodes) == 0 && len(noCacheNodes) == 0 {
+		return "", &FitError{
+			Pod:              pod,
+			FailedPredicates: failedPredicates,
+		}
+	}
 
 	trace.Step("Computing predicates")
 	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, g.cachedNodeInfoMap, nodes, g.predicates, g.extenders)
