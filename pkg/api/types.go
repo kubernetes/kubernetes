@@ -1605,7 +1605,7 @@ type PodAntiAffinity struct {
 type WeightedPodAffinityTerm struct {
 	// weight associated with matching the corresponding podAffinityTerm,
 	// in the range 1-100.
-	Weight int `json:"weight"`
+	Weight int32 `json:"weight"`
 	// Required. A pod affinity term, associated with the corresponding weight.
 	PodAffinityTerm PodAffinityTerm `json:"podAffinityTerm"`
 }
