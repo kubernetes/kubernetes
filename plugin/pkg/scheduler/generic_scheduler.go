@@ -315,7 +315,7 @@ func PrioritizeNodes(
 		wg.Add(1)
 		go func(index int, config algorithm.PriorityConfig) {
 			defer wg.Done()
-			if err := config.Reduce(pod, results[index]); err != nil {
+			if err := config.Reduce(pod, meta, results[index]); err != nil {
 				appendError(err)
 			}
 		}(i, priorityConfig)
