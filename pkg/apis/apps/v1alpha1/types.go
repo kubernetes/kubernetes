@@ -23,30 +23,30 @@ import (
 
 // +genclient=true
 
-// PetSet represents a set of pods with consistent identities.
+// StatefulSet represents a set of pods with consistent identities.
 // Identities are defined as:
 //  - Network: A single stable DNS and hostname.
 //  - Storage: As many VolumeClaims as requested.
-// The PetSet guarantees that a given network identity will always
-// map to the same storage identity. PetSet is currently in alpha
+// The StatefulSet guarantees that a given network identity will always
+// map to the same storage identity. StatefulSet is currently in alpha
 // and subject to change without notice.
-type PetSet struct {
+type StatefulSet struct {
 	unversioned.TypeMeta `json:",inline"`
 	// +optional
 	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Spec defines the desired identities of pets in this set.
+	// Spec defines the desired identities of pods in this set.
 	// +optional
-	Spec PetSetSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+	Spec StatefulSetSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
-	// Status is the current status of Pets in this PetSet. This data
+	// Status is the current status of Pods in this StatefulSet. This data
 	// may be out of date by some window of time.
 	// +optional
-	Status PetSetStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+	Status StatefulSetStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
-// A PetSetSpec is the specification of a PetSet.
-type PetSetSpec struct {
+// A StatefulSetSpec is the specification of a StatefulSet.
+type StatefulSetSpec struct {
 	// Replicas is the desired number of replicas of the given Template.
 	// These are replicas in the sense that they are instantiations of the
 	// same Template, but individual replicas also have a consistent identity.
@@ -62,14 +62,14 @@ type PetSetSpec struct {
 	Selector *unversioned.LabelSelector `json:"selector,omitempty" protobuf:"bytes,2,opt,name=selector"`
 
 	// Template is the object that describes the pod that will be created if
-	// insufficient replicas are detected. Each pod stamped out by the PetSet
+	// insufficient replicas are detected. Each pod stamped out by the StatefulSet
 	// will fulfill this Template, but have a unique identity from the rest
-	// of the PetSet.
+	// of the StatefulSet.
 	Template v1.PodTemplateSpec `json:"template" protobuf:"bytes,3,opt,name=template"`
 
-	// VolumeClaimTemplates is a list of claims that pets are allowed to reference.
-	// The PetSet controller is responsible for mapping network identities to
-	// claims in a way that maintains the identity of a pet. Every claim in
+	// VolumeClaimTemplates is a list of claims that pods are allowed to reference.
+	// The StatefulSet controller is responsible for mapping network identities to
+	// claims in a way that maintains the identity of a pod. Every claim in
 	// this list must have at least one matching (by name) volumeMount in one
 	// container in the template. A claim in this list takes precedence over
 	// any volumes in the template, with the same name.
@@ -77,16 +77,16 @@ type PetSetSpec struct {
 	// +optional
 	VolumeClaimTemplates []v1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty" protobuf:"bytes,4,rep,name=volumeClaimTemplates"`
 
-	// ServiceName is the name of the service that governs this PetSet.
-	// This service must exist before the PetSet, and is responsible for
-	// the network identity of the set. Pets get DNS/hostnames that follow the
-	// pattern: pet-specific-string.serviceName.default.svc.cluster.local
-	// where "pet-specific-string" is managed by the PetSet controller.
+	// ServiceName is the name of the service that governs this StatefulSet.
+	// This service must exist before the StatefulSet, and is responsible for
+	// the network identity of the set. Pods get DNS/hostnames that follow the
+	// pattern: pod-specific-string.serviceName.default.svc.cluster.local
+	// where "pod-specific-string" is managed by the StatefulSet controller.
 	ServiceName string `json:"serviceName" protobuf:"bytes,5,opt,name=serviceName"`
 }
 
-// PetSetStatus represents the current state of a PetSet.
-type PetSetStatus struct {
+// StatefulSetStatus represents the current state of a StatefulSet.
+type StatefulSetStatus struct {
 	// most recent generation observed by this autoscaler.
 	// +optional
 	ObservedGeneration *int64 `json:"observedGeneration,omitempty" protobuf:"varint,1,opt,name=observedGeneration"`
@@ -95,10 +95,10 @@ type PetSetStatus struct {
 	Replicas int32 `json:"replicas" protobuf:"varint,2,opt,name=replicas"`
 }
 
-// PetSetList is a collection of PetSets.
-type PetSetList struct {
+// StatefulSetList is a collection of StatefulSets.
+type StatefulSetList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// +optional
 	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	Items                []PetSet `json:"items" protobuf:"bytes,2,rep,name=items"`
+	Items                []StatefulSet `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

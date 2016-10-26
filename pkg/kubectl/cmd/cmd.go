@@ -183,7 +183,7 @@ __custom_func() {
     * limitranges (aka 'limits')
     * nodes (aka 'no')
     * namespaces (aka 'ns')
-    * petsets (alpha feature, may be unstable)
+    * statefulsets (alpha feature, may be unstable)
     * pods (aka 'po')
     * persistentvolumes (aka 'pv')
     * persistentvolumeclaims (aka 'pvc')

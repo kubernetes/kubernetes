@@ -470,7 +470,7 @@ var (
 	scheduledJobColumns          = []string{"NAME", "SCHEDULE", "SUSPEND", "ACTIVE", "LAST-SCHEDULE"}
 	serviceColumns               = []string{"NAME", "CLUSTER-IP", "EXTERNAL-IP", "PORT(S)", "AGE"}
 	ingressColumns               = []string{"NAME", "HOSTS", "ADDRESS", "PORTS", "AGE"}
-	petSetColumns                = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
+	statefulSetColumns           = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
 	endpointColumns              = []string{"NAME", "ENDPOINTS", "AGE"}
 	nodeColumns                  = []string{"NAME", "STATUS", "AGE"}
 	daemonSetColumns             = []string{"NAME", "DESIRED", "CURRENT", "READY", "NODE-SELECTOR", "AGE"}
@@ -539,8 +539,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(serviceColumns, printServiceList)
 	h.Handler(ingressColumns, printIngress)
 	h.Handler(ingressColumns, printIngressList)
-	h.Handler(petSetColumns, printPetSet)
-	h.Handler(petSetColumns, printPetSetList)
+	h.Handler(statefulSetColumns, printStatefulSet)
+	h.Handler(statefulSetColumns, printStatefulSetList)
 	h.Handler(endpointColumns, printEndpoints)
 	h.Handler(endpointColumns, printEndpointsList)
 	h.Handler(nodeColumns, printNode)
@@ -1227,7 +1227,7 @@ func printIngressList(ingressList *extensions.IngressList, w io.Writer, options 
 	return nil
 }
 
-func printPetSet(ps *apps.PetSet, w io.Writer, options PrintOptions) error {
+func printStatefulSet(ps *apps.StatefulSet, w io.Writer, options PrintOptions) error {
 	name := formatResourceName(options.Kind, ps.Name, options.WithKind)
 
 	namespace := ps.Namespace
@@ -1266,9 +1266,9 @@ func printPetSet(ps *apps.PetSet, w io.Writer, options PrintOptions) error {
 	return nil
 }
 
-func printPetSetList(petSetList *apps.PetSetList, w io.Writer, options PrintOptions) error {
-	for _, ps := range petSetList.Items {
-		if err := printPetSet(&ps, w, options); err != nil {
+func printStatefulSetList(statefulSetList *apps.StatefulSetList, w io.Writer, options PrintOptions) error {
+	for _, ps := range statefulSetList.Items {
+		if err := printStatefulSet(&ps, w, options); err != nil {
 			return err
 		}
 	}

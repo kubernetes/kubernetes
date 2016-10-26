@@ -57,9 +57,9 @@ const (
 
 	// An annotation on the Service denoting if the endpoints controller should
 	// go ahead and create endpoints for unready pods. This annotation is
-	// currently only used by PetSets, where we need the pet to be DNS
+	// currently only used by StatefulSets, where we need the pod to be DNS
 	// resolvable during initialization. In this situation we create a headless
-	// service just for the PetSet, and clients shouldn't be using this Service
+	// service just for the StatefulSet, and clients shouldn't be using this Service
 	// for anything so unready endpoints don't matter.
 	TolerateUnreadyEndpointsAnnotation = "service.alpha.kubernetes.io/tolerate-unready-endpoints"
 )
