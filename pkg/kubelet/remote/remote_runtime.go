@@ -247,12 +247,32 @@ func (r *RemoteRuntimeService) ContainerStatus(containerID string) (*runtimeApi.
 	return resp.Status, nil
 }
 
-// Exec executes a command in the container.
-// TODO: support terminal resizing for exec, refer https://github.com/kubernetes/kubernetes/issues/29579.
-func (r *RemoteRuntimeService) Exec(containerID string, cmd []string, tty bool, stdin io.Reader, stdout, stderr io.WriteCloser) error {
-	return fmt.Errorf("Not implemented")
+// ExecLegacy executes a command in the container.
+// TODO: remove this after full CRI streaming APIs are accomplished.
+func (r *RemoteRuntimeService) ExecLegacy(containerID string, cmd []string, tty bool, stdin io.Reader, stdout, stderr io.WriteCloser) error {
+	return fmt.Errorf("not implemented")
 }
 
 func (r *RemoteRuntimeService) UpdateRuntimeConfig(runtimeConfig *runtimeApi.RuntimeConfig) error {
 	return nil
+}
+
+// Exec prepares a streaming endpoint to execute a command in the container.
+func (r *RemoteRuntimeService) Exec(containerID string, cmd []string, tty, stdin bool) (string, error) {
+	return "", fmt.Errorf("not implemented")
+}
+
+// ExecSync runs a command in a container synchronously and returns stdout, stderr and exit code.
+func (r *RemoteRuntimeService) ExecSync(containerID string, cmd []string, timeout int64) (string, string, int32, error) {
+	return "", "", -1, fmt.Errorf("not implemented")
+}
+
+// Attach prepares a streaming endpoint to attach to a running container.
+func (r *RemoteRuntimeService) Attach(containerID string, stdin bool) (string, error) {
+	return "", fmt.Errorf("not implemented")
+}
+
+// PortForward prepares a streaming endpoint to forward ports from a PodSandbox.
+func (r *RemoteRuntimeService) PortForward(podSandboxID string, port int32) (string, error) {
+	return "", fmt.Errorf("not implemented")
 }

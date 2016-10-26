@@ -349,14 +349,50 @@ func (r *FakeRuntimeService) ContainerStatus(containerID string) (*runtimeApi.Co
 	return &status, nil
 }
 
-func (r *FakeRuntimeService) Exec(containerID string, cmd []string, tty bool, stdin io.Reader, stdout, stderr io.WriteCloser) error {
+func (r *FakeRuntimeService) ExecLegacy(containerID string, cmd []string, tty bool, stdin io.Reader, stdout, stderr io.WriteCloser) error {
 	r.Lock()
 	defer r.Unlock()
 
-	r.Called = append(r.Called, "Exec")
+	r.Called = append(r.Called, "ExecLegacy")
 	return nil
 }
 
 func (r *FakeRuntimeService) UpdateRuntimeConfig(runtimeCOnfig *runtimeApi.RuntimeConfig) error {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "UpdateRuntimeConfig")
 	return nil
+}
+
+func (r *FakeRuntimeService) Exec(containerID string, cmd []string, tty, stdin bool) (string, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "Exec")
+	return "", nil
+}
+
+func (r *FakeRuntimeService) ExecSync(containerID string, cmd []string, timeout int64) (string, string, int32, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "ExecSync")
+	return "", "", 0, nil
+}
+
+func (r *FakeRuntimeService) Attach(containerID string, stdin bool) (string, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "Attach")
+	return "", nil
+}
+
+func (r *FakeRuntimeService) PortForward(podSandboxID string, port int32) (string, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "PortForward")
+	return "", nil
 }

@@ -383,9 +383,23 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 	}, nil
 }
 
-// Exec execute a command in the container.
-// TODO: Need to handle terminal resizing before implementing this function.
-// https://github.com/kubernetes/kubernetes/issues/29579.
-func (ds *dockerService) Exec(containerID string, cmd []string, tty bool, stdin io.Reader, stdout, stderr io.WriteCloser) error {
+// ExecLegacy execute a command in the container.
+// TODO: remove this after full CRI streaming APIs are accomplished.
+func (ds *dockerService) ExecLegacy(containerID string, cmd []string, tty bool, stdin io.Reader, stdout, stderr io.WriteCloser) error {
 	return fmt.Errorf("not implemented")
+}
+
+// Exec prepares a streaming endpoint to execute a command in the container.
+func (ds *dockerService) Exec(containerID string, cmd []string, tty, stdin bool) (string, error) {
+	return "", fmt.Errorf("not implemented")
+}
+
+// ExecSync runs a command in a container synchronously and returns stdout, stderr and exit code.
+func (ds *dockerService) ExecSync(containerID string, cmd []string, timeout int64) (string, string, int32, error) {
+	return "", "", -1, fmt.Errorf("not implemented")
+}
+
+// Attach prepares a streaming endpoint to attach to a running container.
+func (ds *dockerService) Attach(containerID string, stdin bool) (string, error) {
+	return "", fmt.Errorf("not implemented")
 }

@@ -43,7 +43,7 @@ func (ds *dockerService) GetContainerLogs(pod *api.Pod, containerID kubecontaine
 	return dockertools.GetContainerLogs(ds.client, pod, containerID, logOptions, stdout, stderr, container.Config.Tty)
 }
 
-func (ds *dockerService) PortForward(sandboxID string, port uint16, stream io.ReadWriteCloser) error {
+func (ds *dockerService) PortForwardLegacy(sandboxID string, port uint16, stream io.ReadWriteCloser) error {
 	return dockertools.PortForward(ds.client, sandboxID, port, stream)
 }
 

@@ -17,6 +17,7 @@ limitations under the License.
 package rktshim
 
 import (
+	"fmt"
 	"io"
 
 	kubeletApi "k8s.io/kubernetes/pkg/kubelet/api"
@@ -65,7 +66,22 @@ func (*Runtime) ContainerStatus(string) (*runtimeApi.ContainerStatus, error) {
 	panic("not implemented")
 }
 
-// Exec executes a command inside an app running inside a pod sanbox.
-func (*Runtime) Exec(string, []string, bool, io.Reader, io.WriteCloser, io.WriteCloser) error {
+// ExecLegacy executes a command inside an app running inside a pod sanbox.
+func (*Runtime) ExecLegacy(string, []string, bool, io.Reader, io.WriteCloser, io.WriteCloser) error {
 	panic("not implemented")
+}
+
+// Exec prepares a streaming endpoint to execute a command in the container.
+func (*Runtime) Exec(containerID string, cmd []string, tty, stdin bool) (string, error) {
+	return "", fmt.Errorf("not implemented")
+}
+
+// ExecSync runs a command in a container synchronously and returns stdout, stderr and exit code.
+func (*Runtime) ExecSync(containerID string, cmd []string, timeout int64) (string, string, int32, error) {
+	return "", "", -1, fmt.Errorf("not implemented")
+}
+
+// Attach prepares a streaming endpoint to attach to a running container.
+func (*Runtime) Attach(containerID string, stdin bool) (string, error) {
+	return "", fmt.Errorf("not implemented")
 }

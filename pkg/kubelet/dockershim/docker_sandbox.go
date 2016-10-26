@@ -282,3 +282,8 @@ func setSandboxResources(hc *dockercontainer.HostConfig) {
 	// TODO: Get rid of the dependency on kubelet internal package.
 	hc.OomScoreAdj = qos.PodInfraOOMAdj
 }
+
+// PortForward prepares a streaming endpoint to forward ports from a PodSandbox.
+func (ds *dockerService) PortForward(podSandboxID string, port int32) (string, error) {
+	return "", fmt.Errorf("not implemented")
+}
