@@ -105,6 +105,7 @@ type watchCache struct {
 	// store will effectively support LIST operation from the "end of cache
 	// history" i.e. from the moment just after the newest cached watched event.
 	// It is necessary to effectively allow clients to start watching at now.
+	// NOTE: We assume that <store> is thread-safe.
 	store cache.Store
 
 	// ResourceVersion up to which the watchCache is propagated.
@@ -202,6 +203,10 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 	}
 	elem := &storeElement{Key: key, Object: event.Object}
 
+	// TODO: We should consider moving this lock below after the watchCacheEvent
+	// is created. In such situation, the only problematic scenario is Replace(
+	// happening after getting object from store and before acquiring a lock.
+	// Maybe introduce another lock for this purpose.
 	w.Lock()
 	defer w.Unlock()
 	previous, exists, err := w.store.Get(elem)
@@ -240,8 +245,6 @@ func (w *watchCache) updateCache(resourceVersion uint64, event *watchCacheEvent)
 
 // List returns list of pointers to <storeElement> objects.
 func (w *watchCache) List() []interface{} {
-	w.RLock()
-	defer w.RUnlock()
 	return w.store.List()
 }
 
@@ -300,8 +303,6 @@ func (w *watchCache) WaitUntilFreshAndGet(resourceVersion uint64, key string, tr
 }
 
 func (w *watchCache) ListKeys() []string {
-	w.RLock()
-	defer w.RUnlock()
 	return w.store.ListKeys()
 }
 
@@ -317,15 +318,11 @@ func (w *watchCache) Get(obj interface{}) (interface{}, bool, error) {
 		return nil, false, fmt.Errorf("couldn't compute key: %v", err)
 	}
 
-	w.RLock()
-	defer w.RUnlock()
 	return w.store.Get(&storeElement{Key: key, Object: object})
 }
 
 // GetByKey returns pointer to <storeElement>.
 func (w *watchCache) GetByKey(key string) (interface{}, bool, error) {
-	w.RLock()
-	defer w.RUnlock()
 	return w.store.GetByKey(key)
 }
 
