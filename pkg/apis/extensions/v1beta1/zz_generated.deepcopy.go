@@ -1148,7 +1148,7 @@ func DeepCopy_v1beta1_ReplicaSetCondition(in interface{}, out interface{}, c *co
 		out := out.(*ReplicaSetCondition)
 		out.Type = in.Type
 		out.Status = in.Status
-		out.LastTransitionTime = in.LastTransitionTime.DeepCopy()
+		out.LastUpdateTime = in.LastUpdateTime.DeepCopy()
 		out.Reason = in.Reason
 		out.Message = in.Message
 		return nil

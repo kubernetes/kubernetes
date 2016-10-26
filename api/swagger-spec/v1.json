@@ -19161,10 +19161,10 @@
       "type": "string",
       "description": "Status of the condition, one of True, False, Unknown."
      },
-     "lastTransitionTime": {
+     "lastUpdateTime": {
       "type": "string",
       "format": "date-time",
-      "description": "The last time the condition transitioned from one status to another."
+      "description": "The last time we updated this condition."
      },
      "reason": {
       "type": "string",

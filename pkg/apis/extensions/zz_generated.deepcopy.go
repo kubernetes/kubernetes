@@ -830,7 +830,7 @@ func DeepCopy_extensions_ReplicaSetCondition(in interface{}, out interface{}, c 
 		out := out.(*ReplicaSetCondition)
 		out.Type = in.Type
 		out.Status = in.Status
-		out.LastTransitionTime = in.LastTransitionTime.DeepCopy()
+		out.LastUpdateTime = in.LastUpdateTime.DeepCopy()
 		out.Reason = in.Reason
 		out.Message = in.Message
 		return nil

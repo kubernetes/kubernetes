@@ -1035,9 +1035,9 @@ type ReplicaSetCondition struct {
 	Type ReplicaSetConditionType `json:"type"`
 	// Status of the condition, one of True, False, Unknown.
 	Status v1.ConditionStatus `json:"status"`
-	// The last time the condition transitioned from one status to another.
+	// The last time we updated this condition.
 	// +optional
-	LastTransitionTime unversioned.Time `json:"lastTransitionTime,omitempty"`
+	LastUpdateTime unversioned.Time `json:"lastUpdateTime,omitempty"`
 	// The reason for the condition's last transition.
 	// +optional
 	Reason string `json:"reason,omitempty"`

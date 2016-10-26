@@ -4392,9 +4392,9 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "",
 						},
 					},
-					"lastTransitionTime": {
+					"lastUpdateTime": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The last time the condition transitioned from one status to another.",
+							Description: "The last time we updated this condition.",
 							Ref:         spec.MustCreateRef("#/definitions/unversioned.Time"),
 						},
 					},
@@ -11740,9 +11740,9 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "",
 						},
 					},
-					"lastTransitionTime": {
+					"lastUpdateTime": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The last time the condition transitioned from one status to another.",
+							Description: "The last time we updated this condition.",
 							Ref:         spec.MustCreateRef("#/definitions/unversioned.Time"),
 						},
 					},
@@ -17298,9 +17298,9 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "",
 						},
 					},
-					"lastTransitionTime": {
+					"lastUpdateTime": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The last time the condition transitioned from one status to another.",
+							Description: "The last time we updated this condition.",
 							Ref:         spec.MustCreateRef("#/definitions/unversioned.Time"),
 						},
 					},

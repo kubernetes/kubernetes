@@ -895,9 +895,9 @@ message ReplicaSetCondition {
   // Status of the condition, one of True, False, Unknown.
   optional string status = 2;
 
-  // The last time the condition transitioned from one status to another.
+  // The last time we updated this condition.
   // +optional
-  optional k8s.io.kubernetes.pkg.api.unversioned.Time lastTransitionTime = 3;
+  optional k8s.io.kubernetes.pkg.api.unversioned.Time lastUpdateTime = 3;
 
   // The reason for the condition's last transition.
   // +optional
