@@ -266,9 +266,9 @@ func TestInterPodAffinityPriority(t *testing.T) {
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 0}, {Host: "machine3", Score: 0}},
 			test:         "all machines are same priority as Affinity is nil",
 		},
-		// the node(machine1) that have the label {"region": "China"} (match the topology key) and that have existing pods that match the labelSelector get high score
+		// the node(machine1) has the label {"region": "China"} (match the topology key) and that have existing pods that match the labelSelector get high score
 		// the node(machine3) that don't have the label {"region": "whatever the value is"} (mismatch the topology key) but that have existing pods that match the labelSelector get low score
-		// the node(machine2) that have the label {"region": "China"} (match the topology key) but that have existing pods that mismatch the labelSelector get low score
+		// the node(machine2) has the label {"region": "China"} (match the topology key) but that have existing pods that mismatch the labelSelector get low score
 		{
 			pod: &api.Pod{Spec: api.PodSpec{NodeName: ""}, ObjectMeta: api.ObjectMeta{Labels: podLabelSecurityS1, Annotations: stayWithS1InRegion}},
 			pods: []*api.Pod{
@@ -278,10 +278,10 @@ func TestInterPodAffinityPriority(t *testing.T) {
 			},
 			nodes: []*api.Node{
 				{ObjectMeta: api.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
-				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
+				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: labelRgChina}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
 			},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 0}, {Host: "machine3", Score: 0}},
+			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 5}, {Host: "machine3", Score: 5}},
 			test: "Affinity: pod that matches topology key & pods in nodes will get high score comparing to others" +
 				"which doesn't match either pods in nodes or in topology key",
 		},
@@ -299,7 +299,7 @@ func TestInterPodAffinityPriority(t *testing.T) {
 				{ObjectMeta: api.ObjectMeta{Name: "machine2", Labels: labelRgChinaAzAz1}},
 				{ObjectMeta: api.ObjectMeta{Name: "machine3", Labels: labelRgIndia}},
 			},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 10}, {Host: "machine3", Score: 0}},
+			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 10}, {Host: "machine2", Score: 5}, {Host: "machine3", Score: 0}},
 			test:         "All the nodes that have the same topology key & label value with one of them has an existing pod that match the affinity rules, have the same score",
 		},
 		// there are 2 regions, say regionChina(machine1,machine3,machine4) and regionIndia(machine2,machine5), both regions have nodes that match the preference.
