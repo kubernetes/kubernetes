@@ -25,7 +25,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/util/initsystem"
 )
 
@@ -36,7 +36,7 @@ func NewCmdReset(out io.Writer) *cobra.Command {
 		Short: "Revert the actions kubeadm init or join made to the machine",
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunReset(out, cmd, skipPreFlight)
-			cmdutil.CheckErr(err)
+			kubeadmutil.CheckErr(err)
 		},
 	}
 
