@@ -42,6 +42,7 @@ const (
 	appArmor                  = "AppArmor"
 	dynamicKubeletConfig      = "DynamicKubeletConfig"
 	dynamicVolumeProvisioning = "DynamicVolumeProvisioning"
+	streamingProxyRedirects   = "StreamingProxyRedirects"
 )
 
 var (
@@ -49,10 +50,11 @@ var (
 	// represented here.
 	knownFeatures = map[string]featureSpec{
 		allAlphaGate:              {false, alpha},
-		externalTrafficLocalOnly:  {false, alpha},
+		externalTrafficLocalOnly:  {true, beta},
 		appArmor:                  {true, beta},
 		dynamicKubeletConfig:      {false, alpha},
 		dynamicVolumeProvisioning: {true, alpha},
+		streamingProxyRedirects:   {true, ga},
 	}
 
 	// Special handling for a few gates.
@@ -107,6 +109,10 @@ type FeatureGate interface {
 	// owner: mtaufen
 	// alpha: v1.4
 	DynamicKubeletConfig() bool
+
+	// owner: timstclair
+	// ga: v1.5
+	StreamingProxyRedirects() bool
 }
 
 // featureGate implements FeatureGate as well as pflag.Value for flag parsing.
@@ -193,6 +199,12 @@ func (f *featureGate) DynamicKubeletConfig() bool {
 // DynamicVolumeProvisioning returns value for dynamicVolumeProvisioning
 func (f *featureGate) DynamicVolumeProvisioning() bool {
 	return f.lookup(dynamicVolumeProvisioning)
+}
+
+// StreamingProxyRedirects controls whether the apiserver should intercept (and follow)
+// redirects from the backend (Kubelet) for streaming requests (exec/attach/port-forward).
+func (f *featureGate) StreamingProxyRedirects() bool {
+	return f.lookup(streamingProxyRedirects)
 }
 
 func (f *featureGate) lookup(key string) bool {

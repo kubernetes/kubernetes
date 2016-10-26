@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/errors"
+	utilconfig "k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/proxy"
 
@@ -154,7 +155,7 @@ func (h *UpgradeAwareProxyHandler) handleUpgrade(w http.ResponseWriter, req *htt
 	defer requestHijackedConn.Close()
 
 	var backendConn net.Conn
-	if h.InterceptRedirects {
+	if h.InterceptRedirects && utilconfig.DefaultFeatureGate.StreamingProxyRedirects() {
 		backendConn, err = h.connectBackendWithRedirects(req, requestHijackedConn)
 	} else {
 		backendConn, err = h.connectBackend(req, h.Location)
