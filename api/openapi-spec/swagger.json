@@ -3373,7 +3373,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.Eviction"
+        "$ref": "#/definitions/v1beta1.Eviction"
        }
       },
       "401": {
@@ -3387,7 +3387,7 @@
       "in": "body",
       "required": true,
       "schema": {
-       "$ref": "#/definitions/v1alpha1.Eviction"
+       "$ref": "#/definitions/v1beta1.Eviction"
       }
      },
      {
@@ -25158,7 +25158,7 @@
      }
     }
    },
-   "/apis/policy/v1alpha1/": {
+   "/apis/policy/v1beta1/": {
     "get": {
      "description": "get available resources",
      "consumes": [
@@ -25175,9 +25175,9 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "getPolicyV1alpha1APIResources",
+     "operationId": "getPolicyV1beta1APIResources",
      "responses": {
       "200": {
        "description": "OK",
@@ -25191,7 +25191,7 @@
      }
     }
    },
-   "/apis/policy/v1alpha1/namespaces/{namespace}/poddisruptionbudgets": {
+   "/apis/policy/v1beta1/namespaces/{namespace}/poddisruptionbudgets": {
     "get": {
      "description": "list or watch objects of kind PodDisruptionBudget",
      "consumes": [
@@ -25208,9 +25208,9 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "listPolicyV1alpha1NamespacedPodDisruptionBudget",
+     "operationId": "listPolicyV1beta1NamespacedPodDisruptionBudget",
      "parameters": [
       {
        "uniqueItems": true,
@@ -25252,7 +25252,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PodDisruptionBudgetList"
+        "$ref": "#/definitions/v1beta1.PodDisruptionBudgetList"
        }
       },
       "401": {
@@ -25274,16 +25274,16 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "createPolicyV1alpha1NamespacedPodDisruptionBudget",
+     "operationId": "createPolicyV1beta1NamespacedPodDisruptionBudget",
      "parameters": [
       {
        "name": "body",
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PodDisruptionBudget"
+        "$ref": "#/definitions/v1beta1.PodDisruptionBudget"
        }
       }
      ],
@@ -25291,7 +25291,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PodDisruptionBudget"
+        "$ref": "#/definitions/v1beta1.PodDisruptionBudget"
        }
       },
       "401": {
@@ -25313,9 +25313,9 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "deletePolicyV1alpha1CollectionNamespacedPodDisruptionBudget",
+     "operationId": "deletePolicyV1beta1CollectionNamespacedPodDisruptionBudget",
      "parameters": [
       {
        "uniqueItems": true,
@@ -25383,7 +25383,7 @@
      }
     ]
    },
-   "/apis/policy/v1alpha1/namespaces/{namespace}/poddisruptionbudgets/{name}": {
+   "/apis/policy/v1beta1/namespaces/{namespace}/poddisruptionbudgets/{name}": {
     "get": {
      "description": "read the specified PodDisruptionBudget",
      "consumes": [
@@ -25398,9 +25398,9 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "readPolicyV1alpha1NamespacedPodDisruptionBudget",
+     "operationId": "readPolicyV1beta1NamespacedPodDisruptionBudget",
      "parameters": [
       {
        "uniqueItems": true,
@@ -25421,7 +25421,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PodDisruptionBudget"
+        "$ref": "#/definitions/v1beta1.PodDisruptionBudget"
        }
       },
       "401": {
@@ -25443,16 +25443,16 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "replacePolicyV1alpha1NamespacedPodDisruptionBudget",
+     "operationId": "replacePolicyV1beta1NamespacedPodDisruptionBudget",
      "parameters": [
       {
        "name": "body",
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PodDisruptionBudget"
+        "$ref": "#/definitions/v1beta1.PodDisruptionBudget"
        }
       }
      ],
@@ -25460,7 +25460,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PodDisruptionBudget"
+        "$ref": "#/definitions/v1beta1.PodDisruptionBudget"
        }
       },
       "401": {
@@ -25482,9 +25482,9 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "deletePolicyV1alpha1NamespacedPodDisruptionBudget",
+     "operationId": "deletePolicyV1beta1NamespacedPodDisruptionBudget",
      "parameters": [
       {
        "name": "body",
@@ -25523,9 +25523,9 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "patchPolicyV1alpha1NamespacedPodDisruptionBudget",
+     "operationId": "patchPolicyV1beta1NamespacedPodDisruptionBudget",
      "parameters": [
       {
        "name": "body",
@@ -25540,7 +25540,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PodDisruptionBudget"
+        "$ref": "#/definitions/v1beta1.PodDisruptionBudget"
        }
       },
       "401": {
@@ -25574,7 +25574,7 @@
      }
     ]
    },
-   "/apis/policy/v1alpha1/namespaces/{namespace}/poddisruptionbudgets/{name}/status": {
+   "/apis/policy/v1beta1/namespaces/{namespace}/poddisruptionbudgets/{name}/status": {
     "get": {
      "description": "read status of the specified PodDisruptionBudget",
      "consumes": [
@@ -25589,14 +25589,14 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "readPolicyV1alpha1NamespacedPodDisruptionBudgetStatus",
+     "operationId": "readPolicyV1beta1NamespacedPodDisruptionBudgetStatus",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PodDisruptionBudget"
+        "$ref": "#/definitions/v1beta1.PodDisruptionBudget"
        }
       },
       "401": {
@@ -25618,16 +25618,16 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "replacePolicyV1alpha1NamespacedPodDisruptionBudgetStatus",
+     "operationId": "replacePolicyV1beta1NamespacedPodDisruptionBudgetStatus",
      "parameters": [
       {
        "name": "body",
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PodDisruptionBudget"
+        "$ref": "#/definitions/v1beta1.PodDisruptionBudget"
        }
       }
      ],
@@ -25635,7 +25635,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PodDisruptionBudget"
+        "$ref": "#/definitions/v1beta1.PodDisruptionBudget"
        }
       },
       "401": {
@@ -25659,9 +25659,9 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "patchPolicyV1alpha1NamespacedPodDisruptionBudgetStatus",
+     "operationId": "patchPolicyV1beta1NamespacedPodDisruptionBudgetStatus",
      "parameters": [
       {
        "name": "body",
@@ -25676,7 +25676,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PodDisruptionBudget"
+        "$ref": "#/definitions/v1beta1.PodDisruptionBudget"
        }
       },
       "401": {
@@ -25710,7 +25710,7 @@
      }
     ]
    },
-   "/apis/policy/v1alpha1/poddisruptionbudgets": {
+   "/apis/policy/v1beta1/poddisruptionbudgets": {
     "get": {
      "description": "list or watch objects of kind PodDisruptionBudget",
      "consumes": [
@@ -25727,14 +25727,14 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "listPolicyV1alpha1PodDisruptionBudgetForAllNamespaces",
+     "operationId": "listPolicyV1beta1PodDisruptionBudgetForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PodDisruptionBudgetList"
+        "$ref": "#/definitions/v1beta1.PodDisruptionBudgetList"
        }
       },
       "401": {
@@ -25787,7 +25787,7 @@
      }
     ]
    },
-   "/apis/policy/v1alpha1/watch/namespaces/{namespace}/poddisruptionbudgets": {
+   "/apis/policy/v1beta1/watch/namespaces/{namespace}/poddisruptionbudgets": {
     "get": {
      "description": "watch individual changes to a list of PodDisruptionBudget",
      "consumes": [
@@ -25804,9 +25804,9 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "watchPolicyV1alpha1NamespacedPodDisruptionBudgetList",
+     "operationId": "watchPolicyV1beta1NamespacedPodDisruptionBudgetList",
      "responses": {
       "200": {
        "description": "OK",
@@ -25872,7 +25872,7 @@
      }
     ]
    },
-   "/apis/policy/v1alpha1/watch/namespaces/{namespace}/poddisruptionbudgets/{name}": {
+   "/apis/policy/v1beta1/watch/namespaces/{namespace}/poddisruptionbudgets/{name}": {
     "get": {
      "description": "watch changes to an object of kind PodDisruptionBudget",
      "consumes": [
@@ -25889,9 +25889,9 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "watchPolicyV1alpha1NamespacedPodDisruptionBudget",
+     "operationId": "watchPolicyV1beta1NamespacedPodDisruptionBudget",
      "responses": {
       "200": {
        "description": "OK",
@@ -25965,7 +25965,7 @@
      }
     ]
    },
-   "/apis/policy/v1alpha1/watch/poddisruptionbudgets": {
+   "/apis/policy/v1beta1/watch/poddisruptionbudgets": {
     "get": {
      "description": "watch individual changes to a list of PodDisruptionBudget",
      "consumes": [
@@ -25982,9 +25982,9 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "watchPolicyV1alpha1PodDisruptionBudgetListForAllNamespaces",
+     "operationId": "watchPolicyV1beta1PodDisruptionBudgetListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -32405,95 +32405,6 @@
      }
     }
    },
-   "v1alpha1.Eviction": {
-    "description": "Eviction evicts a pod from its node subject to certain policies and safety constraints. This is a subresource of Pod.  A request to cause such an eviction is created by POSTing to .../pods/\u003cpod name\u003e/eviction.",
-    "properties": {
-     "deleteOptions": {
-      "description": "DeleteOptions may be provided",
-      "$ref": "#/definitions/v1.DeleteOptions"
-     },
-     "metadata": {
-      "description": "ObjectMeta describes the pod that is being evicted.",
-      "$ref": "#/definitions/v1.ObjectMeta"
-     }
-    }
-   },
-   "v1alpha1.PodDisruptionBudget": {
-    "description": "PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods",
-    "properties": {
-     "metadata": {
-      "$ref": "#/definitions/v1.ObjectMeta"
-     },
-     "spec": {
-      "description": "Specification of the desired behavior of the PodDisruptionBudget.",
-      "$ref": "#/definitions/v1alpha1.PodDisruptionBudgetSpec"
-     },
-     "status": {
-      "description": "Most recently observed status of the PodDisruptionBudget.",
-      "$ref": "#/definitions/v1alpha1.PodDisruptionBudgetStatus"
-     }
-    }
-   },
-   "v1alpha1.PodDisruptionBudgetList": {
-    "description": "PodDisruptionBudgetList is a collection of PodDisruptionBudgets.",
-    "required": [
-     "items"
-    ],
-    "properties": {
-     "items": {
-      "type": "array",
-      "items": {
-       "$ref": "#/definitions/v1alpha1.PodDisruptionBudget"
-      }
-     },
-     "metadata": {
-      "$ref": "#/definitions/unversioned.ListMeta"
-     }
-    }
-   },
-   "v1alpha1.PodDisruptionBudgetSpec": {
-    "description": "PodDisruptionBudgetSpec is a description of a PodDisruptionBudget.",
-    "properties": {
-     "minAvailable": {
-      "description": "An eviction is allowed if at least \"minAvailable\" pods selected by \"selector\" will still be available after the eviction, i.e. even in the absence of the evicted pod.  So for example you can prevent all voluntary evictions by specifying \"100%\".",
-      "$ref": "#/definitions/intstr.IntOrString"
-     },
-     "selector": {
-      "description": "Label query over pods whose evictions are managed by the disruption budget.",
-      "$ref": "#/definitions/unversioned.LabelSelector"
-     }
-    }
-   },
-   "v1alpha1.PodDisruptionBudgetStatus": {
-    "description": "PodDisruptionBudgetStatus represents information about the status of a PodDisruptionBudget. Status may trail the actual state of a system.",
-    "required": [
-     "disruptionAllowed",
-     "currentHealthy",
-     "desiredHealthy",
-     "expectedPods"
-    ],
-    "properties": {
-     "currentHealthy": {
-      "description": "current number of healthy pods",
-      "type": "integer",
-      "format": "int32"
-     },
-     "desiredHealthy": {
-      "description": "minimum desired number of healthy pods",
-      "type": "integer",
-      "format": "int32"
-     },
-     "disruptionAllowed": {
-      "description": "Whether or not a disruption is currently allowed.",
-      "type": "boolean"
-     },
-     "expectedPods": {
-      "description": "total number of pods counted by this disruption budget",
-      "type": "integer",
-      "format": "int32"
-     }
-    }
-   },
    "v1alpha1.PolicyRule": {
     "description": "PolicyRule holds information that describes a policy rule, but does not contain information about who the rule applies to or which namespace the rule applies to.",
     "required": [
@@ -32972,6 +32883,23 @@
      }
     }
    },
+   "v1beta1.Eviction": {
+    "description": "Eviction evicts a pod from its node subject to certain policies and safety constraints. This is a subresource of Pod.  A request to cause such an eviction is created by POSTing to .../pods/\u003cpod name\u003e/evictions.",
+    "required": [
+     "metadata",
+     "deleteOptions"
+    ],
+    "properties": {
+     "deleteOptions": {
+      "description": "DeleteOptions may be provided",
+      "$ref": "#/definitions/v1.DeleteOptions"
+     },
+     "metadata": {
+      "description": "ObjectMeta describes the pod that is being evicted.",
+      "$ref": "#/definitions/v1.ObjectMeta"
+     }
+    }
+   },
    "v1beta1.HorizontalPodAutoscaler": {
     "description": "configuration of a horizontal pod autoscaler.",
     "properties": {
@@ -33438,6 +33366,93 @@
      "verb": {
       "description": "Verb is the standard HTTP verb",
       "type": "string"
+     }
+    }
+   },
+   "v1beta1.PodDisruptionBudget": {
+    "description": "PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods",
+    "required": [
+     "metadata",
+     "spec",
+     "status"
+    ],
+    "properties": {
+     "metadata": {
+      "$ref": "#/definitions/v1.ObjectMeta"
+     },
+     "spec": {
+      "description": "Specification of the desired behavior of the PodDisruptionBudget.",
+      "$ref": "#/definitions/v1beta1.PodDisruptionBudgetSpec"
+     },
+     "status": {
+      "description": "Most recently observed status of the PodDisruptionBudget.",
+      "$ref": "#/definitions/v1beta1.PodDisruptionBudgetStatus"
+     }
+    }
+   },
+   "v1beta1.PodDisruptionBudgetList": {
+    "description": "PodDisruptionBudgetList is a collection of PodDisruptionBudgets.",
+    "required": [
+     "metadata",
+     "items"
+    ],
+    "properties": {
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1beta1.PodDisruptionBudget"
+      }
+     },
+     "metadata": {
+      "$ref": "#/definitions/unversioned.ListMeta"
+     }
+    }
+   },
+   "v1beta1.PodDisruptionBudgetSpec": {
+    "description": "PodDisruptionBudgetSpec is a description of a PodDisruptionBudget.",
+    "required": [
+     "minAvailable",
+     "selector"
+    ],
+    "properties": {
+     "minAvailable": {
+      "description": "An eviction is allowed if at least \"minAvailable\" pods selected by \"selector\" will still be available after the eviction, i.e. even in the absence of the evicted pod.  So for example you can prevent all voluntary evictions by specifying \"100%\".",
+      "$ref": "#/definitions/intstr.IntOrString"
+     },
+     "selector": {
+      "description": "Label query over pods whose evictions are managed by the disruption budget.",
+      "$ref": "#/definitions/unversioned.LabelSelector"
+     }
+    }
+   },
+   "v1beta1.PodDisruptionBudgetStatus": {
+    "description": "PodDisruptionBudgetStatus represents information about the status of a PodDisruptionBudget. Status may trail the actual state of a system.",
+    "required": [
+     "disruptionsAllowed",
+     "currentHealthy",
+     "desiredHealthy",
+     "expectedPods"
+    ],
+    "properties": {
+     "currentHealthy": {
+      "description": "current number of healthy pods",
+      "type": "integer",
+      "format": "int32"
+     },
+     "desiredHealthy": {
+      "description": "minimum desired number of healthy pods",
+      "type": "integer",
+      "format": "int32"
+     },
+     "disruptionsAllowed": {
+      "description": "Number of pod disruptions that are currently allowed.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "expectedPods": {
+      "description": "total number of pods counted by this disruption budget",
+      "type": "integer",
+      "format": "int32"
      }
     }
    },

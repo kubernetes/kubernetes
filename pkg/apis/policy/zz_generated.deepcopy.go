@@ -124,7 +124,7 @@ func DeepCopy_policy_PodDisruptionBudgetStatus(in interface{}, out interface{}, 
 	{
 		in := in.(*PodDisruptionBudgetStatus)
 		out := out.(*PodDisruptionBudgetStatus)
-		out.PodDisruptionAllowed = in.PodDisruptionAllowed
+		out.PodDisruptionsAllowed = in.PodDisruptionsAllowed
 		out.CurrentHealthy = in.CurrentHealthy
 		out.DesiredHealthy = in.DesiredHealthy
 		out.ExpectedPods = in.ExpectedPods
