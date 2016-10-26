@@ -60,9 +60,6 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyConfiguration(in *KubeProxyConfiguration, out *componentconfig.KubeProxyConfiguration, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
 	out.BindAddress = in.BindAddress
 	out.ClusterCIDR = in.ClusterCIDR
 	out.HealthzBindAddress = in.HealthzBindAddress
@@ -90,9 +87,6 @@ func Convert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyConfigu
 }
 
 func autoConvert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in *componentconfig.KubeProxyConfiguration, out *KubeProxyConfiguration, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
 	out.BindAddress = in.BindAddress
 	out.ClusterCIDR = in.ClusterCIDR
 	out.HealthzBindAddress = in.HealthzBindAddress
@@ -120,9 +114,6 @@ func Convert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfigu
 }
 
 func autoConvert_v1alpha1_KubeSchedulerConfiguration_To_componentconfig_KubeSchedulerConfiguration(in *KubeSchedulerConfiguration, out *componentconfig.KubeSchedulerConfiguration, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
 	out.Port = int32(in.Port)
 	out.Address = in.Address
 	out.AlgorithmProvider = in.AlgorithmProvider
@@ -147,9 +138,6 @@ func Convert_v1alpha1_KubeSchedulerConfiguration_To_componentconfig_KubeSchedule
 }
 
 func autoConvert_componentconfig_KubeSchedulerConfiguration_To_v1alpha1_KubeSchedulerConfiguration(in *componentconfig.KubeSchedulerConfiguration, out *KubeSchedulerConfiguration, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
 	out.Port = int(in.Port)
 	out.Address = in.Address
 	out.AlgorithmProvider = in.AlgorithmProvider
@@ -254,9 +242,6 @@ func Convert_componentconfig_KubeletAuthorization_To_v1alpha1_KubeletAuthorizati
 }
 
 func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfiguration(in *KubeletConfiguration, out *componentconfig.KubeletConfiguration, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
 	out.PodManifestPath = in.PodManifestPath
 	out.SyncFrequency = in.SyncFrequency
 	out.FileCheckFrequency = in.FileCheckFrequency
@@ -439,9 +424,6 @@ func Convert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigurati
 }
 
 func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfiguration(in *componentconfig.KubeletConfiguration, out *KubeletConfiguration, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
 	out.PodManifestPath = in.PodManifestPath
 	out.SyncFrequency = in.SyncFrequency
 	out.FileCheckFrequency = in.FileCheckFrequency

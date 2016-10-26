@@ -48,9 +48,6 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha1_PetSet_To_apps_PetSet(in *PetSet, out *apps.PetSet, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
 	// TODO: Inefficient conversion - can we improve it?
 	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
 		return err
@@ -69,9 +66,6 @@ func Convert_v1alpha1_PetSet_To_apps_PetSet(in *PetSet, out *apps.PetSet, s conv
 }
 
 func autoConvert_apps_PetSet_To_v1alpha1_PetSet(in *apps.PetSet, out *PetSet, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
 	// TODO: Inefficient conversion - can we improve it?
 	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
 		return err
@@ -90,12 +84,7 @@ func Convert_apps_PetSet_To_v1alpha1_PetSet(in *apps.PetSet, out *PetSet, s conv
 }
 
 func autoConvert_v1alpha1_PetSetList_To_apps_PetSetList(in *PetSetList, out *apps.PetSetList, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
-		return err
-	}
+	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]apps.PetSet, len(*in))
@@ -115,12 +104,7 @@ func Convert_v1alpha1_PetSetList_To_apps_PetSetList(in *PetSetList, out *apps.Pe
 }
 
 func autoConvert_apps_PetSetList_To_v1alpha1_PetSetList(in *apps.PetSetList, out *PetSetList, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
-		return err
-	}
+	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]PetSet, len(*in))
