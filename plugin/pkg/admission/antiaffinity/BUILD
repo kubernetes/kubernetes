@@ -36,5 +36,6 @@ go_test(
         "//pkg/admission:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/unversioned:go_default_library",
+        "//pkg/runtime:go_default_library",
     ],
 )
