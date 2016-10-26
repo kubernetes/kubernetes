@@ -19,7 +19,7 @@ limitations under the License.
 
 syntax = 'proto2';
 
-package k8s.io.kubernetes.pkg.apis.apps.v1alpha1;
+package k8s.io.kubernetes.pkg.apis.apps.v1beta1;
 
 import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
 import "k8s.io/kubernetes/pkg/api/unversioned/generated.proto";
@@ -28,7 +28,7 @@ import "k8s.io/kubernetes/pkg/runtime/generated.proto";
 import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1alpha1";
+option go_package = "v1beta1";
 
 // PetSet represents a set of pods with consistent identities.
 // Identities are defined as:

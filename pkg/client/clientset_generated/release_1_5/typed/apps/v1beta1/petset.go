@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	v1alpha1 "k8s.io/kubernetes/pkg/apis/apps/v1alpha1"
+	v1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -32,15 +32,15 @@ type PetSetsGetter interface {
 
 // PetSetInterface has methods to work with PetSet resources.
 type PetSetInterface interface {
-	Create(*v1alpha1.PetSet) (*v1alpha1.PetSet, error)
-	Update(*v1alpha1.PetSet) (*v1alpha1.PetSet, error)
-	UpdateStatus(*v1alpha1.PetSet) (*v1alpha1.PetSet, error)
+	Create(*v1beta1.PetSet) (*v1beta1.PetSet, error)
+	Update(*v1beta1.PetSet) (*v1beta1.PetSet, error)
+	UpdateStatus(*v1beta1.PetSet) (*v1beta1.PetSet, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string) (*v1alpha1.PetSet, error)
-	List(opts v1.ListOptions) (*v1alpha1.PetSetList, error)
+	Get(name string) (*v1beta1.PetSet, error)
+	List(opts v1.ListOptions) (*v1beta1.PetSetList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.PetSet, err error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.PetSet, err error)
 	PetSetExpansion
 }
 
@@ -59,8 +59,8 @@ func newPetSets(c *AppsClient, namespace string) *petSets {
 }
 
 // Create takes the representation of a petSet and creates it.  Returns the server's representation of the petSet, and an error, if there is any.
-func (c *petSets) Create(petSet *v1alpha1.PetSet) (result *v1alpha1.PetSet, err error) {
-	result = &v1alpha1.PetSet{}
+func (c *petSets) Create(petSet *v1beta1.PetSet) (result *v1beta1.PetSet, err error) {
+	result = &v1beta1.PetSet{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("petsets").
@@ -71,8 +71,8 @@ func (c *petSets) Create(petSet *v1alpha1.PetSet) (result *v1alpha1.PetSet, err 
 }
 
 // Update takes the representation of a petSet and updates it. Returns the server's representation of the petSet, and an error, if there is any.
-func (c *petSets) Update(petSet *v1alpha1.PetSet) (result *v1alpha1.PetSet, err error) {
-	result = &v1alpha1.PetSet{}
+func (c *petSets) Update(petSet *v1beta1.PetSet) (result *v1beta1.PetSet, err error) {
+	result = &v1beta1.PetSet{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("petsets").
@@ -83,8 +83,8 @@ func (c *petSets) Update(petSet *v1alpha1.PetSet) (result *v1alpha1.PetSet, err 
 	return
 }
 
-func (c *petSets) UpdateStatus(petSet *v1alpha1.PetSet) (result *v1alpha1.PetSet, err error) {
-	result = &v1alpha1.PetSet{}
+func (c *petSets) UpdateStatus(petSet *v1beta1.PetSet) (result *v1beta1.PetSet, err error) {
+	result = &v1beta1.PetSet{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("petsets").
@@ -119,8 +119,8 @@ func (c *petSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.Lis
 }
 
 // Get takes name of the petSet, and returns the corresponding petSet object, and an error if there is any.
-func (c *petSets) Get(name string) (result *v1alpha1.PetSet, err error) {
-	result = &v1alpha1.PetSet{}
+func (c *petSets) Get(name string) (result *v1beta1.PetSet, err error) {
+	result = &v1beta1.PetSet{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("petsets").
@@ -131,8 +131,8 @@ func (c *petSets) Get(name string) (result *v1alpha1.PetSet, err error) {
 }
 
 // List takes label and field selectors, and returns the list of PetSets that match those selectors.
-func (c *petSets) List(opts v1.ListOptions) (result *v1alpha1.PetSetList, err error) {
-	result = &v1alpha1.PetSetList{}
+func (c *petSets) List(opts v1.ListOptions) (result *v1beta1.PetSetList, err error) {
+	result = &v1beta1.PetSetList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("petsets").
@@ -153,8 +153,8 @@ func (c *petSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched petSet.
-func (c *petSets) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.PetSet, err error) {
-	result = &v1alpha1.PetSet{}
+func (c *petSets) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.PetSet, err error) {
+	result = &v1beta1.PetSet{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("petsets").

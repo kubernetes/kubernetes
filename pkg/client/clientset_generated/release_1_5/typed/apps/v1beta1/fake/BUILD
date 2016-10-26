@@ -13,19 +13,20 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "apps_client.go",
         "doc.go",
-        "generated_expansion.go",
-        "petset.go",
+        "fake_apps_client.go",
+        "fake_petset.go",
     ],
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/api/unversioned:go_default_library",
         "//pkg/api/v1:go_default_library",
-        "//pkg/apimachinery/registered:go_default_library",
-        "//pkg/apis/apps/v1alpha1:go_default_library",
+        "//pkg/apis/apps/v1beta1:go_default_library",
+        "//pkg/client/clientset_generated/release_1_5/typed/apps/v1beta1:go_default_library",
         "//pkg/client/restclient:go_default_library",
-        "//pkg/runtime/serializer:go_default_library",
+        "//pkg/client/testing/core:go_default_library",
+        "//pkg/labels:go_default_library",
         "//pkg/watch:go_default_library",
     ],
 )

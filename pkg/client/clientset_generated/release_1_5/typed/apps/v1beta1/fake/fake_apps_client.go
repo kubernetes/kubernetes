@@ -17,7 +17,7 @@ limitations under the License.
 package fake
 
 import (
-	v1alpha1 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/apps/v1alpha1"
+	v1beta1 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/apps/v1beta1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
@@ -26,7 +26,7 @@ type FakeApps struct {
 	*core.Fake
 }
 
-func (c *FakeApps) PetSets(namespace string) v1alpha1.PetSetInterface {
+func (c *FakeApps) PetSets(namespace string) v1beta1.PetSetInterface {
 	return &FakePetSets{c, namespace}
 }
 

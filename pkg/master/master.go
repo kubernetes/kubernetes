@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
-	appsapi "k8s.io/kubernetes/pkg/apis/apps/v1alpha1"
+	appsapiv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	authenticationv1beta1 "k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/authorization"
 	authorizationapiv1beta1 "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
@@ -214,7 +214,7 @@ func (c completedConfig) New() (*Master, error) {
 	if c.RESTStorageProviders == nil {
 		c.RESTStorageProviders = map[string]genericapiserver.RESTStorageProvider{}
 	}
-	c.RESTStorageProviders[appsapi.GroupName] = appsrest.RESTStorageProvider{}
+	c.RESTStorageProviders[appsapiv1beta1.GroupName] = appsrest.RESTStorageProvider{}
 	c.RESTStorageProviders[authenticationv1beta1.GroupName] = authenticationrest.RESTStorageProvider{Authenticator: c.GenericConfig.Authenticator}
 	c.RESTStorageProviders[authorization.GroupName] = authorizationrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorizer}
 	c.RESTStorageProviders[autoscaling.GroupName] = autoscalingrest.RESTStorageProvider{}
@@ -424,7 +424,7 @@ func DefaultAPIResourceConfigSource() *genericapiserver.ResourceConfig {
 		batchapiv1.SchemeGroupVersion,
 		authenticationv1beta1.SchemeGroupVersion,
 		autoscalingapiv1.SchemeGroupVersion,
-		appsapi.SchemeGroupVersion,
+		appsapiv1beta1.SchemeGroupVersion,
 		policyapiv1alpha1.SchemeGroupVersion,
 		rbacapi.SchemeGroupVersion,
 		storageapiv1beta1.SchemeGroupVersion,
