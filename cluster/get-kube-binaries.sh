@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -117,7 +117,7 @@ function download_tarball() {
   url="${DOWNLOAD_URL_PREFIX}/${file}"
   mkdir -p "${download_path}"
   if [[ $(which curl) ]]; then
-    curl -L "${url}" -o "${download_path}/${file}"
+    curl -L --retry 3 --keepalive-time 2 "${url}" -o "${download_path}/${file}"
   elif [[ $(which wget) ]]; then
     wget "${url}" -O "${download_path}/${file}"
   else
