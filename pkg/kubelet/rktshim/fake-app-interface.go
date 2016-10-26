@@ -17,6 +17,7 @@ limitations under the License.
 package rktshim
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"math/rand"
@@ -24,6 +25,12 @@ import (
 
 	kubeletApi "k8s.io/kubernetes/pkg/kubelet/api"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
+)
+
+const (
+	FakeStreamingHost = "localhost"
+	FakeStreamingPort = "12345"
 )
 
 func init() {
@@ -200,16 +207,34 @@ func (r *FakeRuntime) ContainerStatus(id string) (*runtimeApi.ContainerStatus, e
 	return &c.Status, nil
 }
 
-func (r *FakeRuntime) Exec(id string, cmd []string, tty bool, in io.Reader, out, err io.WriteCloser) error {
-	c, ok := r.Containers[id]
+func (r *FakeRuntime) ExecSync(containerID string, cmd []string, timeout time.Duration) (stdout []byte, stderr []byte, err error) {
+	c, ok := r.Containers[containerID]
 	if !ok {
-		return ErrContainerNotFound
+		return nil, nil, ErrContainerNotFound
 	}
 
 	// TODO(tmrts): Validate the assumption that container has to be running for exec to work.
 	if c.State != runtimeApi.ContainerState_RUNNING {
-		return ErrInvalidContainerStateTransition
+		return nil, nil, ErrInvalidContainerStateTransition
 	}
 
-	return c.Exec(cmd, in, out, err)
+	var stdoutBuffer, stderrBuffer bytes.Buffer
+	err = c.Exec(cmd, nil,
+		ioutils.WriteCloserWrapper(&stdoutBuffer),
+		ioutils.WriteCloserWrapper(&stderrBuffer))
+	return stdoutBuffer.Bytes(), stderrBuffer.Bytes(), err
+}
+
+func (r *FakeRuntime) Exec(req *runtimeApi.ExecRequest) (*runtimeApi.ExecResponse, error) {
+	url := "http://" + FakeStreamingHost + ":" + FakeStreamingPort + "/exec/" + req.GetContainerId()
+	return &runtimeApi.ExecResponse{
+		Url: &url,
+	}, nil
+}
+
+func (r *FakeRuntime) Attach(req *runtimeApi.AttachRequest) (*runtimeApi.AttachResponse, error) {
+	url := "http://" + FakeStreamingHost + ":" + FakeStreamingPort + "/attach/" + req.GetContainerId()
+	return &runtimeApi.AttachResponse{
+		Url: &url,
+	}, nil
 }

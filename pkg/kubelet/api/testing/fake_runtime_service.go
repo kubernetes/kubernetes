@@ -18,7 +18,6 @@ package testing
 
 import (
 	"fmt"
-	"io"
 	"reflect"
 	"sync"
 	"time"
@@ -214,6 +213,14 @@ func (r *FakeRuntimeService) ListPodSandbox(filter *runtimeApi.PodSandboxFilter)
 	return result, nil
 }
 
+func (r *FakeRuntimeService) PortForward(*runtimeApi.PortForwardRequest) (*runtimeApi.PortForwardResponse, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "PortForward")
+	return &runtimeApi.PortForwardResponse{}, nil
+}
+
 func (r *FakeRuntimeService) CreateContainer(podSandboxID string, config *runtimeApi.ContainerConfig, sandboxConfig *runtimeApi.PodSandboxConfig) (string, error) {
 	r.Lock()
 	defer r.Unlock()
@@ -349,12 +356,28 @@ func (r *FakeRuntimeService) ContainerStatus(containerID string) (*runtimeApi.Co
 	return &status, nil
 }
 
-func (r *FakeRuntimeService) Exec(containerID string, cmd []string, tty bool, stdin io.Reader, stdout, stderr io.WriteCloser) error {
+func (r *FakeRuntimeService) ExecSync(containerID string, cmd []string, timeout time.Duration) (stdout []byte, stderr []byte, err error) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "ExecSync")
+	return nil, nil, nil
+}
+
+func (r *FakeRuntimeService) Exec(*runtimeApi.ExecRequest) (*runtimeApi.ExecResponse, error) {
 	r.Lock()
 	defer r.Unlock()
 
 	r.Called = append(r.Called, "Exec")
-	return nil
+	return &runtimeApi.ExecResponse{}, nil
+}
+
+func (r *FakeRuntimeService) Attach(req *runtimeApi.AttachRequest) (*runtimeApi.AttachResponse, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "Attach")
+	return &runtimeApi.AttachResponse{}, nil
 }
 
 func (r *FakeRuntimeService) UpdateRuntimeConfig(runtimeCOnfig *runtimeApi.RuntimeConfig) error {
