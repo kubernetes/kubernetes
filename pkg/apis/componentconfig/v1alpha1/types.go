@@ -207,6 +207,10 @@ type KubeletConfiguration struct {
 	// default /var/run/kubernetes). If tlsCertFile and tlsPrivateKeyFile
 	// are provided, this flag will be ignored.
 	CertDirectory string `json:"certDirectory"`
+	// authentication specifies how requests to the Kubelet's server are authenticated
+	Authentication KubeletAuthentication `json:"authentication"`
+	// authorization specifies how requests to the Kubelet's server are authorized
+	Authorization KubeletAuthorization `json:"authorization"`
 	// hostnameOverride is the hostname used to identify the kubelet instead
 	// of the actual hostname.
 	HostnameOverride string `json:"hostnameOverride"`
@@ -489,4 +493,60 @@ type KubeletConfiguration struct {
 	// using the new Container Runtine Interface.
 	// +optional
 	ExperimentalRuntimeIntegrationType string `json:"experimentalRuntimeIntegrationType,omitempty"`
+}
+
+type KubeletAuthorizationMode string
+
+const (
+	// KubeletAuthorizationModeAlwaysAllow authorizes all authenticated requests
+	KubeletAuthorizationModeAlwaysAllow KubeletAuthorizationMode = "AlwaysAllow"
+	// KubeletAuthorizationModeWebhook uses the SubjectAccessReview API to determine authorization
+	KubeletAuthorizationModeWebhook KubeletAuthorizationMode = "Webhook"
+)
+
+type KubeletAuthorization struct {
+	// mode is the authorization mode to apply to requests to the kubelet server.
+	// Valid values are AlwaysAllow and Webhook.
+	// Webhook mode uses the SubjectAccessReview API to determine authorization.
+	Mode KubeletAuthorizationMode `json:"mode"`
+
+	// webhook contains settings related to Webhook authorization.
+	Webhook KubeletWebhookAuthorization `json:"webhook"`
+}
+
+type KubeletWebhookAuthorization struct {
+	// cacheAuthorizedTTL is the duration to cache 'authorized' responses from the webhook authorizer.
+	CacheAuthorizedTTL unversioned.Duration `json:"cacheAuthorizedTTL"`
+	// cacheUnauthorizedTTL is the duration to cache 'unauthorized' responses from the webhook authorizer.
+	CacheUnauthorizedTTL unversioned.Duration `json:"cacheUnauthorizedTTL"`
+}
+
+type KubeletAuthentication struct {
+	// x509 contains settings related to x509 client certificate authentication
+	X509 KubeletX509Authentication `json:"x509"`
+	// webhook contains settings related to webhook bearer token authentication
+	Webhook KubeletWebhookAuthentication `json:"webhook"`
+	// anonymous contains settings related to anonymous authentication
+	Anonymous KubeletAnonymousAuthentication `json:"anonymous"`
+}
+
+type KubeletX509Authentication struct {
+	// clientCAFile is the path to a PEM-encoded certificate bundle. If set, any request presenting a client certificate
+	// signed by one of the authorities in the bundle is authenticated with a username corresponding to the CommonName,
+	// and groups corresponding to the Organization in the client certificate.
+	ClientCAFile string `json:"clientCAFile"`
+}
+
+type KubeletWebhookAuthentication struct {
+	// enabled allows bearer token authentication backed by the tokenreviews.authentication.k8s.io API
+	Enabled *bool `json:"enabled"`
+	// cacheTTL enables caching of authentication results
+	CacheTTL unversioned.Duration `json:"cacheTTL"`
+}
+
+type KubeletAnonymousAuthentication struct {
+	// enabled allows anonymous requests to the kubelet server.
+	// Requests that are not rejected by another authentication method are treated as anonymous requests.
+	// Anonymous requests have a username of system:anonymous, and a group name of system:unauthenticated.
+	Enabled *bool `json:"enabled"`
 }

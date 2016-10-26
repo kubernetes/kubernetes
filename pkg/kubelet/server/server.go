@@ -57,6 +57,13 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
+const (
+	metricsPath = "/metrics"
+	specPath    = "/spec/"
+	statsPath   = "/stats/"
+	logsPath    = "/logs/"
+)
+
 // Server is a http.Handler which exposes kubelet functionality over HTTP.
 type Server struct {
 	auth             AuthInterface
@@ -253,12 +260,12 @@ func (s *Server) InstallDefaultHandlers() {
 		Operation("getPods"))
 	s.restfulCont.Add(ws)
 
-	s.restfulCont.Add(stats.CreateHandlers(s.host, s.resourceAnalyzer))
-	s.restfulCont.Handle("/metrics", prometheus.Handler())
+	s.restfulCont.Add(stats.CreateHandlers(statsPath, s.host, s.resourceAnalyzer))
+	s.restfulCont.Handle(metricsPath, prometheus.Handler())
 
 	ws = new(restful.WebService)
 	ws.
-		Path("/spec/").
+		Path(specPath).
 		Produces(restful.MIME_JSON)
 	ws.Route(ws.GET("").
 		To(s.getSpec).
@@ -331,7 +338,7 @@ func (s *Server) InstallDebuggingHandlers() {
 
 	ws = new(restful.WebService)
 	ws.
-		Path("/logs/")
+		Path(logsPath)
 	ws.Route(ws.GET("").
 		To(s.getLogs).
 		Operation("getLogs"))

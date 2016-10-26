@@ -55,11 +55,11 @@ type handler struct {
 	summaryProvider SummaryProvider
 }
 
-func CreateHandlers(provider StatsProvider, summaryProvider SummaryProvider) *restful.WebService {
+func CreateHandlers(rootPath string, provider StatsProvider, summaryProvider SummaryProvider) *restful.WebService {
 	h := &handler{provider, summaryProvider}
 
 	ws := &restful.WebService{}
-	ws.Path("/stats/").
+	ws.Path(rootPath).
 		Produces(restful.MIME_JSON)
 
 	endpoints := []struct {

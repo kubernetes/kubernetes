@@ -36,7 +36,13 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_KubeProxyConfiguration, InType: reflect.TypeOf(&KubeProxyConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_KubeSchedulerConfiguration, InType: reflect.TypeOf(&KubeSchedulerConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_KubeletAnonymousAuthentication, InType: reflect.TypeOf(&KubeletAnonymousAuthentication{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_KubeletAuthentication, InType: reflect.TypeOf(&KubeletAuthentication{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_KubeletAuthorization, InType: reflect.TypeOf(&KubeletAuthorization{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_KubeletConfiguration, InType: reflect.TypeOf(&KubeletConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_KubeletWebhookAuthentication, InType: reflect.TypeOf(&KubeletWebhookAuthentication{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_KubeletWebhookAuthorization, InType: reflect.TypeOf(&KubeletWebhookAuthorization{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_KubeletX509Authentication, InType: reflect.TypeOf(&KubeletX509Authentication{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_LeaderElectionConfiguration, InType: reflect.TypeOf(&LeaderElectionConfiguration{})},
 	)
 }
@@ -110,6 +116,46 @@ func DeepCopy_v1alpha1_KubeSchedulerConfiguration(in interface{}, out interface{
 	}
 }
 
+func DeepCopy_v1alpha1_KubeletAnonymousAuthentication(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*KubeletAnonymousAuthentication)
+		out := out.(*KubeletAnonymousAuthentication)
+		if in.Enabled != nil {
+			in, out := &in.Enabled, &out.Enabled
+			*out = new(bool)
+			**out = **in
+		} else {
+			out.Enabled = nil
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1alpha1_KubeletAuthentication(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*KubeletAuthentication)
+		out := out.(*KubeletAuthentication)
+		out.X509 = in.X509
+		if err := DeepCopy_v1alpha1_KubeletWebhookAuthentication(&in.Webhook, &out.Webhook, c); err != nil {
+			return err
+		}
+		if err := DeepCopy_v1alpha1_KubeletAnonymousAuthentication(&in.Anonymous, &out.Anonymous, c); err != nil {
+			return err
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1alpha1_KubeletAuthorization(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*KubeletAuthorization)
+		out := out.(*KubeletAuthorization)
+		out.Mode = in.Mode
+		out.Webhook = in.Webhook
+		return nil
+	}
+}
+
 func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*KubeletConfiguration)
@@ -134,6 +180,10 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		out.TLSCertFile = in.TLSCertFile
 		out.TLSPrivateKeyFile = in.TLSPrivateKeyFile
 		out.CertDirectory = in.CertDirectory
+		if err := DeepCopy_v1alpha1_KubeletAuthentication(&in.Authentication, &out.Authentication, c); err != nil {
+			return err
+		}
+		out.Authorization = in.Authorization
 		out.HostnameOverride = in.HostnameOverride
 		out.PodInfraContainerImage = in.PodInfraContainerImage
 		out.DockerEndpoint = in.DockerEndpoint
@@ -407,6 +457,41 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 			out.AllowedUnsafeSysctls = nil
 		}
 		out.ExperimentalRuntimeIntegrationType = in.ExperimentalRuntimeIntegrationType
+		return nil
+	}
+}
+
+func DeepCopy_v1alpha1_KubeletWebhookAuthentication(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*KubeletWebhookAuthentication)
+		out := out.(*KubeletWebhookAuthentication)
+		if in.Enabled != nil {
+			in, out := &in.Enabled, &out.Enabled
+			*out = new(bool)
+			**out = **in
+		} else {
+			out.Enabled = nil
+		}
+		out.CacheTTL = in.CacheTTL
+		return nil
+	}
+}
+
+func DeepCopy_v1alpha1_KubeletWebhookAuthorization(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*KubeletWebhookAuthorization)
+		out := out.(*KubeletWebhookAuthorization)
+		out.CacheAuthorizedTTL = in.CacheAuthorizedTTL
+		out.CacheUnauthorizedTTL = in.CacheUnauthorizedTTL
+		return nil
+	}
+}
+
+func DeepCopy_v1alpha1_KubeletX509Authentication(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*KubeletX509Authentication)
+		out := out.(*KubeletX509Authentication)
+		out.ClientCAFile = in.ClientCAFile
 		return nil
 	}
 }

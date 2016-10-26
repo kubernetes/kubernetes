@@ -26,6 +26,7 @@ go_library(
         "//pkg/api/validation:go_default_library",
         "//pkg/auth/authenticator:go_default_library",
         "//pkg/auth/authorizer:go_default_library",
+        "//pkg/auth/user:go_default_library",
         "//pkg/healthz:go_default_library",
         "//pkg/httplog:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
@@ -50,7 +51,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["server_test.go"],
+    srcs = [
+        "auth_test.go",
+        "server_test.go",
+    ],
     library = "go_default_library",
     tags = ["automanaged"],
     deps = [
