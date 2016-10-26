@@ -29,7 +29,7 @@ import (
 
 func TestPetIDName(t *testing.T) {
 	replicas := 3
-	ps := newPetSet(replicas)
+	ps := newStatefulSet(replicas)
 	for i := 0; i < replicas; i++ {
 		petName := fmt.Sprintf("%v-%d", ps.Name, i)
 		pcb, err := newPCB(fmt.Sprintf("%d", i), ps)
@@ -45,7 +45,7 @@ func TestPetIDName(t *testing.T) {
 
 func TestPetIDDNS(t *testing.T) {
 	replicas := 3
-	ps := newPetSet(replicas)
+	ps := newStatefulSet(replicas)
 	for i := 0; i < replicas; i++ {
 		petName := fmt.Sprintf("%v-%d", ps.Name, i)
 		petSubdomain := ps.Spec.ServiceName
@@ -65,7 +65,7 @@ func TestPetIDDNS(t *testing.T) {
 }
 func TestPetIDVolume(t *testing.T) {
 	replicas := 3
-	ps := newPetSet(replicas)
+	ps := newStatefulSet(replicas)
 	for i := 0; i < replicas; i++ {
 		pcb, err := newPCB(fmt.Sprintf("%d", i), ps)
 		if err != nil {
@@ -99,7 +99,7 @@ func TestPetIDVolume(t *testing.T) {
 
 func TestPetIDVolumeClaims(t *testing.T) {
 	replicas := 3
-	ps := newPetSet(replicas)
+	ps := newStatefulSet(replicas)
 	for i := 0; i < replicas; i++ {
 		pcb, err := newPCB(fmt.Sprintf("%v", i), ps)
 		if err != nil {
@@ -116,7 +116,7 @@ func TestPetIDVolumeClaims(t *testing.T) {
 
 func TestPetIDCrossAssignment(t *testing.T) {
 	replicas := 3
-	ps := newPetSet(replicas)
+	ps := newStatefulSet(replicas)
 
 	nameMapper := &NameIdentityMapper{ps}
 	volumeMapper := &VolumeIdentityMapper{ps}
@@ -144,7 +144,7 @@ func TestPetIDCrossAssignment(t *testing.T) {
 
 func TestPetIDReset(t *testing.T) {
 	replicas := 2
-	ps := newPetSet(replicas)
+	ps := newStatefulSet(replicas)
 	firstPCB, err := newPCB("1", ps)
 	secondPCB, err := newPCB("2", ps)
 	if identityHash(ps, firstPCB.pod) == identityHash(ps, secondPCB.pod) {

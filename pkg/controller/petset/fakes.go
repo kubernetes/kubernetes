@@ -51,7 +51,7 @@ func newPVC(name string) api.PersistentVolumeClaim {
 	}
 }
 
-func newPetSetWithVolumes(replicas int, name string, petMounts []api.VolumeMount, podMounts []api.VolumeMount) *apps.PetSet {
+func newStatefulSetWithVolumes(replicas int, name string, petMounts []api.VolumeMount, podMounts []api.VolumeMount) *apps.StatefulSet {
 	mounts := append(petMounts, podMounts...)
 	claims := []api.PersistentVolumeClaim{}
 	for _, m := range petMounts {
@@ -70,9 +70,9 @@ func newPetSetWithVolumes(replicas int, name string, petMounts []api.VolumeMount
 		})
 	}
 
-	return &apps.PetSet{
+	return &apps.StatefulSet{
 		TypeMeta: unversioned.TypeMeta{
-			Kind:       "PetSet",
+			Kind:       "StatefulSet",
 			APIVersion: "apps/v1beta1",
 		},
 		ObjectMeta: api.ObjectMeta{
@@ -80,7 +80,7 @@ func newPetSetWithVolumes(replicas int, name string, petMounts []api.VolumeMount
 			Namespace: api.NamespaceDefault,
 			UID:       types.UID("test"),
 		},
-		Spec: apps.PetSetSpec{
+		Spec: apps.StatefulSetSpec{
 			Selector: &unversioned.LabelSelector{
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
@@ -110,7 +110,7 @@ func runningPod(ns, name string) *api.Pod {
 	return p
 }
 
-func newPodList(ps *apps.PetSet, num int) []*api.Pod {
+func newPodList(ps *apps.StatefulSet, num int) []*api.Pod {
 	// knownPods are pods in the system
 	knownPods := []*api.Pod{}
 	for i := 0; i < num; i++ {
@@ -120,14 +120,14 @@ func newPodList(ps *apps.PetSet, num int) []*api.Pod {
 	return knownPods
 }
 
-func newPetSet(replicas int) *apps.PetSet {
+func newStatefulSet(replicas int) *apps.StatefulSet {
 	petMounts := []api.VolumeMount{
 		{Name: "datadir", MountPath: "/tmp/zookeeper"},
 	}
 	podMounts := []api.VolumeMount{
 		{Name: "home", MountPath: "/home"},
 	}
-	return newPetSetWithVolumes(replicas, "foo", petMounts, podMounts)
+	return newStatefulSetWithVolumes(replicas, "foo", petMounts, podMounts)
 }
 
 func checkPodForMount(pod *api.Pod, mountName string) error {
@@ -168,14 +168,14 @@ func (f *fakePetClient) Delete(p *pcb) error {
 	for i, pet := range f.pets {
 		if p.pod.Name == pet.pod.Name {
 			found = true
-			f.recorder.Eventf(pet.parent, api.EventTypeNormal, "SuccessfulDelete", "pet: %v", pet.pod.Name)
+			f.recorder.Eventf(pet.parent, api.EventTypeNormal, "SuccessfulDelete", "pod: %v", pet.pod.Name)
 			continue
 		}
 		pets = append(pets, f.pets[i])
 	}
 	if !found {
 		// TODO: Return proper not found error
-		return fmt.Errorf("Delete failed: pet %v doesn't exist", p.pod.Name)
+		return fmt.Errorf("Delete failed: pod %v doesn't exist", p.pod.Name)
 	}
 	f.pets = pets
 	f.petsDeleted++
@@ -196,10 +196,10 @@ func (f *fakePetClient) Get(p *pcb) (*pcb, bool, error) {
 func (f *fakePetClient) Create(p *pcb) error {
 	for _, pet := range f.pets {
 		if p.pod.Name == pet.pod.Name {
-			return fmt.Errorf("Create failed: pet %v already exists", p.pod.Name)
+			return fmt.Errorf("Create failed: pod %v already exists", p.pod.Name)
 		}
 	}
-	f.recorder.Eventf(p.parent, api.EventTypeNormal, "SuccessfulCreate", "pet: %v", p.pod.Name)
+	f.recorder.Eventf(p.parent, api.EventTypeNormal, "SuccessfulCreate", "pod: %v", p.pod.Name)
 	f.pets = append(f.pets, p)
 	f.petsCreated++
 	return nil
@@ -220,7 +220,7 @@ func (f *fakePetClient) Update(expected, wanted *pcb) error {
 	}
 	f.pets = pets
 	if !found {
-		return fmt.Errorf("Cannot update pet %v not found", wanted.pod.Name)
+		return fmt.Errorf("Cannot update pod %v not found", wanted.pod.Name)
 	}
 	// TODO: Delete pvcs/volumes that are in wanted but not in expected.
 	return nil
@@ -252,7 +252,7 @@ func (f *fakePetClient) setHealthy(index int) error {
 		return fmt.Errorf("Index out of range, len %v index %v", len(f.pets), index)
 	}
 	f.pets[index].pod.Status.Phase = api.PodRunning
-	f.pets[index].pod.Annotations[PetSetInitAnnotation] = "true"
+	f.pets[index].pod.Annotations[StatefulSetInitAnnotation] = "true"
 	f.pets[index].pod.Status.Conditions = []api.PodCondition{
 		{Type: api.PodReady, Status: api.ConditionTrue},
 	}

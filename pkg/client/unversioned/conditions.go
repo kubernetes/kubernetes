@@ -77,11 +77,11 @@ func ReplicaSetHasDesiredReplicas(rsClient extensionsclient.ReplicaSetsGetter, r
 	}
 }
 
-// PetSetHasDesiredPets returns a conditon that checks the number of petset replicas
-func PetSetHasDesiredPets(psClient appsclient.PetSetsGetter, petset *apps.PetSet) wait.ConditionFunc {
+// StatefulSetHasDesiredPets returns a conditon that checks the number of petset replicas
+func StatefulSetHasDesiredPets(psClient appsclient.StatefulSetsGetter, petset *apps.StatefulSet) wait.ConditionFunc {
 	// TODO: Differentiate between 0 pets and a really quick scale down using generation.
 	return func() (bool, error) {
-		ps, err := psClient.PetSets(petset.Namespace).Get(petset.Name)
+		ps, err := psClient.StatefulSets(petset.Namespace).Get(petset.Name)
 		if err != nil {
 			return false, err
 		}

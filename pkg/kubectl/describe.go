@@ -117,7 +117,7 @@ func describerMap(c clientset.Interface) map[unversioned.GroupKind]Describer {
 		extensions.Kind("Ingress"):                     &IngressDescriber{c},
 		batch.Kind("Job"):                              &JobDescriber{c},
 		batch.Kind("ScheduledJob"):                     &ScheduledJobDescriber{c},
-		apps.Kind("PetSet"):                            &PetSetDescriber{c},
+		apps.Kind("StatefulSet"):                       &StatefulSetDescriber{c},
 		certificates.Kind("CertificateSigningRequest"): &CertificateSigningRequestDescriber{c},
 		storage.Kind("StorageClass"):                   &StorageClassDescriber{c},
 	}
@@ -1863,12 +1863,12 @@ func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events
 	})
 }
 
-type PetSetDescriber struct {
+type StatefulSetDescriber struct {
 	client clientset.Interface
 }
 
-func (p *PetSetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	ps, err := p.client.Apps().PetSets(namespace).Get(name)
+func (p *StatefulSetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+	ps, err := p.client.Apps().StatefulSets(namespace).Get(name)
 	if err != nil {
 		return "", err
 	}
