@@ -149,6 +149,7 @@ func NewConfigFactory(client clientset.Interface, schedulerName string, hardPodA
 			DeleteFunc: c.deletePodFromCache,
 		},
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		nil,
 	)
 
 	c.NodeLister.Store, c.nodePopulator = cache.NewInformer(
@@ -160,6 +161,7 @@ func NewConfigFactory(client clientset.Interface, schedulerName string, hardPodA
 			UpdateFunc: c.updateNodeInCache,
 			DeleteFunc: c.deleteNodeFromCache,
 		},
+		nil,
 	)
 
 	// TODO(harryz) need to fill all the handlers here and below for equivalence cache
@@ -168,6 +170,7 @@ func NewConfigFactory(client clientset.Interface, schedulerName string, hardPodA
 		&api.PersistentVolume{},
 		0,
 		cache.ResourceEventHandlerFuncs{},
+		nil,
 	)
 
 	c.ServiceLister.Indexer, c.servicePopulator = cache.NewIndexerInformer(
@@ -176,6 +179,7 @@ func NewConfigFactory(client clientset.Interface, schedulerName string, hardPodA
 		0,
 		cache.ResourceEventHandlerFuncs{},
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		nil,
 	)
 
 	c.ControllerLister.Indexer, c.controllerPopulator = cache.NewIndexerInformer(
@@ -184,6 +188,7 @@ func NewConfigFactory(client clientset.Interface, schedulerName string, hardPodA
 		0,
 		cache.ResourceEventHandlerFuncs{},
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		nil,
 	)
 
 	return c

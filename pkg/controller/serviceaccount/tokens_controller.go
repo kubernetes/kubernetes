@@ -105,6 +105,7 @@ func NewTokensController(cl clientset.Interface, options TokensControllerOptions
 			UpdateFunc: e.queueServiceAccountUpdateSync,
 			DeleteFunc: e.queueServiceAccountSync,
 		},
+		nil,
 	)
 
 	tokenSelector := fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(api.SecretTypeServiceAccountToken)})
@@ -127,6 +128,7 @@ func NewTokensController(cl clientset.Interface, options TokensControllerOptions
 			DeleteFunc: e.queueSecretSync,
 		},
 		cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc},
+		nil,
 	)
 
 	return e

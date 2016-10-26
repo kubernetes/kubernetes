@@ -140,7 +140,9 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 			func(obj pkg_runtime.Object) {
 				ic.deliverIngressObj(obj, 0, false)
 			},
-		))
+		),
+		nil,
+	)
 
 	// Federated informer on ingresses in members of federation.
 	ic.ingressFederatedInformer = util.NewFederatedInformer(
@@ -165,7 +167,9 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 					func(obj pkg_runtime.Object) {
 						ic.deliverIngressObj(obj, ic.ingressReviewDelay, false)
 					},
-				))
+				),
+				nil,
+			)
 		},
 
 		&util.ClusterLifecycleHandlerFuncs{
@@ -206,7 +210,9 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 					func(obj pkg_runtime.Object) {
 						ic.deliverConfigMapObj(cluster.Name, obj, ic.configMapReviewDelay, false)
 					},
-				))
+				),
+				nil,
+			)
 		},
 
 		&util.ClusterLifecycleHandlerFuncs{

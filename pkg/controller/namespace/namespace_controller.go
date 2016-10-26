@@ -115,6 +115,7 @@ func NewNamespaceController(
 				namespaceController.enqueueNamespace(namespace)
 			},
 		},
+		nil,
 	)
 
 	namespaceController.store = store

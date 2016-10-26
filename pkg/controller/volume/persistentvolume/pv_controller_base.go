@@ -136,6 +136,7 @@ func NewController(p ControllerParameters) *PersistentVolumeController {
 			DeleteFunc: controller.deleteVolume,
 		},
 		cache.Indexers{"accessmodes": accessModesIndexFunc},
+		nil,
 	)
 	_, controller.claimController = cache.NewInformer(
 		claimSource,
@@ -146,6 +147,7 @@ func NewController(p ControllerParameters) *PersistentVolumeController {
 			UpdateFunc: controller.updateClaim,
 			DeleteFunc: controller.deleteClaim,
 		},
+		nil,
 	)
 
 	// This is just a cache of StorageClass instances, no special actions are

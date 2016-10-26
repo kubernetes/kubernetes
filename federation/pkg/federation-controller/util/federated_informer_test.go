@@ -92,7 +92,8 @@ func TestFederatedInformer(t *testing.T) {
 			},
 			&api_v1.Service{},
 			10*time.Second,
-			cache.ResourceEventHandlerFuncs{})
+			cache.ResourceEventHandlerFuncs{},
+			nil)
 	}
 
 	addedClusters := make(chan string, 1)

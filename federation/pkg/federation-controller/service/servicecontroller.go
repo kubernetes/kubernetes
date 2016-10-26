@@ -186,6 +186,7 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 			DeleteFunc: s.enqueueService,
 		},
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		nil,
 	)
 	s.clusterStore.Store, s.clusterController = cache.NewInformer(
 		&cache.ListWatch{
@@ -226,6 +227,7 @@ func New(federationClient fedclientset.Interface, dns dnsprovider.Interface,
 				// how could we stop a controller?
 			},
 		},
+		nil,
 	)
 
 	s.endpointWorkerMap = make(map[string]bool)

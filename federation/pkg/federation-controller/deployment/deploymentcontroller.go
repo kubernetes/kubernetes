@@ -132,6 +132,7 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 			fedutil.NewTriggerOnAllChanges(
 				func(obj runtime.Object) { fdc.deliverLocalDeployment(obj, deploymentReviewDelay) },
 			),
+			nil,
 		)
 	}
 	clusterLifecycle := fedutil.ClusterLifecycleHandlerFuncs{
@@ -163,6 +164,7 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 					fdc.clusterDeliverer.DeliverAfter(allClustersKey, nil, allDeploymentReviewDelay)
 				},
 			),
+			nil,
 		)
 	}
 	fdc.fedPodInformer = fedutil.NewFederatedInformer(federationClient, podFedInformerFactory, &fedutil.ClusterLifecycleHandlerFuncs{})
@@ -183,6 +185,7 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 		fedutil.NewTriggerOnMetaAndSpecChanges(
 			func(obj runtime.Object) { fdc.deliverFedDeploymentObj(obj, deploymentReviewDelay) },
 		),
+		nil,
 	)
 
 	fdc.fedUpdater = fedutil.NewFederatedUpdater(fdc.fedDeploymentInformer,

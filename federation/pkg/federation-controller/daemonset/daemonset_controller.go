@@ -111,7 +111,9 @@ func NewDaemonSetController(client federationclientset.Interface) *DaemonSetCont
 		},
 		&extensionsv1.DaemonSet{},
 		controller.NoResyncPeriodFunc(),
-		util.NewTriggerOnAllChanges(func(obj pkg_runtime.Object) { daemonsetcontroller.deliverDaemonSetObj(obj, 0, false) }))
+		util.NewTriggerOnAllChanges(func(obj pkg_runtime.Object) { daemonsetcontroller.deliverDaemonSetObj(obj, 0, false) }),
+		nil,
+	)
 
 	// Federated informer on daemonsets in members of federation.
 	daemonsetcontroller.daemonsetFederatedInformer = util.NewFederatedInformer(
@@ -136,7 +138,9 @@ func NewDaemonSetController(client federationclientset.Interface) *DaemonSetCont
 					func(obj pkg_runtime.Object) {
 						daemonsetcontroller.deliverDaemonSetObj(obj, daemonsetcontroller.daemonsetReviewDelay, false)
 					},
-				))
+				),
+				nil,
+			)
 		},
 
 		&util.ClusterLifecycleHandlerFuncs{

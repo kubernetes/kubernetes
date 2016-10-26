@@ -134,6 +134,7 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 			fedutil.NewTriggerOnAllChanges(
 				func(obj runtime.Object) { frsc.deliverLocalReplicaSet(obj, replicaSetReviewDelay) },
 			),
+			nil,
 		)
 	}
 	clusterLifecycle := fedutil.ClusterLifecycleHandlerFuncs{
@@ -165,6 +166,7 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 					frsc.clusterDeliverer.DeliverAfter(allClustersKey, nil, allReplicaSetReviewDelay)
 				},
 			),
+			nil,
 		)
 	}
 	frsc.fedPodInformer = fedutil.NewFederatedInformer(federationClient, podFedInformerFactory, &fedutil.ClusterLifecycleHandlerFuncs{})
@@ -186,6 +188,7 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 			func(obj runtime.Object) { frsc.deliverFedReplicaSetObj(obj, replicaSetReviewDelay) },
 		),
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		nil,
 	)
 
 	frsc.fedUpdater = fedutil.NewFederatedUpdater(frsc.fedReplicaSetInformer,

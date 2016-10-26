@@ -521,6 +521,7 @@ func (gc *GarbageCollector) monitorFor(resource unversioned.GroupVersionResource
 				gc.propagator.eventQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: gc.clock.Now(), Object: event})
 			},
 		},
+		nil,
 	)
 	return monitor, nil
 }

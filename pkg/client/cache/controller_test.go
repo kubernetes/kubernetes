@@ -40,10 +40,13 @@ func Example() {
 	// This will hold the downstream state, as we know it.
 	downstream := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
 
+	stop := make(chan struct{})
+	defer close(stop)
+
 	// This will hold incoming changes. Note how we pass downstream in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
-	fifo := NewDeltaFIFO(MetaNamespaceKeyFunc, nil, downstream)
+	fifo := NewDeltaFIFO(MetaNamespaceKeyFunc, nil, downstream, stop)
 
 	// Let's do threadsafe output to get predictable test results.
 	deletionCounter := make(chan string, 1000)
@@ -92,8 +95,6 @@ func Example() {
 	}
 
 	// Create the controller and run it until we close stop.
-	stop := make(chan struct{})
-	defer close(stop)
 	go New(cfg).Run(stop)
 
 	// Let's add a few objects to the source.
@@ -126,6 +127,9 @@ func ExampleNewInformer() {
 	// Let's do threadsafe output to get predictable test results.
 	deletionCounter := make(chan string, 1000)
 
+	stop := make(chan struct{})
+	defer close(stop)
+
 	// Make a controller that immediately deletes anything added to it, and
 	// logs anything deleted.
 	_, controller := NewInformer(
@@ -146,11 +150,10 @@ func ExampleNewInformer() {
 				deletionCounter <- key
 			},
 		},
+		stop,
 	)
 
 	// Run the controller and run it until we close stop.
-	stop := make(chan struct{})
-	defer close(stop)
 	go controller.Run(stop)
 
 	// Let's add a few objects to the source.
@@ -203,6 +206,8 @@ func TestHammerController(t *testing.T) {
 		outputSet[key] = append(outputSet[key], eventType)
 	}
 
+	stop := make(chan struct{})
+
 	// Make a controller which just logs all the changes it gets.
 	_, controller := NewInformer(
 		source,
@@ -213,6 +218,7 @@ func TestHammerController(t *testing.T) {
 			UpdateFunc: func(oldObj, newObj interface{}) { recordFunc("update", newObj) },
 			DeleteFunc: func(obj interface{}) { recordFunc("delete", obj) },
 		},
+		stop,
 	)
 
 	if controller.HasSynced() {
@@ -220,8 +226,11 @@ func TestHammerController(t *testing.T) {
 	}
 
 	// Run the controller and run it until we close stop.
-	stop := make(chan struct{})
-	go controller.Run(stop)
+	runCompleted := make(chan struct{})
+	go func() {
+		controller.Run(stop)
+		close(runCompleted)
+	}()
 
 	// Let's wait for the controller to do its initial sync
 	wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
@@ -282,6 +291,11 @@ func TestHammerController(t *testing.T) {
 	// TODO: look in the queue to see how many items need to be processed.
 	time.Sleep(100 * time.Millisecond)
 	close(stop)
+	select {
+	case <-runCompleted:
+	case <-time.After(2 * time.Second):
+		t.Errorf("Run did not complete")
+	}
 
 	outputSetLock.Lock()
 	t.Logf("got: %#v", outputSet)
@@ -340,6 +354,7 @@ func TestUpdate(t *testing.T) {
 
 	var testDoneWG sync.WaitGroup
 	testDoneWG.Add(threads * len(tests))
+	stop := make(chan struct{})
 
 	// Make a controller that deletes things once it observes an update.
 	// It calls Done() on the wait group on deletions so we can tell when
@@ -373,13 +388,17 @@ func TestUpdate(t *testing.T) {
 				testDoneWG.Done()
 			},
 		},
+		stop,
 	)
 
 	// Run the controller and run it until we close stop.
 	// Once Run() is called, calls to testDoneWG.Done() might start, so
 	// all testDoneWG.Add() calls must happen before this point
-	stop := make(chan struct{})
-	go controller.Run(stop)
+	runCompleted := make(chan struct{})
+	go func() {
+		controller.Run(stop)
+		close(runCompleted)
+	}()
 	<-watchCh
 
 	// run every test a few times, in parallel
@@ -398,4 +417,9 @@ func TestUpdate(t *testing.T) {
 	// Let's wait for the controller to process the things we just added.
 	testDoneWG.Wait()
 	close(stop)
+	select {
+	case <-runCompleted:
+	case <-time.After(2 * time.Second):
+		t.Errorf("Run did not complete")
+	}
 }

@@ -204,6 +204,7 @@ func (kd *KubeDNS) setServicesStore() {
 			DeleteFunc: kd.removeService,
 			UpdateFunc: kd.updateService,
 		},
+		nil,
 	)
 }
 
@@ -229,6 +230,7 @@ func (kd *KubeDNS) setEndpointsStore() {
 			// No DeleteFunc for EndpointsStore because endpoint object will be deleted
 			// when corresponding service is deleted.
 		},
+		nil,
 	)
 }
 

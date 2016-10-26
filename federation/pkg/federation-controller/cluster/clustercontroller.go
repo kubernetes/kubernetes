@@ -81,6 +81,7 @@ func NewclusterController(federationClient federationclientset.Interface, cluste
 			DeleteFunc: cc.delFromClusterSet,
 			AddFunc:    cc.addToClusterSet,
 		},
+		nil,
 	)
 	return cc
 }

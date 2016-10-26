@@ -142,6 +142,7 @@ func New(cloud cloudprovider.Interface, kubeClient clientset.Interface, clusterN
 			DeleteFunc: s.enqueueService,
 		},
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		nil,
 	)
 	if err := s.init(); err != nil {
 		return nil, err

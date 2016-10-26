@@ -167,6 +167,7 @@ func newReplicationManager(eventRecorder record.EventRecorder, podInformer cache
 			DeleteFunc: rm.enqueueController,
 		},
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		nil,
 	)
 
 	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{

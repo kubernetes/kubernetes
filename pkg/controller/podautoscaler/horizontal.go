@@ -107,6 +107,7 @@ func newInformer(controller *HorizontalController, resyncPeriod time.Duration) (
 			},
 			// We are not interested in deletions.
 		},
+		nil,
 	)
 }
 

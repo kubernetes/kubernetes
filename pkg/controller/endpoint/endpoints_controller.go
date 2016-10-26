@@ -98,6 +98,7 @@ func NewEndpointController(podInformer cache.SharedIndexInformer, client clients
 			DeleteFunc: e.enqueueService,
 		},
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		nil,
 	)
 
 	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
