@@ -30,7 +30,7 @@ Documentation for other releases can be found at
 # Simplified Federation Control Plane Deployment
 
 **Author**: Madhusudan C.S. <madhusudancs@google.com>  
-**Last updated**: 10/07/2016  
+**Last updated**: 10/26/2016  
 **Status**: **Draft**|Approved|Abandoned|Obsolete
 
 
@@ -41,7 +41,10 @@ Documentation for other releases can be found at
   - [Background](#background)
   - [Goals](#goals)
   - [User Experience](#user-experience)
+      - [Introducing `kubefed`](#introducing-kubefed)
       - [Federation Control Plane Deployment Experience](#federation-control-plane-deployment-experience)
+        - [Deploying to an existing cluster](#deploying-to-an-existing-cluster)
+        - [Deploying to a new cluster at the time of cluster bootstrap](#deploying-to-a-new-cluster-at-the-time-of-cluster-bootstrap)
       - [Cluster Registration Experience](#cluster-registration-experience)
       - [Cluster Deregistration Experience](#cluster-deregistration-experience)
     - [Points for Discussion:](#points-for-discussion)
@@ -110,15 +113,66 @@ single command with additional flags for customization.
 
 ## User Experience
 
-Kubernetes v1.4 shipped a new command line tool called
-[`kubeadm`](http://kubernetes.io/docs/getting-started-guides/kubeadm/).
-`kubeadm` simplifies Kubernetes control plane deployment. Federation
-control plane deployment builds on top of this tool. Cluster
-registration and deregistration will be facilitated through
-[`kubectl`](http://kubernetes.io/docs/user-guide/kubectl-overview/).
+#### Introducing `kubefed`
+
+In the wake of the discussion in
+[Issue #35226](https://github.com/kubernetes/kubernetes/issues/35226#issuecomment-255207042),
+we are introducing a new command line tool called `kubefed` that allows
+users to perform federation-specific actions. `kubefed` stands for
+"kubernetes federatate". In the first implementation, users will be
+able to deploy federation control plane onto exiting clusters and
+register/deregister clusters with/from federation with `kubefed`.
 
 
 #### Federation Control Plane Deployment Experience
+
+Users might want to either deploy a federation control plane onto
+existing Kubernetes clusters or deploy it while bootstrapping a new
+cluster. We want to provide mechanisms for both these cases.
+
+
+##### Deploying to an existing cluster
+
+When a user already has one or more Kubernetes clusters running and
+would like to deploy federation control plane onto one of those
+clusters, they use the `kubefed` CLI to achieve that.
+
+1. User downloads the `kubefed` executable on to their machine.
+2. Runs:
+
+    ```shell
+    $ kubefed init myfederation --host=mycluster
+    ```
+
+  to deploy a federation control plane onto the cluster whose kubeconfig
+  context name is "mycluster".
+
+**HA Note:** Since the question of how this experience could be extended
+to an HA federation control plane deployment has come up in the review a
+number of times, I am just leaving a note here. For HA deployments,
+`--host` flag will be extended into an array flag that could be
+specified multiple times on the command line to deploy the federation
+control plane onto all the listed clusters. More details to come later
+in a design doc that is specific to HA federation control plane
+deployments.
+
+**Note:** Users can download `kubefed` and run these command on any
+machine. This could either be their local computer which they use for
+their day-to- day activities, a physical machine or a VM where they run
+their Kubernetes cluster or any other machine. The only requirement is a
+kubeconfig file containing the credentials of the cluster on to which
+they are deploying the federation control plane, also otherwise called
+as the "host cluster".
+
+
+##### Deploying to a new cluster at the time of cluster bootstrap
+
+Kubernetes v1.4 shipped a new command line tool called
+[`kubeadm`](http://kubernetes.io/docs/getting-started-guides/kubeadm/).
+`kubeadm` simplifies Kubernetes control plane deployment. Federation
+control plane deployment builds on top of this tool for the case where
+users prefer to deploy the federation control plane while bootstrapping
+a new cluster.
 
 1. User provisions their cloud/compute resources: a VM or a physical
    machine.
@@ -128,7 +182,7 @@ registration and deregistration will be facilitated through
 3. Runs:
 
     ```shell
-    $ kubeadm init federation
+    $ kubeadm federation init myfederation
     ```
 
    to set up a Kubernetes control plane and a federation control plane
@@ -137,31 +191,46 @@ registration and deregistration will be facilitated through
 
 #### Cluster Registration Experience
 
-1. User downloads the
-   [`kubectl`](http://kubernetes.io/docs/user-guide/kubectl-overview/)
-   executable on their local computer, i.e. the computer they use for
-   their day-to-day activities.
+Cluster registration and deregistration will be facilitated through
+`kubefed`.
+
+1. User downloads the `kubefed` executable on to their local computer,
+   i.e. the computer they use for their day-to-day activities.
 2. Runs:
 
     ```shell
-    $ kubectl register mycluster
+    $ kubefed join mycluster
     ```
 
    to register their cluster named `mycluster`, where `mycluster` is the
    name of the cluster's context in the local kubeconfig.
+
+**Note:** Like in the case of federation control plane deployment above,
+users can download `kubefed` and run these commands on any machine as
+long as they have a kubeconfig file with the required credentials.
+
 
 #### Cluster Deregistration Experience
 
 1. To deregister a cluster, user runs:
 
     ```shell
-    $ kubectl deregister mycluster
+    $ kubefed unjoin mycluster
     ```
 
 ### Points for Discussion:
 
 1. Is `unregister` a better verb than `deregister`?
+
+A. This document previously proposed `register/deregister` as the verb
+   pair for cluster registration/deregistration and that has been
+   replaced by `join/unjoin` now. See the next question.
+
 2. Does the verb pair `join/unjoin` make more sense in this context?
+
+A. After quite a bit of debate and deliberation, we, the federation team
+   have come to a conclusion that `join/unjoin` is a better verb pair
+   than register/deregister.
 
 
 ## Design
@@ -169,6 +238,8 @@ registration and deregistration will be facilitated through
 
 #### Federation Control Plane Bootstrap
 
+Federation control plane bootstrap works the same way whether it is
+initiated through `kubefed` or `kubeadm`. The only difference is that
 `kubeadm init` initializes a Kubernetes control plane. In order to do
 that, it generates the manifests for the various control plane
 components and starts them. It also generates the certificates and the
@@ -176,13 +247,13 @@ credentials required for those components to interact with the API
 server.
 
 Federation control plane deployment builds on top of this functionality.
-Running `kubeadm init federation` first performs all the operations
+Running `kubeadm federation init` first performs all the operations
 involved in bootstrapping a Kubernetes control plane, as running
 `kubeadm init` would. We henceforth call this Kubernetes cluster for
-which the control plane was initialized, the "bootstrap cluster". Upon
-initializing the bootstrap cluster, we perform the following operations
-to bootstrap a federation control plane.
+which the control plane was initialized, the "host cluster".
 
+To bootstrap a federation control plane, we perform the following
+operations:
 
 **1. Create a namespace for federation system components**
 
@@ -251,11 +322,11 @@ to bootstrap a federation control plane.
 
 ##### Additional enhancements
 
-Users can pass `--register` as an additional flag to `kubeadm init
-federation` to also register the cluster with federation. See the
-[Cluster Registration/Deregistration](#cluster-
-registrationderegistration) section below for details on how this is
-done.
+Users can pass `--join` as an additional flag to
+`kubeadm federation init` to also register the cluster with federation.
+See the
+[Cluster Registration/Deregistration](#cluster-registrationderegistration)
+section below for details on how this is done.
 
 ##### Caveats
 
@@ -277,21 +348,21 @@ interactions with a set of clusters. `kubectl` is already being extended
 to enable interactions with federation. Users can also already use
 `kubectl` to register clusters with and deregister clusters from
 federation. As already described, this process is manual, tedious and
-error-prone. Hence, we aim to reduce these processes to a single command
-each.
+error-prone. Hence, we aim to reduce these operations into a single
+command each using the `kubefed` tool.
 
 ##### Registration
 
-When a user runs `kubectl register <cluster-context-name> --bootstrap-
-cluster=<bootstrap-cluster-context>`, we perform the following operations
-assuming that the current kubeconfig context is a federation endpoint:
+When a user runs `kubefed join <cluster-context-name> --host=<host-
+cluster-context>`, we perform the following operations assuming that the
+current kubeconfig context is a federation endpoint:
 
 **1. Create a kubeconfig secret for the cluster in federation**
 
 * Read the kubeconfig fields: `cluster`, `user` and `context`
   corresponding to the context `<cluster-context-name>` into a separate
-  kubeconfig and create a secret for that in the the bootstrap cluster
-  indicated by the `--bootstrap-cluster` flag.
+  kubeconfig and create a secret for that in the the host cluster
+  indicated by the `--host` flag.
 
 **2. Retrieve the cluster endpoint**
 
@@ -305,9 +376,9 @@ assuming that the current kubeconfig context is a federation endpoint:
 
 ##### Deregistration
 
-When a user runs `kubectl unregister <cluster-context-name> --bootstrap-
-cluster=<cluster-name>`, we perform the following operations, again
-assuming that the current kubeconfig context is a federation endpoint:
+When a user runs `kubefed unjoin <cluster-context-name> --host =<host-
+cluster-context>`, we perform the following operations, again assuming
+that the current kubeconfig context is a federation endpoint:
 
 **1. Remove the cluster resource from federation**
 
@@ -317,22 +388,22 @@ name>` from federation.
 **2. Remove the credentials secret**
 
 * Remove the kubeconfig secret that we created during the registration
-  process from the bootstrap cluster.
+  process from the host cluster.
 
-**Note:** `--bootstrap-cluster` flag is only required because federation
-still doesn't support selecting specific clusters in federated secrets.
-It copies them to all the underlying clusters. It is unnecessary to copy
-the credentials in clusters other than the bootstrap cluster. And since
-these are secrets that include cluster credentials, we want to err on
-the side of being too conservative. This flag can be deprecated once
-federated secrets gain cluster selection support.
+**Note:** `--host` flag is only required because federation still
+doesn't support selecting specific clusters in federated secrets. It
+copies them to all the underlying clusters. It is unnecessary to copy
+the credentials in clusters other than the host cluster. And since these
+are secrets that include cluster credentials, we want to err on the side
+of being too conservative. This flag can be deprecated once federated
+secrets gain cluster selection support.
 
 ## Test Plan
 
 #### Federation Control Plane Bootstrap
 
 End-to-end testing of `kubeadm` functionality is somewhat tricky because
-`kubeadm init` and hence `kubeadm init federation` prints out a token to
+`kubeadm init` and hence `kubeadm federation init` prints out a token to
 STDOUT that must be used in all the `kubeadm join` invocations on the
 non-master Kubernetes nodes. Given that, here is an overview of how we
 plan to test the federation bootstrap functionality.
@@ -347,7 +418,7 @@ plan to test the federation bootstrap functionality.
 
 * We provide a customized `configure-vm.sh` script to run during VM
   startup.
-* On the master VM, this script runs `kubeadm init federation` which
+* On the master VM, this script runs `kubeadm federation init` which
   prints out a token.
 * The token is written to an object store (GCS on GCP and S3 on AWS).
 * On the non-master nodes, `configure-vm.sh` script polls for the token
@@ -363,7 +434,7 @@ plan to test the federation bootstrap functionality.
 
 #### Cluster Registration/Deregistration
 
-This should be as simple as running `kubectl register <cluster-context>`
+This should be as simple as running `kubefed join <cluster-context>`
 and verifying that the registered cluster reports "Ready" status.
 
 Running `kubectl get clusters` should not list the unregistered cluster.
@@ -371,9 +442,9 @@ Running `kubectl get clusters` should not list the unregistered cluster.
 
 ## Timeline
 
-Both the federation control plane deployment functionality via `kubeadm`
-and the cluster registration/deregistration functionality via `kubectl`
-are planned to be implemented in the v1.5 time frame and are considered
+Both the federation control plane deployment functionality and the
+cluster registration/deregistration functionality via `kubefed` are
+planned to be implemented in the v1.5 time frame and are considered
 a P0 feature for v1.5.
 
 
@@ -382,6 +453,8 @@ a P0 feature for v1.5.
 Both functionalities will be labeled "alpha" in v1.5.
 
 
+
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/simplified_federation_deployment.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/federation/simplified_federation_deployment.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
