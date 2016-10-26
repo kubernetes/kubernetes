@@ -50,8 +50,6 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&PodTemplateList{}, func(obj interface{}) { SetObjectDefaults_PodTemplateList(obj.(*PodTemplateList)) })
 	scheme.AddTypeDefaultingFunc(&ReplicationController{}, func(obj interface{}) { SetObjectDefaults_ReplicationController(obj.(*ReplicationController)) })
 	scheme.AddTypeDefaultingFunc(&ReplicationControllerList{}, func(obj interface{}) { SetObjectDefaults_ReplicationControllerList(obj.(*ReplicationControllerList)) })
-	scheme.AddTypeDefaultingFunc(&ResourceQuota{}, func(obj interface{}) { SetObjectDefaults_ResourceQuota(obj.(*ResourceQuota)) })
-	scheme.AddTypeDefaultingFunc(&ResourceQuotaList{}, func(obj interface{}) { SetObjectDefaults_ResourceQuotaList(obj.(*ResourceQuotaList)) })
 	scheme.AddTypeDefaultingFunc(&Secret{}, func(obj interface{}) { SetObjectDefaults_Secret(obj.(*Secret)) })
 	scheme.AddTypeDefaultingFunc(&SecretList{}, func(obj interface{}) { SetObjectDefaults_SecretList(obj.(*SecretList)) })
 	scheme.AddTypeDefaultingFunc(&Service{}, func(obj interface{}) { SetObjectDefaults_Service(obj.(*Service)) })
@@ -85,11 +83,6 @@ func SetObjectDefaults_LimitRange(in *LimitRange) {
 	for i := range in.Spec.Limits {
 		a := &in.Spec.Limits[i]
 		SetDefaults_LimitRangeItem(a)
-		SetDefaults_ResourceList(&a.Max)
-		SetDefaults_ResourceList(&a.Min)
-		SetDefaults_ResourceList(&a.Default)
-		SetDefaults_ResourceList(&a.DefaultRequest)
-		SetDefaults_ResourceList(&a.MaxLimitRequestRatio)
 	}
 }
 
@@ -114,8 +107,6 @@ func SetObjectDefaults_NamespaceList(in *NamespaceList) {
 func SetObjectDefaults_Node(in *Node) {
 	SetDefaults_Node(in)
 	SetDefaults_NodeStatus(&in.Status)
-	SetDefaults_ResourceList(&in.Status.Capacity)
-	SetDefaults_ResourceList(&in.Status.Allocatable)
 }
 
 func SetObjectDefaults_NodeList(in *NodeList) {
@@ -127,7 +118,6 @@ func SetObjectDefaults_NodeList(in *NodeList) {
 
 func SetObjectDefaults_PersistentVolume(in *PersistentVolume) {
 	SetDefaults_PersistentVolume(in)
-	SetDefaults_ResourceList(&in.Spec.Capacity)
 	if in.Spec.PersistentVolumeSource.RBD != nil {
 		SetDefaults_RBDVolumeSource(in.Spec.PersistentVolumeSource.RBD)
 	}
@@ -141,9 +131,6 @@ func SetObjectDefaults_PersistentVolume(in *PersistentVolume) {
 
 func SetObjectDefaults_PersistentVolumeClaim(in *PersistentVolumeClaim) {
 	SetDefaults_PersistentVolumeClaim(in)
-	SetDefaults_ResourceList(&in.Spec.Resources.Limits)
-	SetDefaults_ResourceList(&in.Spec.Resources.Requests)
-	SetDefaults_ResourceList(&in.Status.Capacity)
 }
 
 func SetObjectDefaults_PersistentVolumeClaimList(in *PersistentVolumeClaimList) {
@@ -206,8 +193,6 @@ func SetObjectDefaults_Pod(in *Pod) {
 				}
 			}
 		}
-		SetDefaults_ResourceList(&a.Resources.Limits)
-		SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
 			SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -248,8 +233,6 @@ func SetObjectDefaults_Pod(in *Pod) {
 				}
 			}
 		}
-		SetDefaults_ResourceList(&a.Resources.Limits)
-		SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
 			SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -337,8 +320,6 @@ func SetObjectDefaults_PodTemplate(in *PodTemplate) {
 				}
 			}
 		}
-		SetDefaults_ResourceList(&a.Resources.Limits)
-		SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
 			SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -379,8 +360,6 @@ func SetObjectDefaults_PodTemplate(in *PodTemplate) {
 				}
 			}
 		}
-		SetDefaults_ResourceList(&a.Resources.Limits)
-		SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
 			SetDefaults_Probe(a.LivenessProbe)
 			if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -462,8 +441,6 @@ func SetObjectDefaults_ReplicationController(in *ReplicationController) {
 					}
 				}
 			}
-			SetDefaults_ResourceList(&a.Resources.Limits)
-			SetDefaults_ResourceList(&a.Resources.Requests)
 			if a.LivenessProbe != nil {
 				SetDefaults_Probe(a.LivenessProbe)
 				if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -504,8 +481,6 @@ func SetObjectDefaults_ReplicationController(in *ReplicationController) {
 					}
 				}
 			}
-			SetDefaults_ResourceList(&a.Resources.Limits)
-			SetDefaults_ResourceList(&a.Resources.Requests)
 			if a.LivenessProbe != nil {
 				SetDefaults_Probe(a.LivenessProbe)
 				if a.LivenessProbe.Handler.HTTPGet != nil {
@@ -538,19 +513,6 @@ func SetObjectDefaults_ReplicationControllerList(in *ReplicationControllerList) 
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_ReplicationController(a)
-	}
-}
-
-func SetObjectDefaults_ResourceQuota(in *ResourceQuota) {
-	SetDefaults_ResourceList(&in.Spec.Hard)
-	SetDefaults_ResourceList(&in.Status.Hard)
-	SetDefaults_ResourceList(&in.Status.Used)
-}
-
-func SetObjectDefaults_ResourceQuotaList(in *ResourceQuotaList) {
-	for i := range in.Items {
-		a := &in.Items[i]
-		SetObjectDefaults_ResourceQuota(a)
 	}
 }
 
