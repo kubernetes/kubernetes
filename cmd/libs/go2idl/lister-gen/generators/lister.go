@@ -124,10 +124,11 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 						DefaultGen: generator.DefaultGen{
 							OptionalName: arguments.OutputFileBaseName + "." + normalizedGroupName,
 						},
-						outputPackage: arguments.OutputPackagePath,
-						groupVersion:  gv,
-						types:         orderer.OrderTypes(gvToTypes[gv]),
-						imports:       generator.NewImportTracker(),
+						outputPackage:       arguments.OutputPackagePath,
+						groupVersion:        gv,
+						types:               orderer.OrderTypes(gvToTypes[gv]),
+						imports:             generator.NewImportTracker(),
+						objectMetaByPackage: make(map[string]*types.Type),
 					},
 				}
 			},
@@ -147,10 +148,9 @@ type genListers struct {
 	outputPackage string
 	groupVersion  unversioned.GroupVersion
 	// types in this group
-	types   []*types.Type
-	imports namer.ImportTracker
-	// if true, we need to import k8s.io/kubernetes/pkg/api
-	hasNonNamespaced bool
+	types               []*types.Type
+	imports             namer.ImportTracker
+	objectMetaByPackage map[string]*types.Type
 }
 
 var _ generator.Generator = &genListers{}
@@ -166,10 +166,6 @@ func (g *genListers) Namers(c *generator.Context) namer.NameSystems {
 }
 
 func (g *genListers) Imports(c *generator.Context) (imports []string) {
-	if g.hasNonNamespaced {
-		objectMeta := c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ObjectMeta"})
-		g.imports.AddType(objectMeta)
-	}
 	imports = append(imports, g.imports.ImportLines()...)
 	imports = append(imports, "k8s.io/kubernetes/pkg/api/errors")
 	imports = append(imports, "k8s.io/kubernetes/pkg/labels")
@@ -197,7 +193,6 @@ func (g *genListers) GenerateType(c *generator.Context, t *types.Type, w io.Writ
 		if namespaced {
 			sw.Do(typeListerInterface, m)
 		} else {
-			g.hasNonNamespaced = true
 			sw.Do(typeListerInterface_NonNamespaced, m)
 		}
 
@@ -212,11 +207,35 @@ func (g *genListers) GenerateType(c *generator.Context, t *types.Type, w io.Writ
 			sw.Do(namespaceLister_List, m)
 			sw.Do(namespaceLister_Get, m)
 		} else {
-			sw.Do(typeLister_NonNamespacedGet, m)
+			objectMeta := g.objectMetaForType(t)
+			if objectMeta == nil {
+				glog.Fatalf("unable to locate ObjectMeta for %s", t.Name.Name)
+			}
+			m2 := map[string]interface{}{
+				"group":      groupName,
+				"type":       t,
+				"objectMeta": objectMeta,
+			}
+			sw.Do(typeLister_NonNamespacedGet, m2)
 		}
 	}
 
 	return sw.Error()
+}
+
+func (g *genListers) objectMetaForType(t *types.Type) *types.Type {
+	if objectMeta, ok := g.objectMetaByPackage[t.Name.Package]; ok {
+		return objectMeta
+	}
+
+	for _, member := range t.Members {
+		if member.Name == "ObjectMeta" {
+			g.objectMetaByPackage[t.Name.Package] = member.Type
+			return member.Type
+		}
+	}
+
+	return nil
 }
 
 var typeListerInterface = `
@@ -273,7 +292,7 @@ func (s *$.type|private$Lister) $.type|publicPlural$(namespace string) $.type|pu
 var typeLister_NonNamespacedGet = `
 // Get retrieves the $.type|public$ from the index for a given name.
 func (s *$.type|private$Lister) Get(name string) (*$.type|raw$, error) {
-  key := &$.type|raw${ObjectMeta: api.ObjectMeta{Name: name}}
+  key := &$.type|raw${ObjectMeta: $.objectMeta|raw${Name: name}}
   obj, exists, err := s.indexer.Get(key)
   if err != nil {
     return nil, err
