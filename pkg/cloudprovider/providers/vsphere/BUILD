@@ -24,6 +24,8 @@ go_library(
         "//vendor:github.com/vmware/govmomi/find",
         "//vendor:github.com/vmware/govmomi/object",
         "//vendor:github.com/vmware/govmomi/property",
+        "//vendor:github.com/vmware/govmomi/session",
+        "//vendor:github.com/vmware/govmomi/vim25",
         "//vendor:github.com/vmware/govmomi/vim25/mo",
         "//vendor:github.com/vmware/govmomi/vim25/soap",
         "//vendor:github.com/vmware/govmomi/vim25/types",
