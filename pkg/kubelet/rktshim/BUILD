@@ -23,6 +23,7 @@ go_library(
     deps = [
         "//pkg/kubelet/api:go_default_library",
         "//pkg/kubelet/api/v1alpha1/runtime:go_default_library",
+        "//pkg/kubelet/util/ioutils:go_default_library",
     ],
 )
 

@@ -1001,7 +1001,7 @@ func (m *kubeGenericRuntimeManager) PortForward(pod *kubecontainer.Pod, port uin
 	// now to unblock other tests.
 	// TODO: remove this hack after portforward is defined in CRI.
 	if ds, ok := m.runtimeService.(dockershim.DockerLegacyService); ok {
-		return ds.PortForward(pod.Sandboxes[0].ID.ID, port, stream)
+		return ds.LegacyPortForward(pod.Sandboxes[0].ID.ID, port, stream)
 	}
 
 	return fmt.Errorf("not implemented")
