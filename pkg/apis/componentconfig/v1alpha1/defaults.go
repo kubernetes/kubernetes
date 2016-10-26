@@ -147,6 +147,25 @@ func SetDefaults_LeaderElectionConfiguration(obj *LeaderElectionConfiguration) {
 }
 
 func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
+	if obj.Authentication.Anonymous.Enabled == nil {
+		obj.Authentication.Anonymous.Enabled = boolVar(true)
+	}
+	if obj.Authentication.Webhook.Enabled == nil {
+		obj.Authentication.Webhook.Enabled = boolVar(false)
+	}
+	if obj.Authentication.Webhook.CacheTTL == zeroDuration {
+		obj.Authentication.Webhook.CacheTTL = unversioned.Duration{Duration: 2 * time.Minute}
+	}
+	if obj.Authorization.Mode == "" {
+		obj.Authorization.Mode = KubeletAuthorizationModeAlwaysAllow
+	}
+	if obj.Authorization.Webhook.CacheAuthorizedTTL == zeroDuration {
+		obj.Authorization.Webhook.CacheAuthorizedTTL = unversioned.Duration{Duration: 5 * time.Minute}
+	}
+	if obj.Authorization.Webhook.CacheUnauthorizedTTL == zeroDuration {
+		obj.Authorization.Webhook.CacheUnauthorizedTTL = unversioned.Duration{Duration: 30 * time.Second}
+	}
+
 	if obj.Address == "" {
 		obj.Address = "0.0.0.0"
 	}

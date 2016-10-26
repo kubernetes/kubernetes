@@ -605,10 +605,56 @@ func TestAuthFilters(t *testing.T) {
 		}
 	}
 
+	methodToAPIVerb := map[string]string{"GET": "get", "POST": "create", "PUT": "update"}
+	pathToSubresource := func(path string) string {
+		switch {
+		// Cases for subpaths we expect specific subresources for
+		case isSubpath(path, statsPath):
+			return "stats"
+		case isSubpath(path, specPath):
+			return "spec"
+		case isSubpath(path, logsPath):
+			return "log"
+		case isSubpath(path, metricsPath):
+			return "metrics"
+
+		// Cases for subpaths we expect to map to the "proxy" subresource
+		case isSubpath(path, "/attach"),
+			isSubpath(path, "/configz"),
+			isSubpath(path, "/containerLogs"),
+			isSubpath(path, "/debug"),
+			isSubpath(path, "/exec"),
+			isSubpath(path, "/healthz"),
+			isSubpath(path, "/pods"),
+			isSubpath(path, "/portForward"),
+			isSubpath(path, "/run"),
+			isSubpath(path, "/runningpods"):
+			return "proxy"
+
+		default:
+			panic(fmt.Errorf(`unexpected kubelet API path %s.
+The kubelet API has likely registered a handler for a new path.
+If the new path has a use case for partitioned authorization when requested from the kubelet API,
+add a specific subresource for it in auth.go#GetRequestAttributes() and in TestAuthFilters().
+Otherwise, add it to the expected list of paths that map to the "proxy" subresource in TestAuthFilters().`, path))
+		}
+	}
+	attributesGetter := NewNodeAuthorizerAttributesGetter(types.NodeName("test"))
+
 	for _, tc := range testcases {
 		var (
 			expectedUser       = &user.DefaultInfo{Name: "test"}
-			expectedAttributes = &authorizer.AttributesRecord{User: expectedUser}
+			expectedAttributes = authorizer.AttributesRecord{
+				User:            expectedUser,
+				APIGroup:        "",
+				APIVersion:      "v1",
+				Verb:            methodToAPIVerb[tc.Method],
+				Resource:        "nodes",
+				Name:            "test",
+				Subresource:     pathToSubresource(tc.Path),
+				ResourceRequest: true,
+				Path:            tc.Path,
+			}
 
 			calledAuthenticate = false
 			calledAuthorize    = false
@@ -624,12 +670,12 @@ func TestAuthFilters(t *testing.T) {
 			if u != expectedUser {
 				t.Fatalf("%s: expected user %v, got %v", tc.Path, expectedUser, u)
 			}
-			return expectedAttributes
+			return attributesGetter.GetRequestAttributes(u, req)
 		}
 		fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (authorized bool, reason string, err error) {
 			calledAuthorize = true
 			if a != expectedAttributes {
-				t.Fatalf("%s: expected attributes %v, got %v", tc.Path, expectedAttributes, a)
+				t.Fatalf("%s: expected attributes\n\t%#v\ngot\n\t%#v", tc.Path, expectedAttributes, a)
 			}
 			return false, "", nil
 		}

@@ -98,6 +98,29 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(componentconfig.IPVar{Val: &s.Address}, "address", "The IP address for the Kubelet to serve on (set to 0.0.0.0 for all interfaces)")
 	fs.Int32Var(&s.Port, "port", s.Port, "The port for the Kubelet to serve on.")
 	fs.Int32Var(&s.ReadOnlyPort, "read-only-port", s.ReadOnlyPort, "The read-only port for the Kubelet to serve on with no authentication/authorization (set to 0 to disable)")
+
+	// Authentication
+	fs.BoolVar(&s.Authentication.Anonymous.Enabled, "anonymous-auth", s.Authentication.Anonymous.Enabled, ""+
+		"Enables anonymous requests to the Kubelet server. Requests that are not rejected by another "+
+		"authentication method are treated as anonymous requests. Anonymous requests have a username "+
+		"of system:anonymous, and a group name of system:unauthenticated.")
+	fs.BoolVar(&s.Authentication.Webhook.Enabled, "authentication-token-webhook", s.Authentication.Webhook.Enabled, ""+
+		"Use the TokenReview API to determine authentication for bearer tokens.")
+	fs.DurationVar(&s.Authentication.Webhook.CacheTTL.Duration, "authentication-token-webhook-cache-ttl", s.Authentication.Webhook.CacheTTL.Duration, ""+
+		"The duration to cache responses from the webhook token authenticator.")
+	fs.StringVar(&s.Authentication.X509.ClientCAFile, "client-ca-file", s.Authentication.X509.ClientCAFile, ""+
+		"If set, any request presenting a client certificate signed by one of the authorities in the client-ca-file "+
+		"is authenticated with an identity corresponding to the CommonName of the client certificate.")
+
+	// Authorization
+	fs.StringVar((*string)(&s.Authorization.Mode), "authorization-mode", string(s.Authorization.Mode), ""+
+		"Authorization mode for Kubelet server. Valid options are AlwaysAllow or Webhook. "+
+		"Webhook mode uses the SubjectAccessReview API to determine authorization.")
+	fs.DurationVar(&s.Authorization.Webhook.CacheAuthorizedTTL.Duration, "authorization-webhook-cache-authorized-ttl", s.Authorization.Webhook.CacheAuthorizedTTL.Duration, ""+
+		"The duration to cache 'authorized' responses from the webhook authorizer.")
+	fs.DurationVar(&s.Authorization.Webhook.CacheUnauthorizedTTL.Duration, "authorization-webhook-cache-unauthorized-ttl", s.Authorization.Webhook.CacheUnauthorizedTTL.Duration, ""+
+		"The duration to cache 'unauthorized' responses from the webhook authorizer.")
+
 	fs.StringVar(&s.TLSCertFile, "tls-cert-file", s.TLSCertFile, ""+
 		"File containing x509 Certificate for HTTPS.  (CA cert, if any, concatenated after server cert). "+
 		"If --tls-cert-file and --tls-private-key-file are not provided, a self-signed certificate and key "+
