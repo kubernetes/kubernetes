@@ -43,6 +43,8 @@ type managerImpl struct {
 	killPodFunc KillPodFunc
 	// the interface that knows how to do image gc
 	imageGC ImageGC
+	// the interface that knows how to do volume gc
+	volumeGC VolumeGC
 	// protects access to internal state
 	sync.RWMutex
 	// node conditions are the set of conditions present
@@ -76,6 +78,7 @@ func NewManager(
 	config Config,
 	killPodFunc KillPodFunc,
 	imageGC ImageGC,
+	volumeGC VolumeGC,
 	recorder record.EventRecorder,
 	nodeRef *api.ObjectReference,
 	clock clock.Clock) (Manager, lifecycle.PodAdmitHandler, error) {
@@ -83,6 +86,7 @@ func NewManager(
 		clock:           clock,
 		killPodFunc:     killPodFunc,
 		imageGC:         imageGC,
+		volumeGC:        volumeGC,
 		config:          config,
 		recorder:        recorder,
 		summaryProvider: summaryProvider,
@@ -156,7 +160,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 			return
 		}
 		m.resourceToRankFunc = buildResourceToRankFunc(hasDedicatedImageFs)
-		m.resourceToNodeReclaimFuncs = buildResourceToNodeReclaimFuncs(m.imageGC, hasDedicatedImageFs)
+		m.resourceToNodeReclaimFuncs = buildResourceToNodeReclaimFuncs(m.imageGC, m.volumeGC, hasDedicatedImageFs)
 	}
 
 	// make observations and get a function to derive pod usage stats relative to those observations.

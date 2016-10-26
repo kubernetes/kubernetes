@@ -890,21 +890,21 @@ func PodIsEvicted(podStatus api.PodStatus) bool {
 }
 
 // buildResourceToNodeReclaimFuncs returns reclaim functions associated with resources.
-func buildResourceToNodeReclaimFuncs(imageGC ImageGC, withImageFs bool) map[api.ResourceName]nodeReclaimFuncs {
+func buildResourceToNodeReclaimFuncs(imageGC ImageGC, volumeGC VolumeGC, withImageFs bool) map[api.ResourceName]nodeReclaimFuncs {
 	resourceToReclaimFunc := map[api.ResourceName]nodeReclaimFuncs{}
 	// usage of an imagefs is optional
 	if withImageFs {
 		// with an imagefs, nodefs pressure should just delete logs
-		resourceToReclaimFunc[resourceNodeFs] = nodeReclaimFuncs{deleteLogs()}
-		resourceToReclaimFunc[resourceNodeFsInodes] = nodeReclaimFuncs{deleteLogs()}
+		resourceToReclaimFunc[resourceNodeFs] = nodeReclaimFuncs{deleteLogs(), deleteTerminatedPodsVolumes(volumeGC)}
+		resourceToReclaimFunc[resourceNodeFsInodes] = nodeReclaimFuncs{deleteLogs(), deleteTerminatedPodsVolumes(volumeGC)}
 		// with an imagefs, imagefs pressure should delete unused images
 		resourceToReclaimFunc[resourceImageFs] = nodeReclaimFuncs{deleteImages(imageGC, true)}
 		resourceToReclaimFunc[resourceImageFsInodes] = nodeReclaimFuncs{deleteImages(imageGC, false)}
 	} else {
 		// without an imagefs, nodefs pressure should delete logs, and unused images
 		// since imagefs and nodefs share a common device, they share common reclaim functions
-		resourceToReclaimFunc[resourceNodeFs] = nodeReclaimFuncs{deleteLogs(), deleteImages(imageGC, true)}
-		resourceToReclaimFunc[resourceNodeFsInodes] = nodeReclaimFuncs{deleteLogs(), deleteImages(imageGC, false)}
+		resourceToReclaimFunc[resourceNodeFs] = nodeReclaimFuncs{deleteLogs(), deleteImages(imageGC, true), deleteTerminatedPodsVolumes(volumeGC)}
+		resourceToReclaimFunc[resourceNodeFsInodes] = nodeReclaimFuncs{deleteLogs(), deleteImages(imageGC, false), deleteTerminatedPodsVolumes(volumeGC)}
 		resourceToReclaimFunc[resourceImageFs] = nodeReclaimFuncs{deleteLogs(), deleteImages(imageGC, true)}
 		resourceToReclaimFunc[resourceImageFsInodes] = nodeReclaimFuncs{deleteLogs(), deleteImages(imageGC, false)}
 	}
@@ -932,5 +932,16 @@ func deleteImages(imageGC ImageGC, reportBytesFreed bool) nodeReclaimFunc {
 			reclaimed = bytesFreed
 		}
 		return resource.NewQuantity(reclaimed, resource.BinarySI), nil
+	}
+}
+
+func deleteTerminatedPodsVolumes(volumeGC VolumeGC) nodeReclaimFunc {
+	return func() (*resource.Quantity, error) {
+		glog.Infof("eviction manager: attempting to delete unused volumes")
+		bytesFreed, err := volumeGC.DeleteUnusedVolumes()
+		if err != nil {
+			return nil, err
+		}
+		return resource.NewQuantity(bytesFreed, resource.BinarySI), nil
 	}
 }

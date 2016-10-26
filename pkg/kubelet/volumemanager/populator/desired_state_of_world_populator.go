@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
@@ -52,6 +53,12 @@ type DesiredStateOfWorldPopulator interface {
 	// remounting volumes on pod updates (volumes like Downward API volumes
 	// depend on this behavior to ensure volume content is updated).
 	ReprocessPod(podName volumetypes.UniquePodName)
+
+	// DeleteTerminatedPodVolumes removes volumes from deleted pods in an
+	// effort to free space on the filesystem.  This is normally done
+	// in response to disk pressure on the node.  For debugging purposes,
+	// we would like to keep terminated pods volumes around if space allows.
+	DeleteTerminatedPodVolumes()
 }
 
 // NewDesiredStateOfWorldPopulator returns a new instance of
@@ -107,6 +114,20 @@ func (dswp *desiredStateOfWorldPopulator) ReprocessPod(
 	dswp.deleteProcessedPod(podName)
 }
 
+func (dswp *desiredStateOfWorldPopulator) DeleteTerminatedPodVolumes() {
+	dswp.findAndRemovePods(func(volumeToMount cache.VolumeToMount) bool {
+		if pod, podExists :=
+			dswp.podManager.GetPodByUID(volumeToMount.Pod.UID); podExists {
+			// Allow cleanup of terminated pods volumes
+			if isPodTerminated(pod) {
+				return false
+			}
+			return true
+		}
+		return false
+	})
+}
+
 func (dswp *desiredStateOfWorldPopulator) populatorLoopFunc() func() {
 	return func() {
 		dswp.findAndAddNewPods()
@@ -116,55 +137,60 @@ func (dswp *desiredStateOfWorldPopulator) populatorLoopFunc() func() {
 		// an expensive operation, therefore we limit the rate that
 		// findAndRemoveDeletedPods() is called independently of the main
 		// populator loop.
-		if time.Since(dswp.timeOfLastGetPodStatus) < dswp.getPodStatusRetryDuration {
-			glog.V(5).Infof(
-				"Skipping findAndRemoveDeletedPods(). Not permitted until %v (getPodStatusRetryDuration %v).",
-				dswp.timeOfLastGetPodStatus.Add(dswp.getPodStatusRetryDuration),
-				dswp.getPodStatusRetryDuration)
-
-			return
+		if time.Since(dswp.timeOfLastGetPodStatus) >= dswp.getPodStatusRetryDuration {
+			dswp.findAndRemoveDeletedPods()
 		}
-
-		dswp.findAndRemoveDeletedPods()
 	}
+}
+
+func isPodTerminated(pod *api.Pod) bool {
+	return pod.Status.Phase == api.PodFailed || pod.Status.Phase == api.PodSucceeded
 }
 
 // Iterate through all pods and add to desired state of world if they don't
 // exist but should
 func (dswp *desiredStateOfWorldPopulator) findAndAddNewPods() {
 	for _, pod := range dswp.podManager.GetPods() {
+		// Don't add volumes for terminated pods. This allows deletion
+		// of terminated pods volumes on demand to reclaim space.
+		if isPodTerminated(pod) {
+			continue
+		}
 		dswp.processPodVolumes(pod)
 	}
 }
 
-// Iterate through all pods in desired state of world, and remove if they no
-// longer exist
+type skipPodFunc func(cache.VolumeToMount) bool
+
 func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
-	var runningPods []*kubecontainer.Pod
-
-	runningPodsFetched := false
-	for _, volumeToMount := range dswp.desiredStateOfWorld.GetVolumesToMount() {
-		if _, podExists :=
+	dswp.findAndRemovePods(func(volumeToMount cache.VolumeToMount) bool {
+		if pod, podExists :=
 			dswp.podManager.GetPodByUID(volumeToMount.Pod.UID); podExists {
-			continue
-		}
-
-		// Once a pod has been deleted from kubelet pod manager, do not delete
-		// it immediately from volume manager. Instead, check the kubelet
-		// containerRuntime to verify that all containers in the pod have been
-		// terminated.
-		if !runningPodsFetched {
-			var getPodsErr error
-			runningPods, getPodsErr = dswp.kubeContainerRuntime.GetPods(false)
-			if getPodsErr != nil {
-				glog.Errorf(
-					"kubeContainerRuntime.findAndRemoveDeletedPods returned error %v.",
-					getPodsErr)
-				continue
+			// Allow cleanup evicted pod volumes
+			if eviction.PodIsEvicted(pod.Status) {
+				return false
 			}
+			return true
+		}
+		return false
+	})
+}
 
-			runningPodsFetched = true
-			dswp.timeOfLastGetPodStatus = time.Now()
+// Remove a filtered and terminated set of pods from desired state of world
+func (dswp *desiredStateOfWorldPopulator) findAndRemovePods(skipPod skipPodFunc) {
+	// Once a pod has been deleted from kubelet pod manager, do not delete
+	// it immediately from volume manager. Instead, check the kubelet
+	// containerRuntime to verify that all containers in the pod have been
+	// terminated.
+	runningPods, err := dswp.kubeContainerRuntime.GetPods(false)
+	if err != nil {
+		glog.Errorf("kubeContainerRuntime.findAndRemoveDeletedPods returned error %v.", err)
+		return
+	}
+	dswp.timeOfLastGetPodStatus = time.Now()
+	for _, volumeToMount := range dswp.desiredStateOfWorld.GetVolumesToMount() {
+		if skipPod(volumeToMount) {
+			continue
 		}
 
 		runningContainers := false
@@ -173,7 +199,6 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 				if len(runningPod.Containers) > 0 {
 					runningContainers = true
 				}
-
 				break
 			}
 		}

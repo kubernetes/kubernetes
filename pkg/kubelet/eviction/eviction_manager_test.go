@@ -67,6 +67,19 @@ func (m *mockImageGC) DeleteUnusedImages() (int64, error) {
 	return m.freed, m.err
 }
 
+// mockImageGC is used to simulate invoking image garbage collection.
+type mockVolumeGC struct {
+	err     error
+	freed   int64
+	invoked bool
+}
+
+// DeleteUnusedImages returns the mocked values.
+func (m *mockVolumeGC) DeleteUnusedVolumes() (int64, error) {
+	m.invoked = true
+	return m.freed, m.err
+}
+
 func makePodWithMemoryStats(name string, requests api.ResourceList, limits api.ResourceList, memoryWorkingSet string) (*api.Pod, statsapi.PodStats) {
 	pod := newPod(name, []api.Container{
 		newContainer(name, requests, limits),
@@ -171,6 +184,7 @@ func TestMemoryPressure(t *testing.T) {
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	imageGC := &mockImageGC{freed: int64(0), err: nil}
+	volumeGC := &mockVolumeGC{freed: int64(0), err: nil}
 	nodeRef := &api.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
@@ -199,6 +213,7 @@ func TestMemoryPressure(t *testing.T) {
 		clock:           fakeClock,
 		killPodFunc:     podKiller.killPodNow,
 		imageGC:         imageGC,
+		volumeGC:        volumeGC,
 		config:          config,
 		recorder:        &record.FakeRecorder{},
 		summaryProvider: summaryProvider,
@@ -388,6 +403,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	imageGC := &mockImageGC{freed: int64(0), err: nil}
+	volumeGC := &mockVolumeGC{freed: int64(0), err: nil}
 	nodeRef := &api.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
@@ -416,6 +432,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 		clock:           fakeClock,
 		killPodFunc:     podKiller.killPodNow,
 		imageGC:         imageGC,
+		volumeGC:        volumeGC,
 		config:          config,
 		recorder:        &record.FakeRecorder{},
 		summaryProvider: summaryProvider,
@@ -585,6 +602,7 @@ func TestMinReclaim(t *testing.T) {
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	imageGC := &mockImageGC{freed: int64(0), err: nil}
+	volumeGC := &mockVolumeGC{freed: int64(0), err: nil}
 	nodeRef := &api.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
@@ -608,6 +626,7 @@ func TestMinReclaim(t *testing.T) {
 		clock:           fakeClock,
 		killPodFunc:     podKiller.killPodNow,
 		imageGC:         imageGC,
+		volumeGC:        volumeGC,
 		config:          config,
 		recorder:        &record.FakeRecorder{},
 		summaryProvider: summaryProvider,
@@ -724,6 +743,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	imageGcFree := resource.MustParse("700Mi")
 	imageGC := &mockImageGC{freed: imageGcFree.Value(), err: nil}
+	volumeGC := &mockVolumeGC{freed: int64(0), err: nil}
 	nodeRef := &api.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
@@ -747,6 +767,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 		clock:           fakeClock,
 		killPodFunc:     podKiller.killPodNow,
 		imageGC:         imageGC,
+		volumeGC:        volumeGC,
 		config:          config,
 		recorder:        &record.FakeRecorder{},
 		summaryProvider: summaryProvider,
@@ -778,6 +799,11 @@ func TestNodeReclaimFuncs(t *testing.T) {
 		t.Errorf("Manager should have invoked image gc")
 	}
 
+	// verify volume gc was invoked
+	if volumeGC.invoked {
+		t.Errorf("Manager chose to perform volume gc when it was not neeed")
+	}
+
 	// verify no pod was killed because image gc was sufficient
 	if podKiller.pod != nil {
 		t.Errorf("Manager should not have killed a pod, but killed: %v", podKiller.pod.Name)
@@ -785,6 +811,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 
 	// reset state
 	imageGC.invoked = false
+	volumeGC.invoked = false
 
 	// remove disk pressure
 	fakeClock.Step(20 * time.Minute)
@@ -811,6 +838,11 @@ func TestNodeReclaimFuncs(t *testing.T) {
 		t.Errorf("Manager should have invoked image gc")
 	}
 
+	// verify volume gc was invoked
+	if !volumeGC.invoked {
+		t.Errorf("Manager should have invoked volume gc")
+	}
+
 	// check the right pod was killed
 	if podKiller.pod != podToEvict {
 		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
@@ -823,8 +855,9 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	// reduce disk pressure
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("16Gi", "200Gi", podStats)
-	imageGC.invoked = false // reset state
-	podKiller.pod = nil     // reset state
+	imageGC.invoked = false  // reset state
+	volumeGC.invoked = false // reset state
+	podKiller.pod = nil      // reset state
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	// we should have disk pressure (because transition period not yet met)
@@ -837,6 +870,11 @@ func TestNodeReclaimFuncs(t *testing.T) {
 		t.Errorf("Manager chose to perform image gc when it was not neeed")
 	}
 
+	// no volume gc should have occurred
+	if volumeGC.invoked {
+		t.Errorf("Manager chose to perform volume gc when it was not neeed")
+	}
+
 	// no pod should have been killed
 	if podKiller.pod != nil {
 		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod.Name)
@@ -845,8 +883,9 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	// move the clock past transition period to ensure that we stop reporting pressure
 	fakeClock.Step(5 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("16Gi", "200Gi", podStats)
-	imageGC.invoked = false // reset state
-	podKiller.pod = nil     // reset state
+	imageGC.invoked = false  // reset state
+	volumeGC.invoked = false // reset state
+	podKiller.pod = nil      // reset state
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	// we should not have disk pressure (because transition period met)
@@ -857,6 +896,11 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	// no image gc should have occurred
 	if imageGC.invoked {
 		t.Errorf("Manager chose to perform image gc when it was not neeed")
+	}
+
+	// no volume gc should have occurred
+	if volumeGC.invoked {
+		t.Errorf("Manager chose to perform volume gc when it was not neeed")
 	}
 
 	// no pod should have been killed
@@ -916,6 +960,7 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
 	imageGC := &mockImageGC{freed: int64(0), err: nil}
+	volumeGC := &mockVolumeGC{freed: int64(0), err: nil}
 	nodeRef := &api.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
@@ -944,6 +989,7 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 		clock:           fakeClock,
 		killPodFunc:     podKiller.killPodNow,
 		imageGC:         imageGC,
+		volumeGC:        volumeGC,
 		config:          config,
 		recorder:        &record.FakeRecorder{},
 		summaryProvider: summaryProvider,
