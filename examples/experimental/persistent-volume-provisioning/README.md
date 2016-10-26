@@ -92,7 +92,7 @@ metadata:
   name: slow
 provisioner: kubernetes.io/vsphere-volume
 parameters:
-  diskformat: thin
+  diskformat: eagerzeroedthick
 ```
 
 * `diskformat`: `thin`, `zeroedthick` and `eagerzeroedthick`. See vSphere docs for details. Default: `"thin"`.
