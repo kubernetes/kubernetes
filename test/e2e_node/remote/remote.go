@@ -263,7 +263,7 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 		return "", false, fmt.Errorf("Issue detecting node's OS via node's /etc/os-release. Err: %v, Output:\n%s", err, output)
 	}
 	if strings.Contains(output, "ID=gci") {
-		glog.Infof("GCI node and GCI mounter both detected, modifying --mounter-path accordingly")
+		glog.Infof("GCI node and GCI mounter both detected, modifying --experimental-mounter-path accordingly")
 
 		// Note this implicitly requires the script to be where we expect in the tarball, so if that location changes the error
 		// here will tell us to update the remote test runner.
@@ -274,7 +274,7 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 			return "", false, err
 		}
 		// Insert args at beginning of testArgs, so any values from command line take precedence
-		testArgs = fmt.Sprintf("--mounter-path=%s ", mounterPath) + testArgs
+		testArgs = fmt.Sprintf("--experimental-mounter-path=%s ", mounterPath) + testArgs
 	}
 
 	// Run the tests
