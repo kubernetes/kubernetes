@@ -119,7 +119,7 @@ EmptyDir volumes when FSGroup is specified new files should be created with FSGr
 EmptyDir volumes when FSGroup is specified new files should be created with FSGroup ownership when container is root,childsb,1
 EmptyDir volumes when FSGroup is specified volume on default medium should have the correct mode using FSGroup,eparis,1
 EmptyDir volumes when FSGroup is specified volume on tmpfs should have the correct mode using FSGroup,timothysc,1
-EmptyDir wrapper volumes should not cause race condition when used for configmaps,bprashanth,1
+EmptyDir wrapper volumes should not cause race condition when used for configmaps,mtaufen,1
 EmptyDir wrapper volumes should not cause race condition when used for git_repo,girishkalele,1
 EmptyDir wrapper volumes should not conflict,deads2k,1
 Etcd failure should recover from SIGKILL,pmorie,1
@@ -285,7 +285,7 @@ Pet Store should scale to persist a nominal number ( * ) of transactions in * se
 Pet set recreate should recreate evicted petset,hurf,1
 PetSet Basic PetSet functionality should handle healthy pet restarts during scale,kevin-wangzefeng,1
 PetSet Basic PetSet functionality should provide basic identity,girishkalele,1
-PetSet Deploy clustered applications should creating a working mysql cluster,piosz,1
+PetSet Deploy clustered applications should creating a working mysql cluster,bprashanth,1
 PetSet Deploy clustered applications should creating a working redis cluster,mtaufen,1
 PetSet Deploy clustered applications should creating a working zookeeper cluster,rmmh,1
 "Pod Disks Should schedule a pod w/ a RW PD, gracefully remove it, then schedule it on another host",saad-ali,0
@@ -334,7 +334,7 @@ ReplicaSet should serve a basic image on each replica with a private image,pmori
 ReplicaSet should serve a basic image on each replica with a public image,krousey,0
 ReplicationController should serve a basic image on each replica with a private image,jbeda,1
 ReplicationController should serve a basic image on each replica with a public image,krousey,1
-Rescheduler should ensure that critical pod is scheduled in case there is no resources available,mtaufen,1
+Rescheduler should ensure that critical pod is scheduled in case there is no resources available,piosz,1
 Resource-usage regular resource usage tracking resource tracking for * pods per node,janetkuo,1
 ResourceQuota should create a ResourceQuota and capture the life of a configMap.,timstclair,1
 ResourceQuota should create a ResourceQuota and capture the life of a persistent volume claim.,bgrant0607,1
