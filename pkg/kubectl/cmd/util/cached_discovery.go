@@ -170,7 +170,29 @@ func (d *CachedDiscoveryClient) writeCachedFile(filename string, obj runtime.Obj
 		return err
 	}
 
-	return ioutil.WriteFile(filename, bytes, 0755)
+	f, err := ioutil.TempFile(filepath.Dir(filename), filepath.Base(filename) + ".")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(f.Name())
+	_, err = f.Write(bytes)
+	if err != nil {
+		return err
+	}
+
+	err = f.Chmod(0755)
+	if err != nil {
+		return err
+	}
+
+	name := f.Name()
+	err = f.Close()
+	if err != nil {
+		return err
+	}
+
+	// atomic rename
+	return os.Rename(name, filename)
 }
 
 func (d *CachedDiscoveryClient) RESTClient() restclient.Interface {
