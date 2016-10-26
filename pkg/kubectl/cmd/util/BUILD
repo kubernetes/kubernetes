@@ -13,6 +13,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "cached_discovery.go",
         "clientcache.go",
         "factory.go",
         "helpers.go",
@@ -52,8 +53,10 @@ go_library(
         "//pkg/util/errors:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/flag:go_default_library",
+        "//pkg/util/homedir:go_default_library",
         "//pkg/util/sets:go_default_library",
         "//pkg/util/strategicpatch:go_default_library",
+        "//pkg/version:go_default_library",
         "//pkg/watch:go_default_library",
         "//vendor:github.com/emicklei/go-restful/swagger",
         "//vendor:github.com/evanphx/json-patch",

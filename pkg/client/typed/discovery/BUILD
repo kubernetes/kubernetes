@@ -32,6 +32,7 @@ go_library(
         "//pkg/version:go_default_library",
         "//plugin/pkg/client/auth:go_default_library",
         "//vendor:github.com/emicklei/go-restful/swagger",
+        "//vendor:github.com/golang/glog",
     ],
 )
 
