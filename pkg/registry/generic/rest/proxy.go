@@ -44,10 +44,13 @@ type UpgradeAwareProxyHandler struct {
 	// Transport provides an optional round tripper to use to proxy. If nil, the default proxy transport is used
 	Transport http.RoundTripper
 	// WrapTransport indicates whether the provided Transport should be wrapped with default proxy transport behavior (URL rewriting, X-Forwarded-* header setting)
-	WrapTransport  bool
-	FlushInterval  time.Duration
-	MaxBytesPerSec int64
-	Responder      ErrorResponder
+	WrapTransport bool
+	// InterceptRedirects determines whether the proxy should sniff backend responses for redirects,
+	// following them as necessary.
+	InterceptRedirects bool
+	FlushInterval      time.Duration
+	MaxBytesPerSec     int64
+	Responder          ErrorResponder
 }
 
 const defaultFlushInterval = 200 * time.Millisecond
@@ -140,78 +143,6 @@ func (h *UpgradeAwareProxyHandler) tryUpgrade(w http.ResponseWriter, req *http.R
 }
 
 func (h *UpgradeAwareProxyHandler) handleUpgrade(w http.ResponseWriter, req *http.Request) error {
-	const (
-		maxRedirects    = 10
-		maxResponseSize = 1024
-	)
-	var (
-		// Read 'be' as backend (proxied location).
-		backendRespBuff = bytes.NewBuffer(make([]byte, 0, 256))
-		backendURL      = h.Location
-		backendConn     net.Conn
-	)
-	defer func() {
-		if backendConn != nil {
-			backendConn.Close()
-		}
-	}()
-redirectLoop:
-	for redirects := 0; ; redirects++ {
-		if redirects == maxRedirects {
-			return fmt.Errorf("too many redirects (%d)", redirects)
-		}
-
-		beReq, err := http.NewRequest(req.Method, backendURL.String(), req.Body)
-		if err != nil {
-			return err
-		}
-		beReq.Header = req.Header
-
-		backendConn, err = proxy.DialURL(backendURL, h.Transport)
-		if err != nil {
-			return fmt.Errorf("error dialing backend: %v", err)
-		}
-
-		if err = beReq.Write(backendConn); err != nil {
-			return fmt.Errorf("error sending request: %v", err)
-		}
-
-		// Peek at the backend response.
-		backendRespBuff.Reset()
-		beRespReader := bufio.NewReader(io.TeeReader(
-			io.LimitReader(backendConn, maxResponseSize), // Don't read more than maxResponseSize bytes.
-			backendRespBuff))                             // Save the raw response.
-		beResp, err := http.ReadResponse(beRespReader, req)
-		if err != nil {
-			// Unable to read the backend response; let the client handle it.
-			glog.Warningf("Error reading backend response: %v", err)
-			break redirectLoop
-		}
-		beResp.Body.Close() // Unused.
-
-		switch beResp.StatusCode {
-		case http.StatusFound, http.StatusSeeOther:
-			// Redirect, continue.
-		default:
-			// Don't redirect.
-			break redirectLoop
-		}
-
-		// Reset the connection.
-		backendConn.Close()
-		backendConn = nil
-
-		// Prepare to follow the redirect.
-		redirectStr := beResp.Header.Get("Location")
-		if redirectStr == "" {
-			return fmt.Errorf("%d response missing Location header", beResp.StatusCode)
-		}
-		backendURL, err = h.Location.Parse(redirectStr)
-		if err != nil {
-			return fmt.Errorf("malformed Location header: %v", err)
-		}
-	}
-
 	requestHijacker, ok := w.(http.Hijacker)
 	if !ok {
 		return fmt.Errorf("request connection cannot be hijacked: %T", w)
@@ -222,11 +153,16 @@ redirectLoop:
 	}
 	defer requestHijackedConn.Close()
 
-	// Forward raw response bytes back to client.
-	_, err = io.CopyN(requestHijackedConn, backendRespBuff, int64(backendRespBuff.Len()))
-	if err != nil {
-		return fmt.Errorf("forwarding response: %v", err)
+	var backendConn net.Conn
+	if h.InterceptRedirects {
+		backendConn, err = h.connectBackendWithRedirects(req, requestHijackedConn)
+	} else {
+		backendConn, err = h.connectBackend(req, h.Location)
 	}
+	if err != nil {
+		return fmt.Errorf("error dialing backend: %v", err)
+	}
+	defer backendConn.Close()
 
 	// Proxy the connection.
 	wg := &sync.WaitGroup{}
@@ -262,6 +198,108 @@ redirectLoop:
 
 	wg.Wait()
 	return nil
+}
+
+// connectBackend dials the backend at location and forwards a copy of the client request.
+func (h *UpgradeAwareProxyHandler) connectBackend(req *http.Request, location *url.URL) (conn net.Conn, err error) {
+	defer func() {
+		if err != nil && conn != nil {
+			conn.Close()
+		}
+	}()
+
+	beReq, err := http.NewRequest(req.Method, location.String(), req.Body)
+	if err != nil {
+		return nil, err
+	}
+	beReq.Header = req.Header
+
+	conn, err = proxy.DialURL(location, h.Transport)
+	if err != nil {
+		return conn, fmt.Errorf("error dialing backend: %v", err)
+	}
+
+	if err = beReq.Write(conn); err != nil {
+		return conn, fmt.Errorf("error sending request: %v", err)
+	}
+
+	return conn, err
+}
+
+//
+func (h *UpgradeAwareProxyHandler) connectBackendWithRedirects(req *http.Request, clientConn net.Conn) (net.Conn, error) {
+	const (
+		maxRedirects    = 10
+		maxResponseSize = 1024
+	)
+	var (
+		rawResponse      = bytes.NewBuffer(make([]byte, 0, 256))
+		location         = h.Location
+		intermediateConn net.Conn
+		err              error
+	)
+	defer func() {
+		if intermediateConn != nil {
+			intermediateConn.Close()
+		}
+	}()
+
+redirectLoop:
+	for redirects := 0; ; redirects++ {
+		if redirects == maxRedirects {
+			return nil, fmt.Errorf("too many redirects (%d)", redirects)
+		}
+
+		intermediateConn, err = h.connectBackend(req, location)
+		if err != nil {
+			return nil, err
+		}
+
+		// Peek at the backend response.
+		rawResponse.Reset()
+		respReader := bufio.NewReader(io.TeeReader(
+			io.LimitReader(intermediateConn, maxResponseSize), // Don't read more than maxResponseSize bytes.
+			rawResponse)) // Save the raw response.
+		resp, err := http.ReadResponse(respReader, req)
+		if err != nil {
+			// Unable to read the backend response; let the client handle it.
+			glog.Warningf("Error reading backend response: %v", err)
+			break redirectLoop
+		}
+		resp.Body.Close() // Unused.
+
+		switch resp.StatusCode {
+		case http.StatusFound, http.StatusSeeOther:
+			// Redirect, continue.
+		default:
+			// Don't redirect.
+			break redirectLoop
+		}
+
+		// Reset the connection.
+		intermediateConn.Close()
+		intermediateConn = nil
+
+		// Prepare to follow the redirect.
+		redirectStr := resp.Header.Get("Location")
+		if redirectStr == "" {
+			return nil, fmt.Errorf("%d response missing Location header", resp.StatusCode)
+		}
+		location, err = h.Location.Parse(redirectStr)
+		if err != nil {
+			return nil, fmt.Errorf("malformed Location header: %v", err)
+		}
+	}
+
+	// Forward raw response bytes back to client.
+	_, err = io.CopyN(clientConn, rawResponse, int64(rawResponse.Len()))
+	if err != nil {
+		return nil, fmt.Errorf("forwarding response: %v", err)
+	}
+
+	backendConn := intermediateConn
+	intermediateConn = nil // Don't close the connection when we return it.
+	return backendConn, nil
 }
 
 func (h *UpgradeAwareProxyHandler) defaultProxyTransport(url *url.URL, internalTransport http.RoundTripper) http.RoundTripper {
