@@ -262,16 +262,7 @@ func resizeRC(c clientset.Interface, ns, name string, replicas int32) error {
 func getMaster(c clientset.Interface) string {
 	master := ""
 	switch framework.TestContext.Provider {
-	case "gce":
-		eps, err := c.Core().Endpoints(api.NamespaceDefault).Get("kubernetes")
-		if err != nil {
-			framework.Failf("Fail to get kubernetes endpoinds: %v", err)
-		}
-		if len(eps.Subsets) != 1 || len(eps.Subsets[0].Addresses) != 1 {
-			framework.Failf("There are more than 1 endpoints for kubernetes service: %+v", eps)
-		}
-		master = eps.Subsets[0].Addresses[0].IP
-	case "gke":
+	case "gce", "gke":
 		master = strings.TrimPrefix(framework.TestContext.Host, "https://")
 	case "aws":
 		// TODO(justinsb): Avoid hardcoding this.
