@@ -739,15 +739,15 @@ func Convert_v1_ResourceList_To_api_ResourceList(in *ResourceList, out *api.Reso
 	if *in == nil {
 		return nil
 	}
+
 	if *out == nil {
 		*out = make(api.ResourceList, len(*in))
 	}
 	for key, val := range *in {
-		// Moved to defaults
 		// TODO(#18538): We round up resource values to milli scale to maintain API compatibility.
 		// In the future, we should instead reject values that need rounding.
-		// const milliScale = -3
-		// val.RoundUp(milliScale)
+		const milliScale = -3
+		val.RoundUp(milliScale)
 
 		(*out)[api.ResourceName(key)] = val
 	}
