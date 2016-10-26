@@ -198,39 +198,7 @@ func doSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32) {
 		framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 	}
 
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			Name: "pod-secrets-" + string(uuid.NewUUID()),
-		},
-		Spec: api.PodSpec{
-			Volumes: []api.Volume{
-				{
-					Name: volumeName,
-					VolumeSource: api.VolumeSource{
-						Secret: &api.SecretVolumeSource{
-							SecretName: name,
-						},
-					},
-				},
-			},
-			Containers: []api.Container{
-				{
-					Name:  "secret-volume-test",
-					Image: "gcr.io/google_containers/mounttest:0.7",
-					Args: []string{
-						"--file_content=/etc/secret-volume/data-1",
-						"--file_mode=/etc/secret-volume/data-1"},
-					VolumeMounts: []api.VolumeMount{
-						{
-							Name:      volumeName,
-							MountPath: volumeMountPath,
-						},
-					},
-				},
-			},
-			RestartPolicy: api.RestartPolicyNever,
-		},
-	}
+	pod := getPodWithMountTestContainer(f.Namespace.Name, name, volumeMountPath, volumeName)
 
 	if defaultMode != nil {
 		pod.Spec.Volumes[0].VolumeSource.Secret.DefaultMode = defaultMode
@@ -345,10 +313,32 @@ func doSecretE2EForMountNameSpaceIssue(f *framework.Framework, defaultMode *int3
 		framework.Failf("unable to create test secret %s: %v", secret2.Name, err)
 	}
 
-	pod := &api.Pod{
+	secret2.Data = map[string][]byte{
+		"this_should_not_match_previous_info": []byte("similarly_this_should_not_match_previous_info\n"),
+	}
+
+	pod := getPodWithMountTestContainer(namespace1.Name, name, volumeMountPath, volumeName)
+
+	if defaultMode != nil {
+		pod.Spec.Volumes[0].VolumeSource.Secret.DefaultMode = defaultMode
+	} else {
+		mode := int32(0644)
+		defaultMode = &mode
+	}
+
+	modeString := fmt.Sprintf("%v", os.FileMode(*defaultMode))
+	expectedOutput := []string{
+		"content of file \"/etc/secret-volume/data-1\": value-1",
+		"mode of file \"/etc/secret-volume/data-1\": " + modeString,
+	}
+	f.TestContainerOutput("same name different namespace secrets", pod, 0, expectedOutput)
+}
+
+func getPodWithMountTestContainer(namespace, secretName, volumeMountPath, volumeName string) *api.Pod {
+	return &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "pod-secrets-" + string(uuid.NewUUID()),
-			Namespace: namespace1.Name,
+			Namespace: namespace,
 		},
 		Spec: api.PodSpec{
 			Volumes: []api.Volume{
@@ -356,7 +346,7 @@ func doSecretE2EForMountNameSpaceIssue(f *framework.Framework, defaultMode *int3
 					Name: volumeName,
 					VolumeSource: api.VolumeSource{
 						Secret: &api.SecretVolumeSource{
-							SecretName: name,
+							SecretName: secretName,
 						},
 					},
 				},
@@ -379,18 +369,4 @@ func doSecretE2EForMountNameSpaceIssue(f *framework.Framework, defaultMode *int3
 			RestartPolicy: api.RestartPolicyNever,
 		},
 	}
-
-	if defaultMode != nil {
-		pod.Spec.Volumes[0].VolumeSource.Secret.DefaultMode = defaultMode
-	} else {
-		mode := int32(0644)
-		defaultMode = &mode
-	}
-
-	modeString := fmt.Sprintf("%v", os.FileMode(*defaultMode))
-	expectedOutput := []string{
-		"content of file \"/etc/secret-volume/data-1\": value-1",
-		"mode of file \"/etc/secret-volume/data-1\": " + modeString,
-	}
-	f.TestContainerOutput("same name different namespace secrets", pod, 0, expectedOutput)
 }

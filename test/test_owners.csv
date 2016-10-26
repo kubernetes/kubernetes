@@ -396,6 +396,7 @@ SchedulerPredicates validates that required NodeAffinity setting is respected if
 SchedulerPredicates validates that taints-tolerations is respected if matching,jlowdermilk,1
 SchedulerPredicates validates that taints-tolerations is respected if not matching,derekwaynecarr,1
 Secret should create a pod that reads a secret,luxas,1
+Secrets should be able to mount in a volume regardless of a different secret existing with same name in different namespace,rkouj,1
 Secrets should be consumable from pods in env vars,mml,1
 Secrets should be consumable from pods in volume,ghodss,1
 Secrets should be consumable from pods in volume with defaultMode set,derekwaynecarr,1
@@ -468,6 +469,7 @@ Volumes GlusterFS should be mountable,eparis,1
 Volumes NFS should be mountable,andyzheng0831,1
 Volumes PD should be mountable,caesarxuchao,1
 Volumes iSCSI should be mountable,jsafrane,1
+k8s.io/kubernetes/_output/release-stage/full/kubernetes/examples,rkouj,1
 k8s.io/kubernetes/cmd/genutils,rmmh,1
 k8s.io/kubernetes/cmd/hyperkube,jbeda,0
 k8s.io/kubernetes/cmd/kube-apiserver/app,nikhiljindal,0
@@ -657,6 +659,7 @@ k8s.io/kubernetes/pkg/kubelet/rkt,apelisse,1
 k8s.io/kubernetes/pkg/kubelet/rktshim,mml,1
 k8s.io/kubernetes/pkg/kubelet/server,timstclair,0
 k8s.io/kubernetes/pkg/kubelet/server/portforward,caesarxuchao,1
+k8s.io/kubernetes/pkg/kubelet/server/portforward,rkouj,1
 k8s.io/kubernetes/pkg/kubelet/server/stats,timstclair,0
 k8s.io/kubernetes/pkg/kubelet/server/streaming,caesarxuchao,1
 k8s.io/kubernetes/pkg/kubelet/status,mwielgus,1
