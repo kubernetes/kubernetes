@@ -14,13 +14,8 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
-        "generated.pb.go",
         "register.go",
-        "types.generated.go",
         "types.go",
-        "types_swagger_doc_generated.go",
-        "zz_generated.conversion.go",
-        "zz_generated.deepcopy.go",
     ],
     tags = ["automanaged"],
     deps = [
