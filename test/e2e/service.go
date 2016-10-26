@@ -80,9 +80,22 @@ var _ = framework.KubeDescribe("Services", func() {
 	f := framework.NewDefaultFramework("services")
 
 	var cs clientset.Interface
+	serviceLBNames := []string{}
 
 	BeforeEach(func() {
 		cs = f.ClientSet
+	})
+
+	AfterEach(func() {
+		if CurrentGinkgoTestDescription().Failed {
+			describeSvc(f.Namespace.Name)
+		}
+		for _, lb := range serviceLBNames {
+			framework.Logf("cleaning gce resource for %s", lb)
+			cleanupServiceGCEResources(lb)
+		}
+		//reset serviceLBNames
+		serviceLBNames = []string{}
 	})
 
 	// TODO: We get coverage of TCP/UDP and multi-port services through the DNS test. We should have a simpler test for multi-port TCP here.
@@ -581,6 +594,10 @@ var _ = framework.KubeDescribe("Services", func() {
 			udpService = jig.UpdateServiceOrFail(ns2, udpService.Name, func(s *api.Service) {
 				s.Spec.Type = api.ServiceTypeLoadBalancer
 			})
+		}
+		serviceLBNames = append(serviceLBNames, getLoadBalancerName(tcpService))
+		if loadBalancerSupportsUDP {
+			serviceLBNames = append(serviceLBNames, getLoadBalancerName(udpService))
 		}
 
 		By("waiting for the TCP service to have a load balancer")
@@ -1083,6 +1100,7 @@ var _ = framework.KubeDescribe("ESIPP [Slow][Feature:ExternalTrafficLocalOnly]",
 	loadBalancerCreateTimeout := loadBalancerCreateTimeoutDefault
 
 	var cs clientset.Interface
+	serviceLBNames := []string{}
 
 	BeforeEach(func() {
 		// requires cloud load-balancer support - this feature currently supported only on GCE/GKE
@@ -1094,12 +1112,25 @@ var _ = framework.KubeDescribe("ESIPP [Slow][Feature:ExternalTrafficLocalOnly]",
 		}
 	})
 
+	AfterEach(func() {
+		if CurrentGinkgoTestDescription().Failed {
+			describeSvc(f.Namespace.Name)
+		}
+		for _, lb := range serviceLBNames {
+			framework.Logf("cleaning gce resource for %s", lb)
+			cleanupServiceGCEResources(lb)
+		}
+		//reset serviceLBNames
+		serviceLBNames = []string{}
+	})
+
 	It("should work for type=LoadBalancer [Slow][Feature:ExternalTrafficLocalOnly]", func() {
 		namespace := f.Namespace.Name
 		serviceName := "external-local"
 		jig := NewServiceTestJig(cs, serviceName)
 
 		svc := jig.createOnlyLocalLoadBalancerService(namespace, serviceName, loadBalancerCreateTimeout, true)
+		serviceLBNames = append(serviceLBNames, getLoadBalancerName(svc))
 		healthCheckNodePort := int(service.GetServiceHealthCheckNodePort(svc))
 		if healthCheckNodePort == 0 {
 			framework.Failf("Service HealthCheck NodePort was not allocated")
@@ -1165,6 +1196,7 @@ var _ = framework.KubeDescribe("ESIPP [Slow][Feature:ExternalTrafficLocalOnly]",
 		nodes := jig.getNodes(maxNodesForEndpointsTests)
 
 		svc := jig.createOnlyLocalLoadBalancerService(namespace, serviceName, loadBalancerCreateTimeout, false)
+		serviceLBNames = append(serviceLBNames, getLoadBalancerName(svc))
 		defer func() {
 			jig.ChangeServiceType(svc.Namespace, svc.Name, api.ServiceTypeClusterIP, loadBalancerCreateTimeout)
 			Expect(cs.Core().Services(svc.Namespace).Delete(svc.Name, nil)).NotTo(HaveOccurred())
@@ -1224,6 +1256,7 @@ var _ = framework.KubeDescribe("ESIPP [Slow][Feature:ExternalTrafficLocalOnly]",
 		nodes := jig.getNodes(maxNodesForEndpointsTests)
 
 		svc := jig.createOnlyLocalLoadBalancerService(namespace, serviceName, loadBalancerCreateTimeout, true)
+		serviceLBNames = append(serviceLBNames, getLoadBalancerName(svc))
 		defer func() {
 			jig.ChangeServiceType(svc.Namespace, svc.Name, api.ServiceTypeClusterIP, loadBalancerCreateTimeout)
 			Expect(cs.Core().Services(svc.Namespace).Delete(svc.Name, nil)).NotTo(HaveOccurred())
@@ -1272,6 +1305,7 @@ var _ = framework.KubeDescribe("ESIPP [Slow][Feature:ExternalTrafficLocalOnly]",
 		}
 
 		svc := jig.createOnlyLocalLoadBalancerService(namespace, serviceName, loadBalancerCreateTimeout, true)
+		serviceLBNames = append(serviceLBNames, getLoadBalancerName(svc))
 		defer func() {
 			jig.ChangeServiceType(svc.Namespace, svc.Name, api.ServiceTypeClusterIP, loadBalancerCreateTimeout)
 			Expect(cs.Core().Services(svc.Namespace).Delete(svc.Name, nil)).NotTo(HaveOccurred())
@@ -2696,4 +2730,34 @@ func execSourceipTest(f *framework.Framework, c clientset.Interface, ns, nodeNam
 		framework.Failf("exec pod returned unexpected stdout format: [%v]\n", stdout)
 	}
 	return execPod.Status.PodIP, outputs[1]
+}
+
+func getLoadBalancerName(service *api.Service) string {
+	//GCE requires that the name of a load balancer starts with a lower case letter.
+	ret := "a" + string(service.UID)
+	ret = strings.Replace(ret, "-", "", -1)
+	//AWS requires that the name of a load balancer is shorter than 32 bytes.
+	if len(ret) > 32 {
+		ret = ret[:32]
+	}
+	return ret
+}
+
+func cleanupServiceGCEResources(loadBalancerName string) {
+	if pollErr := wait.Poll(5*time.Second, lbCleanupTimeout, func() (bool, error) {
+		if err := framework.CleanupGCEResources(loadBalancerName); err != nil {
+			framework.Logf("Still waiting for glbc to cleanup: %v", err)
+			return false, nil
+		}
+		return true, nil
+	}); pollErr != nil {
+		framework.Failf("Failed to cleanup service GCE resources.")
+	}
+}
+
+func describeSvc(ns string) {
+	framework.Logf("\nOutput of kubectl describe svc:\n")
+	desc, _ := framework.RunKubectl(
+		"describe", "svc", fmt.Sprintf("--namespace=%v", ns))
+	framework.Logf(desc)
 }
