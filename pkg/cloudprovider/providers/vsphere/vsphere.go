@@ -34,6 +34,7 @@ import (
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/vim25/mo"
+	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
 	"golang.org/x/net/context"
 
@@ -46,14 +47,16 @@ const (
 	ProviderName              = "vsphere"
 	ActivePowerState          = "poweredOn"
 	SCSIControllerType        = "scsi"
-	LSILogicControllerType    = "lsilogic"
-	BusLogicControllerType    = "buslogic"
+	LSILogicControllerType    = "lsiLogic"
+	BusLogicControllerType    = "busLogic"
 	PVSCSIControllerType      = "pvscsi"
-	LSILogicSASControllerType = "lsilogic-sas"
+	LSILogicSASControllerType = "lsiLogic-sas"
 	SCSIControllerLimit       = 4
 	SCSIControllerDeviceLimit = 15
 	SCSIDeviceSlots           = 16
 	SCSIReservedSlot          = 7
+	ThinDiskType              = "thin"
+	VolDir                    = "kubevols"
 )
 
 // Controller types that are currently supported for hot attach of disks
@@ -61,12 +64,13 @@ const (
 // it fails to remove the device from the /dev path (which should be manually done)
 // making the subsequent attaches to the node to fail.
 // TODO: Add support for lsilogic driver type
-var supportedSCSIControllerType = []string{"lsilogic-sas", "pvscsi"}
+var supportedSCSIControllerType = []string{strings.ToLower(LSILogicSASControllerType), PVSCSIControllerType}
 
 var ErrNoDiskUUIDFound = errors.New("No disk UUID found")
 var ErrNoDiskIDFound = errors.New("No vSphere disk ID found")
 var ErrNoDevicesFound = errors.New("No devices found")
 var ErrNonSupportedControllerType = errors.New("Disk is attached to non-supported controller type")
+var ErrFileAlreadyExist = errors.New("File requested already exist")
 
 // VSphere is an implementation of cloud provider Interface for VSphere.
 type VSphere struct {
@@ -804,7 +808,7 @@ func getSCSIControllers(vmDevices object.VirtualDeviceList) []*types.VirtualCont
 	for _, device := range vmDevices {
 		devType := vmDevices.Type(device)
 		switch devType {
-		case SCSIControllerType, LSILogicControllerType, BusLogicControllerType, PVSCSIControllerType, LSILogicSASControllerType:
+		case SCSIControllerType, strings.ToLower(LSILogicControllerType), strings.ToLower(BusLogicControllerType), PVSCSIControllerType, strings.ToLower(LSILogicSASControllerType):
 			if c, ok := device.(types.BaseVirtualController); ok {
 				scsiControllers = append(scsiControllers, c.GetVirtualController())
 			}
@@ -1076,8 +1080,29 @@ func (vs *VSphere) CreateVolume(name string, size int, tags *map[string]string) 
 	dc, err := f.Datacenter(ctx, vs.cfg.Global.Datacenter)
 	f.SetDatacenter(dc)
 
+	ds, err := f.Datastore(ctx, vs.cfg.Global.Datastore)
+	if err != nil {
+		glog.Errorf("Failed while searching for datastore %+q. err %s", vs.cfg.Global.Datastore, err)
+		return "", err
+	}
+
+	if (*tags)["adapterType"] == "" {
+		(*tags)["adapterType"] = LSILogicControllerType
+	}
+	if (*tags)["diskType"] == "" {
+		(*tags)["diskType"] = ThinDiskType
+	}
+
+	// vmdks will be created inside kubevols directory
+	kubeVolsPath := filepath.Clean(ds.Path(VolDir)) + "/"
+	err = makeDirectoryInDatastore(c, dc, kubeVolsPath, false)
+	if err != nil && err != ErrFileAlreadyExist {
+		glog.Errorf("Cannot create dir %#v. err %s", kubeVolsPath, err)
+		return "", err
+	}
+
+	vmDiskPath := kubeVolsPath + name + ".vmdk"
 	// Create a virtual disk manager
-	vmDiskPath := "[" + vs.cfg.Global.Datastore + "] " + name + ".vmdk"
 	virtualDiskManager := object.NewVirtualDiskManager(c.Client)
 
 	// Create specification for new virtual disk
@@ -1172,4 +1197,27 @@ func (vs *VSphere) NodeExists(c *govmomi.Client, nodeName string) (bool, error) 
 	}
 
 	return false, nil
+}
+
+// Creates a folder using the specified name.
+// If the intermediate level folders do not exist,
+// and the parameter createParents is true,
+// all the non-existent folders are created.
+func makeDirectoryInDatastore(c *govmomi.Client, dc *object.Datacenter, path string, createParents bool) error {
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	fileManager := object.NewFileManager(c.Client)
+	err := fileManager.MakeDirectory(ctx, path, dc, createParents)
+	if err != nil {
+		if soap.IsSoapFault(err) {
+			soapFault := soap.ToSoapFault(err)
+			if _, ok := soapFault.VimFault().(types.FileAlreadyExists); ok {
+				return ErrFileAlreadyExist
+			}
+		}
+	}
+
+	return err
 }
