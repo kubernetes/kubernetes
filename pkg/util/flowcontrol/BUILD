@@ -20,7 +20,7 @@ go_library(
     deps = [
         "//pkg/util/clock:go_default_library",
         "//pkg/util/integer:go_default_library",
-        "//vendor:github.com/juju/ratelimit",
+        "//pkg/util/ratelimit:go_default_library",
     ],
 )
 
