@@ -113,13 +113,13 @@ func (p *petSyncer) Sync(pet *pcb) error {
 		}
 	} else if exists {
 		if !p.isHealthy(realPet.pod) {
-			glog.Infof("StatefulSet %v waiting on unhealthy pet %v", pet.parent.Name, realPet.pod.Name)
+			glog.V(4).Infof("StatefulSet %v waiting on unhealthy pet %v", pet.parent.Name, realPet.pod.Name)
 		}
 		return p.Update(realPet, pet)
 	}
 	if p.blockingPet != nil {
 		message := errUnhealthyPet(fmt.Sprintf("Create of %v in StatefulSet %v blocked by unhealthy pet %v", pet.pod.Name, pet.parent.Name, p.blockingPet.pod.Name))
-		glog.Info(message)
+		glog.V(4).Infof(message.Error())
 		return message
 	}
 	// This is counted as a create, even if it fails. We can't skip indices
@@ -149,17 +149,17 @@ func (p *petSyncer) Delete(pet *pcb) error {
 		return nil
 	}
 	if p.blockingPet != nil {
-		glog.Infof("Delete of %v in StatefulSet %v blocked by unhealthy pet %v", realPet.pod.Name, pet.parent.Name, p.blockingPet.pod.Name)
+		glog.V(4).Infof("Delete of %v in StatefulSet %v blocked by unhealthy pet %v", realPet.pod.Name, pet.parent.Name, p.blockingPet.pod.Name)
 		return nil
 	}
 	// This is counted as a delete, even if it fails.
 	// The returned error will force a requeue.
 	p.blockingPet = realPet
 	if !p.isDying(realPet.pod) {
-		glog.Infof("StatefulSet %v deleting pet %v", pet.parent.Name, pet.pod.Name)
+		glog.V(4).Infof("StatefulSet %v deleting pet %v", pet.parent.Name, pet.pod.Name)
 		return p.petClient.Delete(pet)
 	}
-	glog.Infof("StatefulSet %v waiting on pet %v to die in %v", pet.parent.Name, realPet.pod.Name, realPet.pod.DeletionTimestamp)
+	glog.V(4).Infof("StatefulSet %v waiting on pet %v to die in %v", pet.parent.Name, realPet.pod.Name, realPet.pod.DeletionTimestamp)
 	return nil
 }
 
@@ -223,7 +223,7 @@ func (p *apiServerPetClient) Update(pet *pcb, expectedPet *pcb) (updateErr error
 		if err != nil || !needsUpdate {
 			return err
 		}
-		glog.Infof("Resetting pet %v/%v to match StatefulSet %v spec", pet.pod.Namespace, pet.pod.Name, pet.parent.Name)
+		glog.V(4).Infof("Resetting pet %v/%v to match StatefulSet %v spec", pet.pod.Namespace, pet.pod.Name, pet.parent.Name)
 		_, updateErr = pc.Update(&updatePod)
 		if updateErr == nil || i >= updateRetries {
 			return updateErr
@@ -309,9 +309,9 @@ func (d *defaultPetHealthChecker) isHealthy(pod *api.Pod) bool {
 	initialized, ok := pod.Annotations[StatefulSetInitAnnotation]
 	if ok {
 		if initAnnotation, err := strconv.ParseBool(initialized); err != nil {
-			glog.Infof("Failed to parse %v annotation on pod %v: %v", StatefulSetInitAnnotation, pod.Name, err)
+			glog.V(4).Infof("Failed to parse %v annotation on pod %v: %v", StatefulSetInitAnnotation, pod.Name, err)
 		} else if !initAnnotation {
-			glog.Infof("StatefulSet pod %v waiting on annotation %v", pod.Name, StatefulSetInitAnnotation)
+			glog.V(4).Infof("StatefulSet pod %v waiting on annotation %v", pod.Name, StatefulSetInitAnnotation)
 			podReady = initAnnotation
 		}
 	}
