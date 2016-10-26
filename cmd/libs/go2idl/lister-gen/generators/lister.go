@@ -40,6 +40,7 @@ func NameSystems() namer.NameSystems {
 	}
 	return namer.NameSystems{
 		"public":             namer.NewPublicNamer(0),
+		"private":            namer.NewPrivateNamer(0),
 		"raw":                namer.NewRawNamer("", nil),
 		"publicPlural":       namer.NewPublicPluralNamer(pluralExceptions),
 		"allLowercasePlural": namer.NewAllLowercasePluralNamer(pluralExceptions),
@@ -108,6 +109,11 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	for i := range groupVersions {
 		gv := groupVersions[i]
 
+		normalizedGroupName := normalization.BeforeFirstDot(gv.Group)
+		if normalizedGroupName == "api" {
+			normalizedGroupName = "core"
+		}
+
 		packageList = append(packageList, &generator.DefaultPackage{
 			PackageName: filepath.Base(arguments.OutputPackagePath),
 			PackagePath: arguments.OutputPackagePath,
@@ -116,7 +122,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 				return []generator.Generator{
 					&genListers{
 						DefaultGen: generator.DefaultGen{
-							OptionalName: arguments.OutputFileBaseName + "." + normalization.BeforeFirstDot(gv.Group),
+							OptionalName: arguments.OutputFileBaseName + "." + normalizedGroupName,
 						},
 						outputPackage: arguments.OutputPackagePath,
 						groupVersion:  gv,
@@ -167,11 +173,12 @@ func (g *genListers) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports, g.imports.ImportLines()...)
 	imports = append(imports, "k8s.io/kubernetes/pkg/api/errors")
 	imports = append(imports, "k8s.io/kubernetes/pkg/labels")
+	// for Indexer
+	imports = append(imports, "k8s.io/kubernetes/pkg/client/cache")
 	return
 }
 
 func (g *genListers) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
-	glog.Infof("ANDY OptionalName=%s", g.DefaultGen.OptionalName)
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 
 	groupName := g.groupVersion.Group
@@ -179,71 +186,95 @@ func (g *genListers) GenerateType(c *generator.Context, t *types.Type, w io.Writ
 		groupName = "api"
 	}
 
-	sw.Do(example, nil)
-
 	for _, t := range g.types {
 		glog.V(5).Infof("processing type %v", t)
 		m := map[string]interface{}{
 			"group": groupName,
 			"type":  t,
 		}
-		sw.Do(storeToTypeLister, m)
-		sw.Do(storeToTypeLister_List, m)
+
 		namespaced := !extractBoolTagOrDie("nonNamespaced", t.SecondClosestCommentLines)
 		if namespaced {
-			sw.Do(storeToTypeLister_Namespacer, m)
-			sw.Do(namespacer, m)
-			sw.Do(namespacer_List, m)
-			sw.Do(namespacer_Get, m)
+			sw.Do(typeListerInterface, m)
 		} else {
 			g.hasNonNamespaced = true
-			sw.Do(storeToTypeLister_NonNamespacedGet, m)
+			sw.Do(typeListerInterface_NonNamespaced, m)
+		}
+
+		sw.Do(typeListerStruct, m)
+		sw.Do(typeListerConstructor, m)
+		sw.Do(typeLister_List, m)
+
+		if namespaced {
+			sw.Do(typeLister_NamespaceLister, m)
+			sw.Do(namespaceListerInterface, m)
+			sw.Do(namespaceListerStruct, m)
+			sw.Do(namespaceLister_List, m)
+			sw.Do(namespaceLister_Get, m)
+		} else {
+			sw.Do(typeLister_NonNamespacedGet, m)
 		}
 	}
 
 	return sw.Error()
 }
 
-var example = `
-// Lister makes an Index have the List method.  The Stores must contain only the expected type
-// Example:
-// s := cache.NewStore()
-// lw := cache.ListWatch{Client: c, FieldSelector: sel, Resource: "pods"}
-// r := cache.NewReflector(lw, &api.Pod{}, s).Run()
-// l := StoreToPodLister{s}
-// l.List()
-
-`
-
-var storeToTypeLister = `
-// StoreTo$.type|public$Lister makes a Store that lists $.type|publicPlural$.
-type StoreTo$.type|public$Lister struct {
-	Indexer Indexer
+var typeListerInterface = `
+// $.type|public$Lister helps list $.type|publicPlural$.
+type $.type|public$Lister interface {
+	// List lists all $.type|publicPlural$ in the indexer.
+	List(selector labels.Selector) (ret []*$.type|raw$, err error)
+	// $.type|publicPlural$ returns an object that can list and get $.type|publicPlural$.
+	$.type|publicPlural$(namespace string) $.type|public$NamespaceLister
 }
 `
 
-var storeToTypeLister_List = `
-// List lists all $.type|publicPlural$ in the store.
-func (s *StoreTo$.type|public$Lister) List(selector labels.Selector) (ret []*$.type|raw$, err error) {
-	err = ListAll(s.Indexer, selector, func(m interface{}) {
+var typeListerInterface_NonNamespaced = `
+// $.type|public$Lister helps list $.type|publicPlural$.
+type $.type|public$Lister interface {
+	// List lists all $.type|publicPlural$ in the indexer.
+	List(selector labels.Selector) (ret []*$.type|raw$, err error)
+	// Get retrieves the $.type|public$ from the index for a given name.
+	Get(name string) (*$.type|raw$, error)
+}
+`
+
+var typeListerStruct = `
+// $.type|private$Lister implements the $.type|public$Lister interface.
+type $.type|private$Lister struct {
+	indexer cache.Indexer
+}
+`
+
+var typeListerConstructor = `
+// New$.type|public$Lister returns a new $.type|public$Lister.
+func New$.type|public$Lister(indexer cache.Indexer) $.type|public$Lister {
+	return &$.type|private$Lister{indexer: indexer}
+}
+`
+
+var typeLister_List = `
+// List lists all $.type|publicPlural$ in the indexer.
+func (s *$.type|private$Lister) List(selector labels.Selector) (ret []*$.type|raw$, err error) {
+	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
 		ret = append(ret, m.(*$.type|raw$))
 	})
 	return ret, err
 }
 `
 
-var storeToTypeLister_Namespacer = `
-// $.type|publicPlural$ returns an object that can List and Get $.type|publicPlural$.
-func (s *StoreTo$.type|public$Lister) $.type|publicPlural$(namespace string) store$.type|publicPlural$Namespacer {
-	return store$.type|publicPlural$Namespacer{Indexer: s.Indexer, namespace: namespace}
+var typeLister_NamespaceLister = `
+// $.type|publicPlural$ returns an object that can list and get $.type|publicPlural$.
+func (s *$.type|private$Lister) $.type|publicPlural$(namespace string) $.type|public$NamespaceLister {
+	return $.type|private$NamespaceLister{indexer: s.indexer, namespace: namespace}
 }
 `
 
-var storeToTypeLister_NonNamespacedGet = `
-// Get retrieves the $.type|public$ from the store for a given name.
-func (s *StoreTo$.type|public$Lister) Get(name string) (*$.type|raw$, error) {
+var typeLister_NonNamespacedGet = `
+// Get retrieves the $.type|public$ from the index for a given name.
+func (s *$.type|private$Lister) Get(name string) (*$.type|raw$, error) {
   key := &$.type|raw${ObjectMeta: api.ObjectMeta{Name: name}}
-  obj, exists, err := s.Indexer.Get(key)
+  obj, exists, err := s.indexer.Get(key)
   if err != nil {
     return nil, err
   }
@@ -254,27 +285,39 @@ func (s *StoreTo$.type|public$Lister) Get(name string) (*$.type|raw$, error) {
 }
 `
 
-var namespacer = `
-type store$.type|publicPlural$Namespacer struct {
-	Indexer Indexer
+var namespaceListerInterface = `
+// $.type|public$NamespaceLister helps list and get $.type|publicPlural$.
+type $.type|public$NamespaceLister interface {
+	// List lists all $.type|publicPlural$ in the indexer for a given namespace.
+	List(selector labels.Selector) (ret []*$.type|raw$, err error)
+	// Get retrieves the $.type|public$ from the indexer for a given namespace and name.
+	Get(name string) (*$.type|raw$, error)
+}
+`
+
+var namespaceListerStruct = `
+// $.type|private$NamespaceLister implements the $.type|public$NamespaceLister
+// interface.
+type $.type|private$NamespaceLister struct {
+	indexer cache.Indexer
 	namespace string
 }
 `
 
-var namespacer_List = `
-// List lists all $.type|publicPlural$ in the store for a given namespace.
-func (s store$.type|publicPlural$Namespacer) List(selector labels.Selector) (ret []*$.type|raw$, err error) {
-	err = ListAllByNamespace(s.Indexer, s.namespace, selector, func(m interface{}) {
+var namespaceLister_List = `
+// List lists all $.type|publicPlural$ in the indexer for a given namespace.
+func (s $.type|private$NamespaceLister) List(selector labels.Selector) (ret []*$.type|raw$, err error) {
+	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
 		ret = append(ret, m.(*$.type|raw$))
 	})
 	return ret, err
 }
 `
 
-var namespacer_Get = `
-// Get retrieves the $.type|public$ from the store for a given namespace and name.
-func (s store$.type|publicPlural$Namespacer) Get(name string) (*$.type|raw$, error) {
-	obj, exists, err := s.Indexer.GetByKey(s.namespace + "/" + name)
+var namespaceLister_Get = `
+// Get retrieves the $.type|public$ from the indexer for a given namespace and name.
+func (s $.type|private$NamespaceLister) Get(name string) (*$.type|raw$, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
 	if err != nil {
 		return nil, err
 	}
