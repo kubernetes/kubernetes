@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/emicklei/go-restful/swagger"
@@ -48,9 +49,10 @@ type CachedDiscoveryClient struct {
 	// startedAt is the time this client was created
 	startedAt time.Time
 
-	// age is the time of the oldest used cache file, zero if no cache was used
-	age time.Time
-
+	// invalidationLock protects maxAge and lastInvalidation
+	invalidationLock sync.Mutex
+	// maxAge is the time of the oldest used cache file, zero if no cache was used
+	maxAge time.Time
 	// every cache file before this timestamp will be ignored
 	lastInvalidation time.Time
 }
@@ -134,16 +136,20 @@ func (d *CachedDiscoveryClient) getCachedFile(filename string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if fileInfo.ModTime().Before(d.lastInvalidation) {
-		return nil, errors.New("cache invalidated")
-	}
+
 	if time.Now().After(fileInfo.ModTime().Add(d.ttl)) {
 		return nil, errors.New("cache expired")
 	}
 
-	if d.age.IsZero() || d.age.After(fileInfo.ModTime()) {
-		d.age = fileInfo.ModTime()
+	d.invalidationLock.Lock()
+	if fileInfo.ModTime().Before(d.lastInvalidation) {
+		d.invalidationLock.Unlock()
+		return nil, errors.New("cache invalidated")
 	}
+	if d.maxAge.IsZero() || d.maxAge.After(fileInfo.ModTime()) {
+		d.maxAge = fileInfo.ModTime()
+	}
+	d.invalidationLock.Unlock()
 
 	// the cache is present and its valid.  Try to read and use it.
 	cachedBytes, err := ioutil.ReadAll(file)
@@ -188,12 +194,18 @@ func (d *CachedDiscoveryClient) SwaggerSchema(version unversioned.GroupVersion) 
 }
 
 func (d *CachedDiscoveryClient) Fresh() bool {
-	return d.age.IsZero() || d.age.After(d.startedAt)
+	d.invalidationLock.Lock()
+	defer d.invalidationLock.Unlock()
+
+	return d.maxAge.IsZero() || d.maxAge.After(d.startedAt)
 }
 
 func (d *CachedDiscoveryClient) Invalidate() {
+	d.invalidationLock.Lock()
+	defer d.invalidationLock.Unlock()
+
 	d.lastInvalidation = time.Now()
-	d.age = time.Time{}
+	d.maxAge = time.Time{}
 }
 
 // NewCachedDiscoveryClient creates a new DiscoveryClient.  cacheDirectory is the directory where discovery docs are held.  It must be unique per host:port combination to work well.
