@@ -113,9 +113,9 @@ fi
 function get_latest_version_number {
   local -r latest_url="https://storage.googleapis.com/kubernetes-release/release/stable.txt"
   if [[ $(which wget) ]]; then
-    wget -qO- ${latest_url}
+    wget -qO- "${latest_url}"
   elif [[ $(which curl) ]]; then
-    curl -Ss ${latest_url}
+    curl -Ssf --retry 3 --keepalive-time 2 "${latest_url}"
   else
     echo "Couldn't find curl or wget.  Bailing out." >&2
     exit 4
@@ -203,9 +203,9 @@ fi
 
 if "${need_download}"; then
   if [[ $(which curl) ]]; then
-    curl -L  ${release_url} -o ${file}
+    curl -L --retry 3 --keepalive-time 2 "${release_url}" -o "${file}"
   elif [[ $(which wget) ]]; then
-    wget ${release_url}
+    wget "${release_url}"
   else
     echo "Couldn't find curl or wget.  Bailing out."
     exit 1
