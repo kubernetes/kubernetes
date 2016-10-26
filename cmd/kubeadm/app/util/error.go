@@ -33,8 +33,8 @@ const (
 )
 
 var AlphaWarningOnExit = dedent.Dedent(`
-	kubeadm: I am an alpha version, my authors welcome your feedback and bug reports
-	kubeadm: please create issue an using https://github.com/kubernetes/kubernetes/issues/new
+	kubeadm: I am at alpha version, my authors welcome your feedback and bug reports
+	kubeadm: please create an issue using https://github.com/kubernetes/kubernetes/issues/new
 	kubeadm: and make sure to mention @kubernetes/sig-cluster-lifecycle. Thank you!
 `)
 
