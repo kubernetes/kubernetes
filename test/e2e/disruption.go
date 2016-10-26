@@ -26,7 +26,7 @@ import (
 	"k8s.io/client-go/pkg/api/unversioned"
 	api "k8s.io/client-go/pkg/api/v1"
 	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
-	policy "k8s.io/client-go/pkg/apis/policy/v1alpha1"
+	policy "k8s.io/client-go/pkg/apis/policy/v1beta1"
 	"k8s.io/client-go/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
