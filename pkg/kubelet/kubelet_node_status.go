@@ -333,9 +333,7 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 	}
 	node := &nodes.Items[0]
 
-	if kl.reconcileCIDR {
-		kl.updatePodCIDR(node.Spec.PodCIDR)
-	}
+	kl.updatePodCIDR(node.Spec.PodCIDR)
 
 	if err := kl.setNodeStatus(node); err != nil {
 		return err
