@@ -31,12 +31,12 @@ var _ = framework.KubeDescribe("Secrets", func() {
 	f := framework.NewDefaultFramework("secrets")
 
 	It("should be consumable from pods in volume [Conformance]", func() {
-		doSecretE2EWithoutMapping(f, nil)
+		doSecretE2EWithoutMapping(f, nil, nil)
 	})
 
 	It("should be consumable from pods in volume with defaultMode set [Conformance]", func() {
 		defaultMode := int32(0400)
-		doSecretE2EWithoutMapping(f, &defaultMode)
+		doSecretE2EWithoutMapping(f, &defaultMode, nil)
 	})
 
 	It("should be consumable from pods in volume with mappings [Conformance]", func() {
@@ -49,7 +49,24 @@ var _ = framework.KubeDescribe("Secrets", func() {
 	})
 
 	It("should be able to mount in a volume regardless of a different secret existing with same name in different namespace", func() {
-		doSecretE2EForMountNameSpaceIssue(f, nil)
+		var (
+			namespace2  *api.Namespace
+			err         error
+			secret2Name = "secret-test-" + string(uuid.NewUUID())
+		)
+
+		if namespace2, err = f.CreateNamespace("secret-namespace", nil); err != nil {
+			framework.Failf("unable to create new namespace %s: %v", namespace2.Name, err)
+		}
+
+		secret2 := secretForTest(namespace2.Name, secret2Name)
+		secret2.Data = map[string][]byte{
+			"this_should_not_content_of_other_secret": []byte("similarly_this_should_not_match_content_of_other_secret\n"),
+		}
+		if secret2, err = f.ClientSet.Core().Secrets(namespace2.Name).Create(secret2); err != nil {
+			framework.Failf("unable to create test secret %s: %v", secret2.Name, err)
+		}
+		doSecretE2EWithoutMapping(f, nil, secret2)
 	})
 
 	It("should be consumable in multiple volumes in a pod [Conformance]", func() {
@@ -184,13 +201,18 @@ func secretForTest(namespace, name string) *api.Secret {
 	}
 }
 
-func doSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32) {
+func doSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32, secret2 *api.Secret) {
 	var (
 		name            = "secret-test-" + string(uuid.NewUUID())
 		volumeName      = "secret-volume"
 		volumeMountPath = "/etc/secret-volume"
 		secret          = secretForTest(f.Namespace.Name, name)
 	)
+
+	if secret2 != nil {
+		// Existence of a second secret with same name and different namespace shouldn't affect the mount
+		secret.Name = secret2.Name
+	}
 
 	By(fmt.Sprintf("Creating secret with name %s", secret.Name))
 	var err error
@@ -200,7 +222,8 @@ func doSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32) {
 
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Name: "pod-secrets-" + string(uuid.NewUUID()),
+			Name:      "pod-secrets-" + string(uuid.NewUUID()),
+			Namespace: f.Namespace.Name,
 		},
 		Spec: api.PodSpec{
 			Volumes: []api.Volume{
@@ -208,7 +231,7 @@ func doSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32) {
 					Name: volumeName,
 					VolumeSource: api.VolumeSource{
 						Secret: &api.SecretVolumeSource{
-							SecretName: name,
+							SecretName: secret.Name,
 						},
 					},
 				},
@@ -316,81 +339,4 @@ func doSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 	}
 
 	f.TestContainerOutput("consume secrets", pod, 0, expectedOutput)
-}
-
-//Existence of a second secret with same name and different namespace shouldn't affect the mount
-func doSecretE2EForMountNameSpaceIssue(f *framework.Framework, defaultMode *int32) {
-	var (
-		name            = "secret-test-" + string(uuid.NewUUID())
-		volumeName      = "secret-volume"
-		volumeMountPath = "/etc/secret-volume"
-		namespace1      = f.Namespace
-		namespace2      *api.Namespace
-		err             error
-	)
-
-	if namespace2, err = f.CreateNamespace("secret-namespace", nil); err != nil {
-		framework.Failf("unable to create new namespace %s: %v", namespace2.Name, err)
-	}
-
-	secret1, secret2 := secretForTest(namespace1.Name, name), secretForTest(namespace2.Name, name)
-
-	By(fmt.Sprintf("Creating secrets with name %s and namespaces %s %s", name, namespace1.Name, namespace2.Name))
-
-	if secret1, err = f.ClientSet.Core().Secrets(namespace1.Name).Create(secret1); err != nil {
-		framework.Failf("unable to create test secret %s: %v", secret1.Name, err)
-	}
-
-	if secret2, err = f.ClientSet.Core().Secrets(namespace2.Name).Create(secret2); err != nil {
-		framework.Failf("unable to create test secret %s: %v", secret2.Name, err)
-	}
-
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			Name:      "pod-secrets-" + string(uuid.NewUUID()),
-			Namespace: namespace1.Name,
-		},
-		Spec: api.PodSpec{
-			Volumes: []api.Volume{
-				{
-					Name: volumeName,
-					VolumeSource: api.VolumeSource{
-						Secret: &api.SecretVolumeSource{
-							SecretName: name,
-						},
-					},
-				},
-			},
-			Containers: []api.Container{
-				{
-					Name:  "secret-volume-test",
-					Image: "gcr.io/google_containers/mounttest:0.7",
-					Args: []string{
-						"--file_content=/etc/secret-volume/data-1",
-						"--file_mode=/etc/secret-volume/data-1"},
-					VolumeMounts: []api.VolumeMount{
-						{
-							Name:      volumeName,
-							MountPath: volumeMountPath,
-						},
-					},
-				},
-			},
-			RestartPolicy: api.RestartPolicyNever,
-		},
-	}
-
-	if defaultMode != nil {
-		pod.Spec.Volumes[0].VolumeSource.Secret.DefaultMode = defaultMode
-	} else {
-		mode := int32(0644)
-		defaultMode = &mode
-	}
-
-	modeString := fmt.Sprintf("%v", os.FileMode(*defaultMode))
-	expectedOutput := []string{
-		"content of file \"/etc/secret-volume/data-1\": value-1",
-		"mode of file \"/etc/secret-volume/data-1\": " + modeString,
-	}
-	f.TestContainerOutput("same name different namespace secrets", pod, 0, expectedOutput)
 }
