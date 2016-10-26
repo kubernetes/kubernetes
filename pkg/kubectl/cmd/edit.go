@@ -19,7 +19,7 @@ package cmd
 import (
 	"bufio"
 	"bytes"
-	goerrors "errors"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -28,7 +28,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -218,7 +218,7 @@ func RunEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 					file: file,
 				}
 				containsError = true
-				fmt.Fprintln(out, results.addError(errors.NewInvalid(api.Kind(""), "", field.ErrorList{field.Invalid(nil, "The edited file failed validation", fmt.Sprintf("%v", err))}), info))
+				fmt.Fprintln(out, results.addError(apierrors.NewInvalid(api.Kind(""), "", field.ErrorList{field.Invalid(nil, "The edited file failed validation", fmt.Sprintf("%v", err))}), info))
 				continue
 			}
 
@@ -395,12 +395,12 @@ func visitToReplace(originalObj runtime.Object, updates *resource.Info, mapper m
 
 		}
 
-		ok, err := checkAPiVersionKindName(currOriginalObj, info.Object)
+		ok, err := validateImmutableAPIFields(currOriginalObj, info.Object)
 		if err != nil {
 			return err
 		}
 		if !ok {
-			return goerrors.New("At least one of apiVersion, kind and name was changed")
+			return errors.New("The following fields must not be changed: apiVersion, kind, and metadata.name")
 		}
 
 		results.version = defaultVersion
@@ -416,7 +416,7 @@ func visitToReplace(originalObj runtime.Object, updates *resource.Info, mapper m
 	return err
 }
 
-func checkAPiVersionKindName(oldObj, newObj runtime.Object) (bool, error) {
+func validateImmutableAPIFields(oldObj, newObj runtime.Object) (bool, error) {
 	oldMetaAccessor, err := meta.Accessor(oldObj)
 	if err != nil {
 		return false, err
@@ -516,12 +516,12 @@ type editResults struct {
 
 func (r *editResults) addError(err error, info *resource.Info) string {
 	switch {
-	case errors.IsInvalid(err):
+	case apierrors.IsInvalid(err):
 		r.edit = append(r.edit, info)
 		reason := editReason{
 			head: fmt.Sprintf("%s %q was not valid", info.Mapping.Resource, info.Name),
 		}
-		if err, ok := err.(errors.APIStatus); ok {
+		if err, ok := err.(apierrors.APIStatus); ok {
 			if details := err.Status().Details; details != nil {
 				for _, cause := range details.Causes {
 					reason.other = append(reason.other, fmt.Sprintf("%s: %s", cause.Field, cause.Message))
@@ -530,7 +530,7 @@ func (r *editResults) addError(err error, info *resource.Info) string {
 		}
 		r.header.reasons = append(r.header.reasons, reason)
 		return fmt.Sprintf("error: %s %q is invalid", info.Mapping.Resource, info.Name)
-	case errors.IsNotFound(err):
+	case apierrors.IsNotFound(err):
 		r.notfound++
 		return fmt.Sprintf("error: %s %q could not be found on the server", info.Mapping.Resource, info.Name)
 	default:
