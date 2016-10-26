@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // ensures the hard PodAntiAffinity is denied if it defines TopologyKey other than kubernetes.io/hostname.
@@ -236,6 +237,63 @@ func TestHandles(t *testing.T) {
 		result := handler.Handles(op)
 		if result != expected {
 			t.Errorf("Unexpected result for operation %s: %v\n", op, result)
+		}
+	}
+}
+
+// TestOtherResources ensures that this admission controller is a no-op for other resources,
+// subresources, and non-pods.
+func TestOtherResources(t *testing.T) {
+	namespace := "testnamespace"
+	name := "testname"
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespace},
+	}
+	tests := []struct {
+		name        string
+		kind        string
+		resource    string
+		subresource string
+		object      runtime.Object
+		expectError bool
+	}{
+		{
+			name:     "non-pod resource",
+			kind:     "Foo",
+			resource: "foos",
+			object:   pod,
+		},
+		{
+			name:        "pod subresource",
+			kind:        "Pod",
+			resource:    "pods",
+			subresource: "eviction",
+			object:      pod,
+		},
+		{
+			name:        "non-pod object",
+			kind:        "Pod",
+			resource:    "pods",
+			object:      &api.Service{},
+			expectError: true,
+		},
+	}
+
+	for _, tc := range tests {
+		handler := &plugin{}
+
+		err := handler.Admit(admission.NewAttributesRecord(tc.object, nil, api.Kind(tc.kind).WithVersion("version"), namespace, name, api.Resource(tc.resource).WithVersion("version"), tc.subresource, admission.Create, nil))
+
+		if tc.expectError {
+			if err == nil {
+				t.Errorf("%s: unexpected nil error", tc.name)
+			}
+			continue
+		}
+
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", tc.name, err)
+			continue
 		}
 	}
 }
