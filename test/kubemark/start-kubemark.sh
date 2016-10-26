@@ -167,6 +167,11 @@ gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
   "${RESOURCE_DIRECTORY}/controllers_flags" \
   "${MASTER_NAME}":~
 
+gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
+    "${RESOURCE_DIRECTORY}/kubemark_logrotate" \
+    "root@${MASTER_NAME}:/etc/logrotate.d"
+
+
 gcloud compute ssh "${MASTER_NAME}" --zone="${ZONE}" --project="${PROJECT}" \
   --command="chmod a+x configure-kubectl.sh && chmod a+x start-kubemark-master.sh && \
              sudo ./start-kubemark-master.sh ${EVENT_STORE_IP:-127.0.0.1} ${NUM_NODES:-0} ${EVENT_PD:-false} ${ETCD_IMAGE:-}"
