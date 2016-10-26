@@ -180,7 +180,7 @@ of three pods.
 
 ```yaml
 apiVersion: "apps/v1alpha1"
-kind: PetSet
+kind: StatefulSet
 metadata:
   name: cassandra
 spec:
