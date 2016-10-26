@@ -23,7 +23,9 @@ import (
 )
 
 // Group is the API group for abac
-const Group = "abac.authorization.kubernetes.io"
+const GroupName = "abac.authorization.kubernetes.io"
+
+var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
 
 // Scheme is the default instance of runtime.Scheme to which types in the abac API group are registered.
 // TODO: remove this, abac should not have its own scheme.
@@ -43,7 +45,7 @@ var (
 )
 
 func addKnownTypes(scheme *runtime.Scheme) error {
-	scheme.AddKnownTypes(unversioned.GroupVersion{Group: Group, Version: runtime.APIVersionInternal},
+	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Policy{},
 	)
 	return nil
