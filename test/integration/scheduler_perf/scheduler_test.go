@@ -90,7 +90,11 @@ func schedulePods(numNodes, numPods int) int32 {
 		glog.Fatalf("%v", err)
 	}
 	defer nodePreparer.CleanupNodes()
-	makePodsFromRC(c, "rc1", numPods)
+
+	config := testutils.NewTestPodCreatorConfig()
+	config.AddStrategy("sched-test", numPods, testutils.NewSimpleWithControllerCreatePodStrategy("rc1"))
+	podCreator := testutils.NewTestPodCreator(c, config)
+	podCreator.CreatePods()
 
 	prev := 0
 	minQps := int32(math.MaxInt32)
