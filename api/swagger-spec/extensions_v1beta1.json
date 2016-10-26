@@ -7792,7 +7792,7 @@
     ],
     "properties": {
      "selector": {
-      "$ref": "v1beta1.LabelSelector",
+      "$ref": "unversioned.LabelSelector",
       "description": "Selector is a label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors"
      },
      "template": {
@@ -7801,8 +7801,8 @@
      }
     }
    },
-   "v1beta1.LabelSelector": {
-    "id": "v1beta1.LabelSelector",
+   "unversioned.LabelSelector": {
+    "id": "unversioned.LabelSelector",
     "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
     "properties": {
      "matchLabels": {
@@ -7812,14 +7812,14 @@
      "matchExpressions": {
       "type": "array",
       "items": {
-       "$ref": "v1beta1.LabelSelectorRequirement"
+       "$ref": "unversioned.LabelSelectorRequirement"
       },
       "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed."
      }
     }
    },
-   "v1beta1.LabelSelectorRequirement": {
-    "id": "v1beta1.LabelSelectorRequirement",
+   "unversioned.LabelSelectorRequirement": {
+    "id": "unversioned.LabelSelectorRequirement",
     "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
     "required": [
      "key",
@@ -9426,7 +9426,7 @@
       "description": "Number of desired pods. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1."
      },
      "selector": {
-      "$ref": "v1beta1.LabelSelector",
+      "$ref": "unversioned.LabelSelector",
       "description": "Label selector for pods. Existing ReplicaSets whose pods are selected by this will be the ones affected by this deployment."
      },
      "template": {
@@ -10040,7 +10040,7 @@
       "description": "Optional duration in seconds relative to the startTime that the job may be active before the system tries to terminate it; value must be positive integer"
      },
      "selector": {
-      "$ref": "v1beta1.LabelSelector",
+      "$ref": "unversioned.LabelSelector",
       "description": "Selector is a label query over pods that should match the pod count. Normally, the system sets this field for you. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors"
      },
      "autoSelector": {
@@ -10183,7 +10183,7 @@
     ],
     "properties": {
      "podSelector": {
-      "$ref": "v1beta1.LabelSelector",
+      "$ref": "unversioned.LabelSelector",
       "description": "Selects the pods to which this NetworkPolicy object applies.  The array of ingress rules is applied to any pods selected by this field. Multiple network policies can select the same set of pods.  In this case, the ingress rules for each are combined additively. This field is NOT optional and follows standard label selector semantics. An empty podSelector matches all pods in this namespace."
      },
      "ingress": {
@@ -10236,11 +10236,11 @@
     "id": "v1beta1.NetworkPolicyPeer",
     "properties": {
      "podSelector": {
-      "$ref": "v1beta1.LabelSelector",
+      "$ref": "unversioned.LabelSelector",
       "description": "This is a label selector which selects Pods in this namespace. This field follows standard label selector semantics. If not provided, this selector selects no pods. If present but empty, this selector selects all pods in this namespace."
      },
      "namespaceSelector": {
-      "$ref": "v1beta1.LabelSelector",
+      "$ref": "unversioned.LabelSelector",
       "description": "Selects Namespaces using cluster scoped-labels.  This matches all pods in all namespaces selected by this label selector. This field follows standard label selector semantics. If omitted, this selector selects no namespaces. If present but empty, this selector selects all namespaces."
      }
     }
@@ -10314,7 +10314,7 @@
       "description": "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)"
      },
      "selector": {
-      "$ref": "v1beta1.LabelSelector",
+      "$ref": "unversioned.LabelSelector",
       "description": "Selector is a label query over pods that should match the replica count. If the selector is empty, it is defaulted to the labels present on the pod template. Label keys and values that must match in order to be controlled by this replica set. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors"
      },
      "template": {
