@@ -204,6 +204,7 @@ func GetPauseImageName(c clientset.Interface) string {
 }
 
 // GetPauseImageNameForHostArch fetches the pause image name for the same architecture the test is running on.
+// TODO: move this function to the test/utils
 func GetPauseImageNameForHostArch() string {
 	return currentPodInfraContainerImageName + "-" + goRuntime.GOARCH + ":" + currentPodInfraContainerImageVersion
 }
