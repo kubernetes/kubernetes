@@ -61,8 +61,8 @@ type Config struct {
 	// or any of the models will result in spec generation failure.
 	Definitions *OpenAPIDefinitions
 
-	// GetOperationID returns operation id for a restful route. It is an optional function to customize operation IDs.
-	GetOperationID func(servePath string, r *restful.Route) (string, error)
+	// GetOperationIDAndTags returns operation id and tags for a restful route. It is an optional function to customize operation IDs.
+	GetOperationIDAndTags func(servePath string, r *restful.Route) (string, []string, error)
 
 	// SecurityDefinitions is list of all security definitions for OpenAPI service. If this is not nil, the user of config
 	// is responsible to provide DefaultSecurity and (maybe) add unauthorized response to CommonResponses.

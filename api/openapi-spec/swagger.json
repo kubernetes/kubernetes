@@ -21,6 +21,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core"
+     ],
      "operationId": "getCoreAPIVersions",
      "responses": {
       "200": {
@@ -51,6 +54,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "getCoreV1APIResources",
      "responses": {
       "200": {
@@ -78,6 +84,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "listCoreV1ComponentStatus",
      "responses": {
@@ -151,6 +160,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "readCoreV1ComponentStatus",
      "responses": {
       "200": {
@@ -195,6 +207,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "listCoreV1ConfigMapForAllNamespaces",
      "responses": {
@@ -268,6 +283,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "listCoreV1EndpointsForAllNamespaces",
      "responses": {
       "200": {
@@ -339,6 +357,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "listCoreV1EventForAllNamespaces",
      "responses": {
@@ -412,6 +433,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "listCoreV1LimitRangeForAllNamespaces",
      "responses": {
       "200": {
@@ -484,6 +508,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "listCoreV1Namespace",
      "parameters": [
       {
@@ -547,6 +574,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "createCoreV1Namespace",
      "parameters": [
       {
@@ -582,6 +612,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "deleteCoreV1CollectionNamespace",
      "parameters": [
@@ -657,6 +690,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "createCoreV1NamespacedBinding",
      "responses": {
       "200": {
@@ -709,6 +745,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "listCoreV1NamespacedConfigMap",
      "parameters": [
@@ -773,6 +812,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "createCoreV1NamespacedConfigMap",
      "parameters": [
       {
@@ -808,6 +850,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "deleteCoreV1CollectionNamespacedConfigMap",
      "parameters": [
@@ -891,6 +936,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "readCoreV1NamespacedConfigMap",
      "parameters": [
       {
@@ -933,6 +981,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "replaceCoreV1NamespacedConfigMap",
      "parameters": [
       {
@@ -968,6 +1019,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "deleteCoreV1NamespacedConfigMap",
      "parameters": [
@@ -1006,6 +1060,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "patchCoreV1NamespacedConfigMap",
      "parameters": [
@@ -1070,6 +1127,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "listCoreV1NamespacedEndpoints",
      "parameters": [
       {
@@ -1133,6 +1193,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "createCoreV1NamespacedEndpoints",
      "parameters": [
       {
@@ -1168,6 +1231,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "deleteCoreV1CollectionNamespacedEndpoints",
      "parameters": [
@@ -1251,6 +1317,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "readCoreV1NamespacedEndpoints",
      "parameters": [
       {
@@ -1293,6 +1362,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "replaceCoreV1NamespacedEndpoints",
      "parameters": [
       {
@@ -1328,6 +1400,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "deleteCoreV1NamespacedEndpoints",
      "parameters": [
@@ -1366,6 +1441,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "patchCoreV1NamespacedEndpoints",
      "parameters": [
@@ -1430,6 +1508,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "listCoreV1NamespacedEvent",
      "parameters": [
       {
@@ -1493,6 +1574,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "createCoreV1NamespacedEvent",
      "parameters": [
       {
@@ -1528,6 +1612,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "deleteCoreV1CollectionNamespacedEvent",
      "parameters": [
@@ -1611,6 +1698,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "readCoreV1NamespacedEvent",
      "parameters": [
       {
@@ -1653,6 +1743,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "replaceCoreV1NamespacedEvent",
      "parameters": [
       {
@@ -1688,6 +1781,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "deleteCoreV1NamespacedEvent",
      "parameters": [
@@ -1726,6 +1822,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "patchCoreV1NamespacedEvent",
      "parameters": [
@@ -1790,6 +1889,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "listCoreV1NamespacedLimitRange",
      "parameters": [
       {
@@ -1853,6 +1955,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "createCoreV1NamespacedLimitRange",
      "parameters": [
       {
@@ -1888,6 +1993,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "deleteCoreV1CollectionNamespacedLimitRange",
      "parameters": [
@@ -1971,6 +2079,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "readCoreV1NamespacedLimitRange",
      "parameters": [
       {
@@ -2013,6 +2124,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "replaceCoreV1NamespacedLimitRange",
      "parameters": [
       {
@@ -2048,6 +2162,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "deleteCoreV1NamespacedLimitRange",
      "parameters": [
@@ -2086,6 +2203,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "patchCoreV1NamespacedLimitRange",
      "parameters": [
@@ -2150,6 +2270,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "listCoreV1NamespacedPersistentVolumeClaim",
      "parameters": [
       {
@@ -2213,6 +2336,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "createCoreV1NamespacedPersistentVolumeClaim",
      "parameters": [
       {
@@ -2248,6 +2374,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "deleteCoreV1CollectionNamespacedPersistentVolumeClaim",
      "parameters": [
@@ -2331,6 +2460,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "readCoreV1NamespacedPersistentVolumeClaim",
      "parameters": [
       {
@@ -2373,6 +2505,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "replaceCoreV1NamespacedPersistentVolumeClaim",
      "parameters": [
       {
@@ -2408,6 +2543,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "deleteCoreV1NamespacedPersistentVolumeClaim",
      "parameters": [
@@ -2446,6 +2584,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "patchCoreV1NamespacedPersistentVolumeClaim",
      "parameters": [
@@ -2510,6 +2651,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "readCoreV1NamespacedPersistentVolumeClaimStatus",
      "responses": {
       "200": {
@@ -2535,6 +2679,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "replaceCoreV1NamespacedPersistentVolumeClaimStatus",
      "parameters": [
@@ -2573,6 +2720,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "patchCoreV1NamespacedPersistentVolumeClaimStatus",
      "parameters": [
@@ -2637,6 +2787,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "listCoreV1NamespacedPod",
      "parameters": [
       {
@@ -2700,6 +2853,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "createCoreV1NamespacedPod",
      "parameters": [
       {
@@ -2735,6 +2891,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "deleteCoreV1CollectionNamespacedPod",
      "parameters": [
@@ -2818,6 +2977,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "readCoreV1NamespacedPod",
      "parameters": [
       {
@@ -2860,6 +3022,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "replaceCoreV1NamespacedPod",
      "parameters": [
       {
@@ -2895,6 +3060,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "deleteCoreV1NamespacedPod",
      "parameters": [
@@ -2933,6 +3101,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "patchCoreV1NamespacedPod",
      "parameters": [
@@ -2995,6 +3166,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "connectCoreV1GetNamespacedPodAttach",
      "responses": {
       "200": {
@@ -3018,6 +3192,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "connectCoreV1PostNamespacedPodAttach",
      "responses": {
@@ -3100,6 +3277,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "createCoreV1NamespacedBindingBinding",
      "responses": {
       "200": {
@@ -3161,6 +3341,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "createCoreV1NamespacedEvictionEviction",
      "responses": {
       "200": {
@@ -3220,6 +3403,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "connectCoreV1GetNamespacedPodExec",
      "responses": {
       "200": {
@@ -3243,6 +3429,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "connectCoreV1PostNamespacedPodExec",
      "responses": {
@@ -3332,6 +3521,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "readCoreV1NamespacedPodLog",
      "responses": {
@@ -3440,6 +3632,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "connectCoreV1GetNamespacedPodPortforward",
      "responses": {
       "200": {
@@ -3463,6 +3658,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "connectCoreV1PostNamespacedPodPortforward",
      "responses": {
@@ -3508,6 +3706,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "connectCoreV1GetNamespacedPodProxy",
      "responses": {
       "200": {
@@ -3531,6 +3732,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "connectCoreV1PutNamespacedPodProxy",
      "responses": {
@@ -3556,6 +3760,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "connectCoreV1PostNamespacedPodProxy",
      "responses": {
       "200": {
@@ -3579,6 +3786,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "connectCoreV1DeleteNamespacedPodProxy",
      "responses": {
@@ -3604,6 +3814,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "connectCoreV1OptionsNamespacedPodProxy",
      "responses": {
       "200": {
@@ -3627,6 +3840,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "connectCoreV1HeadNamespacedPodProxy",
      "responses": {
@@ -3679,6 +3895,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "connectCoreV1GetNamespacedPodProxyWithPath",
      "responses": {
       "200": {
@@ -3702,6 +3921,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "connectCoreV1PutNamespacedPodProxyWithPath",
      "responses": {
@@ -3727,6 +3949,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "connectCoreV1PostNamespacedPodProxyWithPath",
      "responses": {
       "200": {
@@ -3750,6 +3975,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "connectCoreV1DeleteNamespacedPodProxyWithPath",
      "responses": {
@@ -3775,6 +4003,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "connectCoreV1OptionsNamespacedPodProxyWithPath",
      "responses": {
       "200": {
@@ -3798,6 +4029,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "connectCoreV1HeadNamespacedPodProxyWithPath",
      "responses": {
@@ -3860,6 +4094,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "readCoreV1NamespacedPodStatus",
      "responses": {
       "200": {
@@ -3885,6 +4122,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "replaceCoreV1NamespacedPodStatus",
      "parameters": [
@@ -3923,6 +4163,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "patchCoreV1NamespacedPodStatus",
      "parameters": [
@@ -3987,6 +4230,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "listCoreV1NamespacedPodTemplate",
      "parameters": [
       {
@@ -4050,6 +4296,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "createCoreV1NamespacedPodTemplate",
      "parameters": [
       {
@@ -4085,6 +4334,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "deleteCoreV1CollectionNamespacedPodTemplate",
      "parameters": [
@@ -4168,6 +4420,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "readCoreV1NamespacedPodTemplate",
      "parameters": [
       {
@@ -4210,6 +4465,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "replaceCoreV1NamespacedPodTemplate",
      "parameters": [
       {
@@ -4245,6 +4503,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "deleteCoreV1NamespacedPodTemplate",
      "parameters": [
@@ -4283,6 +4544,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "patchCoreV1NamespacedPodTemplate",
      "parameters": [
@@ -4347,6 +4611,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "listCoreV1NamespacedReplicationController",
      "parameters": [
       {
@@ -4410,6 +4677,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "createCoreV1NamespacedReplicationController",
      "parameters": [
       {
@@ -4445,6 +4715,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "deleteCoreV1CollectionNamespacedReplicationController",
      "parameters": [
@@ -4528,6 +4801,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "readCoreV1NamespacedReplicationController",
      "parameters": [
       {
@@ -4570,6 +4846,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "replaceCoreV1NamespacedReplicationController",
      "parameters": [
       {
@@ -4605,6 +4884,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "deleteCoreV1NamespacedReplicationController",
      "parameters": [
@@ -4643,6 +4925,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "patchCoreV1NamespacedReplicationController",
      "parameters": [
@@ -4707,6 +4992,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "readCoreV1NamespacedScaleScale",
      "responses": {
       "200": {
@@ -4732,6 +5020,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "replaceCoreV1NamespacedScaleScale",
      "parameters": [
@@ -4770,6 +5061,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "patchCoreV1NamespacedScaleScale",
      "parameters": [
@@ -4834,6 +5128,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "readCoreV1NamespacedReplicationControllerStatus",
      "responses": {
       "200": {
@@ -4859,6 +5156,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "replaceCoreV1NamespacedReplicationControllerStatus",
      "parameters": [
@@ -4897,6 +5197,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "patchCoreV1NamespacedReplicationControllerStatus",
      "parameters": [
@@ -4961,6 +5264,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "listCoreV1NamespacedResourceQuota",
      "parameters": [
       {
@@ -5024,6 +5330,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "createCoreV1NamespacedResourceQuota",
      "parameters": [
       {
@@ -5059,6 +5368,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "deleteCoreV1CollectionNamespacedResourceQuota",
      "parameters": [
@@ -5142,6 +5454,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "readCoreV1NamespacedResourceQuota",
      "parameters": [
       {
@@ -5184,6 +5499,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "replaceCoreV1NamespacedResourceQuota",
      "parameters": [
       {
@@ -5219,6 +5537,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "deleteCoreV1NamespacedResourceQuota",
      "parameters": [
@@ -5257,6 +5578,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "patchCoreV1NamespacedResourceQuota",
      "parameters": [
@@ -5321,6 +5645,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "readCoreV1NamespacedResourceQuotaStatus",
      "responses": {
       "200": {
@@ -5346,6 +5673,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "replaceCoreV1NamespacedResourceQuotaStatus",
      "parameters": [
@@ -5384,6 +5714,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "patchCoreV1NamespacedResourceQuotaStatus",
      "parameters": [
@@ -5448,6 +5781,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "listCoreV1NamespacedSecret",
      "parameters": [
       {
@@ -5511,6 +5847,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "createCoreV1NamespacedSecret",
      "parameters": [
       {
@@ -5546,6 +5885,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "deleteCoreV1CollectionNamespacedSecret",
      "parameters": [
@@ -5629,6 +5971,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "readCoreV1NamespacedSecret",
      "parameters": [
       {
@@ -5671,6 +6016,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "replaceCoreV1NamespacedSecret",
      "parameters": [
       {
@@ -5706,6 +6054,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "deleteCoreV1NamespacedSecret",
      "parameters": [
@@ -5744,6 +6095,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "patchCoreV1NamespacedSecret",
      "parameters": [
@@ -5808,6 +6162,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "listCoreV1NamespacedServiceAccount",
      "parameters": [
       {
@@ -5871,6 +6228,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "createCoreV1NamespacedServiceAccount",
      "parameters": [
       {
@@ -5906,6 +6266,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "deleteCoreV1CollectionNamespacedServiceAccount",
      "parameters": [
@@ -5989,6 +6352,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "readCoreV1NamespacedServiceAccount",
      "parameters": [
       {
@@ -6031,6 +6397,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "replaceCoreV1NamespacedServiceAccount",
      "parameters": [
       {
@@ -6066,6 +6435,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "deleteCoreV1NamespacedServiceAccount",
      "parameters": [
@@ -6104,6 +6476,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "patchCoreV1NamespacedServiceAccount",
      "parameters": [
@@ -6168,6 +6543,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "listCoreV1NamespacedService",
      "parameters": [
       {
@@ -6231,6 +6609,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "createCoreV1NamespacedService",
      "parameters": [
       {
@@ -6286,6 +6667,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "readCoreV1NamespacedService",
      "parameters": [
       {
@@ -6328,6 +6712,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "replaceCoreV1NamespacedService",
      "parameters": [
       {
@@ -6364,6 +6751,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "deleteCoreV1NamespacedService",
      "responses": {
       "200": {
@@ -6391,6 +6781,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "patchCoreV1NamespacedService",
      "parameters": [
@@ -6453,6 +6846,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "connectCoreV1GetNamespacedServiceProxy",
      "responses": {
       "200": {
@@ -6476,6 +6872,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "connectCoreV1PutNamespacedServiceProxy",
      "responses": {
@@ -6501,6 +6900,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "connectCoreV1PostNamespacedServiceProxy",
      "responses": {
       "200": {
@@ -6524,6 +6926,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "connectCoreV1DeleteNamespacedServiceProxy",
      "responses": {
@@ -6549,6 +6954,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "connectCoreV1OptionsNamespacedServiceProxy",
      "responses": {
       "200": {
@@ -6572,6 +6980,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "connectCoreV1HeadNamespacedServiceProxy",
      "responses": {
@@ -6624,6 +7035,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "connectCoreV1GetNamespacedServiceProxyWithPath",
      "responses": {
       "200": {
@@ -6647,6 +7061,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "connectCoreV1PutNamespacedServiceProxyWithPath",
      "responses": {
@@ -6672,6 +7089,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "connectCoreV1PostNamespacedServiceProxyWithPath",
      "responses": {
       "200": {
@@ -6695,6 +7115,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "connectCoreV1DeleteNamespacedServiceProxyWithPath",
      "responses": {
@@ -6720,6 +7143,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "connectCoreV1OptionsNamespacedServiceProxyWithPath",
      "responses": {
       "200": {
@@ -6743,6 +7169,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "connectCoreV1HeadNamespacedServiceProxyWithPath",
      "responses": {
@@ -6805,6 +7234,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "readCoreV1NamespacedServiceStatus",
      "responses": {
       "200": {
@@ -6830,6 +7262,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "replaceCoreV1NamespacedServiceStatus",
      "parameters": [
@@ -6868,6 +7303,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "patchCoreV1NamespacedServiceStatus",
      "parameters": [
@@ -6932,6 +7370,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "readCoreV1Namespace",
      "parameters": [
       {
@@ -6974,6 +7415,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "replaceCoreV1Namespace",
      "parameters": [
       {
@@ -7009,6 +7453,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "deleteCoreV1Namespace",
      "parameters": [
@@ -7047,6 +7494,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "patchCoreV1Namespace",
      "parameters": [
@@ -7103,6 +7553,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "replaceCoreV1NamespaceFinalize",
      "responses": {
       "200": {
@@ -7156,6 +7609,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "readCoreV1NamespaceStatus",
      "responses": {
       "200": {
@@ -7181,6 +7637,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "replaceCoreV1NamespaceStatus",
      "parameters": [
@@ -7219,6 +7678,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "patchCoreV1NamespaceStatus",
      "parameters": [
@@ -7274,6 +7736,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "listCoreV1Node",
      "parameters": [
@@ -7338,6 +7803,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "createCoreV1Node",
      "parameters": [
       {
@@ -7373,6 +7841,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "deleteCoreV1CollectionNode",
      "parameters": [
@@ -7448,6 +7919,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "readCoreV1Node",
      "parameters": [
       {
@@ -7490,6 +7964,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "replaceCoreV1Node",
      "parameters": [
       {
@@ -7525,6 +8002,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "deleteCoreV1Node",
      "parameters": [
@@ -7563,6 +8043,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "patchCoreV1Node",
      "parameters": [
@@ -7617,6 +8100,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "connectCoreV1GetNodeProxy",
      "responses": {
       "200": {
@@ -7640,6 +8126,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "connectCoreV1PutNodeProxy",
      "responses": {
@@ -7665,6 +8154,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "connectCoreV1PostNodeProxy",
      "responses": {
       "200": {
@@ -7688,6 +8180,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "connectCoreV1DeleteNodeProxy",
      "responses": {
@@ -7713,6 +8208,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "connectCoreV1OptionsNodeProxy",
      "responses": {
       "200": {
@@ -7736,6 +8234,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "connectCoreV1HeadNodeProxy",
      "responses": {
@@ -7780,6 +8281,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "connectCoreV1GetNodeProxyWithPath",
      "responses": {
       "200": {
@@ -7803,6 +8307,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "connectCoreV1PutNodeProxyWithPath",
      "responses": {
@@ -7828,6 +8335,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "connectCoreV1PostNodeProxyWithPath",
      "responses": {
       "200": {
@@ -7851,6 +8361,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "connectCoreV1DeleteNodeProxyWithPath",
      "responses": {
@@ -7876,6 +8389,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "connectCoreV1OptionsNodeProxyWithPath",
      "responses": {
       "200": {
@@ -7899,6 +8415,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "connectCoreV1HeadNodeProxyWithPath",
      "responses": {
@@ -7953,6 +8472,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "readCoreV1NodeStatus",
      "responses": {
       "200": {
@@ -7978,6 +8500,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "replaceCoreV1NodeStatus",
      "parameters": [
@@ -8016,6 +8541,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "patchCoreV1NodeStatus",
      "parameters": [
@@ -8071,6 +8599,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "listCoreV1PersistentVolumeClaimForAllNamespaces",
      "responses": {
@@ -8144,6 +8675,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "listCoreV1PersistentVolume",
      "parameters": [
       {
@@ -8207,6 +8741,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "createCoreV1PersistentVolume",
      "parameters": [
       {
@@ -8242,6 +8779,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "deleteCoreV1CollectionPersistentVolume",
      "parameters": [
@@ -8317,6 +8857,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "readCoreV1PersistentVolume",
      "parameters": [
       {
@@ -8359,6 +8902,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "replaceCoreV1PersistentVolume",
      "parameters": [
       {
@@ -8394,6 +8940,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "deleteCoreV1PersistentVolume",
      "parameters": [
@@ -8432,6 +8981,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "patchCoreV1PersistentVolume",
      "parameters": [
@@ -8488,6 +9040,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "readCoreV1PersistentVolumeStatus",
      "responses": {
       "200": {
@@ -8513,6 +9068,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "replaceCoreV1PersistentVolumeStatus",
      "parameters": [
@@ -8551,6 +9109,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "patchCoreV1PersistentVolumeStatus",
      "parameters": [
@@ -8606,6 +9167,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "listCoreV1PodForAllNamespaces",
      "responses": {
@@ -8679,6 +9243,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "listCoreV1PodTemplateForAllNamespaces",
      "responses": {
       "200": {
@@ -8749,6 +9316,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "proxyCoreV1GETNamespacedPod",
      "responses": {
       "200": {
@@ -8772,6 +9342,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "proxyCoreV1PUTNamespacedPod",
      "responses": {
@@ -8797,6 +9370,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "proxyCoreV1POSTNamespacedPod",
      "responses": {
       "200": {
@@ -8820,6 +9396,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "proxyCoreV1DELETENamespacedPod",
      "responses": {
@@ -8845,6 +9424,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "proxyCoreV1OPTIONSNamespacedPod",
      "responses": {
       "200": {
@@ -8868,6 +9450,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "proxyCoreV1HEADNamespacedPod",
      "responses": {
@@ -8913,6 +9498,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "proxyCoreV1GETNamespacedPodWithPath",
      "responses": {
       "200": {
@@ -8936,6 +9524,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "proxyCoreV1PUTNamespacedPodWithPath",
      "responses": {
@@ -8961,6 +9552,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "proxyCoreV1POSTNamespacedPodWithPath",
      "responses": {
       "200": {
@@ -8984,6 +9578,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "proxyCoreV1DELETENamespacedPodWithPath",
      "responses": {
@@ -9009,6 +9606,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "proxyCoreV1OPTIONSNamespacedPodWithPath",
      "responses": {
       "200": {
@@ -9032,6 +9632,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "proxyCoreV1HEADNamespacedPodWithPath",
      "responses": {
@@ -9085,6 +9688,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "proxyCoreV1GETNamespacedService",
      "responses": {
       "200": {
@@ -9108,6 +9714,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "proxyCoreV1PUTNamespacedService",
      "responses": {
@@ -9133,6 +9742,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "proxyCoreV1POSTNamespacedService",
      "responses": {
       "200": {
@@ -9156,6 +9768,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "proxyCoreV1DELETENamespacedService",
      "responses": {
@@ -9181,6 +9796,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "proxyCoreV1OPTIONSNamespacedService",
      "responses": {
       "200": {
@@ -9204,6 +9822,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "proxyCoreV1HEADNamespacedService",
      "responses": {
@@ -9249,6 +9870,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "proxyCoreV1GETNamespacedServiceWithPath",
      "responses": {
       "200": {
@@ -9272,6 +9896,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "proxyCoreV1PUTNamespacedServiceWithPath",
      "responses": {
@@ -9297,6 +9924,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "proxyCoreV1POSTNamespacedServiceWithPath",
      "responses": {
       "200": {
@@ -9320,6 +9950,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "proxyCoreV1DELETENamespacedServiceWithPath",
      "responses": {
@@ -9345,6 +9978,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "proxyCoreV1OPTIONSNamespacedServiceWithPath",
      "responses": {
       "200": {
@@ -9368,6 +10004,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "proxyCoreV1HEADNamespacedServiceWithPath",
      "responses": {
@@ -9421,6 +10060,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "proxyCoreV1GETNode",
      "responses": {
       "200": {
@@ -9444,6 +10086,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "proxyCoreV1PUTNode",
      "responses": {
@@ -9469,6 +10114,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "proxyCoreV1POSTNode",
      "responses": {
       "200": {
@@ -9492,6 +10140,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "proxyCoreV1DELETENode",
      "responses": {
@@ -9517,6 +10168,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "proxyCoreV1OPTIONSNode",
      "responses": {
       "200": {
@@ -9540,6 +10194,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "proxyCoreV1HEADNode",
      "responses": {
@@ -9577,6 +10234,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "proxyCoreV1GETNodeWithPath",
      "responses": {
       "200": {
@@ -9600,6 +10260,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "proxyCoreV1PUTNodeWithPath",
      "responses": {
@@ -9625,6 +10288,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "proxyCoreV1POSTNodeWithPath",
      "responses": {
       "200": {
@@ -9648,6 +10314,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "proxyCoreV1DELETENodeWithPath",
      "responses": {
@@ -9673,6 +10342,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "proxyCoreV1OPTIONSNodeWithPath",
      "responses": {
       "200": {
@@ -9696,6 +10368,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "proxyCoreV1HEADNodeWithPath",
      "responses": {
@@ -9742,6 +10417,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "listCoreV1ReplicationControllerForAllNamespaces",
      "responses": {
@@ -9815,6 +10493,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "listCoreV1ResourceQuotaForAllNamespaces",
      "responses": {
       "200": {
@@ -9886,6 +10567,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "listCoreV1SecretForAllNamespaces",
      "responses": {
@@ -9959,6 +10643,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "listCoreV1ServiceAccountForAllNamespaces",
      "responses": {
       "200": {
@@ -10030,6 +10717,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "listCoreV1ServiceForAllNamespaces",
      "responses": {
@@ -10104,6 +10794,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "watchCoreV1ConfigMapListForAllNamespaces",
      "responses": {
       "200": {
@@ -10176,6 +10869,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "watchCoreV1EndpointsListForAllNamespaces",
      "responses": {
@@ -10250,6 +10946,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "watchCoreV1EventListForAllNamespaces",
      "responses": {
       "200": {
@@ -10322,6 +11021,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "watchCoreV1LimitRangeListForAllNamespaces",
      "responses": {
@@ -10396,6 +11098,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "watchCoreV1NamespaceList",
      "responses": {
       "200": {
@@ -10468,6 +11173,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "watchCoreV1NamespacedConfigMapList",
      "responses": {
@@ -10549,6 +11257,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "watchCoreV1NamespacedConfigMap",
      "responses": {
@@ -10639,6 +11350,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "watchCoreV1NamespacedEndpointsList",
      "responses": {
       "200": {
@@ -10719,6 +11433,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "watchCoreV1NamespacedEndpoints",
      "responses": {
@@ -10809,6 +11526,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "watchCoreV1NamespacedEventList",
      "responses": {
       "200": {
@@ -10889,6 +11609,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "watchCoreV1NamespacedEvent",
      "responses": {
@@ -10979,6 +11702,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "watchCoreV1NamespacedLimitRangeList",
      "responses": {
       "200": {
@@ -11059,6 +11785,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "watchCoreV1NamespacedLimitRange",
      "responses": {
@@ -11149,6 +11878,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "watchCoreV1NamespacedPersistentVolumeClaimList",
      "responses": {
       "200": {
@@ -11229,6 +11961,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "watchCoreV1NamespacedPersistentVolumeClaim",
      "responses": {
@@ -11319,6 +12054,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "watchCoreV1NamespacedPodList",
      "responses": {
       "200": {
@@ -11399,6 +12137,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "watchCoreV1NamespacedPod",
      "responses": {
@@ -11489,6 +12230,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "watchCoreV1NamespacedPodTemplateList",
      "responses": {
       "200": {
@@ -11569,6 +12313,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "watchCoreV1NamespacedPodTemplate",
      "responses": {
@@ -11659,6 +12406,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "watchCoreV1NamespacedReplicationControllerList",
      "responses": {
       "200": {
@@ -11739,6 +12489,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "watchCoreV1NamespacedReplicationController",
      "responses": {
@@ -11829,6 +12582,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "watchCoreV1NamespacedResourceQuotaList",
      "responses": {
       "200": {
@@ -11909,6 +12665,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "watchCoreV1NamespacedResourceQuota",
      "responses": {
@@ -11999,6 +12758,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "watchCoreV1NamespacedSecretList",
      "responses": {
       "200": {
@@ -12079,6 +12841,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "watchCoreV1NamespacedSecret",
      "responses": {
@@ -12169,6 +12934,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "watchCoreV1NamespacedServiceAccountList",
      "responses": {
       "200": {
@@ -12249,6 +13017,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "watchCoreV1NamespacedServiceAccount",
      "responses": {
@@ -12339,6 +13110,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "watchCoreV1NamespacedServiceList",
      "responses": {
       "200": {
@@ -12419,6 +13193,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "watchCoreV1NamespacedService",
      "responses": {
@@ -12509,6 +13286,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "watchCoreV1Namespace",
      "responses": {
       "200": {
@@ -12590,6 +13370,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "watchCoreV1NodeList",
      "responses": {
       "200": {
@@ -12662,6 +13445,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "watchCoreV1Node",
      "responses": {
@@ -12744,6 +13530,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "watchCoreV1PersistentVolumeClaimListForAllNamespaces",
      "responses": {
       "200": {
@@ -12817,6 +13606,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "watchCoreV1PersistentVolumeList",
      "responses": {
       "200": {
@@ -12889,6 +13681,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "watchCoreV1PersistentVolume",
      "responses": {
@@ -12971,6 +13766,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "watchCoreV1PodListForAllNamespaces",
      "responses": {
       "200": {
@@ -13043,6 +13841,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "watchCoreV1PodTemplateListForAllNamespaces",
      "responses": {
@@ -13117,6 +13918,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "watchCoreV1ReplicationControllerListForAllNamespaces",
      "responses": {
       "200": {
@@ -13189,6 +13993,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "watchCoreV1ResourceQuotaListForAllNamespaces",
      "responses": {
@@ -13263,6 +14070,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "watchCoreV1SecretListForAllNamespaces",
      "responses": {
       "200": {
@@ -13336,6 +14146,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "core_v1"
+     ],
      "operationId": "watchCoreV1ServiceAccountListForAllNamespaces",
      "responses": {
       "200": {
@@ -13408,6 +14221,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "core_v1"
      ],
      "operationId": "watchCoreV1ServiceListForAllNamespaces",
      "responses": {
@@ -13483,6 +14299,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "apis"
+     ],
      "operationId": "getAPIVersions",
      "responses": {
       "200": {
@@ -13512,6 +14331,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "apps"
      ],
      "operationId": "getAppsAPIGroup",
      "responses": {
@@ -13543,6 +14365,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "apps_v1alpha1"
+     ],
      "operationId": "getAppsV1alpha1APIResources",
      "responses": {
       "200": {
@@ -13570,6 +14395,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "apps_v1alpha1"
      ],
      "operationId": "listAppsV1alpha1NamespacedPetSet",
      "parameters": [
@@ -13634,6 +14462,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "apps_v1alpha1"
+     ],
      "operationId": "createAppsV1alpha1NamespacedPetSet",
      "parameters": [
       {
@@ -13669,6 +14500,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "apps_v1alpha1"
      ],
      "operationId": "deleteAppsV1alpha1CollectionNamespacedPetSet",
      "parameters": [
@@ -13752,6 +14586,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "apps_v1alpha1"
+     ],
      "operationId": "readAppsV1alpha1NamespacedPetSet",
      "parameters": [
       {
@@ -13794,6 +14631,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "apps_v1alpha1"
+     ],
      "operationId": "replaceAppsV1alpha1NamespacedPetSet",
      "parameters": [
       {
@@ -13829,6 +14669,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "apps_v1alpha1"
      ],
      "operationId": "deleteAppsV1alpha1NamespacedPetSet",
      "parameters": [
@@ -13867,6 +14710,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "apps_v1alpha1"
      ],
      "operationId": "patchAppsV1alpha1NamespacedPetSet",
      "parameters": [
@@ -13931,6 +14777,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "apps_v1alpha1"
+     ],
      "operationId": "readAppsV1alpha1NamespacedPetSetStatus",
      "responses": {
       "200": {
@@ -13956,6 +14805,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "apps_v1alpha1"
      ],
      "operationId": "replaceAppsV1alpha1NamespacedPetSetStatus",
      "parameters": [
@@ -13994,6 +14846,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "apps_v1alpha1"
      ],
      "operationId": "patchAppsV1alpha1NamespacedPetSetStatus",
      "parameters": [
@@ -14057,6 +14912,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "apps_v1alpha1"
      ],
      "operationId": "listAppsV1alpha1PetSetForAllNamespaces",
      "responses": {
@@ -14130,6 +14988,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "apps_v1alpha1"
      ],
      "operationId": "watchAppsV1alpha1NamespacedPetSetList",
      "responses": {
@@ -14211,6 +15072,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "apps_v1alpha1"
      ],
      "operationId": "watchAppsV1alpha1NamespacedPetSet",
      "responses": {
@@ -14301,6 +15165,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "apps_v1alpha1"
+     ],
      "operationId": "watchAppsV1alpha1PetSetListForAllNamespaces",
      "responses": {
       "200": {
@@ -14375,6 +15242,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "authentication"
+     ],
      "operationId": "getAuthenticationAPIGroup",
      "responses": {
       "200": {
@@ -14405,6 +15275,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "authentication_v1beta1"
+     ],
      "operationId": "getAuthenticationV1beta1APIResources",
      "responses": {
       "200": {
@@ -14432,6 +15305,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "authentication_v1beta1"
      ],
      "operationId": "createAuthenticationV1beta1TokenReview",
      "responses": {
@@ -14480,6 +15356,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "authorization"
+     ],
      "operationId": "getAuthorizationAPIGroup",
      "responses": {
       "200": {
@@ -14510,6 +15389,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "authorization_v1beta1"
+     ],
      "operationId": "getAuthorizationV1beta1APIResources",
      "responses": {
       "200": {
@@ -14537,6 +15419,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "authorization_v1beta1"
      ],
      "operationId": "createAuthorizationV1beta1NamespacedLocalSubjectAccessReview",
      "responses": {
@@ -14591,6 +15476,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "authorization_v1beta1"
+     ],
      "operationId": "createAuthorizationV1beta1SelfSubjectAccessReview",
      "responses": {
       "200": {
@@ -14635,6 +15523,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "authorization_v1beta1"
      ],
      "operationId": "createAuthorizationV1beta1SubjectAccessReview",
      "responses": {
@@ -14683,6 +15574,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "autoscaling"
+     ],
      "operationId": "getAutoscalingAPIGroup",
      "responses": {
       "200": {
@@ -14713,6 +15607,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "autoscaling_v1"
+     ],
      "operationId": "getAutoscalingV1APIResources",
      "responses": {
       "200": {
@@ -14740,6 +15637,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "autoscaling_v1"
      ],
      "operationId": "listAutoscalingV1HorizontalPodAutoscalerForAllNamespaces",
      "responses": {
@@ -14813,6 +15713,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "autoscaling_v1"
+     ],
      "operationId": "listAutoscalingV1NamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
@@ -14876,6 +15779,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "autoscaling_v1"
+     ],
      "operationId": "createAutoscalingV1NamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
@@ -14911,6 +15817,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "autoscaling_v1"
      ],
      "operationId": "deleteAutoscalingV1CollectionNamespacedHorizontalPodAutoscaler",
      "parameters": [
@@ -14994,6 +15903,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "autoscaling_v1"
+     ],
      "operationId": "readAutoscalingV1NamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
@@ -15036,6 +15948,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "autoscaling_v1"
+     ],
      "operationId": "replaceAutoscalingV1NamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
@@ -15071,6 +15986,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "autoscaling_v1"
      ],
      "operationId": "deleteAutoscalingV1NamespacedHorizontalPodAutoscaler",
      "parameters": [
@@ -15109,6 +16027,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "autoscaling_v1"
      ],
      "operationId": "patchAutoscalingV1NamespacedHorizontalPodAutoscaler",
      "parameters": [
@@ -15173,6 +16094,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "autoscaling_v1"
+     ],
      "operationId": "readAutoscalingV1NamespacedHorizontalPodAutoscalerStatus",
      "responses": {
       "200": {
@@ -15198,6 +16122,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "autoscaling_v1"
      ],
      "operationId": "replaceAutoscalingV1NamespacedHorizontalPodAutoscalerStatus",
      "parameters": [
@@ -15236,6 +16163,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "autoscaling_v1"
      ],
      "operationId": "patchAutoscalingV1NamespacedHorizontalPodAutoscalerStatus",
      "parameters": [
@@ -15300,6 +16230,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "autoscaling_v1"
      ],
      "operationId": "watchAutoscalingV1HorizontalPodAutoscalerListForAllNamespaces",
      "responses": {
@@ -15373,6 +16306,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "autoscaling_v1"
      ],
      "operationId": "watchAutoscalingV1NamespacedHorizontalPodAutoscalerList",
      "responses": {
@@ -15454,6 +16390,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "autoscaling_v1"
      ],
      "operationId": "watchAutoscalingV1NamespacedHorizontalPodAutoscaler",
      "responses": {
@@ -15545,6 +16484,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "batch"
+     ],
      "operationId": "getBatchAPIGroup",
      "responses": {
       "200": {
@@ -15575,6 +16517,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "batch_v1"
+     ],
      "operationId": "getBatchV1APIResources",
      "responses": {
       "200": {
@@ -15602,6 +16547,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "batch_v1"
      ],
      "operationId": "listBatchV1JobForAllNamespaces",
      "responses": {
@@ -15675,6 +16623,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "batch_v1"
+     ],
      "operationId": "listBatchV1NamespacedJob",
      "parameters": [
       {
@@ -15738,6 +16689,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "batch_v1"
+     ],
      "operationId": "createBatchV1NamespacedJob",
      "parameters": [
       {
@@ -15773,6 +16727,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "batch_v1"
      ],
      "operationId": "deleteBatchV1CollectionNamespacedJob",
      "parameters": [
@@ -15856,6 +16813,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "batch_v1"
+     ],
      "operationId": "readBatchV1NamespacedJob",
      "parameters": [
       {
@@ -15898,6 +16858,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "batch_v1"
+     ],
      "operationId": "replaceBatchV1NamespacedJob",
      "parameters": [
       {
@@ -15933,6 +16896,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "batch_v1"
      ],
      "operationId": "deleteBatchV1NamespacedJob",
      "parameters": [
@@ -15971,6 +16937,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "batch_v1"
      ],
      "operationId": "patchBatchV1NamespacedJob",
      "parameters": [
@@ -16035,6 +17004,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "batch_v1"
+     ],
      "operationId": "readBatchV1NamespacedJobStatus",
      "responses": {
       "200": {
@@ -16060,6 +17032,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "batch_v1"
      ],
      "operationId": "replaceBatchV1NamespacedJobStatus",
      "parameters": [
@@ -16098,6 +17073,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "batch_v1"
      ],
      "operationId": "patchBatchV1NamespacedJobStatus",
      "parameters": [
@@ -16162,6 +17140,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "batch_v1"
      ],
      "operationId": "watchBatchV1JobListForAllNamespaces",
      "responses": {
@@ -16235,6 +17216,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "batch_v1"
      ],
      "operationId": "watchBatchV1NamespacedJobList",
      "responses": {
@@ -16316,6 +17300,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "batch_v1"
      ],
      "operationId": "watchBatchV1NamespacedJob",
      "responses": {
@@ -16407,6 +17394,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "batch_v2alpha1"
+     ],
      "operationId": "getBatchV2alpha1APIResources",
      "responses": {
       "200": {
@@ -16436,6 +17426,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "certificates"
      ],
      "operationId": "getCertificatesAPIGroup",
      "responses": {
@@ -16467,6 +17460,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "certificates_v1alpha1"
+     ],
      "operationId": "getCertificatesV1alpha1APIResources",
      "responses": {
       "200": {
@@ -16494,6 +17490,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "certificates_v1alpha1"
      ],
      "operationId": "listCertificatesV1alpha1CertificateSigningRequest",
      "parameters": [
@@ -16558,6 +17557,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "certificates_v1alpha1"
+     ],
      "operationId": "createCertificatesV1alpha1CertificateSigningRequest",
      "parameters": [
       {
@@ -16593,6 +17595,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "certificates_v1alpha1"
      ],
      "operationId": "deleteCertificatesV1alpha1CollectionCertificateSigningRequest",
      "parameters": [
@@ -16668,6 +17673,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "certificates_v1alpha1"
+     ],
      "operationId": "readCertificatesV1alpha1CertificateSigningRequest",
      "parameters": [
       {
@@ -16710,6 +17718,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "certificates_v1alpha1"
+     ],
      "operationId": "replaceCertificatesV1alpha1CertificateSigningRequest",
      "parameters": [
       {
@@ -16745,6 +17756,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "certificates_v1alpha1"
      ],
      "operationId": "deleteCertificatesV1alpha1CertificateSigningRequest",
      "parameters": [
@@ -16783,6 +17797,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "certificates_v1alpha1"
      ],
      "operationId": "patchCertificatesV1alpha1CertificateSigningRequest",
      "parameters": [
@@ -16839,6 +17856,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "certificates_v1alpha1"
+     ],
      "operationId": "replaceCertificatesV1alpha1CertificateSigningRequestApproval",
      "responses": {
       "200": {
@@ -16891,6 +17911,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "certificates_v1alpha1"
      ],
      "operationId": "replaceCertificatesV1alpha1CertificateSigningRequestStatus",
      "responses": {
@@ -16945,6 +17968,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "certificates_v1alpha1"
      ],
      "operationId": "watchCertificatesV1alpha1CertificateSigningRequestList",
      "responses": {
@@ -17018,6 +18044,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "certificates_v1alpha1"
      ],
      "operationId": "watchCertificatesV1alpha1CertificateSigningRequest",
      "responses": {
@@ -17101,6 +18130,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions"
+     ],
      "operationId": "getExtensionsAPIGroup",
      "responses": {
       "200": {
@@ -17131,6 +18163,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "getExtensionsV1beta1APIResources",
      "responses": {
       "200": {
@@ -17158,6 +18193,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "listExtensionsV1beta1DaemonSetForAllNamespaces",
      "responses": {
@@ -17231,6 +18269,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "listExtensionsV1beta1DeploymentForAllNamespaces",
      "responses": {
       "200": {
@@ -17302,6 +18343,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "listExtensionsV1beta1HorizontalPodAutoscalerForAllNamespaces",
      "responses": {
@@ -17375,6 +18419,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "listExtensionsV1beta1IngressForAllNamespaces",
      "responses": {
       "200": {
@@ -17446,6 +18493,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "listExtensionsV1beta1JobForAllNamespaces",
      "responses": {
@@ -17519,6 +18569,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "listExtensionsV1beta1NamespacedDaemonSet",
      "parameters": [
       {
@@ -17582,6 +18635,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "createExtensionsV1beta1NamespacedDaemonSet",
      "parameters": [
       {
@@ -17617,6 +18673,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "deleteExtensionsV1beta1CollectionNamespacedDaemonSet",
      "parameters": [
@@ -17700,6 +18759,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "readExtensionsV1beta1NamespacedDaemonSet",
      "parameters": [
       {
@@ -17742,6 +18804,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "replaceExtensionsV1beta1NamespacedDaemonSet",
      "parameters": [
       {
@@ -17777,6 +18842,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "deleteExtensionsV1beta1NamespacedDaemonSet",
      "parameters": [
@@ -17815,6 +18883,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "patchExtensionsV1beta1NamespacedDaemonSet",
      "parameters": [
@@ -17879,6 +18950,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "readExtensionsV1beta1NamespacedDaemonSetStatus",
      "responses": {
       "200": {
@@ -17904,6 +18978,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "replaceExtensionsV1beta1NamespacedDaemonSetStatus",
      "parameters": [
@@ -17942,6 +19019,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "patchExtensionsV1beta1NamespacedDaemonSetStatus",
      "parameters": [
@@ -18006,6 +19086,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "listExtensionsV1beta1NamespacedDeployment",
      "parameters": [
       {
@@ -18069,6 +19152,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "createExtensionsV1beta1NamespacedDeployment",
      "parameters": [
       {
@@ -18104,6 +19190,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "deleteExtensionsV1beta1CollectionNamespacedDeployment",
      "parameters": [
@@ -18187,6 +19276,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "readExtensionsV1beta1NamespacedDeployment",
      "parameters": [
       {
@@ -18229,6 +19321,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "replaceExtensionsV1beta1NamespacedDeployment",
      "parameters": [
       {
@@ -18264,6 +19359,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "deleteExtensionsV1beta1NamespacedDeployment",
      "parameters": [
@@ -18302,6 +19400,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "patchExtensionsV1beta1NamespacedDeployment",
      "parameters": [
@@ -18366,6 +19467,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "createExtensionsV1beta1NamespacedDeploymentRollbackRollback",
      "responses": {
       "200": {
@@ -18427,6 +19531,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "readExtensionsV1beta1NamespacedDeploymentsScale",
      "responses": {
       "200": {
@@ -18452,6 +19559,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "replaceExtensionsV1beta1NamespacedDeploymentsScale",
      "parameters": [
@@ -18490,6 +19600,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "patchExtensionsV1beta1NamespacedDeploymentsScale",
      "parameters": [
@@ -18554,6 +19667,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "readExtensionsV1beta1NamespacedDeploymentStatus",
      "responses": {
       "200": {
@@ -18579,6 +19695,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "replaceExtensionsV1beta1NamespacedDeploymentStatus",
      "parameters": [
@@ -18617,6 +19736,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "patchExtensionsV1beta1NamespacedDeploymentStatus",
      "parameters": [
@@ -18681,6 +19803,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "listExtensionsV1beta1NamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
@@ -18744,6 +19869,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "createExtensionsV1beta1NamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
@@ -18779,6 +19907,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "deleteExtensionsV1beta1CollectionNamespacedHorizontalPodAutoscaler",
      "parameters": [
@@ -18862,6 +19993,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "readExtensionsV1beta1NamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
@@ -18904,6 +20038,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "replaceExtensionsV1beta1NamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
@@ -18939,6 +20076,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "deleteExtensionsV1beta1NamespacedHorizontalPodAutoscaler",
      "parameters": [
@@ -18977,6 +20117,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "patchExtensionsV1beta1NamespacedHorizontalPodAutoscaler",
      "parameters": [
@@ -19041,6 +20184,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "readExtensionsV1beta1NamespacedHorizontalPodAutoscalerStatus",
      "responses": {
       "200": {
@@ -19066,6 +20212,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "replaceExtensionsV1beta1NamespacedHorizontalPodAutoscalerStatus",
      "parameters": [
@@ -19104,6 +20253,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "patchExtensionsV1beta1NamespacedHorizontalPodAutoscalerStatus",
      "parameters": [
@@ -19168,6 +20320,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "listExtensionsV1beta1NamespacedIngress",
      "parameters": [
       {
@@ -19231,6 +20386,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "createExtensionsV1beta1NamespacedIngress",
      "parameters": [
       {
@@ -19266,6 +20424,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "deleteExtensionsV1beta1CollectionNamespacedIngress",
      "parameters": [
@@ -19349,6 +20510,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "readExtensionsV1beta1NamespacedIngress",
      "parameters": [
       {
@@ -19391,6 +20555,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "replaceExtensionsV1beta1NamespacedIngress",
      "parameters": [
       {
@@ -19426,6 +20593,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "deleteExtensionsV1beta1NamespacedIngress",
      "parameters": [
@@ -19464,6 +20634,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "patchExtensionsV1beta1NamespacedIngress",
      "parameters": [
@@ -19528,6 +20701,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "readExtensionsV1beta1NamespacedIngressStatus",
      "responses": {
       "200": {
@@ -19553,6 +20729,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "replaceExtensionsV1beta1NamespacedIngressStatus",
      "parameters": [
@@ -19591,6 +20770,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "patchExtensionsV1beta1NamespacedIngressStatus",
      "parameters": [
@@ -19655,6 +20837,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "listExtensionsV1beta1NamespacedJob",
      "parameters": [
       {
@@ -19718,6 +20903,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "createExtensionsV1beta1NamespacedJob",
      "parameters": [
       {
@@ -19753,6 +20941,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "deleteExtensionsV1beta1CollectionNamespacedJob",
      "parameters": [
@@ -19836,6 +21027,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "readExtensionsV1beta1NamespacedJob",
      "parameters": [
       {
@@ -19878,6 +21072,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "replaceExtensionsV1beta1NamespacedJob",
      "parameters": [
       {
@@ -19913,6 +21110,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "deleteExtensionsV1beta1NamespacedJob",
      "parameters": [
@@ -19951,6 +21151,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "patchExtensionsV1beta1NamespacedJob",
      "parameters": [
@@ -20015,6 +21218,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "readExtensionsV1beta1NamespacedJobStatus",
      "responses": {
       "200": {
@@ -20040,6 +21246,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "replaceExtensionsV1beta1NamespacedJobStatus",
      "parameters": [
@@ -20078,6 +21287,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "patchExtensionsV1beta1NamespacedJobStatus",
      "parameters": [
@@ -20142,6 +21354,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "listExtensionsV1beta1NamespacedNetworkPolicy",
      "parameters": [
       {
@@ -20205,6 +21420,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "createExtensionsV1beta1NamespacedNetworkPolicy",
      "parameters": [
       {
@@ -20240,6 +21458,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "deleteExtensionsV1beta1CollectionNamespacedNetworkPolicy",
      "parameters": [
@@ -20323,6 +21544,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "readExtensionsV1beta1NamespacedNetworkPolicy",
      "parameters": [
       {
@@ -20365,6 +21589,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "replaceExtensionsV1beta1NamespacedNetworkPolicy",
      "parameters": [
       {
@@ -20400,6 +21627,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "deleteExtensionsV1beta1NamespacedNetworkPolicy",
      "parameters": [
@@ -20438,6 +21668,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "patchExtensionsV1beta1NamespacedNetworkPolicy",
      "parameters": [
@@ -20502,6 +21735,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "listExtensionsV1beta1NamespacedReplicaSet",
      "parameters": [
       {
@@ -20565,6 +21801,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "createExtensionsV1beta1NamespacedReplicaSet",
      "parameters": [
       {
@@ -20600,6 +21839,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "deleteExtensionsV1beta1CollectionNamespacedReplicaSet",
      "parameters": [
@@ -20683,6 +21925,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "readExtensionsV1beta1NamespacedReplicaSet",
      "parameters": [
       {
@@ -20725,6 +21970,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "replaceExtensionsV1beta1NamespacedReplicaSet",
      "parameters": [
       {
@@ -20760,6 +22008,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "deleteExtensionsV1beta1NamespacedReplicaSet",
      "parameters": [
@@ -20798,6 +22049,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "patchExtensionsV1beta1NamespacedReplicaSet",
      "parameters": [
@@ -20862,6 +22116,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "readExtensionsV1beta1NamespacedReplicasetsScale",
      "responses": {
       "200": {
@@ -20887,6 +22144,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "replaceExtensionsV1beta1NamespacedReplicasetsScale",
      "parameters": [
@@ -20925,6 +22185,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "patchExtensionsV1beta1NamespacedReplicasetsScale",
      "parameters": [
@@ -20989,6 +22252,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "readExtensionsV1beta1NamespacedReplicaSetStatus",
      "responses": {
       "200": {
@@ -21014,6 +22280,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "replaceExtensionsV1beta1NamespacedReplicaSetStatus",
      "parameters": [
@@ -21052,6 +22321,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "patchExtensionsV1beta1NamespacedReplicaSetStatus",
      "parameters": [
@@ -21116,6 +22388,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "readExtensionsV1beta1NamespacedReplicationcontrollersScale",
      "responses": {
       "200": {
@@ -21141,6 +22416,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "replaceExtensionsV1beta1NamespacedReplicationcontrollersScale",
      "parameters": [
@@ -21179,6 +22457,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "patchExtensionsV1beta1NamespacedReplicationcontrollersScale",
      "parameters": [
@@ -21242,6 +22523,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "listExtensionsV1beta1NetworkPolicyForAllNamespaces",
      "responses": {
@@ -21315,6 +22599,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "listExtensionsV1beta1ReplicaSetForAllNamespaces",
      "responses": {
       "200": {
@@ -21387,6 +22674,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "listExtensionsV1beta1ThirdPartyResource",
      "parameters": [
       {
@@ -21450,6 +22740,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "createExtensionsV1beta1ThirdPartyResource",
      "parameters": [
       {
@@ -21485,6 +22778,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "deleteExtensionsV1beta1CollectionThirdPartyResource",
      "parameters": [
@@ -21560,6 +22856,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "readExtensionsV1beta1ThirdPartyResource",
      "parameters": [
       {
@@ -21602,6 +22901,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "replaceExtensionsV1beta1ThirdPartyResource",
      "parameters": [
       {
@@ -21637,6 +22939,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "deleteExtensionsV1beta1ThirdPartyResource",
      "parameters": [
@@ -21675,6 +22980,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "patchExtensionsV1beta1ThirdPartyResource",
      "parameters": [
@@ -21731,6 +23039,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "watchExtensionsV1beta1DaemonSetListForAllNamespaces",
      "responses": {
@@ -21805,6 +23116,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "watchExtensionsV1beta1DeploymentListForAllNamespaces",
      "responses": {
       "200": {
@@ -21877,6 +23191,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "watchExtensionsV1beta1HorizontalPodAutoscalerListForAllNamespaces",
      "responses": {
@@ -21951,6 +23268,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "watchExtensionsV1beta1IngressListForAllNamespaces",
      "responses": {
       "200": {
@@ -22024,6 +23344,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "watchExtensionsV1beta1JobListForAllNamespaces",
      "responses": {
       "200": {
@@ -22096,6 +23419,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "watchExtensionsV1beta1NamespacedDaemonSetList",
      "responses": {
@@ -22177,6 +23503,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "watchExtensionsV1beta1NamespacedDaemonSet",
      "responses": {
@@ -22267,6 +23596,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "watchExtensionsV1beta1NamespacedDeploymentList",
      "responses": {
       "200": {
@@ -22347,6 +23679,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "watchExtensionsV1beta1NamespacedDeployment",
      "responses": {
@@ -22437,6 +23772,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "watchExtensionsV1beta1NamespacedHorizontalPodAutoscalerList",
      "responses": {
       "200": {
@@ -22517,6 +23855,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "watchExtensionsV1beta1NamespacedHorizontalPodAutoscaler",
      "responses": {
@@ -22607,6 +23948,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "watchExtensionsV1beta1NamespacedIngressList",
      "responses": {
       "200": {
@@ -22687,6 +24031,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "watchExtensionsV1beta1NamespacedIngress",
      "responses": {
@@ -22777,6 +24124,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "watchExtensionsV1beta1NamespacedJobList",
      "responses": {
       "200": {
@@ -22857,6 +24207,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "watchExtensionsV1beta1NamespacedJob",
      "responses": {
@@ -22947,6 +24300,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "watchExtensionsV1beta1NamespacedNetworkPolicyList",
      "responses": {
       "200": {
@@ -23027,6 +24383,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "watchExtensionsV1beta1NamespacedNetworkPolicy",
      "responses": {
@@ -23117,6 +24476,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "watchExtensionsV1beta1NamespacedReplicaSetList",
      "responses": {
       "200": {
@@ -23197,6 +24559,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "watchExtensionsV1beta1NamespacedReplicaSet",
      "responses": {
@@ -23287,6 +24652,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "watchExtensionsV1beta1NetworkPolicyListForAllNamespaces",
      "responses": {
       "200": {
@@ -23359,6 +24727,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "watchExtensionsV1beta1ReplicaSetListForAllNamespaces",
      "responses": {
@@ -23433,6 +24804,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "extensions_v1beta1"
+     ],
      "operationId": "watchExtensionsV1beta1ThirdPartyResourceList",
      "responses": {
       "200": {
@@ -23505,6 +24879,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "extensions_v1beta1"
      ],
      "operationId": "watchExtensionsV1beta1ThirdPartyResource",
      "responses": {
@@ -23588,6 +24965,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "policy"
+     ],
      "operationId": "getPolicyAPIGroup",
      "responses": {
       "200": {
@@ -23618,6 +24998,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "policy_v1alpha1"
+     ],
      "operationId": "getPolicyV1alpha1APIResources",
      "responses": {
       "200": {
@@ -23645,6 +25028,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "policy_v1alpha1"
      ],
      "operationId": "listPolicyV1alpha1NamespacedPodDisruptionBudget",
      "parameters": [
@@ -23709,6 +25095,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "policy_v1alpha1"
+     ],
      "operationId": "createPolicyV1alpha1NamespacedPodDisruptionBudget",
      "parameters": [
       {
@@ -23744,6 +25133,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "policy_v1alpha1"
      ],
      "operationId": "deletePolicyV1alpha1CollectionNamespacedPodDisruptionBudget",
      "parameters": [
@@ -23827,6 +25219,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "policy_v1alpha1"
+     ],
      "operationId": "readPolicyV1alpha1NamespacedPodDisruptionBudget",
      "parameters": [
       {
@@ -23869,6 +25264,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "policy_v1alpha1"
+     ],
      "operationId": "replacePolicyV1alpha1NamespacedPodDisruptionBudget",
      "parameters": [
       {
@@ -23904,6 +25302,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "policy_v1alpha1"
      ],
      "operationId": "deletePolicyV1alpha1NamespacedPodDisruptionBudget",
      "parameters": [
@@ -23942,6 +25343,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "policy_v1alpha1"
      ],
      "operationId": "patchPolicyV1alpha1NamespacedPodDisruptionBudget",
      "parameters": [
@@ -24006,6 +25410,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "policy_v1alpha1"
+     ],
      "operationId": "readPolicyV1alpha1NamespacedPodDisruptionBudgetStatus",
      "responses": {
       "200": {
@@ -24031,6 +25438,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "policy_v1alpha1"
      ],
      "operationId": "replacePolicyV1alpha1NamespacedPodDisruptionBudgetStatus",
      "parameters": [
@@ -24069,6 +25479,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "policy_v1alpha1"
      ],
      "operationId": "patchPolicyV1alpha1NamespacedPodDisruptionBudgetStatus",
      "parameters": [
@@ -24132,6 +25545,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "policy_v1alpha1"
      ],
      "operationId": "listPolicyV1alpha1PodDisruptionBudgetForAllNamespaces",
      "responses": {
@@ -24205,6 +25621,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "policy_v1alpha1"
      ],
      "operationId": "watchPolicyV1alpha1NamespacedPodDisruptionBudgetList",
      "responses": {
@@ -24286,6 +25705,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "policy_v1alpha1"
      ],
      "operationId": "watchPolicyV1alpha1NamespacedPodDisruptionBudget",
      "responses": {
@@ -24376,6 +25798,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "policy_v1alpha1"
+     ],
      "operationId": "watchPolicyV1alpha1PodDisruptionBudgetListForAllNamespaces",
      "responses": {
       "200": {
@@ -24450,6 +25875,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "rbacAuthorization"
+     ],
      "operationId": "getRbacAuthorizationAPIGroup",
      "responses": {
       "200": {
@@ -24480,6 +25908,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
+     ],
      "operationId": "getRbacAuthorizationV1alpha1APIResources",
      "responses": {
       "200": {
@@ -24507,6 +25938,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
      ],
      "operationId": "listRbacAuthorizationV1alpha1ClusterRoleBinding",
      "parameters": [
@@ -24571,6 +26005,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
+     ],
      "operationId": "createRbacAuthorizationV1alpha1ClusterRoleBinding",
      "parameters": [
       {
@@ -24606,6 +26043,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
      ],
      "operationId": "deleteRbacAuthorizationV1alpha1CollectionClusterRoleBinding",
      "parameters": [
@@ -24681,6 +26121,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
+     ],
      "operationId": "readRbacAuthorizationV1alpha1ClusterRoleBinding",
      "responses": {
       "200": {
@@ -24706,6 +26149,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
      ],
      "operationId": "replaceRbacAuthorizationV1alpha1ClusterRoleBinding",
      "parameters": [
@@ -24742,6 +26188,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
      ],
      "operationId": "deleteRbacAuthorizationV1alpha1ClusterRoleBinding",
      "parameters": [
@@ -24780,6 +26229,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
      ],
      "operationId": "patchRbacAuthorizationV1alpha1ClusterRoleBinding",
      "parameters": [
@@ -24835,6 +26287,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
      ],
      "operationId": "listRbacAuthorizationV1alpha1ClusterRole",
      "parameters": [
@@ -24899,6 +26354,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
+     ],
      "operationId": "createRbacAuthorizationV1alpha1ClusterRole",
      "parameters": [
       {
@@ -24934,6 +26392,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
      ],
      "operationId": "deleteRbacAuthorizationV1alpha1CollectionClusterRole",
      "parameters": [
@@ -25009,6 +26470,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
+     ],
      "operationId": "readRbacAuthorizationV1alpha1ClusterRole",
      "responses": {
       "200": {
@@ -25034,6 +26498,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
      ],
      "operationId": "replaceRbacAuthorizationV1alpha1ClusterRole",
      "parameters": [
@@ -25070,6 +26537,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
      ],
      "operationId": "deleteRbacAuthorizationV1alpha1ClusterRole",
      "parameters": [
@@ -25108,6 +26578,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
      ],
      "operationId": "patchRbacAuthorizationV1alpha1ClusterRole",
      "parameters": [
@@ -25163,6 +26636,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
      ],
      "operationId": "listRbacAuthorizationV1alpha1NamespacedRoleBinding",
      "parameters": [
@@ -25227,6 +26703,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
+     ],
      "operationId": "createRbacAuthorizationV1alpha1NamespacedRoleBinding",
      "parameters": [
       {
@@ -25262,6 +26741,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
      ],
      "operationId": "deleteRbacAuthorizationV1alpha1CollectionNamespacedRoleBinding",
      "parameters": [
@@ -25345,6 +26827,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
+     ],
      "operationId": "readRbacAuthorizationV1alpha1NamespacedRoleBinding",
      "responses": {
       "200": {
@@ -25370,6 +26855,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
      ],
      "operationId": "replaceRbacAuthorizationV1alpha1NamespacedRoleBinding",
      "parameters": [
@@ -25406,6 +26894,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
      ],
      "operationId": "deleteRbacAuthorizationV1alpha1NamespacedRoleBinding",
      "parameters": [
@@ -25444,6 +26935,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
      ],
      "operationId": "patchRbacAuthorizationV1alpha1NamespacedRoleBinding",
      "parameters": [
@@ -25508,6 +27002,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
+     ],
      "operationId": "listRbacAuthorizationV1alpha1NamespacedRole",
      "parameters": [
       {
@@ -25571,6 +27068,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
+     ],
      "operationId": "createRbacAuthorizationV1alpha1NamespacedRole",
      "parameters": [
       {
@@ -25606,6 +27106,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
      ],
      "operationId": "deleteRbacAuthorizationV1alpha1CollectionNamespacedRole",
      "parameters": [
@@ -25689,6 +27192,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
+     ],
      "operationId": "readRbacAuthorizationV1alpha1NamespacedRole",
      "responses": {
       "200": {
@@ -25714,6 +27220,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
      ],
      "operationId": "replaceRbacAuthorizationV1alpha1NamespacedRole",
      "parameters": [
@@ -25750,6 +27259,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
      ],
      "operationId": "deleteRbacAuthorizationV1alpha1NamespacedRole",
      "parameters": [
@@ -25788,6 +27300,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
      ],
      "operationId": "patchRbacAuthorizationV1alpha1NamespacedRole",
      "parameters": [
@@ -25851,6 +27366,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
      ],
      "operationId": "listRbacAuthorizationV1alpha1RoleBindingForAllNamespaces",
      "responses": {
@@ -25923,6 +27441,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
      ],
      "operationId": "listRbacAuthorizationV1alpha1RoleForAllNamespaces",
      "responses": {
@@ -25997,6 +27518,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
+     ],
      "operationId": "watchRbacAuthorizationV1alpha1ClusterRoleBindingList",
      "responses": {
       "200": {
@@ -26069,6 +27593,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
      ],
      "operationId": "watchRbacAuthorizationV1alpha1ClusterRoleBinding",
      "responses": {
@@ -26151,6 +27678,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
+     ],
      "operationId": "watchRbacAuthorizationV1alpha1ClusterRoleList",
      "responses": {
       "200": {
@@ -26223,6 +27753,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
      ],
      "operationId": "watchRbacAuthorizationV1alpha1ClusterRole",
      "responses": {
@@ -26305,6 +27838,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
+     ],
      "operationId": "watchRbacAuthorizationV1alpha1NamespacedRoleBindingList",
      "responses": {
       "200": {
@@ -26385,6 +27921,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
      ],
      "operationId": "watchRbacAuthorizationV1alpha1NamespacedRoleBinding",
      "responses": {
@@ -26475,6 +28014,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
+     ],
      "operationId": "watchRbacAuthorizationV1alpha1NamespacedRoleList",
      "responses": {
       "200": {
@@ -26555,6 +28097,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
      ],
      "operationId": "watchRbacAuthorizationV1alpha1NamespacedRole",
      "responses": {
@@ -26645,6 +28190,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
+     ],
      "operationId": "watchRbacAuthorizationV1alpha1RoleBindingListForAllNamespaces",
      "responses": {
       "200": {
@@ -26717,6 +28265,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
      ],
      "operationId": "watchRbacAuthorizationV1alpha1RoleListForAllNamespaces",
      "responses": {
@@ -26792,6 +28343,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "storage"
+     ],
      "operationId": "getStorageAPIGroup",
      "responses": {
       "200": {
@@ -26822,6 +28376,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "storage_v1beta1"
+     ],
      "operationId": "getStorageV1beta1APIResources",
      "responses": {
       "200": {
@@ -26849,6 +28406,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "storage_v1beta1"
      ],
      "operationId": "listStorageV1beta1StorageClass",
      "parameters": [
@@ -26913,6 +28473,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "storage_v1beta1"
+     ],
      "operationId": "createStorageV1beta1StorageClass",
      "parameters": [
       {
@@ -26948,6 +28511,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "storage_v1beta1"
      ],
      "operationId": "deleteStorageV1beta1CollectionStorageClass",
      "parameters": [
@@ -27023,6 +28589,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "storage_v1beta1"
+     ],
      "operationId": "readStorageV1beta1StorageClass",
      "parameters": [
       {
@@ -27065,6 +28634,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "storage_v1beta1"
+     ],
      "operationId": "replaceStorageV1beta1StorageClass",
      "parameters": [
       {
@@ -27100,6 +28672,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "storage_v1beta1"
      ],
      "operationId": "deleteStorageV1beta1StorageClass",
      "parameters": [
@@ -27138,6 +28713,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "storage_v1beta1"
      ],
      "operationId": "patchStorageV1beta1StorageClass",
      "parameters": [
@@ -27194,6 +28772,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "storage_v1beta1"
      ],
      "operationId": "watchStorageV1beta1StorageClassList",
      "responses": {
@@ -27268,6 +28849,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "storage_v1beta1"
+     ],
      "operationId": "watchStorageV1beta1StorageClass",
      "responses": {
       "200": {
@@ -27339,6 +28923,9 @@
      "schemes": [
       "https"
      ],
+     "tags": [
+      "logs"
+     ],
      "operationId": "logFileListHandler",
      "responses": {
       "401": {
@@ -27351,6 +28938,9 @@
     "get": {
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "logs"
      ],
      "operationId": "logFileHandler",
      "responses": {
@@ -27381,6 +28971,9 @@
      ],
      "schemes": [
       "https"
+     ],
+     "tags": [
+      "version"
      ],
      "operationId": "getCodeVersion",
      "responses": {

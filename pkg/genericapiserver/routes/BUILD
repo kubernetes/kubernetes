@@ -33,7 +33,6 @@ go_library(
         "//vendor:github.com/elazarl/go-bindata-assetfs",
         "//vendor:github.com/emicklei/go-restful",
         "//vendor:github.com/emicklei/go-restful/swagger",
-        "//vendor:github.com/go-openapi/spec",
         "//vendor:github.com/golang/glog",
     ],
 )

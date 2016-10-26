@@ -223,7 +223,7 @@ func NewConfig() *Config {
 					Description: "Default Response.",
 				},
 			},
-			GetOperationID: apiserveropenapi.GetOperationID,
+			GetOperationIDAndTags: apiserveropenapi.GetOperationIDAndTags,
 		},
 		LongRunningFunc: genericfilters.BasicLongRunningRequestCheck(longRunningRE, map[string]string{"watch": "true"}),
 	}
