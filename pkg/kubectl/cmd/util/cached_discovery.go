@@ -44,9 +44,18 @@ type CachedDiscoveryClient struct {
 
 	// ttl is how long the cache should be considered valid
 	ttl time.Duration
+
+	// startedAt is the time this client was created
+	startedAt time.Time
+
+	// age is the time of the oldest used cache file, zero if no cache was used
+	age time.Time
+
+	// every cache file before this timestamp will be ignored
+	lastInvalidation time.Time
 }
 
-var _ discovery.DiscoveryInterface = &CachedDiscoveryClient{}
+var _ discovery.CachedDiscoveryInterface = &CachedDiscoveryClient{}
 
 // ServerResourcesForGroupVersion returns the supported resources for a group and version.
 func (d *CachedDiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (*unversioned.APIResourceList, error) {
@@ -125,8 +134,15 @@ func (d *CachedDiscoveryClient) getCachedFile(filename string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	if fileInfo.ModTime().Before(d.lastInvalidation) {
+		return nil, errors.New("cache invalidated")
+	}
 	if time.Now().After(fileInfo.ModTime().Add(d.ttl)) {
 		return nil, errors.New("cache expired")
+	}
+
+	if d.age.IsZero() || d.age.After(fileInfo.ModTime()) {
+		d.age = fileInfo.ModTime()
 	}
 
 	// the cache is present and its valid.  Try to read and use it.
@@ -171,7 +187,16 @@ func (d *CachedDiscoveryClient) SwaggerSchema(version unversioned.GroupVersion) 
 	return d.delegate.SwaggerSchema(version)
 }
 
+func (d* CachedDiscoveryClient) Fresh() bool {
+	return d.age.IsZero() || d.age.After(d.startedAt)
+}
+
+func (d *CachedDiscoveryClient) Invalidate() {
+	d.lastInvalidation = time.Now()
+	d.age = time.Time{}
+}
+
 // NewCachedDiscoveryClient creates a new DiscoveryClient.  cacheDirectory is the directory where discovery docs are held.  It must be unique per host:port combination to work well.
 func NewCachedDiscoveryClient(delegate discovery.DiscoveryInterface, cacheDirectory string, ttl time.Duration) *CachedDiscoveryClient {
-	return &CachedDiscoveryClient{delegate: delegate, cacheDirectory: cacheDirectory, ttl: ttl}
+	return &CachedDiscoveryClient{delegate: delegate, cacheDirectory: cacheDirectory, ttl: ttl, startedAt: time.Now()}
 }
