@@ -55,7 +55,7 @@ func newRS(name, namespace string, replicas int) *v1beta1.ReplicaSet {
 			Name:      name,
 		},
 		Spec: v1beta1.ReplicaSetSpec{
-			Selector: &unversioned.LabelSelector{
+			Selector: &v1beta1.LabelSelector{
 				MatchLabels: testLabels(),
 			},
 			Replicas: &replicasCopy,
