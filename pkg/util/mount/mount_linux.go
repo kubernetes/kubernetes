@@ -25,6 +25,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path"
 	"strconv"
 	"strings"
 	"syscall"
@@ -53,7 +54,8 @@ const (
 // for the linux platform.  This implementation assumes that the
 // kubelet is running in the host's root mount namespace.
 type Mounter struct {
-	mounterPath string
+	mounterPath       string
+	mounterRootfsPath string
 }
 
 // Mount mounts source to target as fstype with given options. 'source' and 'fstype' must
@@ -64,13 +66,13 @@ type Mounter struct {
 func (mounter *Mounter) Mount(source string, target string, fstype string, options []string) error {
 	bind, bindRemountOpts := isBind(options)
 	if bind {
-		err := doMount(mounter.mounterPath, source, target, fstype, []string{"bind"})
+		err := doMount(mounter.mounterPath, path.Join(mounter.mounterRootfsPath, source), target, fstype, []string{"bind"})
 		if err != nil {
 			return err
 		}
-		return doMount(mounter.mounterPath, source, target, fstype, bindRemountOpts)
+		return doMount(mounter.mounterPath, path.Join(mounter.mounterRootfsPath, source), target, fstype, bindRemountOpts)
 	} else {
-		return doMount(mounter.mounterPath, source, target, fstype, options)
+		return doMount(mounter.mounterPath, path.Join(mounter.mounterRootfsPath, source), target, fstype, options)
 	}
 }
 
