@@ -25,7 +25,7 @@ import (
 
 type AppsInterface interface {
 	RESTClient() restclient.Interface
-	PetSetsGetter
+	StatefulSetsGetter
 }
 
 // AppsClient is used to interact with features provided by the Apps group.
@@ -33,8 +33,8 @@ type AppsClient struct {
 	restClient restclient.Interface
 }
 
-func (c *AppsClient) PetSets(namespace string) PetSetInterface {
-	return newPetSets(c, namespace)
+func (c *AppsClient) StatefulSets(namespace string) StatefulSetInterface {
+	return newStatefulSets(c, namespace)
 }
 
 // NewForConfig creates a new AppsClient for the given config.

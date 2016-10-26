@@ -26,8 +26,8 @@ type FakeApps struct {
 	*core.Fake
 }
 
-func (c *FakeApps) PetSets(namespace string) unversioned.PetSetInterface {
-	return &FakePetSets{c, namespace}
+func (c *FakeApps) StatefulSets(namespace string) unversioned.StatefulSetInterface {
+	return &FakeStatefulSets{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

@@ -16,4 +16,4 @@ limitations under the License.
 
 package unversioned
 
-type PetSetExpansion interface{}
+type StatefulSetExpansion interface{}
