@@ -219,69 +219,64 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 
 	groups := templates.CommandGroups{
 		{
-			Message: "Basic Commands (Beginner):",
+			Message: "Application Management (SubCommands)",
 			Commands: []*cobra.Command{
-				NewCmdCreate(f, out),
+				NewCmdAnnotate(f, out),
+				NewCmdAutoscale(f, out),
 				NewCmdExposeService(f, out),
+				NewCmdLabel(f, out),
+				rollout.NewCmdRollout(f, out),
 				NewCmdRun(f, in, out, err),
+				NewCmdScale(f, out),
 				set.NewCmdSet(f, out, err),
 			},
 		},
 		{
-			Message: "Basic Commands (Intermediate):",
+			Message: "Application Management (Yaml Config)",
 			Commands: []*cobra.Command{
-				NewCmdGet(f, out, err),
-				NewCmdExplain(f, out, err),
+				NewCmdApply(f, out),
 				NewCmdEdit(f, out, err),
+				NewCmdPatch(f, out),
+				NewCmdReplace(f, out),
+			},
+		},
+		{
+			Message: "Application Management (Both Yaml And SubCommands)",
+			Commands: []*cobra.Command{
+				NewCmdCreate(f, out),
 				NewCmdDelete(f, out),
-			},
-		},
-		{
-			Message: "Deploy Commands:",
-			Commands: []*cobra.Command{
-				rollout.NewCmdRollout(f, out),
+				NewCmdGet(f, out, err),
 				NewCmdRollingUpdate(f, out),
-				NewCmdScale(f, out),
-				NewCmdAutoscale(f, out),
 			},
 		},
 		{
-			Message: "Cluster Management Commands:",
+			Message: "Troubleshooting and Debugging",
 			Commands: []*cobra.Command{
-				NewCmdClusterInfo(f, out),
-				NewCmdTop(f, out),
-				NewCmdCordon(f, out),
-				NewCmdUncordon(f, out),
-				NewCmdDrain(f, out),
-				NewCmdTaint(f, out),
-			},
-		},
-		{
-			Message: "Troubleshooting and Debugging Commands:",
-			Commands: []*cobra.Command{
-				NewCmdDescribe(f, out, err),
-				NewCmdLogs(f, out),
 				NewCmdAttach(f, in, out, err),
+				NewCmdDescribe(f, out, err),
 				NewCmdExec(f, in, out, err),
+				NewCmdLogs(f, out),
 				NewCmdPortForward(f, out, err),
 				NewCmdProxy(f, out),
 			},
 		},
 		{
-			Message: "Advanced Commands:",
+			Message: "Cluster Management",
 			Commands: []*cobra.Command{
-				NewCmdApply(f, out),
-				NewCmdPatch(f, out),
-				NewCmdReplace(f, out),
-				NewCmdConvert(f, out),
+				NewCmdClusterInfo(f, out),
+				NewCmdCordon(f, out),
+				NewCmdDrain(f, out),
+				NewCmdUncordon(f, out),
+				NewCmdTaint(f, out),
+				NewCmdTop(f, out),
 			},
 		},
 		{
-			Message: "Settings Commands:",
+			Message: "Kubectl Settings and Usage",
 			Commands: []*cobra.Command{
-				NewCmdLabel(f, out),
-				NewCmdAnnotate(f, out),
+				NewCmdExplain(f, out, err),
 				NewCmdCompletion(f, out),
+				NewCmdConvert(f, out),
 			},
 		},
 	}
