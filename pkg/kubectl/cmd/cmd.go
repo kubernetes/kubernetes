@@ -219,7 +219,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 
 	groups := templates.CommandGroups{
 		{
-			Message: "Application Management (SubCommands)",
+			Message: "Application Management (Using Command Args / Flags)",
 			Commands: []*cobra.Command{
 				NewCmdAnnotate(f, out),
 				NewCmdAutoscale(f, out),
@@ -232,21 +232,21 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			},
 		},
 		{
-			Message: "Application Management (Yaml Config)",
-			Commands: []*cobra.Command{
-				NewCmdApply(f, out),
-				NewCmdEdit(f, out, err),
-				NewCmdPatch(f, out),
-				NewCmdReplace(f, out),
-			},
-		},
-		{
-			Message: "Application Management (Both Yaml And SubCommands)",
+			Message: "Application Management (Either Yaml Or Command Args)",
 			Commands: []*cobra.Command{
 				NewCmdCreate(f, out),
 				NewCmdDelete(f, out),
 				NewCmdGet(f, out, err),
 				NewCmdRollingUpdate(f, out),
+			},
+		},
+		{
+			Message: "Application Management (Using Yaml Config)",
+			Commands: []*cobra.Command{
+				NewCmdApply(f, out),
+				NewCmdEdit(f, out, err),
+				NewCmdPatch(f, out),
+				NewCmdReplace(f, out),
 			},
 		},
 		{
