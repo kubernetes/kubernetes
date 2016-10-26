@@ -35,7 +35,7 @@ type APIGroupResources struct {
 }
 
 // NewRESTMapper returns a PriorityRESTMapper based on the discovered
-// groups and resourced passed in.
+// groups and resources passed in.
 func NewRESTMapper(groupResources []*APIGroupResources, versionInterfaces meta.VersionInterfacesFunc) meta.RESTMapper {
 	unionMapper := meta.MultiRESTMapper{}
 
@@ -47,8 +47,8 @@ func NewRESTMapper(groupResources []*APIGroupResources, versionInterfaces meta.V
 		groupPriority = append(groupPriority, group.Group.Name)
 
 		if len(group.Group.PreferredVersion.Version) != 0 {
-			preffered := group.Group.PreferredVersion.Version
-			if _, ok := group.VersionedResources[preffered]; ok {
+			preferred := group.Group.PreferredVersion.Version
+			if _, ok := group.VersionedResources[preferred]; ok {
 				resourcePriority = append(resourcePriority, unversioned.GroupVersionResource{
 					Group:    group.Group.Name,
 					Version:  group.Group.PreferredVersion.Version,
