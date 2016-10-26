@@ -21,6 +21,7 @@ import (
 	v1 "k8s.io/client-go/pkg/api/v1"
 	v1beta1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // JobsGetter has a method to return a JobInterface.
@@ -45,14 +46,14 @@ type JobInterface interface {
 
 // jobs implements JobInterface
 type jobs struct {
-	client *ExtensionsClient
+	client rest.Interface
 	ns     string
 }
 
 // newJobs returns a Jobs
 func newJobs(c *ExtensionsClient, namespace string) *jobs {
 	return &jobs{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

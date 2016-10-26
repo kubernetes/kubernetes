@@ -93,11 +93,11 @@ type TestGroup struct {
 func init() {
 	if apiMediaType := os.Getenv("KUBE_TEST_API_TYPE"); len(apiMediaType) > 0 {
 		var ok bool
-		mediaType, options, err := mime.ParseMediaType(apiMediaType)
+		mediaType, _, err := mime.ParseMediaType(apiMediaType)
 		if err != nil {
 			panic(err)
 		}
-		serializer, ok = api.Codecs.SerializerForMediaType(mediaType, options)
+		serializer, ok = runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), mediaType)
 		if !ok {
 			panic(fmt.Sprintf("no serializer for %s", apiMediaType))
 		}
@@ -105,11 +105,11 @@ func init() {
 
 	if storageMediaType := StorageMediaType(); len(storageMediaType) > 0 {
 		var ok bool
-		mediaType, options, err := mime.ParseMediaType(storageMediaType)
+		mediaType, _, err := mime.ParseMediaType(storageMediaType)
 		if err != nil {
 			panic(err)
 		}
-		storageSerializer, ok = api.Codecs.SerializerForMediaType(mediaType, options)
+		storageSerializer, ok = runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), mediaType)
 		if !ok {
 			panic(fmt.Sprintf("no serializer for %s", storageMediaType))
 		}
@@ -312,7 +312,7 @@ func (g TestGroup) Codec() runtime.Codec {
 	if serializer.Serializer == nil {
 		return api.Codecs.LegacyCodec(g.externalGroupVersion)
 	}
-	return api.Codecs.CodecForVersions(serializer, api.Codecs.UniversalDeserializer(), unversioned.GroupVersions{g.externalGroupVersion}, nil)
+	return api.Codecs.CodecForVersions(serializer.Serializer, api.Codecs.UniversalDeserializer(), unversioned.GroupVersions{g.externalGroupVersion}, nil)
 }
 
 // NegotiatedSerializer returns the negotiated serializer for the server.
@@ -452,11 +452,11 @@ func GetCodecForObject(obj runtime.Object) (runtime.Codec, error) {
 	}
 	// Codec used for unversioned types
 	if api.Scheme.Recognizes(kind) {
-		serializer, ok := api.Codecs.SerializerForFileExtension("json")
+		serializer, ok := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 		if !ok {
 			return nil, fmt.Errorf("no serializer registered for json")
 		}
-		return serializer, nil
+		return serializer.Serializer, nil
 	}
 	return nil, fmt.Errorf("unexpected kind: %v", kind)
 }

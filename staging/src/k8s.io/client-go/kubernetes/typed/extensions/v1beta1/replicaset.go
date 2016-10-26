@@ -21,6 +21,7 @@ import (
 	v1 "k8s.io/client-go/pkg/api/v1"
 	v1beta1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // ReplicaSetsGetter has a method to return a ReplicaSetInterface.
@@ -45,14 +46,14 @@ type ReplicaSetInterface interface {
 
 // replicaSets implements ReplicaSetInterface
 type replicaSets struct {
-	client *ExtensionsClient
+	client rest.Interface
 	ns     string
 }
 
 // newReplicaSets returns a ReplicaSets
 func newReplicaSets(c *ExtensionsClient, namespace string) *replicaSets {
 	return &replicaSets{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

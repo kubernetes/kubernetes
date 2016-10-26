@@ -20,6 +20,7 @@ import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // PodTemplatesGetter has a method to return a PodTemplateInterface.
@@ -43,14 +44,14 @@ type PodTemplateInterface interface {
 
 // podTemplates implements PodTemplateInterface
 type podTemplates struct {
-	client *CoreClient
+	client rest.Interface
 	ns     string
 }
 
 // newPodTemplates returns a PodTemplates
 func newPodTemplates(c *CoreClient, namespace string) *podTemplates {
 	return &podTemplates{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

@@ -120,6 +120,22 @@ func IsStandardContainerResourceName(str string) bool {
 	return standardContainerResources.Has(str)
 }
 
+// IsOpaqueIntResourceName returns true if the resource name has the opaque
+// integer resource prefix.
+func IsOpaqueIntResourceName(name ResourceName) bool {
+	return strings.HasPrefix(string(name), ResourceOpaqueIntPrefix)
+}
+
+// OpaqueIntResourceName returns a ResourceName with the canonical opaque
+// integer prefix prepended. If the argument already has the prefix, it is
+// returned unmodified.
+func OpaqueIntResourceName(name string) ResourceName {
+	if IsOpaqueIntResourceName(ResourceName(name)) {
+		return ResourceName(name)
+	}
+	return ResourceName(fmt.Sprintf("%s%s", ResourceOpaqueIntPrefix, name))
+}
+
 var standardLimitRangeTypes = sets.NewString(
 	string(LimitTypePod),
 	string(LimitTypeContainer),
@@ -171,6 +187,7 @@ var standardResources = sets.NewString(
 	string(ResourceConfigMaps),
 	string(ResourcePersistentVolumeClaims),
 	string(ResourceStorage),
+	string(ResourceRequestsStorage),
 )
 
 // IsStandardResourceName returns true if the resource is known to the system
@@ -192,7 +209,7 @@ var integerResources = sets.NewString(
 
 // IsIntegerResourceName returns true if the resource is measured in integer values
 func IsIntegerResourceName(str string) bool {
-	return integerResources.Has(str)
+	return integerResources.Has(str) || IsOpaqueIntResourceName(ResourceName(str))
 }
 
 // NewDeleteOptions returns a DeleteOptions indicating the resource should
@@ -235,6 +252,20 @@ var standardFinalizers = sets.NewString(
 	string(FinalizerKubernetes),
 	FinalizerOrphan,
 )
+
+// HasAnnotation returns a bool if passed in annotation exists
+func HasAnnotation(obj ObjectMeta, ann string) bool {
+	_, found := obj.Annotations[ann]
+	return found
+}
+
+// SetMetaDataAnnotation sets the annotation and value
+func SetMetaDataAnnotation(obj *ObjectMeta, ann string, value string) {
+	if obj.Annotations == nil {
+		obj.Annotations = make(map[string]string)
+	}
+	obj.Annotations[ann] = value
+}
 
 func IsStandardFinalizerName(str string) bool {
 	return standardFinalizers.Has(str)
@@ -402,7 +433,7 @@ func NodeSelectorRequirementsAsSelector(nsm []NodeSelectorRequirement) (labels.S
 		default:
 			return nil, fmt.Errorf("%q is not a valid node selector operator", expr.Operator)
 		}
-		r, err := labels.NewRequirement(expr.Key, op, sets.NewString(expr.Values...))
+		r, err := labels.NewRequirement(expr.Key, op, expr.Values)
 		if err != nil {
 			return nil, err
 		}
@@ -512,7 +543,6 @@ func TolerationToleratesTaint(toleration *Toleration, taint *Taint) bool {
 		return true
 	}
 	return false
-
 }
 
 // TaintToleratedByTolerations checks if taint is tolerated by any of the tolerations.

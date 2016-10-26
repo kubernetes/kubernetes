@@ -21,6 +21,7 @@ import (
 	v1 "k8s.io/client-go/pkg/api/v1"
 	v1beta1 "k8s.io/client-go/pkg/apis/storage/v1beta1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // StorageClassesGetter has a method to return a StorageClassInterface.
@@ -44,13 +45,13 @@ type StorageClassInterface interface {
 
 // storageClasses implements StorageClassInterface
 type storageClasses struct {
-	client *StorageClient
+	client rest.Interface
 }
 
 // newStorageClasses returns a StorageClasses
 func newStorageClasses(c *StorageClient) *storageClasses {
 	return &storageClasses{
-		client: c,
+		client: c.RESTClient(),
 	}
 }
 

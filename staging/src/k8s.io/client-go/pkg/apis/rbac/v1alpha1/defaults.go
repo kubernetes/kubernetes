@@ -21,16 +21,20 @@ import (
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
+	RegisterDefaults(scheme)
 	return scheme.AddDefaultingFuncs(
-		func(obj *ClusterRoleBinding) {
-			if len(obj.RoleRef.APIGroup) == 0 {
-				obj.RoleRef.APIGroup = GroupName
-			}
-		},
-		func(obj *RoleBinding) {
-			if len(obj.RoleRef.APIGroup) == 0 {
-				obj.RoleRef.APIGroup = GroupName
-			}
-		},
+		SetDefaults_ClusterRoleBinding,
+		SetDefaults_RoleBinding,
 	)
+}
+
+func SetDefaults_ClusterRoleBinding(obj *ClusterRoleBinding) {
+	if len(obj.RoleRef.APIGroup) == 0 {
+		obj.RoleRef.APIGroup = GroupName
+	}
+}
+func SetDefaults_RoleBinding(obj *RoleBinding) {
+	if len(obj.RoleRef.APIGroup) == 0 {
+		obj.RoleRef.APIGroup = GroupName
+	}
 }
