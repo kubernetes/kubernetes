@@ -336,7 +336,7 @@ func (f *factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
 	}
 
 	mapper := registered.RESTMapper()
-	var cachedDiscoveryClient clientdiscovery.DiscoveryInterface
+	var cachedDiscoveryClient clientdiscovery.CachedDiscoveryInterface
 	if discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg); err == nil {
 		cacheDir := computeDiscoverCacheDir(filepath.Join(homedir.HomeDir(), ".kube"), cfg.Host)
 		cachedDiscoveryClient = NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute))
