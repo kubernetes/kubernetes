@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	clientcache "k8s.io/kubernetes/pkg/client/cache"
+	utilnode "k8s.io/kubernetes/pkg/util/node"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 )
 
@@ -51,6 +52,9 @@ type NodeInfo struct {
 	// Whenever NodeInfo changes, generation is bumped.
 	// This is used to avoid cloning it if the object didn't change.
 	generation int64
+
+	// Zone to which this Node belongs.
+	zone string
 }
 
 // Resource is a collection of compute resource.
@@ -140,6 +144,7 @@ func (n *NodeInfo) Clone() *NodeInfo {
 		allocatableResource: &(*n.allocatableResource),
 		allowedPodNumber:    n.allowedPodNumber,
 		generation:          n.generation,
+		zone:                n.zone,
 	}
 	if len(n.pods) > 0 {
 		clone.pods = append([]*api.Pod(nil), n.pods...)
@@ -248,6 +253,7 @@ func (n *NodeInfo) SetNode(node *api.Node) error {
 	n.allocatableResource.Memory = node.Status.Allocatable.Memory().Value()
 	n.allocatableResource.NvidiaGPU = node.Status.Allocatable.NvidiaGPU().Value()
 	n.allowedPodNumber = int(node.Status.Allocatable.Pods().Value())
+	n.zone = utilnode.GetZoneKey(node)
 	n.generation++
 	return nil
 }
@@ -259,10 +265,15 @@ func (n *NodeInfo) RemoveNode(node *api.Node) error {
 	// and thus can potentially be observed later, even though they happened before
 	// node removal. This is handled correctly in cache.go file.
 	n.node = nil
+	n.zone = ""
 	n.allocatableResource = &Resource{}
 	n.allowedPodNumber = 0
 	n.generation++
 	return nil
+}
+
+func (n *NodeInfo) Zone() string {
+	return n.zone
 }
 
 // getPodKey returns the string key of a pod.

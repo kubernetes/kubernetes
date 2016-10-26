@@ -17,17 +17,13 @@ limitations under the License.
 package priorities
 
 import (
-	"sync"
-
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
-	utilnode "k8s.io/kubernetes/pkg/util/node"
-	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+
+	"github.com/golang/glog"
 )
 
 // The maximum priority value to give to a node
@@ -47,97 +43,86 @@ type SelectorSpread struct {
 func NewSelectorSpreadPriority(
 	serviceLister algorithm.ServiceLister,
 	controllerLister algorithm.ControllerLister,
-	replicaSetLister algorithm.ReplicaSetLister) algorithm.PriorityFunction {
+	replicaSetLister algorithm.ReplicaSetLister) (algorithm.PriorityMapFunction, algorithm.PriorityReduceFunction) {
 	selectorSpread := &SelectorSpread{
 		serviceLister:    serviceLister,
 		controllerLister: controllerLister,
 		replicaSetLister: replicaSetLister,
 	}
-	return selectorSpread.CalculateSpreadPriority
+	return selectorSpread.CalculateSpreadPriorityMap, selectorSpread.CalculateSpreadPriorityReduce
 }
 
-// Returns selectors of services, RCs and RSs matching the given pod.
-func getSelectors(pod *api.Pod, sl algorithm.ServiceLister, cl algorithm.ControllerLister, rsl algorithm.ReplicaSetLister) []labels.Selector {
-	selectors := make([]labels.Selector, 0, 3)
-	if services, err := sl.GetPodServices(pod); err == nil {
-		for _, service := range services {
-			selectors = append(selectors, labels.SelectorFromSet(service.Spec.Selector))
-		}
+func (s *SelectorSpread) CalculateSpreadPriorityMap(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
+	nodeName := nodeInfo.Node().Name
+	var selectors []labels.Selector
+	if priorityMeta, ok := meta.(*priorityMetadata); ok {
+		selectors = priorityMeta.controllerSelectors
+	} else {
+		// We couldn't parse metadata - fallback to computing it.
+		selectors = getSelectors(pod, s.serviceLister, s.controllerLister, s.replicaSetLister)
 	}
-	if rcs, err := cl.GetPodControllers(pod); err == nil {
-		for _, rc := range rcs {
-			selectors = append(selectors, labels.SelectorFromSet(rc.Spec.Selector))
-		}
+
+	if len(selectors) == 0 {
+		return schedulerapi.HostPriority{Host: nodeName, Score: 10}, nil
 	}
-	if rss, err := rsl.GetPodReplicaSets(pod); err == nil {
-		for _, rs := range rss {
-			if selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector); err == nil {
-				selectors = append(selectors, selector)
+
+	count := 0
+	for _, nodePod := range nodeInfo.Pods() {
+		if pod.Namespace != nodePod.Namespace {
+			continue
+		}
+		// When we are replacing a failed pod, we often see the previous
+		// deleted version while scheduling the replacement.
+		// Ignore the previous deleted version for spreading purposes
+		// (it can still be considered for resource restrictions etc.)
+		if nodePod.DeletionTimestamp != nil {
+			glog.V(4).Infof("skipping pending-deleted pod: %s/%s", nodePod.Namespace, nodePod.Name)
+			continue
+		}
+		matches := false
+		for _, selector := range selectors {
+			if selector.Matches(labels.Set(nodePod.ObjectMeta.Labels)) {
+				matches = true
+				break
 			}
 		}
+		if matches {
+			count++
+		}
 	}
-	return selectors
+
+	return schedulerapi.HostPriority{Host: nodeName, Score: count}, nil
 }
 
-func (s *SelectorSpread) getSelectors(pod *api.Pod) []labels.Selector {
-	return getSelectors(pod, s.serviceLister, s.controllerLister, s.replicaSetLister)
-}
+func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *api.Pod, meta interface{}, nodeNameToInfo map[string]*schedulercache.NodeInfo, result schedulerapi.HostPriorityList) error {
+	var selectors []labels.Selector
+	if priorityMeta, ok := meta.(*priorityMetadata); ok {
+		selectors = priorityMeta.controllerSelectors
+	} else {
+		// We couldn't parse metadata - fallback to computing it.
+		selectors = getSelectors(pod, s.serviceLister, s.controllerLister, s.replicaSetLister)
+	}
 
-// CalculateSpreadPriority spreads pods across hosts and zones, considering pods belonging to the same service or replication controller.
-// When a pod is scheduled, it looks for services, RCs or RSs that match the pod, then finds existing pods that match those selectors.
-// It favors nodes that have fewer existing matching pods.
-// i.e. it pushes the scheduler towards a node where there's the smallest number of
-// pods which match the same service, RC or RS selectors as the pod being scheduled.
-// Where zone information is included on the nodes, it favors nodes in zones with fewer existing matching pods.
-func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*api.Node) (schedulerapi.HostPriorityList, error) {
-	selectors := s.getSelectors(pod)
+	if len(selectors) == 0 {
+		return nil
+	}
 
-	// Count similar pods by node
-	countsByNodeName := make(map[string]float32, len(nodes))
-	countsByZone := make(map[string]float32, 10)
+	countsByNodeName := make(map[string]float32, len(result))
 	maxCountByNodeName := float32(0)
-	countsByNodeNameLock := sync.Mutex{}
+	countsByZone := make(map[string]float32, 10)
 
-	if len(selectors) > 0 {
-		processNodeFunc := func(i int) {
-			nodeName := nodes[i].Name
-			count := float32(0)
-			for _, nodePod := range nodeNameToInfo[nodeName].Pods() {
-				if pod.Namespace != nodePod.Namespace {
-					continue
-				}
-				// When we are replacing a failed pod, we often see the previous
-				// deleted version while scheduling the replacement.
-				// Ignore the previous deleted version for spreading purposes
-				// (it can still be considered for resource restrictions etc.)
-				if nodePod.DeletionTimestamp != nil {
-					glog.V(4).Infof("skipping pending-deleted pod: %s/%s", nodePod.Namespace, nodePod.Name)
-					continue
-				}
-				matches := false
-				for _, selector := range selectors {
-					if selector.Matches(labels.Set(nodePod.ObjectMeta.Labels)) {
-						matches = true
-						break
-					}
-				}
-				if matches {
-					count++
-				}
-			}
-			zoneId := utilnode.GetZoneKey(nodes[i])
+	for i := range result {
+		nodeName := result[i].Host
+		count := float32(result[i].Score)
+		zoneId := nodeNameToInfo[nodeName].Zone()
+		countsByNodeName[nodeName] = count
 
-			countsByNodeNameLock.Lock()
-			defer countsByNodeNameLock.Unlock()
-			countsByNodeName[nodeName] = count
-			if count > maxCountByNodeName {
-				maxCountByNodeName = count
-			}
-			if zoneId != "" {
-				countsByZone[zoneId] += count
-			}
+		if count > maxCountByNodeName {
+			maxCountByNodeName = count
 		}
-		workqueue.Parallelize(16, len(nodes), processNodeFunc)
+		if zoneId != "" {
+			countsByZone[zoneId] += count
+		}
 	}
 
 	// Aggregate by-zone information
@@ -150,35 +135,36 @@ func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, nodeNameToInfo ma
 		}
 	}
 
-	result := make(schedulerapi.HostPriorityList, 0, len(nodes))
 	//score int - scale of 0-maxPriority
 	// 0 being the lowest priority and maxPriority being the highest
-	for _, node := range nodes {
+	for i := range result {
+		nodeName := result[i].Host
 		// initializing to the default/max node score of maxPriority
 		fScore := maxPriority
 		if maxCountByNodeName > 0 {
-			fScore = maxPriority * ((maxCountByNodeName - countsByNodeName[node.Name]) / maxCountByNodeName)
+			fScore = maxPriority * ((maxCountByNodeName - countsByNodeName[nodeName]) / maxCountByNodeName)
 		}
 
 		// If there is zone information present, incorporate it
 		if haveZones {
-			zoneId := utilnode.GetZoneKey(node)
+			zoneId := nodeNameToInfo[nodeName].Zone()
 			if zoneId != "" {
 				zoneScore := maxPriority * ((maxCountByZone - countsByZone[zoneId]) / maxCountByZone)
 				fScore = (fScore * (1.0 - zoneWeighting)) + (zoneWeighting * zoneScore)
 			}
 		}
 
-		result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: int(fScore)})
+		result[i].Score = int(fScore)
 		if glog.V(10) {
 			// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
 			// not logged. There is visible performance gain from it.
 			glog.V(10).Infof(
-				"%v -> %v: SelectorSpreadPriority, Score: (%d)", pod.Name, node.Name, int(fScore),
+				"%v -> %v: SelectorSpreadPriority, Score: (%d)", pod.Name, nodeName, int(fScore),
 			)
 		}
 	}
-	return result, nil
+
+	return nil
 }
 
 type ServiceAntiAffinity struct {

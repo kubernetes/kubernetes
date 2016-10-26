@@ -23,6 +23,7 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/labels:go_default_library",
+        "//pkg/util/node:go_default_library",
         "//pkg/util/wait:go_default_library",
         "//plugin/pkg/scheduler/algorithm/priorities/util:go_default_library",
         "//vendor:github.com/golang/glog",

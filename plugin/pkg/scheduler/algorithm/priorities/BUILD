@@ -32,7 +32,6 @@ go_library(
         "//pkg/api/resource:go_default_library",
         "//pkg/api/unversioned:go_default_library",
         "//pkg/labels:go_default_library",
-        "//pkg/util/node:go_default_library",
         "//pkg/util/workqueue:go_default_library",
         "//plugin/pkg/scheduler/algorithm:go_default_library",
         "//plugin/pkg/scheduler/algorithm/predicates:go_default_library",
