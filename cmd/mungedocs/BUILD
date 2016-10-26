@@ -21,7 +21,6 @@ go_binary(
         "mungedocs.go",
         "preformatted.go",
         "toc.go",
-        "unversioned_warning.go",
         "util.go",
         "whitespace.go",
     ],

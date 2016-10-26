@@ -29,9 +29,6 @@ import (
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
-	intstr "k8s.io/kubernetes/pkg/util/intstr"
-	reflect "reflect"
-	unsafe "unsafe"
 )
 
 func init() {
@@ -118,6 +115,10 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_batch_JobSpec_To_v1beta1_JobSpec,
 		Convert_v1beta1_JobStatus_To_batch_JobStatus,
 		Convert_batch_JobStatus_To_v1beta1_JobStatus,
+		Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector,
+		Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector,
+		Convert_v1beta1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement,
+		Convert_unversioned_LabelSelectorRequirement_To_v1beta1_LabelSelectorRequirement,
 		Convert_v1beta1_NetworkPolicy_To_extensions_NetworkPolicy,
 		Convert_extensions_NetworkPolicy_To_v1beta1_NetworkPolicy,
 		Convert_v1beta1_NetworkPolicyIngressRule_To_extensions_NetworkPolicyIngressRule,
@@ -214,10 +215,16 @@ func Convert_extensions_CustomMetricCurrentStatus_To_v1beta1_CustomMetricCurrent
 }
 
 func autoConvert_v1beta1_CustomMetricCurrentStatusList_To_extensions_CustomMetricCurrentStatusList(in *CustomMetricCurrentStatusList, out *extensions.CustomMetricCurrentStatusList, s conversion.Scope) error {
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Items))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Items))
-		*outHdr = *inHdr
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]extensions.CustomMetricCurrentStatus, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_CustomMetricCurrentStatus_To_extensions_CustomMetricCurrentStatus(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
 	}
 	return nil
 }
@@ -227,10 +234,16 @@ func Convert_v1beta1_CustomMetricCurrentStatusList_To_extensions_CustomMetricCur
 }
 
 func autoConvert_extensions_CustomMetricCurrentStatusList_To_v1beta1_CustomMetricCurrentStatusList(in *extensions.CustomMetricCurrentStatusList, out *CustomMetricCurrentStatusList, s conversion.Scope) error {
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Items))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Items))
-		*outHdr = *inHdr
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]CustomMetricCurrentStatus, len(*in))
+		for i := range *in {
+			if err := Convert_extensions_CustomMetricCurrentStatus_To_v1beta1_CustomMetricCurrentStatus(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
 	}
 	return nil
 }
@@ -260,10 +273,16 @@ func Convert_extensions_CustomMetricTarget_To_v1beta1_CustomMetricTarget(in *ext
 }
 
 func autoConvert_v1beta1_CustomMetricTargetList_To_extensions_CustomMetricTargetList(in *CustomMetricTargetList, out *extensions.CustomMetricTargetList, s conversion.Scope) error {
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Items))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Items))
-		*outHdr = *inHdr
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]extensions.CustomMetricTarget, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_CustomMetricTarget_To_extensions_CustomMetricTarget(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
 	}
 	return nil
 }
@@ -273,10 +292,16 @@ func Convert_v1beta1_CustomMetricTargetList_To_extensions_CustomMetricTargetList
 }
 
 func autoConvert_extensions_CustomMetricTargetList_To_v1beta1_CustomMetricTargetList(in *extensions.CustomMetricTargetList, out *CustomMetricTargetList, s conversion.Scope) error {
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Items))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Items))
-		*outHdr = *inHdr
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]CustomMetricTarget, len(*in))
+		for i := range *in {
+			if err := Convert_extensions_CustomMetricTarget_To_v1beta1_CustomMetricTarget(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
 	}
 	return nil
 }
@@ -362,7 +387,15 @@ func Convert_extensions_DaemonSetList_To_v1beta1_DaemonSetList(in *extensions.Da
 }
 
 func autoConvert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *DaemonSetSpec, out *extensions.DaemonSetSpec, s conversion.Scope) error {
-	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = new(unversioned.LabelSelector)
+		if err := Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Selector = nil
+	}
 	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -374,7 +407,15 @@ func Convert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(in *DaemonSetSpec
 }
 
 func autoConvert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(in *extensions.DaemonSetSpec, out *DaemonSetSpec, s conversion.Scope) error {
-	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = new(LabelSelector)
+		if err := Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Selector = nil
+	}
 	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -487,10 +528,7 @@ func Convert_extensions_DeploymentList_To_v1beta1_DeploymentList(in *extensions.
 
 func autoConvert_v1beta1_DeploymentRollback_To_extensions_DeploymentRollback(in *DeploymentRollback, out *extensions.DeploymentRollback, s conversion.Scope) error {
 	out.Name = in.Name
-	{
-		m := (*map[string]string)(unsafe.Pointer(&in.UpdatedAnnotations))
-		out.UpdatedAnnotations = *m
-	}
+	out.UpdatedAnnotations = in.UpdatedAnnotations
 	if err := Convert_v1beta1_RollbackConfig_To_extensions_RollbackConfig(&in.RollbackTo, &out.RollbackTo, s); err != nil {
 		return err
 	}
@@ -503,10 +541,7 @@ func Convert_v1beta1_DeploymentRollback_To_extensions_DeploymentRollback(in *Dep
 
 func autoConvert_extensions_DeploymentRollback_To_v1beta1_DeploymentRollback(in *extensions.DeploymentRollback, out *DeploymentRollback, s conversion.Scope) error {
 	out.Name = in.Name
-	{
-		m := (*map[string]string)(unsafe.Pointer(&in.UpdatedAnnotations))
-		out.UpdatedAnnotations = *m
-	}
+	out.UpdatedAnnotations = in.UpdatedAnnotations
 	if err := Convert_extensions_RollbackConfig_To_v1beta1_RollbackConfig(&in.RollbackTo, &out.RollbackTo, s); err != nil {
 		return err
 	}
@@ -521,7 +556,15 @@ func autoConvert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *Deploym
 	if err := api.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
-	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = new(unversioned.LabelSelector)
+		if err := Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Selector = nil
+	}
 	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -529,9 +572,17 @@ func autoConvert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *Deploym
 		return err
 	}
 	out.MinReadySeconds = in.MinReadySeconds
-	out.RevisionHistoryLimit = (*int32)(unsafe.Pointer(in.RevisionHistoryLimit))
+	out.RevisionHistoryLimit = in.RevisionHistoryLimit
 	out.Paused = in.Paused
-	out.RollbackTo = (*extensions.RollbackConfig)(unsafe.Pointer(in.RollbackTo))
+	if in.RollbackTo != nil {
+		in, out := &in.RollbackTo, &out.RollbackTo
+		*out = new(extensions.RollbackConfig)
+		if err := Convert_v1beta1_RollbackConfig_To_extensions_RollbackConfig(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.RollbackTo = nil
+	}
 	return nil
 }
 
@@ -539,7 +590,15 @@ func autoConvert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensi
 	if err := api.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
-	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = new(LabelSelector)
+		if err := Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Selector = nil
+	}
 	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -547,9 +606,17 @@ func autoConvert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensi
 		return err
 	}
 	out.MinReadySeconds = in.MinReadySeconds
-	out.RevisionHistoryLimit = (*int32)(unsafe.Pointer(in.RevisionHistoryLimit))
+	out.RevisionHistoryLimit = in.RevisionHistoryLimit
 	out.Paused = in.Paused
-	out.RollbackTo = (*RollbackConfig)(unsafe.Pointer(in.RollbackTo))
+	if in.RollbackTo != nil {
+		in, out := &in.RollbackTo, &out.RollbackTo
+		*out = new(RollbackConfig)
+		if err := Convert_extensions_RollbackConfig_To_v1beta1_RollbackConfig(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.RollbackTo = nil
+	}
 	return nil
 }
 
@@ -629,10 +696,16 @@ func Convert_api_ExportOptions_To_v1beta1_ExportOptions(in *api.ExportOptions, o
 
 func autoConvert_v1beta1_FSGroupStrategyOptions_To_extensions_FSGroupStrategyOptions(in *FSGroupStrategyOptions, out *extensions.FSGroupStrategyOptions, s conversion.Scope) error {
 	out.Rule = extensions.FSGroupStrategyType(in.Rule)
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Ranges))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Ranges))
-		*outHdr = *inHdr
+	if in.Ranges != nil {
+		in, out := &in.Ranges, &out.Ranges
+		*out = make([]extensions.IDRange, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_IDRange_To_extensions_IDRange(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ranges = nil
 	}
 	return nil
 }
@@ -643,10 +716,16 @@ func Convert_v1beta1_FSGroupStrategyOptions_To_extensions_FSGroupStrategyOptions
 
 func autoConvert_extensions_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions(in *extensions.FSGroupStrategyOptions, out *FSGroupStrategyOptions, s conversion.Scope) error {
 	out.Rule = FSGroupStrategyType(in.Rule)
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Ranges))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Ranges))
-		*outHdr = *inHdr
+	if in.Ranges != nil {
+		in, out := &in.Ranges, &out.Ranges
+		*out = make([]IDRange, len(*in))
+		for i := range *in {
+			if err := Convert_extensions_IDRange_To_v1beta1_IDRange(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ranges = nil
 	}
 	return nil
 }
@@ -680,10 +759,16 @@ func Convert_extensions_HTTPIngressPath_To_v1beta1_HTTPIngressPath(in *extension
 }
 
 func autoConvert_v1beta1_HTTPIngressRuleValue_To_extensions_HTTPIngressRuleValue(in *HTTPIngressRuleValue, out *extensions.HTTPIngressRuleValue, s conversion.Scope) error {
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Paths))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Paths))
-		*outHdr = *inHdr
+	if in.Paths != nil {
+		in, out := &in.Paths, &out.Paths
+		*out = make([]extensions.HTTPIngressPath, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_HTTPIngressPath_To_extensions_HTTPIngressPath(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Paths = nil
 	}
 	return nil
 }
@@ -693,10 +778,16 @@ func Convert_v1beta1_HTTPIngressRuleValue_To_extensions_HTTPIngressRuleValue(in 
 }
 
 func autoConvert_extensions_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(in *extensions.HTTPIngressRuleValue, out *HTTPIngressRuleValue, s conversion.Scope) error {
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Paths))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Paths))
-		*outHdr = *inHdr
+	if in.Paths != nil {
+		in, out := &in.Paths, &out.Paths
+		*out = make([]HTTPIngressPath, len(*in))
+		for i := range *in {
+			if err := Convert_extensions_HTTPIngressPath_To_v1beta1_HTTPIngressPath(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Paths = nil
 	}
 	return nil
 }
@@ -783,7 +874,7 @@ func Convert_autoscaling_HorizontalPodAutoscalerList_To_v1beta1_HorizontalPodAut
 
 func autoConvert_v1beta1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec(in *HorizontalPodAutoscalerSpec, out *autoscaling.HorizontalPodAutoscalerSpec, s conversion.Scope) error {
 	// WARNING: in.ScaleRef requires manual conversion: does not exist in peer-type
-	out.MinReplicas = (*int32)(unsafe.Pointer(in.MinReplicas))
+	out.MinReplicas = in.MinReplicas
 	out.MaxReplicas = in.MaxReplicas
 	// WARNING: in.CPUUtilization requires manual conversion: does not exist in peer-type
 	return nil
@@ -791,18 +882,18 @@ func autoConvert_v1beta1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPo
 
 func autoConvert_autoscaling_HorizontalPodAutoscalerSpec_To_v1beta1_HorizontalPodAutoscalerSpec(in *autoscaling.HorizontalPodAutoscalerSpec, out *HorizontalPodAutoscalerSpec, s conversion.Scope) error {
 	// WARNING: in.ScaleTargetRef requires manual conversion: does not exist in peer-type
-	out.MinReplicas = (*int32)(unsafe.Pointer(in.MinReplicas))
+	out.MinReplicas = in.MinReplicas
 	out.MaxReplicas = in.MaxReplicas
 	// WARNING: in.TargetCPUUtilizationPercentage requires manual conversion: does not exist in peer-type
 	return nil
 }
 
 func autoConvert_v1beta1_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAutoscalerStatus(in *HorizontalPodAutoscalerStatus, out *autoscaling.HorizontalPodAutoscalerStatus, s conversion.Scope) error {
-	out.ObservedGeneration = (*int64)(unsafe.Pointer(in.ObservedGeneration))
-	out.LastScaleTime = (*unversioned.Time)(unsafe.Pointer(in.LastScaleTime))
+	out.ObservedGeneration = in.ObservedGeneration
+	out.LastScaleTime = in.LastScaleTime
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
-	out.CurrentCPUUtilizationPercentage = (*int32)(unsafe.Pointer(in.CurrentCPUUtilizationPercentage))
+	out.CurrentCPUUtilizationPercentage = in.CurrentCPUUtilizationPercentage
 	return nil
 }
 
@@ -811,11 +902,11 @@ func Convert_v1beta1_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodA
 }
 
 func autoConvert_autoscaling_HorizontalPodAutoscalerStatus_To_v1beta1_HorizontalPodAutoscalerStatus(in *autoscaling.HorizontalPodAutoscalerStatus, out *HorizontalPodAutoscalerStatus, s conversion.Scope) error {
-	out.ObservedGeneration = (*int64)(unsafe.Pointer(in.ObservedGeneration))
-	out.LastScaleTime = (*unversioned.Time)(unsafe.Pointer(in.LastScaleTime))
+	out.ObservedGeneration = in.ObservedGeneration
+	out.LastScaleTime = in.LastScaleTime
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
-	out.CurrentCPUUtilizationPercentage = (*int32)(unsafe.Pointer(in.CurrentCPUUtilizationPercentage))
+	out.CurrentCPUUtilizationPercentage = in.CurrentCPUUtilizationPercentage
 	return nil
 }
 
@@ -921,10 +1012,16 @@ func Convert_extensions_IngressBackend_To_v1beta1_IngressBackend(in *extensions.
 
 func autoConvert_v1beta1_IngressList_To_extensions_IngressList(in *IngressList, out *extensions.IngressList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Items))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Items))
-		*outHdr = *inHdr
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]extensions.Ingress, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_Ingress_To_extensions_Ingress(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
 	}
 	return nil
 }
@@ -935,10 +1032,16 @@ func Convert_v1beta1_IngressList_To_extensions_IngressList(in *IngressList, out 
 
 func autoConvert_extensions_IngressList_To_v1beta1_IngressList(in *extensions.IngressList, out *IngressList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Items))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Items))
-		*outHdr = *inHdr
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]Ingress, len(*in))
+		for i := range *in {
+			if err := Convert_extensions_Ingress_To_v1beta1_Ingress(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
 	}
 	return nil
 }
@@ -972,7 +1075,15 @@ func Convert_extensions_IngressRule_To_v1beta1_IngressRule(in *extensions.Ingres
 }
 
 func autoConvert_v1beta1_IngressRuleValue_To_extensions_IngressRuleValue(in *IngressRuleValue, out *extensions.IngressRuleValue, s conversion.Scope) error {
-	out.HTTP = (*extensions.HTTPIngressRuleValue)(unsafe.Pointer(in.HTTP))
+	if in.HTTP != nil {
+		in, out := &in.HTTP, &out.HTTP
+		*out = new(extensions.HTTPIngressRuleValue)
+		if err := Convert_v1beta1_HTTPIngressRuleValue_To_extensions_HTTPIngressRuleValue(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.HTTP = nil
+	}
 	return nil
 }
 
@@ -981,7 +1092,15 @@ func Convert_v1beta1_IngressRuleValue_To_extensions_IngressRuleValue(in *Ingress
 }
 
 func autoConvert_extensions_IngressRuleValue_To_v1beta1_IngressRuleValue(in *extensions.IngressRuleValue, out *IngressRuleValue, s conversion.Scope) error {
-	out.HTTP = (*HTTPIngressRuleValue)(unsafe.Pointer(in.HTTP))
+	if in.HTTP != nil {
+		in, out := &in.HTTP, &out.HTTP
+		*out = new(HTTPIngressRuleValue)
+		if err := Convert_extensions_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.HTTP = nil
+	}
 	return nil
 }
 
@@ -990,16 +1109,36 @@ func Convert_extensions_IngressRuleValue_To_v1beta1_IngressRuleValue(in *extensi
 }
 
 func autoConvert_v1beta1_IngressSpec_To_extensions_IngressSpec(in *IngressSpec, out *extensions.IngressSpec, s conversion.Scope) error {
-	out.Backend = (*extensions.IngressBackend)(unsafe.Pointer(in.Backend))
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.TLS))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.TLS))
-		*outHdr = *inHdr
+	if in.Backend != nil {
+		in, out := &in.Backend, &out.Backend
+		*out = new(extensions.IngressBackend)
+		if err := Convert_v1beta1_IngressBackend_To_extensions_IngressBackend(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Backend = nil
 	}
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Rules))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Rules))
-		*outHdr = *inHdr
+	if in.TLS != nil {
+		in, out := &in.TLS, &out.TLS
+		*out = make([]extensions.IngressTLS, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_IngressTLS_To_extensions_IngressTLS(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.TLS = nil
+	}
+	if in.Rules != nil {
+		in, out := &in.Rules, &out.Rules
+		*out = make([]extensions.IngressRule, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_IngressRule_To_extensions_IngressRule(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Rules = nil
 	}
 	return nil
 }
@@ -1009,16 +1148,36 @@ func Convert_v1beta1_IngressSpec_To_extensions_IngressSpec(in *IngressSpec, out 
 }
 
 func autoConvert_extensions_IngressSpec_To_v1beta1_IngressSpec(in *extensions.IngressSpec, out *IngressSpec, s conversion.Scope) error {
-	out.Backend = (*IngressBackend)(unsafe.Pointer(in.Backend))
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.TLS))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.TLS))
-		*outHdr = *inHdr
+	if in.Backend != nil {
+		in, out := &in.Backend, &out.Backend
+		*out = new(IngressBackend)
+		if err := Convert_extensions_IngressBackend_To_v1beta1_IngressBackend(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Backend = nil
 	}
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Rules))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Rules))
-		*outHdr = *inHdr
+	if in.TLS != nil {
+		in, out := &in.TLS, &out.TLS
+		*out = make([]IngressTLS, len(*in))
+		for i := range *in {
+			if err := Convert_extensions_IngressTLS_To_v1beta1_IngressTLS(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.TLS = nil
+	}
+	if in.Rules != nil {
+		in, out := &in.Rules, &out.Rules
+		*out = make([]IngressRule, len(*in))
+		for i := range *in {
+			if err := Convert_extensions_IngressRule_To_v1beta1_IngressRule(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Rules = nil
 	}
 	return nil
 }
@@ -1052,11 +1211,7 @@ func Convert_extensions_IngressStatus_To_v1beta1_IngressStatus(in *extensions.In
 }
 
 func autoConvert_v1beta1_IngressTLS_To_extensions_IngressTLS(in *IngressTLS, out *extensions.IngressTLS, s conversion.Scope) error {
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Hosts))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Hosts))
-		*outHdr = *inHdr
-	}
+	out.Hosts = in.Hosts
 	out.SecretName = in.SecretName
 	return nil
 }
@@ -1066,11 +1221,7 @@ func Convert_v1beta1_IngressTLS_To_extensions_IngressTLS(in *IngressTLS, out *ex
 }
 
 func autoConvert_extensions_IngressTLS_To_v1beta1_IngressTLS(in *extensions.IngressTLS, out *IngressTLS, s conversion.Scope) error {
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Hosts))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Hosts))
-		*outHdr = *inHdr
-	}
+	out.Hosts = in.Hosts
 	out.SecretName = in.SecretName
 	return nil
 }
@@ -1184,10 +1335,18 @@ func Convert_batch_JobList_To_v1beta1_JobList(in *batch.JobList, out *JobList, s
 }
 
 func autoConvert_v1beta1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpec, s conversion.Scope) error {
-	out.Parallelism = (*int32)(unsafe.Pointer(in.Parallelism))
-	out.Completions = (*int32)(unsafe.Pointer(in.Completions))
-	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
-	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Parallelism = in.Parallelism
+	out.Completions = in.Completions
+	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = new(unversioned.LabelSelector)
+		if err := Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Selector = nil
+	}
 	// WARNING: in.AutoSelector requires manual conversion: does not exist in peer-type
 	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
@@ -1196,10 +1355,18 @@ func autoConvert_v1beta1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpe
 }
 
 func autoConvert_batch_JobSpec_To_v1beta1_JobSpec(in *batch.JobSpec, out *JobSpec, s conversion.Scope) error {
-	out.Parallelism = (*int32)(unsafe.Pointer(in.Parallelism))
-	out.Completions = (*int32)(unsafe.Pointer(in.Completions))
-	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
-	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Parallelism = in.Parallelism
+	out.Completions = in.Completions
+	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = new(LabelSelector)
+		if err := Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Selector = nil
+	}
 	// WARNING: in.ManualSelector requires manual conversion: does not exist in peer-type
 	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
@@ -1208,13 +1375,19 @@ func autoConvert_batch_JobSpec_To_v1beta1_JobSpec(in *batch.JobSpec, out *JobSpe
 }
 
 func autoConvert_v1beta1_JobStatus_To_batch_JobStatus(in *JobStatus, out *batch.JobStatus, s conversion.Scope) error {
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Conditions))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Conditions))
-		*outHdr = *inHdr
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]batch.JobCondition, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_JobCondition_To_batch_JobCondition(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
 	}
-	out.StartTime = (*unversioned.Time)(unsafe.Pointer(in.StartTime))
-	out.CompletionTime = (*unversioned.Time)(unsafe.Pointer(in.CompletionTime))
+	out.StartTime = in.StartTime
+	out.CompletionTime = in.CompletionTime
 	out.Active = in.Active
 	out.Succeeded = in.Succeeded
 	out.Failed = in.Failed
@@ -1226,13 +1399,19 @@ func Convert_v1beta1_JobStatus_To_batch_JobStatus(in *JobStatus, out *batch.JobS
 }
 
 func autoConvert_batch_JobStatus_To_v1beta1_JobStatus(in *batch.JobStatus, out *JobStatus, s conversion.Scope) error {
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Conditions))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Conditions))
-		*outHdr = *inHdr
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]JobCondition, len(*in))
+		for i := range *in {
+			if err := Convert_batch_JobCondition_To_v1beta1_JobCondition(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
 	}
-	out.StartTime = (*unversioned.Time)(unsafe.Pointer(in.StartTime))
-	out.CompletionTime = (*unversioned.Time)(unsafe.Pointer(in.CompletionTime))
+	out.StartTime = in.StartTime
+	out.CompletionTime = in.CompletionTime
 	out.Active = in.Active
 	out.Succeeded = in.Succeeded
 	out.Failed = in.Failed
@@ -1241,6 +1420,68 @@ func autoConvert_batch_JobStatus_To_v1beta1_JobStatus(in *batch.JobStatus, out *
 
 func Convert_batch_JobStatus_To_v1beta1_JobStatus(in *batch.JobStatus, out *JobStatus, s conversion.Scope) error {
 	return autoConvert_batch_JobStatus_To_v1beta1_JobStatus(in, out, s)
+}
+
+func autoConvert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in *LabelSelector, out *unversioned.LabelSelector, s conversion.Scope) error {
+	out.MatchLabels = in.MatchLabels
+	if in.MatchExpressions != nil {
+		in, out := &in.MatchExpressions, &out.MatchExpressions
+		*out = make([]unversioned.LabelSelectorRequirement, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.MatchExpressions = nil
+	}
+	return nil
+}
+
+func Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in *LabelSelector, out *unversioned.LabelSelector, s conversion.Scope) error {
+	return autoConvert_v1beta1_LabelSelector_To_unversioned_LabelSelector(in, out, s)
+}
+
+func autoConvert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in *unversioned.LabelSelector, out *LabelSelector, s conversion.Scope) error {
+	out.MatchLabels = in.MatchLabels
+	if in.MatchExpressions != nil {
+		in, out := &in.MatchExpressions, &out.MatchExpressions
+		*out = make([]LabelSelectorRequirement, len(*in))
+		for i := range *in {
+			if err := Convert_unversioned_LabelSelectorRequirement_To_v1beta1_LabelSelectorRequirement(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.MatchExpressions = nil
+	}
+	return nil
+}
+
+func Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in *unversioned.LabelSelector, out *LabelSelector, s conversion.Scope) error {
+	return autoConvert_unversioned_LabelSelector_To_v1beta1_LabelSelector(in, out, s)
+}
+
+func autoConvert_v1beta1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement(in *LabelSelectorRequirement, out *unversioned.LabelSelectorRequirement, s conversion.Scope) error {
+	out.Key = in.Key
+	out.Operator = unversioned.LabelSelectorOperator(in.Operator)
+	out.Values = in.Values
+	return nil
+}
+
+func Convert_v1beta1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement(in *LabelSelectorRequirement, out *unversioned.LabelSelectorRequirement, s conversion.Scope) error {
+	return autoConvert_v1beta1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement(in, out, s)
+}
+
+func autoConvert_unversioned_LabelSelectorRequirement_To_v1beta1_LabelSelectorRequirement(in *unversioned.LabelSelectorRequirement, out *LabelSelectorRequirement, s conversion.Scope) error {
+	out.Key = in.Key
+	out.Operator = LabelSelectorOperator(in.Operator)
+	out.Values = in.Values
+	return nil
+}
+
+func Convert_unversioned_LabelSelectorRequirement_To_v1beta1_LabelSelectorRequirement(in *unversioned.LabelSelectorRequirement, out *LabelSelectorRequirement, s conversion.Scope) error {
+	return autoConvert_unversioned_LabelSelectorRequirement_To_v1beta1_LabelSelectorRequirement(in, out, s)
 }
 
 func autoConvert_v1beta1_NetworkPolicy_To_extensions_NetworkPolicy(in *NetworkPolicy, out *extensions.NetworkPolicy, s conversion.Scope) error {
@@ -1274,15 +1515,27 @@ func Convert_extensions_NetworkPolicy_To_v1beta1_NetworkPolicy(in *extensions.Ne
 }
 
 func autoConvert_v1beta1_NetworkPolicyIngressRule_To_extensions_NetworkPolicyIngressRule(in *NetworkPolicyIngressRule, out *extensions.NetworkPolicyIngressRule, s conversion.Scope) error {
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Ports))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Ports))
-		*outHdr = *inHdr
+	if in.Ports != nil {
+		in, out := &in.Ports, &out.Ports
+		*out = make([]extensions.NetworkPolicyPort, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_NetworkPolicyPort_To_extensions_NetworkPolicyPort(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ports = nil
 	}
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.From))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.From))
-		*outHdr = *inHdr
+	if in.From != nil {
+		in, out := &in.From, &out.From
+		*out = make([]extensions.NetworkPolicyPeer, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_NetworkPolicyPeer_To_extensions_NetworkPolicyPeer(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.From = nil
 	}
 	return nil
 }
@@ -1292,15 +1545,27 @@ func Convert_v1beta1_NetworkPolicyIngressRule_To_extensions_NetworkPolicyIngress
 }
 
 func autoConvert_extensions_NetworkPolicyIngressRule_To_v1beta1_NetworkPolicyIngressRule(in *extensions.NetworkPolicyIngressRule, out *NetworkPolicyIngressRule, s conversion.Scope) error {
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Ports))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Ports))
-		*outHdr = *inHdr
+	if in.Ports != nil {
+		in, out := &in.Ports, &out.Ports
+		*out = make([]NetworkPolicyPort, len(*in))
+		for i := range *in {
+			if err := Convert_extensions_NetworkPolicyPort_To_v1beta1_NetworkPolicyPort(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ports = nil
 	}
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.From))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.From))
-		*outHdr = *inHdr
+	if in.From != nil {
+		in, out := &in.From, &out.From
+		*out = make([]NetworkPolicyPeer, len(*in))
+		for i := range *in {
+			if err := Convert_extensions_NetworkPolicyPeer_To_v1beta1_NetworkPolicyPeer(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.From = nil
 	}
 	return nil
 }
@@ -1311,10 +1576,16 @@ func Convert_extensions_NetworkPolicyIngressRule_To_v1beta1_NetworkPolicyIngress
 
 func autoConvert_v1beta1_NetworkPolicyList_To_extensions_NetworkPolicyList(in *NetworkPolicyList, out *extensions.NetworkPolicyList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Items))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Items))
-		*outHdr = *inHdr
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]extensions.NetworkPolicy, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_NetworkPolicy_To_extensions_NetworkPolicy(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
 	}
 	return nil
 }
@@ -1325,10 +1596,16 @@ func Convert_v1beta1_NetworkPolicyList_To_extensions_NetworkPolicyList(in *Netwo
 
 func autoConvert_extensions_NetworkPolicyList_To_v1beta1_NetworkPolicyList(in *extensions.NetworkPolicyList, out *NetworkPolicyList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Items))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Items))
-		*outHdr = *inHdr
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]NetworkPolicy, len(*in))
+		for i := range *in {
+			if err := Convert_extensions_NetworkPolicy_To_v1beta1_NetworkPolicy(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
 	}
 	return nil
 }
@@ -1338,8 +1615,24 @@ func Convert_extensions_NetworkPolicyList_To_v1beta1_NetworkPolicyList(in *exten
 }
 
 func autoConvert_v1beta1_NetworkPolicyPeer_To_extensions_NetworkPolicyPeer(in *NetworkPolicyPeer, out *extensions.NetworkPolicyPeer, s conversion.Scope) error {
-	out.PodSelector = (*unversioned.LabelSelector)(unsafe.Pointer(in.PodSelector))
-	out.NamespaceSelector = (*unversioned.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
+	if in.PodSelector != nil {
+		in, out := &in.PodSelector, &out.PodSelector
+		*out = new(unversioned.LabelSelector)
+		if err := Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.PodSelector = nil
+	}
+	if in.NamespaceSelector != nil {
+		in, out := &in.NamespaceSelector, &out.NamespaceSelector
+		*out = new(unversioned.LabelSelector)
+		if err := Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.NamespaceSelector = nil
+	}
 	return nil
 }
 
@@ -1348,8 +1641,24 @@ func Convert_v1beta1_NetworkPolicyPeer_To_extensions_NetworkPolicyPeer(in *Netwo
 }
 
 func autoConvert_extensions_NetworkPolicyPeer_To_v1beta1_NetworkPolicyPeer(in *extensions.NetworkPolicyPeer, out *NetworkPolicyPeer, s conversion.Scope) error {
-	out.PodSelector = (*unversioned.LabelSelector)(unsafe.Pointer(in.PodSelector))
-	out.NamespaceSelector = (*unversioned.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
+	if in.PodSelector != nil {
+		in, out := &in.PodSelector, &out.PodSelector
+		*out = new(LabelSelector)
+		if err := Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.PodSelector = nil
+	}
+	if in.NamespaceSelector != nil {
+		in, out := &in.NamespaceSelector, &out.NamespaceSelector
+		*out = new(LabelSelector)
+		if err := Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.NamespaceSelector = nil
+	}
 	return nil
 }
 
@@ -1358,8 +1667,14 @@ func Convert_extensions_NetworkPolicyPeer_To_v1beta1_NetworkPolicyPeer(in *exten
 }
 
 func autoConvert_v1beta1_NetworkPolicyPort_To_extensions_NetworkPolicyPort(in *NetworkPolicyPort, out *extensions.NetworkPolicyPort, s conversion.Scope) error {
-	out.Protocol = (*api.Protocol)(unsafe.Pointer(in.Protocol))
-	out.Port = (*intstr.IntOrString)(unsafe.Pointer(in.Port))
+	if in.Protocol != nil {
+		in, out := &in.Protocol, &out.Protocol
+		*out = new(api.Protocol)
+		**out = api.Protocol(**in)
+	} else {
+		out.Protocol = nil
+	}
+	out.Port = in.Port
 	return nil
 }
 
@@ -1368,8 +1683,14 @@ func Convert_v1beta1_NetworkPolicyPort_To_extensions_NetworkPolicyPort(in *Netwo
 }
 
 func autoConvert_extensions_NetworkPolicyPort_To_v1beta1_NetworkPolicyPort(in *extensions.NetworkPolicyPort, out *NetworkPolicyPort, s conversion.Scope) error {
-	out.Protocol = (*v1.Protocol)(unsafe.Pointer(in.Protocol))
-	out.Port = (*intstr.IntOrString)(unsafe.Pointer(in.Port))
+	if in.Protocol != nil {
+		in, out := &in.Protocol, &out.Protocol
+		*out = new(v1.Protocol)
+		**out = v1.Protocol(**in)
+	} else {
+		out.Protocol = nil
+	}
+	out.Port = in.Port
 	return nil
 }
 
@@ -1378,11 +1699,19 @@ func Convert_extensions_NetworkPolicyPort_To_v1beta1_NetworkPolicyPort(in *exten
 }
 
 func autoConvert_v1beta1_NetworkPolicySpec_To_extensions_NetworkPolicySpec(in *NetworkPolicySpec, out *extensions.NetworkPolicySpec, s conversion.Scope) error {
-	out.PodSelector = in.PodSelector
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Ingress))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Ingress))
-		*outHdr = *inHdr
+	if err := Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(&in.PodSelector, &out.PodSelector, s); err != nil {
+		return err
+	}
+	if in.Ingress != nil {
+		in, out := &in.Ingress, &out.Ingress
+		*out = make([]extensions.NetworkPolicyIngressRule, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_NetworkPolicyIngressRule_To_extensions_NetworkPolicyIngressRule(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ingress = nil
 	}
 	return nil
 }
@@ -1392,11 +1721,19 @@ func Convert_v1beta1_NetworkPolicySpec_To_extensions_NetworkPolicySpec(in *Netwo
 }
 
 func autoConvert_extensions_NetworkPolicySpec_To_v1beta1_NetworkPolicySpec(in *extensions.NetworkPolicySpec, out *NetworkPolicySpec, s conversion.Scope) error {
-	out.PodSelector = in.PodSelector
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Ingress))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Ingress))
-		*outHdr = *inHdr
+	if err := Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(&in.PodSelector, &out.PodSelector, s); err != nil {
+		return err
+	}
+	if in.Ingress != nil {
+		in, out := &in.Ingress, &out.Ingress
+		*out = make([]NetworkPolicyIngressRule, len(*in))
+		for i := range *in {
+			if err := Convert_extensions_NetworkPolicyIngressRule_To_v1beta1_NetworkPolicyIngressRule(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ingress = nil
 	}
 	return nil
 }
@@ -1477,25 +1814,41 @@ func Convert_extensions_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyList(i
 
 func autoConvert_v1beta1_PodSecurityPolicySpec_To_extensions_PodSecurityPolicySpec(in *PodSecurityPolicySpec, out *extensions.PodSecurityPolicySpec, s conversion.Scope) error {
 	out.Privileged = in.Privileged
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.DefaultAddCapabilities))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.DefaultAddCapabilities))
-		*outHdr = *inHdr
+	if in.DefaultAddCapabilities != nil {
+		in, out := &in.DefaultAddCapabilities, &out.DefaultAddCapabilities
+		*out = make([]api.Capability, len(*in))
+		for i := range *in {
+			(*out)[i] = api.Capability((*in)[i])
+		}
+	} else {
+		out.DefaultAddCapabilities = nil
 	}
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.RequiredDropCapabilities))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.RequiredDropCapabilities))
-		*outHdr = *inHdr
+	if in.RequiredDropCapabilities != nil {
+		in, out := &in.RequiredDropCapabilities, &out.RequiredDropCapabilities
+		*out = make([]api.Capability, len(*in))
+		for i := range *in {
+			(*out)[i] = api.Capability((*in)[i])
+		}
+	} else {
+		out.RequiredDropCapabilities = nil
 	}
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.AllowedCapabilities))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.AllowedCapabilities))
-		*outHdr = *inHdr
+	if in.AllowedCapabilities != nil {
+		in, out := &in.AllowedCapabilities, &out.AllowedCapabilities
+		*out = make([]api.Capability, len(*in))
+		for i := range *in {
+			(*out)[i] = api.Capability((*in)[i])
+		}
+	} else {
+		out.AllowedCapabilities = nil
 	}
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Volumes))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Volumes))
-		*outHdr = *inHdr
+	if in.Volumes != nil {
+		in, out := &in.Volumes, &out.Volumes
+		*out = make([]extensions.FSType, len(*in))
+		for i := range *in {
+			(*out)[i] = extensions.FSType((*in)[i])
+		}
+	} else {
+		out.Volumes = nil
 	}
 	out.HostNetwork = in.HostNetwork
 	if in.HostPorts != nil {
@@ -1533,25 +1886,41 @@ func Convert_v1beta1_PodSecurityPolicySpec_To_extensions_PodSecurityPolicySpec(i
 
 func autoConvert_extensions_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(in *extensions.PodSecurityPolicySpec, out *PodSecurityPolicySpec, s conversion.Scope) error {
 	out.Privileged = in.Privileged
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.DefaultAddCapabilities))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.DefaultAddCapabilities))
-		*outHdr = *inHdr
+	if in.DefaultAddCapabilities != nil {
+		in, out := &in.DefaultAddCapabilities, &out.DefaultAddCapabilities
+		*out = make([]v1.Capability, len(*in))
+		for i := range *in {
+			(*out)[i] = v1.Capability((*in)[i])
+		}
+	} else {
+		out.DefaultAddCapabilities = nil
 	}
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.RequiredDropCapabilities))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.RequiredDropCapabilities))
-		*outHdr = *inHdr
+	if in.RequiredDropCapabilities != nil {
+		in, out := &in.RequiredDropCapabilities, &out.RequiredDropCapabilities
+		*out = make([]v1.Capability, len(*in))
+		for i := range *in {
+			(*out)[i] = v1.Capability((*in)[i])
+		}
+	} else {
+		out.RequiredDropCapabilities = nil
 	}
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.AllowedCapabilities))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.AllowedCapabilities))
-		*outHdr = *inHdr
+	if in.AllowedCapabilities != nil {
+		in, out := &in.AllowedCapabilities, &out.AllowedCapabilities
+		*out = make([]v1.Capability, len(*in))
+		for i := range *in {
+			(*out)[i] = v1.Capability((*in)[i])
+		}
+	} else {
+		out.AllowedCapabilities = nil
 	}
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Volumes))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Volumes))
-		*outHdr = *inHdr
+	if in.Volumes != nil {
+		in, out := &in.Volumes, &out.Volumes
+		*out = make([]FSType, len(*in))
+		for i := range *in {
+			(*out)[i] = FSType((*in)[i])
+		}
+	} else {
+		out.Volumes = nil
 	}
 	out.HostNetwork = in.HostNetwork
 	if in.HostPorts != nil {
@@ -1694,7 +2063,15 @@ func autoConvert_v1beta1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(in *Replica
 		return err
 	}
 	out.MinReadySeconds = in.MinReadySeconds
-	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = new(unversioned.LabelSelector)
+		if err := Convert_v1beta1_LabelSelector_To_unversioned_LabelSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Selector = nil
+	}
 	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -1706,7 +2083,15 @@ func autoConvert_extensions_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec(in *extensi
 		return err
 	}
 	out.MinReadySeconds = in.MinReadySeconds
-	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = new(LabelSelector)
+		if err := Convert_unversioned_LabelSelector_To_v1beta1_LabelSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Selector = nil
+	}
 	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -1719,10 +2104,16 @@ func autoConvert_v1beta1_ReplicaSetStatus_To_extensions_ReplicaSetStatus(in *Rep
 	out.ReadyReplicas = in.ReadyReplicas
 	out.AvailableReplicas = in.AvailableReplicas
 	out.ObservedGeneration = in.ObservedGeneration
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Conditions))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Conditions))
-		*outHdr = *inHdr
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]extensions.ReplicaSetCondition, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_ReplicaSetCondition_To_extensions_ReplicaSetCondition(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
 	}
 	return nil
 }
@@ -1737,10 +2128,16 @@ func autoConvert_extensions_ReplicaSetStatus_To_v1beta1_ReplicaSetStatus(in *ext
 	out.ReadyReplicas = in.ReadyReplicas
 	out.AvailableReplicas = in.AvailableReplicas
 	out.ObservedGeneration = in.ObservedGeneration
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Conditions))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Conditions))
-		*outHdr = *inHdr
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]ReplicaSetCondition, len(*in))
+		for i := range *in {
+			if err := Convert_extensions_ReplicaSetCondition_To_v1beta1_ReplicaSetCondition(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
 	}
 	return nil
 }
@@ -1797,10 +2194,16 @@ func autoConvert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDepl
 
 func autoConvert_v1beta1_RunAsUserStrategyOptions_To_extensions_RunAsUserStrategyOptions(in *RunAsUserStrategyOptions, out *extensions.RunAsUserStrategyOptions, s conversion.Scope) error {
 	out.Rule = extensions.RunAsUserStrategy(in.Rule)
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Ranges))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Ranges))
-		*outHdr = *inHdr
+	if in.Ranges != nil {
+		in, out := &in.Ranges, &out.Ranges
+		*out = make([]extensions.IDRange, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_IDRange_To_extensions_IDRange(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ranges = nil
 	}
 	return nil
 }
@@ -1811,10 +2214,16 @@ func Convert_v1beta1_RunAsUserStrategyOptions_To_extensions_RunAsUserStrategyOpt
 
 func autoConvert_extensions_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOptions(in *extensions.RunAsUserStrategyOptions, out *RunAsUserStrategyOptions, s conversion.Scope) error {
 	out.Rule = RunAsUserStrategy(in.Rule)
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Ranges))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Ranges))
-		*outHdr = *inHdr
+	if in.Ranges != nil {
+		in, out := &in.Ranges, &out.Ranges
+		*out = make([]IDRange, len(*in))
+		for i := range *in {
+			if err := Convert_extensions_IDRange_To_v1beta1_IDRange(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ranges = nil
 	}
 	return nil
 }
@@ -1825,7 +2234,16 @@ func Convert_extensions_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOpt
 
 func autoConvert_v1beta1_SELinuxStrategyOptions_To_extensions_SELinuxStrategyOptions(in *SELinuxStrategyOptions, out *extensions.SELinuxStrategyOptions, s conversion.Scope) error {
 	out.Rule = extensions.SELinuxStrategy(in.Rule)
-	out.SELinuxOptions = (*api.SELinuxOptions)(unsafe.Pointer(in.SELinuxOptions))
+	if in.SELinuxOptions != nil {
+		in, out := &in.SELinuxOptions, &out.SELinuxOptions
+		*out = new(api.SELinuxOptions)
+		// TODO: Inefficient conversion - can we improve it?
+		if err := s.Convert(*in, *out, 0); err != nil {
+			return err
+		}
+	} else {
+		out.SELinuxOptions = nil
+	}
 	return nil
 }
 
@@ -1835,7 +2253,16 @@ func Convert_v1beta1_SELinuxStrategyOptions_To_extensions_SELinuxStrategyOptions
 
 func autoConvert_extensions_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions(in *extensions.SELinuxStrategyOptions, out *SELinuxStrategyOptions, s conversion.Scope) error {
 	out.Rule = SELinuxStrategy(in.Rule)
-	out.SELinuxOptions = (*v1.SELinuxOptions)(unsafe.Pointer(in.SELinuxOptions))
+	if in.SELinuxOptions != nil {
+		in, out := &in.SELinuxOptions, &out.SELinuxOptions
+		*out = new(v1.SELinuxOptions)
+		// TODO: Inefficient conversion - can we improve it?
+		if err := s.Convert(*in, *out, 0); err != nil {
+			return err
+		}
+	} else {
+		out.SELinuxOptions = nil
+	}
 	return nil
 }
 
@@ -1912,10 +2339,16 @@ func autoConvert_extensions_ScaleStatus_To_v1beta1_ScaleStatus(in *extensions.Sc
 
 func autoConvert_v1beta1_SupplementalGroupsStrategyOptions_To_extensions_SupplementalGroupsStrategyOptions(in *SupplementalGroupsStrategyOptions, out *extensions.SupplementalGroupsStrategyOptions, s conversion.Scope) error {
 	out.Rule = extensions.SupplementalGroupsStrategyType(in.Rule)
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Ranges))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Ranges))
-		*outHdr = *inHdr
+	if in.Ranges != nil {
+		in, out := &in.Ranges, &out.Ranges
+		*out = make([]extensions.IDRange, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_IDRange_To_extensions_IDRange(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ranges = nil
 	}
 	return nil
 }
@@ -1926,10 +2359,16 @@ func Convert_v1beta1_SupplementalGroupsStrategyOptions_To_extensions_Supplementa
 
 func autoConvert_extensions_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions(in *extensions.SupplementalGroupsStrategyOptions, out *SupplementalGroupsStrategyOptions, s conversion.Scope) error {
 	out.Rule = SupplementalGroupsStrategyType(in.Rule)
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Ranges))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Ranges))
-		*outHdr = *inHdr
+	if in.Ranges != nil {
+		in, out := &in.Ranges, &out.Ranges
+		*out = make([]IDRange, len(*in))
+		for i := range *in {
+			if err := Convert_extensions_IDRange_To_v1beta1_IDRange(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Ranges = nil
 	}
 	return nil
 }
@@ -1944,10 +2383,16 @@ func autoConvert_v1beta1_ThirdPartyResource_To_extensions_ThirdPartyResource(in 
 		return err
 	}
 	out.Description = in.Description
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Versions))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Versions))
-		*outHdr = *inHdr
+	if in.Versions != nil {
+		in, out := &in.Versions, &out.Versions
+		*out = make([]extensions.APIVersion, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_APIVersion_To_extensions_APIVersion(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Versions = nil
 	}
 	return nil
 }
@@ -1962,10 +2407,16 @@ func autoConvert_extensions_ThirdPartyResource_To_v1beta1_ThirdPartyResource(in 
 		return err
 	}
 	out.Description = in.Description
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Versions))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Versions))
-		*outHdr = *inHdr
+	if in.Versions != nil {
+		in, out := &in.Versions, &out.Versions
+		*out = make([]APIVersion, len(*in))
+		for i := range *in {
+			if err := Convert_extensions_APIVersion_To_v1beta1_APIVersion(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Versions = nil
 	}
 	return nil
 }
@@ -1979,10 +2430,8 @@ func autoConvert_v1beta1_ThirdPartyResourceData_To_extensions_ThirdPartyResource
 	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
 		return err
 	}
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Data))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Data))
-		*outHdr = *inHdr
+	if err := conversion.Convert_Slice_byte_To_Slice_byte(&in.Data, &out.Data, s); err != nil {
+		return err
 	}
 	return nil
 }
@@ -1996,10 +2445,8 @@ func autoConvert_extensions_ThirdPartyResourceData_To_v1beta1_ThirdPartyResource
 	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
 		return err
 	}
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Data))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Data))
-		*outHdr = *inHdr
+	if err := conversion.Convert_Slice_byte_To_Slice_byte(&in.Data, &out.Data, s); err != nil {
+		return err
 	}
 	return nil
 }
@@ -2010,10 +2457,16 @@ func Convert_extensions_ThirdPartyResourceData_To_v1beta1_ThirdPartyResourceData
 
 func autoConvert_v1beta1_ThirdPartyResourceDataList_To_extensions_ThirdPartyResourceDataList(in *ThirdPartyResourceDataList, out *extensions.ThirdPartyResourceDataList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Items))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Items))
-		*outHdr = *inHdr
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]extensions.ThirdPartyResourceData, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_ThirdPartyResourceData_To_extensions_ThirdPartyResourceData(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
 	}
 	return nil
 }
@@ -2024,10 +2477,16 @@ func Convert_v1beta1_ThirdPartyResourceDataList_To_extensions_ThirdPartyResource
 
 func autoConvert_extensions_ThirdPartyResourceDataList_To_v1beta1_ThirdPartyResourceDataList(in *extensions.ThirdPartyResourceDataList, out *ThirdPartyResourceDataList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Items))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Items))
-		*outHdr = *inHdr
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]ThirdPartyResourceData, len(*in))
+		for i := range *in {
+			if err := Convert_extensions_ThirdPartyResourceData_To_v1beta1_ThirdPartyResourceData(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
 	}
 	return nil
 }
@@ -2038,10 +2497,16 @@ func Convert_extensions_ThirdPartyResourceDataList_To_v1beta1_ThirdPartyResource
 
 func autoConvert_v1beta1_ThirdPartyResourceList_To_extensions_ThirdPartyResourceList(in *ThirdPartyResourceList, out *extensions.ThirdPartyResourceList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Items))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Items))
-		*outHdr = *inHdr
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]extensions.ThirdPartyResource, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_ThirdPartyResource_To_extensions_ThirdPartyResource(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
 	}
 	return nil
 }
@@ -2052,10 +2517,16 @@ func Convert_v1beta1_ThirdPartyResourceList_To_extensions_ThirdPartyResourceList
 
 func autoConvert_extensions_ThirdPartyResourceList_To_v1beta1_ThirdPartyResourceList(in *extensions.ThirdPartyResourceList, out *ThirdPartyResourceList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Items))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Items))
-		*outHdr = *inHdr
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]ThirdPartyResource, len(*in))
+		for i := range *in {
+			if err := Convert_extensions_ThirdPartyResource_To_v1beta1_ThirdPartyResource(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
 	}
 	return nil
 }

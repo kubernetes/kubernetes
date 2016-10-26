@@ -621,9 +621,11 @@ func TestDeletePods(t *testing.T) {
 		},
 	}
 
-	o := DrainOptions{}
-	o.ifPrint = false
 	for _, test := range tests {
+		f, _, _, _ := cmdtesting.NewAPIFactory()
+		o := DrainOptions{}
+		o.mapper, _ = f.Object()
+		o.out = os.Stdout
 		_, pods := createPods(false)
 		pendingPods, err := o.waitForDelete(pods, test.interval, test.timeout, test.getPodFn)
 

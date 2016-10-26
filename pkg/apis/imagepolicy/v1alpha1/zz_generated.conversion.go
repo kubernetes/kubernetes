@@ -24,8 +24,6 @@ import (
 	imagepolicy "k8s.io/kubernetes/pkg/apis/imagepolicy"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
-	reflect "reflect"
-	unsafe "unsafe"
 )
 
 func init() {
@@ -102,15 +100,18 @@ func Convert_imagepolicy_ImageReviewContainerSpec_To_v1alpha1_ImageReviewContain
 }
 
 func autoConvert_v1alpha1_ImageReviewSpec_To_imagepolicy_ImageReviewSpec(in *ImageReviewSpec, out *imagepolicy.ImageReviewSpec, s conversion.Scope) error {
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Containers))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Containers))
-		*outHdr = *inHdr
+	if in.Containers != nil {
+		in, out := &in.Containers, &out.Containers
+		*out = make([]imagepolicy.ImageReviewContainerSpec, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha1_ImageReviewContainerSpec_To_imagepolicy_ImageReviewContainerSpec(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Containers = nil
 	}
-	{
-		m := (*map[string]string)(unsafe.Pointer(&in.Annotations))
-		out.Annotations = *m
-	}
+	out.Annotations = in.Annotations
 	out.Namespace = in.Namespace
 	return nil
 }
@@ -120,15 +121,18 @@ func Convert_v1alpha1_ImageReviewSpec_To_imagepolicy_ImageReviewSpec(in *ImageRe
 }
 
 func autoConvert_imagepolicy_ImageReviewSpec_To_v1alpha1_ImageReviewSpec(in *imagepolicy.ImageReviewSpec, out *ImageReviewSpec, s conversion.Scope) error {
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Containers))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Containers))
-		*outHdr = *inHdr
+	if in.Containers != nil {
+		in, out := &in.Containers, &out.Containers
+		*out = make([]ImageReviewContainerSpec, len(*in))
+		for i := range *in {
+			if err := Convert_imagepolicy_ImageReviewContainerSpec_To_v1alpha1_ImageReviewContainerSpec(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Containers = nil
 	}
-	{
-		m := (*map[string]string)(unsafe.Pointer(&in.Annotations))
-		out.Annotations = *m
-	}
+	out.Annotations = in.Annotations
 	out.Namespace = in.Namespace
 	return nil
 }

@@ -30272,7 +30272,7 @@
      },
      "selector": {
       "description": "Selector is a label query over pods that should match the pod count. Normally, the system sets this field for you. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
-      "$ref": "#/definitions/unversioned.LabelSelector"
+      "$ref": "#/definitions/v1.LabelSelector"
      },
      "template": {
       "description": "Template is the object that describes the pod that will be created when executing a job. More info: http://kubernetes.io/docs/user-guide/jobs",
@@ -30312,6 +30312,49 @@
       "description": "Succeeded is the number of pods which reached Phase Succeeded.",
       "type": "integer",
       "format": "int32"
+     }
+    }
+   },
+   "v1.LabelSelector": {
+    "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
+    "properties": {
+     "matchExpressions": {
+      "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1.LabelSelectorRequirement"
+      }
+     },
+     "matchLabels": {
+      "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "string"
+      }
+     }
+    }
+   },
+   "v1.LabelSelectorRequirement": {
+    "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+    "required": [
+     "key",
+     "operator"
+    ],
+    "properties": {
+     "key": {
+      "description": "key is the label key that the selector applies to.",
+      "type": "string"
+     },
+     "operator": {
+      "description": "operator represents a key's relationship to a set of values. Valid operators ard In, NotIn, Exists and DoesNotExist.",
+      "type": "string"
+     },
+     "values": {
+      "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
      }
     }
    },
@@ -32609,7 +32652,7 @@
     "properties": {
      "selector": {
       "description": "Selector is a label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
-      "$ref": "#/definitions/unversioned.LabelSelector"
+      "$ref": "#/definitions/v1beta1.LabelSelector"
      },
      "template": {
       "description": "Template is the object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template",
@@ -32739,7 +32782,7 @@
      },
      "selector": {
       "description": "Label selector for pods. Existing ReplicaSets whose pods are selected by this will be the ones affected by this deployment.",
-      "$ref": "#/definitions/unversioned.LabelSelector"
+      "$ref": "#/definitions/v1beta1.LabelSelector"
      },
      "strategy": {
       "description": "The deployment strategy to use to replace existing pods with new ones.",
@@ -33096,7 +33139,7 @@
      },
      "selector": {
       "description": "Selector is a label query over pods that should match the pod count. Normally, the system sets this field for you. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
-      "$ref": "#/definitions/unversioned.LabelSelector"
+      "$ref": "#/definitions/v1beta1.LabelSelector"
      },
      "template": {
       "description": "Template is the object that describes the pod that will be created when executing a job. More info: http://kubernetes.io/docs/user-guide/jobs",
@@ -33136,6 +33179,49 @@
       "description": "Succeeded is the number of pods which reached Phase Succeeded.",
       "type": "integer",
       "format": "int32"
+     }
+    }
+   },
+   "v1beta1.LabelSelector": {
+    "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
+    "properties": {
+     "matchExpressions": {
+      "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1beta1.LabelSelectorRequirement"
+      }
+     },
+     "matchLabels": {
+      "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "string"
+      }
+     }
+    }
+   },
+   "v1beta1.LabelSelectorRequirement": {
+    "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+    "required": [
+     "key",
+     "operator"
+    ],
+    "properties": {
+     "key": {
+      "description": "key is the label key that the selector applies to.",
+      "type": "string"
+     },
+     "operator": {
+      "description": "operator represents a key's relationship to a set of values. Valid operators ard In, NotIn, Exists and DoesNotExist.",
+      "type": "string"
+     },
+     "values": {
+      "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
      }
     }
    },
@@ -33212,11 +33298,11 @@
     "properties": {
      "namespaceSelector": {
       "description": "Selects Namespaces using cluster scoped-labels.  This matches all pods in all namespaces selected by this label selector. This field follows standard label selector semantics. If omitted, this selector selects no namespaces. If present but empty, this selector selects all namespaces.",
-      "$ref": "#/definitions/unversioned.LabelSelector"
+      "$ref": "#/definitions/v1beta1.LabelSelector"
      },
      "podSelector": {
       "description": "This is a label selector which selects Pods in this namespace. This field follows standard label selector semantics. If not provided, this selector selects no pods. If present but empty, this selector selects all pods in this namespace.",
-      "$ref": "#/definitions/unversioned.LabelSelector"
+      "$ref": "#/definitions/v1beta1.LabelSelector"
      }
     }
    },
@@ -33246,7 +33332,7 @@
      },
      "podSelector": {
       "description": "Selects the pods to which this NetworkPolicy object applies.  The array of ingress rules is applied to any pods selected by this field. Multiple network policies can select the same set of pods.  In this case, the ingress rules for each are combined additively. This field is NOT optional and follows standard label selector semantics. An empty podSelector matches all pods in this namespace.",
-      "$ref": "#/definitions/unversioned.LabelSelector"
+      "$ref": "#/definitions/v1beta1.LabelSelector"
      }
     }
    },
@@ -33343,7 +33429,7 @@
      },
      "selector": {
       "description": "Selector is a label query over pods that should match the replica count. If the selector is empty, it is defaulted to the labels present on the pod template. Label keys and values that must match in order to be controlled by this replica set. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
-      "$ref": "#/definitions/unversioned.LabelSelector"
+      "$ref": "#/definitions/v1beta1.LabelSelector"
      },
      "template": {
       "description": "Template is the object that describes the pod that will be created if insufficient replicas are detected. More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template",

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors.
 #
@@ -113,17 +113,14 @@ fi
 function get_latest_version_number {
   local -r latest_url="https://storage.googleapis.com/kubernetes-release/release/stable.txt"
   if [[ $(which wget) ]]; then
-    wget -qO- ${latest_url}
+    wget -qO- "${latest_url}"
   elif [[ $(which curl) ]]; then
-    curl -Ss ${latest_url}
+    curl -Ssf --retry 3 --keepalive-time 2 "${latest_url}"
   else
     echo "Couldn't find curl or wget.  Bailing out." >&2
     exit 4
   fi
 }
-
-release=${KUBERNETES_RELEASE:-$(get_latest_version_number)}
-release_url="${KUBERNETES_RELEASE_URL}/${release}/kubernetes.tar.gz"
 
 # TODO: remove client checks once kubernetes.tar.gz no longer includes client
 # binaries by default.
@@ -165,10 +162,36 @@ case "${machine}" in
 esac
 
 file=kubernetes.tar.gz
+release=${KUBERNETES_RELEASE:-$(get_latest_version_number)}
+release_url="${KUBERNETES_RELEASE_URL}/${release}/${file}"
 
-echo "Downloading kubernetes release ${release}"
-echo "  from ${release_url}"
-echo "  to ${PWD}/kubernetes.tar.gz"
+need_download=true
+if [[ -r "${PWD}/${file}" ]]; then
+  downloaded_version=$(tar -xzOf "${PWD}/${file}" kubernetes/version 2>/dev/null || true)
+  echo "Found preexisting ${file}, release ${downloaded_version}"
+  if [[ "${downloaded_version}" == "${release}" ]]; then
+    echo "Using preexisting kubernetes.tar.gz"
+    need_download=false
+  fi
+fi
+
+if "${need_download}"; then
+  echo "Downloading kubernetes release ${release}"
+  echo "  from ${release_url}"
+  echo "  to ${PWD}/${file}"
+fi
+
+if [[ -e "${PWD}/kubernetes" ]]; then
+  # Let's try not to accidentally nuke something that isn't a kubernetes
+  # release dir.
+  if [[ ! -f "${PWD}/kubernetes/version" ]]; then
+    echo "${PWD}/kubernetes exists but does not look like a Kubernetes release."
+    echo "Aborting!"
+    exit 5
+  fi
+  echo "Will also delete preexisting 'kubernetes' directory."
+fi
+
 if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
   echo "Is this ok? [Y]/n"
   read confirm
@@ -178,16 +201,19 @@ if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
   fi
 fi
 
-if [[ $(which curl) ]]; then
-  curl -L -z ${file} ${release_url} -o ${file}
-elif [[ $(which wget) ]]; then
-  wget -N ${release_url}
-else
-  echo "Couldn't find curl or wget.  Bailing out."
-  exit 1
+if "${need_download}"; then
+  if [[ $(which curl) ]]; then
+    curl -L --retry 3 --keepalive-time 2 "${release_url}" -o "${file}"
+  elif [[ $(which wget) ]]; then
+    wget "${release_url}"
+  else
+    echo "Couldn't find curl or wget.  Bailing out."
+    exit 1
+  fi
 fi
 
 echo "Unpacking kubernetes release ${release}"
+rm -rf "${PWD}/kubernetes"
 tar -xzf ${file}
 
 download_kube_binaries
