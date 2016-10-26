@@ -21,6 +21,7 @@ import (
 	v1 "k8s.io/client-go/pkg/api/v1"
 	v1alpha1 "k8s.io/client-go/pkg/apis/rbac/v1alpha1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // RoleBindingsGetter has a method to return a RoleBindingInterface.
@@ -44,14 +45,14 @@ type RoleBindingInterface interface {
 
 // roleBindings implements RoleBindingInterface
 type roleBindings struct {
-	client *RbacClient
+	client rest.Interface
 	ns     string
 }
 
 // newRoleBindings returns a RoleBindings
 func newRoleBindings(c *RbacClient, namespace string) *roleBindings {
 	return &roleBindings{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

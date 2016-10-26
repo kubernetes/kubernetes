@@ -16,6 +16,7 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=package,register
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/policy
+// +k8s:defaulter-gen=TypeMeta
 
 // Package policy is for any kind of policy object.  Suitable examples, even if
 // they aren't all here, are PodDisruptionBudget, PodSecurityPolicy,

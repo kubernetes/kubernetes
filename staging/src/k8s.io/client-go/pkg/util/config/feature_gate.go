@@ -49,7 +49,7 @@ var (
 	// represented here.
 	knownFeatures = map[string]featureSpec{
 		allAlphaGate:              {false, alpha},
-		externalTrafficLocalOnly:  {false, alpha},
+		externalTrafficLocalOnly:  {true, beta},
 		appArmor:                  {true, beta},
 		dynamicKubeletConfig:      {false, alpha},
 		dynamicVolumeProvisioning: {true, alpha},
