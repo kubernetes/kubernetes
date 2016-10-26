@@ -462,7 +462,21 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 }
 
 // Implements storage.Interface.
-func (c *Cacher) GuaranteedUpdate(ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool, preconditions *Preconditions, tryUpdate UpdateFunc) error {
+func (c *Cacher) GuaranteedUpdate(
+	ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool,
+	preconditions *Preconditions, tryUpdate UpdateFunc, _ ...runtime.Object) error {
+	// Ignore the suggestion and try to pass down the current version of the object
+	// read from cache.
+	if elem, exists, err := c.watchCache.GetByKey(key); err != nil {
+		glog.Errorf("GetByKey returned error: %v", err)
+	} else if exists {
+		currObj, copyErr := api.Scheme.Copy(elem.(*storeElement).Object)
+		if copyErr == nil {
+			return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, currObj)
+		}
+		glog.Errorf("couldn't copy object: %v", copyErr)
+	}
+	// If we couldn't get the object, fallback to no-suggestion.
 	return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate)
 }
 
