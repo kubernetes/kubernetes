@@ -49,10 +49,6 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_batch_JobSpec_To_v1_JobSpec,
 		Convert_v1_JobStatus_To_batch_JobStatus,
 		Convert_batch_JobStatus_To_v1_JobStatus,
-		Convert_v1_LabelSelector_To_unversioned_LabelSelector,
-		Convert_unversioned_LabelSelector_To_v1_LabelSelector,
-		Convert_v1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement,
-		Convert_unversioned_LabelSelectorRequirement_To_v1_LabelSelectorRequirement,
 	)
 }
 
@@ -176,7 +172,7 @@ func autoConvert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *JobSpec, s 
 	out.Parallelism = (*int32)(unsafe.Pointer(in.Parallelism))
 	out.Completions = (*int32)(unsafe.Pointer(in.Completions))
 	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
-	out.Selector = (*LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
 	out.ManualSelector = (*bool)(unsafe.Pointer(in.ManualSelector))
 	if err := api_v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
@@ -218,68 +214,4 @@ func autoConvert_batch_JobStatus_To_v1_JobStatus(in *batch.JobStatus, out *JobSt
 
 func Convert_batch_JobStatus_To_v1_JobStatus(in *batch.JobStatus, out *JobStatus, s conversion.Scope) error {
 	return autoConvert_batch_JobStatus_To_v1_JobStatus(in, out, s)
-}
-
-func autoConvert_v1_LabelSelector_To_unversioned_LabelSelector(in *LabelSelector, out *unversioned.LabelSelector, s conversion.Scope) error {
-	{
-		m := (*map[string]string)(unsafe.Pointer(&in.MatchLabels))
-		out.MatchLabels = *m
-	}
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.MatchExpressions))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.MatchExpressions))
-		*outHdr = *inHdr
-	}
-	return nil
-}
-
-func Convert_v1_LabelSelector_To_unversioned_LabelSelector(in *LabelSelector, out *unversioned.LabelSelector, s conversion.Scope) error {
-	return autoConvert_v1_LabelSelector_To_unversioned_LabelSelector(in, out, s)
-}
-
-func autoConvert_unversioned_LabelSelector_To_v1_LabelSelector(in *unversioned.LabelSelector, out *LabelSelector, s conversion.Scope) error {
-	{
-		m := (*map[string]string)(unsafe.Pointer(&in.MatchLabels))
-		out.MatchLabels = *m
-	}
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.MatchExpressions))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.MatchExpressions))
-		*outHdr = *inHdr
-	}
-	return nil
-}
-
-func Convert_unversioned_LabelSelector_To_v1_LabelSelector(in *unversioned.LabelSelector, out *LabelSelector, s conversion.Scope) error {
-	return autoConvert_unversioned_LabelSelector_To_v1_LabelSelector(in, out, s)
-}
-
-func autoConvert_v1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement(in *LabelSelectorRequirement, out *unversioned.LabelSelectorRequirement, s conversion.Scope) error {
-	out.Key = in.Key
-	out.Operator = unversioned.LabelSelectorOperator(in.Operator)
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Values))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Values))
-		*outHdr = *inHdr
-	}
-	return nil
-}
-
-func Convert_v1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement(in *LabelSelectorRequirement, out *unversioned.LabelSelectorRequirement, s conversion.Scope) error {
-	return autoConvert_v1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement(in, out, s)
-}
-
-func autoConvert_unversioned_LabelSelectorRequirement_To_v1_LabelSelectorRequirement(in *unversioned.LabelSelectorRequirement, out *LabelSelectorRequirement, s conversion.Scope) error {
-	out.Key = in.Key
-	out.Operator = LabelSelectorOperator(in.Operator)
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Values))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Values))
-		*outHdr = *inHdr
-	}
-	return nil
-}
-
-func Convert_unversioned_LabelSelectorRequirement_To_v1_LabelSelectorRequirement(in *unversioned.LabelSelectorRequirement, out *LabelSelectorRequirement, s conversion.Scope) error {
-	return autoConvert_unversioned_LabelSelectorRequirement_To_v1_LabelSelectorRequirement(in, out, s)
 }

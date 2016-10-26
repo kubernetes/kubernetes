@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/api/install"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	. "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -67,7 +68,7 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 					Labels: defaultLabels,
 				},
 				Spec: DaemonSetSpec{
-					Selector: &LabelSelector{
+					Selector: &unversioned.LabelSelector{
 						MatchLabels: defaultLabels,
 					},
 					Template: defaultTemplate,
@@ -92,7 +93,7 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 					},
 				},
 				Spec: DaemonSetSpec{
-					Selector: &LabelSelector{
+					Selector: &unversioned.LabelSelector{
 						MatchLabels: defaultLabels,
 					},
 					Template: defaultTemplate,
@@ -449,18 +450,18 @@ func TestSetDefaultJob(t *testing.T) {
 func TestSetDefaultJobSelector(t *testing.T) {
 	tests := []struct {
 		original         *Job
-		expectedSelector *LabelSelector
+		expectedSelector *unversioned.LabelSelector
 	}{
 		// selector set explicitly, nil autoSelector
 		{
 			original: &Job{
 				Spec: JobSpec{
-					Selector: &LabelSelector{
+					Selector: &unversioned.LabelSelector{
 						MatchLabels: map[string]string{"job": "selector"},
 					},
 				},
 			},
-			expectedSelector: &LabelSelector{
+			expectedSelector: &unversioned.LabelSelector{
 				MatchLabels: map[string]string{"job": "selector"},
 			},
 		},
@@ -468,13 +469,13 @@ func TestSetDefaultJobSelector(t *testing.T) {
 		{
 			original: &Job{
 				Spec: JobSpec{
-					Selector: &LabelSelector{
+					Selector: &unversioned.LabelSelector{
 						MatchLabels: map[string]string{"job": "selector"},
 					},
 					AutoSelector: newBool(true),
 				},
 			},
-			expectedSelector: &LabelSelector{
+			expectedSelector: &unversioned.LabelSelector{
 				MatchLabels: map[string]string{"job": "selector"},
 			},
 		},
@@ -482,13 +483,13 @@ func TestSetDefaultJobSelector(t *testing.T) {
 		{
 			original: &Job{
 				Spec: JobSpec{
-					Selector: &LabelSelector{
+					Selector: &unversioned.LabelSelector{
 						MatchLabels: map[string]string{"job": "selector"},
 					},
 					AutoSelector: newBool(false),
 				},
 			},
-			expectedSelector: &LabelSelector{
+			expectedSelector: &unversioned.LabelSelector{
 				MatchLabels: map[string]string{"job": "selector"},
 			},
 		},
@@ -503,7 +504,7 @@ func TestSetDefaultJobSelector(t *testing.T) {
 					},
 				},
 			},
-			expectedSelector: &LabelSelector{
+			expectedSelector: &unversioned.LabelSelector{
 				MatchLabels: map[string]string{"job": "selector"},
 			},
 		},
@@ -519,7 +520,7 @@ func TestSetDefaultJobSelector(t *testing.T) {
 					AutoSelector: newBool(false),
 				},
 			},
-			expectedSelector: &LabelSelector{
+			expectedSelector: &unversioned.LabelSelector{
 				MatchLabels: map[string]string{"job": "selector"},
 			},
 		},
@@ -601,7 +602,7 @@ func TestSetDefaultReplicaSet(t *testing.T) {
 					},
 				},
 				Spec: ReplicaSetSpec{
-					Selector: &LabelSelector{
+					Selector: &unversioned.LabelSelector{
 						MatchLabels: map[string]string{
 							"some": "other",
 						},
@@ -621,7 +622,7 @@ func TestSetDefaultReplicaSet(t *testing.T) {
 		{
 			rs: &ReplicaSet{
 				Spec: ReplicaSetSpec{
-					Selector: &LabelSelector{
+					Selector: &unversioned.LabelSelector{
 						MatchLabels: map[string]string{
 							"some": "other",
 						},
