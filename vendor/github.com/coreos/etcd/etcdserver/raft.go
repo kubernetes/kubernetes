@@ -124,6 +124,46 @@ type raftNode struct {
 	done    chan struct{}
 }
 
+func (s *EtcdServer) send(ms []raftpb.Message) {
+	sentAppResp := false
+	for i := len(ms) - 1; i >= 0; i-- {
+		if s.cluster.IsIDRemoved(types.ID(ms[i].To)) {
+			ms[i].To = 0
+		}
+
+		if ms[i].Type == raftpb.MsgAppResp {
+			if sentAppResp {
+				ms[i].To = 0
+			} else {
+				sentAppResp = true
+			}
+		}
+
+		if ms[i].Type == raftpb.MsgSnap {
+			// There are two separate data store: the store for v2, and the KV for v3.
+			// The msgSnap only contains the most recent snapshot of store without KV.
+			// So we need to redirect the msgSnap to etcd server main loop for merging in the
+			// current store snapshot and KV snapshot.
+			select {
+			case s.msgSnapC <- ms[i]:
+			default:
+				// drop msgSnap if the inflight chan if full.
+			}
+			ms[i].To = 0
+		}
+		if ms[i].Type == raftpb.MsgHeartbeat {
+			ok, exceed := s.r.td.Observe(ms[i].To)
+			if !ok {
+				// TODO: limit request rate.
+				plog.Warningf("failed to send out heartbeat on time (exceeded the %dms timeout for %v)", s.Cfg.TickMs, exceed)
+				plog.Warningf("server is likely overloaded")
+			}
+		}
+	}
+
+	s.r.transport.Send(ms)
+}
+
 // start prepares and starts raftNode in a new goroutine. It is no longer safe
 // to modify the fields after it has been started.
 // TODO: Ideally raftNode should get rid of the passed in server structure.
