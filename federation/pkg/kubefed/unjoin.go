@@ -84,7 +84,7 @@ func unjoinFederation(f cmdutil.Factory, cmdOut, cmdErr io.Writer, config util.A
 	// We want a separate client factory to communicate with the
 	// federation host cluster. See join_federation.go for details.
 	hostFactory := config.HostFactory(unjoinFlags.Host, unjoinFlags.Kubeconfig)
-	err = deleteSecret(hostFactory, cluster.Spec.SecretRef.Name, unjoinFlags.HostSystemNamespace)
+	err = deleteSecret(hostFactory, cluster.Spec.SecretRef.Name, unjoinFlags.FederationSystemNamespace)
 	if isNotFound(err) {
 		fmt.Fprintf(cmdErr, "WARNING: secret %q not found in the host cluster, so it couldn't be deleted", cluster.Spec.SecretRef.Name)
 	} else if err != nil {
