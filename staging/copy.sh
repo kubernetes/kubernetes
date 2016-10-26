@@ -82,6 +82,8 @@ rm "${CLIENT_REPO_TEMP}"/pkg/client/unversioned/portforward/portforward_test.go
 
 pushd "${CLIENT_REPO_TEMP}" > /dev/null
 echo "generating vendor/"
+# debugging
+git status
 GO15VENDOREXPERIMENT=1 godep save ./...
 popd > /dev/null
 
