@@ -187,7 +187,7 @@ func (d *CachedDiscoveryClient) SwaggerSchema(version unversioned.GroupVersion) 
 	return d.delegate.SwaggerSchema(version)
 }
 
-func (d* CachedDiscoveryClient) Fresh() bool {
+func (d *CachedDiscoveryClient) Fresh() bool {
 	return d.age.IsZero() || d.age.After(d.startedAt)
 }
 
