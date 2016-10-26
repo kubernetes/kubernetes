@@ -392,8 +392,9 @@ func TestProxyUpgrade(t *testing.T) {
 				serverURL, _ := url.Parse(backendServer.URL)
 				serverURL.Path = backendPath
 				proxyHandler := &UpgradeAwareProxyHandler{
-					Location:  serverURL,
-					Transport: tc.ProxyTransport,
+					Location:           serverURL,
+					Transport:          tc.ProxyTransport,
+					InterceptRedirects: redirect,
 				}
 				proxy := httptest.NewServer(proxyHandler)
 				defer proxy.Close()
