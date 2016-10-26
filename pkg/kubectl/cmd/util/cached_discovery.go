@@ -170,7 +170,7 @@ func (d *CachedDiscoveryClient) writeCachedFile(filename string, obj runtime.Obj
 		return err
 	}
 
-	f, err := ioutil.TempFile(filepath.Dir(filename), filepath.Base(filename) + ".")
+	f, err := ioutil.TempFile(filepath.Dir(filename), filepath.Base(filename)+".")
 	if err != nil {
 		return err
 	}
