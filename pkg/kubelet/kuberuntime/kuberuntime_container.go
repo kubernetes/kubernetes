@@ -151,6 +151,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 		Labels:      newContainerLabels(container, pod),
 		Annotations: newContainerAnnotations(container, pod, restartCount),
 		Mounts:      m.makeMounts(opts, container, podHasSELinuxLabel),
+		Devices:     makeDevices(opts),
 		LogPath:     &containerLogsPath,
 		Stdin:       &container.Stdin,
 		StdinOnce:   &container.StdinOnce,
@@ -249,6 +250,22 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *api.
 	}
 
 	return linuxConfig
+}
+
+// makeDevices generates container devices for kubelet runtime api.
+func makeDevices(opts *kubecontainer.RunContainerOptions) []*runtimeApi.Device {
+	devices := make([]*runtimeApi.Device, len(opts.Devices))
+
+	for idx := range opts.Devices {
+		device := opts.Devices[idx]
+		devices[idx] = &runtimeApi.Device{
+			HostPath:      &device.PathOnHost,
+			ContainerPath: &device.PathInContainer,
+			Permissions:   &device.Permissions,
+		}
+	}
+
+	return devices
 }
 
 // makeMounts generates container volume mounts for kubelet runtime api.
