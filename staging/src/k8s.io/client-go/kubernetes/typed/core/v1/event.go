@@ -20,6 +20,7 @@ import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // EventsGetter has a method to return a EventInterface.
@@ -43,14 +44,14 @@ type EventInterface interface {
 
 // events implements EventInterface
 type events struct {
-	client *CoreClient
+	client rest.Interface
 	ns     string
 }
 
 // newEvents returns a Events
 func newEvents(c *CoreClient, namespace string) *events {
 	return &events{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

@@ -207,6 +207,10 @@ type KubeletConfiguration struct {
 	// default /var/run/kubernetes). If tlsCertFile and tlsPrivateKeyFile
 	// are provided, this flag will be ignored.
 	CertDirectory string `json:"certDirectory"`
+	// authentication specifies how requests to the Kubelet's server are authenticated
+	Authentication KubeletAuthentication `json:"authentication"`
+	// authorization specifies how requests to the Kubelet's server are authorized
+	Authorization KubeletAuthorization `json:"authorization"`
 	// hostnameOverride is the hostname used to identify the kubelet instead
 	// of the actual hostname.
 	HostnameOverride string `json:"hostnameOverride"`
@@ -343,8 +347,10 @@ type KubeletConfiguration struct {
 	// Enable QoS based Cgroup hierarchy: top level cgroups for QoS Classes
 	// And all Burstable and BestEffort pods are brought up under their
 	// specific top level QoS cgroup.
+	// +optional
 	CgroupsPerQOS *bool `json:"cgroupsPerQOS,omitempty"`
 	// driver that the kubelet uses to manipulate cgroups on the host (cgroupfs or systemd)
+	// +optional
 	CgroupDriver string `json:"cgroupDriver,omitempty"`
 	// containerRuntime is the container runtime to use.
 	ContainerRuntime string `json:"containerRuntime"`
@@ -358,6 +364,11 @@ type KubeletConfiguration struct {
 	// rktPath is the  path of rkt binary. Leave empty to use the first rkt in
 	// $PATH.
 	RktPath string `json:"rktPath"`
+	// experimentalMounterPath is the path to mounter binary. If not set, kubelet will attempt to use mount
+	// binary that is available via $PATH,
+	ExperimentalMounterPath string `json:"experimentalMounterPath,omitempty"`
+	// experimentalMounterRootfsPath is the absolute path to root filesystem for the mounter binary.
+	ExperimentalMounterRootfsPath string `json:"experimentalMounterRootfsPath,omitempty"`
 	// rktApiEndpoint is the endpoint of the rkt API service to communicate with.
 	RktAPIEndpoint string `json:"rktAPIEndpoint"`
 	// rktStage1Image is the image to use as stage1. Local paths and
@@ -372,18 +383,14 @@ type KubeletConfiguration struct {
 	// This will cause the kubelet to listen to inotify events on the lock file,
 	// releasing it and exiting when another process tries to open that file.
 	ExitOnLockContention bool `json:"exitOnLockContention"`
-	// configureCBR0 enables the kublet to configure cbr0 based on
-	// Node.Spec.PodCIDR.
-	ConfigureCBR0 *bool `json:"configureCbr0"`
 	// How should the kubelet configure the container bridge for hairpin packets.
 	// Setting this flag allows endpoints in a Service to loadbalance back to
 	// themselves if they should try to access their own Service. Values:
 	//   "promiscuous-bridge": make the container bridge promiscuous.
 	//   "hairpin-veth":       set the hairpin flag on container veth interfaces.
 	//   "none":               do nothing.
-	// Setting --configure-cbr0 to false implies that to achieve hairpin NAT
-	// one must set --hairpin-mode=veth-flag, because bridge assumes the
-	// existence of a container bridge named cbr0.
+	// Generally, one must set --hairpin-mode=veth-flag to achieve hairpin NAT,
+	// because promiscous-bridge assumes the existence of a container bridge named cbr0.
 	HairpinMode string `json:"hairpinMode"`
 	// The node has babysitter process monitoring docker and kubelet.
 	BabysitDaemons bool `json:"babysitDaemons"`
@@ -409,10 +416,10 @@ type KubeletConfiguration struct {
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
 	MaxOpenFiles int64 `json:"maxOpenFiles"`
 	// reconcileCIDR is Reconcile node CIDR with the CIDR specified by the
-	// API server. No-op if register-node or configure-cbr0 is false.
+	// API server. Won't have any effect if register-node is false.
 	ReconcileCIDR *bool `json:"reconcileCIDR"`
 	// registerSchedulable tells the kubelet to register the node as
-	// schedulable. No-op if register-node is false.
+	// schedulable. Won't have any effect if register-node is false.
 	RegisterSchedulable *bool `json:"registerSchedulable"`
 	// contentType is contentType of requests sent to apiserver.
 	ContentType string `json:"contentType"`
@@ -482,8 +489,66 @@ type KubeletConfiguration struct {
 	IPTablesDropBit *int32 `json:"iptablesDropBit"`
 	// Whitelist of unsafe sysctls or sysctl patterns (ending in *). Use these at your own risk.
 	// Resource isolation might be lacking and pod might influence each other on the same node.
+	// +optional
 	AllowedUnsafeSysctls []string `json:"allowedUnsafeSysctls,omitempty"`
 	// How to integrate with runtime. If set to CRI, kubelet will switch to
 	// using the new Container Runtine Interface.
+	// +optional
 	ExperimentalRuntimeIntegrationType string `json:"experimentalRuntimeIntegrationType,omitempty"`
+}
+
+type KubeletAuthorizationMode string
+
+const (
+	// KubeletAuthorizationModeAlwaysAllow authorizes all authenticated requests
+	KubeletAuthorizationModeAlwaysAllow KubeletAuthorizationMode = "AlwaysAllow"
+	// KubeletAuthorizationModeWebhook uses the SubjectAccessReview API to determine authorization
+	KubeletAuthorizationModeWebhook KubeletAuthorizationMode = "Webhook"
+)
+
+type KubeletAuthorization struct {
+	// mode is the authorization mode to apply to requests to the kubelet server.
+	// Valid values are AlwaysAllow and Webhook.
+	// Webhook mode uses the SubjectAccessReview API to determine authorization.
+	Mode KubeletAuthorizationMode `json:"mode"`
+
+	// webhook contains settings related to Webhook authorization.
+	Webhook KubeletWebhookAuthorization `json:"webhook"`
+}
+
+type KubeletWebhookAuthorization struct {
+	// cacheAuthorizedTTL is the duration to cache 'authorized' responses from the webhook authorizer.
+	CacheAuthorizedTTL unversioned.Duration `json:"cacheAuthorizedTTL"`
+	// cacheUnauthorizedTTL is the duration to cache 'unauthorized' responses from the webhook authorizer.
+	CacheUnauthorizedTTL unversioned.Duration `json:"cacheUnauthorizedTTL"`
+}
+
+type KubeletAuthentication struct {
+	// x509 contains settings related to x509 client certificate authentication
+	X509 KubeletX509Authentication `json:"x509"`
+	// webhook contains settings related to webhook bearer token authentication
+	Webhook KubeletWebhookAuthentication `json:"webhook"`
+	// anonymous contains settings related to anonymous authentication
+	Anonymous KubeletAnonymousAuthentication `json:"anonymous"`
+}
+
+type KubeletX509Authentication struct {
+	// clientCAFile is the path to a PEM-encoded certificate bundle. If set, any request presenting a client certificate
+	// signed by one of the authorities in the bundle is authenticated with a username corresponding to the CommonName,
+	// and groups corresponding to the Organization in the client certificate.
+	ClientCAFile string `json:"clientCAFile"`
+}
+
+type KubeletWebhookAuthentication struct {
+	// enabled allows bearer token authentication backed by the tokenreviews.authentication.k8s.io API
+	Enabled *bool `json:"enabled"`
+	// cacheTTL enables caching of authentication results
+	CacheTTL unversioned.Duration `json:"cacheTTL"`
+}
+
+type KubeletAnonymousAuthentication struct {
+	// enabled allows anonymous requests to the kubelet server.
+	// Requests that are not rejected by another authentication method are treated as anonymous requests.
+	// Anonymous requests have a username of system:anonymous, and a group name of system:unauthenticated.
+	Enabled *bool `json:"enabled"`
 }

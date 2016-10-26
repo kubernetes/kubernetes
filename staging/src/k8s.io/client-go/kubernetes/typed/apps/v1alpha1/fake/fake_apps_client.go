@@ -26,12 +26,13 @@ type FakeApps struct {
 	*testing.Fake
 }
 
-func (c *FakeApps) PetSets(namespace string) v1alpha1.PetSetInterface {
-	return &FakePetSets{c, namespace}
+func (c *FakeApps) StatefulSets(namespace string) v1alpha1.StatefulSetInterface {
+	return &FakeStatefulSets{c, namespace}
 }
 
-// GetRESTClient returns a RESTClient that is used to communicate
+// RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeApps) GetRESTClient() *rest.RESTClient {
-	return nil
+func (c *FakeApps) RESTClient() rest.Interface {
+	var ret *rest.RESTClient
+	return ret
 }

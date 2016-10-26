@@ -20,6 +20,7 @@ import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // SecretsGetter has a method to return a SecretInterface.
@@ -43,14 +44,14 @@ type SecretInterface interface {
 
 // secrets implements SecretInterface
 type secrets struct {
-	client *CoreClient
+	client rest.Interface
 	ns     string
 }
 
 // newSecrets returns a Secrets
 func newSecrets(c *CoreClient, namespace string) *secrets {
 	return &secrets{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

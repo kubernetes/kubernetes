@@ -153,6 +153,10 @@ type KubeletConfiguration struct {
 	// default /var/run/kubernetes). If tlsCertFile and tlsPrivateKeyFile
 	// are provided, this flag will be ignored.
 	CertDirectory string `json:"certDirectory"`
+	// authentication specifies how requests to the Kubelet's server are authenticated
+	Authentication KubeletAuthentication `json:"authentication"`
+	// authorization specifies how requests to the Kubelet's server are authorized
+	Authorization KubeletAuthorization `json:"authorization"`
 	// hostnameOverride is the hostname used to identify the kubelet instead
 	// of the actual hostname.
 	HostnameOverride string `json:"hostnameOverride"`
@@ -271,25 +275,33 @@ type KubeletConfiguration struct {
 	// for additional third party volume plugins
 	VolumePluginDir string `json:"volumePluginDir"`
 	// cloudProvider is the provider for cloud services.
+	// +optional
 	CloudProvider string `json:"cloudProvider,omitempty"`
 	// cloudConfigFile is the path to the cloud provider configuration file.
+	// +optional
 	CloudConfigFile string `json:"cloudConfigFile,omitempty"`
 	// KubeletCgroups is the absolute name of cgroups to isolate the kubelet in.
+	// +optional
 	KubeletCgroups string `json:"kubeletCgroups,omitempty"`
 	// Enable QoS based Cgroup hierarchy: top level cgroups for QoS Classes
 	// And all Burstable and BestEffort pods are brought up under their
 	// specific top level QoS cgroup.
+	// +optional
 	CgroupsPerQOS bool `json:"cgroupsPerQOS,omitempty"`
 	// driver that the kubelet uses to manipulate cgroups on the host (cgroupfs or systemd)
+	// +optional
 	CgroupDriver string `json:"cgroupDriver,omitempty"`
 	// Cgroups that container runtime is expected to be isolated in.
+	// +optional
 	RuntimeCgroups string `json:"runtimeCgroups,omitempty"`
 	// SystemCgroups is absolute name of cgroups in which to place
 	// all non-kernel processes that are not already in a container. Empty
 	// for no container. Rolling back the flag requires a reboot.
+	// +optional
 	SystemCgroups string `json:"systemCgroups,omitempty"`
 	// CgroupRoot is the root cgroup to use for pods.
 	// If CgroupsPerQOS is enabled, this is the root of the QoS cgroup hierarchy.
+	// +optional
 	CgroupRoot string `json:"cgroupRoot,omitempty"`
 	// containerRuntime is the container runtime to use.
 	ContainerRuntime string `json:"containerRuntime"`
@@ -299,14 +311,22 @@ type KubeletConfiguration struct {
 	RemoteImageEndpoint string `json:"remoteImageEndpoint"`
 	// runtimeRequestTimeout is the timeout for all runtime requests except long running
 	// requests - pull, logs, exec and attach.
+	// +optional
 	RuntimeRequestTimeout unversioned.Duration `json:"runtimeRequestTimeout,omitempty"`
 	// rktPath is the path of rkt binary. Leave empty to use the first rkt in
 	// $PATH.
+	// +optional
 	RktPath string `json:"rktPath,omitempty"`
+	// experimentalMounterPath is the path of mounter binary. Leave empty to use the default mount path
+	ExperimentalMounterPath string `json:"experimentalMounterPath,omitempty"`
+	// experimentalMounterRootfsPath is the absolute path to root filesystem for the mounter binary.
+	ExperimentalMounterRootfsPath string `json:"experimentalMounterRootfsPath,omitempty"`
 	// rktApiEndpoint is the endpoint of the rkt API service to communicate with.
+	// +optional
 	RktAPIEndpoint string `json:"rktAPIEndpoint,omitempty"`
 	// rktStage1Image is the image to use as stage1. Local paths and
 	// http/https URLs are supported.
+	// +optional
 	RktStage1Image string `json:"rktStage1Image,omitempty"`
 	// lockFilePath is the path that kubelet will use to as a lock file.
 	// It uses this file as a lock to synchronize with other kubelet processes
@@ -317,18 +337,14 @@ type KubeletConfiguration struct {
 	// This will cause the kubelet to listen to inotify events on the lock file,
 	// releasing it and exiting when another process tries to open that file.
 	ExitOnLockContention bool `json:"exitOnLockContention"`
-	// configureCBR0 enables the kublet to configure cbr0 based on
-	// Node.Spec.PodCIDR.
-	ConfigureCBR0 bool `json:"configureCbr0"`
 	// How should the kubelet configure the container bridge for hairpin packets.
 	// Setting this flag allows endpoints in a Service to loadbalance back to
 	// themselves if they should try to access their own Service. Values:
 	//   "promiscuous-bridge": make the container bridge promiscuous.
 	//   "hairpin-veth":       set the hairpin flag on container veth interfaces.
 	//   "none":               do nothing.
-	// Setting --configure-cbr0 to false implies that to achieve hairpin NAT
-	// one must set --hairpin-mode=veth-flag, because bridge assumes the
-	// existence of a container bridge named cbr0.
+	// Generally, one must set --hairpin-mode=veth-flag to achieve hairpin NAT,
+	// because promiscous-bridge assumes the existence of a container bridge named cbr0.
 	HairpinMode string `json:"hairpinMode"`
 	// The node has babysitter process monitoring docker and kubelet.
 	BabysitDaemons bool `json:"babysitDaemons"`
@@ -354,10 +370,10 @@ type KubeletConfiguration struct {
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
 	MaxOpenFiles int64 `json:"maxOpenFiles"`
 	// reconcileCIDR is Reconcile node CIDR with the CIDR specified by the
-	// API server. No-op if register-node or configure-cbr0 is false.
+	// API server. Won't have any effect if register-node is false.
 	ReconcileCIDR bool `json:"reconcileCIDR"`
 	// registerSchedulable tells the kubelet to register the node as
-	// schedulable. No-op if register-node is false.
+	// schedulable. Won't have any effect if register-node is false.
 	RegisterSchedulable bool `json:"registerSchedulable"`
 	// contentType is contentType of requests sent to apiserver.
 	ContentType string `json:"contentType"`
@@ -373,9 +389,11 @@ type KubeletConfiguration struct {
 	SerializeImagePulls bool `json:"serializeImagePulls"`
 	// outOfDiskTransitionFrequency is duration for which the kubelet has to
 	// wait before transitioning out of out-of-disk node condition status.
+	// +optional
 	OutOfDiskTransitionFrequency unversioned.Duration `json:"outOfDiskTransitionFrequency,omitempty"`
 	// nodeIP is IP address of the node. If set, kubelet will use this IP
 	// address for the node.
+	// +optional
 	NodeIP string `json:"nodeIP,omitempty"`
 	// nodeLabels to add when registering the node in the cluster.
 	NodeLabels map[string]string `json:"nodeLabels"`
@@ -384,16 +402,22 @@ type KubeletConfiguration struct {
 	// enable gathering custom metrics.
 	EnableCustomMetrics bool `json:"enableCustomMetrics"`
 	// Comma-delimited list of hard eviction expressions.  For example, 'memory.available<300Mi'.
+	// +optional
 	EvictionHard string `json:"evictionHard,omitempty"`
 	// Comma-delimited list of soft eviction expressions.  For example, 'memory.available<300Mi'.
+	// +optional
 	EvictionSoft string `json:"evictionSoft,omitempty"`
 	// Comma-delimeted list of grace periods for each soft eviction signal.  For example, 'memory.available=30s'.
+	// +optional
 	EvictionSoftGracePeriod string `json:"evictionSoftGracePeriod,omitempty"`
 	// Duration for which the kubelet has to wait before transitioning out of an eviction pressure condition.
+	// +optional
 	EvictionPressureTransitionPeriod unversioned.Duration `json:"evictionPressureTransitionPeriod,omitempty"`
 	// Maximum allowed grace period (in seconds) to use when terminating pods in response to a soft eviction threshold being met.
+	// +optional
 	EvictionMaxPodGracePeriod int32 `json:"evictionMaxPodGracePeriod,omitempty"`
 	// Comma-delimited list of minimum reclaims (e.g. imagefs.available=2Gi) that describes the minimum amount of resource the kubelet will reclaim when performing a pod eviction if that resource is under pressure.
+	// +optional
 	EvictionMinimumReclaim string `json:"evictionMinimumReclaim,omitempty"`
 	// Maximum number of pods per core. Cannot exceed MaxPods
 	PodsPerCore int32 `json:"podsPerCore"`
@@ -426,10 +450,68 @@ type KubeletConfiguration struct {
 	// Values must be within the range [0, 31]. Must be different from IPTablesMasqueradeBit
 	IPTablesDropBit int32 `json:"iptablesDropBit"`
 	// Whitelist of unsafe sysctls or sysctl patterns (ending in *).
+	// +optional
 	AllowedUnsafeSysctls []string `json:"experimentalAllowedUnsafeSysctls,omitempty"`
 	// How to integrate with runtime. If set to cri, kubelet will switch to
 	// using the new Container Runtine Interface.
+	// +optional
 	ExperimentalRuntimeIntegrationType string `json:"experimentalRuntimeIntegrationType,omitempty"`
+}
+
+type KubeletAuthorizationMode string
+
+const (
+	// KubeletAuthorizationModeAlwaysAllow authorizes all authenticated requests
+	KubeletAuthorizationModeAlwaysAllow KubeletAuthorizationMode = "AlwaysAllow"
+	// KubeletAuthorizationModeWebhook uses the SubjectAccessReview API to determine authorization
+	KubeletAuthorizationModeWebhook KubeletAuthorizationMode = "Webhook"
+)
+
+type KubeletAuthorization struct {
+	// mode is the authorization mode to apply to requests to the kubelet server.
+	// Valid values are AlwaysAllow and Webhook.
+	// Webhook mode uses the SubjectAccessReview API to determine authorization.
+	Mode KubeletAuthorizationMode `json:"mode"`
+
+	// webhook contains settings related to Webhook authorization.
+	Webhook KubeletWebhookAuthorization `json:"webhook"`
+}
+
+type KubeletWebhookAuthorization struct {
+	// cacheAuthorizedTTL is the duration to cache 'authorized' responses from the webhook authorizer.
+	CacheAuthorizedTTL unversioned.Duration `json:"cacheAuthorizedTTL"`
+	// cacheUnauthorizedTTL is the duration to cache 'unauthorized' responses from the webhook authorizer.
+	CacheUnauthorizedTTL unversioned.Duration `json:"cacheUnauthorizedTTL"`
+}
+
+type KubeletAuthentication struct {
+	// x509 contains settings related to x509 client certificate authentication
+	X509 KubeletX509Authentication `json:"x509"`
+	// webhook contains settings related to webhook bearer token authentication
+	Webhook KubeletWebhookAuthentication `json:"webhook"`
+	// anonymous contains settings related to anonymous authentication
+	Anonymous KubeletAnonymousAuthentication `json:"anonymous"`
+}
+
+type KubeletX509Authentication struct {
+	// clientCAFile is the path to a PEM-encoded certificate bundle. If set, any request presenting a client certificate
+	// signed by one of the authorities in the bundle is authenticated with a username corresponding to the CommonName,
+	// and groups corresponding to the Organization in the client certificate.
+	ClientCAFile string `json:"clientCAFile"`
+}
+
+type KubeletWebhookAuthentication struct {
+	// enabled allows bearer token authentication backed by the tokenreviews.authentication.k8s.io API
+	Enabled bool `json:"enabled"`
+	// cacheTTL enables caching of authentication results
+	CacheTTL unversioned.Duration `json:"cacheTTL"`
+}
+
+type KubeletAnonymousAuthentication struct {
+	// enabled allows anonymous requests to the kubelet server.
+	// Requests that are not rejected by another authentication method are treated as anonymous requests.
+	// Anonymous requests have a username of system:anonymous, and a group name of system:unauthenticated.
+	Enabled bool `json:"enabled"`
 }
 
 type KubeSchedulerConfiguration struct {

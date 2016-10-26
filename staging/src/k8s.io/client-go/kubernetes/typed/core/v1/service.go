@@ -20,6 +20,7 @@ import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // ServicesGetter has a method to return a ServiceInterface.
@@ -44,14 +45,14 @@ type ServiceInterface interface {
 
 // services implements ServiceInterface
 type services struct {
-	client *CoreClient
+	client rest.Interface
 	ns     string
 }
 
 // newServices returns a Services
 func newServices(c *CoreClient, namespace string) *services {
 	return &services{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

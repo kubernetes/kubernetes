@@ -21,11 +21,11 @@ syntax = 'proto2';
 
 package k8s.io.kubernetes.federation.apis.federation.v1beta1;
 
-import "k8s.io/client-go/pkg/api/resource/generated.proto";
-import "k8s.io/client-go/pkg/api/unversioned/generated.proto";
-import "k8s.io/client-go/pkg/api/v1/generated.proto";
-import "k8s.io/client-go/pkg/runtime/generated.proto";
-import "k8s.io/client-go/pkg/util/intstr/generated.proto";
+import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
+import "k8s.io/kubernetes/pkg/api/unversioned/generated.proto";
+import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
+import "k8s.io/kubernetes/pkg/runtime/generated.proto";
+import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1beta1";
@@ -34,12 +34,15 @@ option go_package = "v1beta1";
 message Cluster {
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
   // Spec defines the behavior of the Cluster.
+  // +optional
   optional ClusterSpec spec = 2;
 
   // Status describes the current status of a Cluster
+  // +optional
   optional ClusterStatus status = 3;
 }
 
@@ -52,15 +55,19 @@ message ClusterCondition {
   optional string status = 2;
 
   // Last time the condition was checked.
+  // +optional
   optional k8s.io.kubernetes.pkg.api.unversioned.Time lastProbeTime = 3;
 
   // Last time the condition transit from one status to another.
+  // +optional
   optional k8s.io.kubernetes.pkg.api.unversioned.Time lastTransitionTime = 4;
 
   // (brief) reason for the condition's last transition.
+  // +optional
   optional string reason = 5;
 
   // Human readable message indicating details about last transition.
+  // +optional
   optional string message = 6;
 }
 
@@ -68,6 +75,7 @@ message ClusterCondition {
 message ClusterList {
   // Standard list metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+  // +optional
   optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
 
   // List of Cluster objects.
@@ -87,19 +95,23 @@ message ClusterSpec {
   // Admin needs to ensure that the required secret exists. Secret should be in the same namespace where federation control plane is hosted and it should have kubeconfig in its data with key "kubeconfig".
   // This will later be changed to a reference to secret in federation control plane when the federation control plane supports secrets.
   // This can be left empty if the cluster allows insecure access.
+  // +optional
   optional k8s.io.kubernetes.pkg.api.v1.LocalObjectReference secretRef = 2;
 }
 
 // ClusterStatus is information about the current status of a cluster updated by cluster controller peridocally.
 message ClusterStatus {
   // Conditions is an array of current cluster conditions.
+  // +optional
   repeated ClusterCondition conditions = 1;
 
   // Zones is the list of availability zones in which the nodes of the cluster exist, e.g. 'us-east1-a'.
   // These will always be in the same region.
+  // +optional
   repeated string zones = 5;
 
   // Region is the name of the region in which all of the nodes in the cluster exist.  e.g. 'us-east1'.
+  // +optional
   optional string region = 6;
 }
 

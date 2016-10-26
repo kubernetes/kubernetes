@@ -24,7 +24,7 @@ import (
 )
 
 type CoreInterface interface {
-	GetRESTClient() *rest.RESTClient
+	RESTClient() rest.Interface
 	ComponentStatusesGetter
 	ConfigMapsGetter
 	EndpointsGetter
@@ -45,7 +45,7 @@ type CoreInterface interface {
 
 // CoreClient is used to interact with features provided by the Core group.
 type CoreClient struct {
-	*rest.RESTClient
+	restClient rest.Interface
 }
 
 func (c *CoreClient) ComponentStatuses() ComponentStatusInterface {
@@ -136,7 +136,7 @@ func NewForConfigOrDie(c *rest.Config) *CoreClient {
 }
 
 // New creates a new CoreClient for the given RESTClient.
-func New(c *rest.RESTClient) *CoreClient {
+func New(c rest.Interface) *CoreClient {
 	return &CoreClient{c}
 }
 
@@ -161,11 +161,11 @@ func setConfigDefaults(config *rest.Config) error {
 	return nil
 }
 
-// GetRESTClient returns a RESTClient that is used to communicate
+// RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *CoreClient) GetRESTClient() *rest.RESTClient {
+func (c *CoreClient) RESTClient() rest.Interface {
 	if c == nil {
 		return nil
 	}
-	return c.RESTClient
+	return c.restClient
 }

@@ -21,6 +21,7 @@ import (
 	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/version"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/testing"
 )
 
@@ -79,4 +80,8 @@ func (c *FakeDiscovery) SwaggerSchema(version unversioned.GroupVersion) (*swagge
 
 	c.Invokes(action, nil)
 	return &swagger.ApiDeclaration{}, nil
+}
+
+func (c *FakeDiscovery) RESTClient() rest.Interface {
+	return nil
 }

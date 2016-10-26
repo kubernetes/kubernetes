@@ -22,7 +22,6 @@ package v2alpha1
 
 import (
 	api "k8s.io/client-go/pkg/api"
-	unversioned "k8s.io/client-go/pkg/api/unversioned"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	batch "k8s.io/client-go/pkg/apis/batch"
 	conversion "k8s.io/client-go/pkg/conversion"
@@ -51,10 +50,6 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_batch_JobTemplate_To_v2alpha1_JobTemplate,
 		Convert_v2alpha1_JobTemplateSpec_To_batch_JobTemplateSpec,
 		Convert_batch_JobTemplateSpec_To_v2alpha1_JobTemplateSpec,
-		Convert_v2alpha1_LabelSelector_To_unversioned_LabelSelector,
-		Convert_unversioned_LabelSelector_To_v2alpha1_LabelSelector,
-		Convert_v2alpha1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement,
-		Convert_unversioned_LabelSelectorRequirement_To_v2alpha1_LabelSelectorRequirement,
 		Convert_v2alpha1_ScheduledJob_To_batch_ScheduledJob,
 		Convert_batch_ScheduledJob_To_v2alpha1_ScheduledJob,
 		Convert_v2alpha1_ScheduledJobList_To_batch_ScheduledJobList,
@@ -67,10 +62,6 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 }
 
 func autoConvert_v2alpha1_Job_To_batch_Job(in *Job, out *batch.Job, s conversion.Scope) error {
-	SetDefaults_Job(in)
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
 	// TODO: Inefficient conversion - can we improve it?
 	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
 		return err
@@ -89,9 +80,6 @@ func Convert_v2alpha1_Job_To_batch_Job(in *Job, out *batch.Job, s conversion.Sco
 }
 
 func autoConvert_batch_Job_To_v2alpha1_Job(in *batch.Job, out *Job, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
 	// TODO: Inefficient conversion - can we improve it?
 	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
 		return err
@@ -112,12 +100,8 @@ func Convert_batch_Job_To_v2alpha1_Job(in *batch.Job, out *Job, s conversion.Sco
 func autoConvert_v2alpha1_JobCondition_To_batch_JobCondition(in *JobCondition, out *batch.JobCondition, s conversion.Scope) error {
 	out.Type = batch.JobConditionType(in.Type)
 	out.Status = api.ConditionStatus(in.Status)
-	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastProbeTime, &out.LastProbeTime, s); err != nil {
-		return err
-	}
-	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastTransitionTime, &out.LastTransitionTime, s); err != nil {
-		return err
-	}
+	out.LastProbeTime = in.LastProbeTime
+	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
 	out.Message = in.Message
 	return nil
@@ -130,12 +114,8 @@ func Convert_v2alpha1_JobCondition_To_batch_JobCondition(in *JobCondition, out *
 func autoConvert_batch_JobCondition_To_v2alpha1_JobCondition(in *batch.JobCondition, out *JobCondition, s conversion.Scope) error {
 	out.Type = JobConditionType(in.Type)
 	out.Status = v1.ConditionStatus(in.Status)
-	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastProbeTime, &out.LastProbeTime, s); err != nil {
-		return err
-	}
-	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastTransitionTime, &out.LastTransitionTime, s); err != nil {
-		return err
-	}
+	out.LastProbeTime = in.LastProbeTime
+	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
 	out.Message = in.Message
 	return nil
@@ -146,12 +126,7 @@ func Convert_batch_JobCondition_To_v2alpha1_JobCondition(in *batch.JobCondition,
 }
 
 func autoConvert_v2alpha1_JobList_To_batch_JobList(in *JobList, out *batch.JobList, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
-		return err
-	}
+	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]batch.Job, len(*in))
@@ -171,12 +146,7 @@ func Convert_v2alpha1_JobList_To_batch_JobList(in *JobList, out *batch.JobList, 
 }
 
 func autoConvert_batch_JobList_To_v2alpha1_JobList(in *batch.JobList, out *JobList, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
-		return err
-	}
+	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Job, len(*in))
@@ -199,15 +169,7 @@ func autoConvert_v2alpha1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSp
 	out.Parallelism = in.Parallelism
 	out.Completions = in.Completions
 	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
-	if in.Selector != nil {
-		in, out := &in.Selector, &out.Selector
-		*out = new(unversioned.LabelSelector)
-		if err := Convert_v2alpha1_LabelSelector_To_unversioned_LabelSelector(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Selector = nil
-	}
+	out.Selector = in.Selector
 	out.ManualSelector = in.ManualSelector
 	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
@@ -219,15 +181,7 @@ func autoConvert_batch_JobSpec_To_v2alpha1_JobSpec(in *batch.JobSpec, out *JobSp
 	out.Parallelism = in.Parallelism
 	out.Completions = in.Completions
 	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
-	if in.Selector != nil {
-		in, out := &in.Selector, &out.Selector
-		*out = new(LabelSelector)
-		if err := Convert_unversioned_LabelSelector_To_v2alpha1_LabelSelector(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Selector = nil
-	}
+	out.Selector = in.Selector
 	out.ManualSelector = in.ManualSelector
 	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
@@ -284,9 +238,6 @@ func Convert_batch_JobStatus_To_v2alpha1_JobStatus(in *batch.JobStatus, out *Job
 }
 
 func autoConvert_v2alpha1_JobTemplate_To_batch_JobTemplate(in *JobTemplate, out *batch.JobTemplate, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
 	// TODO: Inefficient conversion - can we improve it?
 	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
 		return err
@@ -302,9 +253,6 @@ func Convert_v2alpha1_JobTemplate_To_batch_JobTemplate(in *JobTemplate, out *bat
 }
 
 func autoConvert_batch_JobTemplate_To_v2alpha1_JobTemplate(in *batch.JobTemplate, out *JobTemplate, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
 	// TODO: Inefficient conversion - can we improve it?
 	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
 		return err
@@ -349,73 +297,7 @@ func Convert_batch_JobTemplateSpec_To_v2alpha1_JobTemplateSpec(in *batch.JobTemp
 	return autoConvert_batch_JobTemplateSpec_To_v2alpha1_JobTemplateSpec(in, out, s)
 }
 
-func autoConvert_v2alpha1_LabelSelector_To_unversioned_LabelSelector(in *LabelSelector, out *unversioned.LabelSelector, s conversion.Scope) error {
-	out.MatchLabels = in.MatchLabels
-	if in.MatchExpressions != nil {
-		in, out := &in.MatchExpressions, &out.MatchExpressions
-		*out = make([]unversioned.LabelSelectorRequirement, len(*in))
-		for i := range *in {
-			if err := Convert_v2alpha1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.MatchExpressions = nil
-	}
-	return nil
-}
-
-func Convert_v2alpha1_LabelSelector_To_unversioned_LabelSelector(in *LabelSelector, out *unversioned.LabelSelector, s conversion.Scope) error {
-	return autoConvert_v2alpha1_LabelSelector_To_unversioned_LabelSelector(in, out, s)
-}
-
-func autoConvert_unversioned_LabelSelector_To_v2alpha1_LabelSelector(in *unversioned.LabelSelector, out *LabelSelector, s conversion.Scope) error {
-	out.MatchLabels = in.MatchLabels
-	if in.MatchExpressions != nil {
-		in, out := &in.MatchExpressions, &out.MatchExpressions
-		*out = make([]LabelSelectorRequirement, len(*in))
-		for i := range *in {
-			if err := Convert_unversioned_LabelSelectorRequirement_To_v2alpha1_LabelSelectorRequirement(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.MatchExpressions = nil
-	}
-	return nil
-}
-
-func Convert_unversioned_LabelSelector_To_v2alpha1_LabelSelector(in *unversioned.LabelSelector, out *LabelSelector, s conversion.Scope) error {
-	return autoConvert_unversioned_LabelSelector_To_v2alpha1_LabelSelector(in, out, s)
-}
-
-func autoConvert_v2alpha1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement(in *LabelSelectorRequirement, out *unversioned.LabelSelectorRequirement, s conversion.Scope) error {
-	out.Key = in.Key
-	out.Operator = unversioned.LabelSelectorOperator(in.Operator)
-	out.Values = in.Values
-	return nil
-}
-
-func Convert_v2alpha1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement(in *LabelSelectorRequirement, out *unversioned.LabelSelectorRequirement, s conversion.Scope) error {
-	return autoConvert_v2alpha1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement(in, out, s)
-}
-
-func autoConvert_unversioned_LabelSelectorRequirement_To_v2alpha1_LabelSelectorRequirement(in *unversioned.LabelSelectorRequirement, out *LabelSelectorRequirement, s conversion.Scope) error {
-	out.Key = in.Key
-	out.Operator = LabelSelectorOperator(in.Operator)
-	out.Values = in.Values
-	return nil
-}
-
-func Convert_unversioned_LabelSelectorRequirement_To_v2alpha1_LabelSelectorRequirement(in *unversioned.LabelSelectorRequirement, out *LabelSelectorRequirement, s conversion.Scope) error {
-	return autoConvert_unversioned_LabelSelectorRequirement_To_v2alpha1_LabelSelectorRequirement(in, out, s)
-}
-
 func autoConvert_v2alpha1_ScheduledJob_To_batch_ScheduledJob(in *ScheduledJob, out *batch.ScheduledJob, s conversion.Scope) error {
-	SetDefaults_ScheduledJob(in)
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
 	// TODO: Inefficient conversion - can we improve it?
 	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
 		return err
@@ -434,9 +316,6 @@ func Convert_v2alpha1_ScheduledJob_To_batch_ScheduledJob(in *ScheduledJob, out *
 }
 
 func autoConvert_batch_ScheduledJob_To_v2alpha1_ScheduledJob(in *batch.ScheduledJob, out *ScheduledJob, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
 	// TODO: Inefficient conversion - can we improve it?
 	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
 		return err
@@ -455,12 +334,7 @@ func Convert_batch_ScheduledJob_To_v2alpha1_ScheduledJob(in *batch.ScheduledJob,
 }
 
 func autoConvert_v2alpha1_ScheduledJobList_To_batch_ScheduledJobList(in *ScheduledJobList, out *batch.ScheduledJobList, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
-		return err
-	}
+	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]batch.ScheduledJob, len(*in))
@@ -480,12 +354,7 @@ func Convert_v2alpha1_ScheduledJobList_To_batch_ScheduledJobList(in *ScheduledJo
 }
 
 func autoConvert_batch_ScheduledJobList_To_v2alpha1_ScheduledJobList(in *batch.ScheduledJobList, out *ScheduledJobList, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
-		return err
-	}
+	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]ScheduledJob, len(*in))

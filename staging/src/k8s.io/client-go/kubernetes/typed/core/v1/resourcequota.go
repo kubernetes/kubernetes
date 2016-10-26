@@ -20,6 +20,7 @@ import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // ResourceQuotasGetter has a method to return a ResourceQuotaInterface.
@@ -44,14 +45,14 @@ type ResourceQuotaInterface interface {
 
 // resourceQuotas implements ResourceQuotaInterface
 type resourceQuotas struct {
-	client *CoreClient
+	client rest.Interface
 	ns     string
 }
 
 // newResourceQuotas returns a ResourceQuotas
 func newResourceQuotas(c *CoreClient, namespace string) *resourceQuotas {
 	return &resourceQuotas{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

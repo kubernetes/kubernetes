@@ -20,6 +20,7 @@ import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // NodesGetter has a method to return a NodeInterface.
@@ -44,13 +45,13 @@ type NodeInterface interface {
 
 // nodes implements NodeInterface
 type nodes struct {
-	client *CoreClient
+	client rest.Interface
 }
 
 // newNodes returns a Nodes
 func newNodes(c *CoreClient) *nodes {
 	return &nodes{
-		client: c,
+		client: c.RESTClient(),
 	}
 }
 
