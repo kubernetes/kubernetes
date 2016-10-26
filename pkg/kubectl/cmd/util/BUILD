@@ -13,6 +13,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "cached_discovery.go",
         "clientcache.go",
         "factory.go",
         "helpers.go",
@@ -50,8 +51,10 @@ go_library(
         "//pkg/util/errors:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/flag:go_default_library",
+        "//pkg/util/homedir:go_default_library",
         "//pkg/util/sets:go_default_library",
         "//pkg/util/strategicpatch:go_default_library",
+        "//pkg/version:go_default_library",
         "//pkg/watch:go_default_library",
         "//vendor:github.com/emicklei/go-restful/swagger",
         "//vendor:github.com/evanphx/json-patch",
@@ -64,6 +67,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "cached_discovery_test.go",
         "factory_test.go",
         "helpers_test.go",
         "shortcut_restmapper_test.go",
@@ -85,8 +89,10 @@ go_test(
         "//pkg/apimachinery/registered:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
+        "//pkg/client/restclient:go_default_library",
         "//pkg/client/restclient/fake:go_default_library",
         "//pkg/client/testing/core:go_default_library",
+        "//pkg/client/typed/discovery:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/client/unversioned/clientcmd/api:go_default_library",
         "//pkg/controller:go_default_library",
@@ -97,6 +103,9 @@ go_test(
         "//pkg/util/exec:go_default_library",
         "//pkg/util/flag:go_default_library",
         "//pkg/util/validation/field:go_default_library",
+        "//pkg/version:go_default_library",
         "//pkg/watch:go_default_library",
+        "//vendor:github.com/emicklei/go-restful/swagger",
+        "//vendor:github.com/stretchr/testify/assert",
     ],
 )
