@@ -110,7 +110,7 @@ func verifyExpectedRcsExistAndGetExpectedPods(c clientset.Interface) ([]string, 
 		if err != nil {
 			return nil, err
 		}
-		psList, err := c.Apps().PetSets(api.NamespaceSystem).List(options)
+		psList, err := c.Apps().StatefulSets(api.NamespaceSystem).List(options)
 		if err != nil {
 			return nil, err
 		}
