@@ -76,6 +76,8 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_JobList, InType: reflect.TypeOf(&JobList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_JobSpec, InType: reflect.TypeOf(&JobSpec{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_JobStatus, InType: reflect.TypeOf(&JobStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_LabelSelector, InType: reflect.TypeOf(&LabelSelector{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_LabelSelectorRequirement, InType: reflect.TypeOf(&LabelSelectorRequirement{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_NetworkPolicy, InType: reflect.TypeOf(&NetworkPolicy{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_NetworkPolicyIngressRule, InType: reflect.TypeOf(&NetworkPolicyIngressRule{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_NetworkPolicyList, InType: reflect.TypeOf(&NetworkPolicyList{})},
@@ -226,8 +228,8 @@ func DeepCopy_v1beta1_DaemonSetSpec(in interface{}, out interface{}, c *conversi
 		out := out.(*DaemonSetSpec)
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			*out = new(unversioned.LabelSelector)
-			if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
+			*out = new(LabelSelector)
+			if err := DeepCopy_v1beta1_LabelSelector(*in, *out, c); err != nil {
 				return err
 			}
 		} else {
@@ -322,8 +324,8 @@ func DeepCopy_v1beta1_DeploymentSpec(in interface{}, out interface{}, c *convers
 		}
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			*out = new(unversioned.LabelSelector)
-			if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
+			*out = new(LabelSelector)
+			if err := DeepCopy_v1beta1_LabelSelector(*in, *out, c); err != nil {
 				return err
 			}
 		} else {
@@ -778,8 +780,8 @@ func DeepCopy_v1beta1_JobSpec(in interface{}, out interface{}, c *conversion.Clo
 		}
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			*out = new(unversioned.LabelSelector)
-			if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
+			*out = new(LabelSelector)
+			if err := DeepCopy_v1beta1_LabelSelector(*in, *out, c); err != nil {
 				return err
 			}
 		} else {
@@ -831,6 +833,51 @@ func DeepCopy_v1beta1_JobStatus(in interface{}, out interface{}, c *conversion.C
 		out.Active = in.Active
 		out.Succeeded = in.Succeeded
 		out.Failed = in.Failed
+		return nil
+	}
+}
+
+func DeepCopy_v1beta1_LabelSelector(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*LabelSelector)
+		out := out.(*LabelSelector)
+		if in.MatchLabels != nil {
+			in, out := &in.MatchLabels, &out.MatchLabels
+			*out = make(map[string]string)
+			for key, val := range *in {
+				(*out)[key] = val
+			}
+		} else {
+			out.MatchLabels = nil
+		}
+		if in.MatchExpressions != nil {
+			in, out := &in.MatchExpressions, &out.MatchExpressions
+			*out = make([]LabelSelectorRequirement, len(*in))
+			for i := range *in {
+				if err := DeepCopy_v1beta1_LabelSelectorRequirement(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		} else {
+			out.MatchExpressions = nil
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1beta1_LabelSelectorRequirement(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*LabelSelectorRequirement)
+		out := out.(*LabelSelectorRequirement)
+		out.Key = in.Key
+		out.Operator = in.Operator
+		if in.Values != nil {
+			in, out := &in.Values, &out.Values
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		} else {
+			out.Values = nil
+		}
 		return nil
 	}
 }
@@ -907,8 +954,8 @@ func DeepCopy_v1beta1_NetworkPolicyPeer(in interface{}, out interface{}, c *conv
 		out := out.(*NetworkPolicyPeer)
 		if in.PodSelector != nil {
 			in, out := &in.PodSelector, &out.PodSelector
-			*out = new(unversioned.LabelSelector)
-			if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
+			*out = new(LabelSelector)
+			if err := DeepCopy_v1beta1_LabelSelector(*in, *out, c); err != nil {
 				return err
 			}
 		} else {
@@ -916,8 +963,8 @@ func DeepCopy_v1beta1_NetworkPolicyPeer(in interface{}, out interface{}, c *conv
 		}
 		if in.NamespaceSelector != nil {
 			in, out := &in.NamespaceSelector, &out.NamespaceSelector
-			*out = new(unversioned.LabelSelector)
-			if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
+			*out = new(LabelSelector)
+			if err := DeepCopy_v1beta1_LabelSelector(*in, *out, c); err != nil {
 				return err
 			}
 		} else {
@@ -953,7 +1000,7 @@ func DeepCopy_v1beta1_NetworkPolicySpec(in interface{}, out interface{}, c *conv
 	{
 		in := in.(*NetworkPolicySpec)
 		out := out.(*NetworkPolicySpec)
-		if err := unversioned.DeepCopy_unversioned_LabelSelector(&in.PodSelector, &out.PodSelector, c); err != nil {
+		if err := DeepCopy_v1beta1_LabelSelector(&in.PodSelector, &out.PodSelector, c); err != nil {
 			return err
 		}
 		if in.Ingress != nil {
@@ -1143,8 +1190,8 @@ func DeepCopy_v1beta1_ReplicaSetSpec(in interface{}, out interface{}, c *convers
 		out.MinReadySeconds = in.MinReadySeconds
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			*out = new(unversioned.LabelSelector)
-			if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
+			*out = new(LabelSelector)
+			if err := DeepCopy_v1beta1_LabelSelector(*in, *out, c); err != nil {
 				return err
 			}
 		} else {

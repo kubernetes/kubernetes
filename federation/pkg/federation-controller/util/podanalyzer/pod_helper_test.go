@@ -101,7 +101,7 @@ func newReplicaSet(selectorMap map[string]string) *v1beta1.ReplicaSet {
 		},
 		Spec: v1beta1.ReplicaSetSpec{
 			Replicas: &replicas,
-			Selector: &unversioned.LabelSelector{MatchLabels: selectorMap},
+			Selector: &v1beta1.LabelSelector{MatchLabels: selectorMap},
 		},
 	}
 	return rs
