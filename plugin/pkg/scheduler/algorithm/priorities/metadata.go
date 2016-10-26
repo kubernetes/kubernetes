@@ -18,18 +18,79 @@ package priorities
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
-// priorityMetadata is a type that is passed as metadata for priority functions
-type priorityMetadata struct {
-	nonZeroRequest *schedulercache.Resource
-	podTolerations []api.Toleration
-	affinity       *api.Affinity
+type PriorityMetadataFactory struct {
+	serviceLister    algorithm.ServiceLister
+	controllerLister algorithm.ControllerLister
+	replicaSetLister algorithm.ReplicaSetLister
 }
 
-// PriorityMetadata is a MetadataProducer.  Node info can be nil.
-func PriorityMetadata(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo) interface{} {
+func NewPriorityMetadataFactory(
+	sl algorithm.ServiceLister,
+	cl algorithm.ControllerLister,
+	rsl algorithm.ReplicaSetLister,
+) algorithm.MetadataProducer {
+	factory := &PriorityMetadataFactory{
+		serviceLister:    sl,
+		controllerLister: cl,
+		replicaSetLister: rsl,
+	}
+	return factory.GetMetadata
+}
+
+// priorityMetadata is a type that is passed as metadata for priority functions
+type priorityMetadata struct {
+	nonZeroRequest      *schedulercache.Resource
+	podTolerations      []api.Toleration
+	affinity            *api.Affinity
+	controllerSelectors []labels.Selector
+}
+
+// Returns selectors of services, RCs and RSs matching the given pod.
+func getSelectors(
+	pod *api.Pod,
+	serviceLister algorithm.ServiceLister,
+	controllerLister algorithm.ControllerLister,
+	replicaSetLister algorithm.ReplicaSetLister,
+) []labels.Selector {
+	selectors := make([]labels.Selector, 0, 3)
+	if serviceLister != nil {
+		if services, err := serviceLister.GetPodServices(pod); err == nil {
+			for _, service := range services {
+				selectors = append(selectors, labels.SelectorFromSet(service.Spec.Selector))
+			}
+		}
+	}
+	if controllerLister != nil {
+		if rcs, err := controllerLister.GetPodControllers(pod); err == nil {
+			for _, rc := range rcs {
+				selectors = append(selectors, labels.SelectorFromSet(rc.Spec.Selector))
+			}
+		}
+	}
+	if replicaSetLister != nil {
+		if rss, err := replicaSetLister.GetPodReplicaSets(pod); err == nil {
+			for _, rs := range rss {
+				if selector, err := unversioned.LabelSelectorAsSelector(rs.Spec.Selector); err == nil {
+					selectors = append(selectors, selector)
+				}
+			}
+		}
+	}
+	return selectors
+}
+
+func (pmf *PriorityMetadataFactory) getSelectors(pod *api.Pod) []labels.Selector {
+	return getSelectors(pod, pmf.serviceLister, pmf.controllerLister, pmf.replicaSetLister)
+}
+
+// GetMetadata returns the priorityMetadata used which will be used by various predicates.
+func (pmf *PriorityMetadataFactory) GetMetadata(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo) interface{} {
 	// If we cannot compute metadata, just return nil
 	if pod == nil {
 		return nil
@@ -43,8 +104,9 @@ func PriorityMetadata(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.No
 		return nil
 	}
 	return &priorityMetadata{
-		nonZeroRequest: getNonZeroRequests(pod),
-		podTolerations: tolerations,
-		affinity:       affinity,
+		nonZeroRequest:      getNonZeroRequests(pod),
+		podTolerations:      tolerations,
+		affinity:            affinity,
+		controllerSelectors: pmf.getSelectors(pod),
 	}
 }

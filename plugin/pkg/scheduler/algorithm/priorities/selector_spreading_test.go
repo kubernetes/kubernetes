@@ -284,13 +284,14 @@ func TestSelectorSpreadPriority(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, nil)
-		selectorSpread := SelectorSpread{
-			serviceLister:    algorithm.FakeServiceLister(test.services),
-			controllerLister: algorithm.FakeControllerLister(test.rcs),
-			replicaSetLister: algorithm.FakeReplicaSetLister(test.rss),
-		}
-		list, err := selectorSpread.CalculateSpreadPriority(test.pod, nodeNameToInfo, makeNodeList(test.nodes))
+		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, makeNodeList(test.nodes))
+		selectorSpreadMap, selectorSpreadReduce := NewSelectorSpreadPriority(
+			algorithm.FakeServiceLister(test.services),
+			algorithm.FakeControllerLister(test.rcs),
+			algorithm.FakeReplicaSetLister(test.rss),
+		)
+
+		list, err := priorityFunction(selectorSpreadMap, selectorSpreadReduce)(test.pod, nodeNameToInfo, makeNodeList(test.nodes))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -491,13 +492,14 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, nil)
-		selectorSpread := SelectorSpread{
-			serviceLister:    algorithm.FakeServiceLister(test.services),
-			controllerLister: algorithm.FakeControllerLister(test.rcs),
-			replicaSetLister: algorithm.FakeReplicaSetLister(test.rss),
-		}
-		list, err := selectorSpread.CalculateSpreadPriority(test.pod, nodeNameToInfo, makeLabeledNodeList(labeledNodes))
+		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, makeLabeledNodeList(labeledNodes))
+		selectorSpreadMap, selectorSpreadReduce := NewSelectorSpreadPriority(
+			algorithm.FakeServiceLister(test.services),
+			algorithm.FakeControllerLister(test.rcs),
+			algorithm.FakeReplicaSetLister(test.rss),
+		)
+
+		list, err := priorityFunction(selectorSpreadMap, selectorSpreadReduce)(test.pod, nodeNameToInfo, makeLabeledNodeList(labeledNodes))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
