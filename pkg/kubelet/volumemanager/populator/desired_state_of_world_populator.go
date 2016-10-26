@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
@@ -133,6 +134,10 @@ func (dswp *desiredStateOfWorldPopulator) populatorLoopFunc() func() {
 // exist but should
 func (dswp *desiredStateOfWorldPopulator) findAndAddNewPods() {
 	for _, pod := range dswp.podManager.GetPods() {
+		// If pod was evicted, do not add it back
+		if eviction.PodIsEvicted(pod.Status) {
+			continue
+		}
 		dswp.processPodVolumes(pod)
 	}
 }
@@ -144,9 +149,12 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 
 	runningPodsFetched := false
 	for _, volumeToMount := range dswp.desiredStateOfWorld.GetVolumesToMount() {
-		if _, podExists :=
+		if pod, podExists :=
 			dswp.podManager.GetPodByUID(volumeToMount.Pod.UID); podExists {
-			continue
+			// Do not remove pod unless it was evicted
+			if !eviction.PodIsEvicted(pod.Status) {
+				continue
+			}
 		}
 
 		// Once a pod has been deleted from kubelet pod manager, do not delete
