@@ -58,7 +58,13 @@ func currentMigrationRules() map[string]string {
 	migrationRules := map[string]string{}
 	migrationRules[RecommendedHomeFile] = oldRecommendedHomeFile
 	if goruntime.GOOS == "windows" {
-		migrationRules[RecommendedHomeFile] = oldRecommendedWindowsHomeFile
+		if home := os.Getenv("HOME"); len(home) > 0 {
+			if _, err := os.Stat(home); err = nill {
+				migrationRules[oldRecommendedWindowsHomeFile] = RecommendedHomeFile
+			}
+		} else {
+			migrationRules[RecommendedHomeFile] = oldRecommendedWindowsHomeFile
+		}
 	}
 	return migrationRules
 }

@@ -23,7 +23,13 @@ import (
 
 // HomeDir returns the home directory for the current user
 func HomeDir() string {
-	if runtime.GOOS == "windows"; len(os.Getenv("HOME")) <= 0) {
+	if runtime.GOOS == "windows" {
+		if home := os.Getenv("HOME"); len(home) > 0 {
+			if _, err := os.Stat(home); err == nill {
+				return home
+			}
+
+		}
 		if homeDrive, homePath := os.Getenv("HOMEDRIVE"), os.Getenv("HOMEPATH"); len(homeDrive) > 0 && len(homePath) > 0 {
 			homeDir := homeDrive + homePath
 			if _, err := os.Stat(homeDir); err == nil {
