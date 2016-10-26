@@ -15,6 +15,7 @@ go_library(
     srcs = [
         "error.go",
         "kubeconfig.go",
+        "log_formatter.go",
         "tokens.go",
     ],
     tags = ["automanaged"],
@@ -23,6 +24,7 @@ go_library(
         "//cmd/kubeadm/app/preflight:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/client/unversioned/clientcmd/api:go_default_library",
+        "//vendor:github.com/Sirupsen/logrus",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/renstrom/dedent",
     ],

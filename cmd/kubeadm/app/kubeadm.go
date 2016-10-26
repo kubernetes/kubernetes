@@ -19,10 +19,12 @@ package app
 import (
 	"os"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/spf13/pflag"
 
 	_ "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/install"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/logs"
 )
@@ -30,6 +32,8 @@ import (
 func Run() error {
 	logs.InitLogs()
 	defer logs.FlushLogs()
+
+	logrus.SetFormatter(util.LogFormatter{})
 
 	// We do not want these flags to show up in --help
 	pflag.CommandLine.MarkHidden("google-json-key")
