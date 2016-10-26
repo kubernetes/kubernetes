@@ -59,7 +59,7 @@ fi
 
 "${mungedocs}" "--verify=true" "--verbose=true" \
                "--upstream=${git_upstream}" \
-               "--skip-munges=unversioned-warning,analytics" \
+               "--skip-munges=analytics" \
                "--norecurse" \
                "--root-dir=${KUBE_ROOT}/" && ret=0 || ret=$?
 if [[ $ret -eq 1 ]]; then

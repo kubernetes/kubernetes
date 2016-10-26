@@ -1,32 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Document Conventions
 
 Updated: 11/3/2015
@@ -48,8 +19,6 @@ for Kubernetes.*
     - [Headings](#headings)
   - [What Are Mungers?](#what-are-mungers)
   - [Auto-added Mungers](#auto-added-mungers)
-    - [Unversioned Warning](#unversioned-warning)
-    - [Is Versioned](#is-versioned)
     - [Generate Analytics](#generate-analytics)
 - [Generated documentation](#generated-documentation)
 
@@ -210,33 +179,6 @@ After running `hack/update-munge-docs.sh`, you may see some code / mungers in
 your md file that are auto-added. You don't have to add them manually. It's
 recommended to just read this section as a reference instead of messing up with
 the following mungers.
-
-
-### Unversioned Warning
-
-UNVERSIONED_WARNING munger inserts unversioned warning which warns the users
-when they're reading the document from HEAD and informs them where to find the
-corresponding document for a specific release.
-
-```
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-```
-
-### Is Versioned
-
-IS_VERSIONED munger inserts `IS_VERSIONED` tag in documents in each release,
-which stops UNVERSIONED_WARNING munger from inserting warning messages.
-
-```
-<!-- BEGIN MUNGE: IS_VERSIONED -->
-<!-- TAG IS_VERSIONED -->
-<!-- END MUNGE: IS_VERSIONED -->
-```
 
 ### Generate Analytics
 

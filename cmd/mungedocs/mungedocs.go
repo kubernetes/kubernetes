@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
@@ -50,11 +49,6 @@ Examples:
 
 	ErrChangesNeeded = errors.New("mungedocs: changes required")
 
-	// This records the files in the rootDir in upstream/latest-release
-	filesInLatestRelease string
-	// This indicates if the munger is running inside Jenkins
-	inJenkins bool
-
 	// All of the munge operations to perform.
 	// TODO: allow selection from command line. (e.g., just check links in the examples directory.)
 	allMunges = []munge{
@@ -63,7 +57,6 @@ Examples:
 		// Functions which modify state.
 		{"remove-whitespace", updateWhitespace},
 		{"table-of-contents", updateTOC},
-		{"unversioned-warning", updateUnversionedWarning},
 		{"md-links", updateLinks},
 		{"blank-lines-surround-preformatted", updatePreformatted},
 		{"header-lines", updateHeaderLines},
@@ -215,26 +208,6 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
 		os.Exit(2)
-	}
-
-	absRootDir, err := filepath.Abs(*rootDir)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
-		os.Exit(2)
-	}
-	inJenkins = len(os.Getenv("JENKINS_HOME")) != 0
-	out, err := exec.Command("git", "ls-tree", "-r", "--name-only", fmt.Sprintf("%s/%s", *upstream, latestReleaseBranch), absRootDir).CombinedOutput()
-	if err != nil {
-		if inJenkins {
-			fmt.Fprintf(os.Stderr, "output: %s,\nERROR: %v\n", out, err)
-			os.Exit(2)
-		} else {
-			fmt.Fprintf(os.Stdout, "output: %s,\nERROR: %v\n", out, err)
-			fmt.Fprintf(os.Stdout, "`git ls-tree -r --name-only %s/%s failed. We'll ignore this error locally, but Jenkins may pick an error. Munger uses the output of this command to determine in unversioned warning, if it should add a link to the doc in release branch.\n", *upstream, latestReleaseBranch)
-			filesInLatestRelease = ""
-		}
-	} else {
-		filesInLatestRelease = string(out)
 	}
 
 	fp := fileProcessor{
