@@ -19,6 +19,7 @@ package kubefed
 import (
 	"io"
 
+	kubefedinit "k8s.io/kubernetes/federation/pkg/kubefed/init"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	kubectl "k8s.io/kubernetes/pkg/kubectl/cmd"
@@ -52,6 +53,7 @@ func NewKubeFedCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 		{
 			Message: "Basic Commands:",
 			Commands: []*cobra.Command{
+				kubefedinit.NewCmdInit(f, out, util.NewAdminConfig(clientcmd.NewDefaultPathOptions())),
 				NewCmdJoin(f, out, util.NewAdminConfig(clientcmd.NewDefaultPathOptions())),
 				NewCmdUnjoin(f, out, err, util.NewAdminConfig(clientcmd.NewDefaultPathOptions())),
 			},
