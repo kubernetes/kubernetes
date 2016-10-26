@@ -94,13 +94,25 @@ func (mounter *SafeFormatAndMount) FormatAndMount(source string, target string, 
 }
 
 // New returns a mount.Interface for the current system.
-func New(mounterPath string) Interface {
+func New() Interface {
+	return &Mounter{}
+}
+
+// NewCustomMounter returns a mount.Interface for the current system.
+// It provides options to override the default mounter behavior.
+// mounterPath allows using an alternative to `/bin/mount` for mounting.
+// mounterRootfsPath allows specifying a custom root filesystem path for non default `mounterPath`.
+func NewCustomMounter(mounterPath, mounterRootfsPath string) Interface {
 	// If mounter-path flag is not set, use default mount path
-	if len(mounterPath) == 0 {
+	if mounterPath == "" {
 		mounterPath = mount
 	}
+	if mounterRootfsPath == "" {
+		mounterRootfsPath = "/"
+	}
 	return &Mounter{
-		mounterPath: mounterPath,
+		mounterPath:       mounterPath,
+		mounterRootfsPath: mounterRootfsPath,
 	}
 }
 
