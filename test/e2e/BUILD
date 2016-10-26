@@ -82,6 +82,7 @@ go_library(
         "monitoring.go",
         "namespace.go",
         "network_partition.go",
+        "network_policy.go",
         "networking.go",
         "networking_perf.go",
         "nodeoutofdisk.go",
