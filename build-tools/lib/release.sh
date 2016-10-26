@@ -90,7 +90,7 @@ function kube::release::package_tarballs() {
   kube::release::package_kube_manifests_tarball &
   kube::util::wait-for-jobs || { kube::log::error "previous tarball phase failed"; return 1; }
 
-  kube::release::package_full_tarball & # _full depends on all the previous phases
+  kube::release::package_final_tarball & # _final depends on some of the previous phases
   kube::release::package_test_tarball & # _test doesn't depend on anything
   kube::util::wait-for-jobs || { kube::log::error "previous tarball phase failed"; return 1; }
 }
@@ -371,30 +371,30 @@ function kube::release::package_test_tarball() {
   kube::release::create_tarball "${package_name}" "${release_stage}/.."
 }
 
-# This is all the stuff you need to run/install kubernetes.  This includes:
-#   - precompiled binaries for client
+# This is all the platform-independent stuff you need to run/install kubernetes.
+# Arch-specific binaries will need to be downloaded separately (possibly by
+# using the bundled cluster/get-kube-binaries.sh script).
+# Included in this tarball:
 #   - Cluster spin up/down scripts and configs for various cloud providers
-#   - tarballs for server binary and salt configs that are ready to be uploaded
+#   - Tarballs for salt configs that are ready to be uploaded
 #     to master by whatever means appropriate.
-function kube::release::package_full_tarball() {
-  kube::log::status "Building tarball: full"
+#   - Examples (which may or may not still work)
+#   - The remnants of the docs/ directory
+function kube::release::package_final_tarball() {
+  kube::log::status "Building tarball: final"
 
+  # This isn't a "full" tarball anymore, but the release lib still expects
+  # artifacts under "full/kubernetes/"
   local release_stage="${RELEASE_STAGE}/full/kubernetes"
   rm -rf "${release_stage}"
   mkdir -p "${release_stage}"
 
-  # Copy all of the client binaries in here, but not test or server binaries.
-  # The server binaries are included with the server binary tarball.
-  local platform
-  for platform in "${KUBE_CLIENT_PLATFORMS[@]}"; do
-    local client_bins=("${KUBE_CLIENT_BINARIES[@]}")
-    if [[ "${platform%/*}" == "windows" ]]; then
-      client_bins=("${KUBE_CLIENT_BINARIES_WIN[@]}")
-    fi
-    mkdir -p "${release_stage}/platforms/${platform}"
-    cp "${client_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
-      "${release_stage}/platforms/${platform}"
-  done
+  mkdir -p "${release_stage}/client"
+  cat <<EOF > "${release_stage}/client/README"
+Client binaries are no longer included in the Kubernetes final tarball.
+
+Run cluster/get-kube-binaries.sh to download client and server binaries.
+EOF
 
   # We want everything in /cluster except saltbase.  That is only needed on the
   # server.
@@ -403,8 +403,12 @@ function kube::release::package_full_tarball() {
 
   mkdir -p "${release_stage}/server"
   cp "${RELEASE_DIR}/kubernetes-salt.tar.gz" "${release_stage}/server/"
-  cp "${RELEASE_DIR}"/kubernetes-server-*.tar.gz "${release_stage}/server/"
   cp "${RELEASE_DIR}/kubernetes-manifests.tar.gz" "${release_stage}/server/"
+  cat <<EOF > "${release_stage}/server/README"
+Server binary tarballs are no longer included in the Kubernetes final tarball.
+
+Run cluster/get-kube-binaries.sh to download client and server binaries.
+EOF
 
   mkdir -p "${release_stage}/third_party"
   cp -R "${KUBE_ROOT}/third_party/htpasswd" "${release_stage}/third_party/htpasswd"
