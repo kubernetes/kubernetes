@@ -67,9 +67,6 @@ Deployment overlapping deployment should not fight with each other,kargakis,1
 Deployment paused deployment should be able to scale,kargakis,1
 Deployment paused deployment should be ignored by the controller,kargakis,0
 Deployment scaled rollout deployment should not block on annotation check,kargakis,1
-DisruptionController evictions: * => *,jszczepkowski,1
-DisruptionController should create a PodDisruptionBudget,quinton-hoole,1
-DisruptionController should update PodDisruptionBudget status,bgrant0607,1
 Docker Containers should be able to override the image's default arguments (docker cmd),maisem,0
 Docker Containers should be able to override the image's default command and arguments,maisem,0
 Docker Containers should be able to override the image's default commmand (docker entrypoint),maisem,0

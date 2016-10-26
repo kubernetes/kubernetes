@@ -16,6 +16,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/api/unversioned/validation:go_default_library",
+        "//pkg/api/validation:go_default_library",
         "//pkg/apis/extensions/validation:go_default_library",
         "//pkg/apis/policy:go_default_library",
         "//pkg/util/validation/field:go_default_library",

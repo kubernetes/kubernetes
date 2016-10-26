@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 // This file contains a collection of methods that can be used from go-restful to
 // generate Swagger API documentation for its models. Please read this PR for more
@@ -28,7 +28,7 @@ package v1alpha1
 
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_Eviction = map[string]string{
-	"":              "Eviction evicts a pod from its node subject to certain policies and safety constraints. This is a subresource of Pod.  A request to cause such an eviction is created by POSTing to .../pods/<pod name>/eviction.",
+	"":              "Eviction evicts a pod from its node subject to certain policies and safety constraints. This is a subresource of Pod.  A request to cause such an eviction is created by POSTing to .../pods/<pod name>/evictions.",
 	"metadata":      "ObjectMeta describes the pod that is being evicted.",
 	"deleteOptions": "DeleteOptions may be provided",
 }
@@ -66,11 +66,11 @@ func (PodDisruptionBudgetSpec) SwaggerDoc() map[string]string {
 }
 
 var map_PodDisruptionBudgetStatus = map[string]string{
-	"":                  "PodDisruptionBudgetStatus represents information about the status of a PodDisruptionBudget. Status may trail the actual state of a system.",
-	"disruptionAllowed": "Whether or not a disruption is currently allowed.",
-	"currentHealthy":    "current number of healthy pods",
-	"desiredHealthy":    "minimum desired number of healthy pods",
-	"expectedPods":      "total number of pods counted by this disruption budget",
+	"":                   "PodDisruptionBudgetStatus represents information about the status of a PodDisruptionBudget. Status may trail the actual state of a system.",
+	"disruptionsAllowed": "Number of pod disruptions that are currently allowed.",
+	"currentHealthy":     "current number of healthy pods",
+	"desiredHealthy":     "minimum desired number of healthy pods",
+	"expectedPods":       "total number of pods counted by this disruption budget",
 }
 
 func (PodDisruptionBudgetStatus) SwaggerDoc() map[string]string {
