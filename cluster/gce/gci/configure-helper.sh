@@ -479,7 +479,6 @@ function start-kubelet {
   if [[ -n "${KUBELET_PORT:-}" ]]; then
     flags+=" --port=${KUBELET_PORT}"
   fi
-  local reconcile_cidr="true"
   if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
     flags+=" --enable-debugging-handlers=false"
     flags+=" --hairpin-mode=none"
@@ -490,7 +489,6 @@ function start-kubelet {
       # TODO: determine if we still allow non-hostnetwork pods to run on master, clean up master pod setup
       # WARNING: potential ip range collision with 10.123.45.0/29
       flags+=" --pod-cidr=10.123.45.0/29"
-      reconcile_cidr="false"
     else
       flags+=" --pod-cidr=${MASTER_IP_RANGE}"
     fi
@@ -512,7 +510,6 @@ function start-kubelet {
     fi
     flags+=" --network-plugin=${NETWORK_PROVIDER}"
   fi
-  flags+=" --reconcile-cidr=${reconcile_cidr}"
   if [[ -n "${NON_MASQUERADE_CIDR:-}" ]]; then
     flags+=" --non-masquerade-cidr=${NON_MASQUERADE_CIDR}"
   fi

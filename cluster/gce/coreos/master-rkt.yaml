@@ -183,8 +183,7 @@ coreos:
         --rkt-path=/opt/rkt/rkt \
         --rkt-stage1-image=${RKT_STAGE_IMAGE} \
         --pod-cidr=${MASTER_IP_RANGE} \
-        --register-schedulable=false \
-        --reconcile-cidr=false
+        --register-schedulable=false
         Restart=always
         RestartSec=10
         KillMode=process
