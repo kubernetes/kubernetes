@@ -62,6 +62,8 @@ The example assumes that you already have a running Kubernetes cluster and you a
 
 Quobyte supports since 1.3 fixed user mounts. The fixed-user mounts simply allow to mount all Quobyte Volumes inside one directory and use them as different users. All access to the Quobyte Volume will be rewritten to the specified user and group – both are optional, independent of the user inside the container. You can read more about it [here](https://blog.inovex.de/docker-plugins) under the section "Quobyte Mount and Docker — what’s special"
 
+As default Quobyte will use the [serviceaccount](http://kubernetes.io/docs/user-guide/service-accounts) name as `user` and `group` and overwrites the specified `user` and `group`. If you create the pod below with the serviceaccount `deployer` the Volume Plugin will overwrite `user` and `group` to `deployer` so that the pod receives the logical mountpoint `/var/lib/kubelet/plugins/kubernetes.io~quobyte/deployer#deployer@testVolume`. One exception is the serviceaccount `default` in this case the Plugin allows you to specify the `user` and the `group` without overwriting it.
+
 ## Creating a pod
 
 See example:

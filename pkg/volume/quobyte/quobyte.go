@@ -158,6 +158,12 @@ func (plugin *quobytePlugin) newMounterInternal(spec *volume.Spec, pod *api.Pod,
 		return nil, err
 	}
 
+	// We use the service account if it's not the default service account
+	if pod != nil && len(pod.Spec.ServiceAccountName) != 0 && pod.Spec.ServiceAccountName != "default" {
+		source.User = pod.Spec.ServiceAccountName
+		source.Group = pod.Spec.ServiceAccountName
+	}
+
 	return &quobyteMounter{
 		quobyte: &quobyte{
 			volName: spec.Name(),
@@ -253,20 +259,13 @@ func (mounter *quobyteMounter) SetUpAt(dir string, fsGroup *int64) error {
 // GetPath returns the path to the user specific mount of a Quobyte volume
 // Returns a path in the format ../user#group@volume
 func (quobyteVolume *quobyte) GetPath() string {
-	user := quobyteVolume.user
-	if len(user) == 0 {
-		user = "root"
-	}
-
-	group := quobyteVolume.group
-	if len(group) == 0 {
-		group = "nfsnobody"
-	}
-
 	// Quobyte has only one mount in the PluginDir where all Volumes are mounted
 	// The Quobyte client does a fixed-user mapping
-	pluginDir := quobyteVolume.plugin.host.GetPluginDir(strings.EscapeQualifiedNameForDisk(quobytePluginName))
-	return path.Join(pluginDir, fmt.Sprintf("%s#%s@%s", user, group, quobyteVolume.volume))
+	return path.Join(quobyteVolume.plugin.host.GetPluginDir(strings.EscapeQualifiedNameForDisk(quobytePluginName)),
+		fmt.Sprintf("%s#%s@%s",
+			quobyteVolume.user,
+			quobyteVolume.group,
+			quobyteVolume.volume))
 }
 
 type quobyteUnmounter struct {
