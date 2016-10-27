@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	"k8s.io/kubernetes/pkg/fields"
 )
 
 func NewCmdToken(out io.Writer) *cobra.Command {
@@ -53,6 +54,16 @@ func NewCmdToken(out io.Writer) *cobra.Command {
 	}
 	tokenCmd.AddCommand(createCmd)
 
+	listCmd := &cobra.Command{
+		Use:   "list",
+		Short: "List discovery tokens on the server.",
+		Run: func(tokenCmd *cobra.Command, args []string) {
+			err := RunListTokens(out, tokenCmd, skipPreFlight)
+			kubeadmutil.CheckErr(err)
+		},
+	}
+	tokenCmd.AddCommand(listCmd)
+
 	return tokenCmd
 }
 
@@ -65,22 +76,9 @@ func RunCreateToken(out io.Writer, cmd *cobra.Command, skipPreFlight bool) error
 		fmt.Println("Skipping pre-flight checks")
 	}
 
-	envParams := kubeadmapi.GetEnvParams()
-	adminKubeconfig, err := clientcmd.LoadFromFile(path.Join(envParams["kubernetes_dir"], "admin.conf"))
+	client, err := createAPIClient()
 	if err != nil {
-		return fmt.Errorf("<cmd/token> failed to load admin kubeconfig [%v]", err)
-	}
-	adminClientConfig, err := clientcmd.NewDefaultClientConfig(
-		*adminKubeconfig,
-		&clientcmd.ConfigOverrides{},
-	).ClientConfig()
-	if err != nil {
-		return fmt.Errorf("<cmd/token> failed to create API client configuration [%v]", err)
-	}
-
-	client, err := clientset.NewForConfig(adminClientConfig)
-	if err != nil {
-		return fmt.Errorf("<cmd/token> failed to create API client [%v]", err)
+		return err
 	}
 
 	tokenSecret := &kubeadmapi.Secrets{}
@@ -97,7 +95,7 @@ func RunCreateToken(out io.Writer, cmd *cobra.Command, skipPreFlight bool) error
 		Data: encodeTokenSecretData(tokenSecret),
 	}
 	if _, err := client.Secrets(api.NamespaceSystem).Create(secret); err != nil {
-		return fmt.Errorf("<cmd/token> failed to create token secret [%v]", err)
+		return fmt.Errorf("<cmd/token> failed to bootstrap token [%v]", err)
 	}
 	fmt.Printf("<cmd/token> Token secret created: %s\n", tokenSecret.GivenToken)
 
@@ -124,4 +122,56 @@ func encodeTokenSecretData(tokenSecret *kubeadmapi.Secrets) map[string][]byte {
 	data["usage-bootstrap-signing"] = []byte("true")
 
 	return data
+}
+
+func createAPIClient() (*clientset.Clientset, error) {
+	envParams := kubeadmapi.GetEnvParams()
+	adminKubeconfig, err := clientcmd.LoadFromFile(path.Join(envParams["kubernetes_dir"], "admin.conf"))
+	if err != nil {
+		return nil, fmt.Errorf("<cmd/token> failed to load admin kubeconfig [%v]", err)
+	}
+	adminClientConfig, err := clientcmd.NewDefaultClientConfig(
+		*adminKubeconfig,
+		&clientcmd.ConfigOverrides{},
+	).ClientConfig()
+	if err != nil {
+		return nil, fmt.Errorf("<cmd/token> failed to create API client configuration [%v]", err)
+	}
+
+	client, err := clientset.NewForConfig(adminClientConfig)
+	if err != nil {
+		return nil, fmt.Errorf("<cmd/token> failed to create API client [%v]", err)
+	}
+	return client, nil
+}
+
+func RunListTokens(out io.Writer, cmd *cobra.Command, skipPreFlight bool) error {
+	if !skipPreFlight {
+		fmt.Println("Running pre-flight checks")
+		// TODO
+	} else {
+		fmt.Println("Skipping pre-flight checks")
+	}
+
+	client, err := createAPIClient()
+	if err != nil {
+		return err
+	}
+
+	tokenSelector := fields.SelectorFromSet(
+		map[string]string{
+			api.SecretTypeField: string(api.SecretTypeBootstrapToken),
+		},
+	)
+	listOptions := api.ListOptions{
+		FieldSelector: tokenSelector,
+	}
+
+	results, err := client.Secrets(api.NamespaceSystem).List(listOptions)
+	if err != nil {
+		return fmt.Errorf("<cmd/token> failed to list bootstrap tokens [%v]", err)
+	}
+	fmt.Println(results)
+
+	return nil
 }
