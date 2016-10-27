@@ -23,6 +23,8 @@ import (
 
 	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fake_fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/fake"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
@@ -44,12 +46,16 @@ func TestNamespaceController(t *testing.T) {
 			Name:     "test-namespace",
 			SelfLink: "/api/v1/namespaces/test-namespace",
 		},
+		Spec: api_v1.NamespaceSpec{
+			Finalizers: []api_v1.FinalizerName{api_v1.FinalizerKubernetes},
+		},
 	}
 
 	fakeClient := &fake_fedclientset.Clientset{}
 	RegisterFakeList("clusters", &fakeClient.Fake, &federation_api.ClusterList{Items: []federation_api.Cluster{*cluster1}})
 	RegisterFakeList("namespaces", &fakeClient.Fake, &api_v1.NamespaceList{Items: []api_v1.Namespace{}})
 	namespaceWatch := RegisterFakeWatch("namespaces", &fakeClient.Fake)
+	namespaceCreateChan := RegisterFakeCopyOnCreate("namespaces", &fakeClient.Fake, namespaceWatch)
 	clusterWatch := RegisterFakeWatch("clusters", &fakeClient.Fake)
 
 	cluster1Client := &fake_kubeclientset.Clientset{}
@@ -87,8 +93,7 @@ func TestNamespaceController(t *testing.T) {
 	secretDeleteChan := RegisterDeleteCollection(&fakeClient.Fake, "secrets")
 
 	namespaceController := NewNamespaceController(fakeClient)
-	informer := ToFederatedInformerForTestOnly(namespaceController.namespaceFederatedInformer)
-	informer.SetClientFactory(func(cluster *federation_api.Cluster) (kubeclientset.Interface, error) {
+	informerClientFactory := func(cluster *federation_api.Cluster) (kubeclientset.Interface, error) {
 		switch cluster.Name {
 		case cluster1.Name:
 			return cluster1Client, nil
@@ -97,7 +102,8 @@ func TestNamespaceController(t *testing.T) {
 		default:
 			return nil, fmt.Errorf("Unknown cluster")
 		}
-	})
+	}
+	setClientFactory(namespaceController.namespaceFederatedInformer, informerClientFactory)
 	namespaceController.clusterAvailableDelay = time.Second
 	namespaceController.namespaceReviewDelay = 50 * time.Millisecond
 	namespaceController.smallDelay = 20 * time.Millisecond
@@ -108,11 +114,19 @@ func TestNamespaceController(t *testing.T) {
 
 	// Test add federated namespace.
 	namespaceWatch.Add(&ns1)
+	// Verify that the DeleteFromUnderlyingClusters finalizer is added to the namespace.
+	// Note: finalize invokes the create action in Fake client.
+	// TODO: Seems like a bug. Should invoke update. Fix it.
+	updatedNamespace := GetNamespaceFromChan(namespaceCreateChan)
+	assert.True(t, namespaceController.hasFinalizerFunc(updatedNamespace, deletionhelper.FinalizerDeleteFromUnderlyingClusters))
+	ns1 = *updatedNamespace
+
+	// Verify that the namespace is created in underlying cluster1.
 	createdNamespace := GetNamespaceFromChan(cluster1CreateChan)
 	assert.NotNil(t, createdNamespace)
 	assert.Equal(t, ns1.Name, createdNamespace.Name)
 
-	// Wait for the secret to appear in the informer store
+	// Wait for the namespace to appear in the informer store
 	err := WaitForStoreUpdate(
 		namespaceController.namespaceFederatedInformer.GetTargetStore(),
 		cluster1.Name, ns1.Name, wait.ForeverTestTimeout)
@@ -123,7 +137,7 @@ func TestNamespaceController(t *testing.T) {
 		"A": "B",
 	}
 	namespaceWatch.Modify(&ns1)
-	updatedNamespace := GetNamespaceFromChan(cluster1UpdateChan)
+	updatedNamespace = GetNamespaceFromChan(cluster1UpdateChan)
 	assert.NotNil(t, updatedNamespace)
 	assert.Equal(t, ns1.Name, updatedNamespace.Name)
 	// assert.Contains(t, updatedNamespace.Annotations, "A")
@@ -135,6 +149,10 @@ func TestNamespaceController(t *testing.T) {
 	assert.Equal(t, ns1.Name, createdNamespace2.Name)
 	// assert.Contains(t, createdNamespace2.Annotations, "A")
 
+	// Delete the namespace with orphan finalizer (let namespaces
+	// in underlying clusters be as is).
+	// TODO: Add a test without orphan finalizer.
+	ns1.ObjectMeta.Finalizers = append(ns1.ObjectMeta.Finalizers, api_v1.FinalizerOrphan)
 	ns1.DeletionTimestamp = &unversioned.Time{Time: time.Now()}
 	namespaceWatch.Modify(&ns1)
 	assert.Equal(t, ns1.Name, GetStringFromChan(nsDeleteChan))
@@ -143,6 +161,11 @@ func TestNamespaceController(t *testing.T) {
 	assert.Equal(t, "all", GetStringFromChan(secretDeleteChan))
 
 	close(stop)
+}
+
+func setClientFactory(informer util.FederatedInformer, informerClientFactory func(*federation_api.Cluster) (kubeclientset.Interface, error)) {
+	testInformer := ToFederatedInformerForTestOnly(informer)
+	testInformer.SetClientFactory(informerClientFactory)
 }
 
 func RegisterDeleteCollection(client *core.Fake, resource string) chan string {
@@ -169,7 +192,7 @@ func GetStringFromChan(c chan string) string {
 	case str := <-c:
 		return str
 	case <-time.After(5 * time.Second):
-		return ""
+		return "timedout"
 	}
 }
 
