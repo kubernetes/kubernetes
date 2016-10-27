@@ -141,7 +141,7 @@ func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
 		return
 	}
 
-	nodeObj, found, err := nc.nodeStore.Store.GetByKey(pod.Spec.NodeName)
+	_, found, err := nc.nodeStore.Store.GetByKey(pod.Spec.NodeName)
 	if err != nil {
 		// this can only happen if the Store.KeyFunc has a problem creating
 		// a key for the pod. If it happens once, it will happen again so
@@ -154,23 +154,6 @@ func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
 	// nonexistent nodes
 	if !found {
 		glog.Warningf("Unable to find Node: %v, deleting all assigned Pods.", pod.Spec.NodeName)
-		utilruntime.HandleError(nc.forcefullyDeletePod(pod))
-		return
-	}
-
-	// delete terminating pods that have been scheduled on
-	// nodes that do not support graceful termination
-	// TODO(mikedanese): this can be removed when we no longer
-	// guarantee backwards compatibility of master API to kubelets with
-	// versions less than 1.1.0
-	node := nodeObj.(*api.Node)
-	v, err := version.Parse(node.Status.NodeInfo.KubeletVersion)
-	if err != nil {
-		glog.V(0).Infof("couldn't parse verions %q of minion: %v", node.Status.NodeInfo.KubeletVersion, err)
-		utilruntime.HandleError(nc.forcefullyDeletePod(pod))
-		return
-	}
-	if gracefulDeletionVersion.GT(v) {
 		utilruntime.HandleError(nc.forcefullyDeletePod(pod))
 		return
 	}

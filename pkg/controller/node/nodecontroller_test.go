@@ -1702,21 +1702,21 @@ func TestCheckPod(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{DeletionTimestamp: &unversioned.Time{}},
 				Spec:       api.PodSpec{NodeName: "old"},
 			},
-			prune: true,
+			prune: false,
 		},
 		{
 			pod: api.Pod{
 				ObjectMeta: api.ObjectMeta{DeletionTimestamp: &unversioned.Time{}},
 				Spec:       api.PodSpec{NodeName: "older"},
 			},
-			prune: true,
+			prune: false,
 		},
 		{
 			pod: api.Pod{
 				ObjectMeta: api.ObjectMeta{DeletionTimestamp: &unversioned.Time{}},
 				Spec:       api.PodSpec{NodeName: "oldest"},
 			},
-			prune: true,
+			prune: false,
 		},
 		{
 			pod: api.Pod{
