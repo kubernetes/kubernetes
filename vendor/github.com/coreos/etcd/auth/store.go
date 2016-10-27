@@ -603,6 +603,11 @@ func (as *authStore) isOpPermitted(userName string, key, rangeEnd []byte, permTy
 		return false
 	}
 
+	// root role should have permission on all ranges
+	if hasRootRole(user) {
+		return true
+	}
+
 	if as.isRangeOpPermitted(tx, userName, key, rangeEnd, permTyp) {
 		return true
 	}
