@@ -426,9 +426,16 @@ func (kl *Kubelet) setNodeAddress(node *api.Node) error {
 			// We tried everything we could, but the IP address wasn't fetchable; error out
 			return fmt.Errorf("can't get ip address of node %s. error: %v", node.Name, err)
 		} else {
+			var nodeInternalIP string
+			if kl.kubeletConfiguration.Address != "0.0.0.0" &&
+				kl.kubeletConfiguration.Address != "" {
+				nodeInternalIP = kl.kubeletConfiguration.Address
+			} else {
+				nodeInternalIP = ipAddr.String()
+			}
 			node.Status.Addresses = []api.NodeAddress{
 				{Type: api.NodeLegacyHostIP, Address: ipAddr.String()},
-				{Type: api.NodeInternalIP, Address: ipAddr.String()},
+				{Type: api.NodeInternalIP, Address: nodeInternalIP},
 			}
 		}
 	}
