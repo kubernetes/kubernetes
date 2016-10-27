@@ -409,7 +409,8 @@
       "consumes": [
        "application/json-patch+json",
        "application/merge-patch+json",
-       "application/strategic-merge-patch+json"
+       "application/strategic-merge-patch+json",
+       "application/strategic-merge-patch-v2+json"
       ]
      },
      {
@@ -948,7 +949,8 @@
       "consumes": [
        "application/json-patch+json",
        "application/merge-patch+json",
-       "application/strategic-merge-patch+json"
+       "application/strategic-merge-patch+json",
+       "application/strategic-merge-patch-v2+json"
       ]
      },
      {
@@ -1543,7 +1545,8 @@
       "consumes": [
        "application/json-patch+json",
        "application/merge-patch+json",
-       "application/strategic-merge-patch+json"
+       "application/strategic-merge-patch+json",
+       "application/strategic-merge-patch-v2+json"
       ]
      },
      {
@@ -2309,7 +2312,8 @@
       "consumes": [
        "application/json-patch+json",
        "application/merge-patch+json",
-       "application/strategic-merge-patch+json"
+       "application/strategic-merge-patch+json",
+       "application/strategic-merge-patch-v2+json"
       ]
      },
      {
