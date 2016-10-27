@@ -61,7 +61,10 @@ func NewPrivateKey() (*rsa.PrivateKey, error) {
 func NewSelfSignedCACert(cfg Config, key *rsa.PrivateKey) (*x509.Certificate, error) {
 	now := time.Now()
 	tmpl := x509.Certificate{
-		SerialNumber: new(big.Int).SetInt64(0),
+		// Many clients fail TLS connections if they see two different certs with the same serial number
+		// from the same signer (and they have a local memory of previously seen certs from a given signer).
+		// Hence, we put a timestamp here.
+		SerialNumber: new(big.Int).SetInt64(time.Now().Unix()),
 		Subject: pkix.Name{
 			CommonName:   cfg.CommonName,
 			Organization: cfg.Organization,

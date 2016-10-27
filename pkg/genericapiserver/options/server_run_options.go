@@ -498,12 +498,12 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"File containing the default x509 private key matching --tls-cert-file.")
 
 	fs.Var(config.NewNamedCertKeyArray(&s.SNICertKeys), "tls-sni-cert-key", ""+
-		"A pair of x509 certificate and private key file paths, optionally prefixed with a list of "+
+		"A pair of x509 certificate and private key file paths, optionally suffixed with a list of "+
 		"domain patterns which are fully qualified domain names, possibly with prefixed wildcard "+
 		"segments. If no domain patterns are provided, the names of the certificate are "+
 		"extracted. Non-wildcard matches trump over wildcard matches, explicit domain patterns "+
 		"trump over extracted names. For multiple key/certificate pairs, use the "+
-		"--tls-sni-key-cert multiple times. "+
+		"--tls-sni-cert-key multiple times. "+
 		"Examples: \"example.key,example.crt\" or \"*.foo.com,foo.com:foo.key,foo.crt\".")
 
 	fs.StringVar(&s.TokenAuthFile, "token-auth-file", s.TokenAuthFile, ""+

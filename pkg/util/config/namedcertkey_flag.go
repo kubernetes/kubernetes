@@ -68,7 +68,7 @@ func (*NamedCertKey) Type() string {
 	return "namedCertKey"
 }
 
-// NamedCertKeyArray is a flag value parsing NamedKeyCerts, each passed with its own
+// NamedCertKeyArray is a flag value parsing NamedCertKeys, each passed with its own
 // flag instance (in contrast to comma separated slices).
 type NamedCertKeyArray struct {
 	value   *[]NamedCertKey
@@ -101,7 +101,7 @@ func (a *NamedCertKeyArray) Set(val string) error {
 }
 
 func (a *NamedCertKeyArray) Type() string {
-	return "namedKeyCert"
+	return "namedCertKey"
 }
 
 func (a *NamedCertKeyArray) String() string {

@@ -24,7 +24,7 @@ import (
 	"testing"
 )
 
-func TestNamedKeyCertArrayFlag(t *testing.T) {
+func TestNamedCertKeyArrayFlag(t *testing.T) {
 	tests := []struct {
 		args       []string
 		def        []NamedCertKey
@@ -109,7 +109,7 @@ func TestNamedKeyCertArrayFlag(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		fs := pflag.NewFlagSet("testNamedKeyCertArray", pflag.ContinueOnError)
+		fs := pflag.NewFlagSet("testNamedCertKeyArray", pflag.ContinueOnError)
 		var nkcs []NamedCertKey
 		for _, d := range test.def {
 			nkcs = append(nkcs, d)

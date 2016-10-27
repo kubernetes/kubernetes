@@ -29,6 +29,11 @@ import (
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
+)
+
+const (
+	defaultKeepAlivePeriod = 3 * time.Minute
 )
 
 // serveSecurely runs the secure http server. It fails only if certificates cannot
@@ -106,15 +111,14 @@ func (s *GenericAPIServer) serveInsecurely(stopCh <-chan struct{}) error {
 // runServer listens on the given port, then spawns a go-routine continuously serving
 // until the stopCh is closed. The port is returned. This function does not block.
 func runServer(server *http.Server, stopCh <-chan struct{}) (int, error) {
-	addr := server.Addr
-	if addr == "" {
-		addr = ":https"
+	if len(server.Addr) == 0 {
+		return 0, errors.New("address cannot be empty")
 	}
 
 	// first listen is synchronous (fail early!)
-	ln, err := net.Listen("tcp", addr)
+	ln, err := net.Listen("tcp", server.Addr)
 	if err != nil {
-		return 0, fmt.Errorf("Failed to listen on %v: %v", addr, err)
+		return 0, fmt.Errorf("failed to listen on %v: %v", server.Addr, err)
 	}
 
 	// get port
@@ -143,16 +147,16 @@ func runServer(server *http.Server, stopCh <-chan struct{}) (int, error) {
 			}
 
 			err := server.Serve(listener)
-			glog.Errorf("Error serving %v (%v); will try again.", addr, err)
+			glog.Errorf("Error serving %v (%v); will try again.", server.Addr, err)
 
-			// listen again, but never retry instead of fail.
+			// listen again
 			func() {
 				lock.Lock()
 				defer lock.Unlock()
 				for {
 					time.Sleep(15 * time.Second)
 
-					ln, err = net.Listen("tcp", addr)
+					ln, err = net.Listen("tcp", server.Addr)
 					if err == nil {
 						return
 					}
@@ -161,7 +165,7 @@ func runServer(server *http.Server, stopCh <-chan struct{}) (int, error) {
 						return
 					default:
 					}
-					glog.Errorf("Error listening on %v (%v); will try again.", addr, err)
+					glog.Errorf("Error listening on %v (%v); will try again.", server.Addr, err)
 				}
 			}()
 
@@ -178,7 +182,7 @@ func runServer(server *http.Server, stopCh <-chan struct{}) (int, error) {
 
 // getNamedCertificateMap returns a map of strings to *tls.Certificate, suitable for use in
 // tls.Config#NamedCertificates. Returns an error if any of the certs cannot be loaded.
-// Returns nil if len(namedKeyCerts) == 0
+// Returns nil if len(namedCertKeys) == 0
 func getNamedCertificateMap(namedCertKeys []NamedCertKey) (map[string]*tls.Certificate, error) {
 	if len(namedCertKeys) == 0 {
 		return nil, nil
@@ -241,6 +245,8 @@ func getNamedCertificateMap(namedCertKeys []NamedCertKey) (map[string]*tls.Certi
 // connections. It's used by ListenAndServe and ListenAndServeTLS so
 // dead TCP connections (e.g. closing laptop mid-download) eventually
 // go away.
+//
+// Copied from Go 1.7.2 net/http/server.go
 type tcpKeepAliveListener struct {
 	*net.TCPListener
 }
@@ -251,6 +257,6 @@ func (ln tcpKeepAliveListener) Accept() (c net.Conn, err error) {
 		return
 	}
 	tc.SetKeepAlive(true)
-	tc.SetKeepAlivePeriod(3 * time.Minute)
+	tc.SetKeepAlivePeriod(defaultKeepAlivePeriod)
 	return tc, nil
 }

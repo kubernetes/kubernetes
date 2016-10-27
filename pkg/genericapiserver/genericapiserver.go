@@ -17,7 +17,6 @@ limitations under the License.
 package genericapiserver
 
 import (
-	"crypto/tls"
 	"fmt"
 	"mime"
 	"net"
@@ -207,18 +206,6 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) {
 		}
 	}
 
-	// Attempt to verify the server came up for 20 seconds (100 tries * 100ms, 100ms timeout per try) per port
-	if s.SecureServingInfo != nil {
-		if err := waitForSuccessfulDial(true, "tcp", s.SecureServingInfo.BindAddress, 100*time.Millisecond, 100*time.Millisecond, 100); err != nil {
-			glog.Fatalf("Secure server never started: %v", err)
-		}
-	}
-	if s.InsecureServingInfo != nil {
-		if err := waitForSuccessfulDial(false, "tcp", s.InsecureServingInfo.BindAddress, 100*time.Millisecond, 100*time.Millisecond, 100); err != nil {
-			glog.Fatalf("Insecure server never started: %v", err)
-		}
-	}
-
 	s.RunPostStartHooks()
 
 	// err == systemd.SdNotifyNoSocket when not running on a systemd system
@@ -226,9 +213,7 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) {
 		glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
 	}
 
-	select {
-	case <-stopCh:
-	}
+	<-stopCh
 }
 
 // installAPIResources is a private method for installing the REST storage backing each api groupversionresource
@@ -426,28 +411,4 @@ func NewDefaultAPIGroupInfo(group string) APIGroupInfo {
 		ParameterCodec:               api.ParameterCodec,
 		NegotiatedSerializer:         api.Codecs,
 	}
-}
-
-// waitForSuccessfulDial attempts to connect to the given address, closing and returning nil on the first successful connection.
-func waitForSuccessfulDial(https bool, network, address string, timeout, interval time.Duration, retries int) error {
-	var (
-		conn net.Conn
-		err  error
-	)
-	for i := 0; i <= retries; i++ {
-		dialer := net.Dialer{Timeout: timeout}
-		if https {
-			conn, err = tls.DialWithDialer(&dialer, network, address, &tls.Config{InsecureSkipVerify: true})
-		} else {
-			conn, err = dialer.Dial(network, address)
-		}
-		if err != nil {
-			glog.V(5).Infof("Got error %#v, trying again: %#v\n", err, address)
-			time.Sleep(interval)
-			continue
-		}
-		conn.Close()
-		return nil
-	}
-	return err
 }
