@@ -57,6 +57,12 @@ if [ "${TARGET_STORAGE}" != "etcd2" -a "${TARGET_STORAGE}" != "etcd3" ]; then
   exit 1
 fi
 
+# Correctly support upgrade and rollback to non-default version.
+if [ "${DO_NOT_MOVE_BINARIES:-}" != "true" ]; then
+  cp "/usr/local/bin/etcd-${TARGET_VERSION}" "/usr/local/bin/etcd"
+  cp "/usr/local/bin/etcdctl-${TARGET_VERSION}" "/usr/local/bin/etcdctl"
+fi
+
 # NOTE: SUPPORTED_VERSION has to match release binaries present in the
 # etcd image (to make this script work correctly).
 # We cannot use array since sh doesn't support it.
@@ -156,9 +162,9 @@ for step in ${SUPPORTED_VERSIONS}; do
     fi
     # Kill etcd and wait until this is down.
     stop_etcd
+    CURRENT_VERSION=${step}
+    echo "${CURRENT_VERSION}/${CURRENT_STORAGE}" > "${DATA_DIRECTORY}/${VERSION_FILE}"
   fi
-  CURRENT_VERSION=${step}
-  echo "${CURRENT_VERSION}/${CURRENT_STORAGE}" > "${DATA_DIRECTORY}/${VERSION_FILE}"
   if [ "$(echo ${CURRENT_VERSION} | cut -c1-2)" = "3." -a "${CURRENT_STORAGE}" = "etcd2" -a "${TARGET_STORAGE}" = "etcd3" ]; then
     # If it is the first 3.x release in the list and we are migrating
     # also from 'etcd2' to 'etcd3', do the migration now.
