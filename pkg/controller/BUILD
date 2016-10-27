@@ -41,6 +41,7 @@ go_library(
         "//pkg/util/integer:go_default_library",
         "//pkg/util/sets:go_default_library",
         "//pkg/watch:go_default_library",
+        "//pkg/watch/listwatch:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/golang/groupcache/lru",
     ],
