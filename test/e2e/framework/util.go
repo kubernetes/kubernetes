@@ -1314,7 +1314,7 @@ func waitForPodTerminatedInNamespace(c clientset.Interface, podName, reason, nam
 func waitForPodSuccessInNamespaceTimeout(c clientset.Interface, podName string, namespace string, timeout time.Duration) error {
 	return waitForPodCondition(c, namespace, podName, "success or failure", timeout, func(pod *api.Pod) (bool, error) {
 		if pod.Spec.RestartPolicy == api.RestartPolicyAlways {
-			return false, fmt.Errorf("pod %q will never terminate with a succeeded state since its restart policy is Always", podName)
+			return true, fmt.Errorf("pod %q will never terminate with a succeeded state since its restart policy is Always", podName)
 		}
 		switch pod.Status.Phase {
 		case api.PodSucceeded:
