@@ -1179,7 +1179,7 @@
       "description": "Optional duration in seconds relative to the startTime that the job may be active before the system tries to terminate it; value must be positive integer"
      },
      "selector": {
-      "$ref": "v1.LabelSelector",
+      "$ref": "unversioned.LabelSelector",
       "description": "Selector is a label query over pods that should match the pod count. Normally, the system sets this field for you. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors"
      },
      "manualSelector": {
@@ -1192,8 +1192,8 @@
      }
     }
    },
-   "v1.LabelSelector": {
-    "id": "v1.LabelSelector",
+   "unversioned.LabelSelector": {
+    "id": "unversioned.LabelSelector",
     "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
     "properties": {
      "matchLabels": {
@@ -1203,14 +1203,14 @@
      "matchExpressions": {
       "type": "array",
       "items": {
-       "$ref": "v1.LabelSelectorRequirement"
+       "$ref": "unversioned.LabelSelectorRequirement"
       },
       "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed."
      }
     }
    },
-   "v1.LabelSelectorRequirement": {
-    "id": "v1.LabelSelectorRequirement",
+   "unversioned.LabelSelectorRequirement": {
+    "id": "unversioned.LabelSelectorRequirement",
     "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
     "required": [
      "key",
