@@ -20,3 +20,7 @@ go_binary(
         "//vendor:k8s.io/gengo/examples/set-gen/generators",
     ],
 )
+
+exports_files([
+    "types.go",
+])
