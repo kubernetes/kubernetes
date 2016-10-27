@@ -17,17 +17,12 @@ limitations under the License.
 package fake
 
 import (
-	v1alpha1 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/apps/v1alpha1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
 type FakeApps struct {
 	*core.Fake
-}
-
-func (c *FakeApps) PetSets(namespace string) v1alpha1.PetSetInterface {
-	return &FakePetSets{c, namespace}
 }
 
 // GetRESTClient returns a RESTClient that is used to communicate
