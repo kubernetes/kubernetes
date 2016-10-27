@@ -509,7 +509,8 @@ func (f *fakeAPIFactory) NewBuilder() *resource.Builder {
 
 func NewAPIFactory() (cmdutil.Factory, *TestFactory, runtime.Codec, runtime.NegotiatedSerializer) {
 	t := &TestFactory{
-		Validator: validation.NullSchema{},
+		Validator:    validation.NullSchema{},
+		ClientConfig: &restclient.Config{},
 	}
 	rf := cmdutil.NewFactory(nil)
 	return &fakeAPIFactory{

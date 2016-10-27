@@ -151,6 +151,16 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *App
 
 	dryRun := cmdutil.GetFlagBool(cmd, "dry-run")
 
+	clientConfig, err := f.ClientConfig()
+	if err != nil {
+		return err
+	}
+
+	defaultVersion, err := cmdutil.OutputVersion(cmd, clientConfig.GroupVersion)
+	if err != nil {
+		return err
+	}
+
 	encoder := f.JSONEncoder()
 	decoder := f.Decoder(false)
 
@@ -220,7 +230,13 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *App
 			helper := resource.NewHelper(info.Client, info.Mapping)
 			patcher := NewPatcher(encoder, decoder, info.Mapping, helper, overwrite)
 
-			patchBytes, err := patcher.patch(info.Object, modified, info.Source, info.Namespace, info.Name)
+			infos := []*resource.Info{info}
+			originalObj, err := resource.AsVersionedObject(infos, false, defaultVersion, encoder)
+			if err != nil {
+				return cmdutil.AddSourceToErr(fmt.Sprintf("converting to versioned struct:\n%v\nfor:", info.Object), info.Source, err)
+			}
+
+			patchBytes, err := patcher.patch(originalObj, modified, info.Source, info.Namespace, info.Name)
 			if err != nil {
 				return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patchBytes, info), info.Source, err)
 			}
