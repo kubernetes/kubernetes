@@ -118,7 +118,7 @@ func UnsecuredKubeletDeps(s *options.KubeletServer) (*kubelet.KubeletDeps, error
 		return nil, err
 	}
 
-	mounter := mount.New(s.ExperimentalMounterPath)
+	mounter := mount.NewCustomMounter(s.ExperimentalMounterPath, s.ExperimentalMounterRootfsPath)
 	var writer kubeio.Writer = &kubeio.StdWriter{}
 	if s.Containerized {
 		glog.V(2).Info("Running kubelet in containerized mode (experimental)")
