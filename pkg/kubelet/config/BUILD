@@ -43,6 +43,7 @@ go_library(
         "//pkg/util/validation/field:go_default_library",
         "//pkg/util/wait:go_default_library",
         "//pkg/util/yaml:go_default_library",
+        "//pkg/watch:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:golang.org/x/exp/inotify",
     ],

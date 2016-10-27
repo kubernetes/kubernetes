@@ -26,7 +26,6 @@ go_library(
         "//pkg/client/record:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",
-        "//pkg/fields:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/util/metrics:go_default_library",
         "//pkg/util/runtime:go_default_library",

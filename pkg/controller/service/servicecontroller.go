@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/fields"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/pkg/util/runtime"
@@ -175,8 +174,21 @@ func (s *ServiceController) Run(workers int) {
 	for i := 0; i < workers; i++ {
 		go wait.Until(s.worker, time.Second, wait.NeverStop)
 	}
-	nodeLW := cache.NewListWatchFromClient(s.kubeClient.Core().RESTClient(), "nodes", api.NamespaceAll, fields.Everything())
-	cache.NewReflector(nodeLW, &api.Node{}, s.nodeLister.Store, 0).Run()
+
+	cache.NewReflector(
+		&cache.ListWatch{
+			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
+				return s.kubeClient.Core().Nodes().List(options)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return s.kubeClient.Core().Nodes().Watch(options)
+			},
+		},
+		&api.Node{},
+		s.nodeLister.Store,
+		0,
+	).Run()
+
 	go wait.Until(s.nodeSyncLoop, nodeSyncPeriod, wait.NeverStop)
 }
 

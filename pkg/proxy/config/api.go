@@ -21,16 +21,40 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/fields"
+	coreclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 // NewSourceAPI creates config source that watches for changes to the services and endpoints.
-func NewSourceAPI(c cache.Getter, period time.Duration, servicesChan chan<- ServiceUpdate, endpointsChan chan<- EndpointsUpdate) {
-	servicesLW := cache.NewListWatchFromClient(c, "services", api.NamespaceAll, fields.Everything())
-	cache.NewReflector(servicesLW, &api.Service{}, NewServiceStore(nil, servicesChan), period).Run()
+func NewSourceAPI(c coreclientset.CoreInterface, period time.Duration, servicesChan chan<- ServiceUpdate, endpointsChan chan<- EndpointsUpdate) {
+	cache.NewReflector(
+		&cache.ListWatch{
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return c.Services(api.NamespaceAll).List(options)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return c.Services(api.NamespaceAll).Watch(options)
+			},
+		},
+		&api.Service{},
+		NewServiceStore(nil, servicesChan),
+		period,
+	).Run()
 
-	endpointsLW := cache.NewListWatchFromClient(c, "endpoints", api.NamespaceAll, fields.Everything())
-	cache.NewReflector(endpointsLW, &api.Endpoints{}, NewEndpointsStore(nil, endpointsChan), period).Run()
+	cache.NewReflector(
+		&cache.ListWatch{
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return c.Endpoints(api.NamespaceAll).List(options)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return c.Endpoints(api.NamespaceAll).Watch(options)
+			},
+		},
+		&api.Endpoints{},
+		NewEndpointsStore(nil, endpointsChan),
+		period,
+	).Run()
 }
 
 // NewServiceStore creates an undelta store that expands updates to the store into

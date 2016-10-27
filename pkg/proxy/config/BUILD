@@ -21,9 +21,11 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/client/cache:go_default_library",
-        "//pkg/fields:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset/typed/core/unversioned:go_default_library",
+        "//pkg/runtime:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util/config:go_default_library",
+        "//pkg/watch:go_default_library",
         "//vendor:github.com/davecgh/go-spew/spew",
         "//vendor:github.com/golang/glog",
     ],
