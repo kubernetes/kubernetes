@@ -297,22 +297,23 @@ type petHealthChecker interface {
 // It doesn't update, probe or get the pod.
 type defaultPetHealthChecker struct{}
 
-// isHealthy returns true if the pod is running and has the
-// "pod.alpha.kubernetes.io/initialized" set to "true".
+// isHealthy returns true if the pod is running and if it has the
+// "pod.alpha.kubernetes.io/initialized" annotation, it is set to "true".
 func (d *defaultPetHealthChecker) isHealthy(pod *api.Pod) bool {
 	if pod == nil || pod.Status.Phase != api.PodRunning {
 		return false
 	}
 	initialized, ok := pod.Annotations[PetSetInitAnnotation]
 	if !ok {
-		glog.Infof("PetSet pod %v in %v, waiting on annotation %v", api.PodRunning, pod.Name, PetSetInitAnnotation)
-		return false
+		// if the annotation was not found, we just perform a readiness check.
+		return api.IsPodReady(pod)
 	}
 	b, err := strconv.ParseBool(initialized)
-	if err != nil {
+	if err != nil || !b {
+		glog.Infof("Debug annotation %v set on PetSet pod %v", PetSetInitAnnotation, pod.Name)
 		return false
 	}
-	return b && api.IsPodReady(pod)
+	return api.IsPodReady(pod)
 }
 
 // isDying returns true if the pod has a non-nil deletion timestamp. Since the

@@ -889,6 +889,9 @@ func newPetSet(name, ns, governingSvcName string, replicas int32, petMounts []ap
 		ObjectMeta: api.ObjectMeta{
 			Name:      name,
 			Namespace: ns,
+			Annotations: map[string]string {
+				"pod.alpha.kubernetes.io/initialized": "false",
+			},
 		},
 		Spec: apps.PetSetSpec{
 			Selector: &unversioned.LabelSelector{
