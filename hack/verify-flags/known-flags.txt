@@ -446,6 +446,7 @@ pv-recycler-pod-template-filepath-hostpath
 pv-recycler-pod-template-filepath-nfs
 pv-recycler-timeout-increment-hostpath
 pvclaimbinder-sync-period
+query-port
 read-only-port
 really-crash-for-testing
 reconcile-cidr
@@ -458,6 +459,7 @@ registry-burst
 registry-qps
 reject-methods
 reject-paths
+remote-tcp-port-name
 repair-malformed-updates
 replicaset-lookup-cache-size
 replication-controller-lookup-cache-size
@@ -543,6 +545,7 @@ system-pods-startup-timeout
 system-reserved
 target-port
 target-ram-mb
+tcp-port
 tcp-services
 terminated-pod-gc-threshold
 test-flags
