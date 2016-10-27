@@ -81,7 +81,7 @@ func (r *Reset) Run(out io.Writer) error {
 	// Don't check for errors here, since umount will return a non-zero exit code if there is no directories to umount
 	exec.Command("sh", "-c", "cat /proc/mounts | awk '{print $2}' | grep '/var/lib/kubelet' | xargs umount").Run()
 
-	dirsToRemove := []string{"/var/lib/kubelet", "/var/lib/etcd", "/etc/kubernetes"}
+	dirsToRemove := []string{"/var/lib/kubelet", "/var/lib/etcd", "/etc/kubernetes", "/etc/cni/net.d"}
 	fmt.Printf("Deleting the stateful directories: %v\n", dirsToRemove)
 	for _, dir := range dirsToRemove {
 		err := os.RemoveAll(dir)
