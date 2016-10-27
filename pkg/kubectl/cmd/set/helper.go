@@ -125,13 +125,19 @@ func CalculatePatches(infos []*resource.Info, encoder runtime.Encoder, mutateFn 
 	for _, info := range infos {
 		patch := &Patch{Info: info}
 		patch.Before, patch.Err = runtime.Encode(encoder, info.Object)
-
-		ok, err := mutateFn(info)
-		if !ok {
+		if patch.Err != nil {
+			patches = append(patches, patch)
 			continue
 		}
+
+		ok, err := mutateFn(info)
 		if err != nil {
 			patch.Err = err
+			patches = append(patches, patch)
+			continue
+		}
+		if !ok {
+			continue
 		}
 		patches = append(patches, patch)
 		if patch.Err != nil {
