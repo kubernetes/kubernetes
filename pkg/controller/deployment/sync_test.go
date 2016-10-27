@@ -348,7 +348,7 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 		test := tests[i]
 		fake := &fake.Clientset{}
 		informers := informers.NewSharedInformerFactory(fake, controller.NoResyncPeriodFunc())
-		controller := NewDeploymentController(informers.Deployments(), informers.ReplicaSets(), informers.Pods(), fake)
+		controller := NewDeploymentController(informers.Deployments(), informers.ReplicaSets(), informers.Pods(), fake, false)
 
 		controller.eventRecorder = &record.FakeRecorder{}
 		controller.dListerSynced = alwaysReady

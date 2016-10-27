@@ -28,8 +28,10 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
@@ -38,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/labels"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -56,9 +59,14 @@ const (
 	MaxRetries = 5
 )
 
+func getDeploymentControllerKind() unversioned.GroupVersionKind {
+	return v1beta1.SchemeGroupVersion.WithKind("DeploymentController")
+}
+
 // DeploymentController is responsible for synchronizing Deployment objects stored
 // in the system with actual running replica sets and pods.
 type DeploymentController struct {
+	rsControl     controller.RSControlInterface
 	client        clientset.Interface
 	eventRecorder record.EventRecorder
 
@@ -84,10 +92,13 @@ type DeploymentController struct {
 
 	// Deployments that need to be synced
 	queue workqueue.RateLimitingInterface
+
+	// garbageCollectorEnabled denotes if the garbage collector is enabled.
+	garbageCollectorEnabled bool
 }
 
 // NewDeploymentController creates a new DeploymentController.
-func NewDeploymentController(dInformer informers.DeploymentInformer, rsInformer informers.ReplicaSetInformer, podInformer informers.PodInformer, client clientset.Interface) *DeploymentController {
+func NewDeploymentController(dInformer informers.DeploymentInformer, rsInformer informers.ReplicaSetInformer, podInformer informers.PodInformer, client clientset.Interface, garbageCollectorEnabled bool) *DeploymentController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
@@ -100,6 +111,11 @@ func NewDeploymentController(dInformer informers.DeploymentInformer, rsInformer 
 		client:        client,
 		eventRecorder: eventBroadcaster.NewRecorder(api.EventSource{Component: "deployment-controller"}),
 		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "deployment"),
+		garbageCollectorEnabled: garbageCollectorEnabled,
+	}
+	dc.rsControl = controller.RealRSControl{
+		KubeClient: client,
+		Recorder:   dc.eventRecorder,
 	}
 
 	dInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -338,6 +354,45 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 			dc.client.Extensions().Deployments(d.Namespace).UpdateStatus(d)
 		}
 		return nil
+	}
+
+	if dc.garbageCollectorEnabled {
+		rsList, err := dc.rsLister.ReplicaSets(deployment.Namespace).List(labels.Everything())
+		if err != nil {
+			glog.Errorf("Error getting ReplicaSets for deployment %q: %v", deployment, err)
+			return err
+		}
+
+		deploymentSelector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
+		if err != nil {
+			return fmt.Errorf("deployment %s/%s has invalid label selector: %v", deployment.Namespace, deployment.Name, err)
+		}
+		cm := controller.NewReplicaSetControllerRefManager(dc.rsControl, deployment.ObjectMeta, deploymentSelector, getDeploymentControllerKind())
+		matchesAndControlled, matchesNeedsController, controlledDoesNotMatch := cm.Classify(rsList)
+		for _, replicaSet := range matchesNeedsController {
+			err := cm.AdoptReplicaSet(replicaSet)
+			// continue to next RS if adoption fails.
+			if err != nil {
+				// If the RS no longer exists, don't even log the error.
+				if !errors.IsNotFound(err) {
+					utilruntime.HandleError(err)
+				}
+			} else {
+				matchesAndControlled = append(matchesAndControlled, replicaSet)
+			}
+		}
+		// remove the controllerRef for the RS that no longer have matching labels
+		var errlist []error
+		for _, replicaSet := range controlledDoesNotMatch {
+			err := cm.ReleaseReplicaSet(replicaSet)
+			if err != nil {
+				errlist = append(errlist, cm.ReleaseReplicaSet(replicaSet))
+			}
+		}
+		if len(errlist) != 0 {
+			return utilerrors.NewAggregate(errlist)
+		}
+
 	}
 
 	if d.DeletionTimestamp != nil {
