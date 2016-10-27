@@ -16,6 +16,7 @@ go_library(
         "apply.go",
         "autoscale.go",
         "bash_comp_utils.go",
+        "cluster.go",
         "configmap.go",
         "custom_column_printer.go",
         "deployment.go",
@@ -50,6 +51,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//federation/apis/federation:go_default_library",
+        "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/client/clientset_generated/federation_internalclientset:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/annotations:go_default_library",
@@ -111,6 +113,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "cluster_test.go",
         "configmap_test.go",
         "custom_column_printer_test.go",
         "deployment_test.go",
@@ -139,6 +142,7 @@ go_test(
     tags = ["automanaged"],
     deps = [
         "//federation/apis/federation:go_default_library",
+        "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/client/clientset_generated/federation_internalclientset/fake:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/errors:go_default_library",
