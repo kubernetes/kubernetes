@@ -174,6 +174,22 @@ func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobr
 		return cmdutil.UsageError(cmd, fmt.Sprintf("--restart=%s requires that --replicas=1, found %d", restartPolicy, replicas))
 	}
 
+	attachFlag := cmd.Flags().Lookup("attach")
+	attach := cmdutil.GetFlagBool(cmd, "attach")
+
+	if !attachFlag.Changed && interactive {
+		attach = true
+	}
+
+	remove := cmdutil.GetFlagBool(cmd, "rm")
+	if !attach && remove {
+		return cmdutil.UsageError(cmd, "--rm should only be used for attached containers")
+	}
+
+	if attach && cmdutil.GetDryRunFlag(cmd) {
+		return cmdutil.UsageError(cmd, "--dry-run can't be used with attached containers options (--attach, --stdin, or --tty)")
+	}
+
 	if err := verifyImagePullPolicy(cmd); err != nil {
 		return err
 	}
@@ -239,18 +255,6 @@ func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobr
 		if err := generateService(f, cmd, args, serviceGenerator, params, namespace, cmdOut); err != nil {
 			return err
 		}
-	}
-
-	attachFlag := cmd.Flags().Lookup("attach")
-	attach := cmdutil.GetFlagBool(cmd, "attach")
-
-	if !attachFlag.Changed && interactive {
-		attach = true
-	}
-
-	remove := cmdutil.GetFlagBool(cmd, "rm")
-	if !attach && remove {
-		return cmdutil.UsageError(cmd, "--rm should only be used for attached containers")
 	}
 
 	if attach {

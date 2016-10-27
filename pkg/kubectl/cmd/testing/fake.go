@@ -281,8 +281,15 @@ func (f *FakeFactory) DefaultNamespace() (string, bool, error) {
 	return f.tf.Namespace, false, f.tf.Err
 }
 
-func (f *FakeFactory) Generators(string) map[string]kubectl.Generator {
-	return nil
+func (f *FakeFactory) Generators(cmdName string) map[string]kubectl.Generator {
+	var generator map[string]kubectl.Generator
+	switch cmdName {
+	case "run":
+		generator = map[string]kubectl.Generator{
+			cmdutil.DeploymentV1Beta1GeneratorName: kubectl.DeploymentV1Beta1{},
+		}
+	}
+	return generator
 }
 
 func (f *FakeFactory) CanBeExposed(unversioned.GroupKind) error {
