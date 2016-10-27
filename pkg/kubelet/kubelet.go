@@ -426,7 +426,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		mounter:           kubeDeps.Mounter,
 		writer:            kubeDeps.Writer,
 		nonMasqueradeCIDR: kubeCfg.NonMasqueradeCIDR,
-		reconcileCIDR:     kubeCfg.ReconcileCIDR,
 		maxPods:           int(kubeCfg.MaxPods),
 		podsPerCore:       int(kubeCfg.PodsPerCore),
 		nvidiaGPUs:        int(kubeCfg.NvidiaGPUs),
@@ -940,10 +939,6 @@ type Kubelet struct {
 	// Manager of non-Runtime containers.
 	containerManager cm.ContainerManager
 	nodeConfig       cm.NodeConfig
-
-	// Whether or not kubelet should take responsibility for keeping cbr0 in
-	// the correct state.
-	reconcileCIDR bool
 
 	// Traffic to IPs outside this range will use IP masquerade.
 	nonMasqueradeCIDR string

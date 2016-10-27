@@ -450,11 +450,6 @@ function start_kubelet {
         net_plugin_dir_args="--network-plugin-dir=${NET_PLUGIN_DIR}"
       fi
 
-      kubenet_plugin_args=""
-      if [[ "${NET_PLUGIN}" == "kubenet" ]]; then
-        kubenet_plugin_args="--reconcile-cidr=true "
-      fi
-
       container_runtime_endpoint_args=""
       if [[ -n "${CONTAINER_RUNTIME_ENDPOINT}" ]]; then
         container_runtime_endpoint_args="--container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}"
@@ -484,7 +479,6 @@ function start_kubelet {
         ${dns_args} \
         ${net_plugin_dir_args} \
         ${net_plugin_args} \
-        ${kubenet_plugin_args} \
         ${container_runtime_endpoint_args} \
         ${image_service_endpoint_args} \
         --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &
