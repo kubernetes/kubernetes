@@ -67,18 +67,40 @@ func NewReset(skipPreFlight bool) (*Reset, error) {
 	return &Reset{}, nil
 }
 
+// cleanDir removes everything in a directory, but not the directory itself:
+func cleanDir(path string) {
+	// If the directory doesn't even exist there's nothing to do, and we do
+	// not consider this an error:
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return
+	}
+
+	d, err := os.Open(path)
+	if err != nil {
+		fmt.Printf("failed to remove directory: [%v]\n", err)
+	}
+	defer d.Close()
+	names, err := d.Readdirnames(-1)
+	if err != nil {
+		fmt.Printf("failed to remove directory: [%v]\n", err)
+	}
+	for _, name := range names {
+		err = os.RemoveAll(filepath.Join(path, name))
+		if err != nil {
+			fmt.Printf("failed to remove directory: [%v]\n", err)
+		}
+	}
+}
+
 // resetConfigDir is used to cleanup the files kubeadm writes in /etc/kubernetes/.
 func resetConfigDir(configDirPath string) {
 	dirsToClean := []string{
 		filepath.Join(configDirPath, "manifests"),
 		filepath.Join(configDirPath, "pki"),
 	}
-	fmt.Printf("Deleting config directories: %v\n", dirsToClean)
+	fmt.Printf("Deleting contents of config directories: %v\n", dirsToClean)
 	for _, dir := range dirsToClean {
-		err := os.RemoveAll(dir)
-		if err != nil {
-			fmt.Printf("failed to remove directory: [%v]\n", err)
-		}
+		cleanDir(dir)
 	}
 
 	filesToClean := []string{
@@ -112,12 +134,9 @@ func (r *Reset) Run(out io.Writer) error {
 	resetConfigDir("/etc/kubernetes/")
 
 	dirsToClean := []string{"/var/lib/kubelet", "/var/lib/etcd"}
-	fmt.Printf("Deleting stateful directories: %v\n", dirsToClean)
+	fmt.Printf("Deleting contents of stateful directories: %v\n", dirsToClean)
 	for _, dir := range dirsToClean {
-		err := os.RemoveAll(dir)
-		if err != nil {
-			fmt.Printf("failed to remove directory: [%v]\n", err)
-		}
+		cleanDir(dir)
 	}
 
 	dockerCheck := preflight.ServiceCheck{Service: "docker"}
