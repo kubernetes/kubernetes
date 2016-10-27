@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -447,9 +446,10 @@ func (f *fakeAPIFactory) Printer(mapping *meta.RESTMapping, options kubectl.Prin
 }
 
 func (f *fakeAPIFactory) LogsForObject(object, options runtime.Object) (*restclient.Request, error) {
-	fakeClient := f.tf.Client.(*fake.RESTClient)
-	c := client.NewOrDie(f.tf.ClientConfig)
-	c.Client = fakeClient.Client
+	c, err := f.ClientSet()
+	if err != nil {
+		panic(err)
+	}
 
 	switch t := object.(type) {
 	case *api.Pod:
@@ -457,7 +457,7 @@ func (f *fakeAPIFactory) LogsForObject(object, options runtime.Object) (*restcli
 		if !ok {
 			return nil, errors.New("provided options object is not a PodLogOptions")
 		}
-		return c.Pods(f.tf.Namespace).GetLogs(t.Name, opts), nil
+		return c.Core().Pods(f.tf.Namespace).GetLogs(t.Name, opts), nil
 	default:
 		fqKinds, _, err := api.Scheme.ObjectKinds(object)
 		if err != nil {
