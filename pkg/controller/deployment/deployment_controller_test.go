@@ -162,7 +162,7 @@ func newFixture(t *testing.T) *fixture {
 func (f *fixture) run(deploymentName string) {
 	f.client = fake.NewSimpleClientset(f.objects...)
 	informers := informers.NewSharedInformerFactory(f.client, controller.NoResyncPeriodFunc())
-	c := NewDeploymentController(informers.Deployments(), informers.ReplicaSets(), informers.Pods(), f.client)
+	c := NewDeploymentController(informers.Deployments(), informers.ReplicaSets(), informers.Pods(), f.client, false)
 	c.eventRecorder = &record.FakeRecorder{}
 	c.dListerSynced = alwaysReady
 	c.rsListerSynced = alwaysReady
@@ -235,7 +235,7 @@ func TestSyncDeploymentDontDoAnythingDuringDeletion(t *testing.T) {
 func TestDeploymentController_dontSyncDeploymentsWithEmptyPodSelector(t *testing.T) {
 	fake := &fake.Clientset{}
 	informers := informers.NewSharedInformerFactory(fake, controller.NoResyncPeriodFunc())
-	controller := NewDeploymentController(informers.Deployments(), informers.ReplicaSets(), informers.Pods(), fake)
+	controller := NewDeploymentController(informers.Deployments(), informers.ReplicaSets(), informers.Pods(), fake, false)
 	controller.eventRecorder = &record.FakeRecorder{}
 	controller.dListerSynced = alwaysReady
 	controller.rsListerSynced = alwaysReady

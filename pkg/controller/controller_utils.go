@@ -359,6 +359,26 @@ const (
 	SuccessfulDeletePodReason = "SuccessfulDelete"
 )
 
+// RCControlInterface is an interface that knows how to add or delete
+// ReplicaSets, as well as increment or decrement them. It is used
+// by the deployment controller to ease testing of actions that it takes.
+type RSControlInterface interface {
+	PatchReplicaSet(namespace, name string, data []byte) error
+}
+
+// RealRsControl is the default implementation of RSControllerInterface.
+type RealRSControl struct {
+	KubeClient clientset.Interface
+	Recorder   record.EventRecorder
+}
+
+var _ RSControlInterface = &RealRSControl{}
+
+func (r RealRSControl) PatchReplicaSet(namespace, name string, data []byte) error {
+	_, err := r.KubeClient.Extensions().ReplicaSets(namespace).Patch(name, api.StrategicMergePatchType, data)
+	return err
+}
+
 // PodControlInterface is an interface that knows how to add or delete pods
 // created as an interface to allow testing.
 type PodControlInterface interface {
@@ -719,6 +739,10 @@ func FilterActivePods(pods []*api.Pod) []*api.Pod {
 		}
 	}
 	return result
+}
+
+func IsReplicaSetActive(r *extensions.ReplicaSet) bool {
+	return true
 }
 
 func IsPodActive(p *api.Pod) bool {
