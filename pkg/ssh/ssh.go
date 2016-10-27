@@ -277,6 +277,9 @@ func ParsePublicKeyFromFile(keyFile string) (*rsa.PublicKey, error) {
 		return nil, fmt.Errorf("error reading SSH key %s: '%v'", keyFile, err)
 	}
 	keyBlock, _ := pem.Decode(buffer)
+	if keyBlock == nil {
+		return nil, fmt.Errorf("error parsing SSH key %s: 'invalid PEM format'", keyFile)
+	}
 	key, err := x509.ParsePKIXPublicKey(keyBlock.Bytes)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing SSH key %s: '%v'", keyFile, err)
