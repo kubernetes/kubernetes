@@ -24,6 +24,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/types"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -130,12 +131,13 @@ func (kl *Kubelet) relabelVolumes(pod *api.Pod, volumes kubecontainer.VolumeMap)
 // running and that have no containers running.
 func (kl *Kubelet) cleanupOrphanedPodDirs(
 	pods []*api.Pod, runningPods []*kubecontainer.Pod) error {
-	allPods := sets.NewString()
+	all := map[types.UID]*api.Pod{}
 	for _, pod := range pods {
-		allPods.Insert(string(pod.UID))
+		all[pod.UID] = pod
 	}
+	running := sets.NewString()
 	for _, pod := range runningPods {
-		allPods.Insert(string(pod.ID))
+		running.Insert(string(pod.ID))
 	}
 
 	found, err := kl.listPodsFromDisk()
@@ -144,8 +146,14 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(
 	}
 	errlist := []error{}
 	for _, uid := range found {
-		if allPods.Has(string(uid)) {
+		if running.Has(string(uid)) {
 			continue
+		}
+		if pod, ok := all[uid]; ok {
+			// Pod is terminated, but only cleanup if it was evictied
+			if !eviction.PodIsEvicted(pod.Status) {
+				continue
+			}
 		}
 		// If volumes have not been unmounted/detached, do not delete directory.
 		// Doing so may result in corruption of data.
