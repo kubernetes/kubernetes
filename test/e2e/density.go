@@ -185,59 +185,6 @@ func logPodStartupStatus(c internalclientset.Interface, expectedPods int, ns str
 // all pods to start
 func runDensityTest(dtc DensityTestConfig) time.Duration {
 	defer GinkgoRecover()
-	// Create a listener for events.
-	// eLock is a lock protects the events
-	var eLock sync.Mutex
-	events := make([](*api.Event), 0)
-	_, controller := cache.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return dtc.ClientSet.Core().Events(dtc.Namespace).List(options)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return dtc.ClientSet.Core().Events(dtc.Namespace).Watch(options)
-			},
-		},
-		&api.Event{},
-		0,
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				eLock.Lock()
-				defer eLock.Unlock()
-				events = append(events, obj.(*api.Event))
-			},
-		},
-	)
-	stop := make(chan struct{})
-	go controller.Run(stop)
-
-	// Create a listener for api updates
-	// uLock is a lock protects the updateCount
-	var uLock sync.Mutex
-	updateCount := 0
-	label := labels.SelectorFromSet(labels.Set(map[string]string{"type": "densityPod"}))
-	_, updateController := cache.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				options.LabelSelector = label
-				return dtc.ClientSet.Core().Pods(dtc.Namespace).List(options)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				options.LabelSelector = label
-				return dtc.ClientSet.Core().Pods(dtc.Namespace).Watch(options)
-			},
-		},
-		&api.Pod{},
-		0,
-		cache.ResourceEventHandlerFuncs{
-			UpdateFunc: func(_, _ interface{}) {
-				uLock.Lock()
-				defer uLock.Unlock()
-				updateCount++
-			},
-		},
-	)
-	go updateController.Run(stop)
 
 	// Start all replication controllers.
 	startTime := time.Now()
@@ -259,39 +206,6 @@ func runDensityTest(dtc DensityTestConfig) time.Duration {
 	framework.Logf("E2E startup time for %d pods: %v", dtc.PodCount, startupTime)
 	framework.Logf("Throughput (pods/s) during cluster saturation phase: %v", float32(dtc.PodCount)/float32(startupTime/time.Second))
 
-	By("Waiting for all events to be recorded")
-	last := -1
-	current := len(events)
-	lastCount := -1
-	currentCount := updateCount
-	for start := time.Now(); (last < current || lastCount < currentCount) && time.Since(start) < dtc.Timeout; time.Sleep(10 * time.Second) {
-		func() {
-			eLock.Lock()
-			defer eLock.Unlock()
-			last = current
-			current = len(events)
-		}()
-		func() {
-			uLock.Lock()
-			defer uLock.Unlock()
-			lastCount = currentCount
-			currentCount = updateCount
-		}()
-	}
-	close(stop)
-
-	if current != last {
-		framework.Logf("Warning: Not all events were recorded after waiting %.2f minutes", dtc.Timeout.Minutes())
-	}
-	framework.Logf("Found %d events", current)
-	if currentCount != lastCount {
-		framework.Logf("Warning: Not all updates were recorded after waiting %.2f minutes", dtc.Timeout.Minutes())
-	}
-	framework.Logf("Found %d updates", currentCount)
-
-	// Tune the threshold for allowed failures.
-	badEvents := framework.BadEvents(events)
-	Expect(badEvents).NotTo(BeNumerically(">", int(math.Floor(0.01*float64(dtc.PodCount)))))
 	// Print some data about Pod to Node allocation
 	By("Printing Pod to Node allocation data")
 	podList, err := dtc.ClientSet.Core().Pods(api.NamespaceAll).List(api.ListOptions{})
