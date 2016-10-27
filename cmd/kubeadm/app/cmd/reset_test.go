@@ -66,6 +66,10 @@ func TestConfigDirCleaner(t *testing.T) {
 				"admin.conf",
 				"kubelet.conf",
 			},
+			verifyExists: []string{
+				"manifests",
+				"pki",
+			},
 		},
 		"partial reset": {
 			setupDirs: []string{
@@ -74,6 +78,12 @@ func TestConfigDirCleaner(t *testing.T) {
 			setupFiles: []string{
 				"pki/ca.pem",
 				"kubelet.conf",
+			},
+			verifyExists: []string{
+				"pki",
+			},
+			verifyNotExists: []string{
+				"manifests",
 			},
 		},
 		"preserve cloud-config.json": {
@@ -90,6 +100,8 @@ func TestConfigDirCleaner(t *testing.T) {
 				"cloud-config.json",
 			},
 			verifyExists: []string{
+				"manifests",
+				"pki",
 				"cloud-config.json",
 			},
 		},
@@ -109,6 +121,8 @@ func TestConfigDirCleaner(t *testing.T) {
 				".mydir/.myfile",
 			},
 			verifyExists: []string{
+				"manifests",
+				"pki",
 				".cloud-config.json",
 				".mydir",
 				".mydir/.myfile",
@@ -154,8 +168,8 @@ func TestConfigDirCleaner(t *testing.T) {
 		assertExists(t, tmpDir)
 		assertNotExists(t, filepath.Join(tmpDir, "admin.conf"))
 		assertNotExists(t, filepath.Join(tmpDir, "kubelet.conf"))
-		assertNotExists(t, filepath.Join(tmpDir, "manifests"))
-		assertNotExists(t, filepath.Join(tmpDir, "pki"))
+		assertDirEmpty(t, filepath.Join(tmpDir, "manifests"))
+		assertDirEmpty(t, filepath.Join(tmpDir, "pki"))
 
 		// Verify the files as requested by the test:
 		for _, path := range test.verifyExists {
