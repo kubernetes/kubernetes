@@ -87,8 +87,8 @@ func InitializeWatchCacheSizes(expectedRAMCapacityMB int) {
 	// TODO: Figure out which resource we should have non-default value.
 	watchCacheSizes[Controllers] = maxInt(5*clusterSize, 100)
 	watchCacheSizes[Endpoints] = maxInt(10*clusterSize, 1000)
-	watchCacheSizes[Nodes] = maxInt(3*clusterSize, 1000)
-	watchCacheSizes[Pods] = maxInt(10*clusterSize, 1000)
+	watchCacheSizes[Nodes] = maxInt(5*clusterSize, 1000)
+	watchCacheSizes[Pods] = maxInt(50*clusterSize, 1000)
 	watchCacheSizes[Services] = maxInt(5*clusterSize, 1000)
 }
 
