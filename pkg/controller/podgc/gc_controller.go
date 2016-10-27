@@ -184,7 +184,7 @@ func (gcc *PodGCController) gcOrphaned(pods []*api.Pod) {
 		if err := gcc.deletePod(pod.Namespace, pod.Name); err != nil {
 			utilruntime.HandleError(err)
 		} else {
-			glog.V(4).Infof("Forced deletion of orphaned Pod %s succeeded", pod.Name)
+			glog.V(0).Infof("Forced deletion of orphaned Pod %s succeeded", pod.Name)
 		}
 	}
 }
@@ -194,11 +194,7 @@ func (gcc *PodGCController) gcUnscheduledTerminating(pods []*api.Pod) {
 	glog.V(4).Infof("GC'ing unscheduled pods which are terminating.")
 
 	for _, pod := range pods {
-		if pod.DeletionTimestamp == nil {
-			continue
-		}
-
-		if len(pod.Spec.NodeName) > 0 {
+		if pod.DeletionTimestamp == nil || len(pod.Spec.NodeName) > 0 {
 			continue
 		}
 
@@ -206,7 +202,7 @@ func (gcc *PodGCController) gcUnscheduledTerminating(pods []*api.Pod) {
 		if err := gcc.deletePod(pod.Namespace, pod.Name); err != nil {
 			utilruntime.HandleError(err)
 		} else {
-			glog.V(4).Infof("Forced deletion of unscheduled terminating Pod %s succeeded", pod.Name)
+			glog.V(0).Infof("Forced deletion of unscheduled terminating Pod %s succeeded", pod.Name)
 		}
 	}
 }

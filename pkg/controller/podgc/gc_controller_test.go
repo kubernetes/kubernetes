@@ -226,10 +226,12 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 	}
 
 	testCases := []struct {
+		name            string
 		pods            []nameToPhase
 		deletedPodNames sets.String
 	}{
 		{
+			name: "Unscheduled pod in any phase must be deleted",
 			pods: []nameToPhase{
 				{name: "a", phase: api.PodFailed, deletionTimeStamp: &unversioned.Time{}, nodeName: ""},
 				{name: "b", phase: api.PodSucceeded, deletionTimeStamp: &unversioned.Time{}, nodeName: ""},
@@ -238,6 +240,7 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 			deletedPodNames: sets.NewString("a", "b", "c"),
 		},
 		{
+			name: "Scheduled pod in any phase must not be deleted",
 			pods: []nameToPhase{
 				{name: "a", phase: api.PodFailed, deletionTimeStamp: nil, nodeName: ""},
 				{name: "b", phase: api.PodSucceeded, deletionTimeStamp: nil, nodeName: "node"},
@@ -292,7 +295,7 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 			pass = false
 		}
 		if !pass {
-			t.Errorf("[%v]pod's deleted expected and actual did not match.\n\texpected: %v\n\tactual: %v", i, test.deletedPodNames, deletedPodNames)
+			t.Errorf("[%v]pod's deleted expected and actual did not match.\n\texpected: %v\n\tactual: %v, test: %v", i, test.deletedPodNames, deletedPodNames, test.name)
 		}
 	}
 }
