@@ -85,12 +85,12 @@ type testCase struct {
 	reportedLevels       []uint64
 	reportedCPURequests  []resource.Quantity
 	reportedPodReadiness []api.ConditionStatus
-	cmTarget             *extensions.CustomMetricTargetList
 	scaleUpdated         bool
 	statusUpdated        bool
 	eventCreated         bool
 	verifyEvents         bool
 	useMetricsApi        bool
+	metricsTarget        []autoscaling.MetricSpec
 	// Channel with names of HPA objects which we have reconciled.
 	processed chan string
 
@@ -137,7 +137,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 	if tc.resource == nil {
 		tc.resource = &fakeResource{
 			name:       "test-rc",
-			apiVersion: "extensions/v1beta1",
+			apiVersion: "v1",
 			kind:       "replicationcontrollers",
 		}
 	}
@@ -174,15 +174,30 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		}
 
 		if tc.CPUTarget > 0.0 {
-			obj.Items[0].Spec.TargetCPUUtilizationPercentage = &tc.CPUTarget
-		}
-		if tc.cmTarget != nil {
-			b, err := json.Marshal(tc.cmTarget)
-			if err != nil {
-				t.Fatalf("Failed to marshal cm: %v", err)
+			obj.Items[0].Spec.Metrics = []autoscaling.MetricSpec{
+				{
+					Type: autoscaling.ResourceSourceType,
+					Resource: &autoscaling.ResourceMetricSource{
+						Name: api.ResourceCPU,
+						TargetPercentageOfRequest: &tc.CPUTarget,
+					},
+				},
 			}
-			obj.Items[0].Annotations = make(map[string]string)
-			obj.Items[0].Annotations[HpaCustomMetricsTargetAnnotationName] = string(b)
+		}
+		if len(tc.metricsTarget) > 0 {
+			obj.Items[0].Spec.Metrics = append(obj.Items[0].Spec.Metrics, tc.metricsTarget...)
+		}
+
+		if len(obj.Items[0].Spec.Metrics) == 0 {
+			// manually add in the defaulting logic
+			obj.Items[0].Spec.Metrics = []autoscaling.MetricSpec{
+				{
+					Type: autoscaling.ResourceSourceType,
+					Resource: &autoscaling.ResourceMetricSource{
+						Name: api.ResourceCPU,
+					},
+				},
+			}
 		}
 		return true, obj, nil
 	})
@@ -407,8 +422,16 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		assert.Equal(t, hpaName, obj.Name, "the HPA name should be as expected")
 		assert.Equal(t, tc.desiredReplicas, obj.Status.DesiredReplicas, "the desired replica count reported in the object status should be as expected")
 		if tc.verifyCPUCurrent {
-			assert.NotNil(t, obj.Status.CurrentCPUUtilizationPercentage, "the reported CPU utilization percentage should be non-nil")
-			assert.Equal(t, tc.CPUCurrent, *obj.Status.CurrentCPUUtilizationPercentage, "the report CPU utilization percentage should be as expected")
+			var current *int32
+			for _, metric := range obj.Status.CurrentMetrics {
+				if metric.Type == autoscaling.ResourceSourceType && metric.Resource != nil {
+					current = metric.Resource.CurrentPercentageOfRequest
+					break
+				}
+			}
+			if assert.NotNil(t, current, "the reported CPU utilization percentage should be non-nil") {
+				assert.Equal(t, tc.CPUCurrent, *current, "the report CPU utilization percentage should be as expected")
+			}
 		}
 		tc.statusUpdated = true
 		// Every time we reconcile HPA object we are updating status.
@@ -424,7 +447,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		if tc.verifyEvents {
 			switch obj.Reason {
 			case "SuccessfulRescale":
-				assert.Equal(t, fmt.Sprintf("New size: %d; reason: CPU utilization above target", tc.desiredReplicas), obj.Message)
+				assert.Equal(t, fmt.Sprintf("New size: %d; reason: cpu resource utilization (percentage of request) above target", tc.desiredReplicas), obj.Message)
 			case "DesiredReplicasComputed":
 				assert.Equal(t, fmt.Sprintf(
 					"Computed the desired num of replicas: %d (avgCPUutil: %d, current replicas: %d)",
@@ -644,11 +667,14 @@ func TestScaleUpCM(t *testing.T) {
 		initialReplicas: 3,
 		desiredReplicas: 4,
 		CPUTarget:       0,
-		cmTarget: &extensions.CustomMetricTargetList{
-			Items: []extensions.CustomMetricTarget{{
-				Name:        "qps",
-				TargetValue: resource.MustParse("15.0"),
-			}},
+		metricsTarget: []autoscaling.MetricSpec{
+			{
+				Type: autoscaling.PodsSourceType,
+				Pods: &autoscaling.PodsMetricSource{
+					MetricName:  "qps",
+					TargetValue: resource.MustParse("15.0"),
+				},
+			},
 		},
 		reportedLevels:      []uint64{20, 10, 30},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
@@ -663,11 +689,14 @@ func TestScaleUpCMUnreadyLessScale(t *testing.T) {
 		initialReplicas: 3,
 		desiredReplicas: 4,
 		CPUTarget:       0,
-		cmTarget: &extensions.CustomMetricTargetList{
-			Items: []extensions.CustomMetricTarget{{
-				Name:        "qps",
-				TargetValue: resource.MustParse("15.0"),
-			}},
+		metricsTarget: []autoscaling.MetricSpec{
+			{
+				Type: autoscaling.PodsSourceType,
+				Pods: &autoscaling.PodsMetricSource{
+					MetricName:  "qps",
+					TargetValue: resource.MustParse("15.0"),
+				},
+			},
 		},
 		reportedLevels:       []uint64{50, 10, 30},
 		reportedPodReadiness: []api.ConditionStatus{api.ConditionTrue, api.ConditionTrue, api.ConditionFalse},
@@ -683,11 +712,14 @@ func TestScaleUpCMUnreadyNoScaleWouldScaleDown(t *testing.T) {
 		initialReplicas: 3,
 		desiredReplicas: 3,
 		CPUTarget:       0,
-		cmTarget: &extensions.CustomMetricTargetList{
-			Items: []extensions.CustomMetricTarget{{
-				Name:        "qps",
-				TargetValue: resource.MustParse("15.0"),
-			}},
+		metricsTarget: []autoscaling.MetricSpec{
+			{
+				Type: autoscaling.PodsSourceType,
+				Pods: &autoscaling.PodsMetricSource{
+					MetricName:  "qps",
+					TargetValue: resource.MustParse("15.0"),
+				},
+			},
 		},
 		reportedLevels:       []uint64{50, 15, 30},
 		reportedPodReadiness: []api.ConditionStatus{api.ConditionFalse, api.ConditionTrue, api.ConditionFalse},
@@ -732,11 +764,15 @@ func TestScaleDownCM(t *testing.T) {
 		initialReplicas: 5,
 		desiredReplicas: 3,
 		CPUTarget:       0,
-		cmTarget: &extensions.CustomMetricTargetList{
-			Items: []extensions.CustomMetricTarget{{
-				Name:        "qps",
-				TargetValue: resource.MustParse("20"),
-			}}},
+		metricsTarget: []autoscaling.MetricSpec{
+			{
+				Type: autoscaling.PodsSourceType,
+				Pods: &autoscaling.PodsMetricSource{
+					MetricName:  "qps",
+					TargetValue: resource.MustParse("20.0"),
+				},
+			},
+		},
 		reportedLevels:      []uint64{12, 12, 12, 12, 12},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 	}
@@ -780,11 +816,15 @@ func TestToleranceCM(t *testing.T) {
 		maxReplicas:     5,
 		initialReplicas: 3,
 		desiredReplicas: 3,
-		cmTarget: &extensions.CustomMetricTargetList{
-			Items: []extensions.CustomMetricTarget{{
-				Name:        "qps",
-				TargetValue: resource.MustParse("20"),
-			}}},
+		metricsTarget: []autoscaling.MetricSpec{
+			{
+				Type: autoscaling.PodsSourceType,
+				Pods: &autoscaling.PodsMetricSource{
+					MetricName:  "qps",
+					TargetValue: resource.MustParse("20.0"),
+				},
+			},
+		},
 		reportedLevels:      []uint64{20, 21, 21},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
 	}

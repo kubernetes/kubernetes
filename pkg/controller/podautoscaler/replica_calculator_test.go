@@ -17,27 +17,20 @@ limitations under the License.
 package podautoscaler
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api/v1"
 	_ "k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"k8s.io/kubernetes/pkg/runtime"
-
-	heapster "k8s.io/heapster/metrics/api/v1/types"
-	metrics_api "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -60,6 +53,14 @@ type metricInfo struct {
 	expectedUtilization float64
 }
 
+type objectMetricInfo struct {
+	name  string
+	level float64
+
+	targetUtilization   float64
+	expectedUtilization float64
+}
+
 type replicaCalcTestCase struct {
 	currentReplicas  int32
 	expectedReplicas int32
@@ -69,6 +70,7 @@ type replicaCalcTestCase struct {
 
 	resource *resourceInfo
 	metric   *metricInfo
+	object   *objectMetricInfo
 
 	podReadiness []api.ConditionStatus
 }
@@ -128,87 +130,35 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		return true, obj, nil
 	})
 
-	fakeClient.AddProxyReactor("services", func(action core.Action) (handled bool, ret restclient.ResponseWrapper, err error) {
-		var heapsterRawMemResponse []byte
-
-		if tc.resource != nil {
-			metrics := metrics_api.PodMetricsList{}
-			for i, resValue := range tc.resource.levels {
-				podMetric := metrics_api.PodMetrics{
-					ObjectMeta: v1.ObjectMeta{
-						Name:      fmt.Sprintf("%s-%d", podNamePrefix, i),
-						Namespace: testNamespace,
-					},
-					Timestamp: unversioned.Time{Time: tc.timestamp},
-					Containers: []metrics_api.ContainerMetrics{
-						{
-							Name: "container1",
-							Usage: v1.ResourceList{
-								v1.ResourceName(tc.resource.name): *resource.NewMilliQuantity(
-									int64(resValue),
-									resource.DecimalSI),
-							},
-						},
-						{
-							Name: "container2",
-							Usage: v1.ResourceList{
-								v1.ResourceName(tc.resource.name): *resource.NewMilliQuantity(
-									int64(resValue),
-									resource.DecimalSI),
-							},
-						},
-					},
-				}
-				metrics.Items = append(metrics.Items, podMetric)
-			}
-			heapsterRawMemResponse, _ = json.Marshal(&metrics)
-		} else {
-			// only return the pods that we actually asked for
-			proxyAction := action.(core.ProxyGetAction)
-			pathParts := strings.Split(proxyAction.GetPath(), "/")
-			// pathParts should look like [ api, v1, model, namespaces, $NS, pod-list, $PODS, metrics, $METRIC... ]
-			if len(pathParts) < 9 {
-				return true, nil, fmt.Errorf("invalid heapster path %q", proxyAction.GetPath())
-			}
-
-			podNames := strings.Split(pathParts[7], ",")
-			podPresent := make([]bool, len(tc.metric.levels))
-			for _, name := range podNames {
-				if len(name) <= len(podNamePrefix)+1 {
-					return true, nil, fmt.Errorf("unknown pod %q", name)
-				}
-				num, err := strconv.Atoi(name[len(podNamePrefix)+1:])
-				if err != nil {
-					return true, nil, fmt.Errorf("unknown pod %q", name)
-				}
-				podPresent[num] = true
-			}
-
-			timestamp := tc.timestamp
-			metrics := heapster.MetricResultList{}
-			for i, level := range tc.metric.levels {
-				if !podPresent[i] {
-					continue
-				}
-
-				metric := heapster.MetricResult{
-					Metrics:         []heapster.MetricPoint{{Timestamp: timestamp, Value: uint64(level), FloatValue: &tc.metric.levels[i]}},
-					LatestTimestamp: timestamp,
-				}
-				metrics.Items = append(metrics.Items, metric)
-			}
-			heapsterRawMemResponse, _ = json.Marshal(&metrics)
-		}
-
-		return true, newFakeResponseWrapper(heapsterRawMemResponse), nil
-	})
-
 	return fakeClient
+}
+
+func (tc *replicaCalcTestCase) setupMetricsClient() metrics.MetricsClient {
+
+	client := metrics.NewFakeMetricsClient(tc.timestamp)
+	if tc.resource != nil {
+		metrics := metrics.PodResourceInfo{}
+		for i, resValue := range tc.resource.levels {
+			// each pod has two containers
+			metrics[fmt.Sprintf("%s-%d", podNamePrefix, i)] = 2 * int64(resValue)
+		}
+		client.ResourceMetrics[tc.resource.name] = metrics
+	} else if tc.metric != nil {
+		metrics := metrics.PodMetricsInfo{}
+		for i, resValue := range tc.metric.levels {
+			metrics[fmt.Sprintf("%s-%d", podNamePrefix, i)] = resValue
+		}
+		client.RawMetrics[tc.metric.name] = metrics
+	} else {
+		client.ObjectMetrics[tc.object.name] = tc.object.level
+	}
+
+	return client
 }
 
 func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 	testClient := tc.prepareTestClient(t)
-	metricsClient := metrics.NewHeapsterMetricsClient(testClient, metrics.DefaultHeapsterNamespace, metrics.DefaultHeapsterScheme, metrics.DefaultHeapsterService, metrics.DefaultHeapsterPort)
+	metricsClient := tc.setupMetricsClient()
 
 	replicaCalc := &ReplicaCalculator{
 		metricsClient: metricsClient,
@@ -235,7 +185,7 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 		assert.Equal(t, tc.resource.expectedUtilization, outUtilization, "utilization should be as expected")
 		assert.True(t, tc.timestamp.Equal(outTimestamp), "timestamp should be as expected")
 
-	} else {
+	} else if tc.metric != nil {
 		outReplicas, outUtilization, outTimestamp, err := replicaCalc.GetMetricReplicas(tc.currentReplicas, tc.metric.targetUtilization, tc.metric.name, testNamespace, selector)
 
 		if tc.expectedError != nil {
@@ -246,6 +196,13 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 		require.NoError(t, err, "there should not have been an error calculating the replica count")
 		assert.Equal(t, tc.expectedReplicas, outReplicas, "replicas should be as expected")
 		assert.InDelta(t, tc.metric.expectedUtilization, 0.1, outUtilization, "utilization should be as expected")
+		assert.True(t, tc.timestamp.Equal(outTimestamp), "timestamp should be as expected")
+	} else {
+		outReplicas, outUtilization, outTimestamp, err := replicaCalc.GetObjectMetricReplicas(tc.currentReplicas, tc.object.targetUtilization, tc.object.name, testNamespace, &autoscaling.CrossVersionObjectReference{})
+
+		require.Equal(t, tc.expectedError, err != nil, "error (or lack thereof) from the replica calculator should be as expected: %v", err)
+		assert.Equal(t, tc.expectedReplicas, outReplicas, "replicas should be as expected")
+		assert.InDelta(t, tc.object.expectedUtilization, 0.1, outUtilization, "utilization should be as expected")
 		assert.True(t, tc.timestamp.Equal(outTimestamp), "timestamp should be as expected")
 	}
 }
@@ -477,6 +434,36 @@ func TestReplicaCalcEmptyCPURequest(t *testing.T) {
 			levels:   []int64{200},
 
 			targetUtilization: 100,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcObjectMetrics(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  4,
+		expectedReplicas: 3,
+		object: &objectMetricInfo{
+			name:  "hits-per-second",
+			level: 75,
+
+			targetUtilization:   100,
+			expectedUtilization: 75,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcObjectMetricsTolerance(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  4,
+		expectedReplicas: 4,
+		object: &objectMetricInfo{
+			name:  "hits-per-second",
+			level: 102,
+
+			targetUtilization:   100,
+			expectedUtilization: 102,
 		},
 	}
 	tc.runTest(t)

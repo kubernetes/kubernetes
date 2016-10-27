@@ -25,6 +25,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/labels"
@@ -51,6 +52,10 @@ type MetricsClient interface {
 	// GetRawMetric gets the given metric (and an associated oldest timestamp)
 	// for all pods matching the specified selector in the given namespace
 	GetRawMetric(metricName string, namespace string, selector labels.Selector) (PodMetricsInfo, time.Time, error)
+
+	// GetObjectMetric gets the given metric (and an associated timestamp) for the given
+	// object in the given namespace
+	GetObjectMetric(metricName string, namespace string, objectRef *autoscaling.CrossVersionObjectReference) (float64, time.Time, error)
 }
 
 const (
@@ -193,6 +198,10 @@ func (h *HeapsterMetricsClient) GetRawMetric(metricName string, namespace string
 	}
 
 	return res, *timestamp, nil
+}
+
+func (h *HeapsterMetricsClient) GetObjectMetric(metricName string, namespace string, objectRef *autoscaling.CrossVersionObjectReference) (float64, time.Time, error) {
+	return 0, time.Time{}, fmt.Errorf("object metrics are not yet supported")
 }
 
 func collapseTimeSamples(metrics heapster.MetricResult, duration time.Duration) (float64, time.Time, bool) {

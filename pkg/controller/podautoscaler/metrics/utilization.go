@@ -52,3 +52,16 @@ func GetMetricUtilizationRatio(metrics PodMetricsInfo, targetUtilization float64
 
 	return currentUtilization / targetUtilization, currentUtilization
 }
+
+// GetRawResourceUtilizationRatio takes in a set of metrics and a target utilization, and calculates
+// the ratio of desired to actual utilization (returning that and the actual utilization)
+func GetRawResourceUtilizationRatio(metrics PodResourceInfo, targetUtilization int64) (float64, int64) {
+	metricsTotal := int64(0)
+	for _, metricValue := range metrics {
+		metricsTotal += metricValue
+	}
+
+	currentUtilization := metricsTotal / int64(len(metrics))
+
+	return float64(currentUtilization) / float64(targetUtilization), currentUtilization
+}
