@@ -35,13 +35,13 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("Pods Delete Grace Period", func() {
+var _ = framework.KubeDescribe("Pods", func() {
 	f := framework.NewDefaultFramework("pods")
 	var podClient *framework.PodClient
 	BeforeEach(func() {
 		podClient = f.PodClient()
 	})
-	It("should be submitted and removed [Conformance]", func() {
+	It("should be removable using query string for grace period [Conformance]", func() {
 		By("creating the pod")
 		name := "pod-submit-remove-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
@@ -102,7 +102,6 @@ var _ = framework.KubeDescribe("Pods Delete Grace Period", func() {
 		// save the running pod
 		pod, err = podClient.Get(pod.Name)
 		Expect(err).NotTo(HaveOccurred(), "failed to GET scheduled pod")
-
 
 		// start local proxy, so we can send graceful deletion over query string, rather than body parameter
 		cmd := framework.KubectlCmd("proxy", "-p", "0")
