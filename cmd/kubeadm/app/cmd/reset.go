@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -66,6 +67,55 @@ func NewReset(skipPreFlight bool) (*Reset, error) {
 	return &Reset{}, nil
 }
 
+// cleanDir removes everything in a directory, but not the directory itself:
+func cleanDir(path string) {
+	// If the directory doesn't even exist there's nothing to do, and we do
+	// not consider this an error:
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return
+	}
+
+	d, err := os.Open(path)
+	if err != nil {
+		fmt.Printf("failed to remove directory: [%v]\n", err)
+	}
+	defer d.Close()
+	names, err := d.Readdirnames(-1)
+	if err != nil {
+		fmt.Printf("failed to remove directory: [%v]\n", err)
+	}
+	for _, name := range names {
+		err = os.RemoveAll(filepath.Join(path, name))
+		if err != nil {
+			fmt.Printf("failed to remove directory: [%v]\n", err)
+		}
+	}
+}
+
+// resetConfigDir is used to cleanup the files kubeadm writes in /etc/kubernetes/.
+func resetConfigDir(configDirPath string) {
+	dirsToClean := []string{
+		filepath.Join(configDirPath, "manifests"),
+		filepath.Join(configDirPath, "pki"),
+	}
+	fmt.Printf("Deleting contents of config directories: %v\n", dirsToClean)
+	for _, dir := range dirsToClean {
+		cleanDir(dir)
+	}
+
+	filesToClean := []string{
+		filepath.Join(configDirPath, "admin.conf"),
+		filepath.Join(configDirPath, "kubelet.conf"),
+	}
+	fmt.Printf("Deleting files: %v\n", filesToClean)
+	for _, path := range filesToClean {
+		err := os.RemoveAll(path)
+		if err != nil {
+			fmt.Printf("failed to remove file: [%v]\n", err)
+		}
+	}
+}
+
 // Run reverts any changes made to this host by "kubeadm init" or "kubeadm join".
 func (r *Reset) Run(out io.Writer) error {
 	serviceToStop := "kubelet"
@@ -81,13 +131,12 @@ func (r *Reset) Run(out io.Writer) error {
 	// Don't check for errors here, since umount will return a non-zero exit code if there is no directories to umount
 	exec.Command("sh", "-c", "cat /proc/mounts | awk '{print $2}' | grep '/var/lib/kubelet' | xargs umount").Run()
 
-	dirsToRemove := []string{"/var/lib/kubelet", "/var/lib/etcd", "/etc/kubernetes"}
-	fmt.Printf("Deleting the stateful directories: %v\n", dirsToRemove)
-	for _, dir := range dirsToRemove {
-		err := os.RemoveAll(dir)
-		if err != nil {
-			fmt.Printf("failed to remove directory: [%v]\n", err)
-		}
+	resetConfigDir("/etc/kubernetes/")
+
+	dirsToClean := []string{"/var/lib/kubelet", "/var/lib/etcd"}
+	fmt.Printf("Deleting contents of stateful directories: %v\n", dirsToClean)
+	for _, dir := range dirsToClean {
+		cleanDir(dir)
 	}
 
 	dockerCheck := preflight.ServiceCheck{Service: "docker"}
