@@ -30,6 +30,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/runtime"
 
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 )
 
@@ -43,8 +44,8 @@ var (
 	join_long = templates.LongDesc(`
 		Join a cluster to a federation.
 
-        Current context is assumed to be a federation endpoint.
-        Please use the --context flag otherwise.`)
+        Current context is assumed to be a federation API
+        server. Please use the --context flag otherwise.`)
 	join_example = templates.Examples(`
 		# Join a cluster to a federation by specifying the
 		# cluster context name and the context name of the
@@ -68,19 +69,23 @@ type joinFederationConfig struct {
 	pathOptions *clientcmd.PathOptions
 }
 
+// Assert that `joinFederationConfig` implements the
+// `JoinFederationConfig` interface.
+var _ JoinFederationConfig = &joinFederationConfig{}
+
 func NewJoinFederationConfig(pathOptions *clientcmd.PathOptions) JoinFederationConfig {
 	return &joinFederationConfig{
 		pathOptions: pathOptions,
 	}
 }
 
-func (r *joinFederationConfig) PathOptions() *clientcmd.PathOptions {
-	return r.pathOptions
+func (j *joinFederationConfig) PathOptions() *clientcmd.PathOptions {
+	return j.pathOptions
 }
 
-func (r *joinFederationConfig) HostFactory(host, kubeconfigPath string) cmdutil.Factory {
-	loadingRules := *r.pathOptions.LoadingRules
-	loadingRules.Precedence = r.pathOptions.GetLoadingPrecedence()
+func (j *joinFederationConfig) HostFactory(host, kubeconfigPath string) cmdutil.Factory {
+	loadingRules := *j.pathOptions.LoadingRules
+	loadingRules.Precedence = j.pathOptions.GetLoadingPrecedence()
 	loadingRules.ExplicitPath = kubeconfigPath
 	overrides := &clientcmd.ConfigOverrides{
 		CurrentContext: host,
@@ -124,6 +129,8 @@ func joinFederation(f cmdutil.Factory, cmdOut io.Writer, config JoinFederationCo
 	kubeconfig := cmdutil.GetFlagString(cmd, "kubeconfig")
 	dryRun := cmdutil.GetDryRunFlag(cmd)
 
+	glog.V(2).Infof("Args and flags: name %s, host: %s, host-system-namespace: %s, kubeconfig: %s, dry-run: %s", name, host, hostSystemNamespace, kubeconfig, dryRun)
+
 	po := config.PathOptions()
 	po.LoadingRules.ExplicitPath = kubeconfig
 	clientConfig, err := po.GetStartingConfig()
@@ -132,8 +139,10 @@ func joinFederation(f cmdutil.Factory, cmdOut io.Writer, config JoinFederationCo
 	}
 	generator, err := clusterGenerator(clientConfig, name)
 	if err != nil {
+		glog.V(2).Infof("Failed creating cluster generator: %v", err)
 		return err
 	}
+	glog.V(2).Infof("Created cluster generator: %#v", generator)
 
 	// We are not using the `kubectl create secret` machinery through
 	// `RunCreateSubcommand` as we do to the cluster resource below
@@ -153,8 +162,10 @@ func joinFederation(f cmdutil.Factory, cmdOut io.Writer, config JoinFederationCo
 	hostFactory := config.HostFactory(host, kubeconfig)
 	_, err = createSecret(hostFactory, clientConfig, hostSystemNamespace, name, dryRun)
 	if err != nil {
+		glog.V(2).Infof("Failed creating the cluster credentials secret: %v", err)
 		return err
 	}
+	glog.V(2).Infof("Cluster credentials secret created")
 
 	return kubectlcmd.RunCreateSubcommand(f, cmd, cmdOut, &kubectlcmd.CreateSubcommandOptions{
 		Name:                name,
@@ -194,6 +205,7 @@ func createSecret(hostFactory cmdutil.Factory, clientConfig *clientcmdapi.Config
 	// relevant to the cluster we are registering.
 	newClientConfig, err := minifyConfig(clientConfig, name)
 	if err != nil {
+		glog.V(2).Infof("Failed to minify the kubeconfig for the given context %q: %v", name, err)
 		return nil, err
 	}
 
@@ -201,11 +213,13 @@ func createSecret(hostFactory cmdutil.Factory, clientConfig *clientcmdapi.Config
 	// contents are inlined.
 	err = clientcmdapi.FlattenConfig(newClientConfig)
 	if err != nil {
+		glog.V(2).Infof("Failed to flatten the kubeconfig for the given context %q: %v", name, err)
 		return nil, err
 	}
 
 	configBytes, err := clientcmd.Write(*newClientConfig)
 	if err != nil {
+		glog.V(2).Infof("Failed to serialize the kubeconfig for the given context %q: %v", name, err)
 		return nil, err
 	}
 
@@ -225,6 +239,7 @@ func createSecret(hostFactory cmdutil.Factory, clientConfig *clientcmdapi.Config
 		// Boilerplate to create the secret in the host cluster.
 		clientset, err := hostFactory.ClientSet()
 		if err != nil {
+			glog.V(2).Infof("Failed to retrieve the cluster clientset: %v", err)
 			return nil, err
 		}
 		return clientset.Core().Secrets(namespace).Create(secret)
@@ -248,22 +263,13 @@ func clusterGenerator(clientConfig *clientcmdapi.Config, name string) (kubectl.S
 		return nil, fmt.Errorf("cluster endpoint not found for %q", name)
 	}
 
-	// Parse the cluster APIServer endpoint into a `urlScheme` struct
-	// to extract and normalize the schema. If the schema is specified,
-	// it is used as is. It is otherwise inferred from the port in the
-	// host:port part of the endpoint URL.
-	u, err := urlParse(cluster.Server)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse cluster endpoint %q for cluster %q", cluster.Server, name)
-	}
+	// Extract the scheme portion of the cluster APIServer endpoint and
+	// default it to `https` if it isn't specified.
+	scheme := extractScheme(cluster.Server)
 	serverAddress := cluster.Server
-	if u.scheme == "" {
-		// Use "https" as the default scheme if the port isn't "80". It
-		// is not a perfect inference, it is just a safe heuristic.
+	if scheme == "" {
+		// Use "https" as the default scheme.
 		scheme := "https"
-		if u.port == "80" {
-			scheme = "http"
-		}
 		serverAddress = strings.Join([]string{scheme, serverAddress}, "://")
 	}
 
@@ -275,45 +281,13 @@ func clusterGenerator(clientConfig *clientcmdapi.Config, name string) (kubectl.S
 	return generator, nil
 }
 
-// url represents a APIServer URL in the structured form.
-type urlScheme struct {
-	scheme string
-	host   string
-	port   string
-	path   string
-}
-
-// urlParse implements a logic similar to `net/url.Parse()`, but unlike
-// the standard library function, it gracefully handles the URLs without
-// scheme. On the other hand, it only parses the segments we care about.
-func urlParse(rawurl string) (*urlScheme, error) {
+// extractScheme parses the given URL to extract the scheme portion
+// out of it.
+func extractScheme(url string) string {
 	scheme := ""
-	port := ""
-	path := ""
-	hostport := rawurl
-	segs := strings.SplitN(rawurl, "://", 2)
+	segs := strings.SplitN(url, "://", 2)
 	if len(segs) == 2 {
 		scheme = segs[0]
-		hostport = segs[1]
 	}
-
-	remsegs := strings.SplitN(hostport, "/", 2)
-	if len(remsegs) == 2 {
-		hostport = remsegs[0]
-		path = remsegs[1]
-	}
-
-	host := hostport
-	hpsegs := strings.SplitN(hostport, ":", 2)
-	if len(hpsegs) == 2 {
-		host = hpsegs[0]
-		port = hpsegs[1]
-	}
-
-	return &urlScheme{
-		scheme: scheme,
-		host:   host,
-		port:   port,
-		path:   path,
-	}, nil
+	return scheme
 }

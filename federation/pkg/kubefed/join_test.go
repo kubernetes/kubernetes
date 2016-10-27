@@ -77,7 +77,7 @@ func TestJoinFederation(t *testing.T) {
 			token:              "souvenir",
 			kubeconfigGlobal:   fakeKubeFiles[0],
 			kubeconfigExplicit: fakeKubeFiles[1],
-			expectedServer:     "http://ally256.example.com:80",
+			expectedServer:     "https://ally256.example.com:80",
 			expectedErr:        "",
 		},
 		{
