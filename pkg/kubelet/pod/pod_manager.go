@@ -173,6 +173,9 @@ func (pm *basicManager) updatePodsInternal(pods ...*api.Pod) {
 func (pm *basicManager) DeletePod(pod *api.Pod) {
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
+	if pod == nil {
+		return
+	}
 	podFullName := kubecontainer.GetPodFullName(pod)
 	if IsMirrorPod(pod) {
 		delete(pm.mirrorPodByUID, pod.UID)
