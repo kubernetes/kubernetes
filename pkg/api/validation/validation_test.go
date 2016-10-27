@@ -2220,6 +2220,20 @@ func TestValidateVolumes(t *testing.T) {
 			errtype:  field.ErrorTypeRequired,
 			errfield: "azureDisk.diskURI",
 		},
+		// QingCloudStore
+		{
+			name: "valid QingCloudStore",
+			vol: api.Volume{
+				Name: "qing-cloud",
+				VolumeSource: api.VolumeSource{
+					QingCloudStore: &api.QingCloudStoreVolumeSource{
+						VolumeID: "vol-v0s33l2v",
+						FSType:   "ext4",
+						ReadOnly: false,
+					},
+				},
+			},
+		},
 	}
 
 	for i, tc := range testCases {

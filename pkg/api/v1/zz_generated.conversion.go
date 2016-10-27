@@ -272,6 +272,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_PreferredSchedulingTerm_To_v1_PreferredSchedulingTerm,
 		Convert_v1_Probe_To_api_Probe,
 		Convert_api_Probe_To_v1_Probe,
+		Convert_v1_QingCloudStoreVolumeSource_To_api_QingCloudStoreVolumeSource,
+		Convert_api_QingCloudStoreVolumeSource_To_v1_QingCloudStoreVolumeSource,
 		Convert_v1_QuobyteVolumeSource_To_api_QuobyteVolumeSource,
 		Convert_api_QuobyteVolumeSource_To_v1_QuobyteVolumeSource,
 		Convert_v1_RBDVolumeSource_To_api_RBDVolumeSource,
@@ -4028,6 +4030,15 @@ func autoConvert_v1_PersistentVolumeSource_To_api_PersistentVolumeSource(in *Per
 	} else {
 		out.AzureDisk = nil
 	}
+	if in.QingCloudStore != nil {
+		in, out := &in.QingCloudStore, &out.QingCloudStore
+		*out = new(api.QingCloudStoreVolumeSource)
+		if err := Convert_v1_QingCloudStoreVolumeSource_To_api_QingCloudStoreVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.QingCloudStore = nil
+	}
 	return nil
 }
 
@@ -4179,6 +4190,15 @@ func autoConvert_api_PersistentVolumeSource_To_v1_PersistentVolumeSource(in *api
 		}
 	} else {
 		out.AzureDisk = nil
+	}
+	if in.QingCloudStore != nil {
+		in, out := &in.QingCloudStore, &out.QingCloudStore
+		*out = new(QingCloudStoreVolumeSource)
+		if err := Convert_api_QingCloudStoreVolumeSource_To_v1_QingCloudStoreVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.QingCloudStore = nil
 	}
 	return nil
 }
@@ -5134,6 +5154,28 @@ func autoConvert_api_Probe_To_v1_Probe(in *api.Probe, out *Probe, s conversion.S
 
 func Convert_api_Probe_To_v1_Probe(in *api.Probe, out *Probe, s conversion.Scope) error {
 	return autoConvert_api_Probe_To_v1_Probe(in, out, s)
+}
+
+func autoConvert_v1_QingCloudStoreVolumeSource_To_api_QingCloudStoreVolumeSource(in *QingCloudStoreVolumeSource, out *api.QingCloudStoreVolumeSource, s conversion.Scope) error {
+	out.VolumeID = in.VolumeID
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
+func Convert_v1_QingCloudStoreVolumeSource_To_api_QingCloudStoreVolumeSource(in *QingCloudStoreVolumeSource, out *api.QingCloudStoreVolumeSource, s conversion.Scope) error {
+	return autoConvert_v1_QingCloudStoreVolumeSource_To_api_QingCloudStoreVolumeSource(in, out, s)
+}
+
+func autoConvert_api_QingCloudStoreVolumeSource_To_v1_QingCloudStoreVolumeSource(in *api.QingCloudStoreVolumeSource, out *QingCloudStoreVolumeSource, s conversion.Scope) error {
+	out.VolumeID = in.VolumeID
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
+func Convert_api_QingCloudStoreVolumeSource_To_v1_QingCloudStoreVolumeSource(in *api.QingCloudStoreVolumeSource, out *QingCloudStoreVolumeSource, s conversion.Scope) error {
+	return autoConvert_api_QingCloudStoreVolumeSource_To_v1_QingCloudStoreVolumeSource(in, out, s)
 }
 
 func autoConvert_v1_QuobyteVolumeSource_To_api_QuobyteVolumeSource(in *QuobyteVolumeSource, out *api.QuobyteVolumeSource, s conversion.Scope) error {
@@ -6505,6 +6547,15 @@ func autoConvert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.
 	} else {
 		out.AzureDisk = nil
 	}
+	if in.QingCloudStore != nil {
+		in, out := &in.QingCloudStore, &out.QingCloudStore
+		*out = new(api.QingCloudStoreVolumeSource)
+		if err := Convert_v1_QingCloudStoreVolumeSource_To_api_QingCloudStoreVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.QingCloudStore = nil
+	}
 	return nil
 }
 
@@ -6710,6 +6761,15 @@ func autoConvert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *
 		}
 	} else {
 		out.AzureDisk = nil
+	}
+	if in.QingCloudStore != nil {
+		in, out := &in.QingCloudStore, &out.QingCloudStore
+		*out = new(QingCloudStoreVolumeSource)
+		if err := Convert_api_QingCloudStoreVolumeSource_To_v1_QingCloudStoreVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.QingCloudStore = nil
 	}
 	return nil
 }

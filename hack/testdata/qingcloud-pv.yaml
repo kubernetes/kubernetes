@@ -1,0 +1,13 @@
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: qing-pv
+spec:
+  capacity:
+    storage: 12Gi
+  accessModes:
+    - ReadWriteOnce
+  qingCloudStore:
+    volumeID: vol-8yl1q65r
+    fsType: ext4
+    readOnly: false
