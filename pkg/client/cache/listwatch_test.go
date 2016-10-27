@@ -20,6 +20,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -28,7 +29,9 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/runtime"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 func parseSelectorOrDie(s string) fields.Selector {
@@ -169,5 +172,56 @@ func TestListWatchesCanWatch(t *testing.T) {
 		// This test merely tests that the correct request is made.
 		lw.Watch(api.ListOptions{ResourceVersion: item.rv})
 		handler.ValidateRequest(t, item.location, "GET", nil)
+	}
+}
+
+type lw struct {
+	list  runtime.Object
+	watch watch.Interface
+}
+
+func (w lw) List(options api.ListOptions) (runtime.Object, error) {
+	return w.list, nil
+}
+
+func (w lw) Watch(options api.ListOptions) (watch.Interface, error) {
+	return w.watch, nil
+}
+
+func TestListWatchUntil(t *testing.T) {
+	fw := watch.NewFake()
+	go func() {
+		var obj *api.Pod
+		fw.Modify(obj)
+	}()
+	listwatch := lw{
+		list:  &api.PodList{Items: []api.Pod{{}}},
+		watch: fw,
+	}
+
+	conditions := []watch.ConditionFunc{
+		func(event watch.Event) (bool, error) {
+			t.Logf("got %#v", event)
+			return event.Type == watch.Added, nil
+		},
+		func(event watch.Event) (bool, error) {
+			t.Logf("got %#v", event)
+			return event.Type == watch.Modified, nil
+		},
+	}
+
+	timeout := 10 * time.Second
+	lastEvent, err := ListWatchUntil(timeout, listwatch, conditions...)
+	if err != nil {
+		t.Fatalf("expected nil error, got %#v", err)
+	}
+	if lastEvent == nil {
+		t.Fatal("expected an event")
+	}
+	if lastEvent.Type != watch.Modified {
+		t.Fatalf("expected MODIFIED event type, got %v", lastEvent.Type)
+	}
+	if got, isPod := lastEvent.Object.(*api.Pod); !isPod {
+		t.Fatalf("expected a pod event, got %#v", got)
 	}
 }
