@@ -17,10 +17,10 @@ limitations under the License.
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"path"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -90,9 +90,11 @@ func RunCreateToken(out io.Writer, cmd *cobra.Command, skipPreFlight bool) error
 	}
 
 	secret := &api.Secret{
-		ObjectMeta: api.ObjectMeta{Name: tokenSecret.TokenID},
-		Type:       api.SecretTypeOpaque,
-		Data:       encodeTokenSecretData(tokenSecret),
+		ObjectMeta: api.ObjectMeta{
+			Name: fmt.Sprintf("boostrap-token-%s", tokenSecret.TokenID),
+		},
+		Type: api.SecretTypeBootstrapToken,
+		Data: encodeTokenSecretData(tokenSecret),
 	}
 	if _, err := client.Secrets(api.NamespaceSystem).Create(secret); err != nil {
 		return fmt.Errorf("<cmd/token> failed to create token secret [%v]", err)
@@ -107,7 +109,19 @@ func encodeTokenSecretData(tokenSecret *kubeadmapi.Secrets) map[string][]byte {
 		data = map[string][]byte{}
 	)
 
-	data[tokenSecret.TokenID], _ = json.Marshal(tokenSecret)
+	data["token-id"] = []byte(tokenSecret.TokenID)
+	data["token-secret"] = []byte(tokenSecret.Token)
+
+	// TODO: Configurable token expiration time.
+	// Expire tokens in 24 hours:
+	t := time.Now()
+	t = t.Add(24 * time.Hour)
+	data["expiration"] = []byte(t.Format(time.RFC3339))
+
+	// Technically a boolean but we need a byte array here and to base64
+	// encode it so we'll work with strings.
+	// TODO: Find out why false is even an option in design doc.
+	data["usage-bootstrap-signing"] = []byte("true")
 
 	return data
 }
