@@ -54,7 +54,7 @@ spec:
   selector:
     app: cockroachdb
 ---
-apiVersion: apps/v1alpha1
+apiVersion: apps/v1beta1
 kind: PetSet
 metadata:
   name: cockroachdb
