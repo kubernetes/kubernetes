@@ -1,10 +1,24 @@
+approvers:
+- adohe
+- brendandburns
+- deads2k
+- fabianofranz
+- pwittrock
+- smarterclayton
 reviewers:
-- david-mcmahon
-- erictune
-- liggitt
-- mbohlool
-- mml
+- adohe
+- deads2k
+- derekwaynecarr
+- dims
+- dshulyak
+- eparis
+- ericchiang
+- fabianofranz
+- ghodss
+- kargakis
+- pwittrock
+- rootfs
 - smarterclayton
 - soltysh
-- timothysc
-- wojtek-t
+- sttts
+- ymqytw
