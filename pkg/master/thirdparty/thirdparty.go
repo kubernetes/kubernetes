@@ -58,7 +58,7 @@ type ThirdPartyResourceServer struct {
 	deleteCollectionWorkers int
 
 	// storage for third party objects
-	ThirdPartyStorageConfig *storagebackend.Config
+	thirdPartyStorageConfig *storagebackend.Config
 	// map from api path to a tuple of (storage for the objects, APIGroup)
 	thirdPartyResources map[string]*thirdPartyEntry
 	// protects the map
@@ -68,11 +68,19 @@ type ThirdPartyResourceServer struct {
 	disableThirdPartyControllerForTesting bool
 }
 
-func NewThirdPartyResourceServer(genericAPIServer *genericapiserver.GenericAPIServer) *ThirdPartyResourceServer {
-	return &ThirdPartyResourceServer{
+func NewThirdPartyResourceServer(genericAPIServer *genericapiserver.GenericAPIServer, storageFactory genericapiserver.StorageFactory) *ThirdPartyResourceServer {
+	ret := &ThirdPartyResourceServer{
 		genericAPIServer:    genericAPIServer,
 		thirdPartyResources: map[string]*thirdPartyEntry{},
 	}
+
+	var err error
+	ret.thirdPartyStorageConfig, err = storageFactory.NewConfig(extensions.Resource("thirdpartyresources"))
+	if err != nil {
+		glog.Fatalf("Error building third party storage: %v", err)
+	}
+
+	return ret
 }
 
 // thirdPartyEntry combines objects storage and API group into one struct
@@ -276,7 +284,7 @@ func (m *ThirdPartyResourceServer) InstallThirdPartyResource(rsrc *extensions.Th
 func (m *ThirdPartyResourceServer) thirdpartyapi(group, kind, version, pluralResource string) *apiserver.APIGroupVersion {
 	resourceStorage := thirdpartyresourcedataetcd.NewREST(
 		generic.RESTOptions{
-			StorageConfig:           m.ThirdPartyStorageConfig,
+			StorageConfig:           m.thirdPartyStorageConfig,
 			Decorator:               generic.UndecoratedStorage,
 			DeleteCollectionWorkers: m.deleteCollectionWorkers,
 		},
