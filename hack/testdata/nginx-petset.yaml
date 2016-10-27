@@ -16,7 +16,7 @@ spec:
   selector:
     app: nginx-petset
 ---
-apiVersion: apps/v1alpha1
+apiVersion: apps/v1beta1
 kind: StatefulSet
 metadata:
   name: nginx

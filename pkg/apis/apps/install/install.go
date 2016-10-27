@@ -21,19 +21,19 @@ package install
 import (
 	"k8s.io/kubernetes/pkg/apimachinery/announced"
 	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/apps/v1alpha1"
+	"k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 )
 
 func init() {
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  apps.GroupName,
-			VersionPreferenceOrder:     []string{v1alpha1.SchemeGroupVersion.Version},
+			VersionPreferenceOrder:     []string{v1beta1.SchemeGroupVersion.Version},
 			ImportPrefix:               "k8s.io/kubernetes/pkg/apis/apps",
 			AddInternalObjectsToScheme: apps.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{
-			v1alpha1.SchemeGroupVersion.Version: v1alpha1.AddToScheme,
+			v1beta1.SchemeGroupVersion.Version: v1beta1.AddToScheme,
 		},
 	).Announce().RegisterAndEnable(); err != nil {
 		panic(err)
