@@ -276,7 +276,9 @@ func (f *Framework) deleteFederationNs() {
 
 	clientset := f.FederationClientset_1_5
 	// First delete the namespace from federation apiserver.
-	if err := clientset.Core().Namespaces().Delete(ns.Name, &v1.DeleteOptions{}); err != nil {
+	// Also delete the corresponding namespaces from underlying clusters.
+	orphanDependents := false
+	if err := clientset.Core().Namespaces().Delete(ns.Name, &v1.DeleteOptions{OrphanDependents: &orphanDependents}); err != nil {
 		Failf("Error while deleting federation namespace %s: %s", ns.Name, err)
 	}
 	// Verify that it got deleted.
@@ -297,8 +299,6 @@ func (f *Framework) deleteFederationNs() {
 			Logf("Namespace %v was already deleted", ns.Name)
 		}
 	}
-
-	// TODO: Delete the namespace from underlying clusters.
 }
 
 // AfterEach deletes the namespace, after reading its events.

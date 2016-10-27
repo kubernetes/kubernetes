@@ -3079,6 +3079,7 @@ type FinalizerName string
 // These are internal finalizer values to Kubernetes, must be qualified name unless defined here
 const (
 	FinalizerKubernetes FinalizerName = "kubernetes"
+	FinalizerOrphan     string        = "orphan"
 )
 
 // NamespaceSpec describes the attributes on a Namespace.

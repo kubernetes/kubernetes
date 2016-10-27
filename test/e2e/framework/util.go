@@ -2219,6 +2219,7 @@ func DumpEventsInNamespace(eventsLister EventsLister, namespace string) {
 	events, err := eventsLister(v1.ListOptions{}, namespace)
 	Expect(err).NotTo(HaveOccurred())
 
+	By(fmt.Sprintf("Found %d events.", len(events.Items)))
 	// Sort events by their first timestamp
 	sortedEvents := events.Items
 	if len(sortedEvents) > 1 {
