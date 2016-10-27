@@ -67,13 +67,13 @@ type Mounter struct {
 func (mounter *Mounter) Mount(source string, target string, fstype string, options []string) error {
 	bind, bindRemountOpts := isBind(options)
 	if bind {
-		err := doMount(mounter.mounterPath, path.Join(mounter.mounterRootfsPath, source), target, fstype, []string{"bind"})
+		err := doMount(mounter.mounterPath, path.Join(mounter.mounterRootfsPath, source), path.Join(mounter.mounterRootfsPath, target), fstype, []string{"bind"})
 		if err != nil {
 			return err
 		}
-		return doMount(mounter.mounterPath, path.Join(mounter.mounterRootfsPath, source), target, fstype, bindRemountOpts)
+		return doMount(mounter.mounterPath, path.Join(mounter.mounterRootfsPath, source), path.Join(mounter.mounterRootfsPath, target), fstype, bindRemountOpts)
 	} else {
-		return doMount(mounter.mounterPath, path.Join(mounter.mounterRootfsPath, source), target, fstype, options)
+		return doMount(mounter.mounterPath, source, path.Join(mounter.mounterRootfsPath, target), fstype, options)
 	}
 }
 
