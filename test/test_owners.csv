@@ -649,6 +649,8 @@ k8s.io/kubernetes/pkg/controller/garbagecollector,rmmh,1
 k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly,cjcullen,1
 k8s.io/kubernetes/pkg/controller/job,soltysh,1
 k8s.io/kubernetes/pkg/controller/namespace,rrati,0
+k8s.io/kubernetes/pkg/controller/job,soltysh,0
+k8s.io/kubernetes/pkg/controller/namespace/deletion,nikhiljindal,0
 k8s.io/kubernetes/pkg/controller/node,gmarek,0
 k8s.io/kubernetes/pkg/controller/petset,fgrzadkowski,1
 k8s.io/kubernetes/pkg/controller/podautoscaler,piosz,0

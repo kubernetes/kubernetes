@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/namespace/deletion"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 
@@ -62,9 +63,11 @@ type NamespaceController struct {
 	// function to list of preferred resources for namespace deletion
 	discoverResourcesFn func() ([]*metav1.APIResourceList, error)
 	// opCache is a cache to remember if a particular operation is not supported to aid dynamic client.
-	opCache *operationNotSupportedCache
+	opCache *deletion.OperationNotSupportedCache
 	// finalizerToken is the finalizer token managed by this controller
 	finalizerToken v1.FinalizerName
+	// helper to delete all resources in the namespace when the namespace is deleted.
+	namespacedResourcesDeleter *deletion.NamespacedResourcesDeleter
 }
 
 // NewNamespaceController creates a new NamespaceController
@@ -75,8 +78,8 @@ func NewNamespaceController(
 	resyncPeriod time.Duration,
 	finalizerToken v1.FinalizerName) *NamespaceController {
 
-	opCache := &operationNotSupportedCache{
-		m: make(map[operationKey]bool),
+	opCache := &deletion.OperationNotSupportedCache{
+		M: make(map[deletion.OperationKey]bool),
 	}
 
 	// pre-fill opCache with the discovery info
@@ -102,9 +105,9 @@ func NewNamespaceController(
 				glog.V(6).Infof("Skipping resource %v because it cannot be deleted.", gvr)
 			}
 
-			for _, op := range []operation{operationList, operationDeleteCollection} {
+			for _, op := range []deletion.Operation{deletion.OperationList, deletion.OperationDeleteCollection} {
 				if !verbs.Has(string(op)) {
-					opCache.setNotSupported(operationKey{op: op, gvr: gvr})
+					opCache.SetNotSupported(deletion.OperationKey{Operation: op, Gvr: gvr})
 				}
 			}
 
@@ -114,12 +117,13 @@ func NewNamespaceController(
 
 	// create the controller so we can inject the enqueue function
 	namespaceController := &NamespaceController{
-		kubeClient:          kubeClient,
-		clientPool:          clientPool,
-		queue:               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "namespace"),
-		discoverResourcesFn: discoverResourcesFn,
-		opCache:             opCache,
-		finalizerToken:      finalizerToken,
+		kubeClient:                 kubeClient,
+		clientPool:                 clientPool,
+		queue:                      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "namespace"),
+		discoverResourcesFn:        discoverResourcesFn,
+		opCache:                    opCache,
+		finalizerToken:             finalizerToken,
+		namespacedResourcesDeleter: deletion.NewNamespacedResourcesDeleter(kubeClient.Core().Namespaces(), clientPool, opCache, discoverResourcesFn, finalizerToken, true),
 	}
 
 	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
@@ -187,7 +191,7 @@ func (nm *NamespaceController) worker() {
 			return false
 		}
 
-		if estimate, ok := err.(*contentRemainingError); ok {
+		if estimate, ok := err.(*deletion.ResourcesRemainingError); ok {
 			t := estimate.Estimate/2 + 1
 			glog.V(4).Infof("Content remaining in namespace %s, waiting %d seconds", key, t)
 			nm.queue.AddAfter(key, time.Duration(t)*time.Second)
@@ -224,7 +228,7 @@ func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
 		return err
 	}
 	namespace := obj.(*v1.Namespace)
-	return syncNamespace(nm.kubeClient, nm.clientPool, nm.opCache, nm.discoverResourcesFn, namespace, nm.finalizerToken)
+	return nm.namespacedResourcesDeleter.Delete(namespace.Name)
 }
 
 // Run starts observing the system with the specified number of workers.

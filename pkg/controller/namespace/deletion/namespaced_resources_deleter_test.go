@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package namespace
+package deletion
 
 import (
 	"fmt"
@@ -33,7 +33,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
@@ -66,7 +65,11 @@ func TestFinalizeNamespaceFunc(t *testing.T) {
 			Finalizers: []v1.FinalizerName{"kubernetes", "other"},
 		},
 	}
-	finalizeNamespace(mockClient, testNamespace, v1.FinalizerKubernetes)
+	d := NamespacedResourcesDeleter{
+		nsClient:       mockClient.Core().Namespaces(),
+		finalizerToken: v1.FinalizerKubernetes,
+	}
+	d.finalizeNamespace(testNamespace)
 	actions := mockClient.Actions()
 	if len(actions) != 1 {
 		t.Errorf("Expected 1 mock client action, but got %v", len(actions))
@@ -127,6 +130,11 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 		dynamicClientActionSet.Insert((&fakeAction{method: "GET", path: urlPath}).String())
 		dynamicClientActionSet.Insert((&fakeAction{method: "DELETE", path: urlPath}).String())
 	}
+	// One additional GET for listing pods (to estimate graceful deletion).
+	urlPath := path.Join([]string{
+		dynamic.LegacyAPIPathResolverFunc(schema.GroupVersionKind{Group: "", Version: "v1"}),
+		"", "v1", "namespaces", namespaceName}...)
+	dynamicClientActionSet.Insert((&fakeAction{method: "GET", path: urlPath}).String())
 
 	scenarios := map[string]struct {
 		testNamespace          *v1.Namespace
@@ -139,7 +147,6 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 			kubeClientActionSet: sets.NewString(
 				strings.Join([]string{"get", "namespaces", ""}, "-"),
 				strings.Join([]string{"create", "namespaces", "finalize"}, "-"),
-				strings.Join([]string{"list", "pods", ""}, "-"),
 				strings.Join([]string{"delete", "namespaces", ""}, "-"),
 			),
 			dynamicClientActionSet: dynamicClientActionSet,
@@ -174,8 +181,8 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 		fn := func() ([]*metav1.APIResourceList, error) {
 			return resources, nil
 		}
-
-		err := syncNamespace(mockClient, clientPool, &operationNotSupportedCache{m: make(map[operationKey]bool)}, fn, testInput.testNamespace, v1.FinalizerKubernetes)
+		d := NewNamespacedResourcesDeleter(mockClient.Core().Namespaces(), clientPool, &OperationNotSupportedCache{M: make(map[OperationKey]bool)}, fn, v1.FinalizerKubernetes, true)
+		err := d.Delete(testInput.testNamespace.Name)
 		if err != nil {
 			t.Errorf("scenario %s - Unexpected error when synching namespace %v", scenario, err)
 		}
@@ -205,7 +212,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 func TestRetryOnConflictError(t *testing.T) {
 	mockClient := &fake.Clientset{}
 	numTries := 0
-	retryOnce := func(kubeClient clientset.Interface, namespace *v1.Namespace) (*v1.Namespace, error) {
+	retryOnce := func(namespace *v1.Namespace) (*v1.Namespace, error) {
 		numTries++
 		if numTries <= 1 {
 			return namespace, errors.NewConflict(api.Resource("namespaces"), namespace.Name, fmt.Errorf("ERROR!"))
@@ -213,7 +220,10 @@ func TestRetryOnConflictError(t *testing.T) {
 		return namespace, nil
 	}
 	namespace := &v1.Namespace{}
-	_, err := retryOnConflictError(mockClient, namespace, retryOnce)
+	d := NamespacedResourcesDeleter{
+		nsClient: mockClient.Core().Namespaces(),
+	}
+	_, err := d.retryOnConflictError(namespace, retryOnce)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
@@ -247,12 +257,19 @@ func TestSyncNamespaceThatIsActive(t *testing.T) {
 	fn := func() ([]*metav1.APIResourceList, error) {
 		return testResources(), nil
 	}
-	err := syncNamespace(mockClient, nil, &operationNotSupportedCache{m: make(map[operationKey]bool)}, fn, testNamespace, v1.FinalizerKubernetes)
+	//err := syncNamespace(mockClient, nil, &operationNotSupportedCache{m: make(map[operationKey]bool)}, fn, testNamespace, v1.FinalizerKubernetes)
+	d := NewNamespacedResourcesDeleter(mockClient.Core().Namespaces(), nil,
+		&OperationNotSupportedCache{M: make(map[OperationKey]bool)}, fn, v1.FinalizerKubernetes, true)
+	err := d.Delete(testNamespace.Name)
 	if err != nil {
 		t.Errorf("Unexpected error when synching namespace %v", err)
 	}
-	if len(mockClient.Actions()) != 0 {
-		t.Errorf("Expected no action from controller, but got: %v", mockClient.Actions())
+	if len(mockClient.Actions()) != 1 {
+		t.Errorf("Expected only one action from controller, but got: %d %v", len(mockClient.Actions()), mockClient.Actions())
+	}
+	action := mockClient.Actions()[0]
+	if !action.Matches("get", "namespaces") {
+		t.Errorf("Expected get namespaces, got: %v", action)
 	}
 }
 
