@@ -20,7 +20,13 @@
 TMP_ROOT="$(dirname "${BASH_SOURCE}")/../.."
 KUBE_ROOT=$(readlink -e ${TMP_ROOT} 2> /dev/null || perl -MCwd -e 'print Cwd::abs_path shift' ${TMP_ROOT})
 
+echo "ETCD_VERSION: ${ETCD_VERSION:-}"
+echo "TEST_ETCD_VERSION: ${TEST_ETCD_VERSION:-}"
+
 source "${KUBE_ROOT}/test/kubemark/common.sh"
+
+echo "ETCD_VERSION: ${ETCD_VERSION:-}"
+echo "TEST_ETCD_VERSION: ${TEST_ETCD_VERSION:-}"
 
 function writeEnvironmentFiles() {
   cat > "${RESOURCE_DIRECTORY}/apiserver_flags" <<EOF
