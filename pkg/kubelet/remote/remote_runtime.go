@@ -25,6 +25,7 @@ import (
 	"google.golang.org/grpc"
 	internalApi "k8s.io/kubernetes/pkg/kubelet/api"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	utilexec "k8s.io/kubernetes/pkg/util/exec"
 )
 
 // RemoteRuntimeService is a gRPC implementation of internalApi.RuntimeService.
@@ -267,7 +268,10 @@ func (r *RemoteRuntimeService) ExecSync(containerID string, cmd []string, timeou
 
 	err = nil
 	if resp.GetExitCode() != 0 {
-		err = fmt.Errorf("command '%s' exited with %d: %s", strings.Join(cmd, " "), resp.GetExitCode(), resp.GetStderr())
+		err = utilexec.CodeExitError{
+			Err:  fmt.Errorf("command '%s' exited with %d: %s", strings.Join(cmd, " "), resp.GetExitCode(), resp.GetStderr()),
+			Code: int(resp.GetExitCode()),
+		}
 	}
 
 	return resp.GetStdout(), resp.GetStderr(), err

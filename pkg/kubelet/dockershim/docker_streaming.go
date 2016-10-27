@@ -45,7 +45,7 @@ func (r *streamingRuntime) Exec(containerID string, cmd []string, in io.Reader, 
 
 // Internal version of Exec adds a timeout.
 func (r *streamingRuntime) exec(containerID string, cmd []string, in io.Reader, out, errw io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error {
-	container, err := r.client.InspectContainer(containerID)
+	container, err := checkContainerStatus(r.client, containerID)
 	if err != nil {
 		return err
 	}
@@ -70,7 +70,7 @@ func (r *streamingRuntime) exec(containerID string, cmd []string, in io.Reader, 
 }
 
 func (r *streamingRuntime) Attach(containerID string, in io.Reader, out, errw io.WriteCloser, resize <-chan term.Size) error {
-	container, err := r.client.InspectContainer(containerID)
+	container, err := checkContainerStatus(r.client, containerID)
 	if err != nil {
 		return err
 	}
@@ -106,7 +106,7 @@ func (ds *dockerService) Exec(req *runtimeapi.ExecRequest) (*runtimeapi.ExecResp
 	if ds.streamingServer == nil {
 		return nil, streaming.ErrorStreamingDisabled("exec")
 	}
-	_, err := ds.checkContainerStatus(req.GetContainerId())
+	_, err := checkContainerStatus(ds.client, req.GetContainerId())
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +118,7 @@ func (ds *dockerService) Attach(req *runtimeapi.AttachRequest) (*runtimeapi.Atta
 	if ds.streamingServer == nil {
 		return nil, streaming.ErrorStreamingDisabled("attach")
 	}
-	container, err := ds.checkContainerStatus(req.GetContainerId())
+	container, err := checkContainerStatus(ds.client, req.GetContainerId())
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +131,7 @@ func (ds *dockerService) PortForward(req *runtimeapi.PortForwardRequest) (*runti
 	if ds.streamingServer == nil {
 		return nil, streaming.ErrorStreamingDisabled("port forward")
 	}
-	_, err := ds.checkContainerStatus(req.GetPodSandboxId())
+	_, err := checkContainerStatus(ds.client, req.GetPodSandboxId())
 	if err != nil {
 		return nil, err
 	}
@@ -139,8 +139,8 @@ func (ds *dockerService) PortForward(req *runtimeapi.PortForwardRequest) (*runti
 	return ds.streamingServer.GetPortForward(req)
 }
 
-func (ds *dockerService) checkContainerStatus(containerID string) (*dockertypes.ContainerJSON, error) {
-	container, err := ds.client.InspectContainer(containerID)
+func checkContainerStatus(client dockertools.DockerInterface, containerID string) (*dockertypes.ContainerJSON, error) {
+	container, err := client.InspectContainer(containerID)
 	if err != nil {
 		return nil, err
 	}
