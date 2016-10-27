@@ -311,13 +311,15 @@ Opaque resources should account opaque integer resources in pods with multiple c
 Opaque resources should not break pods that do not consume opaque integer resources.,ConnorDoyle,0
 Opaque resources should not schedule pods that exceed the available amount of opaque integer resource.,ConnorDoyle,0
 Opaque resources should schedule pods that do consume opaque integer resources.,ConnorDoyle,0
-PersistentVolumes with Single PV - PVC pairs create a PV and a pre-bound PVC: test write access,caesarxuchao,1
-PersistentVolumes with Single PV - PVC pairs create a PVC and a pre-bound PV: test write access,caesarxuchao,1
-PersistentVolumes with Single PV - PVC pairs create a PVC and non-pre-bound PV: test write access,caesarxuchao,1
-PersistentVolumes with Single PV - PVC pairs should create a non-pre-bound PV and PVC: test write access,caesarxuchao,1
-PersistentVolumes with multiple PVs and PVCs all in same ns should create 2 PVs and 4 PVCs: test write access,caesarxuchao,1
-PersistentVolumes with multiple PVs and PVCs all in same ns should create 3 PVs and 3 PVCs: test write access,caesarxuchao,1
-PersistentVolumes with multiple PVs and PVCs all in same ns should create 4 PVs and 2 PVCs: test write access,caesarxuchao,1
+PersistentVolumes PersistentVolumes:GCEPD should test that deleting a PVC before the pod does not cause pod deletion to fail on PD detach,copejon,0
+PersistentVolumes PersistentVolumes:GCEPD should test that deleting the PV before the pod does not cause pod deletion to fail on PD detach,copejon,0
+PersistentVolumes PersistentVolumes:NFS with Single PV - PVC pairs create a PV and a pre-bound PVC: test write access,copejon,0
+PersistentVolumes PersistentVolumes:NFS with Single PV - PVC pairs create a PVC and a pre-bound PV: test write access,copejon,0
+PersistentVolumes PersistentVolumes:NFS with Single PV - PVC pairs create a PVC and non-pre-bound PV: test write access,copejon,0
+PersistentVolumes PersistentVolumes:NFS with Single PV - PVC pairs should create a non-pre-bound PV and PVC: test write access,copejon,0
+PersistentVolumes PersistentVolumes:NFS with multiple PVs and PVCs all in same ns should create 2 PVs and 4 PVCs: test write access,copejon,0
+PersistentVolumes PersistentVolumes:NFS with multiple PVs and PVCs all in same ns should create 3 PVs and 3 PVCs: test write access,copejon,0
+PersistentVolumes PersistentVolumes:NFS with multiple PVs and PVCs all in same ns should create 4 PVs and 2 PVCs: test write access,copejon,0
 Pet Store should scale to persist a nominal number ( * ) of transactions in * seconds,xiang90,1
 Pet set recreate should recreate evicted statefulset,roberthbailey,1
 "Pod Disks Should schedule a pod w/ a RW PD, gracefully remove it, then schedule it on another host",alex-mohr,1
