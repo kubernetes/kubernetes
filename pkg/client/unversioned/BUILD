@@ -13,8 +13,10 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "apps.go",
         "conditions.go",
         "helper.go",
+        "pet_sets.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -48,5 +50,17 @@ go_test(
         "//pkg/apimachinery/registered:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/runtime:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_xtest",
+    srcs = ["pet_sets_test.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//pkg/api:go_default_library",
+        "//pkg/api/testapi:go_default_library",
+        "//pkg/apis/apps:go_default_library",
+        "//pkg/client/unversioned/testclient/simple:go_default_library",
     ],
 )
