@@ -3,7 +3,7 @@ apiVersion: v1
 kind: Service
 metadata:
   annotations:
-    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+    service.beta.kubernetes.io/tolerate-unready-endpoints: "true"
   name: galera
   labels:
     app: mysql
