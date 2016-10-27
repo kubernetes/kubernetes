@@ -194,7 +194,7 @@ find "${CLIENT_REPO_TEMP}" -type f \( \
 if [ "${VERIFYONLY}" = true ]; then
     echo "running verify-only"
     ret=0
-    if diff -NauprB "${CLIENT_REPO}" "${CLIENT_REPO_TEMP}"; then
+    if diff -NauprB -I "GoVersion.*\|GodepVersion.*" "${CLIENT_REPO}" "${CLIENT_REPO_TEMP}"; then
       echo "${CLIENT_REPO} up to date."
       cleanup
       exit 0
