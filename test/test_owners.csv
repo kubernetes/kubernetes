@@ -277,10 +277,13 @@ NodeProblemDetector KernelMonitor should generate node condition and events for 
 Nodes Network when a node becomes unreachable *,alex-mohr,1
 Nodes Resize should be able to add nodes,piosz,1
 Nodes Resize should be able to delete nodes,zmerlynn,1
-PersistentVolumes create a PV and a pre-bound PVC: test write access,caesarxuchao,1
-PersistentVolumes create a PVC and a pre-bound PV: test write access,lavalamp,1
-PersistentVolumes create a PVC and non-pre-bound PV: test write access,mwielgus,1
-PersistentVolumes should create a non-pre-bound PV and PVC: test write access,andyzheng0831,1
+PersistentVolumes with Single PV - PVC pairs create a PV and a pre-bound PVC: test write access,alex-mohr,1
+PersistentVolumes with Single PV - PVC pairs create a PVC and a pre-bound PV: test write access,ncdc,1
+PersistentVolumes with Single PV - PVC pairs create a PVC and non-pre-bound PV: test write access,dchen1107,1
+PersistentVolumes with Single PV - PVC pairs should create a non-pre-bound PV and PVC: test write access,dchen1107,1
+PersistentVolumes with multiple PVs and PVCs all in same ns should create 2 PVs and 4 PVCs: test write access,lavalamp,1
+PersistentVolumes with multiple PVs and PVCs all in same ns should create 3 PVs and 3 PVCs: test write access,ghodss,1
+PersistentVolumes with multiple PVs and PVCs all in same ns should create 4 PVs and 2 PVCs: test write access,andyzheng0831,1
 Pet Store should scale to persist a nominal number ( * ) of transactions in * seconds,xiang90,1
 Pet set recreate should recreate evicted petset,hurf,1
 PetSet Basic PetSet functionality should handle healthy pet restarts during scale,kevin-wangzefeng,1
@@ -444,6 +447,7 @@ k8s.io/kubernetes/cmd/kube-apiserver/app,nikhiljindal,0
 k8s.io/kubernetes/cmd/kube-apiserver/app/options,nikhiljindal,0
 k8s.io/kubernetes/cmd/kube-discovery/app,vulpecula,1
 k8s.io/kubernetes/cmd/kube-proxy/app,luxas,1
+k8s.io/kubernetes/cmd/kubeadm/app/cmd,vishh,1
 k8s.io/kubernetes/cmd/kubeadm/app/images,davidopp,1
 k8s.io/kubernetes/cmd/kubeadm/app/util,krousey,1
 k8s.io/kubernetes/cmd/kubelet/app,hurf,1
@@ -530,7 +534,6 @@ k8s.io/kubernetes/pkg/client/unversioned/clientcmd,yifan-gu,1
 k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api,thockin,1
 k8s.io/kubernetes/pkg/client/unversioned/portforward,lavalamp,1
 k8s.io/kubernetes/pkg/client/unversioned/remotecommand,andyzheng0831,1
-k8s.io/kubernetes/pkg/client/unversioned/testclient,brendandburns,1
 k8s.io/kubernetes/pkg/cloudprovider/providers/aws,eparis,1
 k8s.io/kubernetes/pkg/cloudprovider/providers/azure,saad-ali,1
 k8s.io/kubernetes/pkg/cloudprovider/providers/cloudstack,roberthbailey,1
@@ -617,7 +620,9 @@ k8s.io/kubernetes/pkg/kubelet/qos,vishh,0
 k8s.io/kubernetes/pkg/kubelet/rkt,apelisse,1
 k8s.io/kubernetes/pkg/kubelet/rktshim,mml,1
 k8s.io/kubernetes/pkg/kubelet/server,timstclair,0
+k8s.io/kubernetes/pkg/kubelet/server/portforward,timstclair,0
 k8s.io/kubernetes/pkg/kubelet/server/stats,timstclair,0
+k8s.io/kubernetes/pkg/kubelet/server/streaming,timstclair,0
 k8s.io/kubernetes/pkg/kubelet/status,mwielgus,1
 k8s.io/kubernetes/pkg/kubelet/sysctl,piosz,1
 k8s.io/kubernetes/pkg/kubelet/types,jlowdermilk,1
