@@ -3514,13 +3514,6 @@ go_library(
 )
 
 go_library(
-    name = "github.com/google/cadvisor/info/v1/test",
-    srcs = ["github.com/google/cadvisor/info/v1/test/datagen.go"],
-    tags = ["automanaged"],
-    deps = ["//vendor:github.com/google/cadvisor/info/v1"],
-)
-
-go_library(
     name = "github.com/google/cadvisor/info/v2",
     srcs = [
         "github.com/google/cadvisor/info/v2/container.go",
