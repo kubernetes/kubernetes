@@ -128,7 +128,7 @@ func testWatch(t *testing.T, recursive bool) {
 func TestDeleteTriggerWatch(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(t, store, ctx, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
 	w, err := store.Watch(ctx, key, storedObj.ResourceVersion, storage.Everything)
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
@@ -145,7 +145,7 @@ func TestDeleteTriggerWatch(t *testing.T) {
 func TestWatchFromZero(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(t, store, ctx, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
 
 	w, err := store.Watch(ctx, key, "0", storage.Everything)
 	if err != nil {
@@ -159,7 +159,7 @@ func TestWatchFromZero(t *testing.T) {
 func TestWatchFromNoneZero(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(t, store, ctx, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
 
 	w, err := store.Watch(ctx, key, storedObj.ResourceVersion, storage.Everything)
 	if err != nil {
@@ -238,7 +238,7 @@ func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
 func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(t, store, ctx, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
 
 	w, err := store.Watch(ctx, key, storedObj.ResourceVersion, storage.Everything)
 	if err != nil {
