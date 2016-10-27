@@ -276,7 +276,12 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 		// Insert args at beginning of testArgs, so any values from command line take precedence
 		testArgs = fmt.Sprintf("--experimental-mounter-rootfs-path=%s ", mounterRootfsPath) + testArgs
 		testArgs = fmt.Sprintf("--experimental-mounter-path=%s ", mounterPath) + testArgs
-		glog.Infof("GCI node and GCI mounter both detected, setting --experimental-mounter-path=%q and --experimental-mounter-rootfs-path=%q accordingly", mounterPath, mounterRootfsPath)
+
+		glog.Warningf("Flag forwarding to Kubelet for --experimental-mounter-rootfs-path and --experimental-mounter-path has been disabled." +
+			" The GCI mounter script will not be used by the Kubelet during e2e node tests until these flag values are forwarded" +
+			" from the test framework in test/e2e_node/services/services.go.")
+		// Temporarily disabled:
+		// glog.Infof("GCI node and GCI mounter both detected, setting --experimental-mounter-path=%q and --experimental-mounter-rootfs-path=%q accordingly", mounterPath, mounterRootfsPath)
 	}
 
 	// Run the tests
