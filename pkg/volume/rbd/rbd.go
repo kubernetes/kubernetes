@@ -99,7 +99,7 @@ func (plugin *rbdPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.Vo
 	source, _ := plugin.getRBDVolumeSource(spec)
 
 	if source.SecretRef != nil {
-		if secret, err = parseSecret(pod.Namespace, source.SecretRef.Name, plugin.host.GetKubeClient()); err != nil {
+		if secret, err = parsePodSecret(pod, source.SecretRef.Name, plugin.host.GetKubeClient()); err != nil {
 			glog.Errorf("Couldn't get secret from %v/%v", pod.Namespace, source.SecretRef)
 			return nil, err
 		}
@@ -199,7 +199,7 @@ func (plugin *rbdPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 		}
 	}
 
-	secret, err := parseSecret(adminSecretNamespace, adminSecretName, plugin.host.GetKubeClient())
+	secret, err := parsePVSecret(adminSecretNamespace, adminSecretName, plugin.host.GetKubeClient())
 	if err != nil {
 		// log error but don't return yet
 		glog.Errorf("failed to get admin secret from [%q/%q]: %v", adminSecretNamespace, adminSecretName, err)
@@ -281,7 +281,7 @@ func (r *rbdVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 	if adminSecretName == "" {
 		return nil, fmt.Errorf("missing Ceph admin secret name")
 	}
-	if secret, err = parseSecret(adminSecretNamespace, adminSecretName, r.plugin.host.GetKubeClient()); err != nil {
+	if secret, err = parsePVSecret(adminSecretNamespace, adminSecretName, r.plugin.host.GetKubeClient()); err != nil {
 		// log error but don't return yet
 		glog.Errorf("failed to get admin secret from [%q/%q]", adminSecretNamespace, adminSecretName)
 	}
@@ -428,13 +428,26 @@ func getVolumeSource(
 	return nil, false, fmt.Errorf("Spec does not reference a RBD volume type")
 }
 
-// parseSecretMap locates the secret by key name.
-func parseSecret(namespace, secretName string, kubeClient clientset.Interface) (string, error) {
-	secretMap, err := volutil.GetSecret(namespace, secretName, kubeClient)
+func parsePodSecret(pod *api.Pod, secretName string, kubeClient clientset.Interface) (string, error) {
+	secret, err := volutil.GetSecretForPod(pod, secretName, kubeClient)
+	if err != nil {
+		glog.Errorf("failed to get secret from [%q/%q]", pod.Namespace, secretName)
+		return "", fmt.Errorf("failed to get secret from [%q/%q]", pod.Namespace, secretName)
+	}
+	return parseSecretMap(secret)
+}
+
+func parsePVSecret(namespace, secretName string, kubeClient clientset.Interface) (string, error) {
+	secret, err := volutil.GetSecretForPV(namespace, secretName, rbdPluginName, kubeClient)
 	if err != nil {
 		glog.Errorf("failed to get secret from [%q/%q]", namespace, secretName)
 		return "", fmt.Errorf("failed to get secret from [%q/%q]", namespace, secretName)
 	}
+	return parseSecretMap(secret)
+}
+
+// parseSecretMap locates the secret by key name.
+func parseSecretMap(secretMap map[string]string) (string, error) {
 	if len(secretMap) == 0 {
 		return "", fmt.Errorf("empty secret map")
 	}
