@@ -30,18 +30,11 @@ import (
 
 /*
 The following Network Policy tests verify that policy object definitions
-are correctly enforced by a networking plugin. It does this by launching
-a simple netcat server,
-
-We test the following:
-	-  Namespace ingress isolation set to DefaultDeny
-	- Full TCP isolation
-	- Policy rules to allow mono-directional TCP connectivity
-	- Policy rules to allow bi-directional TCP connectivity
-
-	TODO:
-	-  Test UDP traffic
-	-  Test progressively increased isolation (bidir->monodir->fully isolated)
+are correctly enforced by a networking plugin. It accomplishes this by launching
+a simple netcat server, and (in these tests) two clients with different
+attributes. Each test case creates a network policy which should only allow
+connections from one of the clients. The test then asserts that the clients
+failed or succesfully connected as expected.
 */
 
 const (
@@ -59,7 +52,7 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 		ns := f.Namespace
 
 		By("Create a simple server.")
-		podServer, service := createServerPod(f, ns, serverName, []int{listeningPort1})
+		podServer, service := createServerPodAndService(f, ns, serverName, []int{listeningPort1})
 		defer func() {
 			By("Cleaning up the server.")
 			if err := f.Client.Pods(ns.Name).Delete(podServer.Name, nil); err != nil {
@@ -88,7 +81,7 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 
 		framework.Logf("Waiting for client-a to to come up.")
 		err = framework.WaitForPodRunningInNamespace(f.Client, podClientA)
-		Expect(err).NotTo(HaveOccurred(), "waiting for Client-A to run")
+		Expect(err).NotTo(HaveOccurred(), "waiting for client-a to run")
 		framework.Logf("Waiting for client-a to complete.")
 		err = framework.WaitForPodSuccessInNamespace(f.Client, podClientA.Name, ns.Name)
 		Expect(err).NotTo(HaveOccurred(), "checking client-a could communicate with server.")
@@ -97,7 +90,7 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 		setNamespaceIsolation(f, ns, "DefaultDeny")
 
 		// Create a pod with name 'client-b', which will attempt to comunicate with the server,
-		//  but should not be able to now that isolation is on.
+		// but should not be able to now that isolation is on.
 		By("Creating client-b which should *not* be able to contact the server.")
 		podClientB := createClientPod(f, ns, clientBName, service, listeningPort1)
 		defer func() {
@@ -107,9 +100,9 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 			}
 		}()
 
-		framework.Logf("Waiting for client-b to run.")
+		framework.Logf("Waiting for client-b to come up.")
 		err = framework.WaitForPodRunningInNamespace(f.Client, podClientB)
-		Expect(err).NotTo(HaveOccurred(), "waiting for Client-B to run")
+		Expect(err).NotTo(HaveOccurred(), "waiting for client-b to come up.")
 
 		framework.Logf("Waiting for client-b to complete.")
 		err = framework.WaitForPodSuccessInNamespace(f.Client, podClientB.Name, ns.Name)
@@ -121,11 +114,11 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 		setNamespaceIsolation(f, ns, "DefaultDeny")
 
 		By("Creating a simple server.")
-		podServer, service := createServerPod(f, ns, serverName, []int{listeningPort1})
+		serverPod, service := createServerPodAndService(f, ns, serverName, []int{listeningPort1})
 		defer func() {
 			By("Cleaning up the server.")
-			if err := f.Client.Pods(ns.Name).Delete(podServer.Name, nil); err != nil {
-				framework.Failf("unable to delete pod %v: %v", podServer.Name, err)
+			if err := f.Client.Pods(ns.Name).Delete(serverPod.Name, nil); err != nil {
+				framework.Failf("unable to delete pod %v: %v", serverPod.Name, err)
 			}
 		}()
 		defer func() {
@@ -135,19 +128,19 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 			}
 		}()
 		framework.Logf("Waiting for Server to come up.")
-		err := framework.WaitForPodRunningInNamespace(f.Client, podServer)
+		err := framework.WaitForPodRunningInNamespace(f.Client, serverPod)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating a network policy for the server which allows traffic from the pod 'client-a'.")
 		policy, err := f.Client.NetworkPolicies(ns.Name).Create(&extensions.NetworkPolicy{
 			ObjectMeta: api.ObjectMeta{
-				Name: "test-policy",
+				Name: "allow-client-a-via-pod-selector",
 			},
 			Spec: extensions.NetworkPolicySpec{
 				// Apply this policy to the Server
 				PodSelector: unversioned.LabelSelector{
 					MatchLabels: map[string]string{
-						"pod-name": podServer.Name,
+						"pod-name": serverPod.Name,
 					},
 				},
 				// Allow traffic only from client-a
@@ -170,7 +163,6 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 			}
 		}()
 
-		// Create a pod with name 'client-a', which should be able to communicate with server.
 		By("Creating client-a which should be able to contact the server.")
 		podClientA := createClientPod(f, ns, clientAName, service, listeningPort1)
 		defer func() {
@@ -181,7 +173,7 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 		}()
 
 		// Create a pod with name 'client-b', which will attempt to comunicate with the server,
-		//  but should not be able to do to the label-based policy.
+		// but should not be able to due to the label-based policy.
 		By("Creating client-b which should *not* be able to contact the server.")
 		podClientB := createClientPod(f, ns, clientBName, service, listeningPort1)
 		defer func() {
@@ -212,11 +204,11 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 
 		// Create Server with Service
 		By("Creating a simple server.")
-		podServer, service := createServerPod(f, ns, serverName, []int{listeningPort1, listeningPort2})
+		serverPod, service := createServerPodAndService(f, ns, serverName, []int{listeningPort1, listeningPort2})
 		defer func() {
 			By("Cleaning up the server.")
-			if err := f.Client.Pods(ns.Name).Delete(podServer.Name, nil); err != nil {
-				framework.Failf("unable to delete pod %v: %v", podServer.Name, err)
+			if err := f.Client.Pods(ns.Name).Delete(serverPod.Name, nil); err != nil {
+				framework.Failf("unable to delete pod %v: %v", serverPod.Name, err)
 			}
 		}()
 		defer func() {
@@ -226,20 +218,19 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 			}
 		}()
 		framework.Logf("Waiting for Server to come up.")
-		err := framework.WaitForPodRunningInNamespace(f.Client, podServer)
+		err := framework.WaitForPodRunningInNamespace(f.Client, serverPod)
 		Expect(err).NotTo(HaveOccurred())
 
-		// Create Policy for that service that allows traffic via podselector 'client-a'
 		By("Creating a network policy for the Service which allows traffic only to one port.")
 		policy, err := f.Client.NetworkPolicies(ns.Name).Create(&extensions.NetworkPolicy{
 			ObjectMeta: api.ObjectMeta{
-				Name: "test-policy",
+				Name: fmt.Sprintf("allow-ingress-on-port-%d", listeningPort1),
 			},
 			Spec: extensions.NetworkPolicySpec{
 				// Apply to server
 				PodSelector: unversioned.LabelSelector{
 					MatchLabels: map[string]string{
-						"pod-name": podServer.Name,
+						"pod-name": serverPod.Name,
 					},
 				},
 				// Allow traffic only to one port.
@@ -302,15 +293,14 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 		})
 		Expect(err).NotTo(HaveOccurred())
 		setNamespaceIsolation(f, nsA, "DefaultDeny")
-		setNamespaceIsolation(f, nsB, "DefaultDeny")
 
 		// Create Server with Service in NS-B
 		By("Creating a webserver tied to a service.")
-		podServer, service := createServerPod(f, nsA, serverName, []int{listeningPort1})
+		serverPod, service := createServerPodAndService(f, nsA, serverName, []int{listeningPort1})
 		defer func() {
 			By("Cleaning up the server.")
-			if err := f.Client.Pods(nsA.Name).Delete(podServer.Name, nil); err != nil {
-				framework.Failf("unable to delete pod %v: %v", podServer.Name, err)
+			if err := f.Client.Pods(nsA.Name).Delete(serverPod.Name, nil); err != nil {
+				framework.Failf("unable to delete pod %v: %v", serverPod.Name, err)
 			}
 		}()
 		defer func() {
@@ -320,20 +310,20 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 			}
 		}()
 		framework.Logf("Waiting for server to come up.")
-		err = framework.WaitForPodRunningInNamespace(f.Client, podServer)
+		err = framework.WaitForPodRunningInNamespace(f.Client, serverPod)
 		Expect(err).NotTo(HaveOccurred())
 
 		// Create Policy for that service that allows traffic only via namespace B
 		By("Creating a network policy for the server which allows traffic from namespace-b.")
 		policy, err := f.Client.NetworkPolicies(nsA.Name).Create(&extensions.NetworkPolicy{
 			ObjectMeta: api.ObjectMeta{
-				Name: "test-policy",
+				Name: "allow-ns-b-via-namespace-selector",
 			},
 			Spec: extensions.NetworkPolicySpec{
 				// Apply to server
 				PodSelector: unversioned.LabelSelector{
 					MatchLabels: map[string]string{
-						"pod-name": podServer.Name,
+						"pod-name": serverPod.Name,
 					},
 				},
 				// Allow traffic only from NS-B
@@ -367,7 +357,7 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 		}()
 
 		// Create a pod with name 'client-b', which will attempt to comunicate with the server,
-		//  but should not be able to do to the label-based policy.
+		// but should not be able to do to the label-based policy.
 		By("Creating client-b in ns-b which should be able to contact the server.")
 		podClientB := createClientPod(f, nsB, clientBName, service, listeningPort1)
 		defer func() {
@@ -396,15 +386,15 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 // Create a server pod with a listening container for each port in ports[].
 // Will also assign a pod label with key: "pod-name" and label set to the given podname for later use by the network
 // policy.
-func createServerPod(f *framework.Framework, namespace *api.Namespace, podName string, ports []int) (*api.Pod, *api.Service) {
+func createServerPodAndService(f *framework.Framework, namespace *api.Namespace, podName string, ports []int) (*api.Pod, *api.Service) {
 	// Because we have a variable amount of ports, we'll first loop through and generate our Containers for our pod,
 	// and ServicePorts.for our Service.
 	containers := []api.Container{}
 	servicePorts := []api.ServicePort{}
-	for i, port := range ports {
-		// Create the Container
+	for _, port := range ports {
+		// Build the containers for the server pod.
 		containers = append(containers, api.Container{
-			Name:  fmt.Sprintf("%s-container-%d", podName, i),
+			Name:  fmt.Sprintf("%s-container-%d", podName, port),
 			Image: "gcr.io/google_containers/redis:e2e",
 			Args: []string{
 				"/bin/sh",
@@ -413,15 +403,16 @@ func createServerPod(f *framework.Framework, namespace *api.Namespace, podName s
 			},
 			Ports: []api.ContainerPort{{ContainerPort: int32(port)}},
 		})
-		// Create the Service.
+
+		// Build the Service Ports for the service.
 		servicePorts = append(servicePorts, api.ServicePort{
-			Name:       fmt.Sprintf("%s-%d", podName, i),
+			Name:       fmt.Sprintf("%s-%d", podName, port),
 			Port:       int32(port),
 			TargetPort: intstr.FromInt(port),
 		})
 	}
 
-	// Create the Pod.
+	By(fmt.Sprintf("Creating a server pod %s in namespace %s", podName, namespace.Name))
 	pod, err := f.Client.Pods(namespace.Name).Create(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: podName,
@@ -437,11 +428,11 @@ func createServerPod(f *framework.Framework, namespace *api.Namespace, podName s
 	Expect(err).NotTo(HaveOccurred())
 	framework.Logf("Created pod %v", pod.ObjectMeta.Name)
 
-	// Create the Service
-	By(fmt.Sprintf("Creating a service named %v in namespace %v", namespace.Name))
+	svcName := fmt.Sprintf("svc-%s", podName)
+	By(fmt.Sprintf("Creating a service %s for pod %s in namespace %s", svcName, podName, namespace.Name))
 	svc, err := f.Client.Services(namespace.Name).Create(&api.Service{
 		ObjectMeta: api.ObjectMeta{
-			Name: fmt.Sprintf("svc-%s", podName),
+			Name: svcName,
 		},
 		Spec: api.ServiceSpec{
 			Ports: servicePorts,
@@ -451,11 +442,14 @@ func createServerPod(f *framework.Framework, namespace *api.Namespace, podName s
 		},
 	})
 	Expect(err).NotTo(HaveOccurred())
+	framework.Logf("Created service %s", svc.Name)
 
 	return pod, svc
 }
 
 // Create a client pod which will attempt a netcat to the provided service, on the specified port.
+// This client will attempt a oneshot connection, then die, without restarting the pod.
+// Test can then be asserted based on whether the pod quit with an error or not.
 func createClientPod(f *framework.Framework, namespace *api.Namespace, podName string, targetService *api.Service, targetPort int) *api.Pod {
 	pod, err := f.Client.Pods(namespace.Name).Create(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
