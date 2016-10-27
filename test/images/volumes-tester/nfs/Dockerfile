@@ -17,19 +17,20 @@ LABEL maintainers="Jan Safranek, jsafrane@redhat.com; Matthew Wong, mawong@redha
 
 # install nfs-ganesha
 RUN dnf install -y tar gcc cmake autoconf libtool bison flex make gcc-c++ krb5-devel dbus-devel && dnf clean all \
-    && curl -L https://github.com/nfs-ganesha/nfs-ganesha/archive/V2.4.0.3.tar.gz | tar zx \
-    && curl -L https://github.com/nfs-ganesha/ntirpc/archive/v1.4.1.tar.gz | tar zx \
-    && rm -r nfs-ganesha-2.4.0.3/src/libntirpc \
-    && mv ntirpc-1.4.1 nfs-ganesha-2.4.0.3/src/libntirpc \
-    && cd nfs-ganesha-2.4.0.3 \
-    && sed -i '20i#cmakedefine _NO_PORTMAPPER 1' src/include/config-h.in.cmake \
+    && curl -L https://github.com/nfs-ganesha/nfs-ganesha/archive/V2.4.0.4.tar.gz | tar zx \
+    && curl -L https://github.com/nfs-ganesha/ntirpc/archive/v1.4.0.tar.gz | tar zx \
+    && rm -rf nfs-ganesha-2.4.0.4/src/libntirpc \
+    && mv ntirpc-1.4.0 nfs-ganesha-2.4.0.4/src/libntirpc \
+    && cd nfs-ganesha-2.4.0.4 \
     && cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_CONFIG=vfs_only -D_NO_PORTMAPPER=ON src/ \
     && make \
     && make install \
+    && cd .. \
+    && rm -rf nfs-ganesha-2.4.0.4 \
     && dnf remove -y tar gcc cmake autoconf libtool bison flex make gcc-c++ krb5-devel dbus-devel && dnf clean all
 
-# also need this for ganesha to run
-RUN dnf install -y libntirpc
+# also need this for ganesha to run (/etc/netconfig, etc.)
+RUN dnf install -y libtirpc
 
 RUN mkdir -p /exports
 
