@@ -22,7 +22,6 @@ package v2alpha1
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
 	conversion "k8s.io/kubernetes/pkg/conversion"
@@ -51,10 +50,6 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_batch_JobTemplate_To_v2alpha1_JobTemplate,
 		Convert_v2alpha1_JobTemplateSpec_To_batch_JobTemplateSpec,
 		Convert_batch_JobTemplateSpec_To_v2alpha1_JobTemplateSpec,
-		Convert_v2alpha1_LabelSelector_To_unversioned_LabelSelector,
-		Convert_unversioned_LabelSelector_To_v2alpha1_LabelSelector,
-		Convert_v2alpha1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement,
-		Convert_unversioned_LabelSelectorRequirement_To_v2alpha1_LabelSelectorRequirement,
 		Convert_v2alpha1_ScheduledJob_To_batch_ScheduledJob,
 		Convert_batch_ScheduledJob_To_v2alpha1_ScheduledJob,
 		Convert_v2alpha1_ScheduledJobList_To_batch_ScheduledJobList,
@@ -174,15 +169,7 @@ func autoConvert_v2alpha1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSp
 	out.Parallelism = in.Parallelism
 	out.Completions = in.Completions
 	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
-	if in.Selector != nil {
-		in, out := &in.Selector, &out.Selector
-		*out = new(unversioned.LabelSelector)
-		if err := Convert_v2alpha1_LabelSelector_To_unversioned_LabelSelector(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Selector = nil
-	}
+	out.Selector = in.Selector
 	out.ManualSelector = in.ManualSelector
 	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
@@ -194,15 +181,7 @@ func autoConvert_batch_JobSpec_To_v2alpha1_JobSpec(in *batch.JobSpec, out *JobSp
 	out.Parallelism = in.Parallelism
 	out.Completions = in.Completions
 	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
-	if in.Selector != nil {
-		in, out := &in.Selector, &out.Selector
-		*out = new(LabelSelector)
-		if err := Convert_unversioned_LabelSelector_To_v2alpha1_LabelSelector(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Selector = nil
-	}
+	out.Selector = in.Selector
 	out.ManualSelector = in.ManualSelector
 	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
@@ -316,68 +295,6 @@ func autoConvert_batch_JobTemplateSpec_To_v2alpha1_JobTemplateSpec(in *batch.Job
 
 func Convert_batch_JobTemplateSpec_To_v2alpha1_JobTemplateSpec(in *batch.JobTemplateSpec, out *JobTemplateSpec, s conversion.Scope) error {
 	return autoConvert_batch_JobTemplateSpec_To_v2alpha1_JobTemplateSpec(in, out, s)
-}
-
-func autoConvert_v2alpha1_LabelSelector_To_unversioned_LabelSelector(in *LabelSelector, out *unversioned.LabelSelector, s conversion.Scope) error {
-	out.MatchLabels = in.MatchLabels
-	if in.MatchExpressions != nil {
-		in, out := &in.MatchExpressions, &out.MatchExpressions
-		*out = make([]unversioned.LabelSelectorRequirement, len(*in))
-		for i := range *in {
-			if err := Convert_v2alpha1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.MatchExpressions = nil
-	}
-	return nil
-}
-
-func Convert_v2alpha1_LabelSelector_To_unversioned_LabelSelector(in *LabelSelector, out *unversioned.LabelSelector, s conversion.Scope) error {
-	return autoConvert_v2alpha1_LabelSelector_To_unversioned_LabelSelector(in, out, s)
-}
-
-func autoConvert_unversioned_LabelSelector_To_v2alpha1_LabelSelector(in *unversioned.LabelSelector, out *LabelSelector, s conversion.Scope) error {
-	out.MatchLabels = in.MatchLabels
-	if in.MatchExpressions != nil {
-		in, out := &in.MatchExpressions, &out.MatchExpressions
-		*out = make([]LabelSelectorRequirement, len(*in))
-		for i := range *in {
-			if err := Convert_unversioned_LabelSelectorRequirement_To_v2alpha1_LabelSelectorRequirement(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.MatchExpressions = nil
-	}
-	return nil
-}
-
-func Convert_unversioned_LabelSelector_To_v2alpha1_LabelSelector(in *unversioned.LabelSelector, out *LabelSelector, s conversion.Scope) error {
-	return autoConvert_unversioned_LabelSelector_To_v2alpha1_LabelSelector(in, out, s)
-}
-
-func autoConvert_v2alpha1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement(in *LabelSelectorRequirement, out *unversioned.LabelSelectorRequirement, s conversion.Scope) error {
-	out.Key = in.Key
-	out.Operator = unversioned.LabelSelectorOperator(in.Operator)
-	out.Values = in.Values
-	return nil
-}
-
-func Convert_v2alpha1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement(in *LabelSelectorRequirement, out *unversioned.LabelSelectorRequirement, s conversion.Scope) error {
-	return autoConvert_v2alpha1_LabelSelectorRequirement_To_unversioned_LabelSelectorRequirement(in, out, s)
-}
-
-func autoConvert_unversioned_LabelSelectorRequirement_To_v2alpha1_LabelSelectorRequirement(in *unversioned.LabelSelectorRequirement, out *LabelSelectorRequirement, s conversion.Scope) error {
-	out.Key = in.Key
-	out.Operator = LabelSelectorOperator(in.Operator)
-	out.Values = in.Values
-	return nil
-}
-
-func Convert_unversioned_LabelSelectorRequirement_To_v2alpha1_LabelSelectorRequirement(in *unversioned.LabelSelectorRequirement, out *LabelSelectorRequirement, s conversion.Scope) error {
-	return autoConvert_unversioned_LabelSelectorRequirement_To_v2alpha1_LabelSelectorRequirement(in, out, s)
 }
 
 func autoConvert_v2alpha1_ScheduledJob_To_batch_ScheduledJob(in *ScheduledJob, out *batch.ScheduledJob, s conversion.Scope) error {
