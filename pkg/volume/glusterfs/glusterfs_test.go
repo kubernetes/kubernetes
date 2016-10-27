@@ -242,6 +242,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 
 func TestParseClassParameters(t *testing.T) {
 	secret := api.Secret{
+		Type: "kubernetes.io/glusterfs",
 		Data: map[string][]byte{
 			"data": []byte("mypassword"),
 		},
