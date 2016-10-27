@@ -71,6 +71,7 @@ func (o operationNotSupportedCache) isSupported(key operationKey) bool {
 type updateNamespaceFunc func(kubeClient clientset.Interface, namespace *api.Namespace) (*api.Namespace, error)
 
 // retryOnConflictError retries the specified fn if there was a conflict error
+// it will return an error if the UID for an object changes across retry operations.
 // TODO RetryOnConflict should be a generic concept in client code
 func retryOnConflictError(kubeClient clientset.Interface, namespace *api.Namespace, fn updateNamespaceFunc) (result *api.Namespace, err error) {
 	latestNamespace := namespace
@@ -82,9 +83,13 @@ func retryOnConflictError(kubeClient clientset.Interface, namespace *api.Namespa
 		if !errors.IsConflict(err) {
 			return nil, err
 		}
+		prevNamespace := latestNamespace
 		latestNamespace, err = kubeClient.Core().Namespaces().Get(latestNamespace.Name)
 		if err != nil {
 			return nil, err
+		}
+		if prevNamespace.UID != latestNamespace.UID {
+			return nil, fmt.Errorf("namespace uid has changed across retries")
 		}
 	}
 }
@@ -385,9 +390,19 @@ func syncNamespace(
 		return err
 	}
 
+	// the latest view of the namespace asserts that namespace is no longer deleting..
+	if namespace.DeletionTimestamp.IsZero() {
+		return nil
+	}
+
 	// if the namespace is already finalized, delete it
 	if finalized(namespace) {
-		err = kubeClient.Core().Namespaces().Delete(namespace.Name, nil)
+		var opts *api.DeleteOptions
+		uid := namespace.UID
+		if len(uid) > 0 {
+			opts = &api.DeleteOptions{Preconditions: &api.Preconditions{UID: &uid}}
+		}
+		err = kubeClient.Core().Namespaces().Delete(namespace.Name, opts)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
