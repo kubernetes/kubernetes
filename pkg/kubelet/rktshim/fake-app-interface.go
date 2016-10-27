@@ -200,7 +200,7 @@ func (r *FakeRuntime) ContainerStatus(id string) (*runtimeApi.ContainerStatus, e
 	return &c.Status, nil
 }
 
-func (r *FakeRuntime) Exec(id string, cmd []string, tty bool, in io.Reader, out, err io.WriteCloser) error {
+func (r *FakeRuntime) ExecLegacy(id string, cmd []string, tty bool, in io.Reader, out, err io.WriteCloser) error {
 	c, ok := r.Containers[id]
 	if !ok {
 		return ErrContainerNotFound
@@ -212,4 +212,20 @@ func (r *FakeRuntime) Exec(id string, cmd []string, tty bool, in io.Reader, out,
 	}
 
 	return c.Exec(cmd, in, out, err)
+}
+
+func (r *FakeRuntime) Exec(containerID string, cmd []string, tty, stdin bool) (string, error) {
+	return "", nil
+}
+
+func (r *FakeRuntime) ExecSync(containerID string, cmd []string, timeout int64) (string, string, int32, error) {
+	return "", "", 0, nil
+}
+
+func (r *FakeRuntime) Attach(containerID string, stdin bool) (string, error) {
+	return "", nil
+}
+
+func (r *FakeRuntime) PortForward(podSandboxID string, port int32) (string, error) {
+	return "", nil
 }

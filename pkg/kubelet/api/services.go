@@ -43,8 +43,15 @@ type ContainerManager interface {
 	ListContainers(filter *runtimeApi.ContainerFilter) ([]*runtimeApi.Container, error)
 	// ContainerStatus returns the status of the container.
 	ContainerStatus(containerID string) (*runtimeApi.ContainerStatus, error)
-	// Exec executes a command in the container.
-	Exec(containerID string, cmd []string, tty bool, stdin io.Reader, stdout, stderr io.WriteCloser) error
+	// ExecLegacy executes a command in the container.
+	// TODO: remove this after full CRI streaming APIs are accomplished.
+	ExecLegacy(containerID string, cmd []string, tty bool, stdin io.Reader, stdout, stderr io.WriteCloser) error
+	// Exec prepares a streaming endpoint to execute a command in the container.
+	Exec(containerID string, cmd []string, tty, stdin bool) (string, error)
+	// ExecSync runs a command in a container synchronously and returns stdout, stderr and exit code.
+	ExecSync(containerID string, cmd []string, timeout int64) (string, string, int32, error)
+	// Attach prepares a streaming endpoint to attach to a running container.
+	Attach(containerID string, stdin bool) (string, error)
 }
 
 // PodSandboxManager contains methods for operating on PodSandboxes. The methods
@@ -63,6 +70,8 @@ type PodSandboxManager interface {
 	PodSandboxStatus(podSandboxID string) (*runtimeApi.PodSandboxStatus, error)
 	// ListPodSandbox returns a list of Sandbox.
 	ListPodSandbox(filter *runtimeApi.PodSandboxFilter) ([]*runtimeApi.PodSandbox, error)
+	// PortForward prepares a streaming endpoint to forward ports from a PodSandbox.
+	PortForward(podSandboxID string, port int32) (string, error)
 }
 
 // RuntimeService interface should be implemented by a container runtime.

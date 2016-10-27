@@ -123,11 +123,11 @@ func (in instrumentedRuntimeService) ContainerStatus(containerID string) (*runti
 	return out, err
 }
 
-func (in instrumentedRuntimeService) Exec(containerID string, cmd []string, tty bool, stdin io.Reader, stdout, stderr io.WriteCloser) error {
-	const operation = "exec"
+func (in instrumentedRuntimeService) ExecLegacy(containerID string, cmd []string, tty bool, stdin io.Reader, stdout, stderr io.WriteCloser) error {
+	const operation = "exec_legacy"
 	defer recordOperation(operation, time.Now())
 
-	err := in.service.Exec(containerID, cmd, tty, stdin, stdout, stderr)
+	err := in.service.ExecLegacy(containerID, cmd, tty, stdin, stdout, stderr)
 	recordError(operation, err)
 	return err
 }
@@ -184,6 +184,46 @@ func (in instrumentedRuntimeService) UpdateRuntimeConfig(runtimeConfig *runtimeA
 	err := in.service.UpdateRuntimeConfig(runtimeConfig)
 	recordError(operation, err)
 	return err
+}
+
+// Exec prepares a streaming endpoint to execute a command in the container.
+func (in instrumentedRuntimeService) Exec(containerID string, cmd []string, tty, stdin bool) (string, error) {
+	const operation = "exec"
+	defer recordOperation(operation, time.Now())
+
+	url, err := in.service.Exec(containerID, cmd, tty, stdin)
+	recordError(operation, err)
+	return url, err
+}
+
+// ExecSync runs a command in a container synchronously and returns stdout, stderr and exit code.
+func (in instrumentedRuntimeService) ExecSync(containerID string, cmd []string, timeout int64) (string, string, int32, error) {
+	const operation = "exec_sync"
+	defer recordOperation(operation, time.Now())
+
+	stdout, stderr, code, err := in.service.ExecSync(containerID, cmd, timeout)
+	recordError(operation, err)
+	return stdout, stderr, code, err
+}
+
+// Attach prepares a streaming endpoint to attach to a running container.
+func (in instrumentedRuntimeService) Attach(containerID string, stdin bool) (string, error) {
+	const operation = "attach"
+	defer recordOperation(operation, time.Now())
+
+	url, err := in.service.Attach(containerID, stdin)
+	recordError(operation, err)
+	return url, err
+}
+
+// PortForward prepares a streaming endpoint to forward ports from a PodSandbox.
+func (in instrumentedRuntimeService) PortForward(podSandboxID string, port int32) (string, error) {
+	const operation = "portforward"
+	defer recordOperation(operation, time.Now())
+
+	url, err := in.service.PortForward(podSandboxID, port)
+	recordError(operation, err)
+	return url, err
 }
 
 func (in instrumentedImageManagerService) ListImages(filter *runtimeApi.ImageFilter) ([]*runtimeApi.Image, error) {

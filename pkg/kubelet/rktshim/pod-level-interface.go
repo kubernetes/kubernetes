@@ -17,6 +17,7 @@ limitations under the License.
 package rktshim
 
 import (
+	"fmt"
 	kubeletApi "k8s.io/kubernetes/pkg/kubelet/api"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
@@ -56,4 +57,9 @@ func (*PodSandboxManager) PodSandboxStatus(string) (*runtimeApi.PodSandboxStatus
 // ListPodSandbox lists existing sandboxes, filtered by the PodSandboxFilter.
 func (*PodSandboxManager) ListPodSandbox(*runtimeApi.PodSandboxFilter) ([]*runtimeApi.PodSandbox, error) {
 	panic("not implemented")
+}
+
+// PortForward prepares a streaming endpoint to forward ports from a PodSandbox.
+func (*PodSandboxManager) PortForward(podSandboxID string, port int32) (string, error) {
+	return "", fmt.Errorf("not implemented")
 }
