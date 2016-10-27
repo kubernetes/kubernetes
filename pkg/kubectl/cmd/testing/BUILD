@@ -24,7 +24,6 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/typed/discovery:go_default_library",
-        "//pkg/client/unversioned:go_default_library",
         "//pkg/client/unversioned/fake:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",

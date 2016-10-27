@@ -87,6 +87,7 @@ pkg/auth/authorizer/union
 pkg/client/metrics
 pkg/client/metrics/prometheus
 pkg/client/testing/core
+pkg/client/typed/discovery
 pkg/client/unversioned
 pkg/client/unversioned/adapters/internalclientset
 pkg/client/unversioned/auth

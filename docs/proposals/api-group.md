@@ -83,7 +83,7 @@
 
 1. clients:
 
-  Currently we have structured (pkg/client/unversioned#ExperimentalClient, pkg/client/unversioned#Client) and unstructured (pkg/kubectl/resource#Helper) clients. The structured clients are not scalable because each of them implements specific interface, e.g., [here](../../pkg/client/unversioned/client.go#L32). Only the unstructured clients are scalable. We should either auto-generate the code for structured clients or migrate to use the unstructured clients as much as possible.
+  Currently we have structured (pkg/client/unversioned#ExperimentalClient, pkg/client/unversioned#Client) and unstructured (pkg/kubectl/resource#Helper) clients. The structured clients are not scalable because each of them implements specific interface, e.g., `[here]../../pkg/client/unversioned/client.go#L32`--fixed. Only the unstructured clients are scalable. We should either auto-generate the code for structured clients or migrate to use the unstructured clients as much as possible.
 
   We should also move the unstructured client to pkg/client/.
 
