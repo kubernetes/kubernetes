@@ -21,8 +21,10 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	versionedclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -38,7 +40,8 @@ import (
 // NamespaceController is responsible for performing actions dependent upon a namespace phase
 type NamespaceController struct {
 	// client that purges namespace content, must have list/delete privileges on all content
-	kubeClient clientset.Interface
+	kubeClient      clientset.Interface
+	versionedClient versionedclientset.Interface
 	// clientPool manages a pool of dynamic clients
 	clientPool dynamic.ClientPool
 	// store that holds the namespaces
@@ -52,16 +55,17 @@ type NamespaceController struct {
 	// opCache is a cache to remember if a particular operation is not supported to aid dynamic client.
 	opCache operationNotSupportedCache
 	// finalizerToken is the finalizer token managed by this controller
-	finalizerToken api.FinalizerName
+	finalizerToken v1.FinalizerName
 }
 
 // NewNamespaceController creates a new NamespaceController
 func NewNamespaceController(
 	kubeClient clientset.Interface,
+	versionedClient versionedclientset.Interface,
 	clientPool dynamic.ClientPool,
 	groupVersionResources []unversioned.GroupVersionResource,
 	resyncPeriod time.Duration,
-	finalizerToken api.FinalizerName) *NamespaceController {
+	finalizerToken v1.FinalizerName) *NamespaceController {
 
 	// the namespace deletion code looks at the discovery document to enumerate the set of resources on the server.
 	// it then finds all namespaced resources, and in response to namespace deletion, will call delete on all of them.
@@ -81,9 +85,10 @@ func NewNamespaceController(
 
 	// create the controller so we can inject the enqueue function
 	namespaceController := &NamespaceController{
-		kubeClient: kubeClient,
-		clientPool: clientPool,
-		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "namespace"),
+		kubeClient:      kubeClient,
+		versionedClient: versionedClient,
+		clientPool:      clientPool,
+		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "namespace"),
 		groupVersionResources: groupVersionResources,
 		opCache:               opCache,
 		finalizerToken:        finalizerToken,
@@ -189,7 +194,7 @@ func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
 		return err
 	}
 	namespace := obj.(*api.Namespace)
-	return syncNamespace(nm.kubeClient, nm.clientPool, nm.opCache, nm.groupVersionResources, namespace, nm.finalizerToken)
+	return syncNamespace(nm.versionedClient, nm.clientPool, nm.opCache, nm.groupVersionResources, namespace.Name, nm.finalizerToken)
 }
 
 // Run starts observing the system with the specified number of workers.

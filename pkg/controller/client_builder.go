@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
+	versionedclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -39,6 +40,33 @@ type ControllerClientBuilder interface {
 	Config(name string) (*restclient.Config, error)
 	Client(name string) (clientset.Interface, error)
 	ClientOrDie(name string) clientset.Interface
+}
+
+// SimpleVersionedControllerClientBuilder returns a fixed client with different user agents
+type SimpleVersionedControllerClientBuilder struct {
+	// ClientConfig is a skeleton config to clone and use as the basis for each controller client
+	ClientConfig *restclient.Config
+}
+
+func (b SimpleVersionedControllerClientBuilder) Config(name string) (*restclient.Config, error) {
+	clientConfig := *b.ClientConfig
+	return &clientConfig, nil
+}
+
+func (b SimpleVersionedControllerClientBuilder) Client(name string) (versionedclientset.Interface, error) {
+	clientConfig, err := b.Config(name)
+	if err != nil {
+		return nil, err
+	}
+	return versionedclientset.NewForConfig(restclient.AddUserAgent(clientConfig, name))
+}
+
+func (b SimpleVersionedControllerClientBuilder) ClientOrDie(name string) versionedclientset.Interface {
+	client, err := b.Client(name)
+	if err != nil {
+		glog.Fatal(err)
+	}
+	return client
 }
 
 // SimpleControllerClientBuilder returns a fixed client with different user agents
