@@ -15,7 +15,7 @@
 # Build the kube-discovery image.
 #
 # Requires a pre-built kube-discovery binary:
-#   build/run.sh /bin/bash -c "KUBE_BUILD_PLATFORMS=linux/ARCH make WHAT=cmd/kube-discovery"
+#   build-tools/run.sh /bin/bash -c "KUBE_BUILD_PLATFORMS=linux/ARCH make WHAT=cmd/kube-discovery"
 #
 # Usage:
 #   [ARCH=amd64] [REGISTRY="gcr.io/google_containers"] make (build|push) VERSION={some_released_version_of_kubernetes}

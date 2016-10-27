@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.4/docs/devel/cherry-picks.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Overview
 
 This document explains cherry picks are managed on release branches within the
@@ -75,24 +41,6 @@ label.
 
 There is an [issue](https://github.com/kubernetes/kubernetes/issues/23347) open
 tracking the tool to automate the batching procedure.
-
-#### Cherrypicking a doc change
-
-If you are cherrypicking a change which adds a doc, then you also need to run
-`build/versionize-docs.sh` in the release branch to versionize that doc.
-Ideally, just running `hack/cherry_pick_pull.sh` should be enough, but we are
-not there yet: [#18861](https://github.com/kubernetes/kubernetes/issues/18861)
-
-To cherrypick PR 123456 to release-3.14, run the following commands after
-running `hack/cherry_pick_pull.sh` and before merging the PR:
-
-```
-$ git checkout -b automated-cherry-pick-of-#123456-upstream-release-3.14
-origin/automated-cherry-pick-of-#123456-upstream-release-3.14
-$ ./build/versionize-docs.sh release-3.14
-$ git commit -a -m "Running versionize docs"
-$ git push origin automated-cherry-pick-of-#123456-upstream-release-3.14
-```
 
 ## Cherry Pick Review
 

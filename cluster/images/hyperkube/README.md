@@ -10,7 +10,7 @@ See https://github.com/kubernetes/kubernetes/blob/master/docs/devel/local-cluste
 
 ```console
 # First, build the binaries
-$ build/run.sh make cross
+$ build-tools/run.sh make cross
 
 # Build for linux/amd64 (default)
 $ make push VERSION={target_version} ARCH=amd64

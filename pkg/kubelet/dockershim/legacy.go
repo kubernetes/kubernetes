@@ -36,7 +36,11 @@ func (ds *dockerService) AttachContainer(id kubecontainer.ContainerID, stdin io.
 }
 
 func (ds *dockerService) GetContainerLogs(pod *api.Pod, containerID kubecontainer.ContainerID, logOptions *api.PodLogOptions, stdout, stderr io.Writer) (err error) {
-	return dockertools.GetContainerLogs(ds.client, pod, containerID, logOptions, stdout, stderr)
+	container, err := ds.client.InspectContainer(containerID.ID)
+	if err != nil {
+		return err
+	}
+	return dockertools.GetContainerLogs(ds.client, pod, containerID, logOptions, stdout, stderr, container.Config.Tty)
 }
 
 func (ds *dockerService) PortForward(sandboxID string, port uint16, stream io.ReadWriteCloser) error {

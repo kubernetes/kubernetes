@@ -34,11 +34,11 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 
 	var _ = Describe("Federation API server authentication", func() {
 		BeforeEach(func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 		})
 
 		It("should accept cluster resources when the client has right authentication credentials", func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 
 			nsName := f.FederationNamespace.Name
 			svc := createServiceOrFail(f.FederationClientset_1_5, nsName, FederatedServiceName)
@@ -46,7 +46,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 		})
 
 		It("should not accept cluster resources when the client has invalid authentication credentials", func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 
 			contexts := f.GetUnderlyingFederatedContexts()
 
@@ -67,7 +67,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 		})
 
 		It("should not accept cluster resources when the client has no authentication credentials", func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 
 			fcs, err := invalidAuthFederationClientSet(nil)
 			ExpectNoError(err)

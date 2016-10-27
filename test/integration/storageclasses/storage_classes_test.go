@@ -29,8 +29,8 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -41,7 +41,7 @@ func TestStorageClasses(t *testing.T) {
 	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
-	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
 
 	ns := framework.CreateTestingNamespace("storageclass", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -50,7 +50,7 @@ func TestStorageClasses(t *testing.T) {
 }
 
 // DoTestStorageClasses tests storage classes for one api version.
-func DoTestStorageClasses(t *testing.T, client *client.Client, ns *api.Namespace) {
+func DoTestStorageClasses(t *testing.T, client clientset.Interface, ns *api.Namespace) {
 	// Make a storage class object.
 	s := storage.StorageClass{
 		TypeMeta: unversioned.TypeMeta{
@@ -83,20 +83,20 @@ func DoTestStorageClasses(t *testing.T, client *client.Client, ns *api.Namespace
 	}
 
 	pvc.ObjectMeta.Name = "uses-storageclass"
-	if _, err := client.PersistentVolumeClaims(ns.Name).Create(pvc); err != nil {
+	if _, err := client.Core().PersistentVolumeClaims(ns.Name).Create(pvc); err != nil {
 		t.Errorf("Failed to create pvc: %v", err)
 	}
 	defer deletePersistentVolumeClaimOrErrorf(t, client, ns.Name, pvc.Name)
 }
 
-func deleteStorageClassOrErrorf(t *testing.T, c *client.Client, ns, name string) {
-	if err := c.Storage().StorageClasses().Delete(name); err != nil {
+func deleteStorageClassOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
+	if err := c.Storage().StorageClasses().Delete(name, nil); err != nil {
 		t.Errorf("unable to delete storage class %v: %v", name, err)
 	}
 }
 
-func deletePersistentVolumeClaimOrErrorf(t *testing.T, c *client.Client, ns, name string) {
-	if err := c.PersistentVolumeClaims(ns).Delete(name); err != nil {
+func deletePersistentVolumeClaimOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
+	if err := c.Core().PersistentVolumeClaims(ns).Delete(name, nil); err != nil {
 		t.Errorf("unable to delete persistent volume claim %v: %v", name, err)
 	}
 }

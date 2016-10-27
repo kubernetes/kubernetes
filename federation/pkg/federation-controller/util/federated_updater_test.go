@@ -34,11 +34,18 @@ import (
 type fakeFederationView struct {
 }
 
-func (f fakeFederationView) GetClientsetForCluster(clusterName string) (kubeclientset.Interface, error) {
+// Verify that fakeFederationView implements FederationView interface
+var _ FederationView = &fakeFederationView{}
+
+func (f *fakeFederationView) GetClientsetForCluster(clusterName string) (kubeclientset.Interface, error) {
 	return &fake_kubeclientset.Clientset{}, nil
 }
 
 func (f *fakeFederationView) GetReadyClusters() ([]*federation_api.Cluster, error) {
+	return []*federation_api.Cluster{}, nil
+}
+
+func (f *fakeFederationView) GetUnreadyClusters() ([]*federation_api.Cluster, error) {
 	return []*federation_api.Cluster{}, nil
 }
 

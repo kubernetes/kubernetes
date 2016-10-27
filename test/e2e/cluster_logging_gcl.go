@@ -43,7 +43,7 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Flaky]", func()
 		By("Running synthetic logger")
 		createSynthLogger(f, expectedLinesCount)
 		defer f.PodClient().Delete(synthLoggerPodName, &api.DeleteOptions{})
-		err := framework.WaitForPodSuccessInNamespace(f.Client, synthLoggerPodName, f.Namespace.Name)
+		err := framework.WaitForPodSuccessInNamespace(f.ClientSet, synthLoggerPodName, f.Namespace.Name)
 		framework.ExpectNoError(err, fmt.Sprintf("Should've successfully waited for pod %s to succeed", synthLoggerPodName))
 
 		By("Waiting for logs to ingest")

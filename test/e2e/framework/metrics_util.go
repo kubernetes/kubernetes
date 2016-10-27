@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/metrics"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -205,7 +205,7 @@ func setQuantile(metric *LatencyMetric, quantile float64, latency time.Duration)
 	}
 }
 
-func readLatencyMetrics(c *client.Client) (APIResponsiveness, error) {
+func readLatencyMetrics(c clientset.Interface) (APIResponsiveness, error) {
 	var a APIResponsiveness
 
 	body, err := getMetrics(c)
@@ -247,7 +247,7 @@ func readLatencyMetrics(c *client.Client) (APIResponsiveness, error) {
 
 // Prints top five summary metrics for request types with latency and returns
 // number of such request types above threshold.
-func HighLatencyRequests(c *client.Client) (int, error) {
+func HighLatencyRequests(c clientset.Interface) (int, error) {
 	metrics, err := readLatencyMetrics(c)
 	if err != nil {
 		return 0, err
@@ -297,9 +297,9 @@ func VerifyPodStartupLatency(latency PodStartupLatency) error {
 }
 
 // Resets latency metrics in apiserver.
-func ResetMetrics(c *client.Client) error {
+func ResetMetrics(c clientset.Interface) error {
 	Logf("Resetting latency metrics in apiserver...")
-	body, err := c.Delete().AbsPath("/metrics").DoRaw()
+	body, err := c.Core().RESTClient().Delete().AbsPath("/metrics").DoRaw()
 	if err != nil {
 		return err
 	}
@@ -310,8 +310,8 @@ func ResetMetrics(c *client.Client) error {
 }
 
 // Retrieves metrics information.
-func getMetrics(c *client.Client) (string, error) {
-	body, err := c.Get().AbsPath("/metrics").DoRaw()
+func getMetrics(c clientset.Interface) (string, error) {
+	body, err := c.Core().RESTClient().Get().AbsPath("/metrics").DoRaw()
 	if err != nil {
 		return "", err
 	}
@@ -319,11 +319,11 @@ func getMetrics(c *client.Client) (string, error) {
 }
 
 // Retrieves scheduler metrics information.
-func getSchedulingLatency(c *client.Client) (SchedulingLatency, error) {
+func getSchedulingLatency(c clientset.Interface) (SchedulingLatency, error) {
 	result := SchedulingLatency{}
 
 	// Check if master Node is registered
-	nodes, err := c.Nodes().List(api.ListOptions{})
+	nodes, err := c.Core().Nodes().List(api.ListOptions{})
 	ExpectNoError(err)
 
 	var data string
@@ -334,7 +334,7 @@ func getSchedulingLatency(c *client.Client) (SchedulingLatency, error) {
 		}
 	}
 	if masterRegistered {
-		rawData, err := c.Get().
+		rawData, err := c.Core().RESTClient().Get().
 			Prefix("proxy").
 			Namespace(api.NamespaceSystem).
 			Resource("pods").
@@ -383,7 +383,7 @@ func getSchedulingLatency(c *client.Client) (SchedulingLatency, error) {
 }
 
 // Verifies (currently just by logging them) the scheduling latencies.
-func VerifySchedulerLatency(c *client.Client) error {
+func VerifySchedulerLatency(c clientset.Interface) error {
 	latency, err := getSchedulingLatency(c)
 	if err != nil {
 		return err
@@ -457,7 +457,7 @@ func ExtractLatencyMetrics(latencies []PodLatencyData) LatencyMetric {
 
 // LogSuspiciousLatency logs metrics/docker errors from all nodes that had slow startup times
 // If latencyDataLag is nil then it will be populated from latencyData
-func LogSuspiciousLatency(latencyData []PodLatencyData, latencyDataLag []PodLatencyData, nodeCount int, c *client.Client) {
+func LogSuspiciousLatency(latencyData []PodLatencyData, latencyDataLag []PodLatencyData, nodeCount int, c clientset.Interface) {
 	if latencyDataLag == nil {
 		latencyDataLag = latencyData
 	}

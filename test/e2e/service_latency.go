@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -66,9 +67,9 @@ var _ = framework.KubeDescribe("Service endpoints latency", func() {
 		)
 
 		// Turn off rate limiting--it interferes with our measurements.
-		oldThrottle := f.Client.RESTClient.Throttle
-		f.Client.RESTClient.Throttle = flowcontrol.NewFakeAlwaysRateLimiter()
-		defer func() { f.Client.RESTClient.Throttle = oldThrottle }()
+		oldThrottle := f.ClientSet.Core().RESTClient().GetRateLimiter()
+		f.ClientSet.Core().RESTClient().(*restclient.RESTClient).Throttle = flowcontrol.NewFakeAlwaysRateLimiter()
+		defer func() { f.ClientSet.Core().RESTClient().(*restclient.RESTClient).Throttle = oldThrottle }()
 
 		failing := sets.NewString()
 		d, err := runServiceLatencies(f, parallelTrials, totalTrials)
@@ -117,8 +118,8 @@ var _ = framework.KubeDescribe("Service endpoints latency", func() {
 
 func runServiceLatencies(f *framework.Framework, inParallel, total int) (output []time.Duration, err error) {
 	cfg := testutils.RCConfig{
-		Client:       f.Client,
-		Image:        framework.GetPauseImageName(f.Client),
+		Client:       f.ClientSet,
+		Image:        framework.GetPauseImageName(f.ClientSet),
 		Name:         "svc-latency-rc",
 		Namespace:    f.Namespace.Name,
 		Replicas:     1,
@@ -277,10 +278,11 @@ func startEndpointWatcher(f *framework.Framework, q *endpointQueries) {
 	_, controller := cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return f.Client.Endpoints(f.Namespace.Name).List(options)
+				obj, err := f.ClientSet.Core().Endpoints(f.Namespace.Name).List(options)
+				return runtime.Object(obj), err
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return f.Client.Endpoints(f.Namespace.Name).Watch(options)
+				return f.ClientSet.Core().Endpoints(f.Namespace.Name).Watch(options)
 			},
 		},
 		&api.Endpoints{},
@@ -325,7 +327,7 @@ func singleServiceLatency(f *framework.Framework, name string, q *endpointQuerie
 		},
 	}
 	startTime := time.Now()
-	gotSvc, err := f.Client.Services(f.Namespace.Name).Create(svc)
+	gotSvc, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(svc)
 	if err != nil {
 		return 0, err
 	}

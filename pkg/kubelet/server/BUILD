@@ -26,6 +26,7 @@ go_library(
         "//pkg/api/validation:go_default_library",
         "//pkg/auth/authenticator:go_default_library",
         "//pkg/auth/authorizer:go_default_library",
+        "//pkg/auth/user:go_default_library",
         "//pkg/healthz:go_default_library",
         "//pkg/httplog:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
@@ -37,10 +38,7 @@ go_library(
         "//pkg/types:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//pkg/util/flushwriter:go_default_library",
-        "//pkg/util/httpstream:go_default_library",
-        "//pkg/util/httpstream/spdy:go_default_library",
         "//pkg/util/limitwriter:go_default_library",
-        "//pkg/util/runtime:go_default_library",
         "//pkg/util/term:go_default_library",
         "//pkg/volume:go_default_library",
         "//vendor:github.com/emicklei/go-restful",
@@ -53,7 +51,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["server_test.go"],
+    srcs = [
+        "auth_test.go",
+        "server_test.go",
+    ],
     library = "go_default_library",
     tags = ["automanaged"],
     deps = [

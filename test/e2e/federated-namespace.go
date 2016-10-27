@@ -42,9 +42,10 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 	Describe("Namespace objects", func() {
 		var federationName string
 		var clusters map[string]*cluster // All clusters, keyed by cluster name
+		var nsName string
 
 		BeforeEach(func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 
 			// TODO: Federation API server should be able to answer this.
 			if federationName = os.Getenv("FEDERATION_NAME"); federationName == "" {
@@ -56,7 +57,7 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 		})
 
 		AfterEach(func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 			deleteAllTestNamespaces(
 				f.FederationClientset_1_5.Core().Namespaces().List,
 				f.FederationClientset_1_5.Core().Namespaces().Delete)
@@ -69,18 +70,20 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 		})
 
 		It("should be created and deleted successfully", func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 
 			ns := api_v1.Namespace{
 				ObjectMeta: api_v1.ObjectMeta{
 					Name: api.SimpleNameGenerator.GenerateName(namespacePrefix),
 				},
 			}
+			nsName = ns.Name
 			By(fmt.Sprintf("Creating namespace %s", ns.Name))
 			_, err := f.FederationClientset_1_5.Core().Namespaces().Create(&ns)
 			framework.ExpectNoError(err, "Failed to create namespace %s", ns.Name)
 
 			// Check subclusters if the namespace was created there.
+			By(fmt.Sprintf("Waiting for namespace %s to be created in all underlying clusters", ns.Name))
 			err = wait.Poll(5*time.Second, 2*time.Minute, func() (bool, error) {
 				for _, cluster := range clusters {
 					_, err := cluster.Core().Namespaces().Get(ns.Name)
@@ -95,9 +98,19 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 			})
 			framework.ExpectNoError(err, "Not all namespaces created")
 
+			By(fmt.Sprintf("Deleting namespace %s", ns.Name))
 			deleteAllTestNamespaces(
 				f.FederationClientset_1_5.Core().Namespaces().List,
 				f.FederationClientset_1_5.Core().Namespaces().Delete)
+			By(fmt.Sprintf("Verifying that namespace %s was deleted from all underlying clusters", ns.Name))
+			// Verify that the namespace was deleted from all underlying clusters as well.
+			for clusterName, clusterClientset := range clusters {
+				_, err := clusterClientset.Core().Namespaces().Get(ns.Name)
+				if err == nil || !errors.IsNotFound(err) {
+					framework.Failf("expected NotFound error for namespace %s in cluster %s, got error: %v", ns.Name, clusterName, err)
+				}
+			}
+			By(fmt.Sprintf("Verified that deletion succeeded"))
 		})
 	})
 })
@@ -110,7 +123,9 @@ func deleteAllTestNamespaces(lister func(api_v1.ListOptions) (*api_v1.NamespaceL
 	}
 	for _, namespace := range list.Items {
 		if strings.HasPrefix(namespace.Name, namespacePrefix) {
-			err := deleter(namespace.Name, &api_v1.DeleteOptions{})
+			// Do not orphan dependents (corresponding namespaces in underlying clusters).
+			orphanDependents := false
+			err := deleter(namespace.Name, &api_v1.DeleteOptions{OrphanDependents: &orphanDependents})
 			if err != nil {
 				framework.Failf("Failed to set %s for deletion: %v", namespace.Name, err)
 			}

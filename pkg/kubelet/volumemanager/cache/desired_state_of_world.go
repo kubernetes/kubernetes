@@ -58,7 +58,8 @@ type DesiredStateOfWorld interface {
 	// ReportedInUse value is reset to false. The default ReportedInUse value
 	// for a newly created volume is false.
 	// When set to true this value indicates that the volume was successfully
-	// added to the VolumesInUse field in the node's status.
+	// added to the VolumesInUse field in the node's status. Mount operation needs
+	// to check this value before issuing the operation.
 	// If a volume in the reportedVolumes list does not exist in the list of
 	// volumes that should be attached to this node, it is skipped without error.
 	MarkVolumesReportedInUse(reportedVolumes []api.UniqueVolumeName)

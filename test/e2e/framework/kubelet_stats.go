@@ -30,7 +30,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/prometheus/common/model"
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubeletstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
@@ -63,7 +63,7 @@ func (a KubeletLatencyMetrics) Less(i, j int) bool { return a[i].Latency > a[j].
 
 // If a apiserver client is passed in, the function will try to get kubelet metrics from metrics grabber;
 // or else, the function will try to get kubelet metrics directly from the node.
-func getKubeletMetricsFromNode(c *client.Client, nodeName string) (metrics.KubeletMetrics, error) {
+func getKubeletMetricsFromNode(c clientset.Interface, nodeName string) (metrics.KubeletMetrics, error) {
 	if c == nil {
 		return metrics.GrabKubeletMetricsWithoutProxy(nodeName)
 	}
@@ -76,7 +76,7 @@ func getKubeletMetricsFromNode(c *client.Client, nodeName string) (metrics.Kubel
 
 // getKubeletMetrics gets all metrics in kubelet subsystem from specified node and trims
 // the subsystem prefix.
-func getKubeletMetrics(c *client.Client, nodeName string) (metrics.KubeletMetrics, error) {
+func getKubeletMetrics(c clientset.Interface, nodeName string) (metrics.KubeletMetrics, error) {
 	ms, err := getKubeletMetricsFromNode(c, nodeName)
 	if err != nil {
 		return metrics.KubeletMetrics{}, err
@@ -138,7 +138,7 @@ func GetKubeletLatencyMetrics(ms metrics.KubeletMetrics) KubeletLatencyMetrics {
 
 // RuntimeOperationMonitor is the tool getting and parsing docker operation metrics.
 type RuntimeOperationMonitor struct {
-	client          *client.Client
+	client          clientset.Interface
 	nodesRuntimeOps map[string]NodeRuntimeOperationErrorRate
 }
 
@@ -152,12 +152,12 @@ type RuntimeOperationErrorRate struct {
 	TimeoutRate float64
 }
 
-func NewRuntimeOperationMonitor(c *client.Client) *RuntimeOperationMonitor {
+func NewRuntimeOperationMonitor(c clientset.Interface) *RuntimeOperationMonitor {
 	m := &RuntimeOperationMonitor{
 		client:          c,
 		nodesRuntimeOps: make(map[string]NodeRuntimeOperationErrorRate),
 	}
-	nodes, err := m.client.Nodes().List(api.ListOptions{})
+	nodes, err := m.client.Core().Nodes().List(api.ListOptions{})
 	if err != nil {
 		Failf("RuntimeOperationMonitor: unable to get list of nodes: %v", err)
 	}
@@ -224,7 +224,7 @@ func FormatRuntimeOperationErrorRate(nodesResult map[string]NodeRuntimeOperation
 }
 
 // getNodeRuntimeOperationErrorRate gets runtime operation error rate from specified node.
-func getNodeRuntimeOperationErrorRate(c *client.Client, node string) (NodeRuntimeOperationErrorRate, error) {
+func getNodeRuntimeOperationErrorRate(c clientset.Interface, node string) (NodeRuntimeOperationErrorRate, error) {
 	result := make(NodeRuntimeOperationErrorRate)
 	ms, err := getKubeletMetrics(c, node)
 	if err != nil {
@@ -256,7 +256,7 @@ func getNodeRuntimeOperationErrorRate(c *client.Client, node string) (NodeRuntim
 }
 
 // HighLatencyKubeletOperations logs and counts the high latency metrics exported by the kubelet server via /metrics.
-func HighLatencyKubeletOperations(c *client.Client, threshold time.Duration, nodeName string, logFunc func(fmt string, args ...interface{})) (KubeletLatencyMetrics, error) {
+func HighLatencyKubeletOperations(c clientset.Interface, threshold time.Duration, nodeName string, logFunc func(fmt string, args ...interface{})) (KubeletLatencyMetrics, error) {
 	ms, err := getKubeletMetrics(c, nodeName)
 	if err != nil {
 		return KubeletLatencyMetrics{}, err
@@ -278,19 +278,19 @@ func HighLatencyKubeletOperations(c *client.Client, threshold time.Duration, nod
 // in the returned ContainerInfo is subject to the requirements in statsRequest.
 // TODO: This function uses the deprecated kubelet stats API; it should be
 // removed.
-func getContainerInfo(c *client.Client, nodeName string, req *kubeletstats.StatsRequest) (map[string]cadvisorapi.ContainerInfo, error) {
+func getContainerInfo(c clientset.Interface, nodeName string, req *kubeletstats.StatsRequest) (map[string]cadvisorapi.ContainerInfo, error) {
 	reqBody, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}
-	subResourceProxyAvailable, err := ServerVersionGTE(subResourceServiceAndNodeProxyVersion, c)
+	subResourceProxyAvailable, err := ServerVersionGTE(subResourceServiceAndNodeProxyVersion, c.Discovery())
 	if err != nil {
 		return nil, err
 	}
 
 	var data []byte
 	if subResourceProxyAvailable {
-		data, err = c.Post().
+		data, err = c.Core().RESTClient().Post().
 			Resource("nodes").
 			SubResource("proxy").
 			Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
@@ -300,7 +300,7 @@ func getContainerInfo(c *client.Client, nodeName string, req *kubeletstats.Stats
 			Do().Raw()
 
 	} else {
-		data, err = c.Post().
+		data, err = c.Core().RESTClient().Post().
 			Prefix("proxy").
 			Resource("nodes").
 			Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
@@ -344,7 +344,7 @@ func getContainerInfo(c *client.Client, nodeName string, req *kubeletstats.Stats
 // TODO: This function relies on the deprecated kubelet stats API and should be
 // removed and/or rewritten.
 func getOneTimeResourceUsageOnNode(
-	c *client.Client,
+	c clientset.Interface,
 	nodeName string,
 	cpuInterval time.Duration,
 	containerNames func() []string,
@@ -400,15 +400,15 @@ func getOneTimeResourceUsageOnNode(
 	return usageMap, nil
 }
 
-func getNodeStatsSummary(c *client.Client, nodeName string) (*stats.Summary, error) {
-	subResourceProxyAvailable, err := ServerVersionGTE(subResourceServiceAndNodeProxyVersion, c)
+func getNodeStatsSummary(c clientset.Interface, nodeName string) (*stats.Summary, error) {
+	subResourceProxyAvailable, err := ServerVersionGTE(subResourceServiceAndNodeProxyVersion, c.Discovery())
 	if err != nil {
 		return nil, err
 	}
 
 	var data []byte
 	if subResourceProxyAvailable {
-		data, err = c.Get().
+		data, err = c.Core().RESTClient().Get().
 			Resource("nodes").
 			SubResource("proxy").
 			Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
@@ -417,7 +417,7 @@ func getNodeStatsSummary(c *client.Client, nodeName string) (*stats.Summary, err
 			Do().Raw()
 
 	} else {
-		data, err = c.Get().
+		data, err = c.Core().RESTClient().Get().
 			Prefix("proxy").
 			Resource("nodes").
 			Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
@@ -515,7 +515,7 @@ type usageDataPerContainer struct {
 	memWorkSetData []uint64
 }
 
-func GetKubeletHeapStats(c *client.Client, nodeName string) (string, error) {
+func GetKubeletHeapStats(c clientset.Interface, nodeName string) (string, error) {
 	client, err := NodeProxyRequest(c, nodeName, "debug/pprof/heap")
 	if err != nil {
 		return "", err
@@ -531,7 +531,7 @@ func GetKubeletHeapStats(c *client.Client, nodeName string) (string, error) {
 	return strings.Join(lines[len(lines)-numLines:], "\n"), nil
 }
 
-func PrintAllKubeletPods(c *client.Client, nodeName string) {
+func PrintAllKubeletPods(c clientset.Interface, nodeName string) {
 	podList, err := GetKubeletPods(c, nodeName)
 	if err != nil {
 		Logf("Unable to retrieve kubelet pods for node %v: %v", nodeName, err)
@@ -565,13 +565,13 @@ type resourceCollector struct {
 	lock            sync.RWMutex
 	node            string
 	containers      []string
-	client          *client.Client
+	client          clientset.Interface
 	buffers         map[string][]*ContainerResourceUsage
 	pollingInterval time.Duration
 	stopCh          chan struct{}
 }
 
-func newResourceCollector(c *client.Client, nodeName string, containerNames []string, pollingInterval time.Duration) *resourceCollector {
+func newResourceCollector(c clientset.Interface, nodeName string, containerNames []string, pollingInterval time.Duration) *resourceCollector {
 	buffers := make(map[string][]*ContainerResourceUsage)
 	return &resourceCollector{
 		node:            nodeName,
@@ -679,13 +679,13 @@ func (r *resourceCollector) GetBasicCPUStats(containerName string) map[float64]f
 
 // ResourceMonitor manages a resourceCollector per node.
 type ResourceMonitor struct {
-	client          *client.Client
+	client          clientset.Interface
 	containers      []string
 	pollingInterval time.Duration
 	collectors      map[string]*resourceCollector
 }
 
-func NewResourceMonitor(c *client.Client, containerNames []string, pollingInterval time.Duration) *ResourceMonitor {
+func NewResourceMonitor(c clientset.Interface, containerNames []string, pollingInterval time.Duration) *ResourceMonitor {
 	return &ResourceMonitor{
 		containers:      containerNames,
 		client:          c,
@@ -695,7 +695,7 @@ func NewResourceMonitor(c *client.Client, containerNames []string, pollingInterv
 
 func (r *ResourceMonitor) Start() {
 	// It should be OK to monitor unschedulable Nodes
-	nodes, err := r.client.Nodes().List(api.ListOptions{})
+	nodes, err := r.client.Core().Nodes().List(api.ListOptions{})
 	if err != nil {
 		Failf("ResourceMonitor: unable to get list of nodes: %v", err)
 	}

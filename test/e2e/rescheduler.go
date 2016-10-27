@@ -49,21 +49,21 @@ var _ = framework.KubeDescribe("Rescheduler [Serial]", func() {
 	It("should ensure that critical pod is scheduled in case there is no resources available", func() {
 		By("reserving all available cpu")
 		err := reserveAllCpu(f, "reserve-all-cpu", totalMillicores)
-		defer framework.DeleteRCAndPods(f.Client, f.ClientSet, ns, "reserve-all-cpu")
+		defer framework.DeleteRCAndPods(f.ClientSet, ns, "reserve-all-cpu")
 		framework.ExpectNoError(err)
 
-		By("creating a new instance of DNS and waiting for DNS to be scheduled")
-		label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": "kube-dns"}))
+		By("creating a new instance of Dashboard and waiting for Dashboard to be scheduled")
+		label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": "kubernetes-dashboard"}))
 		listOpts := api.ListOptions{LabelSelector: label}
-		rcs, err := f.Client.ReplicationControllers(api.NamespaceSystem).List(listOpts)
+		rcs, err := f.ClientSet.Core().ReplicationControllers(api.NamespaceSystem).List(listOpts)
 		framework.ExpectNoError(err)
 		Expect(len(rcs.Items)).Should(Equal(1))
 
 		rc := rcs.Items[0]
 		replicas := uint(rc.Spec.Replicas)
 
-		err = framework.ScaleRC(f.Client, f.ClientSet, api.NamespaceSystem, rc.Name, replicas+1, true)
-		defer framework.ExpectNoError(framework.ScaleRC(f.Client, f.ClientSet, api.NamespaceSystem, rc.Name, replicas, true))
+		err = framework.ScaleRC(f.ClientSet, api.NamespaceSystem, rc.Name, replicas+1, true)
+		defer framework.ExpectNoError(framework.ScaleRC(f.ClientSet, api.NamespaceSystem, rc.Name, replicas, true))
 		framework.ExpectNoError(err)
 	})
 })
@@ -73,10 +73,10 @@ func reserveAllCpu(f *framework.Framework, id string, millicores int) error {
 	replicas := millicores / 100
 
 	ReserveCpu(f, id, 1, 100)
-	framework.ExpectNoError(framework.ScaleRC(f.Client, f.ClientSet, f.Namespace.Name, id, uint(replicas), false))
+	framework.ExpectNoError(framework.ScaleRC(f.ClientSet, f.Namespace.Name, id, uint(replicas), false))
 
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(10 * time.Second) {
-		pods, err := framework.GetPodsInNamespace(f.Client, f.Namespace.Name, framework.ImagePullerLabels)
+		pods, err := framework.GetPodsInNamespace(f.ClientSet, f.Namespace.Name, framework.ImagePullerLabels)
 		if err != nil {
 			return err
 		}

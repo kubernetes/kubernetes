@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"sync"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -28,11 +29,11 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/util/workqueue"
 
 	"github.com/golang/glog"
 )
@@ -43,7 +44,7 @@ const (
 )
 
 type RCConfig struct {
-	Client         *client.Client
+	Client         clientset.Interface
 	Image          string
 	Command        []string
 	Name           string
@@ -91,8 +92,8 @@ type RCConfig struct {
 	LogFunc func(fmt string, args ...interface{})
 	// If set those functions will be used to gather data from Nodes - in integration tests where no
 	// kubelets are running those variables should be nil.
-	NodeDumpFunc      func(c *client.Client, nodeNames []string, logFunc func(fmt string, args ...interface{}))
-	ContainerDumpFunc func(c *client.Client, ns string, logFunc func(ftm string, args ...interface{}))
+	NodeDumpFunc      func(c clientset.Interface, nodeNames []string, logFunc func(fmt string, args ...interface{}))
+	ContainerDumpFunc func(c clientset.Interface, ns string, logFunc func(ftm string, args ...interface{}))
 }
 
 func (rc *RCConfig) RCConfigLog(fmt string, args ...interface{}) {
@@ -221,7 +222,7 @@ func (config *DeploymentConfig) create() error {
 
 	config.applyTo(&deployment.Spec.Template)
 
-	_, err := config.Client.Deployments(config.Namespace).Create(deployment)
+	_, err := config.Client.Extensions().Deployments(config.Namespace).Create(deployment)
 	if err != nil {
 		return fmt.Errorf("Error creating deployment: %v", err)
 	}
@@ -273,7 +274,7 @@ func (config *ReplicaSetConfig) create() error {
 
 	config.applyTo(&rs.Spec.Template)
 
-	_, err := config.Client.ReplicaSets(config.Namespace).Create(rs)
+	_, err := config.Client.Extensions().ReplicaSets(config.Namespace).Create(rs)
 	if err != nil {
 		return fmt.Errorf("Error creating replica set: %v", err)
 	}
@@ -330,7 +331,7 @@ func (config *RCConfig) create() error {
 
 	config.applyTo(rc.Spec.Template)
 
-	_, err := config.Client.ReplicationControllers(config.Namespace).Create(rc)
+	_, err := config.Client.Core().ReplicationControllers(config.Namespace).Create(rc)
 	if err != nil {
 		return fmt.Errorf("Error creating replication controller: %v", err)
 	}
@@ -537,7 +538,7 @@ func (config *RCConfig) start() error {
 	if oldRunning != config.Replicas {
 		// List only pods from a given replication controller.
 		options := api.ListOptions{LabelSelector: label}
-		if pods, err := config.Client.Pods(api.NamespaceAll).List(options); err == nil {
+		if pods, err := config.Client.Core().Pods(api.NamespaceAll).List(options); err == nil {
 
 			for _, pod := range pods.Items {
 				config.RCConfigLog("Pod %s\t%s\t%s\t%s", pod.Name, pod.Spec.NodeName, pod.Status.Phase, pod.DeletionTimestamp)
@@ -553,7 +554,7 @@ func (config *RCConfig) start() error {
 // Simplified version of RunRC, that does not create RC, but creates plain Pods.
 // Optionally waits for pods to start running (if waitForRunning == true).
 // The number of replicas must be non-zero.
-func StartPods(c *client.Client, replicas int, namespace string, podNamePrefix string,
+func StartPods(c clientset.Interface, replicas int, namespace string, podNamePrefix string,
 	pod api.Pod, waitForRunning bool, logFunc func(fmt string, args ...interface{})) error {
 	// no pod to start
 	if replicas < 1 {
@@ -566,7 +567,7 @@ func StartPods(c *client.Client, replicas int, namespace string, podNamePrefix s
 		pod.ObjectMeta.Labels["name"] = podName
 		pod.ObjectMeta.Labels["startPodsID"] = startPodsID
 		pod.Spec.Containers[0].Name = podName
-		_, err := c.Pods(namespace).Create(&pod)
+		_, err := c.Core().Pods(namespace).Create(&pod)
 		if err != nil {
 			return err
 		}
@@ -584,7 +585,7 @@ func StartPods(c *client.Client, replicas int, namespace string, podNamePrefix s
 
 // Wait up to 10 minutes for all matching pods to become Running and at least one
 // matching pod exists.
-func WaitForPodsWithLabelRunning(c *client.Client, ns string, label labels.Selector) error {
+func WaitForPodsWithLabelRunning(c clientset.Interface, ns string, label labels.Selector) error {
 	running := false
 	PodStore := NewPodStore(c, ns, label, fields.Everything())
 	defer PodStore.Stop()
@@ -671,4 +672,155 @@ func DoCleanupNode(client clientset.Interface, nodeName string, strategy Prepare
 		time.Sleep(100 * time.Millisecond)
 	}
 	return fmt.Errorf("To many conflicts when trying to cleanup Node %v", nodeName)
+}
+
+type TestPodCreateStrategy func(client clientset.Interface, namespace string, podCount int) error
+
+type CountToPodStrategy struct {
+	Count    int
+	Strategy TestPodCreateStrategy
+}
+
+type TestPodCreatorConfig map[string][]CountToPodStrategy
+
+func NewTestPodCreatorConfig() *TestPodCreatorConfig {
+	config := make(TestPodCreatorConfig)
+	return &config
+}
+
+func (c *TestPodCreatorConfig) AddStrategy(
+	namespace string, podCount int, strategy TestPodCreateStrategy) {
+	(*c)[namespace] = append((*c)[namespace], CountToPodStrategy{Count: podCount, Strategy: strategy})
+}
+
+type TestPodCreator struct {
+	Client clientset.Interface
+	// namespace -> count -> strategy
+	Config *TestPodCreatorConfig
+}
+
+func NewTestPodCreator(client clientset.Interface, config *TestPodCreatorConfig) *TestPodCreator {
+	return &TestPodCreator{
+		Client: client,
+		Config: config,
+	}
+}
+
+func (c *TestPodCreator) CreatePods() error {
+	for ns, v := range *(c.Config) {
+		for _, countToStrategy := range v {
+			if err := countToStrategy.Strategy(c.Client, ns, countToStrategy.Count); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func makePodSpec() api.PodSpec {
+	return api.PodSpec{
+		Containers: []api.Container{{
+			Name:  "pause",
+			Image: "kubernetes/pause",
+			Ports: []api.ContainerPort{{ContainerPort: 80}},
+			Resources: api.ResourceRequirements{
+				Limits: api.ResourceList{
+					api.ResourceCPU:    resource.MustParse("100m"),
+					api.ResourceMemory: resource.MustParse("500Mi"),
+				},
+				Requests: api.ResourceList{
+					api.ResourceCPU:    resource.MustParse("100m"),
+					api.ResourceMemory: resource.MustParse("500Mi"),
+				},
+			},
+		}},
+	}
+}
+
+func makeCreatePod(client clientset.Interface, namespace string, podTemplate *api.Pod) error {
+	var err error
+	for attempt := 0; attempt < retries; attempt++ {
+		if _, err := client.Core().Pods(namespace).Create(podTemplate); err == nil {
+			return nil
+		}
+		glog.Errorf("Error while creating pod, maybe retry: %v", err)
+	}
+	return fmt.Errorf("Terminal error while creating pod, won't retry: %v", err)
+}
+
+func createPod(client clientset.Interface, namespace string, podCount int, podTemplate *api.Pod) error {
+	var createError error
+	lock := sync.Mutex{}
+	createPodFunc := func(i int) {
+		if err := makeCreatePod(client, namespace, podTemplate); err != nil {
+			lock.Lock()
+			defer lock.Unlock()
+			createError = err
+		}
+	}
+
+	if podCount < 30 {
+		workqueue.Parallelize(podCount, podCount, createPodFunc)
+	} else {
+		workqueue.Parallelize(30, podCount, createPodFunc)
+	}
+	return createError
+}
+
+func createController(client clientset.Interface, controllerName, namespace string, podCount int, podTemplate *api.Pod) error {
+	rc := &api.ReplicationController{
+		ObjectMeta: api.ObjectMeta{
+			Name: controllerName,
+		},
+		Spec: api.ReplicationControllerSpec{
+			Replicas: int32(podCount),
+			Selector: map[string]string{"name": controllerName},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{"name": controllerName},
+				},
+				Spec: podTemplate.Spec,
+			},
+		},
+	}
+	var err error
+	for attempt := 0; attempt < retries; attempt++ {
+		if _, err := client.Core().ReplicationControllers(namespace).Create(rc); err == nil {
+			return nil
+		}
+		glog.Errorf("Error while creating rc, maybe retry: %v", err)
+	}
+	return fmt.Errorf("Terminal error while creating rc, won't retry: %v", err)
+}
+
+func NewCustomCreatePodStrategy(podTemplate *api.Pod) TestPodCreateStrategy {
+	return func(client clientset.Interface, namespace string, podCount int) error {
+		return createPod(client, namespace, podCount, podTemplate)
+	}
+}
+
+func NewSimpleCreatePodStrategy() TestPodCreateStrategy {
+	basePod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			GenerateName: "simple-pod-",
+		},
+		Spec: makePodSpec(),
+	}
+	return NewCustomCreatePodStrategy(basePod)
+}
+
+func NewSimpleWithControllerCreatePodStrategy(controllerName string) TestPodCreateStrategy {
+	return func(client clientset.Interface, namespace string, podCount int) error {
+		basePod := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				GenerateName: controllerName + "-pod-",
+				Labels:       map[string]string{"name": controllerName},
+			},
+			Spec: makePodSpec(),
+		}
+		if err := createController(client, controllerName, namespace, podCount, basePod); err != nil {
+			return err
+		}
+		return createPod(client, namespace, podCount, basePod)
+	}
 }

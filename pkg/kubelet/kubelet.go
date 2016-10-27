@@ -39,11 +39,13 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/fields"
+	internalApi "k8s.io/kubernetes/pkg/kubelet/api"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
+	dockerremote "k8s.io/kubernetes/pkg/kubelet/dockershim/remote"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
@@ -424,7 +426,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		mounter:           kubeDeps.Mounter,
 		writer:            kubeDeps.Writer,
 		nonMasqueradeCIDR: kubeCfg.NonMasqueradeCIDR,
-		reconcileCIDR:     kubeCfg.ReconcileCIDR,
 		maxPods:           int(kubeCfg.MaxPods),
 		podsPerCore:       int(kubeCfg.PodsPerCore),
 		nvidiaGPUs:        int(kubeCfg.NvidiaGPUs),
@@ -475,8 +476,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	klet.podManager = kubepod.NewBasicPodManager(kubepod.NewBasicMirrorClient(klet.kubeClient))
 
 	if kubeCfg.RemoteRuntimeEndpoint != "" {
-		kubeCfg.ContainerRuntime = "remote"
-
 		// kubeCfg.RemoteImageEndpoint is same as kubeCfg.RemoteRuntimeEndpoint if not explicitly specified
 		if kubeCfg.RemoteImageEndpoint == "" {
 			kubeCfg.RemoteImageEndpoint = kubeCfg.RemoteRuntimeEndpoint
@@ -488,9 +487,36 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	case "docker":
 		switch kubeCfg.ExperimentalRuntimeIntegrationType {
 		case "cri":
-			// Use the new CRI shim for docker. This is need for testing the
+			// Use the new CRI shim for docker. This is needed for testing the
 			// docker integration through CRI, and may be removed in the future.
 			dockerService := dockershim.NewDockerService(klet.dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage)
+			runtimeService := dockerService.(internalApi.RuntimeService)
+			imageService := dockerService.(internalApi.ImageManagerService)
+
+			// This is a temporary knob to easily switch between grpc and non-grpc integration. grpc
+			// will be enabled if this is not empty.
+			// TODO(random-liu): Remove the temporary knob after grpc integration is stabilized and
+			// pass the runtime endpoint through kubelet flags.
+			remoteEndpoint := "/var/run/dockershim.sock"
+
+			// If the remote runtime endpoint is set, use the grpc integration.
+			if remoteEndpoint != "" {
+				// Start the in process dockershim grpc server.
+				server := dockerremote.NewDockerServer(remoteEndpoint, dockerService)
+				err := server.Start()
+				if err != nil {
+					return nil, err
+				}
+				// Start the remote kuberuntime manager.
+				runtimeService, err = remote.NewRemoteRuntimeService(remoteEndpoint, kubeCfg.RuntimeRequestTimeout.Duration)
+				if err != nil {
+					return nil, err
+				}
+				imageService, err = remote.NewRemoteImageService(remoteEndpoint, kubeCfg.RuntimeRequestTimeout.Duration)
+				if err != nil {
+					return nil, err
+				}
+			}
 			klet.containerRuntime, err = kuberuntime.NewKubeGenericRuntimeManager(
 				kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
 				klet.livenessManager,
@@ -506,8 +532,18 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 				float32(kubeCfg.RegistryPullQPS),
 				int(kubeCfg.RegistryBurst),
 				klet.cpuCFSQuota,
-				dockerService,
-				dockerService,
+				// Use DockerLegacyService directly to workaround unimplemented functions.
+				// We add short hack here to keep other code clean.
+				// TODO: Remove this hack after CRI is fully designed and implemented.
+				// TODO: Move the instrumented interface wrapping into kuberuntime.
+				&struct {
+					internalApi.RuntimeService
+					dockershim.DockerLegacyService
+				}{
+					RuntimeService:      kuberuntime.NewInstrumentedRuntimeService(runtimeService),
+					DockerLegacyService: dockerService,
+				},
+				kuberuntime.NewInstrumentedImageManagerService(imageService),
 			)
 			if err != nil {
 				return nil, err
@@ -903,10 +939,6 @@ type Kubelet struct {
 	// Manager of non-Runtime containers.
 	containerManager cm.ContainerManager
 	nodeConfig       cm.NodeConfig
-
-	// Whether or not kubelet should take responsibility for keeping cbr0 in
-	// the correct state.
-	reconcileCIDR bool
 
 	// Traffic to IPs outside this range will use IP masquerade.
 	nonMasqueradeCIDR string
@@ -1496,12 +1528,6 @@ func (kl *Kubelet) rejectPod(pod *api.Pod, reason, message string) {
 // can be admitted, a brief single-word reason and a message explaining why
 // the pod cannot be admitted.
 func (kl *Kubelet) canAdmitPod(pods []*api.Pod, pod *api.Pod) (bool, string, string) {
-	if rs := kl.runtimeState.networkErrors(); len(rs) != 0 {
-		if !podUsesHostNetwork(pod) {
-			return false, "NetworkNotReady", fmt.Sprintf("Network is not ready: %v", rs)
-		}
-	}
-
 	// the kubelet will invoke each pod admit handler in sequence
 	// if any handler rejects, the pod is rejected.
 	// TODO: move out of disk check into a pod admitter
@@ -1538,7 +1564,7 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 	defer housekeepingTicker.Stop()
 	plegCh := kl.pleg.Watch()
 	for {
-		if rs := kl.runtimeState.runtimeErrors(); len(rs) != 0 {
+		if rs := kl.runtimeState.errors(); len(rs) != 0 {
 			glog.Infof("skipping pod synchronization - %v", rs)
 			time.Sleep(5 * time.Second)
 			continue

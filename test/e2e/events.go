@@ -37,7 +37,7 @@ var _ = framework.KubeDescribe("Events", func() {
 
 	It("should be sent by kubelets and the scheduler about pods scheduling and running [Conformance]", func() {
 
-		podClient := f.Client.Pods(f.Namespace.Name)
+		podClient := f.ClientSet.Core().Pods(f.Namespace.Name)
 
 		By("creating the pod")
 		name := "send-events-" + string(uuid.NewUUID())
@@ -95,7 +95,7 @@ var _ = framework.KubeDescribe("Events", func() {
 				"source":                   api.DefaultSchedulerName,
 			}.AsSelector()
 			options := api.ListOptions{FieldSelector: selector}
-			events, err := f.Client.Events(f.Namespace.Name).List(options)
+			events, err := f.ClientSet.Core().Events(f.Namespace.Name).List(options)
 			if err != nil {
 				return false, err
 			}
@@ -115,7 +115,7 @@ var _ = framework.KubeDescribe("Events", func() {
 				"source":                   "kubelet",
 			}.AsSelector()
 			options := api.ListOptions{FieldSelector: selector}
-			events, err = f.Client.Events(f.Namespace.Name).List(options)
+			events, err = f.ClientSet.Core().Events(f.Namespace.Name).List(options)
 			if err != nil {
 				return false, err
 			}

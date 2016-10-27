@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -46,7 +47,7 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 
 	Describe("ReplicaSet objects", func() {
 		AfterEach(func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 
 			// Delete registered replicasets.
 			nsName := f.FederationNamespace.Name
@@ -59,7 +60,7 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 		})
 
 		It("should be created and deleted successfully", func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 
 			nsName := f.FederationNamespace.Name
 			replicaset := createReplicaSetOrFail(f.FederationClientset_1_5, nsName)
@@ -79,7 +80,7 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 			federationName string
 		)
 		BeforeEach(func() {
-			framework.SkipUnlessFederated(f.Client)
+			framework.SkipUnlessFederated(f.ClientSet)
 			if federationName = os.Getenv("FEDERATION_NAME"); federationName == "" {
 				federationName = DefaultFederationName
 			}
@@ -194,7 +195,7 @@ func newReplicaSet(namespace string, name string, replicas int32) *v1beta1.Repli
 		},
 		Spec: v1beta1.ReplicaSetSpec{
 			Replicas: &replicas,
-			Selector: &v1beta1.LabelSelector{
+			Selector: &unversioned.LabelSelector{
 				MatchLabels: map[string]string{"name": "myrs"},
 			},
 			Template: v1.PodTemplateSpec{

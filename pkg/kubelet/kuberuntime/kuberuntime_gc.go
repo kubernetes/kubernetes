@@ -136,6 +136,12 @@ func (cgc *containerGC) removeSandbox(sandboxID string) {
 	}
 }
 
+// isPodDeleted returns true if the pod is already deleted.
+func (cgc *containerGC) isPodDeleted(podUID types.UID) bool {
+	_, found := cgc.podGetter.GetPodByUID(podUID)
+	return !found
+}
+
 // evictableContainers gets all containers that are evictable. Evictable containers are: not running
 // and created more than MinAge ago.
 func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByEvictUnit, error) {
@@ -179,105 +185,8 @@ func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByE
 	return evictUnits, nil
 }
 
-// evictableSandboxes gets all sandboxes that are evictable. Evictable sandboxes are: not running
-// and contains no containers at all.
-func (cgc *containerGC) evictableSandboxes(minAge time.Duration) ([]string, error) {
-	containers, err := cgc.manager.getKubeletContainers(true)
-	if err != nil {
-		return nil, err
-	}
-
-	sandboxes, err := cgc.manager.getKubeletSandboxes(true)
-	if err != nil {
-		return nil, err
-	}
-
-	evictSandboxes := make([]string, 0)
-	newestGCTime := time.Now().Add(-minAge)
-	for _, sandbox := range sandboxes {
-		// Prune out ready sandboxes.
-		if sandbox.GetState() == runtimeApi.PodSandBoxState_READY {
-			continue
-		}
-
-		// Prune out sandboxes that still have containers.
-		found := false
-		sandboxID := sandbox.GetId()
-		for _, container := range containers {
-			if container.GetPodSandboxId() == sandboxID {
-				found = true
-				break
-			}
-		}
-		if found {
-			continue
-		}
-
-		// Only garbage collect sandboxes older than sandboxMinGCAge.
-		createdAt := time.Unix(0, sandbox.GetCreatedAt())
-		if createdAt.After(newestGCTime) {
-			continue
-		}
-
-		evictSandboxes = append(evictSandboxes, sandboxID)
-	}
-
-	return evictSandboxes, nil
-}
-
-// isPodDeleted returns true if the pod is already deleted.
-func (cgc *containerGC) isPodDeleted(podUID types.UID) bool {
-	_, found := cgc.podGetter.GetPodByUID(podUID)
-	return !found
-}
-
-// evictPodLogsDirectories evicts all evictable pod logs directories. Pod logs directories
-// are evictable if there are no corresponding pods.
-func (cgc *containerGC) evictPodLogsDirectories(allSourcesReady bool) error {
-	osInterface := cgc.manager.osInterface
-	if allSourcesReady {
-		// Only remove pod logs directories when all sources are ready.
-		dirs, err := osInterface.ReadDir(podLogsRootDirectory)
-		if err != nil {
-			return fmt.Errorf("failed to read podLogsRootDirectory %q: %v", podLogsRootDirectory, err)
-		}
-		for _, dir := range dirs {
-			podUID := types.UID(dir.Name())
-			if !cgc.isPodDeleted(podUID) {
-				continue
-			}
-			err := osInterface.RemoveAll(filepath.Join(podLogsRootDirectory, dir.Name()))
-			if err != nil {
-				glog.Errorf("Failed to remove pod logs directory %q: %v", dir.Name(), err)
-			}
-		}
-	}
-
-	// Remove dead container log symlinks.
-	// TODO(random-liu): Remove this after cluster logging supports CRI container log path.
-	logSymlinks, _ := filepath.Glob(filepath.Join(legacyContainerLogsDir, fmt.Sprintf("*.%s", legacyLogSuffix)))
-	for _, logSymlink := range logSymlinks {
-		if _, err := osInterface.Stat(logSymlink); os.IsNotExist(err) {
-			err := osInterface.Remove(logSymlink)
-			if err != nil {
-				glog.Errorf("Failed to remove container log dead symlink %q: %v", logSymlink, err)
-			}
-		}
-	}
-	return nil
-}
-
-// GarbageCollect removes dead containers using the specified container gc policy.
-// Note that gc policy is not applied to sandboxes. Sandboxes are only removed when they are
-// not ready and containing no containers.
-//
-// GarbageCollect consists of the following steps:
-// * gets evictable containers which are not active and created more than gcPolicy.MinAge ago.
-// * removes oldest dead containers for each pod by enforcing gcPolicy.MaxPerPodContainer.
-// * removes oldest dead containers by enforcing gcPolicy.MaxContainers.
-// * gets evictable sandboxes which are not ready and contains no containers.
-// * removes evictable sandboxes.
-func (cgc *containerGC) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy, allSourcesReady bool) error {
+// evict all containers that are evictable
+func (cgc *containerGC) evictContainers(gcPolicy kubecontainer.ContainerGCPolicy, allSourcesReady bool) error {
 	// Separate containers by evict units.
 	evictUnits, err := cgc.evictableContainers(gcPolicy.MinAge)
 	if err != nil {
@@ -320,17 +229,116 @@ func (cgc *containerGC) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy,
 			cgc.removeOldestN(flattened, numContainers-gcPolicy.MaxContainers)
 		}
 	}
+	return nil
+}
 
-	// Remove sandboxes with zero containers
-	evictSandboxes, err := cgc.evictableSandboxes(sandboxMinGCAge)
+// evictSandboxes evicts all sandboxes that are evictable. Evictable sandboxes are: not running
+// and contains no containers at all.
+func (cgc *containerGC) evictSandboxes(minAge time.Duration) error {
+	containers, err := cgc.manager.getKubeletContainers(true)
 	if err != nil {
 		return err
 	}
+
+	sandboxes, err := cgc.manager.getKubeletSandboxes(true)
+	if err != nil {
+		return err
+	}
+
+	evictSandboxes := make([]string, 0)
+	newestGCTime := time.Now().Add(-minAge)
+	for _, sandbox := range sandboxes {
+		// Prune out ready sandboxes.
+		if sandbox.GetState() == runtimeApi.PodSandBoxState_READY {
+			continue
+		}
+
+		// Prune out sandboxes that still have containers.
+		found := false
+		sandboxID := sandbox.GetId()
+		for _, container := range containers {
+			if container.GetPodSandboxId() == sandboxID {
+				found = true
+				break
+			}
+		}
+		if found {
+			continue
+		}
+
+		// Only garbage collect sandboxes older than sandboxMinGCAge.
+		createdAt := time.Unix(0, sandbox.GetCreatedAt())
+		if createdAt.After(newestGCTime) {
+			continue
+		}
+
+		evictSandboxes = append(evictSandboxes, sandboxID)
+	}
+
 	for _, sandbox := range evictSandboxes {
 		cgc.removeSandbox(sandbox)
 	}
+	return nil
+}
+
+// evictPodLogsDirectories evicts all evictable pod logs directories. Pod logs directories
+// are evictable if there are no corresponding pods.
+func (cgc *containerGC) evictPodLogsDirectories(allSourcesReady bool) error {
+	osInterface := cgc.manager.osInterface
+	if allSourcesReady {
+		// Only remove pod logs directories when all sources are ready.
+		dirs, err := osInterface.ReadDir(podLogsRootDirectory)
+		if err != nil {
+			return fmt.Errorf("failed to read podLogsRootDirectory %q: %v", podLogsRootDirectory, err)
+		}
+		for _, dir := range dirs {
+			name := dir.Name()
+			podUID := types.UID(name)
+			if !cgc.isPodDeleted(podUID) {
+				continue
+			}
+			err := osInterface.RemoveAll(filepath.Join(podLogsRootDirectory, name))
+			if err != nil {
+				glog.Errorf("Failed to remove pod logs directory %q: %v", name, err)
+			}
+		}
+	}
+
+	// Remove dead container log symlinks.
+	// TODO(random-liu): Remove this after cluster logging supports CRI container log path.
+	logSymlinks, _ := osInterface.Glob(filepath.Join(legacyContainerLogsDir, fmt.Sprintf("*.%s", legacyLogSuffix)))
+	for _, logSymlink := range logSymlinks {
+		if _, err := osInterface.Stat(logSymlink); os.IsNotExist(err) {
+			err := osInterface.Remove(logSymlink)
+			if err != nil {
+				glog.Errorf("Failed to remove container log dead symlink %q: %v", logSymlink, err)
+			}
+		}
+	}
+	return nil
+}
+
+// GarbageCollect removes dead containers using the specified container gc policy.
+// Note that gc policy is not applied to sandboxes. Sandboxes are only removed when they are
+// not ready and containing no containers.
+//
+// GarbageCollect consists of the following steps:
+// * gets evictable containers which are not active and created more than gcPolicy.MinAge ago.
+// * removes oldest dead containers for each pod by enforcing gcPolicy.MaxPerPodContainer.
+// * removes oldest dead containers by enforcing gcPolicy.MaxContainers.
+// * gets evictable sandboxes which are not ready and contains no containers.
+// * removes evictable sandboxes.
+func (cgc *containerGC) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy, allSourcesReady bool) error {
+	// Remove evictable containers
+	if err := cgc.evictContainers(gcPolicy, allSourcesReady); err != nil {
+		return err
+	}
+
+	// Remove sandboxes with zero containers
+	if err := cgc.evictSandboxes(sandboxMinGCAge); err != nil {
+		return err
+	}
 
 	// Remove pod sandbox log directory
-	// TODO(random-liu): Add legacy container log localtion cleanup.
 	return cgc.evictPodLogsDirectories(allSourcesReady)
 }

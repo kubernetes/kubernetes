@@ -331,7 +331,7 @@ func runLivenessTest(f *framework.Framework, pod *api.Pod, expectNumRestarts int
 	// Wait until the pod is not pending. (Here we need to check for something other than
 	// 'Pending' other than checking for 'Running', since when failures occur, we go to
 	// 'Terminated' which can cause indefinite blocking.)
-	framework.ExpectNoError(framework.WaitForPodNotPending(f.Client, ns, pod.Name, pod.ResourceVersion),
+	framework.ExpectNoError(framework.WaitForPodNotPending(f.ClientSet, ns, pod.Name, pod.ResourceVersion),
 		fmt.Sprintf("starting pod %s in namespace %s", pod.Name, ns))
 	framework.Logf("Started pod %s in namespace %s", pod.Name, ns)
 

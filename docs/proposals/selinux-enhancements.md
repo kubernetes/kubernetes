@@ -1,32 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 ## Abstract
 
 Presents a proposal for enhancing the security of Kubernetes clusters using
@@ -174,9 +145,8 @@ Using the host IPC and PID namespaces is not currently supported by rkt.
 2.  The `SelinuxContextRunner` interface should be renamed to `SELinuxRunner`
     and be changed to have the same method names and signatures as the
     libcontainer methods its implementations wrap
-3.  The `SELinuxRunner` interface should have a new method added called
-    `GetLxcContexts`; this should return a **shared** (ie, without MCS labels)
-    SELinux context usable by a container
+3.  The `SELinuxRunner` interface only needs `Getfilecon`, which is used by
+    the rkt code
 
 ```go
 package selinux
@@ -191,17 +161,9 @@ package selinux
 //
 // https://github.com/opencontainers/runc/blob/master/libcontainer/selinux/selinux.go
 type SELinuxRunner interface {
-	// Setfilecon sets the SELinux context for the given path or returns an
-	// error.
-	Setfilecon(path, context string) error
-
 	// Getfilecon returns the SELinux context for the given path or returns an
 	// error.
 	Getfilecon(path string) (string, error)
-
-	// GetLxcContexts returns the process and file SELinux contexts to use for
-	// containers.
-	GetLxcContexts() (string, string)
 }
 ```
 
@@ -233,9 +195,9 @@ ensure things work as expected under rkt.
 1.  The `VolumeHost` interface contains a method called `GetRootContext`; this
     is an artifact of the old assumptions about the Kubelet directory's SELinux
     context and can be removed
-2.  The `empty_dir.go` file should be changed to create an `SELinuxRunner` and
-    call its `GetLxcContexts` method to determine the right SELinux context to
-    give `tmpfs` mounts
+2.  The `empty_dir.go` file should be changed to be completely agnostic of
+    SELinux; no behavior in this plugin needs to be differentiated when SELinux
+    is enabled
 
 ### Changes to `pkg/controller/...`
 

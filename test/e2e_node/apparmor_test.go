@@ -38,58 +38,50 @@ import (
 
 var _ = framework.KubeDescribe("AppArmor [Feature:AppArmor]", func() {
 	if isAppArmorEnabled() {
-		testAppArmorNode()
+		BeforeEach(func() {
+			By("Loading AppArmor profiles for testing")
+			framework.ExpectNoError(loadTestProfiles(), "Could not load AppArmor test profiles")
+		})
+		Context("when running with AppArmor", func() {
+			f := framework.NewDefaultFramework("apparmor-test")
+
+			It("should reject an unloaded profile", func() {
+				status := runAppArmorTest(f, apparmor.ProfileNamePrefix+"non-existant-profile")
+				Expect(status.Phase).To(Equal(api.PodFailed), "PodStatus: %+v", status)
+				Expect(status.Reason).To(Equal("AppArmor"), "PodStatus: %+v", status)
+			})
+			It("should enforce a profile blocking writes", func() {
+				status := runAppArmorTest(f, apparmor.ProfileNamePrefix+apparmorProfilePrefix+"deny-write")
+				if len(status.ContainerStatuses) == 0 {
+					framework.Failf("Unexpected pod status: %s", spew.Sdump(status))
+					return
+				}
+				state := status.ContainerStatuses[0].State.Terminated
+				Expect(state.ExitCode).To(Not(BeZero()), "ContainerStateTerminated: %+v", state)
+
+			})
+			It("should enforce a permissive profile", func() {
+				status := runAppArmorTest(f, apparmor.ProfileNamePrefix+apparmorProfilePrefix+"audit-write")
+				if len(status.ContainerStatuses) == 0 {
+					framework.Failf("Unexpected pod status: %s", spew.Sdump(status))
+					return
+				}
+				state := status.ContainerStatuses[0].State.Terminated
+				Expect(state.ExitCode).To(BeZero(), "ContainerStateTerminated: %+v", state)
+			})
+		})
 	} else {
-		testNonAppArmorNode()
+		Context("when running without AppArmor", func() {
+			f := framework.NewDefaultFramework("apparmor-test")
+
+			It("should reject a pod with an AppArmor profile", func() {
+				status := runAppArmorTest(f, apparmor.ProfileRuntimeDefault)
+				Expect(status.Phase).To(Equal(api.PodFailed), "PodStatus: %+v", status)
+				Expect(status.Reason).To(Equal("AppArmor"), "PodStatus: %+v", status)
+			})
+		})
 	}
 })
-
-func testAppArmorNode() {
-	BeforeEach(func() {
-		By("Loading AppArmor profiles for testing")
-		framework.ExpectNoError(loadTestProfiles(), "Could not load AppArmor test profiles")
-	})
-	Context("when running with AppArmor", func() {
-		f := framework.NewDefaultFramework("apparmor-test")
-
-		It("should reject an unloaded profile", func() {
-			status := runAppArmorTest(f, apparmor.ProfileNamePrefix+"non-existant-profile")
-			Expect(status.Phase).To(Equal(api.PodFailed), "PodStatus: %+v", status)
-			Expect(status.Reason).To(Equal("AppArmor"), "PodStatus: %+v", status)
-		})
-		It("should enforce a profile blocking writes", func() {
-			status := runAppArmorTest(f, apparmor.ProfileNamePrefix+apparmorProfilePrefix+"deny-write")
-			if len(status.ContainerStatuses) == 0 {
-				framework.Failf("Unexpected pod status: %s", spew.Sdump(status))
-				return
-			}
-			state := status.ContainerStatuses[0].State.Terminated
-			Expect(state.ExitCode).To(Not(BeZero()), "ContainerStateTerminated: %+v", state)
-
-		})
-		It("should enforce a permissive profile", func() {
-			status := runAppArmorTest(f, apparmor.ProfileNamePrefix+apparmorProfilePrefix+"audit-write")
-			if len(status.ContainerStatuses) == 0 {
-				framework.Failf("Unexpected pod status: %s", spew.Sdump(status))
-				return
-			}
-			state := status.ContainerStatuses[0].State.Terminated
-			Expect(state.ExitCode).To(BeZero(), "ContainerStateTerminated: %+v", state)
-		})
-	})
-}
-
-func testNonAppArmorNode() {
-	Context("when running without AppArmor", func() {
-		f := framework.NewDefaultFramework("apparmor-test")
-
-		It("should reject a pod with an AppArmor profile", func() {
-			status := runAppArmorTest(f, apparmor.ProfileRuntimeDefault)
-			Expect(status.Phase).To(Equal(api.PodFailed), "PodStatus: %+v", status)
-			Expect(status.Reason).To(Equal("AppArmor"), "PodStatus: %+v", status)
-		})
-	})
-}
 
 const apparmorProfilePrefix = "e2e-node-apparmor-test-"
 const testProfiles = `
@@ -148,7 +140,7 @@ func runAppArmorTest(f *framework.Framework, profile string) api.PodStatus {
 	pod := createPodWithAppArmor(f, profile)
 	// The pod needs to start before it stops, so wait for the longer start timeout.
 	framework.ExpectNoError(framework.WaitTimeoutForPodNoLongerRunningInNamespace(
-		f.Client, pod.Name, f.Namespace.Name, "", framework.PodStartTimeout))
+		f.ClientSet, pod.Name, f.Namespace.Name, "", framework.PodStartTimeout))
 	p, err := f.PodClient().Get(pod.Name)
 	framework.ExpectNoError(err)
 	return p.Status

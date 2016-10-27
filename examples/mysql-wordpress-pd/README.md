@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.4/examples/mysql-wordpress-pd/README.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Persistent Installation of MySQL and WordPress on Kubernetes
 
 This example describes how to run a persistent installation of
@@ -101,7 +67,7 @@ this example.
 * Kubernetes version 1.2 is required due to using newer features, such
   at PV Claims and Deployments. Run `kubectl version` to see your
   cluster version.
-* [Cluster DNS](../../build/kube-dns/) will be used for service discovery.
+* [Cluster DNS](../../build-tools/kube-dns/) will be used for service discovery.
 * An [external load balancer](http://kubernetes.io/docs/user-guide/services/#type-loadbalancer)
   will be used to access WordPress.
 * [Persistent Volume Claims](http://kubernetes.io/docs/user-guide/persistent-volumes/)

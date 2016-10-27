@@ -17,9 +17,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-exit 0
-
 export KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/hack/lib/init.sh"
 
 go get -u github.com/mikedanese/gazel
-"${GOPATH}/bin/gazel" -root="$(realpath ${KUBE_ROOT})"
+"${GOPATH}/bin/gazel" -root="$(kube::realpath ${KUBE_ROOT})"

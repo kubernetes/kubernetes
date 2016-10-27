@@ -186,6 +186,7 @@ func IsRemountRequiredError(err error) bool {
 type actualStateOfWorld struct {
 	// nodeName is the name of this node. This value is passed to Attach/Detach
 	nodeName types.NodeName
+
 	// attachedVolumes is a map containing the set of volumes the kubelet volume
 	// manager believes to be successfully attached to this node. Volume types
 	// that do not implement an attacher interface are assumed to be in this
@@ -193,6 +194,7 @@ type actualStateOfWorld struct {
 	// The key in this map is the name of the volume and the value is an object
 	// containing more information about the attached volume.
 	attachedVolumes map[api.UniqueVolumeName]attachedVolume
+
 	// volumePluginMgr is the volume plugin manager used to create volume
 	// plugin objects.
 	volumePluginMgr *volume.VolumePluginMgr

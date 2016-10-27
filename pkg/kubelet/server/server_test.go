@@ -605,10 +605,56 @@ func TestAuthFilters(t *testing.T) {
 		}
 	}
 
+	methodToAPIVerb := map[string]string{"GET": "get", "POST": "create", "PUT": "update"}
+	pathToSubresource := func(path string) string {
+		switch {
+		// Cases for subpaths we expect specific subresources for
+		case isSubpath(path, statsPath):
+			return "stats"
+		case isSubpath(path, specPath):
+			return "spec"
+		case isSubpath(path, logsPath):
+			return "log"
+		case isSubpath(path, metricsPath):
+			return "metrics"
+
+		// Cases for subpaths we expect to map to the "proxy" subresource
+		case isSubpath(path, "/attach"),
+			isSubpath(path, "/configz"),
+			isSubpath(path, "/containerLogs"),
+			isSubpath(path, "/debug"),
+			isSubpath(path, "/exec"),
+			isSubpath(path, "/healthz"),
+			isSubpath(path, "/pods"),
+			isSubpath(path, "/portForward"),
+			isSubpath(path, "/run"),
+			isSubpath(path, "/runningpods"):
+			return "proxy"
+
+		default:
+			panic(fmt.Errorf(`unexpected kubelet API path %s.
+The kubelet API has likely registered a handler for a new path.
+If the new path has a use case for partitioned authorization when requested from the kubelet API,
+add a specific subresource for it in auth.go#GetRequestAttributes() and in TestAuthFilters().
+Otherwise, add it to the expected list of paths that map to the "proxy" subresource in TestAuthFilters().`, path))
+		}
+	}
+	attributesGetter := NewNodeAuthorizerAttributesGetter(types.NodeName("test"))
+
 	for _, tc := range testcases {
 		var (
 			expectedUser       = &user.DefaultInfo{Name: "test"}
-			expectedAttributes = &authorizer.AttributesRecord{User: expectedUser}
+			expectedAttributes = authorizer.AttributesRecord{
+				User:            expectedUser,
+				APIGroup:        "",
+				APIVersion:      "v1",
+				Verb:            methodToAPIVerb[tc.Method],
+				Resource:        "nodes",
+				Name:            "test",
+				Subresource:     pathToSubresource(tc.Path),
+				ResourceRequest: true,
+				Path:            tc.Path,
+			}
 
 			calledAuthenticate = false
 			calledAuthorize    = false
@@ -624,12 +670,12 @@ func TestAuthFilters(t *testing.T) {
 			if u != expectedUser {
 				t.Fatalf("%s: expected user %v, got %v", tc.Path, expectedUser, u)
 			}
-			return expectedAttributes
+			return attributesGetter.GetRequestAttributes(u, req)
 		}
 		fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (authorized bool, reason string, err error) {
 			calledAuthorize = true
 			if a != expectedAttributes {
-				t.Fatalf("%s: expected attributes %v, got %v", tc.Path, expectedAttributes, a)
+				t.Fatalf("%s: expected attributes\n\t%#v\ngot\n\t%#v", tc.Path, expectedAttributes, a)
 			}
 			return false, "", nil
 		}
@@ -1528,225 +1574,5 @@ func TestServePortForward(t *testing.T) {
 		}
 
 		<-portForwardFuncDone
-	}
-}
-
-type fakeHttpStream struct {
-	headers http.Header
-	id      uint32
-}
-
-func newFakeHttpStream() *fakeHttpStream {
-	return &fakeHttpStream{
-		headers: make(http.Header),
-	}
-}
-
-var _ httpstream.Stream = &fakeHttpStream{}
-
-func (s *fakeHttpStream) Read(data []byte) (int, error) {
-	return 0, nil
-}
-
-func (s *fakeHttpStream) Write(data []byte) (int, error) {
-	return 0, nil
-}
-
-func (s *fakeHttpStream) Close() error {
-	return nil
-}
-
-func (s *fakeHttpStream) Reset() error {
-	return nil
-}
-
-func (s *fakeHttpStream) Headers() http.Header {
-	return s.headers
-}
-
-func (s *fakeHttpStream) Identifier() uint32 {
-	return s.id
-}
-
-func TestPortForwardStreamReceived(t *testing.T) {
-	tests := map[string]struct {
-		port          string
-		streamType    string
-		expectedError string
-	}{
-		"missing port": {
-			expectedError: `"port" header is required`,
-		},
-		"unable to parse port": {
-			port:          "abc",
-			expectedError: `unable to parse "abc" as a port: strconv.ParseUint: parsing "abc": invalid syntax`,
-		},
-		"negative port": {
-			port:          "-1",
-			expectedError: `unable to parse "-1" as a port: strconv.ParseUint: parsing "-1": invalid syntax`,
-		},
-		"missing stream type": {
-			port:          "80",
-			expectedError: `"streamType" header is required`,
-		},
-		"valid port with error stream": {
-			port:       "80",
-			streamType: "error",
-		},
-		"valid port with data stream": {
-			port:       "80",
-			streamType: "data",
-		},
-		"invalid stream type": {
-			port:          "80",
-			streamType:    "foo",
-			expectedError: `invalid stream type "foo"`,
-		},
-	}
-	for name, test := range tests {
-		streams := make(chan httpstream.Stream, 1)
-		f := portForwardStreamReceived(streams)
-		stream := newFakeHttpStream()
-		if len(test.port) > 0 {
-			stream.headers.Set("port", test.port)
-		}
-		if len(test.streamType) > 0 {
-			stream.headers.Set("streamType", test.streamType)
-		}
-		replySent := make(chan struct{})
-		err := f(stream, replySent)
-		close(replySent)
-		if len(test.expectedError) > 0 {
-			if err == nil {
-				t.Errorf("%s: expected err=%q, but it was nil", name, test.expectedError)
-			}
-			if e, a := test.expectedError, err.Error(); e != a {
-				t.Errorf("%s: expected err=%q, got %q", name, e, a)
-			}
-			continue
-		}
-		if err != nil {
-			t.Errorf("%s: unexpected error %v", name, err)
-			continue
-		}
-		if s := <-streams; s != stream {
-			t.Errorf("%s: expected stream %#v, got %#v", name, stream, s)
-		}
-	}
-}
-
-func TestGetStreamPair(t *testing.T) {
-	timeout := make(chan time.Time)
-
-	h := &portForwardStreamHandler{
-		streamPairs: make(map[string]*portForwardStreamPair),
-	}
-
-	// test adding a new entry
-	p, created := h.getStreamPair("1")
-	if p == nil {
-		t.Fatalf("unexpected nil pair")
-	}
-	if !created {
-		t.Fatal("expected created=true")
-	}
-	if p.dataStream != nil {
-		t.Errorf("unexpected non-nil data stream")
-	}
-	if p.errorStream != nil {
-		t.Errorf("unexpected non-nil error stream")
-	}
-
-	// start the monitor for this pair
-	monitorDone := make(chan struct{})
-	go func() {
-		h.monitorStreamPair(p, timeout)
-		close(monitorDone)
-	}()
-
-	if !h.hasStreamPair("1") {
-		t.Fatal("This should still be true")
-	}
-
-	// make sure we can retrieve an existing entry
-	p2, created := h.getStreamPair("1")
-	if created {
-		t.Fatal("expected created=false")
-	}
-	if p != p2 {
-		t.Fatalf("retrieving an existing pair: expected %#v, got %#v", p, p2)
-	}
-
-	// removed via complete
-	dataStream := newFakeHttpStream()
-	dataStream.headers.Set(api.StreamType, api.StreamTypeData)
-	complete, err := p.add(dataStream)
-	if err != nil {
-		t.Fatalf("unexpected error adding data stream to pair: %v", err)
-	}
-	if complete {
-		t.Fatalf("unexpected complete")
-	}
-
-	errorStream := newFakeHttpStream()
-	errorStream.headers.Set(api.StreamType, api.StreamTypeError)
-	complete, err = p.add(errorStream)
-	if err != nil {
-		t.Fatalf("unexpected error adding error stream to pair: %v", err)
-	}
-	if !complete {
-		t.Fatal("unexpected incomplete")
-	}
-
-	// make sure monitorStreamPair completed
-	<-monitorDone
-
-	// make sure the pair was removed
-	if h.hasStreamPair("1") {
-		t.Fatal("expected removal of pair after both data and error streams received")
-	}
-
-	// removed via timeout
-	p, created = h.getStreamPair("2")
-	if !created {
-		t.Fatal("expected created=true")
-	}
-	if p == nil {
-		t.Fatal("expected p not to be nil")
-	}
-	monitorDone = make(chan struct{})
-	go func() {
-		h.monitorStreamPair(p, timeout)
-		close(monitorDone)
-	}()
-	// cause the timeout
-	close(timeout)
-	// make sure monitorStreamPair completed
-	<-monitorDone
-	if h.hasStreamPair("2") {
-		t.Fatal("expected stream pair to be removed")
-	}
-}
-
-func TestRequestID(t *testing.T) {
-	h := &portForwardStreamHandler{}
-
-	s := newFakeHttpStream()
-	s.headers.Set(api.StreamType, api.StreamTypeError)
-	s.id = 1
-	if e, a := "1", h.requestID(s); e != a {
-		t.Errorf("expected %q, got %q", e, a)
-	}
-
-	s.headers.Set(api.StreamType, api.StreamTypeData)
-	s.id = 3
-	if e, a := "1", h.requestID(s); e != a {
-		t.Errorf("expected %q, got %q", e, a)
-	}
-
-	s.id = 7
-	s.headers.Set(api.PortForwardRequestIDHeader, "2")
-	if e, a := "2", h.requestID(s); e != a {
-		t.Errorf("expected %q, got %q", e, a)
 	}
 }

@@ -1630,6 +1630,9 @@ const (
 	// PodReady means the pod is able to service requests and should be added to the
 	// load balancing pools of all matching services.
 	PodReady PodConditionType = "Ready"
+	// PodReasonUnschedulable reason in PodScheduled PodCondition means that the scheduler
+	// can't schedule the pod right now, for example due to insufficient resources in the cluster.
+	PodReasonUnschedulable = "Unschedulable"
 )
 
 // PodCondition contains details for the current condition of this pod.
@@ -2896,7 +2899,7 @@ type AttachedVolume struct {
 	// Name of the attached volume
 	Name UniqueVolumeName `json:"name" protobuf:"bytes,1,rep,name=name"`
 
-	// DevicePath represents the device path where the volume should be avilable
+	// DevicePath represents the device path where the volume should be available
 	DevicePath string `json:"devicePath" protobuf:"bytes,2,rep,name=devicePath"`
 }
 
@@ -3076,6 +3079,7 @@ type FinalizerName string
 // These are internal finalizer values to Kubernetes, must be qualified name unless defined here
 const (
 	FinalizerKubernetes FinalizerName = "kubernetes"
+	FinalizerOrphan     string        = "orphan"
 )
 
 // NamespaceSpec describes the attributes on a Namespace.

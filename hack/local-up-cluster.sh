@@ -23,7 +23,9 @@ DOCKERIZE_KUBELET=${DOCKERIZE_KUBELET:-""}
 ALLOW_PRIVILEGED=${ALLOW_PRIVILEGED:-""}
 ALLOW_SECURITY_CONTEXT=${ALLOW_SECURITY_CONTEXT:-""}
 RUNTIME_CONFIG=${RUNTIME_CONFIG:-""}
+# Name of the network plugin, eg: "kubenet"
 NET_PLUGIN=${NET_PLUGIN:-""}
+# Place the binaries required by NET_PLUGIN in this directory, eg: "/home/kubernetes/bin".
 NET_PLUGIN_DIR=${NET_PLUGIN_DIR:-""}
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/24}
@@ -161,6 +163,8 @@ CLAIM_BINDER_SYNC_PERIOD=${CLAIM_BINDER_SYNC_PERIOD:-"15s"} # current k8s defaul
 ENABLE_CONTROLLER_ATTACH_DETACH=${ENABLE_CONTROLLER_ATTACH_DETACH:-"true"} # current default
 CERT_DIR=${CERT_DIR:-"/var/run/kubernetes"}
 ROOT_CA_FILE=$CERT_DIR/apiserver.crt
+# How the kubelet interacts with the runtime, eg: "cri"
+EXPERIMENTAL_RUNTIME_INTEGRATION_TYPE=${EXPERIMENTAL_RUNTIME_INTEGRATION_TYPE:-""}
 
 
 function test_apiserver_off {
@@ -446,11 +450,6 @@ function start_kubelet {
         net_plugin_dir_args="--network-plugin-dir=${NET_PLUGIN_DIR}"
       fi
 
-      kubenet_plugin_args=""
-      if [[ "${NET_PLUGIN}" == "kubenet" ]]; then
-        kubenet_plugin_args="--reconcile-cidr=true "
-      fi
-
       container_runtime_endpoint_args=""
       if [[ -n "${CONTAINER_RUNTIME_ENDPOINT}" ]]; then
         container_runtime_endpoint_args="--container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}"
@@ -465,6 +464,7 @@ function start_kubelet {
         --v=${LOG_LEVEL} \
         --chaos-chance="${CHAOS_CHANCE}" \
         --container-runtime="${CONTAINER_RUNTIME}" \
+        --experimental-runtime-integration-type="${EXPERIMENTAL_RUNTIME_INTEGRATION_TYPE}" \
         --rkt-path="${RKT_PATH}" \
         --rkt-stage1-image="${RKT_STAGE1_IMAGE}" \
         --hostname-override="${HOSTNAME_OVERRIDE}" \
@@ -479,7 +479,6 @@ function start_kubelet {
         ${dns_args} \
         ${net_plugin_dir_args} \
         ${net_plugin_args} \
-        ${kubenet_plugin_args} \
         ${container_runtime_endpoint_args} \
         ${image_service_endpoint_args} \
         --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &

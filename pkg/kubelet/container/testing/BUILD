@@ -15,6 +15,7 @@ go_library(
     srcs = [
         "fake_cache.go",
         "fake_runtime.go",
+        "mockfileinfo.go",
         "os.go",
         "runtime_mock.go",
     ],
@@ -26,6 +27,7 @@ go_library(
         "//pkg/util/flowcontrol:go_default_library",
         "//pkg/util/term:go_default_library",
         "//pkg/volume:go_default_library",
+        "//vendor:github.com/golang/mock/gomock",
         "//vendor:github.com/stretchr/testify/mock",
     ],
 )
