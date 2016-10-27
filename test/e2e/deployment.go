@@ -187,6 +187,9 @@ func stopDeploymentMaybeOverlap(c clientset.Interface, internalClient internalcl
 	reaper, err := kubectl.ReaperFor(extensionsinternal.Kind("Deployment"), internalClient)
 	Expect(err).NotTo(HaveOccurred())
 	timeout := 1 * time.Minute
+
+	// Make deployment go away immediately by removing
+	// the orphan finalizer
 	err = reaper.Stop(ns, deployment.Name, timeout, api.NewDeleteOptions(0))
 	Expect(err).NotTo(HaveOccurred())
 
