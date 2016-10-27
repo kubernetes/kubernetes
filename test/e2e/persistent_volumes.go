@@ -77,64 +77,60 @@ func nfsServerPodCleanup(c clientset.Interface, config VolumeTestConfig) {
 	}
 }
 
+// TODO Comment
+func pvPvcCleanup(c clientset.Interface, ns string, pv *api.PersistentVolume, pvc *api.PersistentVolumeClaim) {
+	if c != nil && len(ns) > 0 {
+		if pvc != nil && len (pvc.Name) > 0 {
+			deletePersistentVolumeClaim(c, pvc.Name, ns)
+		}
+		if pv != nil && len(pv.Name) > 0 {
+			deletePersistentVolume(c, pv.Name)
+		}
+	}
+}
+
 // Cleanup up pvs and pvcs in multi-pv-pvc test cases. All entries found in the pv and
 // claims maps are deleted.
 // Note: this is the only code that deletes PV objects.
-func pvPvcCleanup(c clientset.Interface, ns string, pvols pvmap, claims pvcmap) {
-
+func pvPvcMapCleanup(c clientset.Interface, ns string, pvols pvmap, claims pvcmap) {
 	if c != nil && len(ns) > 0 {
 		for pvcKey := range claims {
-			_, err := c.Core().PersistentVolumeClaims(pvcKey.Namespace).Get(pvcKey.Name)
-			if !apierrs.IsNotFound(err) {
-				Expect(err).NotTo(HaveOccurred())
-				framework.Logf("   deleting PVC %v ...", pvcKey)
-				err = c.Core().PersistentVolumeClaims(pvcKey.Namespace).Delete(pvcKey.Name)
-				Expect(err).NotTo(HaveOccurred())
-				framework.Logf("   deleted  PVC %v", pvcKey)
-			}
+			deletePersistentVolumeClaim(c, pvcKey.Name, ns)
 			delete(claims, pvcKey)
 		}
 
-		for name := range pvols {
-			_, err := c.Core().PersistentVolumes().Get(name)
-			if !apierrs.IsNotFound(err) {
-				Expect(err).NotTo(HaveOccurred())
-				framework.Logf("   deleting PV %v ...", name)
-				err = c.Core().PersistentVolumes().Delete(name)
-				Expect(err).NotTo(HaveOccurred())
-				framework.Logf("   deleted  PV %v", name)
-			}
-			delete(pvols, name)
+		for pvKey := range pvols {
+			deletePersistentVolume(c, pvKey)
+			delete(pvols, pvKey)
 		}
 	}
 }
 
 // Delete the PV.
-func deletePersistentVolume(c clientset.Interface, pv *api.PersistentVolume) {
-
-	framework.Logf("Deleting PersistentVolume %v", pv.Name)
-	err := c.Core().PersistentVolumes().Delete(pv.Name)
-	Expect(err).NotTo(HaveOccurred())
-
-	// Wait for PersistentVolume to delete
-	deleteDuration := 90 * time.Second
-	err = framework.WaitForPersistentVolumeDeleted(c, pv.Name, 3*time.Second, deleteDuration)
-	Expect(err).NotTo(HaveOccurred())
+func deletePersistentVolume(c clientset.Interface, pvName string) {
+	if c != nil && len(pvName) > 0 {
+	        _, err := c.Core().PersistentVolumes().Get(pvName)
+        	if !apierrs.IsNotFound(err) {
+        		Expect(err).NotTo(HaveOccurred())
+        		framework.Logf("Deleting PersistentVolume %v", pvName)
+        		err := c.Core().PersistentVolumes().Delete(pvName, nil)
+        		Expect(err).NotTo(HaveOccurred())
+        	} else {
+			framework.Logf("", pvName)
+		}
+	}
 }
 
-func deletePersistentVolumeClaim(c clientset.Interface, pvc *api.PersistentVolumeClaim, ns string) {
-	deleteTimeout := 90*time.Second
-	pollPeriod := 2*time.Second
-	pvcname := pvc.Name
-
-	framework.Logf("Deleting PersistentVolumeClaim %v", pvcname)
-	err := c.Core().PersistentVolumeClaims(ns).Delete(pvcname)
-	Expect(err).NotTo(HaveOccurred())
- 	for start := time.Now(); time.Since(start) < deleteTimeout; time.Sleep(pollPeriod){
-		if pvc, err = c.Core().PersistentVolumeClaims(ns).Get(pvcname); apierrs.IsNotFound(err) {
-			framework.Logf("PersistentVolumeClaim %v deleted.", pvcname)
-			break
-		}
+// Delete the Claim
+func deletePersistentVolumeClaim(c clientset.Interface, pvcName string, ns string) {
+	if c != nil && len(pvcName) > 0 {
+	        _, err := c.Core().PersistentVolumeClaims(ns).Get(pvcName)
+        	if !apierrs.IsNotFound(err) {
+        		Expect(err).NotTo(HaveOccurred())
+        		framework.Logf("Deleting PersistentVolumeClaim %v", pvcName)
+        		err := c.Core().PersistentVolumeClaims(ns).Delete(pvcName, nil)
+        		Expect(err).NotTo(HaveOccurred())
+        	}
 	}
 }
 
@@ -146,7 +142,7 @@ func deletePVCandValidatePV(c clientset.Interface, ns string, pvc *api.Persisten
 	pvname := pvc.Spec.VolumeName
 	framework.Logf("Deleting PVC %v to trigger recycling of PV %v", pvc.Name, pvname)
 
-	err := c.Core().PersistentVolumeClaims(ns).Delete(pvc.Name)
+	err := c.Core().PersistentVolumeClaims(ns).Delete(pvc.Name, nil)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Check that the PVC is really deleted.
@@ -417,17 +413,22 @@ func testPodSuccessOrFail(c clientset.Interface, ns string, pod *api.Pod) {
 
 // Delete the passed in pod.
 func deletePod(f *framework.Framework, c clientset.Interface, ns string, pod *api.Pod) {
+	if c != nil {
+		if pod != nil && len(pod.Name) > 0 {
+			framework.Logf("Deleting pod %v", pod.Name)
+			_, err := c.Core().Pods(ns).Get(pod.Name)
+			if !apierrs.IsNotFound(err) {
+				Expect(err).NotTo(HaveOccurred())
+				err := c.Core().Pods(ns).Delete(pod.Name, nil)
+				Expect(err).NotTo(HaveOccurred())
 
-	framework.Logf("Deleting pod %v", pod.Name)
-	err := c.Core().Pods(ns).Delete(pod.Name, nil)
-	Expect(err).NotTo(HaveOccurred())
-
-	// Wait for pod to terminate.  Expect apierr NotFound
-	err = f.WaitForPodTerminated(pod.Name, "")
-	Expect(err).To(HaveOccurred())
-	Expect(apierrs.IsNotFound(err)).To(BeTrue())
-
-	framework.Logf("Ignore \"not found\" error above. Pod %v successfully deleted", pod.Name)
+				// Wait for pod to terminate.  Expect apierr NotFound
+				err = f.WaitForPodTerminated(pod.Name, "")
+				Expect(err).To(HaveOccurred())
+				framework.Logf("Ignore \"not found\" error above. Pod %v successfully deleted", pod.Name)
+			}
+		}
+	}
 }
 
 // Create the test pod, wait for (hopefully) success, and then delete the pod.
@@ -512,7 +513,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 	///////////////////////////////////////////////////////////////////////
 	// Testing configurations of a single a PV/PVC pair, multiple evenly paired PVs/PVCs,
 	// and multiple unevenly paired PV/PVCs
-	framework.KubeDescribe("PV:NFS", func() {
+	framework.KubeDescribe("PersistentVolumes:NFS", func() {
 
 		var (
 			NFSconfig    VolumeTestConfig
@@ -567,30 +568,8 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 
 			// Note: this is the only code where the pv is deleted.
 			AfterEach(func() {
-				if c != nil && len(ns) > 0 {
-					if pvc != nil && len(pvc.Name) > 0 {
-						_, err := c.Core().PersistentVolumeClaims(ns).Get(pvc.Name)
-						if !apierrs.IsNotFound(err) {
-							Expect(err).NotTo(HaveOccurred())
-							framework.Logf("AfterEach: deleting PVC %v", pvc.Name)
-							err = c.Core().PersistentVolumeClaims(ns).Delete(pvc.Name)
-							Expect(err).NotTo(HaveOccurred())
-							framework.Logf("AfterEach: deleted PVC %v", pvc.Name)
-						}
-					}
-					pvc = nil
-					if pv != nil && len(pv.Name) > 0 {
-						_, err := c.Core().PersistentVolumes().Get(pv.Name)
-						if !apierrs.IsNotFound(err) {
-							Expect(err).NotTo(HaveOccurred())
-							framework.Logf("AfterEach: deleting PV %v", pv.Name)
-							err := c.Core().PersistentVolumes().Delete(pv.Name)
-							Expect(err).NotTo(HaveOccurred())
-							framework.Logf("AfterEach: deleted PV %v", pv.Name)
-						}
-					}
-					pv = nil
-				}
+				framework.Logf("AfterEach: Cleaning up test resources.")
+				pvPvcCleanup(c, ns, pv, pvc)
 			})
 
 			// Individual tests follow:
@@ -648,7 +627,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 
 			AfterEach(func() {
 				framework.Logf("AfterEach: deleting %v PVCs and %v PVs...", len(claims), len(pvols))
-				pvPvcCleanup(c, ns, pvols, claims)
+				pvPvcMapCleanup(c, ns, pvols, claims)
 			})
 
 			// Create 2 PVs and 4 PVCs.
@@ -683,7 +662,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 	//				GCE PD
 	///////////////////////////////////////////////////////////////////////
 	// Testing configurations of single a PV/PVC pair attached to a GCE PD
-	framework.KubeDescribe("PV:GCEPD", func() {
+	framework.KubeDescribe("PersistentVolumes:GCEPD", func() {
 
 		var (
 			diskName  string
@@ -714,39 +693,12 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 		})
 
 		AfterEach(func() {
+			framework.Logf("AfterEach: Cleaning up test resources")
 			if c != nil {
-				if clientPod != nil && len(clientPod.Name) > 0 {
-					_, err := c.Core().Pods(ns).Get(clientPod.Name)
-					if !apierrs.IsNotFound(err) {
-						Expect(err).NotTo(HaveOccurred())
-						framework.Logf("AfterEach: deleting client Pod %v", clientPod.Name)
-						err = c.Core().Pods(ns).Delete(clientPod.Name, nil)
-						Expect(err).NotTo(HaveOccurred())
-						framework.Logf("AfterEach: deleted client Pod %v", clientPod.Name)
-					}
-				}
+				deletePod(f, c, ns, clientPod)
+				pvPvcCleanup(c, ns, pv, pvc)
 				clientPod = nil
-				if pvc != nil && len(pvc.Name) > 0 {
-					_, err := c.Core().PersistentVolumeClaims(ns).Get(pvc.Name)
-					if !apierrs.IsNotFound(err) {
-						Expect(err).NotTo(HaveOccurred())
-						framework.Logf("AfterEach: deleting PVC %v", pvc.Name)
-						err = c.Core().PersistentVolumeClaims(ns).Delete(pvc.Name)
-						Expect(err).NotTo(HaveOccurred())
-						framework.Logf("AfterEach: deleted PVC %v", pvc.Name)
-					}
-				}
 				pvc = nil
-				if pv != nil && len(pv.Name) > 0 {
-					_, err := c.Core().PersistentVolumes().Get(pv.Name)
-					if !apierrs.IsNotFound(err) {
-						Expect(err).NotTo(HaveOccurred())
-						framework.Logf("AfterEach: deleting PV %v", pv.Name)
-						err := c.Core().PersistentVolumes().Delete(pv.Name)
-						Expect(err).NotTo(HaveOccurred())
-						framework.Logf("AfterEach: deleted PV %v", pv.Name)
-					}
-				}
 				pv = nil
 			}
 		})
@@ -768,7 +720,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			node := types.NodeName(clientPod.Spec.NodeName)
 
 			By("Deleting the Claim")
-			deletePersistentVolumeClaim(c, pvc, ns)
+			deletePersistentVolumeClaim(c, pvc.Name, ns)
 			verifyDiskAttached(diskName, node)
 
 			By("Deleting the Pod")
@@ -790,7 +742,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 			node := types.NodeName(clientPod.Spec.NodeName)
 
 			By("Deleting the Persistent Volume")
-			deletePersistentVolume(c, pv)
+			deletePersistentVolume(c, pv.Name)
 			verifyDiskAttached(diskName, node)
 
 			By("Deleting the client pod")
