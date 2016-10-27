@@ -18,7 +18,7 @@
 # This script performs etcd upgrade based on the following environmental
 # variables:
 # TARGET_STORAGE - API of etcd to be used (supported: 'etcd2', 'etcd3')
-# TARGET_VERSION - etcd release to be used (supported: '2.2.1', '2.3.7', '3.0.12')
+# TARGET_VERSION - etcd release to be used (supported: '2.2.1', '2.3.7', '3.0.13')
 # DATA_DIRECTORY - directory with etcd data
 #
 # The current etcd version and storage format is detected based on the
@@ -27,8 +27,8 @@
 #
 # The update workflow support the following upgrade steps:
 # - 2.2.1/etcd2 -> 2.3.7/etcd2
-# - 2.3.7/etcd2 -> 3.0.12/etcd2
-# - 3.0.12/etcd2 -> 3.0.12/etcd3
+# - 2.3.7/etcd2 -> 3.0.13/etcd2
+# - 3.0.13/etcd2 -> 3.0.13/etcd3
 #
 # NOTE: The releases supported in this script has to match release binaries
 # present in the etcd image (to make this script work correctly).
@@ -66,7 +66,7 @@ fi
 # NOTE: SUPPORTED_VERSION has to match release binaries present in the
 # etcd image (to make this script work correctly).
 # We cannot use array since sh doesn't support it.
-SUPPORTED_VERSIONS_STRING="2.2.1 2.3.7 3.0.12"
+SUPPORTED_VERSIONS_STRING="2.2.1 2.3.7 3.0.13"
 SUPPORTED_VERSIONS=$(echo "${SUPPORTED_VERSIONS_STRING}" | tr " " "\n")
 
 VERSION_FILE="version.txt"
