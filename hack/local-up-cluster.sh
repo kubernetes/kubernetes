@@ -511,13 +511,28 @@ function start_kubelet {
 
 function start_kubeproxy {
     PROXY_LOG=/tmp/kube-proxy.log
+
+    cat <<EOF > /tmp/kube-proxy.yaml
+apiVersion: componentconfig/v1alpha1
+kind: KubeProxyConfiguration
+clientConnection:
+  kubeconfig: ${CERT_DIR}/kubeconfig
+hostnameOverride: ${HOSTNAME_OVERRIDE}
+featureGates: ${FEATURE_GATES}
+EOF
+
     sudo -E "${GO_OUT}/hyperkube" proxy \
-      --v=${LOG_LEVEL} \
-      --hostname-override="${HOSTNAME_OVERRIDE}" \
-      --feature-gates="${FEATURE_GATES}" \
-      --kubeconfig "$CERT_DIR"/kubeconfig \
-      --master="https://${API_HOST}:${API_SECURE_PORT}" >"${PROXY_LOG}" 2>&1 &
+      --config /tmp/kube-proxy.yaml \
+      --v=${LOG_LEVEL} >"${PROXY_LOG}" 2>&1 &
     PROXY_PID=$!
+
+    #sudo -E "${GO_OUT}/hyperkube" proxy \
+    #  --v=${LOG_LEVEL} \
+    #  --hostname-override="${HOSTNAME_OVERRIDE}" \
+    #  --feature-gates="${FEATURE_GATES}" \
+    #  --kubeconfig "$CERT_DIR"/kubeconfig \
+    #  --master="https://${API_HOST}:${API_SECURE_PORT}" >"${PROXY_LOG}" 2>&1 &
+    #PROXY_PID=$!
 
     SCHEDULER_LOG=/tmp/kube-scheduler.log
     sudo -E "${GO_OUT}/hyperkube" scheduler \

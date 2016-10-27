@@ -150,6 +150,7 @@ func New(exec utilexec.Interface, dbus utildbus.Interface, protocol Protocol) In
 		hasCheck: getIPTablesHasCheckCommand(vstring),
 		waitFlag: getIPTablesWaitFlag(vstring),
 	}
+	// TODO this needs to be moved to a separate Start() or Run() function
 	runner.connectToFirewallD()
 	return runner
 }

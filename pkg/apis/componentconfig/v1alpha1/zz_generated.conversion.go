@@ -37,8 +37,14 @@ func init() {
 // Public to allow building arbitrary schemes.
 func RegisterConversions(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedConversionFuncs(
+		Convert_v1alpha1_ClientConnectionConfiguration_To_componentconfig_ClientConnectionConfiguration,
+		Convert_componentconfig_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration,
 		Convert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyConfiguration,
 		Convert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration,
+		Convert_v1alpha1_KubeProxyConntrackConfiguration_To_componentconfig_KubeProxyConntrackConfiguration,
+		Convert_componentconfig_KubeProxyConntrackConfiguration_To_v1alpha1_KubeProxyConntrackConfiguration,
+		Convert_v1alpha1_KubeProxyIPTablesConfiguration_To_componentconfig_KubeProxyIPTablesConfiguration,
+		Convert_componentconfig_KubeProxyIPTablesConfiguration_To_v1alpha1_KubeProxyIPTablesConfiguration,
 		Convert_v1alpha1_KubeSchedulerConfiguration_To_componentconfig_KubeSchedulerConfiguration,
 		Convert_componentconfig_KubeSchedulerConfiguration_To_v1alpha1_KubeSchedulerConfiguration,
 		Convert_v1alpha1_KubeletAnonymousAuthentication_To_componentconfig_KubeletAnonymousAuthentication,
@@ -60,26 +66,53 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 	)
 }
 
+func autoConvert_v1alpha1_ClientConnectionConfiguration_To_componentconfig_ClientConnectionConfiguration(in *ClientConnectionConfiguration, out *componentconfig.ClientConnectionConfiguration, s conversion.Scope) error {
+	out.KubeConfigFile = in.KubeConfigFile
+	out.AcceptContentTypes = in.AcceptContentTypes
+	out.ContentType = in.ContentType
+	out.QPS = in.QPS
+	out.Burst = in.Burst
+	return nil
+}
+
+func Convert_v1alpha1_ClientConnectionConfiguration_To_componentconfig_ClientConnectionConfiguration(in *ClientConnectionConfiguration, out *componentconfig.ClientConnectionConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_ClientConnectionConfiguration_To_componentconfig_ClientConnectionConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(in *componentconfig.ClientConnectionConfiguration, out *ClientConnectionConfiguration, s conversion.Scope) error {
+	out.KubeConfigFile = in.KubeConfigFile
+	out.AcceptContentTypes = in.AcceptContentTypes
+	out.ContentType = in.ContentType
+	out.QPS = in.QPS
+	out.Burst = in.Burst
+	return nil
+}
+
+func Convert_componentconfig_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(in *componentconfig.ClientConnectionConfiguration, out *ClientConnectionConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(in, out, s)
+}
+
 func autoConvert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyConfiguration(in *KubeProxyConfiguration, out *componentconfig.KubeProxyConfiguration, s conversion.Scope) error {
+	out.FeatureGates = in.FeatureGates
 	out.BindAddress = in.BindAddress
-	out.ClusterCIDR = in.ClusterCIDR
 	out.HealthzBindAddress = in.HealthzBindAddress
-	out.HealthzPort = in.HealthzPort
+	out.ClusterCIDR = in.ClusterCIDR
 	out.HostnameOverride = in.HostnameOverride
-	out.IPTablesMasqueradeBit = (*int32)(unsafe.Pointer(in.IPTablesMasqueradeBit))
-	out.IPTablesSyncPeriod = in.IPTablesSyncPeriod
-	out.KubeconfigPath = in.KubeconfigPath
-	out.MasqueradeAll = in.MasqueradeAll
-	out.Master = in.Master
+	if err := Convert_v1alpha1_ClientConnectionConfiguration_To_componentconfig_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha1_KubeProxyIPTablesConfiguration_To_componentconfig_KubeProxyIPTablesConfiguration(&in.IPTables, &out.IPTables, s); err != nil {
+		return err
+	}
 	out.OOMScoreAdj = (*int32)(unsafe.Pointer(in.OOMScoreAdj))
 	out.Mode = componentconfig.ProxyMode(in.Mode)
 	out.PortRange = in.PortRange
 	out.ResourceContainer = in.ResourceContainer
 	out.UDPIdleTimeout = in.UDPIdleTimeout
-	out.ConntrackMax = in.ConntrackMax
-	out.ConntrackMaxPerCore = in.ConntrackMaxPerCore
-	out.ConntrackMin = in.ConntrackMin
-	out.ConntrackTCPEstablishedTimeout = in.ConntrackTCPEstablishedTimeout
+	if err := Convert_v1alpha1_KubeProxyConntrackConfiguration_To_componentconfig_KubeProxyConntrackConfiguration(&in.Conntrack, &out.Conntrack, s); err != nil {
+		return err
+	}
+	out.ConfigSyncPeriod = in.ConfigSyncPeriod
 	return nil
 }
 
@@ -88,30 +121,77 @@ func Convert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyConfigu
 }
 
 func autoConvert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in *componentconfig.KubeProxyConfiguration, out *KubeProxyConfiguration, s conversion.Scope) error {
+	out.FeatureGates = in.FeatureGates
 	out.BindAddress = in.BindAddress
-	out.ClusterCIDR = in.ClusterCIDR
 	out.HealthzBindAddress = in.HealthzBindAddress
-	out.HealthzPort = in.HealthzPort
+	out.ClusterCIDR = in.ClusterCIDR
 	out.HostnameOverride = in.HostnameOverride
-	out.IPTablesMasqueradeBit = (*int32)(unsafe.Pointer(in.IPTablesMasqueradeBit))
-	out.IPTablesSyncPeriod = in.IPTablesSyncPeriod
-	out.KubeconfigPath = in.KubeconfigPath
-	out.MasqueradeAll = in.MasqueradeAll
-	out.Master = in.Master
+	if err := Convert_componentconfig_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
+		return err
+	}
+	if err := Convert_componentconfig_KubeProxyIPTablesConfiguration_To_v1alpha1_KubeProxyIPTablesConfiguration(&in.IPTables, &out.IPTables, s); err != nil {
+		return err
+	}
 	out.OOMScoreAdj = (*int32)(unsafe.Pointer(in.OOMScoreAdj))
 	out.Mode = ProxyMode(in.Mode)
 	out.PortRange = in.PortRange
 	out.ResourceContainer = in.ResourceContainer
 	out.UDPIdleTimeout = in.UDPIdleTimeout
-	out.ConntrackMax = in.ConntrackMax
-	out.ConntrackMaxPerCore = in.ConntrackMaxPerCore
-	out.ConntrackMin = in.ConntrackMin
-	out.ConntrackTCPEstablishedTimeout = in.ConntrackTCPEstablishedTimeout
+	if err := Convert_componentconfig_KubeProxyConntrackConfiguration_To_v1alpha1_KubeProxyConntrackConfiguration(&in.Conntrack, &out.Conntrack, s); err != nil {
+		return err
+	}
+	out.ConfigSyncPeriod = in.ConfigSyncPeriod
 	return nil
 }
 
 func Convert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in *componentconfig.KubeProxyConfiguration, out *KubeProxyConfiguration, s conversion.Scope) error {
 	return autoConvert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in, out, s)
+}
+
+func autoConvert_v1alpha1_KubeProxyConntrackConfiguration_To_componentconfig_KubeProxyConntrackConfiguration(in *KubeProxyConntrackConfiguration, out *componentconfig.KubeProxyConntrackConfiguration, s conversion.Scope) error {
+	out.Max = in.Max
+	out.MaxPerCore = in.MaxPerCore
+	out.Min = in.Min
+	out.TCPEstablishedTimeout = in.TCPEstablishedTimeout
+	return nil
+}
+
+func Convert_v1alpha1_KubeProxyConntrackConfiguration_To_componentconfig_KubeProxyConntrackConfiguration(in *KubeProxyConntrackConfiguration, out *componentconfig.KubeProxyConntrackConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_KubeProxyConntrackConfiguration_To_componentconfig_KubeProxyConntrackConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_KubeProxyConntrackConfiguration_To_v1alpha1_KubeProxyConntrackConfiguration(in *componentconfig.KubeProxyConntrackConfiguration, out *KubeProxyConntrackConfiguration, s conversion.Scope) error {
+	out.Max = in.Max
+	out.MaxPerCore = in.MaxPerCore
+	out.Min = in.Min
+	out.TCPEstablishedTimeout = in.TCPEstablishedTimeout
+	return nil
+}
+
+func Convert_componentconfig_KubeProxyConntrackConfiguration_To_v1alpha1_KubeProxyConntrackConfiguration(in *componentconfig.KubeProxyConntrackConfiguration, out *KubeProxyConntrackConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_KubeProxyConntrackConfiguration_To_v1alpha1_KubeProxyConntrackConfiguration(in, out, s)
+}
+
+func autoConvert_v1alpha1_KubeProxyIPTablesConfiguration_To_componentconfig_KubeProxyIPTablesConfiguration(in *KubeProxyIPTablesConfiguration, out *componentconfig.KubeProxyIPTablesConfiguration, s conversion.Scope) error {
+	out.MasqueradeBit = (*int32)(unsafe.Pointer(in.MasqueradeBit))
+	out.MasqueradeAll = in.MasqueradeAll
+	out.SyncPeriod = in.SyncPeriod
+	return nil
+}
+
+func Convert_v1alpha1_KubeProxyIPTablesConfiguration_To_componentconfig_KubeProxyIPTablesConfiguration(in *KubeProxyIPTablesConfiguration, out *componentconfig.KubeProxyIPTablesConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_KubeProxyIPTablesConfiguration_To_componentconfig_KubeProxyIPTablesConfiguration(in, out, s)
+}
+
+func autoConvert_componentconfig_KubeProxyIPTablesConfiguration_To_v1alpha1_KubeProxyIPTablesConfiguration(in *componentconfig.KubeProxyIPTablesConfiguration, out *KubeProxyIPTablesConfiguration, s conversion.Scope) error {
+	out.MasqueradeBit = (*int32)(unsafe.Pointer(in.MasqueradeBit))
+	out.MasqueradeAll = in.MasqueradeAll
+	out.SyncPeriod = in.SyncPeriod
+	return nil
+}
+
+func Convert_componentconfig_KubeProxyIPTablesConfiguration_To_v1alpha1_KubeProxyIPTablesConfiguration(in *componentconfig.KubeProxyIPTablesConfiguration, out *KubeProxyIPTablesConfiguration, s conversion.Scope) error {
+	return autoConvert_componentconfig_KubeProxyIPTablesConfiguration_To_v1alpha1_KubeProxyIPTablesConfiguration(in, out, s)
 }
 
 func autoConvert_v1alpha1_KubeSchedulerConfiguration_To_componentconfig_KubeSchedulerConfiguration(in *KubeSchedulerConfiguration, out *componentconfig.KubeSchedulerConfiguration, s conversion.Scope) error {

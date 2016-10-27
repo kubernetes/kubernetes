@@ -20,11 +20,9 @@ import (
 	"time"
 
 	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
-	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
-	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -52,35 +50,33 @@ func (*FakeProxier) SyncLoop() {
 func NewHollowProxyOrDie(
 	nodeName string,
 	client clientset.Interface,
-	endpointsConfig *proxyconfig.EndpointsConfig,
-	serviceConfig *proxyconfig.ServiceConfig,
 	iptInterface utiliptables.Interface,
 	broadcaster record.EventBroadcaster,
 	recorder record.EventRecorder,
 ) *HollowProxy {
 	// Create and start Hollow Proxy
-	config := options.NewProxyConfig()
-	config.OOMScoreAdj = util.Int32Ptr(0)
-	config.ResourceContainer = ""
-	config.NodeRef = &api.ObjectReference{
+	nodeRef := &api.ObjectReference{
 		Kind:      "Node",
 		Name:      nodeName,
 		UID:       types.UID(nodeName),
 		Namespace: "",
 	}
-	proxyconfig.NewSourceAPI(
-		client.Core().RESTClient(),
-		30*time.Second,
-		serviceConfig.Channel("api"),
-		endpointsConfig.Channel("api"),
-	)
 
-	hollowProxy, err := proxyapp.NewProxyServer(client, config, iptInterface, &FakeProxier{}, broadcaster, recorder, nil, "fake")
-	if err != nil {
-		glog.Fatalf("Error while creating ProxyServer: %v\n", err)
-	}
 	return &HollowProxy{
-		ProxyServer: hollowProxy,
+		ProxyServer: &proxyapp.ProxyServer{
+			Client:                 client,
+			IptInterface:           iptInterface,
+			Proxier:                &FakeProxier{},
+			ServiceConfigHandler:   &FakeProxyHandler{},
+			EndpointsConfigHandler: &FakeProxyHandler{},
+			Broadcaster:            broadcaster,
+			Recorder:               recorder,
+			ProxyMode:              "fake",
+			NodeRef:                nodeRef,
+			OOMScoreAdj:            util.Int32Ptr(0),
+			ResourceContainer:      "",
+			ConfigSyncPeriod:       30 * time.Second,
+		},
 	}
 }
 

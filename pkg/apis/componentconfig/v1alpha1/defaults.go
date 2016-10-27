@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -64,11 +65,10 @@ func SetDefaults_KubeProxyConfiguration(obj *KubeProxyConfiguration) {
 	if obj.BindAddress == "" {
 		obj.BindAddress = "0.0.0.0"
 	}
-	if obj.HealthzPort == 0 {
-		obj.HealthzPort = 10249
-	}
-	if obj.HealthzBindAddress == "" {
-		obj.HealthzBindAddress = "127.0.0.1"
+	if len(obj.HealthzBindAddress) == 0 {
+		obj.HealthzBindAddress = "127.0.0.1:10249"
+	} else if !strings.Contains(obj.HealthzBindAddress, ":") {
+		obj.HealthzBindAddress += ":10249"
 	}
 	if obj.OOMScoreAdj == nil {
 		temp := int32(qos.KubeProxyOOMScoreAdj)
@@ -77,29 +77,42 @@ func SetDefaults_KubeProxyConfiguration(obj *KubeProxyConfiguration) {
 	if obj.ResourceContainer == "" {
 		obj.ResourceContainer = "/kube-proxy"
 	}
-	if obj.IPTablesSyncPeriod.Duration == 0 {
-		obj.IPTablesSyncPeriod = unversioned.Duration{Duration: 30 * time.Second}
+	if obj.IPTables.SyncPeriod.Duration == 0 {
+		obj.IPTables.SyncPeriod = unversioned.Duration{Duration: 30 * time.Second}
 	}
 	zero := unversioned.Duration{}
 	if obj.UDPIdleTimeout == zero {
 		obj.UDPIdleTimeout = unversioned.Duration{Duration: 250 * time.Millisecond}
 	}
 	// If ConntrackMax is set, respect it.
-	if obj.ConntrackMax == 0 {
+	if obj.Conntrack.Max == 0 {
 		// If ConntrackMax is *not* set, use per-core scaling.
-		if obj.ConntrackMaxPerCore == 0 {
-			obj.ConntrackMaxPerCore = 32 * 1024
+		if obj.Conntrack.MaxPerCore == 0 {
+			obj.Conntrack.MaxPerCore = 32 * 1024
 		}
-		if obj.ConntrackMin == 0 {
-			obj.ConntrackMin = 128 * 1024
+		if obj.Conntrack.Min == 0 {
+			obj.Conntrack.Min = 128 * 1024
 		}
 	}
-	if obj.IPTablesMasqueradeBit == nil {
+	if obj.IPTables.MasqueradeBit == nil {
 		temp := int32(14)
-		obj.IPTablesMasqueradeBit = &temp
+		obj.IPTables.MasqueradeBit = &temp
 	}
-	if obj.ConntrackTCPEstablishedTimeout == zero {
-		obj.ConntrackTCPEstablishedTimeout = unversioned.Duration{Duration: 24 * time.Hour} // 1 day (1/5 default)
+	if obj.Conntrack.TCPEstablishedTimeout == zero {
+		obj.Conntrack.TCPEstablishedTimeout = unversioned.Duration{Duration: 24 * time.Hour} // 1 day (1/5 default)
+	}
+	if obj.ConfigSyncPeriod.Duration == 0 {
+		obj.ConfigSyncPeriod.Duration = 15 * time.Minute
+	}
+
+	if len(obj.ClientConnection.ContentType) == 0 {
+		obj.ClientConnection.ContentType = "application/vnd.kubernetes.protobuf"
+	}
+	if obj.ClientConnection.QPS == 0.0 {
+		obj.ClientConnection.QPS = 5.0
+	}
+	if obj.ClientConnection.Burst == 0 {
+		obj.ClientConnection.Burst = 10
 	}
 }
 

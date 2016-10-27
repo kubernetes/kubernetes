@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubemark"
-	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/util/flag"
 	fakeiptables "k8s.io/kubernetes/pkg/util/iptables/testing"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -126,13 +125,7 @@ func main() {
 
 		iptInterface := fakeiptables.NewFake()
 
-		serviceConfig := proxyconfig.NewServiceConfig()
-		serviceConfig.RegisterHandler(&kubemark.FakeProxyHandler{})
-
-		endpointsConfig := proxyconfig.NewEndpointsConfig()
-		endpointsConfig.RegisterHandler(&kubemark.FakeProxyHandler{})
-
-		hollowProxy := kubemark.NewHollowProxyOrDie(config.NodeName, clientset, endpointsConfig, serviceConfig, iptInterface, eventBroadcaster, recorder)
+		hollowProxy := kubemark.NewHollowProxyOrDie(config.NodeName, clientset, iptInterface, eventBroadcaster, recorder)
 		hollowProxy.Run()
 	}
 }
