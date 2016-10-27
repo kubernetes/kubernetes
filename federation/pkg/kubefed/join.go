@@ -38,6 +38,12 @@ const (
 	// KubeconfigSecretDataKey is the key name used in the secret to
 	// stores a cluster's credentials.
 	KubeconfigSecretDataKey = "kubeconfig"
+
+	// defaultClusterCIDR is the default CIDR range accepted by the
+	// joining API server. See `apis/federation.ClusterSpec` for
+	// details.
+	// TODO(madhusudancs): Make this value customizable.
+	defaultClientCIDR = "0.0.0.0/0"
 )
 
 var (
@@ -275,6 +281,7 @@ func clusterGenerator(clientConfig *clientcmdapi.Config, name string) (kubectl.S
 
 	generator := &kubectl.ClusterGeneratorV1Beta1{
 		Name:          name,
+		ClientCIDR:    defaultClientCIDR,
 		ServerAddress: serverAddress,
 		SecretName:    name,
 	}

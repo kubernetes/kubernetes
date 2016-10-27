@@ -270,6 +270,7 @@ func fakeCluster(name, server string) federationapi.Cluster {
 		Spec: federationapi.ClusterSpec{
 			ServerAddressByClientCIDRs: []federationapi.ServerAddressByClientCIDR{
 				{
+					ClientCIDR:    defaultClientCIDR,
 					ServerAddress: server,
 				},
 			},
