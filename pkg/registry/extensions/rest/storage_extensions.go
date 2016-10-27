@@ -140,3 +140,7 @@ func (p RESTStorageProvider) postStartHookFunc(hookContext genericapiserver.Post
 
 	return nil
 }
+
+func (p RESTStorageProvider) GroupName() string {
+	return extensions.GroupName
+}

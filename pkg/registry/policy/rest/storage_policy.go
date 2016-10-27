@@ -50,3 +50,7 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapis
 	}
 	return storage
 }
+
+func (p RESTStorageProvider) GroupName() string {
+	return policy.GroupName
+}

@@ -52,3 +52,7 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapise
 
 	return storage
 }
+
+func (p RESTStorageProvider) GroupName() string {
+	return storageapi.GroupName
+}
