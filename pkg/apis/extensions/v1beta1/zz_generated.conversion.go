@@ -58,6 +58,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus,
 		Convert_v1beta1_Deployment_To_extensions_Deployment,
 		Convert_extensions_Deployment_To_v1beta1_Deployment,
+		Convert_v1beta1_DeploymentCondition_To_extensions_DeploymentCondition,
+		Convert_extensions_DeploymentCondition_To_v1beta1_DeploymentCondition,
 		Convert_v1beta1_DeploymentList_To_extensions_DeploymentList,
 		Convert_extensions_DeploymentList_To_v1beta1_DeploymentList,
 		Convert_v1beta1_DeploymentRollback_To_extensions_DeploymentRollback,
@@ -465,6 +467,34 @@ func Convert_extensions_Deployment_To_v1beta1_Deployment(in *extensions.Deployme
 	return autoConvert_extensions_Deployment_To_v1beta1_Deployment(in, out, s)
 }
 
+func autoConvert_v1beta1_DeploymentCondition_To_extensions_DeploymentCondition(in *DeploymentCondition, out *extensions.DeploymentCondition, s conversion.Scope) error {
+	out.Type = extensions.DeploymentConditionType(in.Type)
+	out.Status = api.ConditionStatus(in.Status)
+	out.LastUpdateTime = in.LastUpdateTime
+	out.LastTransitionTime = in.LastTransitionTime
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return nil
+}
+
+func Convert_v1beta1_DeploymentCondition_To_extensions_DeploymentCondition(in *DeploymentCondition, out *extensions.DeploymentCondition, s conversion.Scope) error {
+	return autoConvert_v1beta1_DeploymentCondition_To_extensions_DeploymentCondition(in, out, s)
+}
+
+func autoConvert_extensions_DeploymentCondition_To_v1beta1_DeploymentCondition(in *extensions.DeploymentCondition, out *DeploymentCondition, s conversion.Scope) error {
+	out.Type = DeploymentConditionType(in.Type)
+	out.Status = v1.ConditionStatus(in.Status)
+	out.LastUpdateTime = in.LastUpdateTime
+	out.LastTransitionTime = in.LastTransitionTime
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return nil
+}
+
+func Convert_extensions_DeploymentCondition_To_v1beta1_DeploymentCondition(in *extensions.DeploymentCondition, out *DeploymentCondition, s conversion.Scope) error {
+	return autoConvert_extensions_DeploymentCondition_To_v1beta1_DeploymentCondition(in, out, s)
+}
+
 func autoConvert_v1beta1_DeploymentList_To_extensions_DeploymentList(in *DeploymentList, out *extensions.DeploymentList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
@@ -554,6 +584,7 @@ func autoConvert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *Deploym
 	} else {
 		out.RollbackTo = nil
 	}
+	out.ProgressDeadlineSeconds = in.ProgressDeadlineSeconds
 	return nil
 }
 
@@ -580,6 +611,7 @@ func autoConvert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensi
 	} else {
 		out.RollbackTo = nil
 	}
+	out.ProgressDeadlineSeconds = in.ProgressDeadlineSeconds
 	return nil
 }
 
@@ -589,6 +621,17 @@ func autoConvert_v1beta1_DeploymentStatus_To_extensions_DeploymentStatus(in *Dep
 	out.UpdatedReplicas = in.UpdatedReplicas
 	out.AvailableReplicas = in.AvailableReplicas
 	out.UnavailableReplicas = in.UnavailableReplicas
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]extensions.DeploymentCondition, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_DeploymentCondition_To_extensions_DeploymentCondition(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
+	}
 	return nil
 }
 
@@ -602,6 +645,17 @@ func autoConvert_extensions_DeploymentStatus_To_v1beta1_DeploymentStatus(in *ext
 	out.UpdatedReplicas = in.UpdatedReplicas
 	out.AvailableReplicas = in.AvailableReplicas
 	out.UnavailableReplicas = in.UnavailableReplicas
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]DeploymentCondition, len(*in))
+		for i := range *in {
+			if err := Convert_extensions_DeploymentCondition_To_v1beta1_DeploymentCondition(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
+	}
 	return nil
 }
 

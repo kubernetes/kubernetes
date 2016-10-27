@@ -32665,6 +32665,43 @@
      }
     }
    },
+   "v1beta1.DeploymentCondition": {
+    "description": "DeploymentCondition describes the state of a deployment at a certain point.",
+    "required": [
+     "type",
+     "status",
+     "lastUpdateTime",
+     "lastTransitionTime",
+     "reason",
+     "message"
+    ],
+    "properties": {
+     "lastTransitionTime": {
+      "description": "Last time the condition transitioned from one status to another.",
+      "$ref": "#/definitions/unversioned.Time"
+     },
+     "lastUpdateTime": {
+      "description": "The last time this condition was updated.",
+      "$ref": "#/definitions/unversioned.Time"
+     },
+     "message": {
+      "description": "A human readable message indicating details about the transition.",
+      "type": "string"
+     },
+     "reason": {
+      "description": "The reason for the condition's last transition.",
+      "type": "string"
+     },
+     "status": {
+      "description": "Status of the condition, one of True, False, Unknown.",
+      "type": "string"
+     },
+     "type": {
+      "description": "Type of deployment condition.",
+      "type": "string"
+     }
+    }
+   },
    "v1beta1.DeploymentList": {
     "description": "DeploymentList is a list of Deployments.",
     "required": [
@@ -32711,7 +32748,8 @@
    "v1beta1.DeploymentSpec": {
     "description": "DeploymentSpec is the specification of the desired behavior of the Deployment.",
     "required": [
-     "template"
+     "template",
+     "progressDeadlineSeconds"
     ],
     "properties": {
      "minReadySeconds": {
@@ -32722,6 +32760,11 @@
      "paused": {
       "description": "Indicates that the deployment is paused and will not be processed by the deployment controller.",
       "type": "boolean"
+     },
+     "progressDeadlineSeconds": {
+      "description": "The maximum time in seconds for a deployment to make progress before it is considered to be failed. The deployment controller will continue to process failed deployments and a condition with a ProgressDeadlineExceeded reason will be surfaced in the deployment status. Once autoRollback is implemented, the deployment controller will automatically rollback failed deployments. Note that progress will not be estimated during the time a deployment is paused. This is not set by default.",
+      "type": "integer",
+      "format": "int32"
      },
      "replicas": {
       "description": "Number of desired pods. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1.",
@@ -32753,11 +32796,21 @@
    },
    "v1beta1.DeploymentStatus": {
     "description": "DeploymentStatus is the most recently observed status of the Deployment.",
+    "required": [
+     "conditions"
+    ],
     "properties": {
      "availableReplicas": {
       "description": "Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.",
       "type": "integer",
       "format": "int32"
+     },
+     "conditions": {
+      "description": "Represents the latest available observations of a deployment's current state.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1beta1.DeploymentCondition"
+      }
      },
      "observedGeneration": {
       "description": "The generation observed by the deployment controller.",
