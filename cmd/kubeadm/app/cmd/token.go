@@ -75,7 +75,7 @@ func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
 }
 
 func RunGenerateToken(out io.Writer) error {
-	s := new(kubeadmapi.Secrets)
+	s := &kubeadmapi.Secrets{}
 	err := util.GenerateToken(s)
 	if err != nil {
 		return err
