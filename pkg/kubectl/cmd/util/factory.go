@@ -293,6 +293,26 @@ func makeInterfacesFor(versionList []unversioned.GroupVersion) func(version unve
 	}
 }
 
+func updateAuthFromPrompt(flags *pflag.FlagSet, cfg *restclient.Config) {
+	user := flags.Lookup("username")
+	if user != nil {
+		username := user.Value.String()
+		if len(username) > 0 {
+			return
+		}
+	}
+	pw := flags.Lookup("password")
+	if pw != nil {
+		password := pw.Value.String()
+		if len(password) > 0 {
+			return
+		}
+	}
+	flags.Set("username", cfg.Username)
+	flags.Set("password", cfg.Password)
+	return
+}
+
 type factory struct {
 	flags        *pflag.FlagSet
 	clientConfig clientcmd.ClientConfig
@@ -327,6 +347,7 @@ func (f *factory) FlagSet() *pflag.FlagSet {
 func (f *factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
 	cfg, err := f.clientConfig.ClientConfig()
 	checkErrWithPrefix("failed to get client config: ", err)
+	updateAuthFromPrompt(f.flags, cfg)
 	cmdApiVersion := unversioned.GroupVersion{}
 	if cfg.GroupVersion != nil {
 		cmdApiVersion = *cfg.GroupVersion
@@ -417,6 +438,7 @@ func (f *factory) ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClie
 	if err != nil {
 		return nil, err
 	}
+	updateAuthFromPrompt(f.flags, cfg)
 	if err := client.SetKubernetesDefaults(cfg); err != nil {
 		return nil, err
 	}
@@ -443,6 +465,7 @@ func (f *factory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (resou
 	if err != nil {
 		return nil, err
 	}
+	updateAuthFromPrompt(f.flags, cfg)
 	if err := restclient.SetKubernetesDefaults(cfg); err != nil {
 		return nil, err
 	}
@@ -738,6 +761,7 @@ func (f *factory) Validator(validate bool, cacheDir string) (validation.Schema, 
 		if err != nil {
 			return nil, err
 		}
+		updateAuthFromPrompt(f.flags, clientConfig)
 		restclient, err := restclient.RESTClientFor(clientConfig)
 		if err != nil {
 			return nil, err
