@@ -101,6 +101,9 @@ type Manager interface {
 	// Get version information about different components we depend on.
 	GetVersionInfo() (*info.VersionInfo, error)
 
+	// Get filesystem information for the filesystem that contains the given directory
+	GetDirFsInfo(dir string) (v2.FsInfo, error)
+
 	// Get filesystem information for a given label.
 	// Returns information for all global filesystems if label is empty.
 	GetFsInfo(label string) ([]v2.FsInfo, error)
@@ -655,6 +658,27 @@ func (self *manager) getRequestedContainers(containerName string, options v2.Req
 		return containersMap, fmt.Errorf("invalid request type %q", options.IdType)
 	}
 	return containersMap, nil
+}
+
+func (self *manager) GetDirFsInfo(dir string) (v2.FsInfo, error) {
+	dirDevice, err := self.fsInfo.GetDirFsDevice(dir)
+	if err != nil {
+		return v2.FsInfo{}, fmt.Errorf("error trying to get filesystem Device for dir %v: err: %v", dir, err)
+	}
+	dirMountpoint, err := self.fsInfo.GetMountpointForDevice(dirDevice.Device)
+	if err != nil {
+		return v2.FsInfo{}, fmt.Errorf("error trying to get MountPoint for Root Device: %v, err: %v", dirDevice, err)
+	}
+	infos, err := self.GetFsInfo("")
+	if err != nil {
+		return v2.FsInfo{}, err
+	}
+	for _, info := range infos {
+		if info.Mountpoint == dirMountpoint {
+			return info, nil
+		}
+	}
+	return v2.FsInfo{}, fmt.Errorf("did not find fs info for dir: %v", dir)
 }
 
 func (self *manager) GetFsInfo(label string) ([]v2.FsInfo, error) {
