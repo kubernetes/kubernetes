@@ -742,6 +742,14 @@ func (dm *DockerManager) runContainer(
 		setInfraContainerNetworkConfig(pod, netMode, opts, &dockerOpts)
 	}
 
+	//Set IPC Shm size for the infra-container as this IPC Shm is used by
+	//all containers in the pod
+	if container.Name == PodInfraContainerName {
+		if pod.Spec.ShmSize != nil && !pod.Spec.SecurityContext.HostIPC {
+			hc.ShmSize = pod.Spec.ShmSize.Value()
+		}
+	}
+
 	setEntrypointAndCommand(container, opts, dockerOpts)
 
 	glog.V(3).Infof("Container %v/%v/%v: setting entrypoint \"%v\" and command \"%v\"", pod.Namespace, pod.Name, container.Name, dockerOpts.Config.Entrypoint, dockerOpts.Config.Cmd)

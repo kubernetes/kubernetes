@@ -2087,6 +2087,11 @@ type PodSpec struct {
 	// If not specified, the pod will not have a domainname at all.
 	// +optional
 	Subdomain string `json:"subdomain,omitempty" protobuf:"bytes,17,opt,name=subdomain"`
+	//Optional: Docker "--shm-size" support. Defines the size of /dev/shm in the IPC namespace of the pod.
+	//If not defined here Docker uses a default value.
+	//Omitted if HostIPC is true.
+	//Cannot be updated
+	ShmSize *resource.Quantity `json:"shmSize,omitempty" protobuf:"bytes,18,opt,name=shmsize"`
 }
 
 // PodSecurityContext holds pod-level security attributes and common container settings.

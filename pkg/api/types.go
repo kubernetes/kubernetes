@@ -1802,6 +1802,11 @@ type PodSpec struct {
 	// If not specified, the pod will not have a domainname at all.
 	// +optional
 	Subdomain string `json:"subdomain,omitempty"`
+	//Optional: Docker "--shm-size" support. Defines the size of /dev/shm in the IPC namespace of the pod.
+	//If not defined here Docker uses a default value.
+	//Omitted if HostIPC is true.
+	//Cannot be updated
+	ShmSize *resource.Quantity `json:"shmSize,omitempty"`
 }
 
 // Sysctl defines a kernel parameter to be set

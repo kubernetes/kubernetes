@@ -17939,6 +17939,10 @@
      "subdomain": {
       "type": "string",
       "description": "If specified, the fully qualified Pod hostname will be \"\u003chostname\u003e.\u003csubdomain\u003e.\u003cpod namespace\u003e.svc.\u003ccluster domain\u003e\". If not specified, the pod will not have a domainname at all."
+     },
+     "shmSize": {
+      "type": "string",
+      "description": "Optional: Docker \"--shm-size\" support. Defines the size of /dev/shm in the IPC namespace of the pod. If not defined here Docker uses a default value. Omitted if HostIPC is true. Cannot be updated"
      }
     }
    },

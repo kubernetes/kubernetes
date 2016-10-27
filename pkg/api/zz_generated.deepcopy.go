@@ -21,6 +21,7 @@ limitations under the License.
 package api
 
 import (
+	resource "k8s.io/kubernetes/pkg/api/resource"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	fields "k8s.io/kubernetes/pkg/fields"
@@ -2713,6 +2714,13 @@ func DeepCopy_api_PodSpec(in interface{}, out interface{}, c *conversion.Cloner)
 		}
 		out.Hostname = in.Hostname
 		out.Subdomain = in.Subdomain
+		if in.ShmSize != nil {
+			in, out := &in.ShmSize, &out.ShmSize
+			*out = new(resource.Quantity)
+			**out = (*in).DeepCopy()
+		} else {
+			out.ShmSize = nil
+		}
 		return nil
 	}
 }
