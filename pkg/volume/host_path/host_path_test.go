@@ -78,7 +78,7 @@ func TestRecycler(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	recycler, err := plug.NewRecycler("pv-name", spec)
+	recycler, err := plug.NewRecycler("pv-name", spec, nil)
 	if err != nil {
 		t.Errorf("Failed to make a new Recyler: %v", err)
 	}

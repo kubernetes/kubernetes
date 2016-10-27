@@ -46,7 +46,7 @@ func ProbeVolumePlugins(volumeConfig volume.VolumeConfig) []volume.VolumePlugin 
 type nfsPlugin struct {
 	host volume.VolumeHost
 	// decouple creating recyclers by deferring to a function.  Allows for easier testing.
-	newRecyclerFunc func(pvName string, spec *volume.Spec, host volume.VolumeHost, volumeConfig volume.VolumeConfig) (volume.Recycler, error)
+	newRecyclerFunc func(pvName string, spec *volume.Spec, eventRecorder volume.RecycleEventRecorder, host volume.VolumeHost, volumeConfig volume.VolumeConfig) (volume.Recycler, error)
 	config          volume.VolumeConfig
 }
 
@@ -132,8 +132,8 @@ func (plugin *nfsPlugin) newUnmounterInternal(volName string, podUID types.UID, 
 	}}, nil
 }
 
-func (plugin *nfsPlugin) NewRecycler(pvName string, spec *volume.Spec) (volume.Recycler, error) {
-	return plugin.newRecyclerFunc(pvName, spec, plugin.host, plugin.config)
+func (plugin *nfsPlugin) NewRecycler(pvName string, spec *volume.Spec, eventRecorder volume.RecycleEventRecorder) (volume.Recycler, error) {
+	return plugin.newRecyclerFunc(pvName, spec, eventRecorder, plugin.host, plugin.config)
 }
 
 func (plugin *nfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
@@ -274,18 +274,19 @@ func (c *nfsUnmounter) TearDownAt(dir string) error {
 	return nil
 }
 
-func newRecycler(pvName string, spec *volume.Spec, host volume.VolumeHost, volumeConfig volume.VolumeConfig) (volume.Recycler, error) {
+func newRecycler(pvName string, spec *volume.Spec, eventRecorder volume.RecycleEventRecorder, host volume.VolumeHost, volumeConfig volume.VolumeConfig) (volume.Recycler, error) {
 	if spec.PersistentVolume == nil || spec.PersistentVolume.Spec.NFS == nil {
 		return nil, fmt.Errorf("spec.PersistentVolumeSource.NFS is nil")
 	}
 	return &nfsRecycler{
-		name:    spec.Name(),
-		server:  spec.PersistentVolume.Spec.NFS.Server,
-		path:    spec.PersistentVolume.Spec.NFS.Path,
-		host:    host,
-		config:  volumeConfig,
-		timeout: volume.CalculateTimeoutForVolume(volumeConfig.RecyclerMinimumTimeout, volumeConfig.RecyclerTimeoutIncrement, spec.PersistentVolume),
-		pvName:  pvName,
+		name:          spec.Name(),
+		server:        spec.PersistentVolume.Spec.NFS.Server,
+		path:          spec.PersistentVolume.Spec.NFS.Path,
+		host:          host,
+		config:        volumeConfig,
+		timeout:       volume.CalculateTimeoutForVolume(volumeConfig.RecyclerMinimumTimeout, volumeConfig.RecyclerTimeoutIncrement, spec.PersistentVolume),
+		pvName:        pvName,
+		eventRecorder: eventRecorder,
 	}, nil
 }
 
@@ -298,7 +299,8 @@ type nfsRecycler struct {
 	config  volume.VolumeConfig
 	timeout int64
 	volume.MetricsNil
-	pvName string
+	pvName        string
+	eventRecorder volume.RecycleEventRecorder
 }
 
 func (r *nfsRecycler) GetPath() string {
@@ -318,7 +320,7 @@ func (r *nfsRecycler) Recycle() error {
 			Path:   r.path,
 		},
 	}
-	return volume.RecycleVolumeByWatchingPodUntilCompletion(r.pvName, pod, r.host.GetKubeClient())
+	return volume.RecycleVolumeByWatchingPodUntilCompletion(r.pvName, pod, r.host.GetKubeClient(), r.eventRecorder)
 }
 
 func getVolumeSource(spec *volume.Spec) (*api.NFSVolumeSource, bool, error) {

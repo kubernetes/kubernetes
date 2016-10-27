@@ -91,7 +91,7 @@ func TestRecycler(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	recycler, err := plug.NewRecycler("pv-name", spec)
+	recycler, err := plug.NewRecycler("pv-name", spec, nil)
 	if err != nil {
 		t.Errorf("Failed to make a new Recyler: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestRecycler(t *testing.T) {
 	}
 }
 
-func newMockRecycler(pvName string, spec *volume.Spec, host volume.VolumeHost, config volume.VolumeConfig) (volume.Recycler, error) {
+func newMockRecycler(pvName string, spec *volume.Spec, eventRecorder volume.RecycleEventRecorder, host volume.VolumeHost, config volume.VolumeConfig) (volume.Recycler, error) {
 	return &mockRecycler{
 		path: spec.PersistentVolume.Spec.NFS.Path,
 	}, nil
