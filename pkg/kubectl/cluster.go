@@ -29,11 +29,14 @@ import (
 type ClusterGeneratorV1Beta1 struct {
 	// Name of the cluster context (required)
 	Name string
+	// ClientCIDR is the CIDR range in which the Kubernetes APIServer
+	// is available for the client (required)
+	ClientCIDR string
 	// ServerAddress is the APIServer address of the Kubernetes cluster
-	// that is being registered (optional)
+	// that is being registered (required)
 	ServerAddress string
 	// SecretName is the name of the secret that stores the credentials
-	// for the Kubernetes cluster that is being registered (optional)
+	// for the Kubernetes cluster that is being registered (required)
 	SecretName string
 }
 
@@ -61,7 +64,8 @@ func (s ClusterGeneratorV1Beta1) Generate(genericParams map[string]interface{}) 
 		params[key] = strVal
 	}
 	clustergen.Name = params["name"]
-	clustergen.ServerAddress = params["serverAddress"]
+	clustergen.ClientCIDR = params["client-cidr"]
+	clustergen.ServerAddress = params["server-address"]
 	clustergen.SecretName = params["secret"]
 	return clustergen.StructuredGenerate()
 }
@@ -71,7 +75,8 @@ func (s ClusterGeneratorV1Beta1) Generate(genericParams map[string]interface{}) 
 func (s ClusterGeneratorV1Beta1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
-		{"serverAddress", false},
+		{"client-cidr", false},
+		{"server-address", false},
 		{"secret", false},
 	}
 }
@@ -89,6 +94,7 @@ func (s ClusterGeneratorV1Beta1) StructuredGenerate() (runtime.Object, error) {
 		Spec: federationapi.ClusterSpec{
 			ServerAddressByClientCIDRs: []federationapi.ServerAddressByClientCIDR{
 				{
+					ClientCIDR:    s.ClientCIDR,
 					ServerAddress: s.ServerAddress,
 				},
 			},
@@ -105,6 +111,15 @@ func (s ClusterGeneratorV1Beta1) StructuredGenerate() (runtime.Object, error) {
 func (s ClusterGeneratorV1Beta1) validate() error {
 	if len(s.Name) == 0 {
 		return fmt.Errorf("name must be specified")
+	}
+	if len(s.ClientCIDR) == 0 {
+		return fmt.Errorf("client CIDR must be specified")
+	}
+	if len(s.ServerAddress) == 0 {
+		return fmt.Errorf("server address must be specified")
+	}
+	if len(s.SecretName) == 0 {
+		return fmt.Errorf("secret name must be specified")
 	}
 	return nil
 }

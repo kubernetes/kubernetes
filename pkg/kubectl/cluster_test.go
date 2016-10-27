@@ -32,7 +32,10 @@ func TestClusterGenerate(t *testing.T) {
 	}{
 		{
 			params: map[string]interface{}{
-				"name": "foo",
+				"name":           "foo",
+				"client-cidr":    "0.0.0.0/0",
+				"server-address": "10.20.30.40",
+				"secret":         "foo-credentials",
 			},
 			expected: &federationapi.Cluster{
 				ObjectMeta: v1.ObjectMeta{
@@ -41,51 +44,8 @@ func TestClusterGenerate(t *testing.T) {
 				Spec: federationapi.ClusterSpec{
 					ServerAddressByClientCIDRs: []federationapi.ServerAddressByClientCIDR{
 						{
-							ServerAddress: "",
-						},
-					},
-					SecretRef: &v1.LocalObjectReference{
-						Name: "",
-					},
-				},
-			},
-			expectErr: false,
-		},
-		{
-			params: map[string]interface{}{
-				"name":          "foo",
-				"serverAddress": "10.20.30.40",
-			},
-			expected: &federationapi.Cluster{
-				ObjectMeta: v1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: federationapi.ClusterSpec{
-					ServerAddressByClientCIDRs: []federationapi.ServerAddressByClientCIDR{
-						{
+							ClientCIDR:    "0.0.0.0/0",
 							ServerAddress: "10.20.30.40",
-						},
-					},
-					SecretRef: &v1.LocalObjectReference{
-						Name: "",
-					},
-				},
-			},
-			expectErr: false,
-		},
-		{
-			params: map[string]interface{}{
-				"name":   "foo",
-				"secret": "foo-credentials",
-			},
-			expected: &federationapi.Cluster{
-				ObjectMeta: v1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: federationapi.ClusterSpec{
-					ServerAddressByClientCIDRs: []federationapi.ServerAddressByClientCIDR{
-						{
-							ServerAddress: "",
 						},
 					},
 					SecretRef: &v1.LocalObjectReference{
@@ -97,9 +57,10 @@ func TestClusterGenerate(t *testing.T) {
 		},
 		{
 			params: map[string]interface{}{
-				"name":          "foo",
-				"serverAddress": "https://foo.example.com",
-				"secret":        "foo-credentials",
+				"name":           "foo",
+				"client-cidr":    "10.20.30.40/16",
+				"server-address": "https://foo.example.com",
+				"secret":         "foo-credentials",
 			},
 			expected: &federationapi.Cluster{
 				ObjectMeta: v1.ObjectMeta{
@@ -108,6 +69,7 @@ func TestClusterGenerate(t *testing.T) {
 				Spec: federationapi.ClusterSpec{
 					ServerAddressByClientCIDRs: []federationapi.ServerAddressByClientCIDR{
 						{
+							ClientCIDR:    "10.20.30.40/16",
 							ServerAddress: "https://foo.example.com",
 						},
 					},
@@ -120,9 +82,10 @@ func TestClusterGenerate(t *testing.T) {
 		},
 		{
 			params: map[string]interface{}{
-				"name":          "bar-cluster",
-				"serverAddress": "http://10.20.30.40",
-				"secret":        "credentials",
+				"name":           "bar-cluster",
+				"client-cidr":    "10.20.30.40/16",
+				"server-address": "http://10.20.30.40",
+				"secret":         "credentials",
 			},
 			expected: &federationapi.Cluster{
 				ObjectMeta: v1.ObjectMeta{
@@ -131,6 +94,7 @@ func TestClusterGenerate(t *testing.T) {
 				Spec: federationapi.ClusterSpec{
 					ServerAddressByClientCIDRs: []federationapi.ServerAddressByClientCIDR{
 						{
+							ClientCIDR:    "10.20.30.40/16",
 							ServerAddress: "http://10.20.30.40",
 						},
 					},
@@ -143,7 +107,7 @@ func TestClusterGenerate(t *testing.T) {
 		},
 		{
 			params: map[string]interface{}{
-				"serverAddress": "https://10.20.30.40",
+				"server-address": "https://10.20.30.40",
 			},
 			expected:  nil,
 			expectErr: true,
@@ -157,8 +121,24 @@ func TestClusterGenerate(t *testing.T) {
 		},
 		{
 			params: map[string]interface{}{
-				"serverAddress": "http://foo.example.com",
-				"secret":        "foo-credentials",
+				"server-address": "http://foo.example.com",
+				"secret":         "foo-credentials",
+			},
+			expected:  nil,
+			expectErr: true,
+		},
+		{
+			params: map[string]interface{}{
+				"name":   "foo",
+				"secret": "foo-credentials",
+			},
+			expected:  nil,
+			expectErr: true,
+		},
+		{
+			params: map[string]interface{}{
+				"name":        "foo",
+				"client-cidr": "10.20.30.40/16",
 			},
 			expected:  nil,
 			expectErr: true,
