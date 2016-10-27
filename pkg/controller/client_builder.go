@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/watch/listwatch"
 
 	"github.com/golang/glog"
 )
@@ -119,7 +120,7 @@ func (b SAControllerClientBuilder) Config(name string) (*restclient.Config, erro
 			return b.CoreClient.Secrets(b.Namespace).Watch(options)
 		},
 	}
-	_, err = watch.ListWatchUntil(30*time.Second, lw,
+	_, err = listwatch.Until(30*time.Second, lw,
 		func(event watch.Event) (bool, error) {
 			switch event.Type {
 			case watch.Deleted:
