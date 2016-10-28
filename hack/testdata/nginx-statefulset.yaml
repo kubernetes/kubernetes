@@ -6,7 +6,7 @@ metadata:
     service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
   name: nginx
   labels:
-    app: nginx-petset
+    app: nginx-statefulset
 spec:
   ports:
   - port: 80
@@ -14,7 +14,7 @@ spec:
   # *.nginx.default.svc.cluster.local
   clusterIP: None
   selector:
-    app: nginx-petset
+    app: nginx-statefulset
 ---
 apiVersion: apps/v1beta1
 kind: StatefulSet
@@ -26,7 +26,7 @@ spec:
   template:
     metadata:
       labels:
-        app: nginx-petset
+        app: nginx-statefulset
       annotations:
         pod.alpha.kubernetes.io/initialized: "true"
     spec:
@@ -41,4 +41,3 @@ spec:
         - sh
         - -c
         - 'while true; do sleep 1; done'
-
