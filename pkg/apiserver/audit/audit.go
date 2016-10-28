@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/pborman/uuid"
 
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
@@ -41,7 +42,11 @@ type auditResponseWriter struct {
 }
 
 func (a *auditResponseWriter) WriteHeader(code int) {
-	fmt.Fprintf(a.out, "%s AUDIT: id=%q response=\"%d\"\n", time.Now().Format(time.RFC3339Nano), a.id, code)
+	line := fmt.Sprintf("%s AUDIT: id=%q response=\"%d\"\n", time.Now().Format(time.RFC3339Nano), a.id, code)
+	if _, err := fmt.Fprint(a.out, line); err != nil {
+		glog.Errorf("Unable to write audit log: %s, the error is: %v", line, err)
+	}
+
 	a.ResponseWriter.WriteHeader(code)
 }
 
@@ -103,8 +108,11 @@ func WithAudit(handler http.Handler, attributeGetter apiserver.RequestAttributeG
 		}
 		id := uuid.NewRandom().String()
 
-		fmt.Fprintf(out, "%s AUDIT: id=%q ip=%q method=%q user=%q as=%q asgroups=%q namespace=%q uri=%q\n",
+		line := fmt.Sprintf("%s AUDIT: id=%q ip=%q method=%q user=%q as=%q asgroups=%q namespace=%q uri=%q\n",
 			time.Now().Format(time.RFC3339Nano), id, utilnet.GetClientIP(req), req.Method, attribs.GetUser().GetName(), asuser, asgroups, namespace, req.URL)
+		if _, err := fmt.Fprint(out, line); err != nil {
+			glog.Errorf("Unable to write audit log: %s, the error is: %v", line, err)
+		}
 		respWriter := decorateResponseWriter(w, out, id)
 		handler.ServeHTTP(respWriter, req)
 	})
