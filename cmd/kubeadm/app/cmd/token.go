@@ -35,6 +35,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 )
 
+const (
+	bootstrapTokenSecretPrefix = "bootstrap-token-"
+)
+
 func NewCmdToken(out io.Writer) *cobra.Command {
 	var skipPreFlight bool
 	tokenCmd := &cobra.Command{
@@ -67,6 +71,16 @@ func NewCmdToken(out io.Writer) *cobra.Command {
 	}
 	tokenCmd.AddCommand(listCmd)
 
+	deleteCmd := &cobra.Command{
+		Use:   "delete",
+		Short: "Delete discovery tokens on the server.",
+		Run: func(tokenCmd *cobra.Command, args []string) {
+			err := RunDeleteToken(out, tokenCmd, skipPreFlight, args[0])
+			kubeadmutil.CheckErr(err)
+		},
+	}
+	tokenCmd.AddCommand(deleteCmd)
+
 	return tokenCmd
 }
 
@@ -92,7 +106,7 @@ func RunCreateToken(out io.Writer, cmd *cobra.Command, skipPreFlight bool) error
 
 	secret := &api.Secret{
 		ObjectMeta: api.ObjectMeta{
-			Name: fmt.Sprintf("boostrap-token-%s", tokenSecret.TokenID),
+			Name: fmt.Sprintf("%s%s", bootstrapTokenSecretPrefix, tokenSecret.TokenID),
 		},
 		Type: api.SecretTypeBootstrapToken,
 		Data: encodeTokenSecretData(tokenSecret),
@@ -183,6 +197,28 @@ func RunListTokens(out io.Writer, cmd *cobra.Command, skipPreFlight bool) error 
 		fmt.Fprintf(w, "%s\t%s\t%s\n", tokenId, token, expires)
 	}
 	w.Flush()
+
+	return nil
+}
+
+func RunDeleteToken(out io.Writer, cmd *cobra.Command, skipPreFlight bool, tokenId string) error {
+	if !skipPreFlight {
+		fmt.Println("Running pre-flight checks")
+		// TODO
+	} else {
+		fmt.Println("Skipping pre-flight checks")
+	}
+
+	client, err := createAPIClient()
+	if err != nil {
+		return err
+	}
+
+	tokenSecretName := fmt.Sprintf("%s%s", bootstrapTokenSecretPrefix, tokenId)
+	if err := client.Secrets(api.NamespaceSystem).Delete(tokenSecretName, nil); err != nil {
+		return fmt.Errorf("<cmd/token> failed to delete bootstrap token [%v]", err)
+	}
+	fmt.Printf("<cmd/token> bootstrap token deleted: %s\n", tokenId)
 
 	return nil
 }
