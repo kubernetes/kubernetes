@@ -761,7 +761,7 @@ func makePvcKey(ns, name string) types.NamespacedName {
 	return types.NamespacedName{Namespace: ns, Name: name}
 }
 
-// Returns a PV definition based on `the nfs server IP. If the PVC is not nil
+// Returns a PV definition based on the nfs server IP. If the PVC is not nil
 // then the PV is defined with a ClaimRef which includes the PVC's namespace.
 // If the PVC is nil then the PV is not defined with a ClaimRef.
 // Note: the passed-in claim does not have a name until it is created
