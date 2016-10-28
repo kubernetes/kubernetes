@@ -196,12 +196,7 @@ E2E_STORAGE_TEST_ENVIRONMENT=${KUBE_E2E_STORAGE_TEST_ENVIRONMENT:-false}
 PREPULL_E2E_IMAGES="${PREPULL_E2E_IMAGES:-true}"
 
 # Evict pods whenever compute resource availability on the nodes gets below a threshold.
-# TODO: Get rid of the conditionals once https://github.com/kubernetes/kubernetes/issues/33444 is resolved.
-if [[ "${NODE_OS_DISTRIBUTION}" == "debian" ]]; then
-    EVICTION_HARD="${EVICTION_HARD:-memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5%}"
-else
-    EVICTION_HARD="${EVICTION_HARD:-memory.available<100Mi,imagefs.available<10%,imagefs.inodesFree<5%}"
-fi
+EVICTION_HARD="${EVICTION_HARD:-memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5%}"
 
 # Optional: custom scheduling algorithm
 SCHEDULING_ALGORITHM_PROVIDER="${SCHEDULING_ALGORITHM_PROVIDER:-}"

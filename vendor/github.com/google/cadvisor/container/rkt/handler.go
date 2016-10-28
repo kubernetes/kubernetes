@@ -18,7 +18,6 @@ package rkt
 import (
 	"fmt"
 	"os"
-	"time"
 
 	rktapi "github.com/coreos/rkt/api/v1alpha"
 	"github.com/google/cadvisor/container"
@@ -84,7 +83,7 @@ func newRktContainerHandler(name string, rktClient rktapi.PublicAPIClient, rktPa
 		return nil, fmt.Errorf("this should be impossible!, new handler failing, but factory allowed, name = %s", name)
 	}
 
-	//rktnetes uses containerID: rkt://fff40827-b994-4e3a-8f88-6427c2c8a5ac:nginx
+	// rktnetes uses containerID: rkt://fff40827-b994-4e3a-8f88-6427c2c8a5ac:nginx
 	if parsed.Container == "" {
 		isPod = true
 		aliases = append(aliases, "rkt://"+parsed.Pod)
@@ -150,7 +149,7 @@ func newRktContainerHandler(name string, rktClient rktapi.PublicAPIClient, rktPa
 	}
 
 	if !ignoreMetrics.Has(container.DiskUsageMetrics) {
-		handler.fsHandler = common.NewFsHandler(time.Minute, rootfsStorageDir, "", fsInfo)
+		handler.fsHandler = common.NewFsHandler(common.DefaultPeriod, rootfsStorageDir, "", fsInfo)
 	}
 
 	return handler, nil
@@ -228,7 +227,10 @@ func (handler *rktContainerHandler) getFsStats(stats *info.ContainerStats) error
 
 	fsStat := info.FsStats{Device: deviceInfo.Device, Limit: limit}
 
-	fsStat.BaseUsage, fsStat.Usage = handler.fsHandler.Usage()
+	usage := handler.fsHandler.Usage()
+	fsStat.BaseUsage = usage.BaseUsageBytes
+	fsStat.Usage = usage.TotalUsageBytes
+	fsStat.Inodes = usage.InodeUsage
 
 	stats.Filesystem = append(stats.Filesystem, fsStat)
 

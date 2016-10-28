@@ -175,6 +175,6 @@ func RegisterNodeFlags() {
 	flag.BoolVar(&TestContext.DisableKubenet, "disable-kubenet", false, "If true, start kubelet without kubenet. (default false)")
 	// TODO: uncomment this when the flag is re-enabled in kubelet
 	//flag.BoolVar(&TestContext.CgroupsPerQOS, "cgroups-per-qos", false, "Enable creation of QoS cgroup hierarchy, if true top level QoS and pod cgroups are created.")
-	flag.StringVar(&TestContext.EvictionHard, "eviction-hard", "memory.available<250Mi,imagefs.available<10%", "The hard eviction thresholds. If set, pods get evicted when the specified resources drop below the thresholds.")
+	flag.StringVar(&TestContext.EvictionHard, "eviction-hard", "memory.available<250Mi,nodefs.available<10%,nodefs.inodesFree<5%", "The hard eviction thresholds. If set, pods get evicted when the specified resources drop below the thresholds.")
 	flag.StringVar(&TestContext.ManifestPath, "manifest-path", "", "The path to the static pod manifest file.")
 }
