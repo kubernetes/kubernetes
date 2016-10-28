@@ -115,10 +115,19 @@ def get_maintainers():
     return sorted(ret - SKIP_MAINTAINERS)
 
 
+def detect_github_username():
+    remotes = subprocess.check_output(['git', 'remote', '-v'])
+    repos = set(re.findall(r'\w+(?=/kubernetes)', remotes))
+    repos.remove('kubernetes')
+    if len(repos) == 1:
+        return repos.pop()
+    raise ValueError('unable to guess GitHub user from `git remote -v` output, use --user instead')
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--history', action='store_true', help='Generate test list from result history.')
-    parser.add_argument('--user', help='User to assign new tests to (default: random).')
+    parser.add_argument('--user', help='User to assign new tests to (or RANDOM, default: current GitHub user).')
     parser.add_argument('--check', action='store_true', help='Exit with a nonzero status if the test list has changed.')
     options = parser.parse_args()
 
@@ -148,6 +157,9 @@ def main():
             sys.exit(1)
         sys.exit(0)
 
+    if not options.user:
+        options.user = detect_github_username()
+
     for name in outdated_tests:
         owners.pop(name)
 
@@ -164,17 +176,18 @@ def main():
         if owner in maintainers)
     for test_name in set(test_names) - set(owners):
         random_assignment = True
-        if options.user:
+        if options.user.lower() == 'random':
+            new_owner, _count = random.choice(owner_counts.most_common()[-4:])
+        else:
             new_owner = options.user
             random_assignment = False
-        else:
-            new_owner, _count = random.choice(owner_counts.most_common()[-4:])
         owner_counts[new_owner] += 1
         owners[test_name] = (new_owner, random_assignment)
 
-    print '# Tests per maintainer:'
-    for owner, count in owner_counts.most_common():
-        print '%-20s %3d' % (owner, count)
+    if options.user.lower() == 'random':
+        print '# Tests per maintainer:'
+        for owner, count in owner_counts.most_common():
+            print '%-20s %3d' % (owner, count)
 
     write_owners(OWNERS_PATH, owners)
 
