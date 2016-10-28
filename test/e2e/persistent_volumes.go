@@ -77,32 +77,23 @@ func nfsServerPodCleanup(c clientset.Interface, config VolumeTestConfig) {
 	}
 }
 
-// TODO Comment
+// Clean up a pv and pvc in a single pv/pvc test case.
 func pvPvcCleanup(c clientset.Interface, ns string, pv *api.PersistentVolume, pvc *api.PersistentVolumeClaim) {
-	if c != nil && len(ns) > 0 {
-		if pvc != nil && len (pvc.Name) > 0 {
-			deletePersistentVolumeClaim(c, pvc.Name, ns)
-		}
-		if pv != nil && len(pv.Name) > 0 {
-			deletePersistentVolume(c, pv.Name)
-		}
-	}
+	deletePersistentVolumeClaim(c, pvc.Name, ns)
+	deletePersistentVolume(c, pv.Name)
 }
 
-// Cleanup up pvs and pvcs in multi-pv-pvc test cases. All entries found in the pv and
+// Clean up pvs and pvcs in multi-pv-pvc test cases. All entries found in the pv and
 // claims maps are deleted.
-// Note: this is the only code that deletes PV objects.
 func pvPvcMapCleanup(c clientset.Interface, ns string, pvols pvmap, claims pvcmap) {
-	if c != nil && len(ns) > 0 {
-		for pvcKey := range claims {
-			deletePersistentVolumeClaim(c, pvcKey.Name, ns)
-			delete(claims, pvcKey)
-		}
+	for pvcKey := range claims {
+		deletePersistentVolumeClaim(c, pvcKey.Name, ns)
+		delete(claims, pvcKey)
+	}
 
-		for pvKey := range pvols {
-			deletePersistentVolume(c, pvKey)
-			delete(pvols, pvKey)
-		}
+	for pvKey := range pvols {
+		deletePersistentVolume(c, pvKey)
+		delete(pvols, pvKey)
 	}
 }
 
@@ -141,12 +132,10 @@ func deletePVCandValidatePV(c clientset.Interface, ns string, pvc *api.Persisten
 
 	pvname := pvc.Spec.VolumeName
 	framework.Logf("Deleting PVC %v to trigger recycling of PV %v", pvc.Name, pvname)
-
-	err := c.Core().PersistentVolumeClaims(ns).Delete(pvc.Name, nil)
-	Expect(err).NotTo(HaveOccurred())
+	deletePersistentVolumeClaim(c, pvc.Name, ns)
 
 	// Check that the PVC is really deleted.
-	pvc, err = c.Core().PersistentVolumeClaims(ns).Get(pvc.Name)
+	pvc, err := c.Core().PersistentVolumeClaims(ns).Get(pvc.Name)
 	Expect(apierrs.IsNotFound(err)).To(BeTrue())
 
 	// Wait for the PV's phase to return to Available
@@ -772,7 +761,7 @@ func makePvcKey(ns, name string) types.NamespacedName {
 	return types.NamespacedName{Namespace: ns, Name: name}
 }
 
-// Returns a PV definition based on the nfs server IP. If the PVC is not nil
+// Returns a PV definition based on `the nfs server IP. If the PVC is not nil
 // then the PV is defined with a ClaimRef which includes the PVC's namespace.
 // If the PVC is nil then the PV is not defined with a ClaimRef.
 // Note: the passed-in claim does not have a name until it is created
