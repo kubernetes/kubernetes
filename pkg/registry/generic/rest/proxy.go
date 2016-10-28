@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -137,22 +138,21 @@ func (h *UpgradeAwareProxyHandler) tryUpgrade(w http.ResponseWriter, req *http.R
 	if !httpstream.IsUpgradeRequest(req) {
 		return false
 	}
-	if err := h.handleUpgrade(w, req); err != nil {
-		h.Responder.Error(err)
-	}
-	return true
-}
 
-func (h *UpgradeAwareProxyHandler) handleUpgrade(w http.ResponseWriter, req *http.Request) error {
 	requestHijacker, ok := w.(http.Hijacker)
 	if !ok {
-		return fmt.Errorf("request connection cannot be hijacked: %T", w)
+		h.Responder.Error(fmt.Errorf("request connection cannot be hijacked: %T", w))
+		return true
 	}
 	requestHijackedConn, _, err := requestHijacker.Hijack()
 	if err != nil {
-		return fmt.Errorf("error hijacking request connection: %v", err)
+		h.Responder.Error(fmt.Errorf("error hijacking request connection: %v", err))
+		return true
 	}
 	defer requestHijackedConn.Close()
+
+	// Once the connection is hijacked, the error responder can no longer be used.
+	h.Responder = &hijackedErrorResponder{requestHijackedConn}
 
 	var backendConn net.Conn
 	if h.InterceptRedirects && utilconfig.DefaultFeatureGate.StreamingProxyRedirects() {
@@ -161,7 +161,8 @@ func (h *UpgradeAwareProxyHandler) handleUpgrade(w http.ResponseWriter, req *htt
 		backendConn, err = h.connectBackend(req, h.Location)
 	}
 	if err != nil {
-		return fmt.Errorf("error dialing backend: %v", err)
+		h.Responder.Error(fmt.Errorf("error dialing backend: %v", err))
+		return true
 	}
 	defer backendConn.Close()
 
@@ -198,7 +199,7 @@ func (h *UpgradeAwareProxyHandler) handleUpgrade(w http.ResponseWriter, req *htt
 	}()
 
 	wg.Wait()
-	return nil
+	return true
 }
 
 // connectBackend dials the backend at location and forwards a copy of the client request.
@@ -349,4 +350,26 @@ func removeCORSHeaders(resp *http.Response) {
 	resp.Header.Del("Access-Control-Allow-Headers")
 	resp.Header.Del("Access-Control-Allow-Methods")
 	resp.Header.Del("Access-Control-Allow-Origin")
+}
+
+type hijackedErrorResponder struct {
+	// The hijacked client connection to respond over.
+	conn net.Conn
+}
+
+func (r *hijackedErrorResponder) Error(err error) {
+	header := http.Header{}
+	header.Set("Content-Type", "text/plain")
+	body := bytes.NewBufferString(err.Error())
+	response := http.Response{
+		StatusCode:    http.StatusInternalServerError,
+		Header:        header,
+		ContentLength: int64(body.Len()),
+		Body:          ioutil.NopCloser(body),
+	}
+	writeErr := response.Write(r.conn)
+	if writeErr != nil {
+		// Nothing to do but log it.
+		glog.Errorf("Failed to write error response (%v): %v", err, writeErr)
+	}
 }

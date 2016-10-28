@@ -21,6 +21,7 @@ import (
 	"compress/gzip"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -33,25 +34,61 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"golang.org/x/net/websocket"
 
+	"k8s.io/kubernetes/pkg/util/httpstream"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/proxy"
 )
 
+const fakeStatusCode = 567
+
 type fakeResponder struct {
+	t      *testing.T
 	called bool
 	err    error
+	// called chan error
+	w http.ResponseWriter
 }
 
 func (r *fakeResponder) Error(err error) {
 	if r.called {
-		panic("called twice")
+		r.t.Errorf("Error responder called again!\nprevious error: %v\nnew error: %v", r.err, err)
 	}
+
+	if r.w != nil {
+		r.t.Logf(">>>> writing to connection")
+		r.w.WriteHeader(fakeStatusCode)
+		_, writeErr := r.w.Write([]byte(err.Error()))
+		r.t.Logf(">>>> wrote to connection")
+		assert.NoError(r.t, writeErr)
+		r.t.Logf(">>>> checked writeErr")
+	} else {
+		r.t.Logf("No ResponseWriter set")
+	}
+
 	r.called = true
 	r.err = err
+	r.t.Logf(">>>> set error & called")
 }
+
+type fakeConn struct {
+	err error // The error to return when io is performed over the connection.
+}
+
+func (f *fakeConn) Read([]byte) (int, error)        { return 0, f.err }
+func (f *fakeConn) Write([]byte) (int, error)       { return 0, f.err }
+func (f *fakeConn) Close() error                    { return nil }
+func (fakeConn) LocalAddr() net.Addr                { return nil }
+func (fakeConn) RemoteAddr() net.Addr               { return nil }
+func (fakeConn) SetDeadline(t time.Time) error      { return nil }
+func (fakeConn) SetReadDeadline(t time.Time) error  { return nil }
+func (fakeConn) SetWriteDeadline(t time.Time) error { return nil }
 
 type SimpleBackendHandler struct {
 	requestURL     url.URL
@@ -210,7 +247,7 @@ func TestServeHTTP(t *testing.T) {
 			backendServer := httptest.NewServer(backendHandler)
 			defer backendServer.Close()
 
-			responder := &fakeResponder{}
+			responder := &fakeResponder{t: t}
 			backendURL, _ := url.Parse(backendServer.URL)
 			backendURL.Path = test.requestPath
 			proxyHandler := &UpgradeAwareProxyHandler{
@@ -420,6 +457,47 @@ func TestProxyUpgrade(t *testing.T) {
 			}()
 		}
 	}
+}
+
+func TestProxyUpgradeErrorResponse(t *testing.T) {
+	var (
+		responder   *fakeResponder
+		expectedErr = errors.New("EXPECTED")
+	)
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		transport := http.DefaultTransport.(*http.Transport)
+		transport.Dial = func(network, addr string) (net.Conn, error) {
+			return &fakeConn{err: expectedErr}, nil
+		}
+		responder = &fakeResponder{t: t, w: w}
+		proxyHandler := &UpgradeAwareProxyHandler{
+			Location: &url.URL{
+				Host: "fake-backend",
+			},
+			UpgradeRequired: true,
+			Responder:       responder,
+			Transport:       transport,
+		}
+		proxyHandler.ServeHTTP(w, r)
+	}))
+	defer proxy.Close()
+
+	// Send request to proxy server.
+	req, err := http.NewRequest("POST", "http://"+proxy.Listener.Addr().String()+"/some/path", nil)
+	require.NoError(t, err)
+	req.Header.Set(httpstream.HeaderConnection, httpstream.HeaderUpgrade)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	// Expect error response.
+	assert.Equal(t, resp.StatusCode, http.StatusInternalServerError)
+	msg, err := ioutil.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Contains(t, string(msg), expectedErr.Error())
+
+	// Original responder should not be invoked.
+	require.False(t, responder.called, "should have responded through hijackedErrorResponder")
 }
 
 func TestDefaultProxyTransport(t *testing.T) {
@@ -635,7 +713,7 @@ func TestProxyRequestContentLengthAndTransferEncoding(t *testing.T) {
 		}))
 		defer downstreamServer.Close()
 
-		responder := &fakeResponder{}
+		responder := &fakeResponder{t: t}
 		backendURL, _ := url.Parse(downstreamServer.URL)
 		proxyHandler := &UpgradeAwareProxyHandler{
 			Location:        backendURL,
