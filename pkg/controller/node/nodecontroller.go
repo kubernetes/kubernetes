@@ -413,36 +413,6 @@ func (nc *NodeController) Run() {
 				})
 			}
 		}, nodeEvictionPeriod, wait.NeverStop)
-
-		// TODO: replace with a controller that ensures pods that are terminating complete
-		// in a particular time period
-		go wait.Until(func() {
-			nc.evictorLock.Lock()
-			defer nc.evictorLock.Unlock()
-			for k := range nc.zoneTerminationEvictor {
-				nc.zoneTerminationEvictor[k].Try(func(value TimedValue) (bool, time.Duration) {
-					nodeUid, _ := value.UID.(string)
-					completed, remaining, err := terminatePods(nc.kubeClient, nc.recorder, value.Value, nodeUid, value.AddedAt, nc.maximumGracePeriod)
-					if err != nil {
-						utilruntime.HandleError(fmt.Errorf("unable to terminate pods on node %q: %v", value.Value, err))
-						return false, 0
-					}
-
-					if completed {
-						glog.V(2).Infof("All pods terminated on %s", value.Value)
-						recordNodeEvent(nc.recorder, value.Value, nodeUid, api.EventTypeNormal, "TerminatedAllPods", fmt.Sprintf("Terminated all Pods on Node %s.", value.Value))
-						return true, 0
-					}
-
-					glog.V(2).Infof("Pods terminating since %s on %q, estimated completion %s", value.AddedAt, value.Value, remaining)
-					// clamp very short intervals
-					if remaining < nodeEvictionPeriod {
-						remaining = nodeEvictionPeriod
-					}
-					return false, remaining
-				})
-			}
-		}, nodeEvictionPeriod, wait.NeverStop)
 	}()
 }
 
@@ -559,7 +529,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 						// Kubelet is not reporting and Cloud Provider says node
 						// is gone. Delete it without worrying about grace
 						// periods.
-						if err := forcefullyDeleteNode(nc.kubeClient, nodeName, nc.forcefullyDeletePod); err != nil {
+						if err := forcefullyDeleteNode(nc.kubeClient, nodeName); err != nil {
 							glog.Errorf("Unable to forcefully delete node %q: %v", nodeName, err)
 						}
 					}(node.Name)
