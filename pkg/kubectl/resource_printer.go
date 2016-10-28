@@ -639,7 +639,7 @@ func formatEndpoints(endpoints *api.Endpoints, ports sets.String) string {
 	return ret
 }
 
-func shortHumanDuration(d time.Duration) string {
+func ShortHumanDuration(d time.Duration) string {
 	// Allow deviation no more than 2 seconds(excluded) to tolerate machine time
 	// inconsistence, it can be considered as almost now.
 	if seconds := int(d.Seconds()); seconds < -1 {
@@ -664,7 +664,7 @@ func translateTimestamp(timestamp unversioned.Time) string {
 	if timestamp.IsZero() {
 		return "<unknown>"
 	}
-	return shortHumanDuration(time.Now().Sub(timestamp.Time))
+	return ShortHumanDuration(time.Now().Sub(timestamp.Time))
 }
 
 func printPodBase(pod *api.Pod, w io.Writer, options PrintOptions) error {

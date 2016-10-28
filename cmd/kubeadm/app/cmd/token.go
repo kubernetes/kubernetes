@@ -19,7 +19,9 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"os"
 	"path"
+	"text/tabwriter"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -30,6 +32,7 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/kubectl"
 )
 
 func NewCmdToken(out io.Writer) *cobra.Command {
@@ -108,18 +111,13 @@ func encodeTokenSecretData(tokenSecret *kubeadmapi.Secrets) map[string][]byte {
 	)
 
 	data["token-id"] = []byte(tokenSecret.TokenID)
-	data["token-secret"] = []byte(tokenSecret.Token)
+	data["token-secret"] = []byte(tokenSecret.BearerToken)
 
 	// TODO: Configurable token expiration time.
 	// Expire tokens in 24 hours:
 	t := time.Now()
 	t = t.Add(24 * time.Hour)
 	data["expiration"] = []byte(t.Format(time.RFC3339))
-
-	// Technically a boolean but we need a byte array here and to base64
-	// encode it so we'll work with strings.
-	// TODO: Find out why false is even an option in design doc.
-	data["usage-bootstrap-signing"] = []byte("true")
 
 	return data
 }
@@ -171,7 +169,20 @@ func RunListTokens(out io.Writer, cmd *cobra.Command, skipPreFlight bool) error 
 	if err != nil {
 		return fmt.Errorf("<cmd/token> failed to list bootstrap tokens [%v]", err)
 	}
-	fmt.Println(results)
+
+	w := tabwriter.NewWriter(os.Stdout, 10, 4, 3, ' ', 0)
+	fmt.Fprintln(w, "ID\tTOKEN\tEXPIRATION")
+	for _, secret := range results.Items {
+		tokenId := secret.Data["token-id"]
+		token := fmt.Sprintf("%s.%s", tokenId, secret.Data["token-secret"])
+		expireTime, err := time.Parse(time.RFC3339, string(secret.Data["expiration"]))
+		if err != nil {
+			return fmt.Errorf("<cmd/token> error parsing expiry time [%v]", err)
+		}
+		expires := kubectl.ShortHumanDuration(expireTime.Sub(time.Now()))
+		fmt.Fprintf(w, "%s\t%s\t%s\n", tokenId, token, expires)
+	}
+	w.Flush()
 
 	return nil
 }
