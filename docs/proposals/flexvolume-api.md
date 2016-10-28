@@ -11,6 +11,8 @@ The existing flex volume plugin enables administrators/vendors to create out-of-
 ### Goals:
 The goals of this proposal are 
 * Define new stable driver API.
+* API should be versioned and backward compatible.
+* API should be extensible to accommodate future enhancements.
 * Add support for dynamic provisioning and centralized attach-detach controller and
 * The biggest advantage of flex volume is it’s simplicity. It is just an adapter around the internal api. We will keep it simple in the new design and try to follow the same adapter pattern.
 
@@ -46,20 +48,29 @@ Proposes fewer APIs with stable request & response API objects.
 
 ```protobuf
 
+
 // Capabilities of the driver
 message DriverCapabilities {
-	string supported_read_write_modes = 1;
-	enum AttachmentPolicy {
-	    NONE = 0;  // Driver does not support attach/detach.
-	    LOCAL = 1; // Driver supports local volume attachments from kubelet.
-	    REMOTE = 2; // Driver supports remote volume attachments to a node from controller-manager.
-	}
-	AttachmentPolicy supported_attachment_policy = 2;
-	bool supports_dynamic_provisioning = 3;
-	bool supports_custom_mount = 4;
-	bool supports_selinux = 5;
-	bool supports_ownership_management = 6;
-	bool supports_metrics = 7;
+    enum read_write_modes {
+        READ_ONLY = 0;
+        READ_WRITE_ONCE = 1;
+        READ_WRITE_MANY = 2;
+    }
+	repeated string supported_read_write_modes = 1;
+    enum AttachmentPolicy {
+        NONE = 0;  // Driver does not support attach/detach.
+        LOCAL = 1; // Driver supports local volume attachments from kubelet.
+        REMOTE = 2; // Driver supports remote volume attachments to a node from controller-manager.
+    }
+    AttachmentPolicy supported_attachment_policy = 2;
+    enum Capabilities {
+        DYNAMIC_PROVISIONING = 0;
+        CUSTOM_MOUNT = 1;
+        SELINUX = 2,
+        OWNERSHIP_MANAGEMENT = 3;
+        METRICS = 4;
+    }
+    repeated Capabilities supported_capabilities = 3;
 }
 
 message ProbeDriverRequest {}
@@ -93,8 +104,9 @@ message Spec {
     string name = 1; // Name of the volume.
     string fstype = 2; // Requested file system type.
     string read_write_mode = 3;
-    map<string, string> secrets = 4; // Secrets required for the driver to talk to its own controller.
-    map<string, string> options = 5; // Extra options passed to the driver.
+    uint64 size = 4; // Size of the volume.
+    map<string, string> secrets = 5; // Secrets required for the driver to talk to its own controller.
+    map<string, string> options = 6; // Extra options passed to the driver.
 }
 
 message CreateRequest{
@@ -110,11 +122,8 @@ message DeleteRequest{
 message DeleteResponse{}
 
 message AttachRequest {
-    string name = 1; // Name of the volume.
+    Spec spec = 1; // Volume spec.
     string host = 2; // Name of the host to attach volume to.
-    bool sync = 3; // Wait for attach to finish.
-    map<string, string> secrets = 4; // Secrets required for the driver to talk to its own controller.
-    map<string, string> options = 5; // Extra options passed to the driver.
 }
 
 message AttachResponse{
@@ -169,7 +178,14 @@ Expose the existing in-tree plugin API as driver API. For more details on existi
 * Many call outs. For full support, a plugin has to implement 17 APIs.
 
 ## Dynamic Provisioning support:
-Dynamic provisioning support is optional. Driver can choose to implement it by implementing Create & Delete APIs. Driver should also report it supports dynamic provisioning by setting the "supports_dynamic_provisioning" capability.
+To support Dynamic provisioning driver should
+1. report the following capabilities and
+ - DYNAMIC_PROVISIONING
+2. implement the following gRPC API calls
+ - rpc Create(CreateRequest) returns (CreateResponse) {}
+ - rpc Delete(DeleteRequest) returns (DeleteResponse) {}
+ 
+Dynamic provisioning support is optional. If the driver reports "DYNAMIC_PROVISIONING" capability, flex volume plugin framework enables dynamic provisioning support and implements the required attach & detach interfaces for this driver.
 
 ## Attach detach support:
 Attach detach support is optional. Driver can choose to implement it by implementing Attach & Detach APIs. Driver should also report the type of attachment policy it supports. If the driver supports attach from Kubelet it should report AttachmentPolicy "LOCAL" and if it supports attaching from Central controller(controller-manager), it should report AttachmentPolicy "GLOBAL".
