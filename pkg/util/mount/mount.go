@@ -30,7 +30,7 @@ import (
 
 const (
 	// Default mount command if mounter path is not specified
-	mount = "mount"
+	defaultMountCommand = "mount"
 )
 
 type Interface interface {
@@ -105,7 +105,7 @@ func New() Interface {
 func NewCustomMounter(mounterPath, mounterRootfsPath string) Interface {
 	// If mounter-path flag is not set, use default mount path
 	if mounterPath == "" {
-		mounterPath = mount
+		mounterPath = defaultMountCommand
 	}
 	if mounterRootfsPath == "" {
 		mounterRootfsPath = "/"
