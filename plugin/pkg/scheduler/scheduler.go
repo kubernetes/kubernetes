@@ -87,9 +87,12 @@ type Config struct {
 	// It is expected that changes made via SchedulerCache will be observed
 	// by NodeLister and Algorithm.
 	SchedulerCache schedulercache.Cache
-	NodeLister     algorithm.NodeLister
-	Algorithm      algorithm.ScheduleAlgorithm
-	Binder         Binder
+	// Ecache is used for optimistically invalid affected cache items after
+	// successfully binding a pod
+	Ecache     *EquivalenceCache
+	NodeLister algorithm.NodeLister
+	Algorithm  algorithm.ScheduleAlgorithm
+	Binder     Binder
 	// PodConditionUpdater is used only in case of scheduling errors. If we succeed
 	// with scheduling, PodScheduled condition will be updated in apiserver in /bind
 	// handler so that binding and setting PodCondition it is atomic.
@@ -186,6 +189,13 @@ func (s *Scheduler) scheduleOne() {
 		// as binding doesn't make sense anyway.
 		// This should be fixed properly though.
 		return
+	}
+
+	// Optimistically assume that the binding will succeed, so we need to invalidate affected
+	// predicates in equivalence cache.
+	// If the binding fails, these invalidated item will not break anything.
+	if s.config.Ecache != nil {
+		s.config.Ecache.InvalidCachedPredicateItemForPodAdd(pod, dest)
 	}
 
 	go func() {

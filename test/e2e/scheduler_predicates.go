@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -46,6 +47,8 @@ type pausePodConfig struct {
 	Affinity                          *v1.Affinity
 	Annotations, Labels, NodeSelector map[string]string
 	Resources                         *v1.ResourceRequirements
+	Ports                             []v1.ContainerPort
+	OwnerReferences                   []metav1.OwnerReference
 }
 
 var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
@@ -759,9 +762,10 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        conf.Name,
-			Labels:      conf.Labels,
-			Annotations: conf.Annotations,
+			Name:            conf.Name,
+			Labels:          conf.Labels,
+			Annotations:     conf.Annotations,
+			OwnerReferences: conf.OwnerReferences,
 		},
 		Spec: v1.PodSpec{
 			NodeSelector: conf.NodeSelector,
@@ -770,6 +774,7 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 				{
 					Name:  podName,
 					Image: framework.GetPauseImageName(f.ClientSet),
+					Ports: conf.Ports,
 				},
 			},
 		},
@@ -932,6 +937,32 @@ func verifyResult(c clientset.Interface, expectedScheduled int, expectedNotSched
 
 	Expect(len(notScheduledPods)).To(Equal(expectedNotScheduled), printOnce(fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods)))
 	Expect(len(scheduledPods)).To(Equal(expectedScheduled), printOnce(fmt.Sprintf("Scheduled Pods: %#v", scheduledPods)))
+}
+
+// verifyReplicasResult is wrapper of verifyResult for a group pods with same "name: labelName" label, which means they belong to same RC
+func verifyReplicasResult(c clientset.Interface, expectedScheduled int, expectedNotScheduled int, ns string, labelName string) {
+	allPods := getPodsByLabels(c, ns, map[string]string{"name": labelName})
+	scheduledPods, notScheduledPods := framework.GetPodsScheduled(masterNodes, allPods)
+
+	printed := false
+	printOnce := func(msg string) string {
+		if !printed {
+			printed = true
+			return msg
+		} else {
+			return ""
+		}
+	}
+
+	Expect(len(notScheduledPods)).To(Equal(expectedNotScheduled), printOnce(fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods)))
+	Expect(len(scheduledPods)).To(Equal(expectedScheduled), printOnce(fmt.Sprintf("Scheduled Pods: %#v", scheduledPods)))
+}
+
+func getPodsByLabels(c clientset.Interface, ns string, labelsMap map[string]string) *v1.PodList {
+	selector := labels.SelectorFromSet(labels.Set(labelsMap))
+	allPods, err := c.Core().Pods(ns).List(v1.ListOptions{LabelSelector: selector.String()})
+	framework.ExpectNoError(err)
+	return allPods
 }
 
 func runAndKeepPodWithLabelAndGetNodeName(f *framework.Framework) (string, string) {
