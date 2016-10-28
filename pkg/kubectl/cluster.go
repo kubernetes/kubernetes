@@ -30,13 +30,13 @@ type ClusterGeneratorV1Beta1 struct {
 	// Name of the cluster context (required)
 	Name string
 	// ClientCIDR is the CIDR range in which the Kubernetes APIServer
-	// is available for the client (required)
+	// is available for the client (optional)
 	ClientCIDR string
 	// ServerAddress is the APIServer address of the Kubernetes cluster
 	// that is being registered (required)
 	ServerAddress string
 	// SecretName is the name of the secret that stores the credentials
-	// for the Kubernetes cluster that is being registered (required)
+	// for the Kubernetes cluster that is being registered (optional)
 	SecretName string
 }
 
@@ -76,7 +76,7 @@ func (s ClusterGeneratorV1Beta1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
 		{"client-cidr", false},
-		{"server-address", false},
+		{"server-address", true},
 		{"secret", false},
 	}
 }
@@ -86,6 +86,12 @@ func (s ClusterGeneratorV1Beta1) ParamNames() []GeneratorParam {
 func (s ClusterGeneratorV1Beta1) StructuredGenerate() (runtime.Object, error) {
 	if err := s.validate(); err != nil {
 		return nil, err
+	}
+	if s.ClientCIDR == "" {
+		s.ClientCIDR = "0.0.0.0/0"
+	}
+	if s.SecretName == "" {
+		s.SecretName = s.Name
 	}
 	cluster := &federationapi.Cluster{
 		ObjectMeta: v1.ObjectMeta{
@@ -112,14 +118,8 @@ func (s ClusterGeneratorV1Beta1) validate() error {
 	if len(s.Name) == 0 {
 		return fmt.Errorf("name must be specified")
 	}
-	if len(s.ClientCIDR) == 0 {
-		return fmt.Errorf("client CIDR must be specified")
-	}
 	if len(s.ServerAddress) == 0 {
 		return fmt.Errorf("server address must be specified")
-	}
-	if len(s.SecretName) == 0 {
-		return fmt.Errorf("secret name must be specified")
 	}
 	return nil
 }
