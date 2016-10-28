@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -30,7 +31,25 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 }
 
 func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
-	// TODO set defaults for MasterConfiguration
+	if obj.KubernetesVersion == "" {
+		obj.KubernetesVersion = kubeadmapi.DefaultKubernetesVersion
+	}
+
+	if obj.API.BindPort == 0 {
+		obj.API.BindPort = kubeadmapi.DefaultAPIBindPort
+	}
+
+	if obj.Discovery.BindPort == 0 {
+		obj.Discovery.BindPort = kubeadmapi.DefaultDiscoveryBindPort
+	}
+
+	if obj.Networking.ServiceSubnet == "" {
+		obj.Networking.ServiceSubnet = kubeadmapi.DefaultServicesSubnet
+	}
+
+	if obj.Networking.DNSDomain == "" {
+		obj.Networking.DNSDomain = kubeadmapi.DefaultServiceDNSDomain
+	}
 }
 
 func SetDefaults_NodeConfiguration(obj *NodeConfiguration) {
