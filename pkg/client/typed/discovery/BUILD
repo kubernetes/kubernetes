@@ -62,8 +62,8 @@ go_test(
         "//pkg/api/unversioned:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
         "//pkg/client/restclient:go_default_library",
+        "//pkg/client/restclient/fake:go_default_library",
         "//pkg/client/typed/discovery:go_default_library",
-        "//pkg/client/unversioned/fake:go_default_library",
         "//pkg/runtime:go_default_library",
     ],
 )
