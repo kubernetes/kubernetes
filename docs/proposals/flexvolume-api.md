@@ -113,7 +113,9 @@ message CreateRequest{
     Spec spec = 1; // Volume specification.
 }
 
-message CreateResponse{}
+message CreateResponse{
+    string id = 1; // Volume identifier, UUID/name
+}
 
 message DeleteRequest{
     string name = 1; // Name of the volume.
