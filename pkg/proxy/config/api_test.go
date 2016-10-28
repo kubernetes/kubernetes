@@ -17,12 +17,14 @@ limitations under the License.
 package config
 
 import (
+	"sort"
 	"testing"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -69,7 +71,7 @@ func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
 	}
 	expected := ServiceUpdate{Op: SET, Services: []api.Service{}}
 	if !api.Semantic.DeepEqual(expected, got) {
-		t.Errorf("Expected %#v; Got %#v", expected, got)
+		t.Errorf("Unexpected mismatch: %s", diff.ObjectDiff(expected, got))
 	}
 
 	// Add the first service
@@ -80,7 +82,7 @@ func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
 	}
 	expected = ServiceUpdate{Op: SET, Services: []api.Service{*service1v1}}
 	if !api.Semantic.DeepEqual(expected, got) {
-		t.Errorf("Expected %#v; Got %#v", expected, got)
+		t.Errorf("Unexpected mismatch: %s", diff.ObjectDiff(expected, got))
 	}
 
 	// Add another service
@@ -90,11 +92,13 @@ func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
 		t.Errorf("Unable to read from channel when expected")
 	}
 	// Could be sorted either of these two ways:
-	expectedA := ServiceUpdate{Op: SET, Services: []api.Service{*service1v1, *service2}}
-	expectedB := ServiceUpdate{Op: SET, Services: []api.Service{*service2, *service1v1}}
+	services := []api.Service{*service2, *service1v1}
+	sort.Sort(sortedServices(services))
+	sort.Sort(sortedServices(got.Services))
+	expected = ServiceUpdate{Op: SET, Services: services}
 
-	if !api.Semantic.DeepEqual(expectedA, got) && !api.Semantic.DeepEqual(expectedB, got) {
-		t.Errorf("Expected %#v or %#v, Got %#v", expectedA, expectedB, got)
+	if !api.Semantic.DeepEqual(expected, got) {
+		t.Errorf("Unexpected mismatch: %s", diff.ObjectDiff(expected, got))
 	}
 
 	// Modify service1
@@ -103,11 +107,13 @@ func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
 	if !ok {
 		t.Errorf("Unable to read from channel when expected")
 	}
-	expectedA = ServiceUpdate{Op: SET, Services: []api.Service{*service1v2, *service2}}
-	expectedB = ServiceUpdate{Op: SET, Services: []api.Service{*service2, *service1v2}}
+	services = []api.Service{*service1v2, *service2}
+	sort.Sort(sortedServices(services))
+	sort.Sort(sortedServices(got.Services))
+	expected = ServiceUpdate{Op: SET, Services: services}
 
-	if !api.Semantic.DeepEqual(expectedA, got) && !api.Semantic.DeepEqual(expectedB, got) {
-		t.Errorf("Expected %#v or %#v, Got %#v", expectedA, expectedB, got)
+	if !api.Semantic.DeepEqual(expected, got) {
+		t.Errorf("Unexpected mismatch: %s", diff.ObjectDiff(expected, got))
 	}
 
 	// Delete service1
@@ -118,7 +124,7 @@ func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
 	}
 	expected = ServiceUpdate{Op: SET, Services: []api.Service{*service2}}
 	if !api.Semantic.DeepEqual(expected, got) {
-		t.Errorf("Expected %#v, Got %#v", expected, got)
+		t.Errorf("Unexpected mismatch: %s", diff.ObjectDiff(expected, got))
 	}
 
 	// Delete service2
@@ -129,7 +135,7 @@ func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
 	}
 	expected = ServiceUpdate{Op: SET, Services: []api.Service{}}
 	if !api.Semantic.DeepEqual(expected, got) {
-		t.Errorf("Expected %#v, Got %#v", expected, got)
+		t.Errorf("Unexpected mismatch: %s", diff.ObjectDiff(expected, got))
 	}
 }
 
@@ -180,7 +186,7 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 	}
 	expected := EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{}}
 	if !api.Semantic.DeepEqual(expected, got) {
-		t.Errorf("Expected %#v; Got %#v", expected, got)
+		t.Errorf("Unexpected mismatch: %s", diff.ObjectDiff(expected, got))
 	}
 
 	// Add the first endpoints
@@ -191,7 +197,7 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 	}
 	expected = EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{*endpoints1v1}}
 	if !api.Semantic.DeepEqual(expected, got) {
-		t.Errorf("Expected %#v; Got %#v", expected, got)
+		t.Errorf("Unexpected mismatch: %s", diff.ObjectDiff(expected, got))
 	}
 
 	// Add another endpoints
@@ -201,11 +207,13 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 		t.Errorf("Unable to read from channel when expected")
 	}
 	// Could be sorted either of these two ways:
-	expectedA := EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{*endpoints1v1, *endpoints2}}
-	expectedB := EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{*endpoints2, *endpoints1v1}}
+	endpoints := []api.Endpoints{*endpoints2, *endpoints1v1}
+	sort.Sort(sortedEndpoints(endpoints))
+	sort.Sort(sortedEndpoints(got.Endpoints))
+	expected = EndpointsUpdate{Op: SET, Endpoints: endpoints}
 
-	if !api.Semantic.DeepEqual(expectedA, got) && !api.Semantic.DeepEqual(expectedB, got) {
-		t.Errorf("Expected %#v or %#v, Got %#v", expectedA, expectedB, got)
+	if !api.Semantic.DeepEqual(expected, got) {
+		t.Errorf("Unexpected mismatch: %s", diff.ObjectDiff(expected, got))
 	}
 
 	// Modify endpoints1
@@ -214,11 +222,13 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 	if !ok {
 		t.Errorf("Unable to read from channel when expected")
 	}
-	expectedA = EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{*endpoints1v2, *endpoints2}}
-	expectedB = EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{*endpoints2, *endpoints1v2}}
+	endpoints = []api.Endpoints{*endpoints2, *endpoints1v2}
+	sort.Sort(sortedEndpoints(endpoints))
+	sort.Sort(sortedEndpoints(got.Endpoints))
+	expected = EndpointsUpdate{Op: SET, Endpoints: endpoints}
 
-	if !api.Semantic.DeepEqual(expectedA, got) && !api.Semantic.DeepEqual(expectedB, got) {
-		t.Errorf("Expected %#v or %#v, Got %#v", expectedA, expectedB, got)
+	if !api.Semantic.DeepEqual(expected, got) {
+		t.Errorf("Unexpected mismatch: %s", diff.ObjectDiff(expected, got))
 	}
 
 	// Delete endpoints1
@@ -229,7 +239,7 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 	}
 	expected = EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{*endpoints2}}
 	if !api.Semantic.DeepEqual(expected, got) {
-		t.Errorf("Expected %#v, Got %#v", expected, got)
+		t.Errorf("Unexpected mismatch: %s", diff.ObjectDiff(expected, got))
 	}
 
 	// Delete endpoints2
@@ -240,6 +250,6 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 	}
 	expected = EndpointsUpdate{Op: SET, Endpoints: []api.Endpoints{}}
 	if !api.Semantic.DeepEqual(expected, got) {
-		t.Errorf("Expected %#v, Got %#v", expected, got)
+		t.Errorf("Unexpected mismatch: %s", diff.ObjectDiff(expected, got))
 	}
 }
