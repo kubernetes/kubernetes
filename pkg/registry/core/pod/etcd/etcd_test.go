@@ -388,8 +388,7 @@ func TestEtcdCreate(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	ctx := api.NewDefaultContext()
-	key, _ := storage.KeyFunc(ctx, "foo")
-	key = etcdtest.AddPrefix(key)
+
 	_, err := storage.Create(ctx, validNewPod())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -418,8 +417,6 @@ func TestEtcdCreateBindingNoPod(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	ctx := api.NewDefaultContext()
 
-	key, _ := storage.KeyFunc(ctx, "foo")
-	key = etcdtest.AddPrefix(key)
 	// Assume that a pod has undergone the following:
 	// - Create (apiserver)
 	// - Schedule (scheduler)
@@ -462,8 +459,7 @@ func TestEtcdCreateWithContainersNotFound(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	ctx := api.NewDefaultContext()
-	key, _ := storage.KeyFunc(ctx, "foo")
-	key = etcdtest.AddPrefix(key)
+
 	_, err := storage.Create(ctx, validNewPod())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -529,8 +525,7 @@ func TestEtcdCreateWithExistingContainers(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	ctx := api.NewDefaultContext()
-	key, _ := storage.KeyFunc(ctx, "foo")
-	key = etcdtest.AddPrefix(key)
+
 	_, err := storage.Create(ctx, validNewPod())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -589,8 +584,6 @@ func TestEtcdCreateBinding(t *testing.T) {
 	}
 	for k, test := range testCases {
 		storage, bindingStorage, _, server := newStorage(t)
-		key, _ := storage.KeyFunc(ctx, "foo")
-		key = etcdtest.AddPrefix(key)
 
 		if _, err := storage.Create(ctx, validNewPod()); err != nil {
 			t.Fatalf("%s: unexpected error: %v", k, err)
@@ -617,8 +610,6 @@ func TestEtcdUpdateNotScheduled(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	ctx := api.NewDefaultContext()
 
-	key, _ := storage.KeyFunc(ctx, "foo")
-	key = etcdtest.AddPrefix(key)
 	if _, err := storage.Create(ctx, validNewPod()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
