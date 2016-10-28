@@ -90,6 +90,15 @@ func NewScheme() *Scheme {
 	}
 	s.converter = conversion.NewConverter(s.nameFunc)
 
+	// Add the deep copy funcs that can't auto-register themselves
+	// This should only be the runtime and unversioned packages
+	if err := s.AddGeneratedDeepCopyFuncs(GetGeneratedDeepCopyFuncs()...); err != nil {
+		panic(err)
+	}
+	if err := s.AddGeneratedDeepCopyFuncs(unversioned.GetGeneratedDeepCopyFuncs()...); err != nil {
+		panic(err)
+	}
+
 	s.AddConversionFuncs(DefaultEmbeddedConversions()...)
 
 	// Enable map[string][]string conversions by default
