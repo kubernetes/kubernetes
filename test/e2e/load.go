@@ -66,7 +66,6 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 	var nodeCount int
 	var ns string
 	var configs []*testutils.RCConfig
-	var namespaces []*api.Namespace
 
 	// Gathers metrics before teardown
 	// TODO add flag that allows to skip cleanup on failure
@@ -140,7 +139,9 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 
 		It(name, func() {
 			// Create a number of namespaces.
-			namespaces = createNamespaces(f, nodeCount, itArg.podsPerNode)
+			namespaceCount := (nodeCount + nodeCountPerNamespace - 1) / nodeCountPerNamespace
+			namespaces, err := CreateNamespaces(f, namespaceCount, fmt.Sprintf("load-%v-nodepods", itArg.podsPerNode))
+			framework.ExpectNoError(err)
 
 			totalPods := itArg.podsPerNode * nodeCount
 			configs = generateRCConfigs(totalPods, itArg.image, itArg.command, namespaces)
@@ -209,17 +210,6 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 		})
 	}
 })
-
-func createNamespaces(f *framework.Framework, nodeCount, podsPerNode int) []*api.Namespace {
-	namespaceCount := (nodeCount + nodeCountPerNamespace - 1) / nodeCountPerNamespace
-	namespaces := []*api.Namespace{}
-	for i := 1; i <= namespaceCount; i++ {
-		namespace, err := f.CreateNamespace(fmt.Sprintf("load-%d-nodepods-%d", podsPerNode, i), nil)
-		framework.ExpectNoError(err)
-		namespaces = append(namespaces, namespace)
-	}
-	return namespaces
-}
 
 func createClients(numberOfClients int) ([]*internalclientset.Clientset, error) {
 	clients := make([]*internalclientset.Clientset, numberOfClients)
@@ -413,4 +403,16 @@ func deleteRC(wg *sync.WaitGroup, config *testutils.RCConfig, deletingTime time.
 	} else {
 		framework.ExpectNoError(framework.DeleteRCAndPods(config.Client, config.Namespace, config.Name), fmt.Sprintf("deleting rc %s", config.Name))
 	}
+}
+
+func CreateNamespaces(f *framework.Framework, namespaceCount int, namePrefix string) ([]*api.Namespace, error) {
+	namespaces := []*api.Namespace{}
+	for i := 1; i <= namespaceCount; i++ {
+		namespace, err := f.CreateNamespace(fmt.Sprintf("%v-%d", namePrefix, i), nil)
+		if err != nil {
+			return []*api.Namespace{}, err
+		}
+		namespaces = append(namespaces, namespace)
+	}
+	return namespaces, nil
 }
