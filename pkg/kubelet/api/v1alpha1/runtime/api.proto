@@ -49,6 +49,9 @@ service RuntimeService {
 
     // UpdateRuntimeConfig updates the runtime configuration based on request
     rpc UpdateRuntimeConfig(UpdateRuntimeConfigRequest) returns (UpdateRuntimeConfigResponse) {}
+
+    // Status returns the status of the runtime.
+    rpc Status(StatusRequest) returns (StatusResponse) {}
 }
 
 // Image service defines the public APIs for managing images
@@ -784,3 +787,40 @@ message UpdateRuntimeConfigRequest {
 }
 
 message UpdateRuntimeConfigResponse {}
+
+// RuntimeCondition contains condition information for the runtime.
+// There are 2 kinds of runtime conditions:
+// 1. Required condtitions: Conditions are required for kubelet to work
+// properly. If any required condition is unmet, the node will be not ready.
+// The required conditions include:
+//   * RuntimeReady: RuntimeReady means the runtime is up and ready to accept
+//   basic containers e.g. container only needs host network.
+//   * NetworkReady: NetworkReady means the runtime network is up and ready to
+//   accept containers which require container network.
+// 2. Optional conditions: Conditions are informative to the user, but kubelet
+// will not rely on. Since condition type is an arbitrary string, all conditions
+// not required are optional. These conditions will be exposed to users to help
+// them understand the status of the system.
+message RuntimeCondition {
+    // Type of runtime condition.
+    optional string type = 1;
+    // Status of the condition, one of true/false.
+    optional bool status = 2;
+    // Reason is brief reason for the condition's last transition.
+    optional string reason = 3;
+    // Message is human readable message indicating details about last transition.
+    optional string message = 4;
+}
+
+// RuntimeStatus is information about the current status of the runtime.
+message RuntimeStatus {
+    // Conditions is an array of current observed runtime conditions.
+    repeated RuntimeCondition conditions = 1;
+}
+
+message StatusRequest {}
+
+message StatusResponse {
+    // The status of the Runtime.
+    optional RuntimeStatus status = 1;
+}

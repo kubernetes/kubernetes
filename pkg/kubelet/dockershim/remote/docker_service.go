@@ -51,6 +51,10 @@ func (d *dockerService) Version(ctx context.Context, r *runtimeApi.VersionReques
 	return d.runtimeService.Version(r.GetVersion())
 }
 
+func (d *dockerService) Status(ctx context.Context, r *runtimeApi.StatusRequest) (*runtimeApi.StatusResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
 func (d *dockerService) RunPodSandbox(ctx context.Context, r *runtimeApi.RunPodSandboxRequest) (*runtimeApi.RunPodSandboxResponse, error) {
 	podSandboxId, err := d.runtimeService.RunPodSandbox(r.GetConfig())
 	if err != nil {
