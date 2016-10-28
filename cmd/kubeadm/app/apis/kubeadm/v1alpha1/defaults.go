@@ -24,10 +24,14 @@ import (
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	RegisterDefaults(scheme)
 	return scheme.AddDefaultingFuncs(
+		SetDefaults_ClusterInfo,
 		SetDefaults_MasterConfiguration,
 		SetDefaults_NodeConfiguration,
-		SetDefaults_ClusterInfo,
 	)
+}
+
+func SetDefaults_ClusterInfo(obj *ClusterInfo) {
+	// defaults for ClusterInfo not needed yet
 }
 
 func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
@@ -60,8 +64,4 @@ func SetDefaults_NodeConfiguration(obj *NodeConfiguration) {
 	if obj.DiscoveryPort == 0 {
 		obj.DiscoveryPort = kubeadmapi.DefaultDiscoveryBindPort
 	}
-}
-
-func SetDefaults_ClusterInfo(obj *ClusterInfo) {
-	// TODO set defaults for ClusterInfo
 }
