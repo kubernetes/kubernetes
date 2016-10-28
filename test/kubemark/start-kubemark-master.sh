@@ -76,6 +76,14 @@ function mount-master-pd() {
 
 mount-master-pd
 
+ETCD_QUOTA_BYTES=
+if [ "${TEST_ETCD_VERSION:0:2}" == "3." ]; then
+  # TODO: Set larger quota to see if that helps with
+  # 'mvcc: database space exceeded' errors. If so, pipe
+  # though our setup scripts.
+  ETCD_QUOTA_BYTES="--backend-quota-bytes=4294967296 "
+fi
+
 if [ "${EVENT_STORE_IP}" == "127.0.0.1" ]; then
 	# Retry starting etcd to avoid pulling image errors.
 	retry sudo docker run --net=host \
@@ -84,7 +92,7 @@ if [ "${EVENT_STORE_IP}" == "127.0.0.1" ]; then
 		--listen-peer-urls http://127.0.0.1:2381 \
 		--advertise-client-urls=http://127.0.0.1:4002 \
 		--listen-client-urls=http://0.0.0.0:4002 \
-		--data-dir=/var/etcd/data 1>> /var/log/etcd-events.log 2>&1"
+		--data-dir=/var/etcd/data ${ETCD_QUOTA_BYTES} 1>> /var/log/etcd-events.log 2>&1"
 fi
 
 # Retry starting etcd to avoid pulling image errors.
