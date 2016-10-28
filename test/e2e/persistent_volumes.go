@@ -714,6 +714,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 		It("should test that deleting a PVC before the pod does not cause pod deletion to fail on PD detach", func() {
 			By("Creating the PV and PVC")
 			pv, pvc = createPVPVC(c, pvConfig, ns, false)
+			waitOnPVandPVC(c, ns, pv, pvc)
 
 			By("Creating the Client Pod")
 			clientPod = createClientPod(c, ns, pvc)
@@ -736,6 +737,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 		It("should test that deleting the PV before the pod does not cause pod deletion to fail on PD detach", func() {
 			By("Creating the PV and PVC")
 			pv, pvc = createPVPVC(c, pvConfig, ns, false)
+			waitOnPVandPVC(c, ns, pv, pvc)
 
 			By("Creating the Client Pod")
 			clientPod = createClientPod(c, ns, pvc)
