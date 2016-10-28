@@ -116,12 +116,12 @@ def get_maintainers():
 
 
 def detect_github_username():
-    remotes = subprocess.check_output(['git', 'remote', '-v'])
-    repos = set(re.findall(r'\w+(?=/kubernetes)', remotes))
-    repos.remove('kubernetes')
-    if len(repos) == 1:
-        return repos.pop()
-    raise ValueError('unable to guess GitHub user from `git remote -v` output, use --user instead')
+    origin_url = subprocess.check_output(['git', 'config', 'remote.origin.url'])
+    m = re.search(r'github.com[:/](.*)/', origin_url)
+    if m and m.group(1) != 'kubernetes':
+        return m.group(1)
+    raise ValueError('unable to determine GitHub user from '
+                     '`git config remote.origin.url` output, run with --user instead')
 
 
 def main():
