@@ -25,7 +25,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path"
 	"strconv"
 	"strings"
 	"syscall"
@@ -63,18 +62,23 @@ type Mounter struct {
 // type, where kernel handles fs type for you. The mount 'options' is a list of options,
 // currently come from mount(8), e.g. "ro", "remount", "bind", etc. If no more option is
 // required, call Mount with an empty string list or nil.
-// Update source path to include a root filesystem override to make a containerized mounter (specified via `mounterPath`) work.
 func (mounter *Mounter) Mount(source string, target string, fstype string, options []string) error {
+	// Path to mounter binary. Set of mount accessible via $PATH by default.
+	mounterPath := "mount"
 	bind, bindRemountOpts := isBind(options)
 	if bind {
-		err := doMount(mounter.mounterPath, path.Join(mounter.mounterRootfsPath, source), path.Join(mounter.mounterRootfsPath, target), fstype, []string{"bind"})
+		err := doMount(mounterPath, source, target, fstype, []string{"bind"})
 		if err != nil {
 			return err
 		}
-		return doMount(mounter.mounterPath, path.Join(mounter.mounterRootfsPath, source), path.Join(mounter.mounterRootfsPath, target), fstype, bindRemountOpts)
-	} else {
-		return doMount(mounter.mounterPath, source, path.Join(mounter.mounterRootfsPath, target), fstype, options)
+		return doMount(mounterPath, source, target, fstype, bindRemountOpts)
 	}
+	// Use the custom mounter when mounting nfs or glusterfs only.
+	// TODO (storage-team) Remove this hack!
+	if strings.Contains(fstype, "nfs") || strings.Contains(fstype, "gluster") {
+		mounterPath = mounter.mounterPath
+	}
+	return doMount(mounterPath, source, target, fstype, options)
 }
 
 // isBind detects whether a bind mount is being requested and makes the remount options to

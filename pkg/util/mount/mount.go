@@ -105,7 +105,7 @@ func New() Interface {
 func NewCustomMounter(mounterPath, mounterRootfsPath string) Interface {
 	// If mounter-path flag is not set, use default mount path
 	if mounterPath == "" {
-		mounterPath = mount
+		mounterPath = "mount"
 	}
 	if mounterRootfsPath == "" {
 		mounterRootfsPath = "/"
