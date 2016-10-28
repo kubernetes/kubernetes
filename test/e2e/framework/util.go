@@ -1420,9 +1420,8 @@ func WaitForPodToDisappear(c clientset.Interface, ns, podName string, label labe
 // In case of failure or too long waiting time, an error is returned.
 func WaitForRCPodToDisappear(c clientset.Interface, ns, rcName, podName string) error {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
-	// NodeController evicts pod after 5 minutes, so we need timeout greater than that.
-	// Additionally, there can be non-zero grace period, so we are setting 10 minutes
-	// to be on the safe size.
+	// NodeController tries to evict pod after 5 minutes, so we need timeout greater than that.
+	// The grace period must be set to 0 on the pod for it to be deleted during the partition.
 	return WaitForPodToDisappear(c, ns, podName, label, 20*time.Second, 10*time.Minute)
 }
 

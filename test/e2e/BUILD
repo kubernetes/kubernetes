@@ -68,6 +68,7 @@ go_library(
         "mesos.go",
         "monitoring.go",
         "namespace.go",
+        "network_partition.go",
         "networking.go",
         "networking_perf.go",
         "node_problem_detector.go",
