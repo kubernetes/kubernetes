@@ -863,7 +863,7 @@ func (f *factory) UpdatePodSpecForObject(obj runtime.Object, fn func(*api.PodSpe
 		return true, fn(&t.Spec.Template.Spec)
 	case *extensions.ReplicaSet:
 		return true, fn(&t.Spec.Template.Spec)
-	case *apps.PetSet:
+	case *apps.StatefulSet:
 		return true, fn(&t.Spec.Template.Spec)
 	case *batch.Job:
 		return true, fn(&t.Spec.Template.Spec)

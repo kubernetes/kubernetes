@@ -27,7 +27,7 @@ import (
 )
 
 // newPCB generates a new PCB using the id string as a unique qualifier
-func newPCB(id string, ps *apps.PetSet) (*pcb, error) {
+func newPCB(id string, ps *apps.StatefulSet) (*pcb, error) {
 	petPod, err := controller.GetPodFromTemplate(&ps.Spec.Template, ps, nil)
 	if err != nil {
 		return nil, err
@@ -87,7 +87,7 @@ func (pt *petQueue) empty() bool {
 }
 
 // NewPetQueue returns a queue for tracking pets
-func NewPetQueue(ps *apps.PetSet, podList []*api.Pod) *petQueue {
+func NewPetQueue(ps *apps.StatefulSet, podList []*api.Pod) *petQueue {
 	pt := petQueue{pets: []*pcb{}, idMapper: &NameIdentityMapper{ps}}
 	// Seed the queue with existing pets. Assume all pets are scheduled for
 	// deletion, enqueuing a pet will "undelete" it. We always want to delete
@@ -102,10 +102,10 @@ func NewPetQueue(ps *apps.PetSet, podList []*api.Pod) *petQueue {
 	return &pt
 }
 
-// petsetIterator implements a simple iterator over pets in the given petset.
-type petSetIterator struct {
-	// ps is the petset for this iterator.
-	ps *apps.PetSet
+// statefulsetIterator implements a simple iterator over pets in the given statefulset.
+type statefulSetIterator struct {
+	// ps is the statefulset for this iterator.
+	ps *apps.StatefulSet
 	// queue contains the elements to iterate over.
 	queue *petQueue
 	// errs is a list because we always want the iterator to drain.
@@ -115,7 +115,7 @@ type petSetIterator struct {
 }
 
 // Next returns true for as long as there are elements in the underlying queue.
-func (pi *petSetIterator) Next() bool {
+func (pi *statefulSetIterator) Next() bool {
 	var pet *pcb
 	var err error
 	if pi.petCount < pi.ps.Spec.Replicas {
@@ -133,14 +133,14 @@ func (pi *petSetIterator) Next() bool {
 }
 
 // Value dequeues an element from the queue.
-func (pi *petSetIterator) Value() *pcb {
+func (pi *statefulSetIterator) Value() *pcb {
 	return pi.queue.dequeue()
 }
 
-// NewPetSetIterator returns a new iterator. All pods in the given podList
+// NewStatefulSetIterator returns a new iterator. All pods in the given podList
 // are used to seed the queue of the iterator.
-func NewPetSetIterator(ps *apps.PetSet, podList []*api.Pod) *petSetIterator {
-	pi := &petSetIterator{
+func NewStatefulSetIterator(ps *apps.StatefulSet, podList []*api.Pod) *statefulSetIterator {
+	pi := &statefulSetIterator{
 		ps:       ps,
 		queue:    NewPetQueue(ps, podList),
 		errs:     []error{},

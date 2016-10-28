@@ -37,7 +37,7 @@ const (
 	// GCE instances can have up to 16 PD volumes attached.
 	DefaultMaxGCEPDVolumes    = 16
 	ClusterAutoscalerProvider = "ClusterAutoscalerProvider"
-	PetSetKind                = "PetSet"
+	StatefulSetKind           = "StatefulSet"
 )
 
 // getMaxVols checks the max PD volumes environment variable, otherwise returning a default value
@@ -239,7 +239,7 @@ func GetEquivalencePod(pod *api.Pod) interface{} {
 func isValidControllerKind(kind string) bool {
 	switch kind {
 	// list of kinds that we cannot handle
-	case PetSetKind:
+	case StatefulSetKind:
 		return false
 	default:
 		return true

@@ -17,7 +17,7 @@ spec:
     app: nginx-petset
 ---
 apiVersion: apps/v1alpha1
-kind: PetSet
+kind: StatefulSet
 metadata:
   name: nginx
 spec:

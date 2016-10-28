@@ -39,7 +39,7 @@ const (
 	HorizontalPodAutoscalers   Resource = "horizontalpodautoscalers"
 	Ingress                    Resource = "ingress"
 	PodDisruptionBudget        Resource = "poddisruptionbudgets"
-	PetSet                     Resource = "petset"
+	StatefulSet                Resource = "statefulset"
 	Jobs                       Resource = "jobs"
 	LimitRanges                Resource = "limitranges"
 	Namespaces                 Resource = "namespaces"

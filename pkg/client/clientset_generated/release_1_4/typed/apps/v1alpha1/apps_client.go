@@ -25,16 +25,11 @@ import (
 
 type AppsInterface interface {
 	GetRESTClient() *restclient.RESTClient
-	PetSetsGetter
 }
 
 // AppsClient is used to interact with features provided by the Apps group.
 type AppsClient struct {
 	*restclient.RESTClient
-}
-
-func (c *AppsClient) PetSets(namespace string) PetSetInterface {
-	return newPetSets(c, namespace)
 }
 
 // NewForConfig creates a new AppsClient for the given config.

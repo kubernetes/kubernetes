@@ -41,10 +41,10 @@ const (
 	// updateRetries is the number of Get/Update cycles we perform when an
 	// update fails.
 	updateRetries = 3
-	// PetSetInitAnnotation is an annotation which when set, indicates that the
+	// StatefulSetInitAnnotation is an annotation which when set, indicates that the
 	// pet has finished initializing itself.
 	// TODO: Replace this with init container status.
-	PetSetInitAnnotation = "pod.alpha.kubernetes.io/initialized"
+	StatefulSetInitAnnotation = "pod.alpha.kubernetes.io/initialized"
 )
 
 // pcb is the control block used to transmit all updates about a single pet.
@@ -59,8 +59,8 @@ type pcb struct {
 	event petLifeCycleEvent
 	// id is the identity index of this pet.
 	id string
-	// parent is a pointer to the parent petset.
-	parent *apps.PetSet
+	// parent is a pointer to the parent statefulset.
+	parent *apps.StatefulSet
 }
 
 // pvcClient is a client for managing persistent volume claims.
@@ -113,12 +113,12 @@ func (p *petSyncer) Sync(pet *pcb) error {
 		}
 	} else if exists {
 		if !p.isHealthy(realPet.pod) {
-			glog.Infof("PetSet %v waiting on unhealthy pet %v", pet.parent.Name, realPet.pod.Name)
+			glog.Infof("StatefulSet %v waiting on unhealthy pet %v", pet.parent.Name, realPet.pod.Name)
 		}
 		return p.Update(realPet, pet)
 	}
 	if p.blockingPet != nil {
-		message := errUnhealthyPet(fmt.Sprintf("Create of %v in PetSet %v blocked by unhealthy pet %v", pet.pod.Name, pet.parent.Name, p.blockingPet.pod.Name))
+		message := errUnhealthyPet(fmt.Sprintf("Create of %v in StatefulSet %v blocked by unhealthy pet %v", pet.pod.Name, pet.parent.Name, p.blockingPet.pod.Name))
 		glog.Info(message)
 		return message
 	}
@@ -135,7 +135,7 @@ func (p *petSyncer) Sync(pet *pcb) error {
 	return nil
 }
 
-// Delete deletes the given pet, if no other pet in the petset is blocking a
+// Delete deletes the given pet, if no other pet in the statefulset is blocking a
 // scale event.
 func (p *petSyncer) Delete(pet *pcb) error {
 	if pet == nil {
@@ -149,17 +149,17 @@ func (p *petSyncer) Delete(pet *pcb) error {
 		return nil
 	}
 	if p.blockingPet != nil {
-		glog.Infof("Delete of %v in PetSet %v blocked by unhealthy pet %v", realPet.pod.Name, pet.parent.Name, p.blockingPet.pod.Name)
+		glog.Infof("Delete of %v in StatefulSet %v blocked by unhealthy pet %v", realPet.pod.Name, pet.parent.Name, p.blockingPet.pod.Name)
 		return nil
 	}
 	// This is counted as a delete, even if it fails.
 	// The returned error will force a requeue.
 	p.blockingPet = realPet
 	if !p.isDying(realPet.pod) {
-		glog.Infof("PetSet %v deleting pet %v", pet.parent.Name, pet.pod.Name)
+		glog.Infof("StatefulSet %v deleting pet %v", pet.parent.Name, pet.pod.Name)
 		return p.petClient.Delete(pet)
 	}
-	glog.Infof("PetSet %v waiting on pet %v to die in %v", pet.parent.Name, realPet.pod.Name, realPet.pod.DeletionTimestamp)
+	glog.Infof("StatefulSet %v waiting on pet %v to die in %v", pet.parent.Name, realPet.pod.Name, realPet.pod.DeletionTimestamp)
 	return nil
 }
 
@@ -173,7 +173,7 @@ type petClient interface {
 	Update(*pcb, *pcb) error
 }
 
-// apiServerPetClient is a petset aware Kubernetes client.
+// apiServerPetClient is a statefulset aware Kubernetes client.
 type apiServerPetClient struct {
 	c        internalclientset.Interface
 	recorder record.EventRecorder
@@ -223,7 +223,7 @@ func (p *apiServerPetClient) Update(pet *pcb, expectedPet *pcb) (updateErr error
 		if err != nil || !needsUpdate {
 			return err
 		}
-		glog.Infof("Resetting pet %v/%v to match PetSet %v spec", pet.pod.Namespace, pet.pod.Name, pet.parent.Name)
+		glog.Infof("Resetting pet %v/%v to match StatefulSet %v spec", pet.pod.Namespace, pet.pod.Name, pet.parent.Name)
 		_, updateErr = pc.Update(&updatePod)
 		if updateErr == nil || i >= updateRetries {
 			return updateErr
@@ -303,9 +303,9 @@ func (d *defaultPetHealthChecker) isHealthy(pod *api.Pod) bool {
 	if pod == nil || pod.Status.Phase != api.PodRunning {
 		return false
 	}
-	initialized, ok := pod.Annotations[PetSetInitAnnotation]
+	initialized, ok := pod.Annotations[StatefulSetInitAnnotation]
 	if !ok {
-		glog.Infof("PetSet pod %v in %v, waiting on annotation %v", api.PodRunning, pod.Name, PetSetInitAnnotation)
+		glog.Infof("StatefulSet pod %v in %v, waiting on annotation %v", api.PodRunning, pod.Name, StatefulSetInitAnnotation)
 		return false
 	}
 	b, err := strconv.ParseBool(initialized)
