@@ -366,8 +366,15 @@ func (asw *actualStateOfWorld) addVolume(
 			globallyMounted:    false,
 			devicePath:         devicePath,
 		}
-		asw.attachedVolumes[volumeName] = volumeObj
+	} else {
+		// If volume object already exists, update the fields such as device path
+		volumeObj.devicePath = devicePath
+		volumeObj.spec = volumeSpec
+		glog.V(2).Infof("Volume %q is already added to attachedVolume list, update device path %q",
+			volumeName,
+			devicePath)
 	}
+	asw.attachedVolumes[volumeName] = volumeObj
 
 	return nil
 }
