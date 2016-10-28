@@ -206,14 +206,8 @@ func logStackOnRecover(s runtime.NegotiatedSerializer, panicReason interface{}, 
 
 // Adds a service to return the supported api versions at the legacy /api.
 func AddApiWebService(s runtime.NegotiatedSerializer, container *restful.Container, apiPrefix string, getAPIVersionsFunc func(req *restful.Request) *unversioned.APIVersions) {
-	// TODO: InstallREST should register each version automatically
-
-	// Because in release 1.1, /api returns response with empty APIVersion, we
-	// use StripVersionNegotiatedSerializer to keep the response backwards
-	// compatible.
 	mediaTypes, _ := mediaTypesForSerializer(s)
-	ss := StripVersionNegotiatedSerializer{s}
-	versionHandler := APIVersionHandler(ss, getAPIVersionsFunc)
+	versionHandler := APIVersionHandler(s, getAPIVersionsFunc)
 	ws := new(restful.WebService)
 	ws.Path(apiPrefix)
 	ws.Doc("get available API versions")
@@ -226,60 +220,10 @@ func AddApiWebService(s runtime.NegotiatedSerializer, container *restful.Contain
 	container.Add(ws)
 }
 
-// stripVersionEncoder strips APIVersion field from the encoding output. It's
-// used to keep the responses at the discovery endpoints backward compatible
-// with release-1.1, when the responses have empty APIVersion.
-type stripVersionEncoder struct {
-	encoder    runtime.Encoder
-	serializer runtime.Serializer
-}
-
-func (c stripVersionEncoder) Encode(obj runtime.Object, w io.Writer) error {
-	buf := bytes.NewBuffer([]byte{})
-	err := c.encoder.Encode(obj, buf)
-	if err != nil {
-		return err
-	}
-	roundTrippedObj, gvk, err := c.serializer.Decode(buf.Bytes(), nil, nil)
-	if err != nil {
-		return err
-	}
-	gvk.Group = ""
-	gvk.Version = ""
-	roundTrippedObj.GetObjectKind().SetGroupVersionKind(*gvk)
-	return c.serializer.Encode(roundTrippedObj, w)
-}
-
-// StripVersionNegotiatedSerializer will return stripVersionEncoder when
-// EncoderForVersion is called. See comments for stripVersionEncoder.
-type StripVersionNegotiatedSerializer struct {
-	runtime.NegotiatedSerializer
-}
-
-func (n StripVersionNegotiatedSerializer) EncoderForVersion(encoder runtime.Encoder, gv runtime.GroupVersioner) runtime.Encoder {
-	serializer, ok := encoder.(runtime.Serializer)
-	if !ok {
-		// The stripVersionEncoder needs both an encoder and decoder, but is called from a context that doesn't have access to the
-		// decoder. We do a best effort cast here (since this code path is only for backwards compatibility) to get access to the caller's
-		// decoder.
-		panic(fmt.Sprintf("Unable to extract serializer from %#v", encoder))
-	}
-	versioned := n.NegotiatedSerializer.EncoderForVersion(encoder, gv)
-	return stripVersionEncoder{versioned, serializer}
-}
-
-func keepUnversioned(group string) bool {
-	return group == "" || group == "extensions"
-}
-
 // NewApisWebService returns a webservice serving the available api version under /apis.
 func NewApisWebService(s runtime.NegotiatedSerializer, apiPrefix string, f func(req *restful.Request) []unversioned.APIGroup) *restful.WebService {
-	// Because in release 1.1, /apis returns response with empty APIVersion, we
-	// use StripVersionNegotiatedSerializer to keep the response backwards
-	// compatible.
-	ss := StripVersionNegotiatedSerializer{s}
 	mediaTypes, _ := mediaTypesForSerializer(s)
-	rootAPIHandler := RootAPIHandler(ss, f)
+	rootAPIHandler := RootAPIHandler(s, f)
 	ws := new(restful.WebService)
 	ws.Path(apiPrefix)
 	ws.Doc("get available API versions")
@@ -295,15 +239,8 @@ func NewApisWebService(s runtime.NegotiatedSerializer, apiPrefix string, f func(
 // NewGroupWebService returns a webservice serving the supported versions, preferred version, and name
 // of a group. E.g., such a web service will be registered at /apis/extensions.
 func NewGroupWebService(s runtime.NegotiatedSerializer, path string, group unversioned.APIGroup) *restful.WebService {
-	ss := s
-	if keepUnversioned(group.Name) {
-		// Because in release 1.1, /apis/extensions returns response with empty
-		// APIVersion, we use StripVersionNegotiatedSerializer to keep the
-		// response backwards compatible.
-		ss = StripVersionNegotiatedSerializer{s}
-	}
 	mediaTypes, _ := mediaTypesForSerializer(s)
-	groupHandler := GroupHandler(ss, group)
+	groupHandler := GroupHandler(s, group)
 	ws := new(restful.WebService)
 	ws.Path(path)
 	ws.Doc("get information of a group")
@@ -319,15 +256,8 @@ func NewGroupWebService(s runtime.NegotiatedSerializer, path string, group unver
 // Adds a service to return the supported resources, E.g., a such web service
 // will be registered at /apis/extensions/v1.
 func AddSupportedResourcesWebService(s runtime.NegotiatedSerializer, ws *restful.WebService, groupVersion unversioned.GroupVersion, lister APIResourceLister) {
-	ss := s
-	if keepUnversioned(groupVersion.Group) {
-		// Because in release 1.1, /apis/extensions/v1beta1 returns response
-		// with empty APIVersion, we use StripVersionNegotiatedSerializer to
-		// keep the response backwards compatible.
-		ss = StripVersionNegotiatedSerializer{s}
-	}
 	mediaTypes, _ := mediaTypesForSerializer(s)
-	resourceHandler := SupportedResourcesHandler(ss, groupVersion, lister)
+	resourceHandler := SupportedResourcesHandler(s, groupVersion, lister)
 	ws.Route(ws.GET("/").To(resourceHandler).
 		Doc("get available resources").
 		Operation("getAPIResources").
