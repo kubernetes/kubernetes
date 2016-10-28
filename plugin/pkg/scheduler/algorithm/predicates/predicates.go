@@ -968,7 +968,7 @@ func (c *PodAffinityChecker) getMatchingAntiAffinityTerms(pod *api.Pod, allPods 
 		if err != nil {
 			return nil, err
 		}
-		if affinity.PodAntiAffinity != nil {
+		if affinity != nil && affinity.PodAntiAffinity != nil {
 			existingPodNode, err := c.info.GetNodeInfo(existingPod.Spec.NodeName)
 			if err != nil {
 				return nil, err
