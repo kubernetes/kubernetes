@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -139,6 +138,24 @@ func (h *UpgradeAwareProxyHandler) tryUpgrade(w http.ResponseWriter, req *http.R
 		return false
 	}
 
+	var (
+		backendConn net.Conn
+		rawResponse []byte
+		err         error
+	)
+	if h.InterceptRedirects && utilconfig.DefaultFeatureGate.StreamingProxyRedirects() {
+		backendConn, rawResponse, err = h.connectBackendWithRedirects(req)
+	} else {
+		backendConn, err = h.connectBackend(req, h.Location)
+	}
+	if err != nil {
+		h.Responder.Error(fmt.Errorf("error dialing backend: %v", err))
+		return true
+	}
+	defer backendConn.Close()
+
+	// Once the connection is hijacked, the ErrorResponder will no longer work, so
+	// hijacking should be the last step in the upgrade.
 	requestHijacker, ok := w.(http.Hijacker)
 	if !ok {
 		h.Responder.Error(fmt.Errorf("request connection cannot be hijacked: %T", w))
@@ -151,20 +168,10 @@ func (h *UpgradeAwareProxyHandler) tryUpgrade(w http.ResponseWriter, req *http.R
 	}
 	defer requestHijackedConn.Close()
 
-	// Once the connection is hijacked, the error responder can no longer be used.
-	h.Responder = &hijackedErrorResponder{requestHijackedConn}
-
-	var backendConn net.Conn
-	if h.InterceptRedirects && utilconfig.DefaultFeatureGate.StreamingProxyRedirects() {
-		backendConn, err = h.connectBackendWithRedirects(req, requestHijackedConn)
-	} else {
-		backendConn, err = h.connectBackend(req, h.Location)
+	// Forward raw response bytes back to client.
+	if _, err = requestHijackedConn.Write(rawResponse); err != nil {
+		glog.Errorf("Error proxying response from backend to client: %v", err)
 	}
-	if err != nil {
-		h.Responder.Error(fmt.Errorf("error dialing backend: %v", err))
-		return true
-	}
-	defer backendConn.Close()
 
 	// Proxy the connection.
 	wg := &sync.WaitGroup{}
@@ -228,8 +235,10 @@ func (h *UpgradeAwareProxyHandler) connectBackend(req *http.Request, location *u
 	return conn, err
 }
 
-//
-func (h *UpgradeAwareProxyHandler) connectBackendWithRedirects(req *http.Request, clientConn net.Conn) (net.Conn, error) {
+// connectBackendWithRedirects dials the backend and forwards a copy of the client request. If the
+// client responds with a redirect, it is followed. The raw response bytes are returned, and should
+// be forwarded back to the client.
+func (h *UpgradeAwareProxyHandler) connectBackendWithRedirects(req *http.Request) (net.Conn, []byte, error) {
 	const (
 		maxRedirects    = 10
 		maxResponseSize = 1024
@@ -249,12 +258,12 @@ func (h *UpgradeAwareProxyHandler) connectBackendWithRedirects(req *http.Request
 redirectLoop:
 	for redirects := 0; ; redirects++ {
 		if redirects == maxRedirects {
-			return nil, fmt.Errorf("too many redirects (%d)", redirects)
+			return nil, nil, fmt.Errorf("too many redirects (%d)", redirects)
 		}
 
 		intermediateConn, err = h.connectBackend(req, location)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		// Peek at the backend response.
@@ -285,23 +294,17 @@ redirectLoop:
 		// Prepare to follow the redirect.
 		redirectStr := resp.Header.Get("Location")
 		if redirectStr == "" {
-			return nil, fmt.Errorf("%d response missing Location header", resp.StatusCode)
+			return nil, nil, fmt.Errorf("%d response missing Location header", resp.StatusCode)
 		}
 		location, err = h.Location.Parse(redirectStr)
 		if err != nil {
-			return nil, fmt.Errorf("malformed Location header: %v", err)
+			return nil, nil, fmt.Errorf("malformed Location header: %v", err)
 		}
-	}
-
-	// Forward raw response bytes back to client.
-	_, err = io.CopyN(clientConn, rawResponse, int64(rawResponse.Len()))
-	if err != nil {
-		return nil, fmt.Errorf("forwarding response: %v", err)
 	}
 
 	backendConn := intermediateConn
 	intermediateConn = nil // Don't close the connection when we return it.
-	return backendConn, nil
+	return backendConn, rawResponse.Bytes(), nil
 }
 
 func (h *UpgradeAwareProxyHandler) defaultProxyTransport(url *url.URL, internalTransport http.RoundTripper) http.RoundTripper {
@@ -350,26 +353,4 @@ func removeCORSHeaders(resp *http.Response) {
 	resp.Header.Del("Access-Control-Allow-Headers")
 	resp.Header.Del("Access-Control-Allow-Methods")
 	resp.Header.Del("Access-Control-Allow-Origin")
-}
-
-type hijackedErrorResponder struct {
-	// The hijacked client connection to respond over.
-	conn net.Conn
-}
-
-func (r *hijackedErrorResponder) Error(err error) {
-	header := http.Header{}
-	header.Set("Content-Type", "text/plain")
-	body := bytes.NewBufferString(err.Error())
-	response := http.Response{
-		StatusCode:    http.StatusInternalServerError,
-		Header:        header,
-		ContentLength: int64(body.Len()),
-		Body:          ioutil.NopCloser(body),
-	}
-	writeErr := response.Write(r.conn)
-	if writeErr != nil {
-		// Nothing to do but log it.
-		glog.Errorf("Failed to write error response (%v): %v", err, writeErr)
-	}
 }
