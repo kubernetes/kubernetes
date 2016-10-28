@@ -25,7 +25,6 @@ import (
 
 	dockertypes "github.com/docker/engine-api/types"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
@@ -75,9 +74,8 @@ func (r *streamingRuntime) Attach(containerID string, in io.Reader, out, errw io
 		return err
 	}
 
-	id := kubecontainer.BuildContainerID("docker", containerID)
 	tty := container.Config.Tty
-	return dockertools.AttachContainer(r.client, id, in, out, errw, tty, resize)
+	return dockertools.AttachContainer(r.client, containerID, in, out, errw, tty, resize)
 }
 
 func (r *streamingRuntime) PortForward(podSandboxID string, port int32, stream io.ReadWriteCloser) error {

@@ -63,7 +63,9 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 		os:                 kubecontainer.RealOS{},
 		podSandboxImage:    podSandboxImage,
 		streamingRuntime: &streamingRuntime{
-			client:      client,
+			client: client,
+			// Only the native exec handling is supported for now.
+			// TODO(#35747) - Either deprecate nsenter exec handling, or add support for it here.
 			execHandler: &dockertools.NativeExecHandler{},
 		},
 	}
@@ -104,8 +106,6 @@ type dockerService struct {
 	streamingRuntime   *streamingRuntime
 	streamingServer    streaming.Server
 }
-
-var _ DockerLegacyService = &dockerService{}
 
 // Version returns the runtime name, runtime version and runtime API version
 func (ds *dockerService) Version(_ string) (*runtimeApi.VersionResponse, error) {
