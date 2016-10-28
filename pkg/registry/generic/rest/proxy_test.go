@@ -62,19 +62,15 @@ func (r *fakeResponder) Error(err error) {
 	}
 
 	if r.w != nil {
-		r.t.Logf(">>>> writing to connection")
 		r.w.WriteHeader(fakeStatusCode)
 		_, writeErr := r.w.Write([]byte(err.Error()))
-		r.t.Logf(">>>> wrote to connection")
 		assert.NoError(r.t, writeErr)
-		r.t.Logf(">>>> checked writeErr")
 	} else {
 		r.t.Logf("No ResponseWriter set")
 	}
 
 	r.called = true
 	r.err = err
-	r.t.Logf(">>>> set error & called")
 }
 
 type fakeConn struct {
@@ -491,13 +487,11 @@ func TestProxyUpgradeErrorResponse(t *testing.T) {
 	defer resp.Body.Close()
 
 	// Expect error response.
-	assert.Equal(t, resp.StatusCode, http.StatusInternalServerError)
+	assert.True(t, responder.called)
+	assert.Equal(t, fakeStatusCode, resp.StatusCode)
 	msg, err := ioutil.ReadAll(resp.Body)
 	require.NoError(t, err)
 	assert.Contains(t, string(msg), expectedErr.Error())
-
-	// Original responder should not be invoked.
-	require.False(t, responder.called, "should have responded through hijackedErrorResponder")
 }
 
 func TestDefaultProxyTransport(t *testing.T) {
@@ -509,7 +503,6 @@ func TestDefaultProxyTransport(t *testing.T) {
 		expectedHost,
 		expectedPathPrepend string
 	}{
-
 		{
 			name:                "simple path",
 			url:                 "http://test.server:8080/a/test/location",
