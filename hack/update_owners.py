@@ -121,7 +121,7 @@ def detect_github_username():
     repos.remove('kubernetes')
     if len(repos) == 1:
         return repos.pop()
-    raise ValueError('unable to guess GitHub user from `git remote -v` output, use --user instead')
+    raise ValueError('unable to guess GitHub user from `git remote -v` output, please run with --user instead')
 
 
 def main():
