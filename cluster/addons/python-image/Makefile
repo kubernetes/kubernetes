@@ -21,5 +21,5 @@ build:
 	docker build -t "$(IMAGE):$(VERSION)" .
 
 push:
-	gcloud docker push "$(IMAGE):$(VERSION)"
+	gcloud docker -- push "$(IMAGE):$(VERSION)"
 

@@ -60,6 +60,6 @@ container:
 	rm -rf $(TEMP_DIR)
 
 push: container
-	gcloud docker push $(REGISTRY)/kubedns-$(ARCH):$(TAG)
+	gcloud docker -- push $(REGISTRY)/kubedns-$(ARCH):$(TAG)
 
 .PHONY: all container push

@@ -50,7 +50,7 @@ ifeq ($(ARCH),amd64)
 	# Do not compile if we should make an image for amd64, use the official etcd binaries instead
 	curl -sSL --retry 5 https://github.com/coreos/etcd/releases/download/v$(TAG)/etcd-v$(TAG)-linux-amd64.tar.gz | tar -xz -C $(TEMP_DIR) --strip-components=1
 else
-	
+
 	# Download etcd in a golang container and cross-compile it statically
 	docker run -it -v $(TEMP_DIR):/etcdbin golang:$(GOLANG_VERSION) /bin/bash -c \
 		"git clone https://github.com/coreos/etcd /go/src/github.com/coreos/etcd \
@@ -73,12 +73,12 @@ endif
 	docker build -t $(REGISTRY)/etcd-$(ARCH):$(TAG) $(TEMP_DIR)
 
 push: build
-	gcloud docker push $(REGISTRY)/etcd-$(ARCH):$(TAG)
+	gcloud docker -- push $(REGISTRY)/etcd-$(ARCH):$(TAG)
 
 ifeq ($(ARCH),amd64)
 	# Backward compatibility. TODO: deprecate this image tag
 	docker tag $(REGISTRY)/etcd-$(ARCH):$(TAG) $(REGISTRY)/etcd:$(TAG)
-	gcloud docker push $(REGISTRY)/etcd:$(TAG)
+	gcloud docker -- push $(REGISTRY)/etcd:$(TAG)
 endif
 
 all: build

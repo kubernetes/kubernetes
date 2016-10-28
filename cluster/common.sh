@@ -490,7 +490,8 @@ function stage-images() {
     local docker_tag="$(cat ${temp_dir}/kubernetes/server/bin/${binary}.docker_tag)"
     (
       "${docker_cmd[@]}" load -i "${temp_dir}/kubernetes/server/bin/${binary}.tar"
-      "${docker_cmd[@]}" tag -f "gcr.io/google_containers/${binary}:${docker_tag}" "${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_IMAGE_TAG}"
+	  docker rmi "${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_IMAGE_TAG}" || true
+	  "${docker_cmd[@]}" tag "gcr.io/google_containers/${binary}:${docker_tag}" "${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_IMAGE_TAG}"
       "${docker_push_cmd[@]}" push "${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_IMAGE_TAG}"
     ) &> "${temp_dir}/${binary}-push.log" &
   done
