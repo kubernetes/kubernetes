@@ -440,15 +440,15 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 
 	groupVersion = "apps/v1alpha1"
 	resources, found = resourceMap[groupVersion]
-	glog.Infof("Attempting to start petset, full resource map %+v", resourceMap)
+	glog.Infof("Attempting to start statefulset, full resource map %+v", resourceMap)
 	if containsVersion(versions, groupVersion) && found {
 		glog.Infof("Starting %s apis", groupVersion)
-		if containsResource(resources, "petsets") {
-			glog.Infof("Starting PetSet controller")
+		if containsResource(resources, "statefulsets") {
+			glog.Infof("Starting StatefulSet controller")
 			resyncPeriod := ResyncPeriod(s)()
-			go petset.NewPetSetController(
+			go petset.NewStatefulSetController(
 				sharedInformers.Pods().Informer(),
-				client("petset-controller"),
+				client("statefulset-controller"),
 				resyncPeriod,
 			).Run(1, wait.NeverStop)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))

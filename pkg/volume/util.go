@@ -274,7 +274,7 @@ func GetPath(mounter Mounter) (string, error) {
 // ChooseZone implements our heuristics for choosing a zone for volume creation based on the volume name
 // Volumes are generally round-robin-ed across all active zones, using the hash of the PVC Name.
 // However, if the PVCName ends with `-<integer>`, we will hash the prefix, and then add the integer to the hash.
-// This means that a PetSet's volumes (`claimname-petsetname-id`) will spread across available zones,
+// This means that a StatefulSet's volumes (`claimname-statefulsetname-id`) will spread across available zones,
 // assuming the id values are consecutive.
 func ChooseZoneForVolume(zones sets.String, pvcName string) string {
 	// We create the volume in a zone determined by the name
@@ -290,8 +290,8 @@ func ChooseZoneForVolume(zones sets.String, pvcName string) string {
 	} else {
 		hashString := pvcName
 
-		// Heuristic to make sure that volumes in a PetSet are spread across zones
-		// PetSet PVCs are (currently) named ClaimName-PetSetName-Id,
+		// Heuristic to make sure that volumes in a StatefulSet are spread across zones
+		// StatefulSet PVCs are (currently) named ClaimName-StatefulSetName-Id,
 		// where Id is an integer index
 		lastDash := strings.LastIndexByte(pvcName, '-')
 		if lastDash != -1 {
@@ -302,7 +302,7 @@ func ChooseZoneForVolume(zones sets.String, pvcName string) string {
 				index = uint32(petID)
 				// We still hash the volume name, but only the base
 				hashString = pvcName[:lastDash]
-				glog.V(2).Infof("Detected PetSet-style volume name %q; index=%d", pvcName, index)
+				glog.V(2).Infof("Detected StatefulSet-style volume name %q; index=%d", pvcName, index)
 			}
 		}
 
@@ -314,7 +314,7 @@ func ChooseZoneForVolume(zones sets.String, pvcName string) string {
 
 	// Zones.List returns zones in a consistent order (sorted)
 	// We do have a potential failure case where volumes will not be properly spread,
-	// if the set of zones changes during PetSet volume creation.  However, this is
+	// if the set of zones changes during StatefulSet volume creation.  However, this is
 	// probably relatively unlikely because we expect the set of zones to be essentially
 	// static for clusters.
 	// Hopefully we can address this problem if/when we do full scheduler integration of

@@ -87,8 +87,8 @@ func ReaperFor(kind unversioned.GroupKind, c internalclientset.Interface) (Reape
 	case extensions.Kind("Job"), batch.Kind("Job"):
 		return &JobReaper{c.Batch(), c.Core(), Interval, Timeout}, nil
 
-	case apps.Kind("PetSet"):
-		return &PetSetReaper{c.Apps(), c.Core(), Interval, Timeout}, nil
+	case apps.Kind("StatefulSet"):
+		return &StatefulSetReaper{c.Apps(), c.Core(), Interval, Timeout}, nil
 
 	case extensions.Kind("Deployment"):
 		return &DeploymentReaper{c.Extensions(), c.Extensions(), Interval, Timeout}, nil
@@ -129,8 +129,8 @@ type PodReaper struct {
 type ServiceReaper struct {
 	client coreclient.ServicesGetter
 }
-type PetSetReaper struct {
-	client                appsclient.PetSetsGetter
+type StatefulSetReaper struct {
+	client                appsclient.StatefulSetsGetter
 	podClient             coreclient.PodsGetter
 	pollInterval, timeout time.Duration
 }
@@ -325,10 +325,10 @@ func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duratio
 	return reaper.client.DaemonSets(namespace).Delete(name, nil)
 }
 
-func (reaper *PetSetReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
-	petsets := reaper.client.PetSets(namespace)
-	scaler := &PetSetScaler{reaper.client}
-	ps, err := petsets.Get(name)
+func (reaper *StatefulSetReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
+	statefulsets := reaper.client.StatefulSets(namespace)
+	scaler := &StatefulSetScaler{reaper.client}
+	ps, err := statefulsets.Get(name)
 	if err != nil {
 		return err
 	}
@@ -337,13 +337,13 @@ func (reaper *PetSetReaper) Stop(namespace, name string, timeout time.Duration, 
 		timeout = Timeout + time.Duration(10*numPets)*time.Second
 	}
 	retry := NewRetryParams(reaper.pollInterval, reaper.timeout)
-	waitForPetSet := NewRetryParams(reaper.pollInterval, reaper.timeout)
-	if err = scaler.Scale(namespace, name, 0, nil, retry, waitForPetSet); err != nil {
+	waitForStatefulSet := NewRetryParams(reaper.pollInterval, reaper.timeout)
+	if err = scaler.Scale(namespace, name, 0, nil, retry, waitForStatefulSet); err != nil {
 		return err
 	}
 
-	// TODO: This shouldn't be needed, see corresponding TODO in PetSetHasDesiredPets.
-	// PetSet should track generation number.
+	// TODO: This shouldn't be needed, see corresponding TODO in StatefulSetHasDesiredPets.
+	// StatefulSet should track generation number.
 	pods := reaper.podClient.Pods(namespace)
 	selector, _ := unversioned.LabelSelectorAsSelector(ps.Spec.Selector)
 	options := api.ListOptions{LabelSelector: selector}
@@ -365,8 +365,8 @@ func (reaper *PetSetReaper) Stop(namespace, name string, timeout time.Duration, 
 	}
 
 	// TODO: Cleanup volumes? We don't want to accidentally delete volumes from
-	// stop, so just leave this up to the petset.
-	return petsets.Delete(name, nil)
+	// stop, so just leave this up to the statefulset.
+	return statefulsets.Delete(name, nil)
 }
 
 func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
