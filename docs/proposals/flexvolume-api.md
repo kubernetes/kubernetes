@@ -51,12 +51,12 @@ Proposes fewer APIs with stable request & response API objects.
 
 // Capabilities of the driver
 message DriverCapabilities {
-    enum read_write_modes {
+    enum ReadWriteMode {
         READ_ONLY = 0;
         READ_WRITE_ONCE = 1;
         READ_WRITE_MANY = 2;
     }
-	repeated string supported_read_write_modes = 1;
+	ReadWriteMode supported_read_write_mode = 1;
     enum AttachmentPolicy {
         NONE = 0;  // Driver does not support attach/detach.
         LOCAL = 1; // Driver supports local volume attachments from kubelet.
@@ -180,13 +180,13 @@ Expose the existing in-tree plugin API as driver API. For more details on existi
 * Many call outs. For full support, a plugin has to implement 17 APIs.
 
 ## Dynamic Provisioning support:
-To support Dynamic provisioning driver should
+To support Dynamic provisioning the driver should
 1. report the following capabilities and
  - DYNAMIC_PROVISIONING
-2. implement the following gRPC API calls
+2. implement create and delete logic in the following gRPC API calls
  - rpc Create(CreateRequest) returns (CreateResponse) {}
  - rpc Delete(DeleteRequest) returns (DeleteResponse) {}
- 
+
 Dynamic provisioning support is optional. If the driver reports "DYNAMIC_PROVISIONING" capability, flex volume plugin framework enables dynamic provisioning support and implements the required attach & detach interfaces for this driver.
 
 ## Attach detach support:
