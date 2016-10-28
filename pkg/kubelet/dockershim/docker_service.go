@@ -169,6 +169,16 @@ func (ds *dockerService) Version(_ string) (*runtimeApi.VersionResponse, error) 
 	}, nil
 }
 
-func (ds *dockerService) UpdateRuntimeConfig(runtimeConfig *runtimeApi.RuntimeConfig) error {
-	return nil
+// UpdateRuntimeConfig updates the runtime config. Currently only handles podCIDR updates.
+func (ds *dockerService) UpdateRuntimeConfig(runtimeConfig *runtimeApi.RuntimeConfig) (err error) {
+	if runtimeConfig == nil {
+		return
+	}
+	glog.Infof("docker cri received runtime config %+v", runtimeConfig)
+	if ds.networkPlugin != nil && runtimeConfig.NetworkConfig.PodCidr != nil {
+		event := make(map[string]interface{})
+		event[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = *runtimeConfig.NetworkConfig.PodCidr
+		ds.networkPlugin.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, event)
+	}
+	return
 }

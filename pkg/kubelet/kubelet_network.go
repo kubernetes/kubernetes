@@ -216,10 +216,16 @@ func (kl *Kubelet) updatePodCIDR(cidr string) {
 	glog.Infof("Setting Pod CIDR: %v -> %v", podCIDR, cidr)
 	kl.runtimeState.setPodCIDR(cidr)
 
+	// kubelet -> network plugin
 	if kl.networkPlugin != nil {
 		details := make(map[string]interface{})
 		details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = cidr
 		kl.networkPlugin.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, details)
+	}
+
+	// kubelet -> generic runtime -> runtime shim -> network plugin
+	if err := kl.GetRuntime().UpdatePodCIDR(cidr); err != nil {
+		glog.Errorf("Failed to update pod CIDR: %v", err)
 	}
 }
 
