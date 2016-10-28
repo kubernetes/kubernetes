@@ -54,8 +54,7 @@ const (
 // for the linux platform.  This implementation assumes that the
 // kubelet is running in the host's root mount namespace.
 type Mounter struct {
-	mounterPath       string
-	mounterRootfsPath string
+	mounterPath string
 }
 
 // Mount mounts source to target as fstype with given options. 'source' and 'fstype' must
