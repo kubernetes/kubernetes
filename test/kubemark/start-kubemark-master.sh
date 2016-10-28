@@ -81,7 +81,7 @@ if [ "${TEST_ETCD_VERSION:0:2}" == "3." ]; then
   # TODO: Set larger quota to see if that helps with
   # 'mvcc: database space exceeded' errors. If so, pipe
   # though our setup scripts.
-  ETCD_QUOTA_BYTES="--backend-quota-bytes=4294967296 "
+  ETCD_QUOTA_BYTES="--quota-backend-bytes=4294967296 "
 fi
 
 if [ "${EVENT_STORE_IP}" == "127.0.0.1" ]; then
@@ -102,7 +102,7 @@ retry sudo docker run --net=host \
 	--listen-peer-urls http://127.0.0.1:2380 \
 	--advertise-client-urls=http://127.0.0.1:2379 \
 	--listen-client-urls=http://0.0.0.0:2379 \
-	--data-dir=/var/etcd/data 1>> /var/log/etcd.log 2>&1"
+	--data-dir=/var/etcd/data ${ETCD_QUOTA_BYTES} 1>> /var/log/etcd.log 2>&1"
 
 # Increase the allowed number of open file descriptors
 ulimit -n 65536
