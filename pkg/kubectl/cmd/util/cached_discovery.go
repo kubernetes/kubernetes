@@ -234,9 +234,9 @@ func (d *CachedDiscoveryClient) Invalidate() {
 // NewCachedDiscoveryClient creates a new DiscoveryClient.  cacheDirectory is the directory where discovery docs are held.  It must be unique per host:port combination to work well.
 func NewCachedDiscoveryClient(delegate discovery.DiscoveryInterface, cacheDirectory string, ttl time.Duration) *CachedDiscoveryClient {
 	return &CachedDiscoveryClient{
-		delegate: delegate,
+		delegate:       delegate,
 		cacheDirectory: cacheDirectory,
-		ttl: ttl,
+		ttl:            ttl,
 		// round down to cope with second precision of a number of file systems
 		startedAt: time.Now().Truncate(time.Second),
 	}
