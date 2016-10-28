@@ -27,6 +27,7 @@ import (
 	"path"
 	rt "runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/admission"
@@ -40,7 +41,9 @@ import (
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/flushwriter"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wsstream"
+	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/emicklei/go-restful"
 	"github.com/golang/glog"
@@ -343,10 +346,48 @@ func APIVersionHandler(s runtime.NegotiatedSerializer, getAPIVersionsFunc func(r
 	}
 }
 
+// TODO: Remove in 1.6. Returns if kubectl is older than v1.5.0
+func isOldKubectl(userAgent string) bool {
+	// example userAgent string: kubectl-1.3/v1.3.8 (linux/amd64) kubernetes/e328d5b
+	if !strings.Contains(userAgent, "kubectl") {
+		return false
+	}
+	userAgent = strings.Split(userAgent, " ")[0]
+	subs := strings.Split(userAgent, "/")
+	if len(subs) != 2 {
+		return false
+	}
+	kubectlVersion, versionErr := version.Parse(subs[1])
+	if versionErr != nil {
+		return false
+	}
+	return kubectlVersion.LT(version.MustParse("v1.5.0"))
+}
+
+// TODO: Remove in 1.6. This is for backward compatibility with 1.4 kubectl.
+// See https://github.com/kubernetes/kubernetes/issues/35791
+var groupsWithNewVersionsIn1_5 = sets.NewString("apps", "policy")
+
+// TODO: Remove in 1.6.
+func filterAPIGroups(req *restful.Request, groups []unversioned.APIGroup) []unversioned.APIGroup {
+	if !isOldKubectl(req.HeaderParameter("User-Agent")) {
+		return groups
+	}
+	// hide API group that has new versions added in 1.5.
+	var ret []unversioned.APIGroup
+	for _, group := range groups {
+		if groupsWithNewVersionsIn1_5.Has(group.Name) {
+			continue
+		}
+		ret = append(ret, group)
+	}
+	return ret
+}
+
 // RootAPIHandler returns a handler which will list the provided groups and versions as available.
 func RootAPIHandler(s runtime.NegotiatedSerializer, f func(req *restful.Request) []unversioned.APIGroup) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
-		writeNegotiated(s, unversioned.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, &unversioned.APIGroupList{Groups: f(req)})
+		writeNegotiated(s, unversioned.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, &unversioned.APIGroupList{Groups: filterAPIGroups(req, f(req))})
 	}
 }
 
