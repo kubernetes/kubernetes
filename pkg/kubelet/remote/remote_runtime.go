@@ -319,6 +319,23 @@ func (r *RemoteRuntimeService) PortForward(req *runtimeApi.PortForwardRequest) (
 	return resp, nil
 }
 
+// UpdateRuntimeConfig updates the config of a runtime service. The only
+// update payload currently supported is the pod CIDR assigned to a node,
+// and the runtime service just proxies it down to the network plugin.
 func (r *RemoteRuntimeService) UpdateRuntimeConfig(runtimeConfig *runtimeApi.RuntimeConfig) error {
+	ctx, cancel := getContextWithTimeout(r.timeout)
+	defer cancel()
+
+	// Response doesn't contain anything of interest. This translates to an
+	// Event notification to the network plugin, which can't fail, so we're
+	// really looking to surface destination unreachable.
+	_, err := r.runtimeClient.UpdateRuntimeConfig(ctx, &runtimeApi.UpdateRuntimeConfigRequest{
+		RuntimeConfig: runtimeConfig,
+	})
+
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

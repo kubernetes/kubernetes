@@ -2179,6 +2179,12 @@ func (r *Runtime) PortForward(pod *kubecontainer.Pod, port uint16, stream io.Rea
 	return command.Run()
 }
 
+// UpdatePodCIDR updates the runtimeconfig with the podCIDR.
+// Currently no-ops, just implemented to satisfy the cri.
+func (r *Runtime) UpdatePodCIDR(podCIDR string) error {
+	return nil
+}
+
 // appStateToContainerState converts rktapi.AppState to kubecontainer.ContainerState.
 func appStateToContainerState(state rktapi.AppState) kubecontainer.ContainerState {
 	switch state {

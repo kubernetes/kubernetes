@@ -118,6 +118,10 @@ type Runtime interface {
 	ContainerAttacher
 	// ImageService provides methods to image-related methods.
 	ImageService
+	// UpdatePodCIDR sends a new podCIDR to the runtime.
+	// This method just proxies a new runtimeConfig with the updated
+	// CIDR value down to the runtime shim.
+	UpdatePodCIDR(podCIDR string) error
 }
 
 type ImageService interface {
