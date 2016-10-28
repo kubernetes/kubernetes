@@ -12,6 +12,10 @@ spec:
   - name: kube-addon-manager
     # When updating version also bump it in cluster/images/hyperkube/static-pods/addon-manager.json
     image: gcr.io/google-containers/kube-addon-manager:v5.2
+    command:
+    - /bin/bash
+    - -c
+    - /opt/kube-addons.sh 1>>/var/log/kube-addon-manager.log 2>&1
     resources:
       requests:
         cpu: 5m
@@ -20,7 +24,13 @@ spec:
     - mountPath: /etc/kubernetes/
       name: addons
       readOnly: true
+    - mountPath: /var/log
+      name: varlog
+      readOnly: false
   volumes:
   - hostPath:
       path: /etc/kubernetes/
     name: addons
+  - hostPath:
+      path: /var/log
+    name: varlog
