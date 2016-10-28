@@ -76,18 +76,18 @@ func (a *adminConfig) HostFactory(host, kubeconfigPath string) cmdutil.Factory {
 // SubcommandFlags holds the flags required by the subcommands of
 // `kubefed`.
 type SubcommandFlags struct {
-	Name                string
-	Host                string
-	HostSystemNamespace string
-	Kubeconfig          string
+	Name                      string
+	Host                      string
+	FederationSystemNamespace string
+	Kubeconfig                string
 }
 
 // AddSubcommandFlags adds the definition for `kubefed` subcommand
 // flags.
 func AddSubcommandFlags(cmd *cobra.Command) {
 	cmd.Flags().String("kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
-	cmd.Flags().String("host", "", "Host cluster context")
-	cmd.Flags().String("host-system-namespace", "federation-system", "Namespace in the host cluster where the federation system components are installed")
+	cmd.Flags().String("host-cluster-context", "", "Host cluster context")
+	cmd.Flags().String("federation-system-namespace", "federation-system", "Namespace in the host cluster where the federation system components are installed")
 }
 
 // GetSubcommandFlags retrieves the command line flag values for the
@@ -98,10 +98,10 @@ func GetSubcommandFlags(cmd *cobra.Command, args []string) (*SubcommandFlags, er
 		return nil, err
 	}
 	return &SubcommandFlags{
-		Name:                name,
-		Host:                cmdutil.GetFlagString(cmd, "host"),
-		HostSystemNamespace: cmdutil.GetFlagString(cmd, "host-system-namespace"),
-		Kubeconfig:          cmdutil.GetFlagString(cmd, "kubeconfig"),
+		Name: name,
+		Host: cmdutil.GetFlagString(cmd, "host-cluster-context"),
+		FederationSystemNamespace: cmdutil.GetFlagString(cmd, "federation-system-namespace"),
+		Kubeconfig:                cmdutil.GetFlagString(cmd, "kubeconfig"),
 	}, nil
 }
 

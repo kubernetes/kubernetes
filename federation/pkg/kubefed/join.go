@@ -103,7 +103,7 @@ func joinFederation(f cmdutil.Factory, cmdOut io.Writer, config util.AdminConfig
 	//    don't have to print the created secret in the default case.
 	// Having said that, secret generation machinery could be altered to
 	// suit our needs, but it is far less invasive and readable this way.
-	_, err = createSecret(hostFactory, clientConfig, joinFlags.HostSystemNamespace, joinFlags.Name, dryRun)
+	_, err = createSecret(hostFactory, clientConfig, joinFlags.FederationSystemNamespace, joinFlags.Name, dryRun)
 	if err != nil {
 		return err
 	}

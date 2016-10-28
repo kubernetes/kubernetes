@@ -50,9 +50,9 @@ import (
 )
 
 const (
-	APIServerCN         = "federation-apiserver"
-	ControllerManagerCN = "federation-controller-manager"
-	DNSDomain           = "cluster.local."
+	APIServerCN                 = "federation-apiserver"
+	ControllerManagerCN         = "federation-controller-manager"
+	HostClusterLocalDNSZoneName = "cluster.local."
 
 	lbAddrRetryInterval = 5 * time.Second
 )
@@ -63,19 +63,40 @@ var (
 
         Federation control plane is hosted inside a Kubernetes
         cluster. The host cluster must be specified using the
-        --host flag.`)
+        --host-cluster-context flag.`)
 	init_example = templates.Examples(`
 		# Initialize federation control plane for a federation
 		# named foo in the host cluster whose local kubeconfig
 		# context is bar.
-		kubectl init foo --host=bar`)
+		kubectl init foo --host-cluster-context=bar`)
+
+	componentLabel = map[string]string{
+		"app": "federated-cluster",
+	}
+
+	apiserverSvcSelector = map[string]string{
+		"app":    "federated-cluster",
+		"module": "federation-apiserver",
+	}
+
+	apiserverPodLabels = map[string]string{
+		"app":    "federated-cluster",
+		"module": "federation-apiserver",
+	}
+
+	controllerManagerPodLabels = map[string]string{
+		"app":    "federated-cluster",
+		"module": "federation-controller-manager",
+	}
+
+	hyperkubeImage = "gcr.io/google_containers/hyperkube-amd64:v1.5.0"
 )
 
 // NewCmdInit defines the `init` command that bootstraps a federation
 // control plane inside a set of host clusters.
 func NewCmdInit(f cmdutil.Factory, cmdOut io.Writer, config util.AdminConfig) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "init FEDERATION --host=HOST_CONTEXT",
+		Use:     "init FEDERATION_NAME --host-cluster-context=HOST_CONTEXT",
 		Short:   "init initializes a federation control plane",
 		Long:    init_long,
 		Example: init_example,
@@ -91,9 +112,9 @@ func NewCmdInit(f cmdutil.Factory, cmdOut io.Writer, config util.AdminConfig) *c
 }
 
 type entityKeyPairs struct {
-	ca     *triple.KeyPair
-	server *triple.KeyPair
-	cm     *triple.KeyPair
+	ca                *triple.KeyPair
+	server            *triple.KeyPair
+	controllerManager *triple.KeyPair
 }
 
 // initFederation initializes a federation control plane.
@@ -118,13 +139,13 @@ func initFederation(f cmdutil.Factory, cmdOut io.Writer, config util.AdminConfig
 	cmKubeconfigName := fmt.Sprintf("%s-kubeconfig", cmName)
 
 	// 1. Create a namespace for federation system components
-	_, err = createNamespace(hostClientset, initFlags.HostSystemNamespace)
+	_, err = createNamespace(hostClientset, initFlags.FederationSystemNamespace)
 	if err != nil {
 		return err
 	}
 
 	// 2. Expose a network endpoint for the federation API server
-	svc, err := createService(hostClientset, initFlags.HostSystemNamespace, serverName)
+	svc, err := createService(hostClientset, initFlags.FederationSystemNamespace, serverName)
 	if err != nil {
 		return err
 	}
@@ -134,36 +155,45 @@ func initFederation(f cmdutil.Factory, cmdOut io.Writer, config util.AdminConfig
 	}
 
 	// 3. Generate TLS certificates and credentials
-	entKeyPairs, err := genCerts(hostClientset, initFlags.HostSystemNamespace, initFlags.Name, svc.Name, DNSDomain, ips, hostnames)
+	entKeyPairs, err := genCerts(initFlags.FederationSystemNamespace, initFlags.Name, svc.Name, HostClusterLocalDNSZoneName, ips, hostnames)
 	if err != nil {
 		return err
 	}
 
-	_, err = createAPIServerCredentialsSecret(hostClientset, initFlags.HostSystemNamespace, serverCredName, entKeyPairs)
+	_, err = createAPIServerCredentialsSecret(hostClientset, initFlags.FederationSystemNamespace, serverCredName, entKeyPairs)
 	if err != nil {
 		return err
 	}
 
 	// 4. Create a kubeconfig secret
-	_, err = createControllerManagerKubeconfigSecret(hostClientset, initFlags.HostSystemNamespace, initFlags.Name, svc.Name, cmKubeconfigName, entKeyPairs)
+	_, err = createControllerManagerKubeconfigSecret(hostClientset, initFlags.FederationSystemNamespace, initFlags.Name, svc.Name, cmKubeconfigName, entKeyPairs)
 	if err != nil {
 		return err
 	}
 
-	// 5. Create a persistent volume and a claim to store the federation API server's state
-	pvc, err := createPVC(hostClientset, initFlags.HostSystemNamespace, svc.Name)
+	// 5. Create a persistent volume and a claim to store the federation
+	// API server's state. This is where federation API server's etcd
+	// stores its data.
+	pvc, err := createPVC(hostClientset, initFlags.FederationSystemNamespace, svc.Name)
 	if err != nil {
 		return err
+	}
+
+	// Since only one IP address can be specified as advertise address,
+	// we arbitrarily pick the first availabe IP address
+	advertiseAddress := ""
+	if len(ips) > 0 {
+		advertiseAddress = ips[0]
 	}
 
 	// 6. Create federation API server
-	_, err = createAPIServer(hostClientset, initFlags.HostSystemNamespace, serverName, serverCredName, pvc.Name, ips)
+	_, err = createAPIServer(hostClientset, initFlags.FederationSystemNamespace, serverName, serverCredName, pvc.Name, advertiseAddress)
 	if err != nil {
 		return err
 	}
 
 	// 7. Create federation controller manager
-	_, err = createControllerManager(hostClientset, initFlags.HostSystemNamespace, cmName, cmKubeconfigName, dnsZoneName)
+	_, err = createControllerManager(hostClientset, initFlags.FederationSystemNamespace, cmName, cmKubeconfigName, dnsZoneName)
 	if err != nil {
 		return err
 	}
@@ -185,16 +215,11 @@ func createService(clientset *client.Clientset, namespace, svcName string) (*api
 		ObjectMeta: api.ObjectMeta{
 			Name:      svcName,
 			Namespace: namespace,
-			Labels: map[string]string{
-				"app": "federated-cluster",
-			},
+			Labels:    componentLabel,
 		},
 		Spec: api.ServiceSpec{
-			Type: api.ServiceTypeLoadBalancer,
-			Selector: map[string]string{
-				"app":    "federated-cluster",
-				"module": "federation-apiserver",
-			},
+			Type:     api.ServiceTypeLoadBalancer,
+			Selector: apiserverSvcSelector,
 			Ports: []api.ServicePort{
 				{
 					Name:       "https",
@@ -240,12 +265,12 @@ func waitForLoadBalancerAddress(clientset *client.Clientset, svc *api.Service) (
 	return ips, hostnames, nil
 }
 
-func genCerts(clientset *client.Clientset, svcNamespace, name, svcName, dnsDomain string, ips, hostnames []string) (*entityKeyPairs, error) {
+func genCerts(svcNamespace, name, svcName, localDNSZoneName string, ips, hostnames []string) (*entityKeyPairs, error) {
 	ca, err := triple.NewCA(name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CA key and certificate: %v", err)
 	}
-	server, err := triple.NewServerKeyPair(ca, APIServerCN, svcName, svcNamespace, dnsDomain, ips, hostnames)
+	server, err := triple.NewServerKeyPair(ca, APIServerCN, svcName, svcNamespace, localDNSZoneName, ips, hostnames)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create federation API server key and certificate: %v", err)
 	}
@@ -254,9 +279,9 @@ func genCerts(clientset *client.Clientset, svcNamespace, name, svcName, dnsDomai
 		return nil, fmt.Errorf("failed to create federation controller manager client key and certificate: %v", err)
 	}
 	return &entityKeyPairs{
-		ca:     ca,
-		server: server,
-		cm:     cm,
+		ca:                ca,
+		server:            server,
+		controllerManager: cm,
 	}, nil
 }
 
@@ -290,8 +315,8 @@ func createControllerManagerKubeconfigSecret(clientset *client.Clientset, namesp
 		basicClientConfig,
 		name,
 		"federation-controller-manager",
-		certutil.EncodePrivateKeyPEM(entKeyPairs.cm.Key),
-		certutil.EncodeCertPEM(entKeyPairs.cm.Cert),
+		certutil.EncodePrivateKeyPEM(entKeyPairs.controllerManager.Key),
+		certutil.EncodeCertPEM(entKeyPairs.controllerManager.Cert),
 	)
 
 	return util.CreateKubeconfigSecret(clientset, config, namespace, kubeconfigName, false)
@@ -307,9 +332,7 @@ func createPVC(clientset *client.Clientset, namespace, svcName string) (*api.Per
 		ObjectMeta: api.ObjectMeta{
 			Name:      fmt.Sprintf("%s-etcd-claim", svcName),
 			Namespace: namespace,
-			Labels: map[string]string{
-				"app": "federated-cluster",
-			},
+			Labels:    componentLabel,
 			Annotations: map[string]string{
 				"volume.alpha.kubernetes.io/storage-class": "yes",
 			},
@@ -329,7 +352,7 @@ func createPVC(clientset *client.Clientset, namespace, svcName string) (*api.Per
 	return clientset.Core().PersistentVolumeClaims(namespace).Create(pvc)
 }
 
-func createAPIServer(clientset *client.Clientset, namespace, name, credentialsName, pvcName string, ips []string) (*extensions.Deployment, error) {
+func createAPIServer(clientset *client.Clientset, namespace, name, credentialsName, pvcName, advertiseAddress string) (*extensions.Deployment, error) {
 	command := []string{
 		"/hyperkube",
 		"federation-apiserver",
@@ -343,33 +366,30 @@ func createAPIServer(clientset *client.Clientset, namespace, name, credentialsNa
 		"--tls-cert-file=/etc/federation/apiserver/server.crt",
 		"--tls-private-key-file=/etc/federation/apiserver/server.key",
 	}
-	// Since only one IP address can be specified as advertise address, we arbitrarily pick the first availabe IP address
-	if len(ips) > 0 {
-		command = append(command, fmt.Sprintf("--advertise-address=%s", ips[0]))
+
+	if advertiseAddress != "" {
+		command = append(command, fmt.Sprintf("--advertise-address=%s", advertiseAddress))
 	}
+
+	dataVolumeName := "etcddata"
 
 	dep := &extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
-			Labels: map[string]string{
-				"app": "federated-cluster",
-			},
+			Labels:    componentLabel,
 		},
 		Spec: extensions.DeploymentSpec{
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
-					Name: name,
-					Labels: map[string]string{
-						"app":    "federated-cluster",
-						"module": "federation-apiserver",
-					},
+					Name:   name,
+					Labels: apiserverPodLabels,
 				},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{
 							Name:    "apiserver",
-							Image:   "gcr.io/google_containers/hyperkube-amd64:v1.5.0",
+							Image:   hyperkubeImage,
 							Command: command,
 							Ports: []api.ContainerPort{
 								{
@@ -399,7 +419,7 @@ func createAPIServer(clientset *client.Clientset, namespace, name, credentialsNa
 							},
 							VolumeMounts: []api.VolumeMount{
 								{
-									Name:      "etcddata",
+									Name:      dataVolumeName,
 									MountPath: "/var/etcd",
 								},
 							},
@@ -415,7 +435,7 @@ func createAPIServer(clientset *client.Clientset, namespace, name, credentialsNa
 							},
 						},
 						{
-							Name: "etcddata",
+							Name: dataVolumeName,
 							VolumeSource: api.VolumeSource{
 								PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
 									ClaimName: pvcName,
@@ -436,24 +456,19 @@ func createControllerManager(clientset *client.Clientset, namespace, name, kubec
 		ObjectMeta: api.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
-			Labels: map[string]string{
-				"app": "federated-cluster",
-			},
+			Labels:    componentLabel,
 		},
 		Spec: extensions.DeploymentSpec{
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
-					Name: name,
-					Labels: map[string]string{
-						"app":    "federated-cluster",
-						"module": "federation-controller-manager",
-					},
+					Name:   name,
+					Labels: controllerManagerPodLabels,
 				},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{
 							Name:  "controller-manager",
-							Image: "gcr.io/google_containers/hyperkube-amd64:v1.5.0",
+							Image: hyperkubeImage,
 							Command: []string{
 								"/hyperkube",
 								"federation-controller-manager",
