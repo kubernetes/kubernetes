@@ -158,7 +158,7 @@ Finalizer breaks an assumption that many Kubernetes components have: a deletion 
 
 **Replication controller manager**, **Job controller**, and **ReplicaSet controller** ignore pods in terminated phase, so pods with pending finalizers will not block these controllers.
 
-**PetSet controller** will be blocked by a pod with pending finalizers, so synchronous GC might slow down its progress.
+**StatefulSet controller** will be blocked by a pod with pending finalizers, so synchronous GC might slow down its progress.
 
 **kubectl**: synchronous GC can simplify the **kubectl delete** reapers. Let's take the `deployment reaper` as an example, since it's the most complicated one. Currently, the reaper finds all `RS` with matching labels, scales them down, polls until `RS.Status.Replica` reaches 0, deletes the `RS`es, and finally deletes the `deployment`. If using synchronous GC, `kubectl delete deployment` is as easy as sending a synchronous GC delete request for the deployment, and polls until the deployment is deleted from the key-value store.
 

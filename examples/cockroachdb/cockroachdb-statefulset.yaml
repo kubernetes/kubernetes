@@ -23,10 +23,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  # This service only exists to create DNS entries for each pet in the petset
-  # such that they can resolve each other's IP addresses. It does not create a
-  # load-balanced ClusterIP and should not be used directly by clients in most
-  # circumstances.
+  # This service only exists to create DNS entries for each pod in the stateful
+  # set such that they can resolve each other's IP addresses. It does not
+  # create a load-balanced ClusterIP and should not be used directly by clients
+  # in most circumstances.
   name: cockroachdb
   labels:
     app: cockroachdb
@@ -55,7 +55,7 @@ spec:
     app: cockroachdb
 ---
 apiVersion: apps/v1beta1
-kind: PetSet
+kind: StatefulSet
 metadata:
   name: cockroachdb
 spec:
@@ -71,8 +71,8 @@ spec:
         # it's started up for the first time. It has to exit successfully
         # before the pod's main containers are allowed to start.
         # This particular init container does a DNS lookup for other pods in
-        # the petset to help determine whether or not a cluster already exists.
-        # If any other pets exist, it creates a file in the cockroach-data
+        # the set to help determine whether or not a cluster already exists.
+        # If any other pods exist, it creates a file in the cockroach-data
         # directory to pass that information along to the primary container that
         # has to decide what command-line flags to use when starting CockroachDB.
         # This only matters when a pod's persistent volume is empty - if it has
