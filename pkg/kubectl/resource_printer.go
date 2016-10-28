@@ -489,6 +489,7 @@ var (
 	clusterRoleColumns           = []string{"NAME", "AGE"}
 	clusterRoleBindingColumns    = []string{"NAME", "AGE"}
 	storageClassColumns          = []string{"NAME", "TYPE"}
+	statusColumns                = []string{"STATUS", "REASON", "MESSAGE"}
 
 	// TODO: consider having 'KIND' for third party resource data
 	thirdPartyResourceDataColumns    = []string{"NAME", "LABELS", "DATA"}
@@ -591,6 +592,7 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(certificateSigningRequestColumns, printCertificateSigningRequestList)
 	h.Handler(storageClassColumns, printStorageClass)
 	h.Handler(storageClassColumns, printStorageClassList)
+	h.Handler(statusColumns, printStatus)
 }
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
@@ -2111,6 +2113,14 @@ func printStorageClassList(scList *storage.StorageClassList, w io.Writer, option
 			return err
 		}
 	}
+	return nil
+}
+
+func printStatus(status *unversioned.Status, w io.Writer, options PrintOptions) error {
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n", status.Status, status.Reason, status.Message); err != nil {
+		return err
+	}
+
 	return nil
 }
 

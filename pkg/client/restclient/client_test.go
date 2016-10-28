@@ -47,6 +47,26 @@ type TestParam struct {
 	testBodyErrorIsNotNil bool
 }
 
+// TestSerializer makes sure that you're always able to decode an unversioned API object
+func TestSerializer(t *testing.T) {
+	contentConfig := ContentConfig{
+		ContentType:          "application/json",
+		GroupVersion:         &unversioned.GroupVersion{Group: "other", Version: runtime.APIVersionInternal},
+		NegotiatedSerializer: api.Codecs,
+	}
+
+	serializer, err := createSerializers(contentConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// bytes based on actual return from API server when encoding an "unversioned" object
+	obj, err := runtime.Decode(serializer.Decoder, []byte(`{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Success"}`))
+	t.Log(obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestDoRequestSuccess(t *testing.T) {
 	testServer, fakeHandler, status := testServerEnv(t, 200)
 	defer testServer.Close()
@@ -162,10 +182,11 @@ func TestBadRequest(t *testing.T) {
 }
 
 func validate(testParam TestParam, t *testing.T, body []byte, fakeHandler *utiltesting.FakeHandler) {
-	if testParam.expectingError {
-		if testParam.actualError == nil {
-			t.Errorf("Expected error")
-		}
+	switch {
+	case testParam.expectingError && testParam.actualError == nil:
+		t.Errorf("Expected error")
+	case !testParam.expectingError && testParam.actualError != nil:
+		t.Error(testParam.actualError)
 	}
 	if !testParam.expCreated {
 		if testParam.actualCreated {
