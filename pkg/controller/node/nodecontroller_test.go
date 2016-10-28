@@ -1723,14 +1723,14 @@ func TestCheckPod(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{DeletionTimestamp: &unversioned.Time{}},
 				Spec:       api.PodSpec{NodeName: ""},
 			},
-			prune: true,
+			prune: false,
 		},
 		{
 			pod: api.Pod{
 				ObjectMeta: api.ObjectMeta{DeletionTimestamp: &unversioned.Time{}},
 				Spec:       api.PodSpec{NodeName: "nonexistant"},
 			},
-			prune: true,
+			prune: false,
 		},
 	}
 
