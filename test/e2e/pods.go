@@ -103,7 +103,6 @@ var _ = framework.KubeDescribe("Pods Delete Grace Period", func() {
 		pod, err = podClient.Get(pod.Name)
 		Expect(err).NotTo(HaveOccurred(), "failed to GET scheduled pod")
 
-
 		// start local proxy, so we can send graceful deletion over query string, rather than body parameter
 		cmd := framework.KubectlCmd("proxy", "-p", "0")
 		stdout, stderr, err := framework.StartCmdAndStreamOutput(cmd)
