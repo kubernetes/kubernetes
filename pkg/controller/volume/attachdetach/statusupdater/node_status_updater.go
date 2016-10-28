@@ -107,16 +107,11 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 
 		_, err = nsu.kubeClient.Core().Nodes().PatchStatus(nodeName, patchBytes)
 		if err != nil {
+			// If update node status fails, reset flag statusUpdateNeeded back to true
+			// to indicate this node status needs to be udpated again
+			nsu.actualStateOfWorld.SetNodeStatusUpdateNeeded(nodeName)
 			return fmt.Errorf(
 				"failed to kubeClient.Core().Nodes().Patch for node %q. %v",
-				nodeName,
-				err)
-		}
-
-		err = nsu.actualStateOfWorld.ResetNodeStatusUpdateNeeded(nodeName)
-		if err != nil {
-			return fmt.Errorf(
-				"failed to ResetNodeStatusUpdateNeeded for node %q. %v",
 				nodeName,
 				err)
 		}
