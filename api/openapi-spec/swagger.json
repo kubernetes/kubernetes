@@ -33873,7 +33873,7 @@
       "type": "string"
      },
      "unschedulable": {
-      "description": "Unschedulable controls node schedulability of new pods. By default, node is schedulable. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration\"`",
+      "description": "Unschedulable controls node schedulability of new pods. By default, node is schedulable. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration\"",
       "type": "boolean"
      }
     }

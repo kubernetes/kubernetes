@@ -2818,7 +2818,7 @@ type NodeSpec struct {
 	// +optional
 	ProviderID string `json:"providerID,omitempty" protobuf:"bytes,3,opt,name=providerID"`
 	// Unschedulable controls node schedulability of new pods. By default, node is schedulable.
-	// More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration"`
+	// More info: http://releases.k8s.io/HEAD/docs/admin/node.md#manual-node-administration"
 	// +optional
 	Unschedulable bool `json:"unschedulable,omitempty" protobuf:"varint,4,opt,name=unschedulable"`
 }
