@@ -22,11 +22,13 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/validation"
 
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
@@ -220,8 +222,9 @@ func getNamedCertificateMap(namedCertKeys []NamedCertKey) (map[string]*tls.Certi
 		if err != nil {
 			return nil, fmt.Errorf("parse error for certificate in %q: %v", nkc.CertFile, err)
 		}
-		if len(x509Cert.Subject.CommonName) > 0 {
-			tlsCertsByName[x509Cert.Subject.CommonName] = cert
+		cn := x509Cert.Subject.CommonName
+		if cn == "*" || len(validation.IsDNS1123Subdomain(strings.TrimPrefix(cn, "*."))) == 0 {
+			tlsCertsByName[cn] = cert
 		}
 		for _, san := range x509Cert.DNSNames {
 			tlsCertsByName[san] = cert
