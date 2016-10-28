@@ -41,6 +41,8 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+const ServiceServingCASecretKey = "service-ca.crt"
+
 // RemoveTokenBackoff is the recommended (empirical) retry interval for removing
 // a secret reference from a service account when the secret is deleted. It is
 // exported for use by custom secret controllers.
@@ -66,6 +68,9 @@ type TokensControllerOptions struct {
 	// MaxRetries controls the maximum number of times a particular key is retried before giving up
 	// If zero, a default max is used
 	MaxRetries int
+
+	// This CA will be added in the secrets of service accounts
+	ServiceServingCA []byte
 }
 
 // NewTokensController returns a new *TokensController.
@@ -76,9 +81,10 @@ func NewTokensController(cl clientset.Interface, options TokensControllerOptions
 	}
 
 	e := &TokensController{
-		client: cl,
-		token:  options.TokenGenerator,
-		rootCA: options.RootCA,
+		client:           cl,
+		token:            options.TokenGenerator,
+		rootCA:           options.RootCA,
+		serviceServingCA: options.ServiceServingCA,
 
 		syncServiceAccountQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "serviceaccount_tokens_service"),
 		syncSecretQueue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "serviceaccount_tokens_secret"),
@@ -137,7 +143,8 @@ type TokensController struct {
 	client clientset.Interface
 	token  serviceaccount.TokenGenerator
 
-	rootCA []byte
+	rootCA           []byte
+	serviceServingCA []byte
 
 	serviceAccounts cache.Store
 	secrets         cache.Indexer
@@ -420,6 +427,9 @@ func (e *TokensController) ensureReferencedToken(serviceAccount *api.ServiceAcco
 	if e.rootCA != nil && len(e.rootCA) > 0 {
 		secret.Data[api.ServiceAccountRootCAKey] = e.rootCA
 	}
+	if e.serviceServingCA != nil && len(e.serviceServingCA) > 0 {
+		secret.Data[ServiceServingCASecretKey] = e.serviceServingCA
+	}
 
 	// Save the secret
 	createdToken, err := e.client.Core().Secrets(serviceAccount.Namespace).Create(secret)
@@ -454,22 +464,23 @@ func (e *TokensController) ensureReferencedToken(serviceAccount *api.ServiceAcco
 	return false, nil
 }
 
-func (e *TokensController) secretUpdateNeeded(secret *api.Secret) (bool, bool, bool) {
+func (e *TokensController) secretUpdateNeeded(secret *api.Secret) (bool, bool, bool, bool) {
 	caData := secret.Data[api.ServiceAccountRootCAKey]
 	needsCA := len(e.rootCA) > 0 && bytes.Compare(caData, e.rootCA) != 0
+	needsServiceServingCA := len(e.serviceServingCA) > 0 && bytes.Compare(secret.Data[ServiceServingCASecretKey], e.serviceServingCA) != 0
 
 	needsNamespace := len(secret.Data[api.ServiceAccountNamespaceKey]) == 0
 
 	tokenData := secret.Data[api.ServiceAccountTokenKey]
 	needsToken := len(tokenData) == 0
 
-	return needsCA, needsNamespace, needsToken
+	return needsCA, needsServiceServingCA, needsNamespace, needsToken
 }
 
 // generateTokenIfNeeded populates the token data for the given Secret if not already set
 func (e *TokensController) generateTokenIfNeeded(serviceAccount *api.ServiceAccount, cachedSecret *api.Secret) ( /* retry */ bool, error) {
 	// Check the cached secret to see if changes are needed
-	if needsCA, needsNamespace, needsToken := e.secretUpdateNeeded(cachedSecret); !needsCA && !needsToken && !needsNamespace {
+	if needsCA, needsServiceServingCA, needsNamespace, needsToken := e.secretUpdateNeeded(cachedSecret); !needsCA && !needsServiceServingCA && !needsToken && !needsNamespace {
 		return false, nil
 	}
 
@@ -488,8 +499,8 @@ func (e *TokensController) generateTokenIfNeeded(serviceAccount *api.ServiceAcco
 		return false, nil
 	}
 
-	needsCA, needsNamespace, needsToken := e.secretUpdateNeeded(liveSecret)
-	if !needsCA && !needsToken && !needsNamespace {
+	needsCA, needsServiceServingCA, needsNamespace, needsToken := e.secretUpdateNeeded(liveSecret)
+	if !needsCA && !needsServiceServingCA && !needsToken && !needsNamespace {
 		return false, nil
 	}
 
@@ -503,6 +514,9 @@ func (e *TokensController) generateTokenIfNeeded(serviceAccount *api.ServiceAcco
 	// Set the CA
 	if needsCA {
 		liveSecret.Data[api.ServiceAccountRootCAKey] = e.rootCA
+	}
+	if needsServiceServingCA {
+		liveSecret.Data[ServiceServingCASecretKey] = e.serviceServingCA
 	}
 	// Set the namespace
 	if needsNamespace {

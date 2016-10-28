@@ -23,13 +23,32 @@ import (
 	"github.com/golang/groupcache/lru"
 )
 
+// Clock defines an interface for obtaining the current time
+type Clock interface {
+	Now() time.Time
+}
+
+// realClock implements the Clock interface by calling time.Now()
+type realClock struct{}
+
+func (realClock) Now() time.Time { return time.Now() }
+
 type LRUExpireCache struct {
+	// clock is used to obtain the current time
+	clock Clock
+
 	cache *lru.Cache
 	lock  sync.Mutex
 }
 
+// NewLRUExpireCache creates an expiring cache with the given size
 func NewLRUExpireCache(maxSize int) *LRUExpireCache {
-	return &LRUExpireCache{cache: lru.New(maxSize)}
+	return &LRUExpireCache{clock: realClock{}, cache: lru.New(maxSize)}
+}
+
+// NewLRUExpireCache creates an expiring cache with the given size, using the specified clock to obtain the current time
+func NewLRUExpireCacheWithClock(maxSize int, clock Clock) *LRUExpireCache {
+	return &LRUExpireCache{clock: clock, cache: lru.New(maxSize)}
 }
 
 type cacheEntry struct {
@@ -40,7 +59,7 @@ type cacheEntry struct {
 func (c *LRUExpireCache) Add(key lru.Key, value interface{}, ttl time.Duration) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	c.cache.Add(key, &cacheEntry{value, time.Now().Add(ttl)})
+	c.cache.Add(key, &cacheEntry{value, c.clock.Now().Add(ttl)})
 	// Remove entry from cache after ttl.
 	time.AfterFunc(ttl, func() { c.remove(key) })
 }
@@ -52,7 +71,7 @@ func (c *LRUExpireCache) Get(key lru.Key) (interface{}, bool) {
 	if !ok {
 		return nil, false
 	}
-	if time.Now().After(e.(*cacheEntry).expireTime) {
+	if c.clock.Now().After(e.(*cacheEntry).expireTime) {
 		go c.remove(key)
 		return nil, false
 	}

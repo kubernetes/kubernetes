@@ -38,8 +38,10 @@ func (l *testLoader) Load() (*clientcmdapi.Config, error) {
 }
 
 type testClientConfig struct {
-	config *restclient.Config
-	err    error
+	config             *restclient.Config
+	namespace          string
+	namespaceSpecified bool
+	err                error
 }
 
 func (c *testClientConfig) RawConfig() (clientcmdapi.Config, error) {
@@ -49,7 +51,7 @@ func (c *testClientConfig) ClientConfig() (*restclient.Config, error) {
 	return c.config, c.err
 }
 func (c *testClientConfig) Namespace() (string, bool, error) {
-	return "", false, fmt.Errorf("unexpected call")
+	return c.namespace, c.namespaceSpecified, c.err
 }
 func (c *testClientConfig) ConfigAccess() ConfigAccess {
 	return nil
@@ -212,6 +214,115 @@ func TestInClusterConfig(t *testing.T) {
 		}
 		if err != test.err || cfg != test.result {
 			t.Errorf("%s: unexpected result: %v %#v", name, err, cfg)
+		}
+	}
+}
+
+func TestInClusterConfigNamespace(t *testing.T) {
+	err1 := fmt.Errorf("unique error")
+
+	testCases := map[string]struct {
+		clientConfig *testClientConfig
+		icc          *testICC
+
+		checkedICC bool
+		result     string
+		ok         bool
+		err        error
+	}{
+		"in-cluster checked on other error": {
+			clientConfig: &testClientConfig{err: ErrEmptyConfig},
+			icc:          &testICC{},
+
+			checkedICC: true,
+			err:        ErrEmptyConfig,
+		},
+
+		"in-cluster not checked on non-empty error": {
+			clientConfig: &testClientConfig{err: ErrEmptyCluster},
+			icc:          &testICC{},
+
+			err: ErrEmptyCluster,
+		},
+
+		"in-cluster checked when config is default": {
+			clientConfig: &testClientConfig{},
+			icc:          &testICC{},
+
+			checkedICC: true,
+		},
+
+		"in-cluster not checked when config is not equal to default": {
+			clientConfig: &testClientConfig{namespace: "test", namespaceSpecified: true},
+			icc:          &testICC{},
+
+			result: "test",
+			ok:     true,
+		},
+
+		"in-cluster checked when namespcae is not specified, but is defaulted": {
+			clientConfig: &testClientConfig{namespace: "test", namespaceSpecified: false},
+			icc:          &testICC{},
+
+			checkedICC: true,
+			result:     "test",
+			ok:         false,
+		},
+
+		"in-cluster error returned when config is empty": {
+			clientConfig: &testClientConfig{err: ErrEmptyConfig},
+			icc: &testICC{
+				possible: true,
+				testClientConfig: testClientConfig{
+					err: err1,
+				},
+			},
+
+			checkedICC: true,
+			err:        err1,
+		},
+
+		"in-cluster config returned when config is empty": {
+			clientConfig: &testClientConfig{err: ErrEmptyConfig},
+			icc: &testICC{
+				possible: true,
+				testClientConfig: testClientConfig{
+					namespace:          "test",
+					namespaceSpecified: true,
+				},
+			},
+
+			checkedICC: true,
+			result:     "test",
+			ok:         true,
+		},
+
+		"in-cluster config returned when config is empty with default": {
+			clientConfig: &testClientConfig{err: ErrEmptyConfig},
+			icc: &testICC{
+				possible: true,
+				testClientConfig: testClientConfig{
+					namespace:          "test",
+					namespaceSpecified: false,
+				},
+			},
+
+			checkedICC: true,
+			result:     "test",
+			ok:         false,
+		},
+	}
+
+	for name, test := range testCases {
+		c := &DeferredLoadingClientConfig{icc: test.icc}
+		c.clientConfig = test.clientConfig
+
+		ns, ok, err := c.Namespace()
+		if test.icc.called != test.checkedICC {
+			t.Errorf("%s: unexpected in-cluster-config call %t", name, test.icc.called)
+		}
+		if err != test.err || ns != test.result || ok != test.ok {
+			t.Errorf("%s: unexpected result: %v %s %t", name, err, ns, ok)
 		}
 	}
 }

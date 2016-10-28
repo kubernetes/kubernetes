@@ -643,7 +643,7 @@
       "type": "v1alpha1.PodDisruptionBudgetList",
       "method": "GET",
       "summary": "list or watch objects of kind PodDisruptionBudget",
-      "nickname": "listNamespacedPodDisruptionBudget",
+      "nickname": "listPodDisruptionBudgetForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -709,6 +709,45 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "v1alpha1.PodDisruptionBudget",
+      "method": "POST",
+      "summary": "create a PodDisruptionBudget",
+      "nickname": "createPodDisruptionBudgetForAllNamespaces",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1alpha1.PodDisruptionBudget",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1alpha1.PodDisruptionBudget"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -720,7 +759,7 @@
       "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of PodDisruptionBudget",
-      "nickname": "watchNamespacedPodDisruptionBudgetList",
+      "nickname": "watchPodDisruptionBudgetListForAllNamespaces",
       "parameters": [
        {
         "type": "string",

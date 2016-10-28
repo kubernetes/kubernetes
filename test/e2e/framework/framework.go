@@ -149,7 +149,8 @@ func getClientRepoConfig(src *restclient.Config) (dst *clientreporestclient.Conf
 	sv := reflect.ValueOf(src).Elem()
 	dv := reflect.ValueOf(dst).Elem()
 	for i := 0; i < sv.NumField(); i++ {
-		if skippedFields.Has(sv.Type().Field(i).Name) {
+		name := sv.Type().Field(i).Name
+		if skippedFields.Has(name) {
 			continue
 		}
 		sf := sv.Field(i).Interface()
@@ -157,10 +158,11 @@ func getClientRepoConfig(src *restclient.Config) (dst *clientreporestclient.Conf
 		if err != nil {
 			Expect(err).NotTo(HaveOccurred())
 		}
-		if !dv.Field(i).CanAddr() {
-			Failf("unaddressable field: %v", dv.Type().Field(i).Name)
+		v := dv.FieldByName(name)
+		if !v.CanAddr() {
+			continue
 		} else {
-			if err := json.Unmarshal(data, dv.Field(i).Addr().Interface()); err != nil {
+			if err := json.Unmarshal(data, v.Addr().Interface()); err != nil {
 				Expect(err).NotTo(HaveOccurred())
 			}
 		}

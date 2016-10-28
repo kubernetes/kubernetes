@@ -466,7 +466,7 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 }
 
 func (c *Cacher) terminateAllWatchers() {
-	glog.Warningf("Terminating all watchers from cacher %v", c.objectType)
+	glog.V(4).Infof("Terminating all watchers from cacher %v", c.objectType)
 	c.Lock()
 	defer c.Unlock()
 	c.watchers.terminateAll()

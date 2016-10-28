@@ -23,7 +23,6 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
@@ -142,12 +141,8 @@ func TestPlugin(t *testing.T) {
 	}
 
 	// Test Provisioner
-	cap := resource.MustParse("100Mi")
 	options := volume.VolumeOptions{
-		Capacity: cap,
-		AccessModes: []api.PersistentVolumeAccessMode{
-			api.ReadWriteOnce,
-		},
+		PVC: volumetest.CreateTestPVC("100Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
 	}
 	provisioner, err := plug.(*vsphereVolumePlugin).newProvisionerInternal(options, &fakePDManager{})
@@ -160,7 +155,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Provision() returned unexpected path %s", persistentSpec.Spec.PersistentVolumeSource.VsphereVolume.VolumePath)
 	}
 
-	cap = persistentSpec.Spec.Capacity[api.ResourceStorage]
+	cap := persistentSpec.Spec.Capacity[api.ResourceStorage]
 	size := cap.Value()
 	if size != 100*1024 {
 		t.Errorf("Provision() returned unexpected volume size: %v", size)

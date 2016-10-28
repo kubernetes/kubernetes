@@ -169,15 +169,22 @@ __custom_func() {
 	// and add a short forms entry in expandResourceShortcut() when appropriate.
 	// TODO: This should be populated using the discovery information from apiserver.
 	valid_resources = `Valid resource types include:
+   * buildconfigs (aka 'bc')
+   * builds
    * clusters (valid only for federation apiservers)
    * componentstatuses (aka 'cs')
    * configmaps (aka 'cm')
    * daemonsets (aka 'ds')
    * deployments (aka 'deploy')
+   * deploymentconfigs (aka 'dc')
    * events (aka 'ev')
    * endpoints (aka 'ep')
    * horizontalpodautoscalers (aka 'hpa')
+   * imagestreamimages (aka 'isimage')
+   * imagestreams (aka 'is')
+   * imagestreamtags (aka 'istag')
    * ingress (aka 'ing')
+   * groups
    * jobs
    * limitranges (aka 'limits')
    * nodes (aka 'no')
@@ -186,13 +193,18 @@ __custom_func() {
    * pods (aka 'po')
    * persistentvolumes (aka 'pv')
    * persistentvolumeclaims (aka 'pvc')
+   * policies
+   * projects
    * quota
    * resourcequotas (aka 'quota')
    * replicasets (aka 'rs')
    * replicationcontrollers (aka 'rc')
+   * rolebindings
+   * routes
    * secrets
    * serviceaccounts (aka 'sa')
    * services (aka 'svc')
+   * users
 `
 	usage_template = `{{if gt .Aliases 0}}
 
@@ -249,7 +261,7 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 				NewCmdCreate(f, out),
 				NewCmdExposeService(f, out),
 				NewCmdRun(f, in, out, err),
-				set.NewCmdSet(f, out),
+				set.NewCmdSet(f, out, err),
 			},
 		},
 		{

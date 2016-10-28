@@ -147,6 +147,20 @@ func Flatten(agg Aggregate) Aggregate {
 	return NewAggregate(result)
 }
 
+// Reduce will return err or, if err is an Aggregate and only has one item,
+// the first item in the aggregate.
+func Reduce(err error) error {
+	if agg, ok := err.(Aggregate); ok && err != nil {
+		switch len(agg.Errors()) {
+		case 1:
+			return agg.Errors()[0]
+		case 0:
+			return nil
+		}
+	}
+	return err
+}
+
 // AggregateGoroutines runs the provided functions in parallel, stuffing all
 // non-nil errors into the returned Aggregate.
 // Returns nil if all the functions complete successfully.

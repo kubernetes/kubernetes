@@ -134,6 +134,10 @@ type Factory struct {
 	PauseObject func(object runtime.Object) (bool, error)
 	// ResumeObject resumes a paused object ie. it will be reconciled by its controller.
 	ResumeObject func(object runtime.Object) (bool, error)
+	// ResolveImage resolves the image names. For kubernetes this function is just
+	// passthrough but it allows to perform more sophisticated image name resolving for
+	// third-party vendors.
+	ResolveImage func(imageName string) (string, error)
 	// Returns a schema that can validate objects stored on disk.
 	Validator func(validate bool, cacheDir string) (validation.Schema, error)
 	// SwaggerSchema returns the schema declaration for the provided group version kind.
@@ -670,6 +674,9 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				}
 				return false, fmt.Errorf("cannot resume %v", gvks[0])
 			}
+		},
+		ResolveImage: func(imageName string) (string, error) {
+			return imageName, nil
 		},
 		Scaler: func(mapping *meta.RESTMapping) (kubectl.Scaler, error) {
 			mappingVersion := mapping.GroupVersionKind.GroupVersion()
@@ -1238,6 +1245,29 @@ func DefaultClientConfig(flags *pflag.FlagSet) clientcmd.ClientConfig {
 	clientConfig := clientcmd.NewInteractiveDeferredLoadingClientConfig(loadingRules, overrides, os.Stdin)
 
 	return clientConfig
+}
+
+func (f *Factory) DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *kubectl.PrintOptions {
+	columnLabel, err := cmd.Flags().GetStringSlice("label-columns")
+	if err != nil {
+		columnLabel = []string{}
+	}
+	opts := &kubectl.PrintOptions{
+		NoHeaders:          GetFlagBool(cmd, "no-headers"),
+		WithNamespace:      withNamespace,
+		Wide:               GetWideFlag(cmd),
+		ShowAll:            GetFlagBool(cmd, "show-all"),
+		ShowLabels:         GetFlagBool(cmd, "show-labels"),
+		AbsoluteTimestamps: isWatch(cmd),
+		ColumnLabels:       columnLabel,
+	}
+
+	return opts
+}
+
+// DefaultResourceFilterFunc returns a collection of FilterFuncs suitable for filtering specific resource types.
+func (f *Factory) DefaultResourceFilterFunc() kubectl.Filters {
+	return kubectl.NewResourceFilter()
 }
 
 // PrintObject prints an api object given command line flags to modify the output format

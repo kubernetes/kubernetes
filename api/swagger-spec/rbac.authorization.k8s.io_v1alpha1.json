@@ -1705,7 +1705,7 @@
       "type": "v1alpha1.RoleBindingList",
       "method": "GET",
       "summary": "list or watch objects of kind RoleBinding",
-      "nickname": "listNamespacedRoleBinding",
+      "nickname": "listRoleBindingForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -1771,6 +1771,45 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "v1alpha1.RoleBinding",
+      "method": "POST",
+      "summary": "create a RoleBinding",
+      "nickname": "createRoleBindingForAllNamespaces",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1alpha1.RoleBinding",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1alpha1.RoleBinding"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -1782,7 +1821,7 @@
       "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of RoleBinding",
-      "nickname": "watchNamespacedRoleBindingList",
+      "nickname": "watchRoleBindingListForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -2471,7 +2510,7 @@
       "type": "v1alpha1.RoleList",
       "method": "GET",
       "summary": "list or watch objects of kind Role",
-      "nickname": "listNamespacedRole",
+      "nickname": "listRoleForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -2537,6 +2576,45 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "v1alpha1.Role",
+      "method": "POST",
+      "summary": "create a Role",
+      "nickname": "createRoleForAllNamespaces",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1alpha1.Role",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1alpha1.Role"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -2548,7 +2626,7 @@
       "type": "*versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Role",
-      "nickname": "watchNamespacedRoleList",
+      "nickname": "watchRoleListForAllNamespaces",
       "parameters": [
        {
         "type": "string",

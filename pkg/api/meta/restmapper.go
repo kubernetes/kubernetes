@@ -139,6 +139,7 @@ func (m *DefaultRESTMapper) Add(kind unversioned.GroupVersionKind, scope RESTSco
 // callers to use the RESTMapper they mean.
 var unpluralizedSuffixes = []string{
 	"endpoints",
+	"securitycontextconstraints",
 }
 
 // KindToResource converts Kind to a resource name.

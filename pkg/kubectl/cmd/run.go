@@ -80,7 +80,15 @@ var (
 		kubectl run pi --schedule="0/5 * * * ?" --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'`)
 )
 
+type RunOptions struct {
+	DefaultRestartAlwaysGenerator string
+	DefaultGenerator              string
+}
+
 func NewCmdRun(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
+	return NewCmdRunWithOptions(f, nil, cmdIn, cmdOut, cmdErr)
+}
+func NewCmdRunWithOptions(f *cmdutil.Factory, opts *RunOptions, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "run NAME --image=image [--env=\"key=value\"] [--port=port] [--replicas=replicas] [--dry-run=bool] [--overrides=inline-json] [--command] -- [COMMAND] [args...]",
 		// run-container is deprecated
@@ -90,7 +98,7 @@ func NewCmdRun(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *c
 		Example: run_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			argsLenAtDash := cmd.ArgsLenAtDash()
-			err := Run(f, cmdIn, cmdOut, cmdErr, cmd, args, argsLenAtDash)
+			err := Run(f, opts, cmdIn, cmdOut, cmdErr, cmd, args, argsLenAtDash)
 			cmdutil.CheckErr(err)
 		},
 	}
@@ -130,7 +138,7 @@ func addRunFlags(cmd *cobra.Command) {
 	cmd.Flags().String("schedule", "", "A schedule in the Cron format the job should be run with.")
 }
 
-func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobra.Command, args []string, argsLenAtDash int) error {
+func Run(f *cmdutil.Factory, opts *RunOptions, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobra.Command, args []string, argsLenAtDash int) error {
 	if len(os.Args) > 1 && os.Args[1] == "run-container" {
 		printDeprecationWarning("run", "run-container")
 	}
@@ -177,6 +185,14 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 	schedule := cmdutil.GetFlagString(cmd, "schedule")
 	if len(schedule) != 0 && len(generatorName) == 0 {
 		generatorName = "scheduledjob/v2alpha1"
+	}
+	if len(generatorName) == 0 && opts != nil {
+		switch {
+		case restartPolicy == api.RestartPolicyAlways:
+			generatorName = opts.DefaultRestartAlwaysGenerator
+		default:
+			generatorName = opts.DefaultGenerator
+		}
 	}
 	if len(generatorName) == 0 {
 		client, err := f.Client()
@@ -349,7 +365,7 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 	if outputFormat != "" || cmdutil.GetDryRunFlag(cmd) {
 		return f.PrintObject(cmd, mapper, obj, cmdOut)
 	}
-	cmdutil.PrintSuccess(mapper, false, cmdOut, mapping.Resource, args[0], "created")
+	cmdutil.PrintSuccess(mapper, false, cmdOut, mapping.Resource, args[0], cmdutil.GetDryRunFlag(cmd), "created")
 	return nil
 }
 
@@ -573,7 +589,7 @@ func generateService(f *cmdutil.Factory, cmd *cobra.Command, args []string, serv
 	if cmdutil.GetFlagString(cmd, "output") != "" || cmdutil.GetDryRunFlag(cmd) {
 		return f.PrintObject(cmd, mapper, obj, out)
 	}
-	cmdutil.PrintSuccess(mapper, false, out, mapping.Resource, args[0], "created")
+	cmdutil.PrintSuccess(mapper, false, out, mapping.Resource, args[0], cmdutil.GetDryRunFlag(cmd), "created")
 
 	return nil
 }

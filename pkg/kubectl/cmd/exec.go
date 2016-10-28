@@ -22,7 +22,6 @@ import (
 	"net/url"
 
 	dockerterm "github.com/docker/docker/pkg/term"
-	"github.com/golang/glog"
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
@@ -62,6 +61,7 @@ func NewCmdExec(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *
 
 		Executor: &DefaultRemoteExecutor{},
 	}
+
 	cmd := &cobra.Command{
 		Use:     "exec POD [-c CONTAINER] -- COMMAND [args...]",
 		Short:   "Execute a command in a container",
@@ -128,6 +128,9 @@ type StreamOptions struct {
 type ExecOptions struct {
 	StreamOptions
 
+	FullCmdName       string
+	SuggestedCmdUsage string
+
 	Command []string
 
 	Executor RemoteExecutor
@@ -153,6 +156,14 @@ func (p *ExecOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn []
 		if len(p.Command) < 1 {
 			return cmdutil.UsageError(cmd, execUsageStr)
 		}
+	}
+
+	cmdParent := cmd.Parent()
+	if cmdParent != nil {
+		p.FullCmdName = cmdParent.CommandPath()
+	}
+	if len(p.FullCmdName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "describe") {
+		p.SuggestedCmdUsage = fmt.Sprintf("Use '%s describe pod/%s' to see all of the containers in this pod.", p.FullCmdName, p.PodName)
 	}
 
 	namespace, _, err := f.DefaultNamespace()
@@ -258,7 +269,14 @@ func (p *ExecOptions) Run() error {
 
 	containerName := p.ContainerName
 	if len(containerName) == 0 {
-		glog.V(4).Infof("defaulting container name to %s", pod.Spec.Containers[0].Name)
+		if len(pod.Spec.Containers) > 1 {
+			usageString := fmt.Sprintf("Defaulting container name to %s.", pod.Spec.Containers[0].Name)
+			if len(p.SuggestedCmdUsage) > 0 {
+				usageString = fmt.Sprintf("%s\n%s", usageString, p.SuggestedCmdUsage)
+			}
+
+			fmt.Fprintf(p.Err, "%s\n", usageString)
+		}
 		containerName = pod.Spec.Containers[0].Name
 	}
 

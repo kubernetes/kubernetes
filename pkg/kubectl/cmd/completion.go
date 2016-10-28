@@ -234,7 +234,6 @@ __kubectl_quote() {
     fi
 }
 
-autoload -U +X compinit && compinit
 autoload -U +X bashcompinit && bashcompinit
 
 # use word boundary patterns for BSD or GNU sed

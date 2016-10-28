@@ -41,8 +41,10 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -352,10 +354,9 @@ type PrintOptions struct {
 // will only be printed if the object type changes. This makes it useful for printing items
 // received from watches.
 type HumanReadablePrinter struct {
-	handlerMap   map[reflect.Type]*handlerEntry
-	options      PrintOptions
-	lastType     reflect.Type
-	hiddenObjNum int
+	handlerMap map[reflect.Type]*handlerEntry
+	options    PrintOptions
+	lastType   reflect.Type
 }
 
 // NewHumanReadablePrinter creates a HumanReadablePrinter.
@@ -448,10 +449,6 @@ func (h *HumanReadablePrinter) HandledResources() []string {
 }
 
 func (h *HumanReadablePrinter) FinishPrint(output io.Writer, res string) error {
-	if !h.options.NoHeaders && !h.options.ShowAll && h.hiddenObjNum > 0 {
-		_, err := fmt.Fprintf(output, "  info: %d completed object(s) was(were) not shown in %s list. Pass --show-all to see all objects.\n\n", h.hiddenObjNum, res)
-		return err
-	}
 	return nil
 }
 
@@ -459,6 +456,7 @@ func (h *HumanReadablePrinter) FinishPrint(output io.Writer, res string) error {
 // pkg/kubectl/cmd/get.go to reflect the new resource type.
 var podColumns = []string{"NAME", "READY", "STATUS", "RESTARTS", "AGE"}
 var podTemplateColumns = []string{"TEMPLATE", "CONTAINER(S)", "IMAGE(S)", "PODLABELS"}
+var podDisruptionBudgetColumns = []string{"NAME", "MIN-AVAILABLE", "SELECTOR"}
 var replicationControllerColumns = []string{"NAME", "DESIRED", "CURRENT", "READY", "AGE"}
 var replicaSetColumns = []string{"NAME", "DESIRED", "CURRENT", "READY", "AGE"}
 var jobColumns = []string{"NAME", "DESIRED", "SUCCESSFUL", "AGE"}
@@ -495,14 +493,9 @@ var podSecurityPolicyColumns = []string{"NAME", "PRIV", "CAPS", "VOLUMEPLUGINS",
 var clusterColumns = []string{"NAME", "STATUS", "AGE"}
 var networkPolicyColumns = []string{"NAME", "POD-SELECTOR", "AGE"}
 var certificateSigningRequestColumns = []string{"NAME", "AGE", "REQUESTOR", "CONDITION"}
+var securityContextConstraintsColumns = []string{"NAME", "PRIV", "CAPS", "SELINUX", "RUNASUSER", "FSGROUP", "SUPGROUP", "PRIORITY", "READONLYROOTFS", "VOLUMES"}
 
 func (h *HumanReadablePrinter) printPod(pod *api.Pod, w io.Writer, options PrintOptions) error {
-	reason := string(pod.Status.Phase)
-	// if not printing all pods, skip terminated pods (default)
-	if !options.ShowAll && (reason == string(api.PodSucceeded) || reason == string(api.PodFailed)) {
-		h.hiddenObjNum++
-		return nil
-	}
 	if err := printPodBase(pod, w, options); err != nil {
 		return err
 	}
@@ -512,13 +505,6 @@ func (h *HumanReadablePrinter) printPod(pod *api.Pod, w io.Writer, options Print
 
 func (h *HumanReadablePrinter) printPodList(podList *api.PodList, w io.Writer, options PrintOptions) error {
 	for _, pod := range podList.Items {
-		reason := string(pod.Status.Phase)
-		// if not printing all pods, skip terminated pods (default)
-		if !options.ShowAll && (reason == string(api.PodSucceeded) || reason == string(api.PodFailed)) {
-			h.hiddenObjNum++
-			continue
-		}
-
 		if err := printPodBase(&pod, w, options); err != nil {
 			return err
 		}
@@ -532,6 +518,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(podColumns, h.printPod)
 	h.Handler(podTemplateColumns, printPodTemplate)
 	h.Handler(podTemplateColumns, printPodTemplateList)
+	h.Handler(podDisruptionBudgetColumns, printPodDisruptionBudget)
+	h.Handler(podDisruptionBudgetColumns, printPodDisruptionBudgetList)
 	h.Handler(replicationControllerColumns, printReplicationController)
 	h.Handler(replicationControllerColumns, printReplicationControllerList)
 	h.Handler(replicaSetColumns, printReplicaSet)
@@ -598,6 +586,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(certificateSigningRequestColumns, printCertificateSigningRequestList)
 	h.Handler(storageClassColumns, printStorageClass)
 	h.Handler(storageClassColumns, printStorageClassList)
+	h.Handler(securityContextConstraintsColumns, printSecurityContextConstraints)
+	h.Handler(securityContextConstraintsColumns, printSecurityContextConstraintsList)
 }
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
@@ -814,6 +804,41 @@ func printPodTemplate(pod *api.PodTemplate, w io.Writer, options PrintOptions) e
 func printPodTemplateList(podList *api.PodTemplateList, w io.Writer, options PrintOptions) error {
 	for _, pod := range podList.Items {
 		if err := printPodTemplate(&pod, w, options); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printPodDisruptionBudget(pdb *policy.PodDisruptionBudget, w io.Writer, options PrintOptions) error {
+	// name, minavailable, selector
+	name := formatResourceName(options.Kind, pdb.Name, options.WithKind)
+	namespace := pdb.Namespace
+
+	if options.WithNamespace {
+		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
+			return err
+		}
+	}
+
+	selector := "<none>"
+	if pdb.Spec.Selector != nil {
+		selector = unversioned.FormatLabelSelector(pdb.Spec.Selector)
+	}
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n",
+		name,
+		pdb.Spec.MinAvailable.String(),
+		selector,
+	); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func printPodDisruptionBudgetList(pdbList *policy.PodDisruptionBudgetList, w io.Writer, options PrintOptions) error {
+	for _, pdb := range pdbList.Items {
+		if err := printPodDisruptionBudget(&pdb, w, options); err != nil {
 			return err
 		}
 	}
@@ -2071,6 +2096,10 @@ func printNetworkPolicyList(list *extensions.NetworkPolicyList, w io.Writer, opt
 
 func printStorageClass(sc *storage.StorageClass, w io.Writer, options PrintOptions) error {
 	name := sc.Name
+
+	if storageutil.IsDefaultAnnotation(sc.ObjectMeta) {
+		name += " (default)"
+	}
 	provtype := sc.Provisioner
 
 	if _, err := fmt.Fprintf(w, "%s\t%s\t", name, provtype); err != nil {
@@ -2437,4 +2466,26 @@ func (j *JSONPathPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 // TODO: implement HandledResources()
 func (p *JSONPathPrinter) HandledResources() []string {
 	return []string{}
+}
+
+func printSecurityContextConstraints(item *api.SecurityContextConstraints, w io.Writer, options PrintOptions) error {
+	priority := "<none>"
+	if item.Priority != nil {
+		priority = fmt.Sprintf("%d", *item.Priority)
+	}
+
+	_, err := fmt.Fprintf(w, "%s\t%t\t%v\t%s\t%s\t%s\t%s\t%s\t%t\t%v\n", item.Name, item.AllowPrivilegedContainer,
+		item.AllowedCapabilities, item.SELinuxContext.Type,
+		item.RunAsUser.Type, item.FSGroup.Type, item.SupplementalGroups.Type, priority, item.ReadOnlyRootFilesystem, item.Volumes)
+	return err
+}
+
+func printSecurityContextConstraintsList(list *api.SecurityContextConstraintsList, w io.Writer, options PrintOptions) error {
+	for _, item := range list.Items {
+		if err := printSecurityContextConstraints(&item, w, options); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

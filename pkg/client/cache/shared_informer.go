@@ -18,6 +18,7 @@ package cache
 
 import (
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
@@ -68,11 +69,12 @@ func NewSharedInformer(lw ListerWatcher, objType runtime.Object, resyncPeriod ti
 // be shared amongst all consumers.
 func NewSharedIndexInformer(lw ListerWatcher, objType runtime.Object, resyncPeriod time.Duration, indexers Indexers) SharedIndexInformer {
 	sharedIndexInformer := &sharedIndexInformer{
-		processor:        &sharedProcessor{},
-		indexer:          NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers),
-		listerWatcher:    lw,
-		objectType:       objType,
-		fullResyncPeriod: resyncPeriod,
+		processor:             &sharedProcessor{},
+		indexer:               NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers),
+		listerWatcher:         lw,
+		objectType:            objType,
+		fullResyncPeriod:      resyncPeriod,
+		cacheMutationDetector: NewCacheMutationDetector(fmt.Sprintf("%v", reflect.TypeOf(objType))),
 	}
 	return sharedIndexInformer
 }
@@ -109,7 +111,8 @@ type sharedIndexInformer struct {
 	indexer    Indexer
 	controller *Controller
 
-	processor *sharedProcessor
+	processor             *sharedProcessor
+	cacheMutationDetector CacheMutationDetector
 
 	// This block is tracked to handle late initialization of the controller
 	listerWatcher    ListerWatcher
@@ -118,13 +121,6 @@ type sharedIndexInformer struct {
 
 	started     bool
 	startedLock sync.Mutex
-
-	// blockDeltas gives a way to stop all event distribution so that a late event handler
-	// can safely join the shared informer.
-	blockDeltas sync.Mutex
-	// stopCh is the channel used to stop the main Run process.  We have to track it so that
-	// late joiners can have a proper stop
-	stopCh <-chan struct{}
 }
 
 // dummyController hides the fact that a SharedInformer is different from a dedicated one
@@ -179,7 +175,7 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 		s.started = true
 	}()
 
-	s.stopCh = stopCh
+	s.cacheMutationDetector.Run(stopCh)
 	s.processor.run(stopCh)
 	s.controller.Run(stopCh)
 }
@@ -237,42 +233,22 @@ func (s *sharedIndexInformer) AddEventHandler(handler ResourceEventHandler) erro
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
 
-	if !s.started {
-		listener := newProcessListener(handler)
-		s.processor.listeners = append(s.processor.listeners, listener)
-		return nil
+	if s.started {
+		return fmt.Errorf("informer has already started")
 	}
-
-	// in order to safely join, we have to
-	// 1. stop sending add/update/delete notifications
-	// 2. do a list against the store
-	// 3. send synthetic "Add" events to the new handler
-	// 4. unblock
-	s.blockDeltas.Lock()
-	defer s.blockDeltas.Unlock()
 
 	listener := newProcessListener(handler)
 	s.processor.listeners = append(s.processor.listeners, listener)
-
-	go listener.run(s.stopCh)
-	go listener.pop(s.stopCh)
-
-	items := s.indexer.List()
-	for i := range items {
-		listener.add(addNotification{newObj: items[i]})
-	}
-
 	return nil
 }
 
 func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
-	s.blockDeltas.Lock()
-	defer s.blockDeltas.Unlock()
-
 	// from oldest to newest
 	for _, d := range obj.(Deltas) {
 		switch d.Type {
 		case Sync, Added, Updated:
+			s.cacheMutationDetector.AddObject(d.Object)
+
 			if old, exists, err := s.indexer.Get(d.Object); err == nil && exists {
 				if err := s.indexer.Update(d.Object); err != nil {
 					return err

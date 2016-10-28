@@ -41,6 +41,7 @@ var _ = framework.KubeDescribe("Kubernetes Dashboard", func() {
 	f := framework.NewDefaultFramework(uiServiceName)
 
 	It("should check that the kubernetes-dashboard instance is alive", func() {
+		framework.Skipf("UI is disabled")
 		By("Checking whether the kubernetes-dashboard service exists.")
 		err := framework.WaitForService(f.Client, uiNamespace, uiServiceName, true, framework.Poll, framework.ServiceStartTimeout)
 		Expect(err).NotTo(HaveOccurred())

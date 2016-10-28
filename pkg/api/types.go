@@ -776,6 +776,36 @@ type DownwardAPIVolumeFile struct {
 	Mode *int32 `json:"mode,omitempty"`
 }
 
+// DeprecatedDownwardAPIVolumeSource represents a volume containing downward API info.
+// This type is deprecated and should be replaced by use of the downwardAPI volume source.
+type DeprecatedDownwardAPIVolumeSource struct {
+	// Items is a list of downward API volume file
+	Items []DeprecatedDownwardAPIVolumeFile `json:"items,omitempty"`
+	// Mode bits to use on created files by default. Must be a value between
+	// 0 and 0777.
+	// Directories within the path are not affected by this setting.
+	// This might be in conflict with other options that affect the file
+	// mode, like fsGroup, and the result can be other mode bits set.
+	DefaultMode *int32 `json:"defaultMode,omitempty"`
+}
+
+// DeprecatedDownwardAPIVolumeFile represents information to create the file containing the pod field
+// This type is deprecated and should be replaced by use of the downwardAPI volume source.
+type DeprecatedDownwardAPIVolumeFile struct {
+	// Required: Name is the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'
+	Path string `json:"name"`
+	// Required: Selects a field of the pod: only annotations, labels, name and namespace are supported.
+	FieldRef *ObjectFieldSelector `json:"fieldRef,omitempty"`
+	// Selects a resource of the container: only resources limits and requests
+	// (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.
+	ResourceFieldRef *ResourceFieldSelector `json:"resourceFieldRef,omitempty"`
+	// Optional: mode bits to use on this file, must be a value between 0
+	// and 0777. If not specified, the volume defaultMode will be used.
+	// This might be in conflict with other options that affect the file
+	// mode, like fsGroup, and the result can be other mode bits set.
+	Mode *int32 `json:"mode,omitempty"`
+}
+
 // AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
 type AzureFileVolumeSource struct {
 	// the name of secret that contains Azure Storage Account Name and Key
@@ -2637,6 +2667,8 @@ const (
 	LimitTypePod LimitType = "Pod"
 	// Limit that applies to all containers in a namespace
 	LimitTypeContainer LimitType = "Container"
+	// Limit that applies to all persistent volume claims in a namespace
+	LimitTypePersistentVolumeClaim LimitType = "PersistentVolumeClaim"
 )
 
 // LimitRangeItem defines a min/max usage limit for any resource that matches on kind
@@ -3062,3 +3094,195 @@ const (
 	// DefaultFailureDomains defines the set of label keys used when TopologyKey is empty in PreferredDuringScheduling anti-affinity.
 	DefaultFailureDomains string = unversioned.LabelHostname + "," + unversioned.LabelZoneFailureDomain + "," + unversioned.LabelZoneRegion
 )
+
+// +genclient=true
+// +nonNamespaced=true
+
+// SecurityContextConstraints governs the ability to make requests that affect the SecurityContext
+// that will be applied to a container.
+type SecurityContextConstraints struct {
+	unversioned.TypeMeta
+	ObjectMeta
+
+	// Priority influences the sort order of SCCs when evaluating which SCCs to try first for
+	// a given pod request based on access in the Users and Groups fields.  The higher the int, the
+	// higher priority.  If scores for multiple SCCs are equal they will be sorted by name.
+	Priority *int32
+
+	// AllowPrivilegedContainer determines if a container can request to be run as privileged.
+	AllowPrivilegedContainer bool
+	// DefaultAddCapabilities is the default set of capabilities that will be added to the container
+	// unless the pod spec specifically drops the capability.  You may not list a capabiility in both
+	// DefaultAddCapabilities and RequiredDropCapabilities.
+	DefaultAddCapabilities []Capability
+	// RequiredDropCapabilities are the capabilities that will be dropped from the container.  These
+	// are required to be dropped and cannot be added.
+	RequiredDropCapabilities []Capability
+	// AllowedCapabilities is a list of capabilities that can be requested to add to the container.
+	// Capabilities in this field maybe added at the pod author's discretion.
+	// You must not list a capability in both AllowedCapabilities and RequiredDropCapabilities.
+	AllowedCapabilities []Capability
+	// Volumes is a white list of allowed volume plugins.  FSType corresponds directly with the field names
+	// of a VolumeSource (azureFile, configMap, emptyDir).  To allow all volumes you may use '*'.
+	Volumes []FSType
+	// AllowHostNetwork determines if the policy allows the use of HostNetwork in the pod spec.
+	AllowHostNetwork bool
+	// AllowHostPorts determines if the policy allows host ports in the containers.
+	AllowHostPorts bool
+	// AllowHostPID determines if the policy allows host pid in the containers.
+	AllowHostPID bool
+	// AllowHostIPC determines if the policy allows host ipc in the containers.
+	AllowHostIPC bool
+	// SELinuxContext is the strategy that will dictate what labels will be set in the SecurityContext.
+	SELinuxContext SELinuxContextStrategyOptions
+	// RunAsUser is the strategy that will dictate what RunAsUser is used in the SecurityContext.
+	RunAsUser RunAsUserStrategyOptions
+	// SupplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.
+	SupplementalGroups SupplementalGroupsStrategyOptions
+	// FSGroup is the strategy that will dictate what fs group is used by the SecurityContext.
+	FSGroup FSGroupStrategyOptions
+	// ReadOnlyRootFilesystem when set to true will force containers to run with a read only root file
+	// system.  If the container specifically requests to run with a non-read only root file system
+	// the SCC should deny the pod.
+	// If set to false the container may run with a read only root file system if it wishes but it
+	// will not be forced to.
+	ReadOnlyRootFilesystem bool
+	// SeccompProfiles lists the allowed profiles that may be set for the pod or
+	// container's seccomp annotations.  An unset (nil) or empty value means that no profiles may
+	// be specifid by the pod or container.	The wildcard '*' may be used to allow all profiles.  When
+	// used to generate a value for a pod the first non-wildcard profile will be used as
+	// the default.
+	SeccompProfiles []string
+
+	// The users who have permissions to use this security context constraints
+	Users []string
+	// The groups that have permission to use this security context constraints
+	Groups []string
+}
+
+// FS Type gives strong typing to different file systems that are used by volumes.
+type FSType string
+
+var (
+	FSTypeAzureFile             FSType = "azureFile"
+	FSTypeAzureDisk             FSType = "azureDisk"
+	FSTypeFlocker               FSType = "flocker"
+	FSTypeFlexVolume            FSType = "flexVolume"
+	FSTypeHostPath              FSType = "hostPath"
+	FSTypeEmptyDir              FSType = "emptyDir"
+	FSTypeGCEPersistentDisk     FSType = "gcePersistentDisk"
+	FSTypeAWSElasticBlockStore  FSType = "awsElasticBlockStore"
+	FSTypeGitRepo               FSType = "gitRepo"
+	FSTypeSecret                FSType = "secret"
+	FSTypeNFS                   FSType = "nfs"
+	FSTypeISCSI                 FSType = "iscsi"
+	FSTypeGlusterfs             FSType = "glusterfs"
+	FSTypePersistentVolumeClaim FSType = "persistentVolumeClaim"
+	FSTypeRBD                   FSType = "rbd"
+	FSTypeCinder                FSType = "cinder"
+	FSTypeCephFS                FSType = "cephFS"
+	FSTypeDownwardAPI           FSType = "downwardAPI"
+	FSTypeFC                    FSType = "fc"
+	FSTypeConfigMap             FSType = "configMap"
+	FSTypeVsphereVolume         FSType = "vsphere"
+	FSTypeQuobyte               FSType = "quobyte"
+	FSTypeAll                   FSType = "*"
+)
+
+// SELinuxContextStrategyOptions defines the strategy type and any options used to create the strategy.
+type SELinuxContextStrategyOptions struct {
+	// Type is the strategy that will dictate what SELinux context is used in the SecurityContext.
+	Type SELinuxContextStrategyType
+	// seLinuxOptions required to run as; required for MustRunAs
+	SELinuxOptions *SELinuxOptions
+}
+
+// RunAsUserStrategyOptions defines the strategy type and any options used to create the strategy.
+type RunAsUserStrategyOptions struct {
+	// Type is the strategy that will dictate what RunAsUser is used in the SecurityContext.
+	Type RunAsUserStrategyType
+	// UID is the user id that containers must run as.  Required for the MustRunAs strategy if not using
+	// namespace/service account allocated uids.
+	UID *int64
+	// UIDRangeMin defines the min value for a strategy that allocates by range.
+	UIDRangeMin *int64
+	// UIDRangeMax defines the max value for a strategy that allocates by range.
+	UIDRangeMax *int64
+}
+
+// FSGroupStrategyOptions defines the strategy type and options used to create the strategy.
+type FSGroupStrategyOptions struct {
+	// Type is the strategy that will dictate what FSGroup is used in the SecurityContext.
+	Type FSGroupStrategyType
+	// Ranges are the allowed ranges of fs groups.  If you would like to force a single
+	// fs group then supply a single range with the same start and end.
+	Ranges []IDRange
+}
+
+// SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy.
+type SupplementalGroupsStrategyOptions struct {
+	// Type is the strategy that will dictate what supplemental groups is used in the SecurityContext.
+	Type SupplementalGroupsStrategyType
+	// Ranges are the allowed ranges of supplemental groups.  If you would like to force a single
+	// supplemental group then supply a single range with the same start and end.
+	Ranges []IDRange
+}
+
+// IDRange provides a min/max of an allowed range of IDs.
+// TODO: this could be reused for UIDs.
+type IDRange struct {
+	// Min is the start of the range, inclusive.
+	Min int64
+	// Max is the end of the range, inclusive.
+	Max int64
+}
+
+// SELinuxContextStrategyType denotes strategy types for generating SELinux options for a
+// SecurityContext
+type SELinuxContextStrategyType string
+
+// RunAsUserStrategyType denotes strategy types for generating RunAsUser values for a
+// SecurityContext
+type RunAsUserStrategyType string
+
+// SupplementalGroupsStrategyType denotes strategy types for determining valid supplemental
+// groups for a SecurityContext.
+type SupplementalGroupsStrategyType string
+
+// FSGroupStrategyType denotes strategy types for generating FSGroup values for a
+// SecurityContext
+type FSGroupStrategyType string
+
+const (
+	// container must have SELinux labels of X applied.
+	SELinuxStrategyMustRunAs SELinuxContextStrategyType = "MustRunAs"
+	// container may make requests for any SELinux context labels.
+	SELinuxStrategyRunAsAny SELinuxContextStrategyType = "RunAsAny"
+
+	// container must run as a particular uid.
+	RunAsUserStrategyMustRunAs RunAsUserStrategyType = "MustRunAs"
+	// container must run as a particular uid.
+	RunAsUserStrategyMustRunAsRange RunAsUserStrategyType = "MustRunAsRange"
+	// container must run as a non-root uid
+	RunAsUserStrategyMustRunAsNonRoot RunAsUserStrategyType = "MustRunAsNonRoot"
+	// container may make requests for any uid.
+	RunAsUserStrategyRunAsAny RunAsUserStrategyType = "RunAsAny"
+
+	// container must have FSGroup of X applied.
+	FSGroupStrategyMustRunAs FSGroupStrategyType = "MustRunAs"
+	// container may make requests for any FSGroup labels.
+	FSGroupStrategyRunAsAny FSGroupStrategyType = "RunAsAny"
+
+	// container must run as a particular gid.
+	SupplementalGroupsStrategyMustRunAs SupplementalGroupsStrategyType = "MustRunAs"
+	// container may make requests for any gid.
+	SupplementalGroupsStrategyRunAsAny SupplementalGroupsStrategyType = "RunAsAny"
+)
+
+// SecurityContextConstraintsList is a list of SecurityContextConstraints objects
+type SecurityContextConstraintsList struct {
+	unversioned.TypeMeta `json:",inline"`
+	unversioned.ListMeta `json:"metadata,omitempty"`
+
+	Items []SecurityContextConstraints `json:"items"`
+}

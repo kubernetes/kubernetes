@@ -609,12 +609,12 @@ func (r *resourceCollector) collectStats(oldStatsMap map[string]*stats.Container
 	defer r.lock.Unlock()
 	for _, name := range r.containers {
 		cStats, ok := cStatsMap[name]
-		if !ok {
+		if !ok || cStats.CPU == nil {
 			Logf("Missing info/stats for container %q on node %q", name, r.node)
 			return
 		}
 
-		if oldStats, ok := oldStatsMap[name]; ok {
+		if oldStats, ok := oldStatsMap[name]; ok && oldStats.CPU != nil {
 			if oldStats.CPU.Time.Equal(cStats.CPU.Time) {
 				// No change -> skip this stat.
 				continue

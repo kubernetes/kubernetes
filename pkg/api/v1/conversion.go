@@ -158,6 +158,12 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_extensions_ReplicaSet_to_v1_ReplicationController,
 		Convert_extensions_ReplicaSetSpec_to_v1_ReplicationControllerSpec,
 		Convert_extensions_ReplicaSetStatus_to_v1_ReplicationControllerStatus,
+
+		Convert_api_VolumeSource_To_v1_VolumeSource,
+		Convert_v1_VolumeSource_To_api_VolumeSource,
+
+		Convert_v1_SecurityContextConstraints_To_api_SecurityContextConstraints,
+		Convert_api_SecurityContextConstraints_To_v1_SecurityContextConstraints,
 	)
 	if err != nil {
 		return err
@@ -811,4 +817,86 @@ func AddFieldLabelConversionsForSecret(scheme *runtime.Scheme) error {
 				return "", "", fmt.Errorf("field label not supported: %s", label)
 			}
 		})
+}
+
+// This will Convert our internal represantation of VolumeSource to its v1 representation
+// Used for keeping backwards compatibility for the Metadata field
+func Convert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *VolumeSource, s conversion.Scope) error {
+	if err := autoConvert_api_VolumeSource_To_v1_VolumeSource(in, out, s); err != nil {
+		return err
+	}
+
+	// Metadata is a copy of DownwardAPI
+	if out.DownwardAPI != nil {
+		out.Metadata = &DeprecatedDownwardAPIVolumeSource{
+			DefaultMode: in.DownwardAPI.DefaultMode,
+		}
+		for _, item := range out.DownwardAPI.Items {
+			out.Metadata.Items = append(out.Metadata.Items, DeprecatedDownwardAPIVolumeFile{
+				Path:             item.Path,
+				FieldRef:         item.FieldRef,
+				ResourceFieldRef: item.ResourceFieldRef,
+				Mode:             item.Mode,
+			})
+		}
+	}
+
+	return nil
+}
+
+// This will Convert the v1 representation of VolumeSource to our internal representation
+// Used for keeping backwards compatibility for the Metadata field
+func Convert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.VolumeSource, s conversion.Scope) error {
+	if err := autoConvert_v1_VolumeSource_To_api_VolumeSource(in, out, s); err != nil {
+		return err
+	}
+
+	// Metadata overrides DownwardAPI
+	if in.Metadata != nil {
+		SetDefaults_DeprecatedDownwardAPIVolumeSource(in.Metadata)
+		out.DownwardAPI = &api.DownwardAPIVolumeSource{
+			DefaultMode: in.Metadata.DefaultMode,
+		}
+		for _, item := range in.Metadata.Items {
+			file := api.DownwardAPIVolumeFile{
+				Path: item.Path,
+				Mode: item.Mode,
+			}
+			if item.FieldRef != nil {
+				file.FieldRef = new(api.ObjectFieldSelector)
+				if err := Convert_v1_ObjectFieldSelector_To_api_ObjectFieldSelector(item.FieldRef, file.FieldRef, s); err != nil {
+					return err
+				}
+			}
+			if item.ResourceFieldRef != nil {
+				file.ResourceFieldRef = new(api.ResourceFieldSelector)
+				if err := Convert_v1_ResourceFieldSelector_To_api_ResourceFieldSelector(item.ResourceFieldRef, file.ResourceFieldRef, s); err != nil {
+					return err
+				}
+			}
+			out.DownwardAPI.Items = append(out.DownwardAPI.Items, file)
+		}
+	}
+	return nil
+}
+
+func Convert_v1_SecurityContextConstraints_To_api_SecurityContextConstraints(in *SecurityContextConstraints, out *api.SecurityContextConstraints, s conversion.Scope) error {
+	return autoConvert_v1_SecurityContextConstraints_To_api_SecurityContextConstraints(in, out, s)
+}
+
+func Convert_api_SecurityContextConstraints_To_v1_SecurityContextConstraints(in *api.SecurityContextConstraints, out *SecurityContextConstraints, s conversion.Scope) error {
+	if err := autoConvert_api_SecurityContextConstraints_To_v1_SecurityContextConstraints(in, out, s); err != nil {
+		return err
+	}
+
+	if in.Volumes != nil {
+		for _, v := range in.Volumes {
+			// set the Allow* fields based on the existence in the volume slice
+			switch v {
+			case api.FSTypeHostPath, api.FSTypeAll:
+				out.AllowHostDirVolumePlugin = true
+			}
+		}
+	}
+	return nil
 }

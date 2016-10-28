@@ -287,9 +287,6 @@ func (a *HorizontalController) reconcileAutoscaler(hpa *autoscaling.HorizontalPo
 	} else if hpa.Spec.MinReplicas != nil && currentReplicas < *hpa.Spec.MinReplicas {
 		rescaleReason = "Current number of replicas below Spec.MinReplicas"
 		desiredReplicas = *hpa.Spec.MinReplicas
-	} else if currentReplicas == 0 {
-		rescaleReason = "Current number of replicas must be greater than 0"
-		desiredReplicas = 1
 	} else {
 		// All basic scenarios covered, the state should be sane, lets use metrics.
 		cmAnnotation, cmAnnotationFound := hpa.Annotations[HpaCustomMetricsTargetAnnotationName]

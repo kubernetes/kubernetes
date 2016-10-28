@@ -102,7 +102,7 @@ func (jm *ScheduledJobController) SyncAll() {
 		return
 	}
 	sjs := sjl.Items
-	glog.Infof("Found %d scheduledjobs", len(sjs))
+	glog.V(4).Infof("Found %d scheduledjobs", len(sjs))
 
 	jl, err := jm.kubeClient.Batch().Jobs(api.NamespaceAll).List(api.ListOptions{})
 	if err != nil {
@@ -110,10 +110,10 @@ func (jm *ScheduledJobController) SyncAll() {
 		return
 	}
 	js := jl.Items
-	glog.Infof("Found %d jobs", len(js))
+	glog.V(4).Infof("Found %d jobs", len(js))
 
 	jobsBySj := groupJobsByParent(sjs, js)
-	glog.Infof("Found %d groups", len(jobsBySj))
+	glog.V(4).Infof("Found %d groups", len(jobsBySj))
 
 	for _, sj := range sjs {
 		SyncOne(sj, jobsBySj[sj.UID], time.Now(), jm.jobControl, jm.sjControl, jm.podControl, jm.recorder)

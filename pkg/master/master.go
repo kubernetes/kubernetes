@@ -76,6 +76,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/rangeallocation"
 	resourcequotaetcd "k8s.io/kubernetes/pkg/registry/resourcequota/etcd"
 	secretetcd "k8s.io/kubernetes/pkg/registry/secret/etcd"
+	sccetcd "k8s.io/kubernetes/pkg/registry/securitycontextconstraints/etcd"
 	"k8s.io/kubernetes/pkg/registry/service"
 	etcdallocator "k8s.io/kubernetes/pkg/registry/service/allocator/etcd"
 	serviceetcd "k8s.io/kubernetes/pkg/registry/service/etcd"
@@ -355,6 +356,8 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 	nodeStorage := nodeetcd.NewStorage(restOptions("nodes"), c.KubeletClient, m.ProxyTransport)
 	m.nodeRegistry = node.NewRegistry(nodeStorage.Node)
 
+	securityContextConstraintsStorage := sccetcd.NewStorage(restOptions("securityContextConstraints"))
+
 	podStorage := podetcd.NewStorage(
 		restOptions("pods"),
 		kubeletclient.ConnectionInfoGetter(nodeStorage.Node),
@@ -436,6 +439,7 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 		"namespaces/finalize":           namespaceFinalizeStorage,
 		"secrets":                       secretStorage,
 		"serviceAccounts":               serviceAccountStorage,
+		"securityContextConstraints":    securityContextConstraintsStorage,
 		"persistentVolumes":             persistentVolumeStorage,
 		"persistentVolumes/status":      persistentVolumeStatusStorage,
 		"persistentVolumeClaims":        persistentVolumeClaimStorage,

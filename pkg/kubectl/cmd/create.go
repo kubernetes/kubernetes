@@ -72,11 +72,12 @@ func NewCmdCreate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	usage := "Filename, directory, or URL to file to use to create the resource"
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	cmd.MarkFlagRequired("filename")
+	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
-	cmdutil.AddOutputFlagsForMutation(cmd)
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
+	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 
 	// create subcommands
@@ -124,6 +125,8 @@ func RunCreate(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *C
 		return err
 	}
 
+	dryRun := cmdutil.GetFlagBool(cmd, "dry-run")
+
 	count := 0
 	err = r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
@@ -139,8 +142,10 @@ func RunCreate(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *C
 			}
 		}
 
-		if err := createAndRefresh(info); err != nil {
-			return cmdutil.AddSourceToErr("creating", info.Source, err)
+		if !dryRun {
+			if err := createAndRefresh(info); err != nil {
+				return cmdutil.AddSourceToErr("creating", info.Source, err)
+			}
 		}
 
 		count++
@@ -148,7 +153,8 @@ func RunCreate(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *C
 		if !shortOutput {
 			f.PrintObjectSpecificMessage(info.Object, out)
 		}
-		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, "created")
+
+		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "created")
 		return nil
 	})
 	if err != nil {
@@ -234,7 +240,7 @@ func RunCreateSubcommand(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, 
 	}
 
 	if useShortOutput := options.OutputFormat == "name"; useShortOutput || len(options.OutputFormat) == 0 {
-		cmdutil.PrintSuccess(mapper, useShortOutput, out, mapping.Resource, options.Name, "created")
+		cmdutil.PrintSuccess(mapper, useShortOutput, out, mapping.Resource, options.Name, options.DryRun, "created")
 		return nil
 	}
 
