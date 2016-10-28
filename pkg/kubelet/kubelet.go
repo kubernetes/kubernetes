@@ -158,9 +158,6 @@ const (
 	// Period for performing image garbage collection.
 	ImageGCPeriod = 5 * time.Minute
 
-	// maxImagesInStatus is the number of max images we store in image status.
-	maxImagesInNodeStatus = 50
-
 	// Minimum number of dead containers to keep in a pod
 	minDeadContainerInPod = 1
 )

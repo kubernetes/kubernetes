@@ -44,6 +44,10 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
+const (
+	maxImageTagsForTest = 20
+)
+
 // generateTestingImageList generate randomly generated image list and corresponding expectedImageList.
 func generateTestingImageList(count int) ([]kubecontainer.Image, []api.ContainerImage) {
 	// imageList is randomly generated image list
@@ -64,7 +68,7 @@ func generateTestingImageList(count int) ([]kubecontainer.Image, []api.Container
 	var expectedImageList []api.ContainerImage
 	for _, kubeImage := range imageList {
 		apiImage := api.ContainerImage{
-			Names:     kubeImage.RepoTags,
+			Names:     kubeImage.RepoTags[0:maxNamesPerImageInNodeStatus],
 			SizeBytes: kubeImage.Size,
 		}
 
@@ -76,7 +80,9 @@ func generateTestingImageList(count int) ([]kubecontainer.Image, []api.Container
 
 func generateImageTags() []string {
 	var tagList []string
-	count := rand.IntnRange(1, maxImageTagsForTest+1)
+	// Generate > maxNamesPerImageInNodeStatus tags so that the test can verify
+	// that kubelet report up to maxNamesPerImageInNodeStatus tags.
+	count := rand.IntnRange(maxNamesPerImageInNodeStatus+1, maxImageTagsForTest+1)
 	for ; count > 0; count-- {
 		tagList = append(tagList, "gcr.io/google_containers:v"+strconv.Itoa(count))
 	}
