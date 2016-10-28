@@ -172,6 +172,13 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 			}
 		}()
 
+		framework.Logf("Waiting for client-a to come up.")
+		err = framework.WaitForPodRunningInNamespace(f.Client, podClientA)
+		Expect(err).NotTo(HaveOccurred(), "waiting for Client-A to run")
+		framework.Logf("Waiting for client-a to complete.")
+		err = framework.WaitForPodSuccessInNamespace(f.Client, podClientA.Name, ns.Name)
+		Expect(err).NotTo(HaveOccurred(), "checking client-a could communicate with server.")
+
 		// Create a pod with name 'client-b', which will attempt to comunicate with the server,
 		// but should not be able to due to the label-based policy.
 		By("Creating client-b which should *not* be able to contact the server.")
@@ -182,17 +189,9 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 				framework.Failf("unable to delete pod %v: %v", podClientB.Name, err)
 			}
 		}()
-
-		framework.Logf("Waiting for both clients to run.")
-		err = framework.WaitForPodRunningInNamespace(f.Client, podClientA)
-		Expect(err).NotTo(HaveOccurred(), "waiting for Client-A to run")
+		framework.Logf("Waiting for client-b to come up.")
 		err = framework.WaitForPodRunningInNamespace(f.Client, podClientB)
 		Expect(err).NotTo(HaveOccurred(), "waiting for Client-B to run")
-
-		framework.Logf("Waiting for client-a to complete.")
-		err = framework.WaitForPodSuccessInNamespace(f.Client, podClientA.Name, ns.Name)
-		Expect(err).NotTo(HaveOccurred(), "checking client-a could communicate with server.")
-
 		framework.Logf("Waiting for client-b to complete.")
 		err = framework.WaitForPodSuccessInNamespace(f.Client, podClientB.Name, ns.Name)
 		Expect(err).To(HaveOccurred(), "checking client-b could not communicate with server")
@@ -258,6 +257,13 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 			}
 		}()
 
+		framework.Logf("Waiting for client-a to come up.")
+		err = framework.WaitForPodRunningInNamespace(f.Client, podClientA)
+		Expect(err).NotTo(HaveOccurred(), "waiting for client-a to come up.")
+		framework.Logf("Waiting for client-a to complete.")
+		err = framework.WaitForPodSuccessInNamespace(f.Client, podClientA.Name, ns.Name)
+		Expect(err).NotTo(HaveOccurred(), "checking Client-A could communicate with server.")
+
 		By("Creating a client-b that should not succesfully connect to the closed port.")
 		podClientB := createClientPod(f, ns, clientBName, service, listeningPort2)
 		defer func() {
@@ -266,20 +272,12 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 				framework.Failf("unable to delete pod %v: %v", podClientB.Name, err)
 			}
 		}()
-
-		framework.Logf("Waiting for both clients to run.")
-		err = framework.WaitForPodRunningInNamespace(f.Client, podClientA)
-		Expect(err).NotTo(HaveOccurred(), "waiting for Client-A to run")
+		framework.Logf("Waiting for client-b to come up.")
 		err = framework.WaitForPodRunningInNamespace(f.Client, podClientB)
-		Expect(err).NotTo(HaveOccurred(), "waiting for Client-B to run")
-
-		framework.Logf("Waiting for client-a to complete.")
-		err = framework.WaitForPodSuccessInNamespace(f.Client, podClientA.Name, ns.Name)
-		Expect(err).NotTo(HaveOccurred(), "checking Client-A could communicate with server.")
-
+		Expect(err).NotTo(HaveOccurred(), "waiting for client-b to come up.")
 		framework.Logf("Waiting for client-b to complete.")
 		err = framework.WaitForPodSuccessInNamespace(f.Client, podClientB.Name, ns.Name)
-		Expect(err).To(HaveOccurred(), "checking Client-B could not communicate with server")
+		Expect(err).To(HaveOccurred(), "checking client-b could not communicate with server")
 	})
 
 	It("should enforce policy based on NamespaceSelector [Feature:NetworkPolicy]", func() {
@@ -356,6 +354,14 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 			}
 		}()
 
+		framework.Logf("Waiting for client-a to come up.")
+		err = framework.WaitForPodRunningInNamespace(f.Client, podClientA)
+		Expect(err).NotTo(HaveOccurred(), "waiting for client-a to run")
+		framework.Logf("Waiting for client-a to complete.")
+		err = framework.WaitForPodSuccessInNamespace(f.Client, podClientA.Name, nsA.Name)
+		Expect(err).To(HaveOccurred(), "checking client-a could not communicate with server.")
+
+
 		// Create a pod with name 'client-b', which will attempt to comunicate with the server,
 		// but should not be able to do to the label-based policy.
 		By("Creating client-b in ns-b which should be able to contact the server.")
@@ -367,16 +373,9 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 			}
 		}()
 
-		framework.Logf("Waiting for both clients to run.")
-		err = framework.WaitForPodRunningInNamespace(f.Client, podClientA)
-		Expect(err).NotTo(HaveOccurred(), "waiting for Client-A to run")
+		framework.Logf("Waiting for client-b to come up.")
 		err = framework.WaitForPodRunningInNamespace(f.Client, podClientB)
 		Expect(err).NotTo(HaveOccurred(), "waiting for Client-B to run")
-
-		framework.Logf("Waiting for client-a to complete.")
-		err = framework.WaitForPodSuccessInNamespace(f.Client, podClientA.Name, nsA.Name)
-		Expect(err).To(HaveOccurred(), "checking Client-A could not communicate with server.")
-
 		framework.Logf("Waiting for client-b to complete.")
 		err = framework.WaitForPodSuccessInNamespace(f.Client, podClientB.Name, nsB.Name)
 		Expect(err).NotTo(HaveOccurred(), "checking Client-B could communicate with server")
