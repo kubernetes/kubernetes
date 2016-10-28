@@ -99,8 +99,8 @@ function split-commas {
 }
 
 function install-rkt {
-    local -r rkt_binary="rkt-v1.17.0"
-    local -r rkt_sha1="e9183dcae0683e345cc73fef98ffd80a253d371a"
+    local -r rkt_binary="rkt-v1.18.0"
+    local -r rkt_sha1="75fc8f29c79bc9e505f3e7f6e8fadf2425c21967"
     download-or-bust "${rkt_sha1}" "https://storage.googleapis.com/kubernetes-release/rkt/${rkt_binary}"
     local -r rkt_dst="${KUBE_HOME}/bin/rkt"
     mv "${KUBE_HOME}/${rkt_binary}" "${rkt_dst}"
