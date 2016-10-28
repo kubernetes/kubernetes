@@ -90,6 +90,17 @@ addon-dir-create:
     - makedirs: True
 {% endif %}
 
+{% if pillar.get('enable_dns_horizontal_autoscaler', '').lower() == 'true'
+   and pillar.get('enable_cluster_dns', '').lower() == 'true' %}
+/etc/kubernetes/addons/dns-horizontal-autoscaler/dns-horizontal-autoscaler.yaml:
+  file.managed:
+    - source: salt://kube-addons/dns-horizontal-autoscaler/dns-horizontal-autoscaler.yaml
+    - user: root
+    - group: root
+    - file_mode: 644
+    - makedirs: True
+{% endif %}
+
 {% if pillar.get('enable_cluster_registry', '').lower() == 'true' %}
 /etc/kubernetes/addons/registry/registry-svc.yaml:
   file.managed:
