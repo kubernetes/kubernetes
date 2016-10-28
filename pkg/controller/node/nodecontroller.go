@@ -401,7 +401,7 @@ func (nc *NodeController) Run() {
 	go func() {
 		defer utilruntime.HandleCrash()
 
-		if !nc.nodeController.HasSynced() || !nc.podController.HasSynced() || !nc.daemonSetController.HasSynced() {
+		if !framework.WaitForCacheSync(wait.NeverStop, nc.nodeController.HasSynced, nc.podController.HasSynced, nc.daemonSetController.HasSynced) {
 			utilruntime.HandleError(errors.New("NodeController timed out while waiting for informers to sync..."))
 			return
 		}
@@ -487,10 +487,6 @@ func (nc *NodeController) Run() {
 		}, nodeEvictionPeriod, wait.NeverStop)
 
 		go wait.Until(func() {
-			if !nc.nodeController.HasSynced() || !nc.podController.HasSynced() || !nc.daemonSetController.HasSynced() {
-				glog.V(2).Infof("NodeController is waiting for informers to sync...")
-				return
-			}
 			pods, err := nc.podStore.List(labels.Everything())
 			if err != nil {
 				utilruntime.HandleError(err)
