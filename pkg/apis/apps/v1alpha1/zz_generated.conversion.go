@@ -22,13 +22,10 @@ package v1alpha1
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
-	reflect "reflect"
-	unsafe "unsafe"
 )
 
 func init() {
@@ -130,14 +127,21 @@ func autoConvert_v1alpha1_PetSetSpec_To_apps_PetSetSpec(in *PetSetSpec, out *app
 	if err := api.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
-	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Selector = in.Selector
 	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.VolumeClaimTemplates))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.VolumeClaimTemplates))
-		*outHdr = *inHdr
+	if in.VolumeClaimTemplates != nil {
+		in, out := &in.VolumeClaimTemplates, &out.VolumeClaimTemplates
+		*out = make([]api.PersistentVolumeClaim, len(*in))
+		for i := range *in {
+			// TODO: Inefficient conversion - can we improve it?
+			if err := s.Convert(&(*in)[i], &(*out)[i], 0); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.VolumeClaimTemplates = nil
 	}
 	out.ServiceName = in.ServiceName
 	return nil
@@ -147,21 +151,28 @@ func autoConvert_apps_PetSetSpec_To_v1alpha1_PetSetSpec(in *apps.PetSetSpec, out
 	if err := api.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
-	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Selector = in.Selector
 	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.VolumeClaimTemplates))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.VolumeClaimTemplates))
-		*outHdr = *inHdr
+	if in.VolumeClaimTemplates != nil {
+		in, out := &in.VolumeClaimTemplates, &out.VolumeClaimTemplates
+		*out = make([]v1.PersistentVolumeClaim, len(*in))
+		for i := range *in {
+			// TODO: Inefficient conversion - can we improve it?
+			if err := s.Convert(&(*in)[i], &(*out)[i], 0); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.VolumeClaimTemplates = nil
 	}
 	out.ServiceName = in.ServiceName
 	return nil
 }
 
 func autoConvert_v1alpha1_PetSetStatus_To_apps_PetSetStatus(in *PetSetStatus, out *apps.PetSetStatus, s conversion.Scope) error {
-	out.ObservedGeneration = (*int64)(unsafe.Pointer(in.ObservedGeneration))
+	out.ObservedGeneration = in.ObservedGeneration
 	out.Replicas = in.Replicas
 	return nil
 }
@@ -171,7 +182,7 @@ func Convert_v1alpha1_PetSetStatus_To_apps_PetSetStatus(in *PetSetStatus, out *a
 }
 
 func autoConvert_apps_PetSetStatus_To_v1alpha1_PetSetStatus(in *apps.PetSetStatus, out *PetSetStatus, s conversion.Scope) error {
-	out.ObservedGeneration = (*int64)(unsafe.Pointer(in.ObservedGeneration))
+	out.ObservedGeneration = in.ObservedGeneration
 	out.Replicas = in.Replicas
 	return nil
 }

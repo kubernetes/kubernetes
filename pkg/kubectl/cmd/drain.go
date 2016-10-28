@@ -54,7 +54,6 @@ type DrainOptions struct {
 	nodeInfo           *resource.Info
 	out                io.Writer
 	typer              runtime.ObjectTyper
-	ifPrint            bool
 }
 
 // Takes a pod and returns a bool indicating whether or not to operate on the
@@ -197,8 +196,6 @@ func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-
-	o.ifPrint = true
 
 	r := o.factory.NewBuilder().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -422,9 +419,7 @@ func (o *DrainOptions) waitForDelete(pods []api.Pod, interval, timeout time.Dura
 		for i, pod := range pods {
 			p, err := getPodFn(pod.Namespace, pod.Name)
 			if apierrors.IsNotFound(err) || (p != nil && p.ObjectMeta.UID != pod.ObjectMeta.UID) {
-				if o.ifPrint {
-					cmdutil.PrintSuccess(o.mapper, false, o.out, "pod", pod.Name, false, "deleted")
-				}
+				cmdutil.PrintSuccess(o.mapper, false, o.out, "pod", pod.Name, false, "deleted")
 				continue
 			} else if err != nil {
 				return false, err

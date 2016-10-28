@@ -102,8 +102,7 @@ coreos:
         --cluster-domain=${DNS_DOMAIN} \
         --logtostderr=true \
         --container-runtime=docker \
-        --network-plugin=${NETWORK_PROVIDER} \
-        --reconcile-cidr=true
+        --network-plugin=${NETWORK_PROVIDER}
         Restart=always
         RestartSec=10
         KillMode=process

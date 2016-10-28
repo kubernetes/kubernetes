@@ -126,7 +126,7 @@ func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) restful.Rou
 		func(ctx api.Context, name string, req *restful.Request) (runtime.Object, error) {
 			// For performance tracking purposes.
 			trace := util.NewTrace("Get " + req.Request.URL.Path)
-			defer trace.LogIfLong(250 * time.Millisecond)
+			defer trace.LogIfLong(500 * time.Millisecond)
 
 			// check for export
 			if values := req.Request.URL.Query(); len(values) > 0 {
@@ -334,7 +334,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 	return func(req *restful.Request, res *restful.Response) {
 		// For performance tracking purposes.
 		trace := util.NewTrace("Create " + req.Request.URL.Path)
-		defer trace.LogIfLong(250 * time.Millisecond)
+		defer trace.LogIfLong(500 * time.Millisecond)
 
 		w := res.ResponseWriter
 
@@ -656,7 +656,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 	return func(req *restful.Request, res *restful.Response) {
 		// For performance tracking purposes.
 		trace := util.NewTrace("Update " + req.Request.URL.Path)
-		defer trace.LogIfLong(250 * time.Millisecond)
+		defer trace.LogIfLong(500 * time.Millisecond)
 
 		w := res.ResponseWriter
 
@@ -743,7 +743,7 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 	return func(req *restful.Request, res *restful.Response) {
 		// For performance tracking purposes.
 		trace := util.NewTrace("Delete " + req.Request.URL.Path)
-		defer trace.LogIfLong(250 * time.Millisecond)
+		defer trace.LogIfLong(500 * time.Millisecond)
 
 		w := res.ResponseWriter
 
