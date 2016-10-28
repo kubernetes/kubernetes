@@ -478,7 +478,7 @@ function start-kubelet {
   flags+=" --experimental-mounter-path=${KUBE_HOME}/bin/mounter"
   # Note: This patch must match the rootfs path in mounter/mounter
   flags+=" --experimental-mounter-rootfs-path=/media/root"
-  
+
   if [[ -n "${KUBELET_PORT:-}" ]]; then
     flags+=" --port=${KUBELET_PORT}"
   fi
@@ -1171,6 +1171,10 @@ For Kubernetes copyright and licensing information, see:
   /home/kubernetes/LICENSES
 
 EOF
+}
+
+function pre-warm-mounter {
+    ${KUBE_HOME}/bin/mounter &> /dev/null
 }
 
 function pre-warm-mounter {
