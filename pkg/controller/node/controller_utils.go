@@ -231,7 +231,7 @@ func nodeRunningOutdatedKubelet(node *api.Node) bool {
 		return true
 	}
 	if podStatusReconciliationVersion.GT(v) {
-		glog.Infof("Node %v running kubelet at (%v) which is less than the minimum version that allows nodecontroller to mark pods NotReady (%v).", node.Name, v, podStatusReconciliationVersion)
+		glog.V(2).Infof("Node %v running kubelet at (%v) which is less than the minimum version that allows nodecontroller to mark pods NotReady (%v).", node.Name, v, podStatusReconciliationVersion)
 		return true
 	}
 	return false

@@ -113,13 +113,13 @@ func (p *petSyncer) Sync(pet *pcb) error {
 		}
 	} else if exists {
 		if !p.isHealthy(realPet.pod) {
-			glog.Infof("PetSet %v waiting on unhealthy pet %v", pet.parent.Name, realPet.pod.Name)
+			glog.V(2).Infof("PetSet %v waiting on unhealthy pet %v", pet.parent.Name, realPet.pod.Name)
 		}
 		return p.Update(realPet, pet)
 	}
 	if p.blockingPet != nil {
 		message := errUnhealthyPet(fmt.Sprintf("Create of %v in PetSet %v blocked by unhealthy pet %v", pet.pod.Name, pet.parent.Name, p.blockingPet.pod.Name))
-		glog.Info(message)
+		glog.V(2).Infof(message.Error())
 		return message
 	}
 	// This is counted as a create, even if it fails. We can't skip indices
@@ -149,17 +149,17 @@ func (p *petSyncer) Delete(pet *pcb) error {
 		return nil
 	}
 	if p.blockingPet != nil {
-		glog.Infof("Delete of %v in PetSet %v blocked by unhealthy pet %v", realPet.pod.Name, pet.parent.Name, p.blockingPet.pod.Name)
+		glog.V(2).Infof("Delete of %v in PetSet %v blocked by unhealthy pet %v", realPet.pod.Name, pet.parent.Name, p.blockingPet.pod.Name)
 		return nil
 	}
 	// This is counted as a delete, even if it fails.
 	// The returned error will force a requeue.
 	p.blockingPet = realPet
 	if !p.isDying(realPet.pod) {
-		glog.Infof("PetSet %v deleting pet %v", pet.parent.Name, pet.pod.Name)
+		glog.V(2).Infof("PetSet %v deleting pet %v", pet.parent.Name, pet.pod.Name)
 		return p.petClient.Delete(pet)
 	}
-	glog.Infof("PetSet %v waiting on pet %v to die in %v", pet.parent.Name, realPet.pod.Name, realPet.pod.DeletionTimestamp)
+	glog.V(2).Infof("PetSet %v waiting on pet %v to die in %v", pet.parent.Name, realPet.pod.Name, realPet.pod.DeletionTimestamp)
 	return nil
 }
 

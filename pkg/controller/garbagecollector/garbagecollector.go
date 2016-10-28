@@ -763,7 +763,7 @@ func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 	wait.PollInfinite(10*time.Second, func() (bool, error) {
 		for _, monitor := range gc.monitors {
 			if !monitor.controller.HasSynced() {
-				glog.Infof("Garbage Collector: Waiting for resource monitors to be synced...")
+				glog.V(4).Infof("Garbage Collector: Waiting for resource monitors to be synced...")
 				return false, nil
 			}
 		}

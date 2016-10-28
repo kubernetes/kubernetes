@@ -151,7 +151,7 @@ func (gcc *PodGCController) gcTerminated(pods []*api.Pod) {
 		deleteCount = terminatedPodCount
 	}
 	if deleteCount > 0 {
-		glog.Infof("garbage collecting %v pods", deleteCount)
+		glog.V(2).Infof("garbage collecting %v pods", deleteCount)
 	}
 
 	var wait sync.WaitGroup

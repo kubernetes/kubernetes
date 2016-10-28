@@ -337,7 +337,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return err
 	}
 	if !exists {
-		glog.Infof("Deployment has been deleted %v", key)
+		glog.V(3).Infof("Deployment has been deleted %v", key)
 		return nil
 	}
 

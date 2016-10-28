@@ -95,10 +95,10 @@ func NewCIDRRangeAllocator(client clientset.Interface, clusterCIDR *net.IPNet, s
 	if nodeList != nil {
 		for _, node := range nodeList.Items {
 			if node.Spec.PodCIDR == "" {
-				glog.Infof("Node %v has no CIDR, ignoring", node.Name)
+				glog.V(2).Infof("Node %v has no CIDR, ignoring", node.Name)
 				continue
 			} else {
-				glog.Infof("Node %v has CIDR %s, occupying it in CIDR map", node.Name, node.Spec.PodCIDR)
+				glog.V(2).Infof("Node %v has CIDR %s, occupying it in CIDR map", node.Name, node.Spec.PodCIDR)
 			}
 			if err := ra.occupyCIDR(&node); err != nil {
 				// This will happen if:
