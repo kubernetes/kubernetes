@@ -53,7 +53,13 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 }
 
 func SetDefaults_NodeConfiguration(obj *NodeConfiguration) {
-	// TODO set defaults for NodeConfiguration
+	if obj.APIPort == 0 {
+		obj.APIPort = kubeadmapi.DefaultAPIBindPort
+	}
+
+	if obj.DiscoveryPort == 0 {
+		obj.DiscoveryPort = kubeadmapi.DefaultDiscoveryBindPort
+	}
 }
 
 func SetDefaults_ClusterInfo(obj *ClusterInfo) {
