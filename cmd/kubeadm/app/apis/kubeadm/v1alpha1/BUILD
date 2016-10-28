@@ -13,14 +13,19 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "defaults.go",
         "doc.go",
         "register.go",
         "types.go",
+        "zz_generated.deepcopy.go",
+        "zz_generated.defaults.go",
     ],
     tags = ["automanaged"],
     deps = [
+        "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//pkg/api/unversioned:go_default_library",
         "//pkg/api/v1:go_default_library",
+        "//pkg/conversion:go_default_library",
         "//pkg/runtime:go_default_library",
     ],
 )
