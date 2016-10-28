@@ -151,6 +151,9 @@ generation, etc., and display the output
 
 * `--output-version=...`: Convert the output to a different API group/version
 
+* `--short`: Output a compact summary of normal output; the format is subject
+to change and is optimizied for reading not parsing.
+
 * `--validate`: Validate the resource schema
 
 ## Output conventions
