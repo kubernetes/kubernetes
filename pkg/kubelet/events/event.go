@@ -34,6 +34,10 @@ const (
 	ErrImageNeverPullPolicy = "ErrImageNeverPull"
 	BackOffPullImage        = "BackOff"
 
+	// Runtime event reason list
+	RuntimeReady    = "RuntimeReady"
+	RuntimeNotReady = "RuntimeNotReady"
+
 	// kubelet event reason list
 	NodeReady               = "NodeReady"
 	NodeNotReady            = "NodeNotReady"

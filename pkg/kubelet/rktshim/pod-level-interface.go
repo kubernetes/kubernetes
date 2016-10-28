@@ -57,3 +57,8 @@ func (*PodSandboxManager) PodSandboxStatus(string) (*runtimeApi.PodSandboxStatus
 func (*PodSandboxManager) ListPodSandbox(*runtimeApi.PodSandboxFilter) ([]*runtimeApi.PodSandbox, error) {
 	panic("not implemented")
 }
+
+// Status returns the status of the runtime service.
+func (*PodSandboxManager) Status() (*runtimeApi.StatusResponse, error) {
+	panic("not implemented")
+}

@@ -74,6 +74,8 @@ type RuntimeService interface {
 
 	// UpdateRuntimeConfig updates runtime configuration if specified
 	UpdateRuntimeConfig(runtimeConfig *runtimeApi.RuntimeConfig) error
+	// Status returns the status of the runtime service.
+	Status() (*runtimeApi.StatusResponse, error)
 }
 
 // ImageManagerService interface should be implemented by a container image

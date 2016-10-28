@@ -161,6 +161,10 @@ func (d *dockerService) UpdateRuntimeConfig(ctx context.Context, r *runtimeApi.U
 	return &runtimeApi.UpdateRuntimeConfigResponse{}, nil
 }
 
+func (d *dockerService) Status(ctx context.Context, r *runtimeApi.StatusRequest) (*runtimeApi.StatusResponse, error) {
+	return d.runtimeService.Status()
+}
+
 func (d *dockerService) ListImages(ctx context.Context, r *runtimeApi.ListImagesRequest) (*runtimeApi.ListImagesResponse, error) {
 	images, err := d.imageService.ListImages(r.GetFilter())
 	if err != nil {

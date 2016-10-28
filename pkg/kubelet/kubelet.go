@@ -519,6 +519,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			}
 			klet.containerRuntime, err = kuberuntime.NewKubeGenericRuntimeManager(
 				kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
+				klet.nodeRef,
 				klet.livenessManager,
 				containerRefManager,
 				machineInfo,
@@ -624,6 +625,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		}
 		klet.containerRuntime, err = kuberuntime.NewKubeGenericRuntimeManager(
 			kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
+			klet.nodeRef,
 			klet.livenessManager,
 			containerRefManager,
 			machineInfo,
