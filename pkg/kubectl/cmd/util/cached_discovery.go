@@ -219,18 +219,25 @@ func (d *CachedDiscoveryClient) Fresh() bool {
 	d.invalidationLock.Lock()
 	defer d.invalidationLock.Unlock()
 
-	return d.maxAge.IsZero() || d.maxAge.After(d.startedAt)
+	return d.maxAge.IsZero() || !d.startedAt.After(d.maxAge)
 }
 
 func (d *CachedDiscoveryClient) Invalidate() {
 	d.invalidationLock.Lock()
 	defer d.invalidationLock.Unlock()
 
-	d.lastInvalidation = time.Now()
+	// round down to cope with second precision of a number of file systems
+	d.lastInvalidation = time.Now().Truncate(time.Second)
 	d.maxAge = time.Time{}
 }
 
 // NewCachedDiscoveryClient creates a new DiscoveryClient.  cacheDirectory is the directory where discovery docs are held.  It must be unique per host:port combination to work well.
 func NewCachedDiscoveryClient(delegate discovery.DiscoveryInterface, cacheDirectory string, ttl time.Duration) *CachedDiscoveryClient {
-	return &CachedDiscoveryClient{delegate: delegate, cacheDirectory: cacheDirectory, ttl: ttl, startedAt: time.Now()}
+	return &CachedDiscoveryClient{
+		delegate: delegate,
+		cacheDirectory: cacheDirectory,
+		ttl: ttl,
+		// round down to cope with second precision of a number of file systems
+		startedAt: time.Now().Truncate(time.Second),
+	}
 }
