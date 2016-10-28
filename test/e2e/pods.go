@@ -92,7 +92,7 @@ var _ = framework.KubeDescribe("Pods Delete Grace Period", func() {
 			if event.Type != watch.Added {
 				framework.Failf("Failed to observe pod creation: %v", event)
 			}
-		case <-time.After(framework.PodStartTimeout):
+		case <-time .After(framework.PodStartTimeout):
 			Fail("Timeout while waiting for pod creation")
 		}
 
