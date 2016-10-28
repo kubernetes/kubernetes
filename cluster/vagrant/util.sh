@@ -241,7 +241,14 @@ function verify-cluster {
   echo "Waiting for each node to be registered with cloud provider"
   for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
     local validated="0"
+    start="$(date +%s)"
     until [[ "$validated" == "1" ]]; do
+      now="$(date +%s)"
+      # Timeout set to 3 minutes
+      if [ $((now - start)) -gt 180 ]; then
+        echo "Timeout while waiting for echo node to be registered with cloud provider"
+        exit 2
+      fi
       local nodes=$("${KUBE_ROOT}/cluster/kubectl.sh" get nodes -o name --api-version=v1)
       validated=$(echo $nodes | grep -c "${NODE_NAMES[i]}") || {
         printf "."
