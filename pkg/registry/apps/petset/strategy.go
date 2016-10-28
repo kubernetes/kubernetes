@@ -31,109 +31,109 @@ import (
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
-// petSetStrategy implements verification logic for Replication PetSets.
-type petSetStrategy struct {
+// statefulSetStrategy implements verification logic for Replication StatefulSets.
+type statefulSetStrategy struct {
 	runtime.ObjectTyper
 	api.NameGenerator
 }
 
-// Strategy is the default logic that applies when creating and updating Replication PetSet objects.
-var Strategy = petSetStrategy{api.Scheme, api.SimpleNameGenerator}
+// Strategy is the default logic that applies when creating and updating Replication StatefulSet objects.
+var Strategy = statefulSetStrategy{api.Scheme, api.SimpleNameGenerator}
 
-// NamespaceScoped returns true because all PetSet' need to be within a namespace.
-func (petSetStrategy) NamespaceScoped() bool {
+// NamespaceScoped returns true because all StatefulSet' need to be within a namespace.
+func (statefulSetStrategy) NamespaceScoped() bool {
 	return true
 }
 
-// PrepareForCreate clears the status of an PetSet before creation.
-func (petSetStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
-	petSet := obj.(*apps.PetSet)
+// PrepareForCreate clears the status of an StatefulSet before creation.
+func (statefulSetStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
+	statefulSet := obj.(*apps.StatefulSet)
 	// create cannot set status
-	petSet.Status = apps.PetSetStatus{}
+	statefulSet.Status = apps.StatefulSetStatus{}
 
-	petSet.Generation = 1
+	statefulSet.Generation = 1
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (petSetStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
-	newPetSet := obj.(*apps.PetSet)
-	oldPetSet := old.(*apps.PetSet)
+func (statefulSetStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
+	newStatefulSet := obj.(*apps.StatefulSet)
+	oldStatefulSet := old.(*apps.StatefulSet)
 	// Update is not allowed to set status
-	newPetSet.Status = oldPetSet.Status
+	newStatefulSet.Status = oldStatefulSet.Status
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object.
 	// See api.ObjectMeta description for more information on Generation.
-	if !reflect.DeepEqual(oldPetSet.Spec, newPetSet.Spec) {
-		newPetSet.Generation = oldPetSet.Generation + 1
+	if !reflect.DeepEqual(oldStatefulSet.Spec, newStatefulSet.Spec) {
+		newStatefulSet.Generation = oldStatefulSet.Generation + 1
 	}
 
 }
 
-// Validate validates a new PetSet.
-func (petSetStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
-	petSet := obj.(*apps.PetSet)
-	return validation.ValidatePetSet(petSet)
+// Validate validates a new StatefulSet.
+func (statefulSetStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
+	statefulSet := obj.(*apps.StatefulSet)
+	return validation.ValidateStatefulSet(statefulSet)
 }
 
 // Canonicalize normalizes the object after validation.
-func (petSetStrategy) Canonicalize(obj runtime.Object) {
+func (statefulSetStrategy) Canonicalize(obj runtime.Object) {
 }
 
-// AllowCreateOnUpdate is false for PetSet; this means POST is needed to create one.
-func (petSetStrategy) AllowCreateOnUpdate() bool {
+// AllowCreateOnUpdate is false for StatefulSet; this means POST is needed to create one.
+func (statefulSetStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (petSetStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
-	validationErrorList := validation.ValidatePetSet(obj.(*apps.PetSet))
-	updateErrorList := validation.ValidatePetSetUpdate(obj.(*apps.PetSet), old.(*apps.PetSet))
+func (statefulSetStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
+	validationErrorList := validation.ValidateStatefulSet(obj.(*apps.StatefulSet))
+	updateErrorList := validation.ValidateStatefulSetUpdate(obj.(*apps.StatefulSet), old.(*apps.StatefulSet))
 	return append(validationErrorList, updateErrorList...)
 }
 
-// AllowUnconditionalUpdate is the default update policy for PetSet objects.
-func (petSetStrategy) AllowUnconditionalUpdate() bool {
+// AllowUnconditionalUpdate is the default update policy for StatefulSet objects.
+func (statefulSetStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-// PetSetToSelectableFields returns a field set that represents the object.
-func PetSetToSelectableFields(petSet *apps.PetSet) fields.Set {
-	return generic.ObjectMetaFieldsSet(&petSet.ObjectMeta, true)
+// StatefulSetToSelectableFields returns a field set that represents the object.
+func StatefulSetToSelectableFields(statefulSet *apps.StatefulSet) fields.Set {
+	return generic.ObjectMetaFieldsSet(&statefulSet.ObjectMeta, true)
 }
 
-// MatchPetSet is the filter used by the generic etcd backend to watch events
+// MatchStatefulSet is the filter used by the generic etcd backend to watch events
 // from etcd to clients of the apiserver only interested in specific labels/fields.
-func MatchPetSet(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
+func MatchStatefulSet(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 	return storage.SelectionPredicate{
 		Label: label,
 		Field: field,
 		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			petSet, ok := obj.(*apps.PetSet)
+			statefulSet, ok := obj.(*apps.StatefulSet)
 			if !ok {
-				return nil, nil, fmt.Errorf("given object is not an PetSet.")
+				return nil, nil, fmt.Errorf("given object is not an StatefulSet.")
 			}
-			return labels.Set(petSet.ObjectMeta.Labels), PetSetToSelectableFields(petSet), nil
+			return labels.Set(statefulSet.ObjectMeta.Labels), StatefulSetToSelectableFields(statefulSet), nil
 		},
 	}
 }
 
-type petSetStatusStrategy struct {
-	petSetStrategy
+type statefulSetStatusStrategy struct {
+	statefulSetStrategy
 }
 
-var StatusStrategy = petSetStatusStrategy{Strategy}
+var StatusStrategy = statefulSetStatusStrategy{Strategy}
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update of status
-func (petSetStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
-	newPetSet := obj.(*apps.PetSet)
-	oldPetSet := old.(*apps.PetSet)
+func (statefulSetStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
+	newStatefulSet := obj.(*apps.StatefulSet)
+	oldStatefulSet := old.(*apps.StatefulSet)
 	// status changes are not allowed to update spec
-	newPetSet.Spec = oldPetSet.Spec
+	newStatefulSet.Spec = oldStatefulSet.Spec
 }
 
 // ValidateUpdate is the default update validation for an end user updating status
-func (petSetStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
+func (statefulSetStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
 	// TODO: Validate status updates.
-	return validation.ValidatePetSetStatusUpdate(obj.(*apps.PetSet), old.(*apps.PetSet))
+	return validation.ValidateStatefulSetStatusUpdate(obj.(*apps.StatefulSet), old.(*apps.StatefulSet))
 }

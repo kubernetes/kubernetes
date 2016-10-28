@@ -47,6 +47,7 @@ func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 type RESTClient struct {
 	Client               *http.Client
 	NegotiatedSerializer runtime.NegotiatedSerializer
+	GroupName            string
 
 	Req  *http.Request
 	Resp *http.Response
@@ -94,8 +95,14 @@ func (c *RESTClient) request(verb string) *restclient.Request {
 	ns := c.NegotiatedSerializer
 	serializer, _ := ns.SerializerForMediaType(runtime.ContentTypeJSON, nil)
 	streamingSerializer, _ := ns.StreamingSerializerForMediaType(runtime.ContentTypeJSON, nil)
+
+	groupName := api.GroupName
+	if c.GroupName != "" {
+		groupName = c.GroupName
+	}
+
 	internalVersion := unversioned.GroupVersion{
-		Group:   registered.GroupOrDie(api.GroupName).GroupVersion.Group,
+		Group:   registered.GroupOrDie(groupName).GroupVersion.Group,
 		Version: runtime.APIVersionInternal,
 	}
 	internalVersion.Version = runtime.APIVersionInternal

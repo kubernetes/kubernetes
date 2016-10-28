@@ -24,8 +24,6 @@ import (
 	authorization "k8s.io/kubernetes/pkg/apis/authorization"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
-	reflect "reflect"
-	unsafe "unsafe"
 )
 
 func init() {
@@ -178,8 +176,24 @@ func Convert_authorization_SelfSubjectAccessReview_To_v1beta1_SelfSubjectAccessR
 }
 
 func autoConvert_v1beta1_SelfSubjectAccessReviewSpec_To_authorization_SelfSubjectAccessReviewSpec(in *SelfSubjectAccessReviewSpec, out *authorization.SelfSubjectAccessReviewSpec, s conversion.Scope) error {
-	out.ResourceAttributes = (*authorization.ResourceAttributes)(unsafe.Pointer(in.ResourceAttributes))
-	out.NonResourceAttributes = (*authorization.NonResourceAttributes)(unsafe.Pointer(in.NonResourceAttributes))
+	if in.ResourceAttributes != nil {
+		in, out := &in.ResourceAttributes, &out.ResourceAttributes
+		*out = new(authorization.ResourceAttributes)
+		if err := Convert_v1beta1_ResourceAttributes_To_authorization_ResourceAttributes(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.ResourceAttributes = nil
+	}
+	if in.NonResourceAttributes != nil {
+		in, out := &in.NonResourceAttributes, &out.NonResourceAttributes
+		*out = new(authorization.NonResourceAttributes)
+		if err := Convert_v1beta1_NonResourceAttributes_To_authorization_NonResourceAttributes(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.NonResourceAttributes = nil
+	}
 	return nil
 }
 
@@ -188,8 +202,24 @@ func Convert_v1beta1_SelfSubjectAccessReviewSpec_To_authorization_SelfSubjectAcc
 }
 
 func autoConvert_authorization_SelfSubjectAccessReviewSpec_To_v1beta1_SelfSubjectAccessReviewSpec(in *authorization.SelfSubjectAccessReviewSpec, out *SelfSubjectAccessReviewSpec, s conversion.Scope) error {
-	out.ResourceAttributes = (*ResourceAttributes)(unsafe.Pointer(in.ResourceAttributes))
-	out.NonResourceAttributes = (*NonResourceAttributes)(unsafe.Pointer(in.NonResourceAttributes))
+	if in.ResourceAttributes != nil {
+		in, out := &in.ResourceAttributes, &out.ResourceAttributes
+		*out = new(ResourceAttributes)
+		if err := Convert_authorization_ResourceAttributes_To_v1beta1_ResourceAttributes(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.ResourceAttributes = nil
+	}
+	if in.NonResourceAttributes != nil {
+		in, out := &in.NonResourceAttributes, &out.NonResourceAttributes
+		*out = new(NonResourceAttributes)
+		if err := Convert_authorization_NonResourceAttributes_To_v1beta1_NonResourceAttributes(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.NonResourceAttributes = nil
+	}
 	return nil
 }
 
@@ -234,17 +264,39 @@ func Convert_authorization_SubjectAccessReview_To_v1beta1_SubjectAccessReview(in
 }
 
 func autoConvert_v1beta1_SubjectAccessReviewSpec_To_authorization_SubjectAccessReviewSpec(in *SubjectAccessReviewSpec, out *authorization.SubjectAccessReviewSpec, s conversion.Scope) error {
-	out.ResourceAttributes = (*authorization.ResourceAttributes)(unsafe.Pointer(in.ResourceAttributes))
-	out.NonResourceAttributes = (*authorization.NonResourceAttributes)(unsafe.Pointer(in.NonResourceAttributes))
-	out.User = in.User
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Groups))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Groups))
-		*outHdr = *inHdr
+	if in.ResourceAttributes != nil {
+		in, out := &in.ResourceAttributes, &out.ResourceAttributes
+		*out = new(authorization.ResourceAttributes)
+		if err := Convert_v1beta1_ResourceAttributes_To_authorization_ResourceAttributes(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.ResourceAttributes = nil
 	}
-	{
-		m := (*map[string]authorization.ExtraValue)(unsafe.Pointer(&in.Extra))
-		out.Extra = *m
+	if in.NonResourceAttributes != nil {
+		in, out := &in.NonResourceAttributes, &out.NonResourceAttributes
+		*out = new(authorization.NonResourceAttributes)
+		if err := Convert_v1beta1_NonResourceAttributes_To_authorization_NonResourceAttributes(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.NonResourceAttributes = nil
+	}
+	out.User = in.User
+	out.Groups = in.Groups
+	if in.Extra != nil {
+		in, out := &in.Extra, &out.Extra
+		*out = make(map[string]authorization.ExtraValue, len(*in))
+		for key, val := range *in {
+			newVal := new(authorization.ExtraValue)
+			// TODO: Inefficient conversion - can we improve it?
+			if err := s.Convert(&val, newVal, 0); err != nil {
+				return err
+			}
+			(*out)[key] = *newVal
+		}
+	} else {
+		out.Extra = nil
 	}
 	return nil
 }
@@ -254,17 +306,39 @@ func Convert_v1beta1_SubjectAccessReviewSpec_To_authorization_SubjectAccessRevie
 }
 
 func autoConvert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessReviewSpec(in *authorization.SubjectAccessReviewSpec, out *SubjectAccessReviewSpec, s conversion.Scope) error {
-	out.ResourceAttributes = (*ResourceAttributes)(unsafe.Pointer(in.ResourceAttributes))
-	out.NonResourceAttributes = (*NonResourceAttributes)(unsafe.Pointer(in.NonResourceAttributes))
-	out.User = in.User
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Groups))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Groups))
-		*outHdr = *inHdr
+	if in.ResourceAttributes != nil {
+		in, out := &in.ResourceAttributes, &out.ResourceAttributes
+		*out = new(ResourceAttributes)
+		if err := Convert_authorization_ResourceAttributes_To_v1beta1_ResourceAttributes(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.ResourceAttributes = nil
 	}
-	{
-		m := (*map[string]ExtraValue)(unsafe.Pointer(&in.Extra))
-		out.Extra = *m
+	if in.NonResourceAttributes != nil {
+		in, out := &in.NonResourceAttributes, &out.NonResourceAttributes
+		*out = new(NonResourceAttributes)
+		if err := Convert_authorization_NonResourceAttributes_To_v1beta1_NonResourceAttributes(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.NonResourceAttributes = nil
+	}
+	out.User = in.User
+	out.Groups = in.Groups
+	if in.Extra != nil {
+		in, out := &in.Extra, &out.Extra
+		*out = make(map[string]ExtraValue, len(*in))
+		for key, val := range *in {
+			newVal := new(ExtraValue)
+			// TODO: Inefficient conversion - can we improve it?
+			if err := s.Convert(&val, newVal, 0); err != nil {
+				return err
+			}
+			(*out)[key] = *newVal
+		}
+	} else {
+		out.Extra = nil
 	}
 	return nil
 }

@@ -48,6 +48,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_DaemonSetSpec, InType: reflect.TypeOf(&DaemonSetSpec{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_DaemonSetStatus, InType: reflect.TypeOf(&DaemonSetStatus{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_Deployment, InType: reflect.TypeOf(&Deployment{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_DeploymentCondition, InType: reflect.TypeOf(&DeploymentCondition{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_DeploymentList, InType: reflect.TypeOf(&DeploymentList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_DeploymentRollback, InType: reflect.TypeOf(&DeploymentRollback{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_DeploymentSpec, InType: reflect.TypeOf(&DeploymentSpec{})},
@@ -263,7 +264,23 @@ func DeepCopy_v1beta1_Deployment(in interface{}, out interface{}, c *conversion.
 		if err := DeepCopy_v1beta1_DeploymentSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
 		}
+		if err := DeepCopy_v1beta1_DeploymentStatus(&in.Status, &out.Status, c); err != nil {
+			return err
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1beta1_DeploymentCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*DeploymentCondition)
+		out := out.(*DeploymentCondition)
+		out.Type = in.Type
 		out.Status = in.Status
+		out.LastUpdateTime = in.LastUpdateTime.DeepCopy()
+		out.LastTransitionTime = in.LastTransitionTime.DeepCopy()
+		out.Reason = in.Reason
+		out.Message = in.Message
 		return nil
 	}
 }
@@ -351,6 +368,13 @@ func DeepCopy_v1beta1_DeploymentSpec(in interface{}, out interface{}, c *convers
 		} else {
 			out.RollbackTo = nil
 		}
+		if in.ProgressDeadlineSeconds != nil {
+			in, out := &in.ProgressDeadlineSeconds, &out.ProgressDeadlineSeconds
+			*out = new(int32)
+			**out = **in
+		} else {
+			out.ProgressDeadlineSeconds = nil
+		}
 		return nil
 	}
 }
@@ -364,6 +388,17 @@ func DeepCopy_v1beta1_DeploymentStatus(in interface{}, out interface{}, c *conve
 		out.UpdatedReplicas = in.UpdatedReplicas
 		out.AvailableReplicas = in.AvailableReplicas
 		out.UnavailableReplicas = in.UnavailableReplicas
+		if in.Conditions != nil {
+			in, out := &in.Conditions, &out.Conditions
+			*out = make([]DeploymentCondition, len(*in))
+			for i := range *in {
+				if err := DeepCopy_v1beta1_DeploymentCondition(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		} else {
+			out.Conditions = nil
+		}
 		return nil
 	}
 }

@@ -16,7 +16,7 @@ go_library(
         "apps_client.go",
         "doc.go",
         "generated_expansion.go",
-        "petset.go",
+        "statefulset.go",
     ],
     tags = ["automanaged"],
     deps = [

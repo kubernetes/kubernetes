@@ -475,11 +475,13 @@ function start-kubelet {
   flags+=" --config=/etc/kubernetes/manifests"
   flags+=" --kubelet-cgroups=/kubelet"
   flags+=" --system-cgroups=/system"
-
+  flags+=" --experimental-mounter-path=${KUBE_HOME}/bin/mounter"
+  # Note: This patch must match the rootfs path in mounter/mounter
+  flags+=" --experimental-mounter-rootfs-path=/media/root"
+  
   if [[ -n "${KUBELET_PORT:-}" ]]; then
     flags+=" --port=${KUBELET_PORT}"
   fi
-  local reconcile_cidr="true"
   if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
     flags+=" --enable-debugging-handlers=false"
     flags+=" --hairpin-mode=none"
@@ -490,7 +492,6 @@ function start-kubelet {
       # TODO: determine if we still allow non-hostnetwork pods to run on master, clean up master pod setup
       # WARNING: potential ip range collision with 10.123.45.0/29
       flags+=" --pod-cidr=10.123.45.0/29"
-      reconcile_cidr="false"
     else
       flags+=" --pod-cidr=${MASTER_IP_RANGE}"
     fi
@@ -512,7 +513,6 @@ function start-kubelet {
     fi
     flags+=" --network-plugin=${NETWORK_PROVIDER}"
   fi
-  flags+=" --reconcile-cidr=${reconcile_cidr}"
   if [[ -n "${NON_MASQUERADE_CIDR:-}" ]]; then
     flags+=" --non-masquerade-cidr=${NON_MASQUERADE_CIDR}"
   fi
@@ -1167,6 +1167,9 @@ For Kubernetes copyright and licensing information, see:
 EOF
 }
 
+function pre-warm-mounter {
+    ${KUBE_HOME}/bin/mounter &> /dev/null
+}
 
 ########### Main Function ###########
 echo "Start to configure instance for kubernetes"
@@ -1201,6 +1204,8 @@ else
   create-kubeproxy-kubeconfig
 fi
 
+# Run the containerized mounter once to pre-cache the container image.
+pre-warm-mounter
 assemble-docker-flags
 load-docker-images
 start-kubelet

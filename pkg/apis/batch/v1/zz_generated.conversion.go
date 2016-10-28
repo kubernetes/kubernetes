@@ -22,13 +22,10 @@ package v1
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
-	reflect "reflect"
-	unsafe "unsafe"
 )
 
 func init() {
@@ -157,11 +154,11 @@ func Convert_batch_JobList_To_v1_JobList(in *batch.JobList, out *JobList, s conv
 }
 
 func autoConvert_v1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpec, s conversion.Scope) error {
-	out.Parallelism = (*int32)(unsafe.Pointer(in.Parallelism))
-	out.Completions = (*int32)(unsafe.Pointer(in.Completions))
-	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
-	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
-	out.ManualSelector = (*bool)(unsafe.Pointer(in.ManualSelector))
+	out.Parallelism = in.Parallelism
+	out.Completions = in.Completions
+	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
+	out.Selector = in.Selector
+	out.ManualSelector = in.ManualSelector
 	if err := api_v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -169,11 +166,11 @@ func autoConvert_v1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpec, s 
 }
 
 func autoConvert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *JobSpec, s conversion.Scope) error {
-	out.Parallelism = (*int32)(unsafe.Pointer(in.Parallelism))
-	out.Completions = (*int32)(unsafe.Pointer(in.Completions))
-	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
-	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
-	out.ManualSelector = (*bool)(unsafe.Pointer(in.ManualSelector))
+	out.Parallelism = in.Parallelism
+	out.Completions = in.Completions
+	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
+	out.Selector = in.Selector
+	out.ManualSelector = in.ManualSelector
 	if err := api_v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -181,13 +178,19 @@ func autoConvert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *JobSpec, s 
 }
 
 func autoConvert_v1_JobStatus_To_batch_JobStatus(in *JobStatus, out *batch.JobStatus, s conversion.Scope) error {
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Conditions))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Conditions))
-		*outHdr = *inHdr
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]batch.JobCondition, len(*in))
+		for i := range *in {
+			if err := Convert_v1_JobCondition_To_batch_JobCondition(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
 	}
-	out.StartTime = (*unversioned.Time)(unsafe.Pointer(in.StartTime))
-	out.CompletionTime = (*unversioned.Time)(unsafe.Pointer(in.CompletionTime))
+	out.StartTime = in.StartTime
+	out.CompletionTime = in.CompletionTime
 	out.Active = in.Active
 	out.Succeeded = in.Succeeded
 	out.Failed = in.Failed
@@ -199,13 +202,19 @@ func Convert_v1_JobStatus_To_batch_JobStatus(in *JobStatus, out *batch.JobStatus
 }
 
 func autoConvert_batch_JobStatus_To_v1_JobStatus(in *batch.JobStatus, out *JobStatus, s conversion.Scope) error {
-	{
-		outHdr := (*reflect.SliceHeader)(unsafe.Pointer(&out.Conditions))
-		inHdr := (*reflect.SliceHeader)(unsafe.Pointer(&in.Conditions))
-		*outHdr = *inHdr
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]JobCondition, len(*in))
+		for i := range *in {
+			if err := Convert_batch_JobCondition_To_v1_JobCondition(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Conditions = nil
 	}
-	out.StartTime = (*unversioned.Time)(unsafe.Pointer(in.StartTime))
-	out.CompletionTime = (*unversioned.Time)(unsafe.Pointer(in.CompletionTime))
+	out.StartTime = in.StartTime
+	out.CompletionTime = in.CompletionTime
 	out.Active = in.Active
 	out.Succeeded = in.Succeeded
 	out.Failed = in.Failed

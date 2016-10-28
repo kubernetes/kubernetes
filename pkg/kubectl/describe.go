@@ -43,7 +43,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
+	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/fields"
@@ -116,7 +117,7 @@ func describerMap(c clientset.Interface) map[unversioned.GroupKind]Describer {
 		extensions.Kind("Ingress"):                     &IngressDescriber{c},
 		batch.Kind("Job"):                              &JobDescriber{c},
 		batch.Kind("ScheduledJob"):                     &ScheduledJobDescriber{c},
-		apps.Kind("PetSet"):                            &PetSetDescriber{c},
+		apps.Kind("StatefulSet"):                       &StatefulSetDescriber{c},
 		certificates.Kind("CertificateSigningRequest"): &CertificateSigningRequestDescriber{c},
 		storage.Kind("StorageClass"):                   &StorageClassDescriber{c},
 	}
@@ -1862,12 +1863,12 @@ func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events
 	})
 }
 
-type PetSetDescriber struct {
+type StatefulSetDescriber struct {
 	client clientset.Interface
 }
 
-func (p *PetSetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	ps, err := p.client.Apps().PetSets(namespace).Get(name)
+func (p *StatefulSetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+	ps, err := p.client.Apps().StatefulSets(namespace).Get(name)
 	if err != nil {
 		return "", err
 	}
@@ -2186,7 +2187,7 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 // of getting all DS's and searching through them manually).
 // TODO: write an interface for controllers and fuse getReplicationControllersForLabels
 // and getDaemonSetsForLabels.
-func getDaemonSetsForLabels(c client.DaemonSetInterface, labelsToMatch labels.Labels) ([]extensions.DaemonSet, error) {
+func getDaemonSetsForLabels(c extensionsclient.DaemonSetInterface, labelsToMatch labels.Labels) ([]extensions.DaemonSet, error) {
 	// Get all daemon sets
 	// TODO: this needs a namespace scope as argument
 	dss, err := c.List(api.ListOptions{})
@@ -2237,7 +2238,7 @@ func printReplicaSetsByLabels(matchingRSs []*extensions.ReplicaSet) string {
 	return list
 }
 
-func getPodStatusForController(c client.PodInterface, selector labels.Selector) (running, waiting, succeeded, failed int, err error) {
+func getPodStatusForController(c coreclient.PodInterface, selector labels.Selector) (running, waiting, succeeded, failed int, err error) {
 	options := api.ListOptions{LabelSelector: selector}
 	rcPods, err := c.List(options)
 	if err != nil {

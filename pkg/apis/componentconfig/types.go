@@ -317,8 +317,10 @@ type KubeletConfiguration struct {
 	// $PATH.
 	// +optional
 	RktPath string `json:"rktPath,omitempty"`
-	// mounterPath is the path of mounter binary. Leave empty to use the default mount path
-	MounterPath string `json:"mounterPath,omitempty"`
+	// experimentalMounterPath is the path of mounter binary. Leave empty to use the default mount path
+	ExperimentalMounterPath string `json:"experimentalMounterPath,omitempty"`
+	// experimentalMounterRootfsPath is the absolute path to root filesystem for the mounter binary.
+	ExperimentalMounterRootfsPath string `json:"experimentalMounterRootfsPath,omitempty"`
 	// rktApiEndpoint is the endpoint of the rkt API service to communicate with.
 	// +optional
 	RktAPIEndpoint string `json:"rktAPIEndpoint,omitempty"`

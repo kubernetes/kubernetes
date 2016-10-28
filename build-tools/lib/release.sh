@@ -187,10 +187,10 @@ function kube::release::md5() {
 }
 
 function kube::release::sha1() {
-  if which shasum >/dev/null 2>&1; then
-    shasum -a1 "$1" | awk '{ print $1 }'
-  else
+  if which sha1sum >/dev/null 2>&1; then
     sha1sum "$1" | awk '{ print $1 }'
+  else
+    shasum -a1 "$1" | awk '{ print $1 }'
   fi
 }
 

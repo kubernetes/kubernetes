@@ -118,7 +118,7 @@ func UnsecuredKubeletDeps(s *options.KubeletServer) (*kubelet.KubeletDeps, error
 		return nil, err
 	}
 
-	mounter := mount.New(s.MounterPath)
+	mounter := mount.NewCustomMounter(s.ExperimentalMounterPath, s.ExperimentalMounterRootfsPath)
 	var writer kubeio.Writer = &kubeio.StdWriter{}
 	if s.Containerized {
 		glog.V(2).Info("Running kubelet in containerized mode (experimental)")
@@ -413,7 +413,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 	}
 
 	if kubeDeps.CAdvisorInterface == nil {
-		kubeDeps.CAdvisorInterface, err = cadvisor.New(uint(s.CAdvisorPort), s.ContainerRuntime)
+		kubeDeps.CAdvisorInterface, err = cadvisor.New(uint(s.CAdvisorPort), s.ContainerRuntime, s.RootDirectory)
 		if err != nil {
 			return err
 		}

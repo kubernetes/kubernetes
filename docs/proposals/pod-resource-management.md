@@ -1,37 +1,3 @@
-<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
-
-<!-- BEGIN STRIP_FOR_RELEASE -->
-
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
-     width="25" height="25">
-
-<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
-
-If you are using a released version of Kubernetes, you should
-refer to the docs that go with that version.
-
-<!-- TAG RELEASE_LINK, added by the munger automatically -->
-<strong>
-The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.4/docs/proposals/pod-resource-management.md).
-
-Documentation for other releases can be found at
-[releases.k8s.io](http://releases.k8s.io).
-</strong>
---
-
-<!-- END STRIP_FOR_RELEASE -->
-
-<!-- END MUNGE: UNVERSIONED_WARNING -->
-
 # Pod level resource management in Kubelet
 
 **Author**: Buddha Prakash (@dubstack), Vishnu Kannan (@vishh)
@@ -131,7 +97,7 @@ A pod can belong to one of the following 3 QoS classes: Guaranteed, Burstable, a
 
 #### Guaranteed
 
-`G` pods will be placed at the `$Root` cgroup by default. `$Root` is the system root ie. "/" by default and if `--cgroup-root` flag is used then we use the specified cgroup-root as the `$Root`. To ensure Kubelet's idempotent behaviour we follow a pod cgroup naming format which is opaque and deterministic. Say we have a pod with UID: `5f9b19c9-3a30-11e6-8eea-28d2444e470d` the pod cgroup PodUID would be named: `pod-5f9b19c93a3011e6-8eea28d2444e470d`.
+`G` pods will be placed at the `$Root` cgroup by default. `$Root` is the system root i.e. "/" by default and if `--cgroup-root` flag is used then we use the specified cgroup-root as the `$Root`. To ensure Kubelet's idempotent behaviour we follow a pod cgroup naming format which is opaque and deterministic. Say we have a pod with UID: `5f9b19c9-3a30-11e6-8eea-28d2444e470d` the pod cgroup PodUID would be named: `pod-5f9b19c93a3011e6-8eea28d2444e470d`.
 
 
 __Note__: The cgroup-root flag would allow the user to configure the root of the QoS cgroup hierarchy. Hence cgroup-root would be redefined as the root of QoS cgroup hierarchy and not containers.
@@ -308,7 +274,7 @@ Example:  We plan to have the following cgroup hierarchy on systemd systems
 
 ### Hierarchy Outline
 
-- "$Root" is the system root of the node ie. "/" by default and if `--cgroup-root` is specified then the specified cgroup-root is used as "$Root".
+- "$Root" is the system root of the node i.e. "/" by default and if `--cgroup-root` is specified then the specified cgroup-root is used as "$Root".
 - We have a top level QoS cgroup for the `Bu` and `BE` QoS classes.
 - But we __dont__ have a separate cgroup for the `G` QoS class. `G` pod cgroups are brought up directly under the `Root` cgroup.
 - Each pod has its own cgroup which is nested under the cgroup matching the pod's QoS class.

@@ -334,7 +334,7 @@ runTests() {
   hpa_min_field=".spec.minReplicas"
   hpa_max_field=".spec.maxReplicas"
   hpa_cpu_field=".spec.targetCPUUtilizationPercentage"
-  petset_replicas_field=".spec.replicas"
+  statefulset_replicas_field=".spec.replicas"
   job_parallelism_field=".spec.parallelism"
   deployment_replicas=".spec.replicas"
   secret_data=".data"
@@ -1185,7 +1185,7 @@ __EOF__
   kube::test::if_has_string "${output_message}" "/api/v1/namespaces/default/pods 200 OK"
   kube::test::if_has_string "${output_message}" "/api/v1/namespaces/default/replicationcontrollers 200 OK"
   kube::test::if_has_string "${output_message}" "/api/v1/namespaces/default/services 200 OK"
-  kube::test::if_has_string "${output_message}" "/apis/apps/v1alpha1/namespaces/default/petsets 200 OK"
+  kube::test::if_has_string "${output_message}" "/apis/apps/v1alpha1/namespaces/default/statefulsets 200 OK"
   kube::test::if_has_string "${output_message}" "/apis/autoscaling/v1/namespaces/default/horizontalpodautoscalers 200"
   kube::test::if_has_string "${output_message}" "/apis/batch/v1/namespaces/default/jobs 200 OK"
   kube::test::if_has_string "${output_message}" "/apis/extensions/v1beta1/namespaces/default/deployments 200 OK"
@@ -2396,25 +2396,25 @@ __EOF__
 
 
 
-  ############
-  # Pet Sets #
-  ############
+  #################
+  # Stateful Sets #
+  #################
 
-  kube::log::status "Testing kubectl(${version}:petsets)"
+  kube::log::status "Testing kubectl(${version}:statefulsets)"
 
-  ### Create and stop petset, make sure it doesn't leak pods
-  # Pre-condition: no petset exists
-  kube::test::get_object_assert petset "{{range.items}}{{$id_field}}:{{end}}" ''
-  # Command: create petset
+  ### Create and stop statefulset, make sure it doesn't leak pods
+  # Pre-condition: no statefulset exists
+  kube::test::get_object_assert statefulset "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command: create statefulset
   kubectl create -f hack/testdata/nginx-petset.yaml "${kube_flags[@]}"
 
-  ### Scale petset test with current-replicas and replicas
+  ### Scale statefulset test with current-replicas and replicas
   # Pre-condition: 0 replicas
-  kube::test::get_object_assert 'petset nginx' "{{$petset_replicas_field}}" '0'
+  kube::test::get_object_assert 'statefulset nginx' "{{$statefulset_replicas_field}}" '0'
   # Command: Scale up
-  kubectl scale --current-replicas=0 --replicas=1 petset nginx "${kube_flags[@]}"
+  kubectl scale --current-replicas=0 --replicas=1 statefulset nginx "${kube_flags[@]}"
   # Post-condition: 1 replica, named nginx-0
-  kube::test::get_object_assert 'petset nginx' "{{$petset_replicas_field}}" '1'
+  kube::test::get_object_assert 'statefulset nginx' "{{$statefulset_replicas_field}}" '1'
   # Typically we'd wait and confirm that N>1 replicas are up, but this framework
   # doesn't start  the scheduler, so pet-0 will block all others.
   # TODO: test robust scaling in an e2e.
@@ -2422,7 +2422,7 @@ __EOF__
 
   ### Clean up
   kubectl delete -f hack/testdata/nginx-petset.yaml "${kube_flags[@]}"
-  # Post-condition: no pods from petset controller
+  # Post-condition: no pods from statefulset controller
   wait-for-pods-with-label "app=nginx-petset" ""
 
 

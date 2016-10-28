@@ -26,7 +26,6 @@
 
 {% set debugging_handlers = "--enable-debugging-handlers=true" -%}
 
-{% set reconcile_cidr_args = "" -%}
 {% if grains['roles'][0] == 'kubernetes-master' -%}
   {% if grains.cloud in ['aws', 'gce', 'vagrant', 'vsphere', 'photon-controller', 'openstack', 'azure-legacy'] -%}
 
@@ -35,7 +34,6 @@
     {% if grains.kubelet_api_servers is defined -%}
       {% set api_servers_with_port = "--api-servers=https://" + grains.kubelet_api_servers -%}
       {% set master_kubelet_args = master_kubelet_args + "--register-schedulable=false" -%}
-      {% set reconcile_cidr_args =  "--reconcile-cidr=false" -%}
     {% else -%}
       {% set api_servers_with_port = "" -%}
     {% endif -%}
@@ -145,9 +143,6 @@
   {% set network_plugin = "--network-plugin=cni --network-plugin-dir=/etc/cni/net.d/" %}
 {% elif pillar.get('network_provider', '').lower() == 'kubenet' %}
   {% set network_plugin = "--network-plugin=kubenet" -%}
-  {% if reconcile_cidr_args == '' -%}
-    {% set reconcile_cidr_args =  "--reconcile-cidr=true" -%}
-  {% endif -%}
 {% endif -%}
 
 # Don't pipe the --hairpin-mode flag by default. This allows the kubelet to pick
@@ -194,4 +189,4 @@
 {% endif -%}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
-DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{cloud_config}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{log_level}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}}  {{non_masquerade_cidr}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{ master_kubelet_args }} {{cpu_cfs_quota}} {{network_plugin}} {{kubelet_port}} {{ reconcile_cidr_args }} {{ hairpin_mode }} {{enable_custom_metrics}} {{runtime_container}} {{kubelet_container}} {{node_labels}} {{babysit_daemons}} {{eviction_hard}} {{feature_gates}} {{test_args}}"
+DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{cloud_config}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{log_level}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}}  {{non_masquerade_cidr}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{ master_kubelet_args }} {{cpu_cfs_quota}} {{network_plugin}} {{kubelet_port}} {{ hairpin_mode }} {{enable_custom_metrics}} {{runtime_container}} {{kubelet_container}} {{node_labels}} {{babysit_daemons}} {{eviction_hard}} {{feature_gates}} {{test_args}}"

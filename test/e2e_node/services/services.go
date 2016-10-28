@@ -211,7 +211,8 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		"--eviction-pressure-transition-period", "30s",
 		"--feature-gates", framework.TestContext.FeatureGates,
 		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
-		"--mounter-path", framework.TestContext.MounterPath,
+		"--experimental-mounter-path", framework.TestContext.MounterPath,
+		"--experimental-mounter-rootfs-path", framework.TestContext.MounterRootfsPath,
 	)
 
 	if framework.TestContext.RuntimeIntegrationType != "" {

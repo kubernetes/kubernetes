@@ -204,6 +204,7 @@ func GetPauseImageName(c clientset.Interface) string {
 }
 
 // GetPauseImageNameForHostArch fetches the pause image name for the same architecture the test is running on.
+// TODO: move this function to the test/utils
 func GetPauseImageNameForHostArch() string {
 	return currentPodInfraContainerImageName + "-" + goRuntime.GOARCH + ":" + currentPodInfraContainerImageVersion
 }
@@ -1313,7 +1314,7 @@ func waitForPodTerminatedInNamespace(c clientset.Interface, podName, reason, nam
 func waitForPodSuccessInNamespaceTimeout(c clientset.Interface, podName string, namespace string, timeout time.Duration) error {
 	return waitForPodCondition(c, namespace, podName, "success or failure", timeout, func(pod *api.Pod) (bool, error) {
 		if pod.Spec.RestartPolicy == api.RestartPolicyAlways {
-			return false, fmt.Errorf("pod %q will never terminate with a succeeded state since its restart policy is Always", podName)
+			return true, fmt.Errorf("pod %q will never terminate with a succeeded state since its restart policy is Always", podName)
 		}
 		switch pod.Status.Phase {
 		case api.PodSucceeded:
@@ -1792,14 +1793,6 @@ func LoadFederatedConfig(overrides *clientcmd.ConfigOverrides) (*restclient.Conf
 	return cfg, nil
 }
 
-func loadClientFromConfig(config *restclient.Config) (*client.Client, error) {
-	c, err := client.New(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating client: %v", err.Error())
-	}
-	return c, nil
-}
-
 func LoadFederationClientset_1_5() (*federation_release_1_5.Clientset, error) {
 	config, err := LoadFederatedConfig(&clientcmd.ConfigOverrides{})
 	if err != nil {
@@ -1811,14 +1804,6 @@ func LoadFederationClientset_1_5() (*federation_release_1_5.Clientset, error) {
 		return nil, fmt.Errorf("error creating federation clientset: %v", err.Error())
 	}
 	return c, nil
-}
-
-func LoadClient() (*client.Client, error) {
-	config, err := LoadConfig()
-	if err != nil {
-		return nil, fmt.Errorf("error creating client: %v", err.Error())
-	}
-	return loadClientFromConfig(config)
 }
 
 func LoadInternalClientset() (*clientset.Clientset, error) {
@@ -2218,6 +2203,7 @@ func DumpEventsInNamespace(eventsLister EventsLister, namespace string) {
 	events, err := eventsLister(v1.ListOptions{}, namespace)
 	Expect(err).NotTo(HaveOccurred())
 
+	By(fmt.Sprintf("Found %d events.", len(events.Items)))
 	// Sort events by their first timestamp
 	sortedEvents := events.Items
 	if len(sortedEvents) > 1 {
@@ -3212,33 +3198,6 @@ func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, 
 		return false, nil
 	})
 	return deployment, err
-}
-
-// Prints the histogram of the events and returns the number of bad events.
-func BadEvents(events []*api.Event) int {
-	type histogramKey struct {
-		reason string
-		source string
-	}
-	histogram := make(map[histogramKey]int)
-	for _, e := range events {
-		histogram[histogramKey{reason: e.Reason, source: e.Source.Component}]++
-	}
-	for key, number := range histogram {
-		Logf("- reason: %s, source: %s -> %d", key.reason, key.source, number)
-	}
-	badPatterns := []string{"kill", "fail"}
-	badEvents := 0
-	for key, number := range histogram {
-		for _, s := range badPatterns {
-			if strings.Contains(key.reason, s) {
-				Logf("WARNING %d events from %s with reason: %s", number, key.source, key.reason)
-				badEvents += number
-				break
-			}
-		}
-	}
-	return badEvents
 }
 
 // NodeAddresses returns the first address of the given type of each node.

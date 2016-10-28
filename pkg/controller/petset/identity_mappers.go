@@ -30,7 +30,7 @@ import (
 )
 
 // identityMapper is an interface for assigning identities to a pet.
-// All existing identity mappers just append "-(index)" to the petset name to
+// All existing identity mappers just append "-(index)" to the statefulset name to
 // generate a unique identity. This is used in claims/DNS/hostname/petname
 // etc. There's a more elegant way to achieve this mapping, but we're
 // taking the simplest route till we have data on whether users will need
@@ -39,15 +39,15 @@ import (
 // your pet a unique identity. You must run them all. Order doesn't matter.
 type identityMapper interface {
 	// SetIdentity takes an id and assigns the given pet an identity based
-	// on the pet set spec. The is must be unique amongst members of the
-	// pet set.
+	// on the stateful set spec. The is must be unique amongst members of the
+	// stateful set.
 	SetIdentity(id string, pet *api.Pod)
 
 	// Identity returns the identity of the pet.
 	Identity(pod *api.Pod) string
 }
 
-func newIdentityMappers(ps *apps.PetSet) []identityMapper {
+func newIdentityMappers(ps *apps.StatefulSet) []identityMapper {
 	return []identityMapper{
 		&NameIdentityMapper{ps},
 		&NetworkIdentityMapper{ps},
@@ -57,7 +57,7 @@ func newIdentityMappers(ps *apps.PetSet) []identityMapper {
 
 // NetworkIdentityMapper assigns network identity to pets.
 type NetworkIdentityMapper struct {
-	ps *apps.PetSet
+	ps *apps.StatefulSet
 }
 
 // SetIdentity sets network identity on the pet.
@@ -81,7 +81,7 @@ func (n *NetworkIdentityMapper) String(pet *api.Pod) string {
 
 // VolumeIdentityMapper assigns storage identity to pets.
 type VolumeIdentityMapper struct {
-	ps *apps.PetSet
+	ps *apps.StatefulSet
 }
 
 // SetIdentity sets storge identity on the pet.
@@ -90,16 +90,16 @@ func (v *VolumeIdentityMapper) SetIdentity(id string, pet *api.Pod) {
 	petClaims := v.GetClaims(id)
 
 	// These volumes will all go down with the pod. If a name matches one of
-	// the claims in the pet set, it gets clobbered.
+	// the claims in the stateful set, it gets clobbered.
 	podVolumes := map[string]api.Volume{}
 	for _, podVol := range pet.Spec.Volumes {
 		podVolumes[podVol.Name] = podVol
 	}
 
-	// Insert claims for the idempotent petSet volumes
+	// Insert claims for the idempotent statefulset volumes
 	for name, claim := range petClaims {
 		// Volumes on a pet for which there are no associated claims on the
-		// petset are pod local, and die with the pod.
+		// statefulset are pod local, and die with the pod.
 		podVol, ok := podVolumes[name]
 		if ok {
 			// TODO: Validate and reject this.
@@ -143,7 +143,7 @@ func (v *VolumeIdentityMapper) String(pet *api.Pod) string {
 	}
 	for _, podVol := range pet.Spec.Volumes {
 		// Volumes on a pet for which there are no associated claims on the
-		// petset are pod local, and die with the pod.
+		// statefulset are pod local, and die with the pod.
 		if !petVols.Has(podVol.Name) {
 			continue
 		}
@@ -159,7 +159,7 @@ func (v *VolumeIdentityMapper) String(pet *api.Pod) string {
 }
 
 // GetClaims returns the volume claims associated with the given id.
-// The claims belong to the petset. The id should be unique within a petset.
+// The claims belong to the statefulset. The id should be unique within a statefulset.
 func (v *VolumeIdentityMapper) GetClaims(id string) map[string]api.PersistentVolumeClaim {
 	petClaims := map[string]api.PersistentVolumeClaim{}
 	for _, pvc := range v.ps.Spec.VolumeClaimTemplates {
@@ -192,7 +192,7 @@ func (v *VolumeIdentityMapper) GetClaimsForPet(pet *api.Pod) []api.PersistentVol
 // NameIdentityMapper assigns names to pets.
 // It also puts the pet in the same namespace as the parent.
 type NameIdentityMapper struct {
-	ps *apps.PetSet
+	ps *apps.StatefulSet
 }
 
 // SetIdentity sets the pet namespace and name.
@@ -214,7 +214,7 @@ func (n *NameIdentityMapper) String(pet *api.Pod) string {
 
 // identityHash computes a hash of the pet by running all the above identity
 // mappers.
-func identityHash(ps *apps.PetSet, pet *api.Pod) string {
+func identityHash(ps *apps.StatefulSet, pet *api.Pod) string {
 	id := ""
 	for _, idMapper := range newIdentityMappers(ps) {
 		id += idMapper.Identity(pet)
