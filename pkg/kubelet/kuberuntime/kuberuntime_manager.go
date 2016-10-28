@@ -1006,3 +1006,17 @@ func (m *kubeGenericRuntimeManager) PortForward(pod *kubecontainer.Pod, port uin
 
 	return fmt.Errorf("not implemented")
 }
+
+// UpdatePodCIDR is just a passthrough method to update the runtimeConfig of the shim
+// with the podCIDR supplied by the kubelet.
+func (m *kubeGenericRuntimeManager) UpdatePodCIDR(podCIDR string) error {
+	// TODO(#35531): do we really want to write a method on this manager for each
+	// field of the config?
+	glog.Infof("updating runtime config through cri with podcidr %v", podCIDR)
+	return m.runtimeService.UpdateRuntimeConfig(
+		&runtimeApi.RuntimeConfig{
+			NetworkConfig: &runtimeApi.NetworkConfig{
+				PodCidr: &podCIDR,
+			},
+		})
+}
