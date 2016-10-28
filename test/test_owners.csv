@@ -885,3 +885,4 @@ k8s.io/kubernetes/test/integration/storageclasses,andyzheng0831,1
 k8s.io/kubernetes/test/integration/thirdparty,ixdy,1
 k8s.io/kubernetes/test/list,pmorie,1
 kubelet Clean up pods on node kubelet should be able to delete * pods per node in *.,yujuhong,0
+when we create and delete pods with containers * times should eventually garbage collect containers that have been recreated more than * times,random-liu,0
