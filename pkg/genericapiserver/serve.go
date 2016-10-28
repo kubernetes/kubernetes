@@ -22,11 +22,13 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/validation"
 
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
@@ -216,8 +218,10 @@ func getNamedCertificateMap(namedCertKeys []NamedCertKey) (map[string]*tls.Certi
 		if err != nil {
 			return nil, fmt.Errorf("parse error for certificate in %q: %v", nkc.CertFile, err)
 		}
-		if len(x509Cert.Subject.CommonName) > 0 {
-			tlsCertsByName[x509Cert.Subject.CommonName] = cert
+		cn := x509Cert.Subject.CommonName
+		strippedCN := stripWildcardPrefix(cn)
+		if strippedCN == "*" || len(validation.IsDNS1123Subdomain(strippedCN)) == 0 {
+			tlsCertsByName[cn] = cert
 		}
 		for _, san := range x509Cert.DNSNames {
 			tlsCertsByName[san] = cert
@@ -239,6 +243,13 @@ func getNamedCertificateMap(namedCertKeys []NamedCertKey) (map[string]*tls.Certi
 	}
 
 	return tlsCertsByName, nil
+}
+
+func stripWildcardPrefix(s string) string {
+	if strings.HasPrefix(s, "*.") {
+		return s[2:]
+	}
+	return s
 }
 
 // tcpKeepAliveListener sets TCP keep-alive timeouts on accepted
