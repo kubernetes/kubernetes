@@ -129,7 +129,7 @@ func Relabel(path string, fileLabel string, shared bool) error {
 
 	exclude_paths := map[string]bool{"/": true, "/usr": true, "/etc": true}
 	if exclude_paths[path] {
-		return fmt.Errorf("Relabeling of %s is not allowed", path)
+		return fmt.Errorf("SELinux relabeling of %s is not allowed", path)
 	}
 
 	if shared {
@@ -137,7 +137,10 @@ func Relabel(path string, fileLabel string, shared bool) error {
 		c["level"] = "s0"
 		fileLabel = c.Get()
 	}
-	return selinux.Chcon(path, fileLabel, true)
+	if err := selinux.Chcon(path, fileLabel, true); err != nil {
+		return fmt.Errorf("SELinux relabeling of %s is not allowed: %q", path, err)
+	}
+	return nil
 }
 
 // GetPidLabel will return the label of the process running with the specified pid

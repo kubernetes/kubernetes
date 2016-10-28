@@ -50,7 +50,7 @@ func setupRootfs(config *configs.Config, console *linuxConsole, pipe io.ReadWrit
 			}
 		}
 		if err := mountToRootfs(m, config.Rootfs, config.MountLabel); err != nil {
-			return newSystemErrorWithCausef(err, "mounting %q to rootfs %q", m.Destination, config.Rootfs)
+			return newSystemErrorWithCausef(err, "mounting %q to rootfs %q at %q", m.Source, config.Rootfs, m.Destination)
 		}
 
 		for _, postcmd := range m.PostmountCmds {
@@ -270,7 +270,7 @@ func mountToRootfs(m *configs.Mount, rootfs, mountLabel string) error {
 }
 
 func getCgroupMounts(m *configs.Mount) ([]*configs.Mount, error) {
-	mounts, err := cgroups.GetCgroupMounts()
+	mounts, err := cgroups.GetCgroupMounts(false)
 	if err != nil {
 		return nil, err
 	}
@@ -320,6 +320,8 @@ func checkMountDestination(rootfs, dest string) error {
 		"/proc/diskstats",
 		"/proc/meminfo",
 		"/proc/stat",
+		"/proc/swaps",
+		"/proc/uptime",
 		"/proc/net/dev",
 	}
 	for _, valid := range validDestinations {
