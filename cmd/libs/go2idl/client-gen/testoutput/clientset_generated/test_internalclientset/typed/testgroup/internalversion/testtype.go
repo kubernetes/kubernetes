@@ -17,7 +17,7 @@ limitations under the License.
 package internalversion
 
 import (
-	testgroup_k8s_io "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup.k8s.io"
+	testgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup"
 	api "k8s.io/kubernetes/pkg/api"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
@@ -31,15 +31,15 @@ type TestTypesGetter interface {
 
 // TestTypeInterface has methods to work with TestType resources.
 type TestTypeInterface interface {
-	Create(*testgroup_k8s_io.TestType) (*testgroup_k8s_io.TestType, error)
-	Update(*testgroup_k8s_io.TestType) (*testgroup_k8s_io.TestType, error)
-	UpdateStatus(*testgroup_k8s_io.TestType) (*testgroup_k8s_io.TestType, error)
+	Create(*testgroup.TestType) (*testgroup.TestType, error)
+	Update(*testgroup.TestType) (*testgroup.TestType, error)
+	UpdateStatus(*testgroup.TestType) (*testgroup.TestType, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
-	Get(name string) (*testgroup_k8s_io.TestType, error)
-	List(opts api.ListOptions) (*testgroup_k8s_io.TestTypeList, error)
+	Get(name string) (*testgroup.TestType, error)
+	List(opts api.ListOptions) (*testgroup.TestTypeList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *testgroup_k8s_io.TestType, err error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *testgroup.TestType, err error)
 	TestTypeExpansion
 }
 
@@ -50,7 +50,7 @@ type testTypes struct {
 }
 
 // newTestTypes returns a TestTypes
-func newTestTypes(c *TestgroupInternalVersionClient, namespace string) *testTypes {
+func newTestTypes(c *TestgroupClient, namespace string) *testTypes {
 	return &testTypes{
 		client: c.RESTClient(),
 		ns:     namespace,
@@ -58,8 +58,8 @@ func newTestTypes(c *TestgroupInternalVersionClient, namespace string) *testType
 }
 
 // Create takes the representation of a testType and creates it.  Returns the server's representation of the testType, and an error, if there is any.
-func (c *testTypes) Create(testType *testgroup_k8s_io.TestType) (result *testgroup_k8s_io.TestType, err error) {
-	result = &testgroup_k8s_io.TestType{}
+func (c *testTypes) Create(testType *testgroup.TestType) (result *testgroup.TestType, err error) {
+	result = &testgroup.TestType{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("testtypes").
@@ -70,8 +70,8 @@ func (c *testTypes) Create(testType *testgroup_k8s_io.TestType) (result *testgro
 }
 
 // Update takes the representation of a testType and updates it. Returns the server's representation of the testType, and an error, if there is any.
-func (c *testTypes) Update(testType *testgroup_k8s_io.TestType) (result *testgroup_k8s_io.TestType, err error) {
-	result = &testgroup_k8s_io.TestType{}
+func (c *testTypes) Update(testType *testgroup.TestType) (result *testgroup.TestType, err error) {
+	result = &testgroup.TestType{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("testtypes").
@@ -82,8 +82,8 @@ func (c *testTypes) Update(testType *testgroup_k8s_io.TestType) (result *testgro
 	return
 }
 
-func (c *testTypes) UpdateStatus(testType *testgroup_k8s_io.TestType) (result *testgroup_k8s_io.TestType, err error) {
-	result = &testgroup_k8s_io.TestType{}
+func (c *testTypes) UpdateStatus(testType *testgroup.TestType) (result *testgroup.TestType, err error) {
+	result = &testgroup.TestType{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("testtypes").
@@ -118,8 +118,8 @@ func (c *testTypes) DeleteCollection(options *api.DeleteOptions, listOptions api
 }
 
 // Get takes name of the testType, and returns the corresponding testType object, and an error if there is any.
-func (c *testTypes) Get(name string) (result *testgroup_k8s_io.TestType, err error) {
-	result = &testgroup_k8s_io.TestType{}
+func (c *testTypes) Get(name string) (result *testgroup.TestType, err error) {
+	result = &testgroup.TestType{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("testtypes").
@@ -130,8 +130,8 @@ func (c *testTypes) Get(name string) (result *testgroup_k8s_io.TestType, err err
 }
 
 // List takes label and field selectors, and returns the list of TestTypes that match those selectors.
-func (c *testTypes) List(opts api.ListOptions) (result *testgroup_k8s_io.TestTypeList, err error) {
-	result = &testgroup_k8s_io.TestTypeList{}
+func (c *testTypes) List(opts api.ListOptions) (result *testgroup.TestTypeList, err error) {
+	result = &testgroup.TestTypeList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("testtypes").
@@ -152,8 +152,8 @@ func (c *testTypes) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched testType.
-func (c *testTypes) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *testgroup_k8s_io.TestType, err error) {
-	result = &testgroup_k8s_io.TestType{}
+func (c *testTypes) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *testgroup.TestType, err error) {
+	result = &testgroup.TestType{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("testtypes").

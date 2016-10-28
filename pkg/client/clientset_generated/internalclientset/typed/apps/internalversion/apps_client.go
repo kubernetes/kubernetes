@@ -22,22 +22,22 @@ import (
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
-type AppsInternalVersionInterface interface {
+type AppsInterface interface {
 	RESTClient() restclient.Interface
 	StatefulSetsGetter
 }
 
-// AppsInternalVersionClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
-type AppsInternalVersionClient struct {
+// AppsClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
+type AppsClient struct {
 	restClient restclient.Interface
 }
 
-func (c *AppsInternalVersionClient) StatefulSets(namespace string) StatefulSetInterface {
+func (c *AppsClient) StatefulSets(namespace string) StatefulSetInterface {
 	return newStatefulSets(c, namespace)
 }
 
-// NewForConfig creates a new AppsInternalVersionClient for the given config.
-func NewForConfig(c *restclient.Config) (*AppsInternalVersionClient, error) {
+// NewForConfig creates a new AppsClient for the given config.
+func NewForConfig(c *restclient.Config) (*AppsClient, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -46,12 +46,12 @@ func NewForConfig(c *restclient.Config) (*AppsInternalVersionClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &AppsInternalVersionClient{client}, nil
+	return &AppsClient{client}, nil
 }
 
-// NewForConfigOrDie creates a new AppsInternalVersionClient for the given config and
+// NewForConfigOrDie creates a new AppsClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *AppsInternalVersionClient {
+func NewForConfigOrDie(c *restclient.Config) *AppsClient {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -59,9 +59,9 @@ func NewForConfigOrDie(c *restclient.Config) *AppsInternalVersionClient {
 	return client
 }
 
-// New creates a new AppsInternalVersionClient for the given RESTClient.
-func New(c restclient.Interface) *AppsInternalVersionClient {
-	return &AppsInternalVersionClient{c}
+// New creates a new AppsClient for the given RESTClient.
+func New(c restclient.Interface) *AppsClient {
+	return &AppsClient{c}
 }
 
 func setConfigDefaults(config *restclient.Config) error {
@@ -91,7 +91,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *AppsInternalVersionClient) RESTClient() restclient.Interface {
+func (c *AppsClient) RESTClient() restclient.Interface {
 	if c == nil {
 		return nil
 	}

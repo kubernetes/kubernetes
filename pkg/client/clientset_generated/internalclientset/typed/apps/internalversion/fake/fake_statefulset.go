@@ -27,7 +27,7 @@ import (
 
 // FakeStatefulSets implements StatefulSetInterface
 type FakeStatefulSets struct {
-	Fake *FakeAppsInternalVersion
+	Fake *FakeApps
 	ns   string
 }
 

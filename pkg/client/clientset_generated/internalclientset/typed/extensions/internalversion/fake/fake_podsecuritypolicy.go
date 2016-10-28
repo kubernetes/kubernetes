@@ -27,7 +27,7 @@ import (
 
 // FakePodSecurityPolicies implements PodSecurityPolicyInterface
 type FakePodSecurityPolicies struct {
-	Fake *FakeExtensionsInternalVersion
+	Fake *FakeExtensions
 }
 
 var podsecuritypoliciesResource = unversioned.GroupVersionResource{Group: "extensions", Version: "", Resource: "podsecuritypolicies"}

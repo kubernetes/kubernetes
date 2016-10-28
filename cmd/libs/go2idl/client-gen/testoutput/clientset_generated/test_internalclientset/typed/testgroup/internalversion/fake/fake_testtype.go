@@ -17,7 +17,7 @@ limitations under the License.
 package fake
 
 import (
-	testgroup_k8s_io "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup.k8s.io"
+	testgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup"
 	api "k8s.io/kubernetes/pkg/api"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
@@ -27,45 +27,45 @@ import (
 
 // FakeTestTypes implements TestTypeInterface
 type FakeTestTypes struct {
-	Fake *FakeTestgroupInternalVersion
+	Fake *FakeTestgroup
 	ns   string
 }
 
 var testtypesResource = unversioned.GroupVersionResource{Group: "testgroup.k8s.io", Version: "", Resource: "testtypes"}
 
-func (c *FakeTestTypes) Create(testType *testgroup_k8s_io.TestType) (result *testgroup_k8s_io.TestType, err error) {
+func (c *FakeTestTypes) Create(testType *testgroup.TestType) (result *testgroup.TestType, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction(testtypesResource, c.ns, testType), &testgroup_k8s_io.TestType{})
+		Invokes(core.NewCreateAction(testtypesResource, c.ns, testType), &testgroup.TestType{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*testgroup_k8s_io.TestType), err
+	return obj.(*testgroup.TestType), err
 }
 
-func (c *FakeTestTypes) Update(testType *testgroup_k8s_io.TestType) (result *testgroup_k8s_io.TestType, err error) {
+func (c *FakeTestTypes) Update(testType *testgroup.TestType) (result *testgroup.TestType, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction(testtypesResource, c.ns, testType), &testgroup_k8s_io.TestType{})
+		Invokes(core.NewUpdateAction(testtypesResource, c.ns, testType), &testgroup.TestType{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*testgroup_k8s_io.TestType), err
+	return obj.(*testgroup.TestType), err
 }
 
-func (c *FakeTestTypes) UpdateStatus(testType *testgroup_k8s_io.TestType) (*testgroup_k8s_io.TestType, error) {
+func (c *FakeTestTypes) UpdateStatus(testType *testgroup.TestType) (*testgroup.TestType, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateSubresourceAction(testtypesResource, "status", c.ns, testType), &testgroup_k8s_io.TestType{})
+		Invokes(core.NewUpdateSubresourceAction(testtypesResource, "status", c.ns, testType), &testgroup.TestType{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*testgroup_k8s_io.TestType), err
+	return obj.(*testgroup.TestType), err
 }
 
 func (c *FakeTestTypes) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(core.NewDeleteAction(testtypesResource, c.ns, name), &testgroup_k8s_io.TestType{})
+		Invokes(core.NewDeleteAction(testtypesResource, c.ns, name), &testgroup.TestType{})
 
 	return err
 }
@@ -73,23 +73,23 @@ func (c *FakeTestTypes) Delete(name string, options *api.DeleteOptions) error {
 func (c *FakeTestTypes) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	action := core.NewDeleteCollectionAction(testtypesResource, c.ns, listOptions)
 
-	_, err := c.Fake.Invokes(action, &testgroup_k8s_io.TestTypeList{})
+	_, err := c.Fake.Invokes(action, &testgroup.TestTypeList{})
 	return err
 }
 
-func (c *FakeTestTypes) Get(name string) (result *testgroup_k8s_io.TestType, err error) {
+func (c *FakeTestTypes) Get(name string) (result *testgroup.TestType, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewGetAction(testtypesResource, c.ns, name), &testgroup_k8s_io.TestType{})
+		Invokes(core.NewGetAction(testtypesResource, c.ns, name), &testgroup.TestType{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*testgroup_k8s_io.TestType), err
+	return obj.(*testgroup.TestType), err
 }
 
-func (c *FakeTestTypes) List(opts api.ListOptions) (result *testgroup_k8s_io.TestTypeList, err error) {
+func (c *FakeTestTypes) List(opts api.ListOptions) (result *testgroup.TestTypeList, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewListAction(testtypesResource, c.ns, opts), &testgroup_k8s_io.TestTypeList{})
+		Invokes(core.NewListAction(testtypesResource, c.ns, opts), &testgroup.TestTypeList{})
 
 	if obj == nil {
 		return nil, err
@@ -99,8 +99,8 @@ func (c *FakeTestTypes) List(opts api.ListOptions) (result *testgroup_k8s_io.Tes
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &testgroup_k8s_io.TestTypeList{}
-	for _, item := range obj.(*testgroup_k8s_io.TestTypeList).Items {
+	list := &testgroup.TestTypeList{}
+	for _, item := range obj.(*testgroup.TestTypeList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -116,12 +116,12 @@ func (c *FakeTestTypes) Watch(opts api.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched testType.
-func (c *FakeTestTypes) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *testgroup_k8s_io.TestType, err error) {
+func (c *FakeTestTypes) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *testgroup.TestType, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewPatchSubresourceAction(testtypesResource, c.ns, name, data, subresources...), &testgroup_k8s_io.TestType{})
+		Invokes(core.NewPatchSubresourceAction(testtypesResource, c.ns, name, data, subresources...), &testgroup.TestType{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*testgroup_k8s_io.TestType), err
+	return obj.(*testgroup.TestType), err
 }

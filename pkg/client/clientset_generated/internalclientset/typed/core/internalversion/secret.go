@@ -48,7 +48,7 @@ type secrets struct {
 }
 
 // newSecrets returns a Secrets
-func newSecrets(c *CoreInternalVersionClient, namespace string) *secrets {
+func newSecrets(c *CoreClient, namespace string) *secrets {
 	return &secrets{
 		client: c.RESTClient(),
 		ns:     namespace,

@@ -25,14 +25,13 @@ import (
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/types"
 	clientgenargs "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/args"
-	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/normalization"
 	clientgentypes "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/types"
 )
 
 func PackageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, packageBasePath string, srcTreePath string, inputPath string, boilerplate []byte, generatedBy string) generator.Package {
-	outputPackagePath := strings.ToLower(filepath.Join(packageBasePath, gv.Group, gv.Version, "fake"))
+	outputPackagePath := strings.ToLower(filepath.Join(packageBasePath, gv.Group.NonEmpty(), gv.Version.NonEmpty(), "fake"))
 	// TODO: should make this a function, called by here and in client-generator.go
-	realClientPath := filepath.Join(packageBasePath, gv.Group, gv.Version)
+	realClientPath := filepath.Join(packageBasePath, gv.Group.NonEmpty(), gv.Version.NonEmpty())
 	return &generator.DefaultPackage{
 		PackageName: "fake",
 		PackagePath: outputPackagePath,
@@ -56,8 +55,8 @@ func PackageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, pac
 						OptionalName: "fake_" + strings.ToLower(c.Namers["private"].Name(t)),
 					},
 					outputPackage: outputPackagePath,
-					group:         normalization.BeforeFirstDot(gv.Group),
-					version:       normalization.Version(gv.Version),
+					group:         gv.Group.NonEmpty(),
+					version:       gv.Version.String(),
 					inputPackage:  inputPath,
 					typeToMatch:   t,
 					imports:       generator.NewImportTracker(),
@@ -66,12 +65,12 @@ func PackageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, pac
 
 			generators = append(generators, &genFakeForGroup{
 				DefaultGen: generator.DefaultGen{
-					OptionalName: "fake_" + normalization.BeforeFirstDot(gv.Group) + "_client",
+					OptionalName: "fake_" + gv.Group.NonEmpty() + "_client",
 				},
 				outputPackage:  outputPackagePath,
 				realClientPath: realClientPath,
-				group:          normalization.BeforeFirstDot(gv.Group),
-				version:        normalization.Version(gv.Version),
+				group:          gv.Group.NonEmpty(),
+				version:        gv.Version.String(),
 				types:          typeList,
 				imports:        generator.NewImportTracker(),
 			})

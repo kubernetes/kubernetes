@@ -22,17 +22,17 @@ import (
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
-type FakeAppsInternalVersion struct {
+type FakeApps struct {
 	*core.Fake
 }
 
-func (c *FakeAppsInternalVersion) StatefulSets(namespace string) internalversion.StatefulSetInterface {
+func (c *FakeApps) StatefulSets(namespace string) internalversion.StatefulSetInterface {
 	return &FakeStatefulSets{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeAppsInternalVersion) RESTClient() restclient.Interface {
+func (c *FakeApps) RESTClient() restclient.Interface {
 	var ret *restclient.RESTClient
 	return ret
 }

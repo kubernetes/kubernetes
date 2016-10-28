@@ -59,7 +59,7 @@ type FakeNodeHandler struct {
 }
 
 type FakeLegacyHandler struct {
-	unversionedcore.CoreInternalVersionInterface
+	unversionedcore.CoreInterface
 	n *FakeNodeHandler
 }
 
@@ -73,7 +73,7 @@ func (c *FakeNodeHandler) getUpdatedNodesCopy() []*api.Node {
 	return updatedNodesCopy
 }
 
-func (c *FakeNodeHandler) Core() unversionedcore.CoreInternalVersionInterface {
+func (c *FakeNodeHandler) Core() unversionedcore.CoreInterface {
 	return &FakeLegacyHandler{c.Clientset.Core(), c}
 }
 

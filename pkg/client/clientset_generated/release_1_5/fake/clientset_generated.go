@@ -134,11 +134,6 @@ func (c *Clientset) Autoscaling() v1autoscaling.AutoscalingV1Interface {
 	return &fakev1autoscaling.FakeAutoscalingV1{Fake: &c.Fake}
 }
 
-// BatchV2alpha1 retrieves the BatchV2alpha1Client
-func (c *Clientset) BatchV2alpha1() v2alpha1batch.BatchV2alpha1Interface {
-	return &fakev2alpha1batch.FakeBatchV2alpha1{Fake: &c.Fake}
-}
-
 // BatchV1 retrieves the BatchV1Client
 func (c *Clientset) BatchV1() v1batch.BatchV1Interface {
 	return &fakev1batch.FakeBatchV1{Fake: &c.Fake}
@@ -147,6 +142,11 @@ func (c *Clientset) BatchV1() v1batch.BatchV1Interface {
 // Batch retrieves the BatchV1Client
 func (c *Clientset) Batch() v1batch.BatchV1Interface {
 	return &fakev1batch.FakeBatchV1{Fake: &c.Fake}
+}
+
+// BatchV2alpha1 retrieves the BatchV2alpha1Client
+func (c *Clientset) BatchV2alpha1() v2alpha1batch.BatchV2alpha1Interface {
+	return &fakev2alpha1batch.FakeBatchV2alpha1{Fake: &c.Fake}
 }
 
 // CertificatesV1alpha1 retrieves the CertificatesV1alpha1Client

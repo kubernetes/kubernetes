@@ -53,11 +53,11 @@ type Interface interface {
 	AutoscalingV1() v1autoscaling.AutoscalingV1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Autoscaling() v1autoscaling.AutoscalingV1Interface
-	BatchV2alpha1() v2alpha1batch.BatchV2alpha1Interface
-
 	BatchV1() v1batch.BatchV1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Batch() v1batch.BatchV1Interface
+	BatchV2alpha1() v2alpha1batch.BatchV2alpha1Interface
+
 	CertificatesV1alpha1() v1alpha1certificates.CertificatesV1alpha1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Certificates() v1alpha1certificates.CertificatesV1alpha1Interface
@@ -84,8 +84,8 @@ type Clientset struct {
 	*v1beta1authentication.AuthenticationV1beta1Client
 	*v1beta1authorization.AuthorizationV1beta1Client
 	*v1autoscaling.AutoscalingV1Client
-	*v2alpha1batch.BatchV2alpha1Client
 	*v1batch.BatchV1Client
+	*v2alpha1batch.BatchV2alpha1Client
 	*v1alpha1certificates.CertificatesV1alpha1Client
 	*v1beta1extensions.ExtensionsV1beta1Client
 	*v1alpha1policy.PolicyV1alpha1Client
@@ -178,14 +178,6 @@ func (c *Clientset) Autoscaling() v1autoscaling.AutoscalingV1Interface {
 	return c.AutoscalingV1Client
 }
 
-// BatchV2alpha1 retrieves the BatchV2alpha1Client
-func (c *Clientset) BatchV2alpha1() v2alpha1batch.BatchV2alpha1Interface {
-	if c == nil {
-		return nil
-	}
-	return c.BatchV2alpha1Client
-}
-
 // BatchV1 retrieves the BatchV1Client
 func (c *Clientset) BatchV1() v1batch.BatchV1Interface {
 	if c == nil {
@@ -201,6 +193,14 @@ func (c *Clientset) Batch() v1batch.BatchV1Interface {
 		return nil
 	}
 	return c.BatchV1Client
+}
+
+// BatchV2alpha1 retrieves the BatchV2alpha1Client
+func (c *Clientset) BatchV2alpha1() v2alpha1batch.BatchV2alpha1Interface {
+	if c == nil {
+		return nil
+	}
+	return c.BatchV2alpha1Client
 }
 
 // CertificatesV1alpha1 retrieves the CertificatesV1alpha1Client
@@ -321,11 +321,11 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
-	clientset.BatchV2alpha1Client, err = v2alpha1batch.NewForConfig(&configShallowCopy)
+	clientset.BatchV1Client, err = v1batch.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.BatchV1Client, err = v1batch.NewForConfig(&configShallowCopy)
+	clientset.BatchV2alpha1Client, err = v2alpha1batch.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -367,8 +367,8 @@ func NewForConfigOrDie(c *restclient.Config) *Clientset {
 	clientset.AuthenticationV1beta1Client = v1beta1authentication.NewForConfigOrDie(c)
 	clientset.AuthorizationV1beta1Client = v1beta1authorization.NewForConfigOrDie(c)
 	clientset.AutoscalingV1Client = v1autoscaling.NewForConfigOrDie(c)
-	clientset.BatchV2alpha1Client = v2alpha1batch.NewForConfigOrDie(c)
 	clientset.BatchV1Client = v1batch.NewForConfigOrDie(c)
+	clientset.BatchV2alpha1Client = v2alpha1batch.NewForConfigOrDie(c)
 	clientset.CertificatesV1alpha1Client = v1alpha1certificates.NewForConfigOrDie(c)
 	clientset.ExtensionsV1beta1Client = v1beta1extensions.NewForConfigOrDie(c)
 	clientset.PolicyV1alpha1Client = v1alpha1policy.NewForConfigOrDie(c)
@@ -387,8 +387,8 @@ func New(c restclient.Interface) *Clientset {
 	clientset.AuthenticationV1beta1Client = v1beta1authentication.New(c)
 	clientset.AuthorizationV1beta1Client = v1beta1authorization.New(c)
 	clientset.AutoscalingV1Client = v1autoscaling.New(c)
-	clientset.BatchV2alpha1Client = v2alpha1batch.New(c)
 	clientset.BatchV1Client = v1batch.New(c)
+	clientset.BatchV2alpha1Client = v2alpha1batch.New(c)
 	clientset.CertificatesV1alpha1Client = v1alpha1certificates.New(c)
 	clientset.ExtensionsV1beta1Client = v1beta1extensions.New(c)
 	clientset.PolicyV1alpha1Client = v1alpha1policy.New(c)

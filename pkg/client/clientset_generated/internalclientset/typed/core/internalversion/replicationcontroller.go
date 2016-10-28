@@ -49,7 +49,7 @@ type replicationControllers struct {
 }
 
 // newReplicationControllers returns a ReplicationControllers
-func newReplicationControllers(c *CoreInternalVersionClient, namespace string) *replicationControllers {
+func newReplicationControllers(c *CoreClient, namespace string) *replicationControllers {
 	return &replicationControllers{
 		client: c.RESTClient(),
 		ns:     namespace,

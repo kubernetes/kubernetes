@@ -22,22 +22,22 @@ import (
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
-type AuthenticationInternalVersionInterface interface {
+type AuthenticationInterface interface {
 	RESTClient() restclient.Interface
 	TokenReviewsGetter
 }
 
-// AuthenticationInternalVersionClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
-type AuthenticationInternalVersionClient struct {
+// AuthenticationClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
+type AuthenticationClient struct {
 	restClient restclient.Interface
 }
 
-func (c *AuthenticationInternalVersionClient) TokenReviews() TokenReviewInterface {
+func (c *AuthenticationClient) TokenReviews() TokenReviewInterface {
 	return newTokenReviews(c)
 }
 
-// NewForConfig creates a new AuthenticationInternalVersionClient for the given config.
-func NewForConfig(c *restclient.Config) (*AuthenticationInternalVersionClient, error) {
+// NewForConfig creates a new AuthenticationClient for the given config.
+func NewForConfig(c *restclient.Config) (*AuthenticationClient, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -46,12 +46,12 @@ func NewForConfig(c *restclient.Config) (*AuthenticationInternalVersionClient, e
 	if err != nil {
 		return nil, err
 	}
-	return &AuthenticationInternalVersionClient{client}, nil
+	return &AuthenticationClient{client}, nil
 }
 
-// NewForConfigOrDie creates a new AuthenticationInternalVersionClient for the given config and
+// NewForConfigOrDie creates a new AuthenticationClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *AuthenticationInternalVersionClient {
+func NewForConfigOrDie(c *restclient.Config) *AuthenticationClient {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -59,9 +59,9 @@ func NewForConfigOrDie(c *restclient.Config) *AuthenticationInternalVersionClien
 	return client
 }
 
-// New creates a new AuthenticationInternalVersionClient for the given RESTClient.
-func New(c restclient.Interface) *AuthenticationInternalVersionClient {
-	return &AuthenticationInternalVersionClient{c}
+// New creates a new AuthenticationClient for the given RESTClient.
+func New(c restclient.Interface) *AuthenticationClient {
+	return &AuthenticationClient{c}
 }
 
 func setConfigDefaults(config *restclient.Config) error {
@@ -91,7 +91,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *AuthenticationInternalVersionClient) RESTClient() restclient.Interface {
+func (c *AuthenticationClient) RESTClient() restclient.Interface {
 	if c == nil {
 		return nil
 	}

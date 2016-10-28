@@ -27,7 +27,7 @@ import (
 
 // FakeDaemonSets implements DaemonSetInterface
 type FakeDaemonSets struct {
-	Fake *FakeExtensionsInternalVersion
+	Fake *FakeExtensions
 	ns   string
 }
 

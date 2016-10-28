@@ -22,7 +22,7 @@ import (
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
-type CoreInternalVersionInterface interface {
+type CoreInterface interface {
 	RESTClient() restclient.Interface
 	ComponentStatusesGetter
 	ConfigMapsGetter
@@ -42,77 +42,77 @@ type CoreInternalVersionInterface interface {
 	ServiceAccountsGetter
 }
 
-// CoreInternalVersionClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
-type CoreInternalVersionClient struct {
+// CoreClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
+type CoreClient struct {
 	restClient restclient.Interface
 }
 
-func (c *CoreInternalVersionClient) ComponentStatuses() ComponentStatusInterface {
+func (c *CoreClient) ComponentStatuses() ComponentStatusInterface {
 	return newComponentStatuses(c)
 }
 
-func (c *CoreInternalVersionClient) ConfigMaps(namespace string) ConfigMapInterface {
+func (c *CoreClient) ConfigMaps(namespace string) ConfigMapInterface {
 	return newConfigMaps(c, namespace)
 }
 
-func (c *CoreInternalVersionClient) Endpoints(namespace string) EndpointsInterface {
+func (c *CoreClient) Endpoints(namespace string) EndpointsInterface {
 	return newEndpoints(c, namespace)
 }
 
-func (c *CoreInternalVersionClient) Events(namespace string) EventInterface {
+func (c *CoreClient) Events(namespace string) EventInterface {
 	return newEvents(c, namespace)
 }
 
-func (c *CoreInternalVersionClient) LimitRanges(namespace string) LimitRangeInterface {
+func (c *CoreClient) LimitRanges(namespace string) LimitRangeInterface {
 	return newLimitRanges(c, namespace)
 }
 
-func (c *CoreInternalVersionClient) Namespaces() NamespaceInterface {
+func (c *CoreClient) Namespaces() NamespaceInterface {
 	return newNamespaces(c)
 }
 
-func (c *CoreInternalVersionClient) Nodes() NodeInterface {
+func (c *CoreClient) Nodes() NodeInterface {
 	return newNodes(c)
 }
 
-func (c *CoreInternalVersionClient) PersistentVolumes() PersistentVolumeInterface {
+func (c *CoreClient) PersistentVolumes() PersistentVolumeInterface {
 	return newPersistentVolumes(c)
 }
 
-func (c *CoreInternalVersionClient) PersistentVolumeClaims(namespace string) PersistentVolumeClaimInterface {
+func (c *CoreClient) PersistentVolumeClaims(namespace string) PersistentVolumeClaimInterface {
 	return newPersistentVolumeClaims(c, namespace)
 }
 
-func (c *CoreInternalVersionClient) Pods(namespace string) PodInterface {
+func (c *CoreClient) Pods(namespace string) PodInterface {
 	return newPods(c, namespace)
 }
 
-func (c *CoreInternalVersionClient) PodTemplates(namespace string) PodTemplateInterface {
+func (c *CoreClient) PodTemplates(namespace string) PodTemplateInterface {
 	return newPodTemplates(c, namespace)
 }
 
-func (c *CoreInternalVersionClient) ReplicationControllers(namespace string) ReplicationControllerInterface {
+func (c *CoreClient) ReplicationControllers(namespace string) ReplicationControllerInterface {
 	return newReplicationControllers(c, namespace)
 }
 
-func (c *CoreInternalVersionClient) ResourceQuotas(namespace string) ResourceQuotaInterface {
+func (c *CoreClient) ResourceQuotas(namespace string) ResourceQuotaInterface {
 	return newResourceQuotas(c, namespace)
 }
 
-func (c *CoreInternalVersionClient) Secrets(namespace string) SecretInterface {
+func (c *CoreClient) Secrets(namespace string) SecretInterface {
 	return newSecrets(c, namespace)
 }
 
-func (c *CoreInternalVersionClient) Services(namespace string) ServiceInterface {
+func (c *CoreClient) Services(namespace string) ServiceInterface {
 	return newServices(c, namespace)
 }
 
-func (c *CoreInternalVersionClient) ServiceAccounts(namespace string) ServiceAccountInterface {
+func (c *CoreClient) ServiceAccounts(namespace string) ServiceAccountInterface {
 	return newServiceAccounts(c, namespace)
 }
 
-// NewForConfig creates a new CoreInternalVersionClient for the given config.
-func NewForConfig(c *restclient.Config) (*CoreInternalVersionClient, error) {
+// NewForConfig creates a new CoreClient for the given config.
+func NewForConfig(c *restclient.Config) (*CoreClient, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -121,12 +121,12 @@ func NewForConfig(c *restclient.Config) (*CoreInternalVersionClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &CoreInternalVersionClient{client}, nil
+	return &CoreClient{client}, nil
 }
 
-// NewForConfigOrDie creates a new CoreInternalVersionClient for the given config and
+// NewForConfigOrDie creates a new CoreClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *CoreInternalVersionClient {
+func NewForConfigOrDie(c *restclient.Config) *CoreClient {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -134,9 +134,9 @@ func NewForConfigOrDie(c *restclient.Config) *CoreInternalVersionClient {
 	return client
 }
 
-// New creates a new CoreInternalVersionClient for the given RESTClient.
-func New(c restclient.Interface) *CoreInternalVersionClient {
-	return &CoreInternalVersionClient{c}
+// New creates a new CoreClient for the given RESTClient.
+func New(c restclient.Interface) *CoreClient {
+	return &CoreClient{c}
 }
 
 func setConfigDefaults(config *restclient.Config) error {
@@ -166,7 +166,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *CoreInternalVersionClient) RESTClient() restclient.Interface {
+func (c *CoreClient) RESTClient() restclient.Interface {
 	if c == nil {
 		return nil
 	}

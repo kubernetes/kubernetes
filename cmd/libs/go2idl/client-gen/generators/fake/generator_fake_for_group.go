@@ -25,7 +25,6 @@ import (
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
-	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/normalization"
 )
 
 // genFakeForGroup produces a file for a group client, e.g. ExtensionsClient for the extension group.
@@ -64,7 +63,7 @@ func (g *genFakeForGroup) GenerateType(c *generator.Context, t *types.Type, w io
 	const pkgRESTClient = "k8s.io/kubernetes/pkg/client/restclient"
 	m := map[string]interface{}{
 		"group":               g.group,
-		"GroupVersion":        namer.IC(g.group) + namer.IC(normalization.Version(g.version)),
+		"GroupVersion":        namer.IC(g.group) + namer.IC(g.version),
 		"Fake":                c.Universe.Type(types.Name{Package: pkgTestingCore, Name: "Fake"}),
 		"RESTClientInterface": c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "Interface"}),
 		"RESTClient":          c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "RESTClient"}),
@@ -73,7 +72,7 @@ func (g *genFakeForGroup) GenerateType(c *generator.Context, t *types.Type, w io
 	for _, t := range g.types {
 		wrapper := map[string]interface{}{
 			"type":              t,
-			"GroupVersion":      namer.IC(g.group) + namer.IC(normalization.Version(g.version)),
+			"GroupVersion":      namer.IC(g.group) + namer.IC(g.version),
 			"realClientPackage": strings.ToLower(filepath.Base(g.realClientPath)),
 		}
 		namespaced := !extractBoolTagOrDie("nonNamespaced", t.SecondClosestCommentLines)

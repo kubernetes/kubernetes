@@ -26,7 +26,7 @@ import (
 
 // FakeReplicationControllers implements ReplicationControllerInterface
 type FakeReplicationControllers struct {
-	Fake *FakeCoreInternalVersion
+	Fake *FakeCore
 	ns   string
 }
 

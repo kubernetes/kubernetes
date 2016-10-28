@@ -81,7 +81,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"namespaced":          namespaced,
 	}
 
-	if g.version == "internalVersion" {
+	if g.version == "" {
 		m["DeleteOptions"] = c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "DeleteOptions"})
 		m["ListOptions"] = c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ListOptions"})
 	} else {

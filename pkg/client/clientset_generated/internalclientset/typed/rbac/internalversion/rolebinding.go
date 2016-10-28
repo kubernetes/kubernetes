@@ -49,7 +49,7 @@ type roleBindings struct {
 }
 
 // newRoleBindings returns a RoleBindings
-func newRoleBindings(c *RbacInternalVersionClient, namespace string) *roleBindings {
+func newRoleBindings(c *RbacClient, namespace string) *roleBindings {
 	return &roleBindings{
 		client: c.RESTClient(),
 		ns:     namespace,

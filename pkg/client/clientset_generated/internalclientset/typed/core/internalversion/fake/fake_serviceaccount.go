@@ -26,7 +26,7 @@ import (
 
 // FakeServiceAccounts implements ServiceAccountInterface
 type FakeServiceAccounts struct {
-	Fake *FakeCoreInternalVersion
+	Fake *FakeCore
 	ns   string
 }
 

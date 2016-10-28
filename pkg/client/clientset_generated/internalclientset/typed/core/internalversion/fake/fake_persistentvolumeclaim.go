@@ -26,7 +26,7 @@ import (
 
 // FakePersistentVolumeClaims implements PersistentVolumeClaimInterface
 type FakePersistentVolumeClaims struct {
-	Fake *FakeCoreInternalVersion
+	Fake *FakeCore
 	ns   string
 }
 

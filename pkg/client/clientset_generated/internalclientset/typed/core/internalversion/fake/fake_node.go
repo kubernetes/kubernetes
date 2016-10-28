@@ -26,7 +26,7 @@ import (
 
 // FakeNodes implements NodeInterface
 type FakeNodes struct {
-	Fake *FakeCoreInternalVersion
+	Fake *FakeCore
 }
 
 var nodesResource = unversioned.GroupVersionResource{Group: "", Version: "", Resource: "nodes"}

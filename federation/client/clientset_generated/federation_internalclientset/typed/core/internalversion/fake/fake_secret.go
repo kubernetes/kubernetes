@@ -26,7 +26,7 @@ import (
 
 // FakeSecrets implements SecretInterface
 type FakeSecrets struct {
-	Fake *FakeCoreInternalVersion
+	Fake *FakeCore
 	ns   string
 }
 

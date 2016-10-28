@@ -49,7 +49,7 @@ type clusters struct {
 }
 
 // newClusters returns a Clusters
-func newClusters(c *FederationInternalVersionClient) *clusters {
+func newClusters(c *FederationClient) *clusters {
 	return &clusters{
 		client: c.RESTClient(),
 	}

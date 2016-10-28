@@ -26,7 +26,7 @@ import (
 
 // FakePersistentVolumes implements PersistentVolumeInterface
 type FakePersistentVolumes struct {
-	Fake *FakeCoreInternalVersion
+	Fake *FakeCore
 }
 
 var persistentvolumesResource = unversioned.GroupVersionResource{Group: "", Version: "", Resource: "persistentvolumes"}

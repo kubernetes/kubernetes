@@ -50,7 +50,7 @@ type daemonSets struct {
 }
 
 // newDaemonSets returns a DaemonSets
-func newDaemonSets(c *ExtensionsInternalVersionClient, namespace string) *daemonSets {
+func newDaemonSets(c *ExtensionsClient, namespace string) *daemonSets {
 	return &daemonSets{
 		client: c.RESTClient(),
 		ns:     namespace,

@@ -22,7 +22,6 @@ import (
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
-	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/normalization"
 )
 
 // genGroup produces a file for a group client, e.g. ExtensionsClient for the extension group.
@@ -85,9 +84,9 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	}
 
 	m := map[string]interface{}{
-		"group":                      normalization.BeforeFirstDot(g.group),
+		"group":                      g.group,
 		"version":                    g.version,
-		"GroupVersion":               namer.IC(normalization.BeforeFirstDot(g.group)) + namer.IC(normalization.Version(g.version)),
+		"GroupVersion":               namer.IC(g.group) + namer.IC(g.version),
 		"groupName":                  groupName,
 		"types":                      g.types,
 		"Config":                     c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "Config"}),
@@ -108,7 +107,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	for _, t := range g.types {
 		wrapper := map[string]interface{}{
 			"type":         t,
-			"GroupVersion": namer.IC(normalization.BeforeFirstDot(g.group)) + namer.IC(normalization.Version(g.version)),
+			"GroupVersion": namer.IC(g.group) + namer.IC(g.version),
 		}
 		namespaced := !extractBoolTagOrDie("nonNamespaced", t.SecondClosestCommentLines)
 		if namespaced {
@@ -121,7 +120,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	sw.Do(newClientForConfigTemplate, m)
 	sw.Do(newClientForConfigOrDieTemplate, m)
 	sw.Do(newClientForRESTClientTemplate, m)
-	if g.version == "internalVersion" {
+	if g.version == "" {
 		sw.Do(setInternalVersionClientDefaultsTemplate, m)
 	} else {
 		sw.Do(setClientDefaultsTemplate, m)

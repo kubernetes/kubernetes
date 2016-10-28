@@ -50,7 +50,7 @@ type jobs struct {
 }
 
 // newJobs returns a Jobs
-func newJobs(c *BatchInternalVersionClient, namespace string) *jobs {
+func newJobs(c *BatchClient, namespace string) *jobs {
 	return &jobs{
 		client: c.RESTClient(),
 		ns:     namespace,

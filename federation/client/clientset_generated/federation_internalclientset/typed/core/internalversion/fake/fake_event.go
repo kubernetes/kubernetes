@@ -26,7 +26,7 @@ import (
 
 // FakeEvents implements EventInterface
 type FakeEvents struct {
-	Fake *FakeCoreInternalVersion
+	Fake *FakeCore
 	ns   string
 }
 

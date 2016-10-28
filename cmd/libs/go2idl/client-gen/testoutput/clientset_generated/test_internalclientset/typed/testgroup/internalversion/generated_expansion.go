@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fake
+package internalversion
 
-func (c *FakeTestTypes) Hello() string {
-	return "hello!"
-}
+type TestTypeExpansion interface{}

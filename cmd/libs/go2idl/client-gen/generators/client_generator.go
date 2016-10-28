@@ -28,7 +28,6 @@ import (
 	"k8s.io/gengo/types"
 	clientgenargs "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/args"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/fake"
-	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/normalization"
 	clientgentypes "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/types"
 
 	"github.com/golang/glog"
@@ -63,9 +62,9 @@ func generatedBy(customArgs clientgenargs.Args) string {
 }
 
 func packageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, packageBasePath string, apiPath string, srcTreePath string, inputPath string, boilerplate []byte, generatedBy string) generator.Package {
-	outputPackagePath := strings.ToLower(filepath.Join(packageBasePath, gv.Group, gv.Version))
+	outputPackagePath := strings.ToLower(filepath.Join(packageBasePath, gv.Group.NonEmpty(), gv.Version.NonEmpty()))
 	return &generator.DefaultPackage{
-		PackageName: strings.ToLower(gv.Version),
+		PackageName: strings.ToLower(gv.Version.NonEmpty()),
 		PackagePath: outputPackagePath,
 		HeaderText:  boilerplate,
 		PackageDocumentation: []byte(
@@ -87,8 +86,8 @@ func packageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, pac
 						OptionalName: strings.ToLower(c.Namers["private"].Name(t)),
 					},
 					outputPackage: outputPackagePath,
-					group:         normalization.BeforeFirstDot(gv.Group),
-					version:       normalization.Version(gv.Version),
+					group:         gv.Group.NonEmpty(),
+					version:       gv.Version.String(),
 					typeToMatch:   t,
 					imports:       generator.NewImportTracker(),
 				})
@@ -96,12 +95,12 @@ func packageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, pac
 
 			generators = append(generators, &genGroup{
 				DefaultGen: generator.DefaultGen{
-					OptionalName: normalization.BeforeFirstDot(gv.Group) + "_client",
+					OptionalName: gv.Group.NonEmpty() + "_client",
 				},
 				outputPackage: outputPackagePath,
 				inputPacakge:  inputPath,
-				group:         gv.Group,
-				version:       gv.Version,
+				group:         gv.Group.NonEmpty(),
+				version:       gv.Version.String(),
 				apiPath:       apiPath,
 				types:         typeList,
 				imports:       generator.NewImportTracker(),
@@ -220,9 +219,9 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			gv := clientgentypes.GroupVersion{Group: group.Group, Version: version}
 			types := gvToTypes[gv]
 			inputPath := customArgs.GroupVersionToInputPath[gv]
-			packageList = append(packageList, packageForGroup(clientgentypes.NormalizeGroupVersion(gv), orderer.OrderTypes(types), typedClientBasePath, customArgs.ClientsetAPIPath, arguments.OutputBase, inputPath, boilerplate, generatedBy))
+			packageList = append(packageList, packageForGroup(gv, orderer.OrderTypes(types), typedClientBasePath, customArgs.ClientsetAPIPath, arguments.OutputBase, inputPath, boilerplate, generatedBy))
 			if customArgs.FakeClient {
-				packageList = append(packageList, fake.PackageForGroup(clientgentypes.NormalizeGroupVersion(gv), orderer.OrderTypes(types), typedClientBasePath, arguments.OutputBase, inputPath, boilerplate, generatedBy))
+				packageList = append(packageList, fake.PackageForGroup(gv, orderer.OrderTypes(types), typedClientBasePath, arguments.OutputBase, inputPath, boilerplate, generatedBy))
 			}
 		}
 	}

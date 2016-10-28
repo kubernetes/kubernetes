@@ -22,17 +22,17 @@ import (
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
-type FakePolicyInternalVersion struct {
+type FakePolicy struct {
 	*core.Fake
 }
 
-func (c *FakePolicyInternalVersion) PodDisruptionBudgets(namespace string) internalversion.PodDisruptionBudgetInterface {
+func (c *FakePolicy) PodDisruptionBudgets(namespace string) internalversion.PodDisruptionBudgetInterface {
 	return &FakePodDisruptionBudgets{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakePolicyInternalVersion) RESTClient() restclient.Interface {
+func (c *FakePolicy) RESTClient() restclient.Interface {
 	var ret *restclient.RESTClient
 	return ret
 }

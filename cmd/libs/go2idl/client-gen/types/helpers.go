@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"k8s.io/gengo/namer"
-	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/normalization"
 )
 
 // ToGroupVersion turns "group/version" string into a GroupVersion struct. It reports error
@@ -37,10 +36,10 @@ func ToGroupVersion(gv string) (GroupVersion, error) {
 
 	switch strings.Count(gv, "/") {
 	case 0:
-		return GroupVersion{"", gv}, nil
+		return GroupVersion{"", Version(gv)}, nil
 	case 1:
 		i := strings.Index(gv, "/")
-		return GroupVersion{gv[:i], gv[i+1:]}, nil
+		return GroupVersion{Group(gv[:i]), Version(gv[i+1:])}, nil
 	default:
 		return GroupVersion{}, fmt.Errorf("unexpected GroupVersion string: %v", gv)
 	}
@@ -76,25 +75,27 @@ func (a sortableSliceOfVersions) Less(i, j int) bool {
 // Determine the default version among versions. If a user calls a group client
 // without specifying the version (e.g., c.Core(), instead of c.CoreV1()), the
 // default version will be returned.
-func defaultVersion(versions []string) string {
-	sort.Sort(sortableSliceOfVersions(versions))
-	return versions[len(versions)-1]
+func defaultVersion(versions []Version) Version {
+	var versionStrings []string
+	for _, version := range versions {
+		versionStrings = append(versionStrings, string(version))
+	}
+	sort.Sort(sortableSliceOfVersions(versionStrings))
+	return Version(versionStrings[len(versionStrings)-1])
 }
 
 // ToGroupVersionPackages is a helper function used by generators for groups.
 func ToGroupVersionPackages(groups []GroupVersions) []GroupVersionPackage {
 	var groupVersionPackages []GroupVersionPackage
 	for _, group := range groups {
-		groupString := normalization.BeforeFirstDot(normalization.Group(group.Group))
 		defaultVersion := defaultVersion(group.Versions)
 		for _, version := range group.Versions {
-			versionString := normalization.Version(version)
 			groupVersionPackages = append(groupVersionPackages, GroupVersionPackage{
-				Group:            namer.IC(groupString),
-				Version:          namer.IC(versionString),
-				GroupVersion:     namer.IC(groupString) + namer.IC(versionString),
-				PackageName:      strings.ToLower(versionString + groupString),
-				IsDefaultVersion: version == defaultVersion,
+				Group:            Group(namer.IC(group.Group.NonEmpty())),
+				Version:          Version(namer.IC(version.String())),
+				GroupVersion:     namer.IC(group.Group.NonEmpty()) + namer.IC(version.String()),
+				PackageName:      strings.ToLower(version.NonEmpty() + group.Group.NonEmpty()),
+				IsDefaultVersion: version == defaultVersion && version != "",
 			})
 		}
 	}
@@ -102,6 +103,6 @@ func ToGroupVersionPackages(groups []GroupVersions) []GroupVersionPackage {
 }
 
 // NormalizeGroupVersion calls normalizes the GroupVersion.
-func NormalizeGroupVersion(gv GroupVersion) GroupVersion {
-	return GroupVersion{Group: normalization.Group(gv.Group), Version: normalization.Version(gv.Version)}
-}
+//func NormalizeGroupVersion(gv GroupVersion) GroupVersion {
+//	return GroupVersion{Group: gv.Group.NonEmpty(), Version: gv.Version, NonEmptyVersion: normalization.Version(gv.Version)}
+//}

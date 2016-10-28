@@ -27,7 +27,7 @@ import (
 
 // FakeThirdPartyResources implements ThirdPartyResourceInterface
 type FakeThirdPartyResources struct {
-	Fake *FakeExtensionsInternalVersion
+	Fake *FakeExtensions
 }
 
 var thirdpartyresourcesResource = unversioned.GroupVersionResource{Group: "extensions", Version: "", Resource: "thirdpartyresources"}

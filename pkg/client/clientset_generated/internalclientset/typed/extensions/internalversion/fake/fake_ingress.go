@@ -27,7 +27,7 @@ import (
 
 // FakeIngresses implements IngressInterface
 type FakeIngresses struct {
-	Fake *FakeExtensionsInternalVersion
+	Fake *FakeExtensions
 	ns   string
 }
 

@@ -22,7 +22,7 @@ import (
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
-type ExtensionsInternalVersionInterface interface {
+type ExtensionsInterface interface {
 	RESTClient() restclient.Interface
 	DaemonSetsGetter
 	DeploymentsGetter
@@ -30,29 +30,29 @@ type ExtensionsInternalVersionInterface interface {
 	ReplicaSetsGetter
 }
 
-// ExtensionsInternalVersionClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
-type ExtensionsInternalVersionClient struct {
+// ExtensionsClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
+type ExtensionsClient struct {
 	restClient restclient.Interface
 }
 
-func (c *ExtensionsInternalVersionClient) DaemonSets(namespace string) DaemonSetInterface {
+func (c *ExtensionsClient) DaemonSets(namespace string) DaemonSetInterface {
 	return newDaemonSets(c, namespace)
 }
 
-func (c *ExtensionsInternalVersionClient) Deployments(namespace string) DeploymentInterface {
+func (c *ExtensionsClient) Deployments(namespace string) DeploymentInterface {
 	return newDeployments(c, namespace)
 }
 
-func (c *ExtensionsInternalVersionClient) Ingresses(namespace string) IngressInterface {
+func (c *ExtensionsClient) Ingresses(namespace string) IngressInterface {
 	return newIngresses(c, namespace)
 }
 
-func (c *ExtensionsInternalVersionClient) ReplicaSets(namespace string) ReplicaSetInterface {
+func (c *ExtensionsClient) ReplicaSets(namespace string) ReplicaSetInterface {
 	return newReplicaSets(c, namespace)
 }
 
-// NewForConfig creates a new ExtensionsInternalVersionClient for the given config.
-func NewForConfig(c *restclient.Config) (*ExtensionsInternalVersionClient, error) {
+// NewForConfig creates a new ExtensionsClient for the given config.
+func NewForConfig(c *restclient.Config) (*ExtensionsClient, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -61,12 +61,12 @@ func NewForConfig(c *restclient.Config) (*ExtensionsInternalVersionClient, error
 	if err != nil {
 		return nil, err
 	}
-	return &ExtensionsInternalVersionClient{client}, nil
+	return &ExtensionsClient{client}, nil
 }
 
-// NewForConfigOrDie creates a new ExtensionsInternalVersionClient for the given config and
+// NewForConfigOrDie creates a new ExtensionsClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *ExtensionsInternalVersionClient {
+func NewForConfigOrDie(c *restclient.Config) *ExtensionsClient {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -74,9 +74,9 @@ func NewForConfigOrDie(c *restclient.Config) *ExtensionsInternalVersionClient {
 	return client
 }
 
-// New creates a new ExtensionsInternalVersionClient for the given RESTClient.
-func New(c restclient.Interface) *ExtensionsInternalVersionClient {
-	return &ExtensionsInternalVersionClient{c}
+// New creates a new ExtensionsClient for the given RESTClient.
+func New(c restclient.Interface) *ExtensionsClient {
+	return &ExtensionsClient{c}
 }
 
 func setConfigDefaults(config *restclient.Config) error {
@@ -106,7 +106,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *ExtensionsInternalVersionClient) RESTClient() restclient.Interface {
+func (c *ExtensionsClient) RESTClient() restclient.Interface {
 	if c == nil {
 		return nil
 	}

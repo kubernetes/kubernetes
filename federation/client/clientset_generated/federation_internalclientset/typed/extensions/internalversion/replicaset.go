@@ -50,7 +50,7 @@ type replicaSets struct {
 }
 
 // newReplicaSets returns a ReplicaSets
-func newReplicaSets(c *ExtensionsInternalVersionClient, namespace string) *replicaSets {
+func newReplicaSets(c *ExtensionsClient, namespace string) *replicaSets {
 	return &replicaSets{
 		client: c.RESTClient(),
 		ns:     namespace,

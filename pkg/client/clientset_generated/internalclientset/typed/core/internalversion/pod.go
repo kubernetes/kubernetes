@@ -49,7 +49,7 @@ type pods struct {
 }
 
 // newPods returns a Pods
-func newPods(c *CoreInternalVersionClient, namespace string) *pods {
+func newPods(c *CoreClient, namespace string) *pods {
 	return &pods{
 		client: c.RESTClient(),
 		ns:     namespace,

@@ -22,77 +22,77 @@ import (
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
-type FakeCoreInternalVersion struct {
+type FakeCore struct {
 	*core.Fake
 }
 
-func (c *FakeCoreInternalVersion) ComponentStatuses() internalversion.ComponentStatusInterface {
+func (c *FakeCore) ComponentStatuses() internalversion.ComponentStatusInterface {
 	return &FakeComponentStatuses{c}
 }
 
-func (c *FakeCoreInternalVersion) ConfigMaps(namespace string) internalversion.ConfigMapInterface {
+func (c *FakeCore) ConfigMaps(namespace string) internalversion.ConfigMapInterface {
 	return &FakeConfigMaps{c, namespace}
 }
 
-func (c *FakeCoreInternalVersion) Endpoints(namespace string) internalversion.EndpointsInterface {
+func (c *FakeCore) Endpoints(namespace string) internalversion.EndpointsInterface {
 	return &FakeEndpoints{c, namespace}
 }
 
-func (c *FakeCoreInternalVersion) Events(namespace string) internalversion.EventInterface {
+func (c *FakeCore) Events(namespace string) internalversion.EventInterface {
 	return &FakeEvents{c, namespace}
 }
 
-func (c *FakeCoreInternalVersion) LimitRanges(namespace string) internalversion.LimitRangeInterface {
+func (c *FakeCore) LimitRanges(namespace string) internalversion.LimitRangeInterface {
 	return &FakeLimitRanges{c, namespace}
 }
 
-func (c *FakeCoreInternalVersion) Namespaces() internalversion.NamespaceInterface {
+func (c *FakeCore) Namespaces() internalversion.NamespaceInterface {
 	return &FakeNamespaces{c}
 }
 
-func (c *FakeCoreInternalVersion) Nodes() internalversion.NodeInterface {
+func (c *FakeCore) Nodes() internalversion.NodeInterface {
 	return &FakeNodes{c}
 }
 
-func (c *FakeCoreInternalVersion) PersistentVolumes() internalversion.PersistentVolumeInterface {
+func (c *FakeCore) PersistentVolumes() internalversion.PersistentVolumeInterface {
 	return &FakePersistentVolumes{c}
 }
 
-func (c *FakeCoreInternalVersion) PersistentVolumeClaims(namespace string) internalversion.PersistentVolumeClaimInterface {
+func (c *FakeCore) PersistentVolumeClaims(namespace string) internalversion.PersistentVolumeClaimInterface {
 	return &FakePersistentVolumeClaims{c, namespace}
 }
 
-func (c *FakeCoreInternalVersion) Pods(namespace string) internalversion.PodInterface {
+func (c *FakeCore) Pods(namespace string) internalversion.PodInterface {
 	return &FakePods{c, namespace}
 }
 
-func (c *FakeCoreInternalVersion) PodTemplates(namespace string) internalversion.PodTemplateInterface {
+func (c *FakeCore) PodTemplates(namespace string) internalversion.PodTemplateInterface {
 	return &FakePodTemplates{c, namespace}
 }
 
-func (c *FakeCoreInternalVersion) ReplicationControllers(namespace string) internalversion.ReplicationControllerInterface {
+func (c *FakeCore) ReplicationControllers(namespace string) internalversion.ReplicationControllerInterface {
 	return &FakeReplicationControllers{c, namespace}
 }
 
-func (c *FakeCoreInternalVersion) ResourceQuotas(namespace string) internalversion.ResourceQuotaInterface {
+func (c *FakeCore) ResourceQuotas(namespace string) internalversion.ResourceQuotaInterface {
 	return &FakeResourceQuotas{c, namespace}
 }
 
-func (c *FakeCoreInternalVersion) Secrets(namespace string) internalversion.SecretInterface {
+func (c *FakeCore) Secrets(namespace string) internalversion.SecretInterface {
 	return &FakeSecrets{c, namespace}
 }
 
-func (c *FakeCoreInternalVersion) Services(namespace string) internalversion.ServiceInterface {
+func (c *FakeCore) Services(namespace string) internalversion.ServiceInterface {
 	return &FakeServices{c, namespace}
 }
 
-func (c *FakeCoreInternalVersion) ServiceAccounts(namespace string) internalversion.ServiceAccountInterface {
+func (c *FakeCore) ServiceAccounts(namespace string) internalversion.ServiceAccountInterface {
 	return &FakeServiceAccounts{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeCoreInternalVersion) RESTClient() restclient.Interface {
+func (c *FakeCore) RESTClient() restclient.Interface {
 	var ret *restclient.RESTClient
 	return ret
 }

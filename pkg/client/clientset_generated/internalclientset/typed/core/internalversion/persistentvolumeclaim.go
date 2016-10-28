@@ -49,7 +49,7 @@ type persistentVolumeClaims struct {
 }
 
 // newPersistentVolumeClaims returns a PersistentVolumeClaims
-func newPersistentVolumeClaims(c *CoreInternalVersionClient, namespace string) *persistentVolumeClaims {
+func newPersistentVolumeClaims(c *CoreClient, namespace string) *persistentVolumeClaims {
 	return &persistentVolumeClaims{
 		client: c.RESTClient(),
 		ns:     namespace,

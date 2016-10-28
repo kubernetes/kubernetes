@@ -22,22 +22,22 @@ import (
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
-type CertificatesInternalVersionInterface interface {
+type CertificatesInterface interface {
 	RESTClient() restclient.Interface
 	CertificateSigningRequestsGetter
 }
 
-// CertificatesInternalVersionClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
-type CertificatesInternalVersionClient struct {
+// CertificatesClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
+type CertificatesClient struct {
 	restClient restclient.Interface
 }
 
-func (c *CertificatesInternalVersionClient) CertificateSigningRequests() CertificateSigningRequestInterface {
+func (c *CertificatesClient) CertificateSigningRequests() CertificateSigningRequestInterface {
 	return newCertificateSigningRequests(c)
 }
 
-// NewForConfig creates a new CertificatesInternalVersionClient for the given config.
-func NewForConfig(c *restclient.Config) (*CertificatesInternalVersionClient, error) {
+// NewForConfig creates a new CertificatesClient for the given config.
+func NewForConfig(c *restclient.Config) (*CertificatesClient, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -46,12 +46,12 @@ func NewForConfig(c *restclient.Config) (*CertificatesInternalVersionClient, err
 	if err != nil {
 		return nil, err
 	}
-	return &CertificatesInternalVersionClient{client}, nil
+	return &CertificatesClient{client}, nil
 }
 
-// NewForConfigOrDie creates a new CertificatesInternalVersionClient for the given config and
+// NewForConfigOrDie creates a new CertificatesClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *CertificatesInternalVersionClient {
+func NewForConfigOrDie(c *restclient.Config) *CertificatesClient {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -59,9 +59,9 @@ func NewForConfigOrDie(c *restclient.Config) *CertificatesInternalVersionClient 
 	return client
 }
 
-// New creates a new CertificatesInternalVersionClient for the given RESTClient.
-func New(c restclient.Interface) *CertificatesInternalVersionClient {
-	return &CertificatesInternalVersionClient{c}
+// New creates a new CertificatesClient for the given RESTClient.
+func New(c restclient.Interface) *CertificatesClient {
+	return &CertificatesClient{c}
 }
 
 func setConfigDefaults(config *restclient.Config) error {
@@ -91,7 +91,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *CertificatesInternalVersionClient) RESTClient() restclient.Interface {
+func (c *CertificatesClient) RESTClient() restclient.Interface {
 	if c == nil {
 		return nil
 	}

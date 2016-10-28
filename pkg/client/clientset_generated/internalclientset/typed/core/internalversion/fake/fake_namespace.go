@@ -26,7 +26,7 @@ import (
 
 // FakeNamespaces implements NamespaceInterface
 type FakeNamespaces struct {
-	Fake *FakeCoreInternalVersion
+	Fake *FakeCore
 }
 
 var namespacesResource = unversioned.GroupVersionResource{Group: "", Version: "", Resource: "namespaces"}

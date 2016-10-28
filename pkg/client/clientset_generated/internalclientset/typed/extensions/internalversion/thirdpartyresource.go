@@ -48,7 +48,7 @@ type thirdPartyResources struct {
 }
 
 // newThirdPartyResources returns a ThirdPartyResources
-func newThirdPartyResources(c *ExtensionsInternalVersionClient) *thirdPartyResources {
+func newThirdPartyResources(c *ExtensionsClient) *thirdPartyResources {
 	return &thirdPartyResources{
 		client: c.RESTClient(),
 	}

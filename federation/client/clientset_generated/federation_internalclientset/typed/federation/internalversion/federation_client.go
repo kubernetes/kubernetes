@@ -22,22 +22,22 @@ import (
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
-type FederationInternalVersionInterface interface {
+type FederationInterface interface {
 	RESTClient() restclient.Interface
 	ClustersGetter
 }
 
-// FederationInternalVersionClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
-type FederationInternalVersionClient struct {
+// FederationClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
+type FederationClient struct {
 	restClient restclient.Interface
 }
 
-func (c *FederationInternalVersionClient) Clusters() ClusterInterface {
+func (c *FederationClient) Clusters() ClusterInterface {
 	return newClusters(c)
 }
 
-// NewForConfig creates a new FederationInternalVersionClient for the given config.
-func NewForConfig(c *restclient.Config) (*FederationInternalVersionClient, error) {
+// NewForConfig creates a new FederationClient for the given config.
+func NewForConfig(c *restclient.Config) (*FederationClient, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -46,12 +46,12 @@ func NewForConfig(c *restclient.Config) (*FederationInternalVersionClient, error
 	if err != nil {
 		return nil, err
 	}
-	return &FederationInternalVersionClient{client}, nil
+	return &FederationClient{client}, nil
 }
 
-// NewForConfigOrDie creates a new FederationInternalVersionClient for the given config and
+// NewForConfigOrDie creates a new FederationClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *FederationInternalVersionClient {
+func NewForConfigOrDie(c *restclient.Config) *FederationClient {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -59,9 +59,9 @@ func NewForConfigOrDie(c *restclient.Config) *FederationInternalVersionClient {
 	return client
 }
 
-// New creates a new FederationInternalVersionClient for the given RESTClient.
-func New(c restclient.Interface) *FederationInternalVersionClient {
-	return &FederationInternalVersionClient{c}
+// New creates a new FederationClient for the given RESTClient.
+func New(c restclient.Interface) *FederationClient {
+	return &FederationClient{c}
 }
 
 func setConfigDefaults(config *restclient.Config) error {
@@ -91,7 +91,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FederationInternalVersionClient) RESTClient() restclient.Interface {
+func (c *FederationClient) RESTClient() restclient.Interface {
 	if c == nil {
 		return nil
 	}

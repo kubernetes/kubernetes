@@ -48,7 +48,7 @@ type namespaces struct {
 }
 
 // newNamespaces returns a Namespaces
-func newNamespaces(c *CoreInternalVersionClient) *namespaces {
+func newNamespaces(c *CoreClient) *namespaces {
 	return &namespaces{
 		client: c.RESTClient(),
 	}

@@ -22,22 +22,22 @@ import (
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
-type StorageInternalVersionInterface interface {
+type StorageInterface interface {
 	RESTClient() restclient.Interface
 	StorageClassesGetter
 }
 
-// StorageInternalVersionClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
-type StorageInternalVersionClient struct {
+// StorageClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
+type StorageClient struct {
 	restClient restclient.Interface
 }
 
-func (c *StorageInternalVersionClient) StorageClasses() StorageClassInterface {
+func (c *StorageClient) StorageClasses() StorageClassInterface {
 	return newStorageClasses(c)
 }
 
-// NewForConfig creates a new StorageInternalVersionClient for the given config.
-func NewForConfig(c *restclient.Config) (*StorageInternalVersionClient, error) {
+// NewForConfig creates a new StorageClient for the given config.
+func NewForConfig(c *restclient.Config) (*StorageClient, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -46,12 +46,12 @@ func NewForConfig(c *restclient.Config) (*StorageInternalVersionClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &StorageInternalVersionClient{client}, nil
+	return &StorageClient{client}, nil
 }
 
-// NewForConfigOrDie creates a new StorageInternalVersionClient for the given config and
+// NewForConfigOrDie creates a new StorageClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *StorageInternalVersionClient {
+func NewForConfigOrDie(c *restclient.Config) *StorageClient {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -59,9 +59,9 @@ func NewForConfigOrDie(c *restclient.Config) *StorageInternalVersionClient {
 	return client
 }
 
-// New creates a new StorageInternalVersionClient for the given RESTClient.
-func New(c restclient.Interface) *StorageInternalVersionClient {
-	return &StorageInternalVersionClient{c}
+// New creates a new StorageClient for the given RESTClient.
+func New(c restclient.Interface) *StorageClient {
+	return &StorageClient{c}
 }
 
 func setConfigDefaults(config *restclient.Config) error {
@@ -91,7 +91,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *StorageInternalVersionClient) RESTClient() restclient.Interface {
+func (c *StorageClient) RESTClient() restclient.Interface {
 	if c == nil {
 		return nil
 	}

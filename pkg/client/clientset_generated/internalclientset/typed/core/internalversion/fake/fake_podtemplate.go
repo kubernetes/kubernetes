@@ -26,7 +26,7 @@ import (
 
 // FakePodTemplates implements PodTemplateInterface
 type FakePodTemplates struct {
-	Fake *FakeCoreInternalVersion
+	Fake *FakeCore
 	ns   string
 }
 

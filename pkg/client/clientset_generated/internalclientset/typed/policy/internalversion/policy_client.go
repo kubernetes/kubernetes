@@ -22,22 +22,22 @@ import (
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
-type PolicyInternalVersionInterface interface {
+type PolicyInterface interface {
 	RESTClient() restclient.Interface
 	PodDisruptionBudgetsGetter
 }
 
-// PolicyInternalVersionClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
-type PolicyInternalVersionClient struct {
+// PolicyClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
+type PolicyClient struct {
 	restClient restclient.Interface
 }
 
-func (c *PolicyInternalVersionClient) PodDisruptionBudgets(namespace string) PodDisruptionBudgetInterface {
+func (c *PolicyClient) PodDisruptionBudgets(namespace string) PodDisruptionBudgetInterface {
 	return newPodDisruptionBudgets(c, namespace)
 }
 
-// NewForConfig creates a new PolicyInternalVersionClient for the given config.
-func NewForConfig(c *restclient.Config) (*PolicyInternalVersionClient, error) {
+// NewForConfig creates a new PolicyClient for the given config.
+func NewForConfig(c *restclient.Config) (*PolicyClient, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -46,12 +46,12 @@ func NewForConfig(c *restclient.Config) (*PolicyInternalVersionClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &PolicyInternalVersionClient{client}, nil
+	return &PolicyClient{client}, nil
 }
 
-// NewForConfigOrDie creates a new PolicyInternalVersionClient for the given config and
+// NewForConfigOrDie creates a new PolicyClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *PolicyInternalVersionClient {
+func NewForConfigOrDie(c *restclient.Config) *PolicyClient {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -59,9 +59,9 @@ func NewForConfigOrDie(c *restclient.Config) *PolicyInternalVersionClient {
 	return client
 }
 
-// New creates a new PolicyInternalVersionClient for the given RESTClient.
-func New(c restclient.Interface) *PolicyInternalVersionClient {
-	return &PolicyInternalVersionClient{c}
+// New creates a new PolicyClient for the given RESTClient.
+func New(c restclient.Interface) *PolicyClient {
+	return &PolicyClient{c}
 }
 
 func setConfigDefaults(config *restclient.Config) error {
@@ -91,7 +91,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *PolicyInternalVersionClient) RESTClient() restclient.Interface {
+func (c *PolicyClient) RESTClient() restclient.Interface {
 	if c == nil {
 		return nil
 	}

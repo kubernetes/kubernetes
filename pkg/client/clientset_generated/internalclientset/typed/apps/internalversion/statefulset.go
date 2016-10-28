@@ -50,7 +50,7 @@ type statefulSets struct {
 }
 
 // newStatefulSets returns a StatefulSets
-func newStatefulSets(c *AppsInternalVersionClient, namespace string) *statefulSets {
+func newStatefulSets(c *AppsClient, namespace string) *statefulSets {
 	return &statefulSets{
 		client: c.RESTClient(),
 		ns:     namespace,

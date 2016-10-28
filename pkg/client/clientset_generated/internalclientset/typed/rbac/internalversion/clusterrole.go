@@ -48,7 +48,7 @@ type clusterRoles struct {
 }
 
 // newClusterRoles returns a ClusterRoles
-func newClusterRoles(c *RbacInternalVersionClient) *clusterRoles {
+func newClusterRoles(c *RbacClient) *clusterRoles {
 	return &clusterRoles{
 		client: c.RESTClient(),
 	}

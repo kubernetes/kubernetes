@@ -16,20 +16,46 @@ limitations under the License.
 
 package types
 
+type Version string
+
+func (v Version) String() string {
+	return string(v)
+}
+
+func (v Version) NonEmpty() string {
+	if v == "" {
+		return "internalVersion"
+	}
+	return v.String()
+}
+
+type Group string
+
+func (g Group) String() string {
+	return string(g)
+}
+
+func (g Group) NonEmpty() string {
+	if g == "api" {
+		return "core"
+	}
+	return string(g)
+}
+
 type GroupVersion struct {
-	Group   string
-	Version string
+	Group   Group
+	Version Version
 }
 
 type GroupVersions struct {
-	Group    string
-	Versions []string
+	Group    Group
+	Versions []Version
 }
 
 // GroupVersionPackage contains group name, version name, and the package name client-gen will generate for this group version.
 type GroupVersionPackage struct {
-	Group   string
-	Version string
+	Group   Group
+	Version Version
 	// If a user calls a group client without specifying the version (e.g.,
 	// c.Core(), instead of c.CoreV1()), the default version will be returned.
 	IsDefaultVersion bool

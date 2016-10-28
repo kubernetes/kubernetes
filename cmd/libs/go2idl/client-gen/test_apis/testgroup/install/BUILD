@@ -15,8 +15,8 @@ go_library(
     srcs = ["install.go"],
     tags = ["automanaged"],
     deps = [
-        "//cmd/libs/go2idl/client-gen/test_apis/testgroup.k8s.io:go_default_library",
-        "//cmd/libs/go2idl/client-gen/test_apis/testgroup.k8s.io/v1:go_default_library",
+        "//cmd/libs/go2idl/client-gen/test_apis/testgroup:go_default_library",
+        "//cmd/libs/go2idl/client-gen/test_apis/testgroup/v1:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/meta:go_default_library",
         "//pkg/api/unversioned:go_default_library",

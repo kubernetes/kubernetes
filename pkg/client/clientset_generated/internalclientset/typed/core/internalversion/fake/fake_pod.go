@@ -26,7 +26,7 @@ import (
 
 // FakePods implements PodInterface
 type FakePods struct {
-	Fake *FakeCoreInternalVersion
+	Fake *FakeCore
 	ns   string
 }
 

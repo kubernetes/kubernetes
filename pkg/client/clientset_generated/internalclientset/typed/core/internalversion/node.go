@@ -48,7 +48,7 @@ type nodes struct {
 }
 
 // newNodes returns a Nodes
-func newNodes(c *CoreInternalVersionClient) *nodes {
+func newNodes(c *CoreClient) *nodes {
 	return &nodes{
 		client: c.RESTClient(),
 	}

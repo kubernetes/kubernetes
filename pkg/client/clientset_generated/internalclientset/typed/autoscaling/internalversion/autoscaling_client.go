@@ -22,22 +22,22 @@ import (
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
-type AutoscalingInternalVersionInterface interface {
+type AutoscalingInterface interface {
 	RESTClient() restclient.Interface
 	HorizontalPodAutoscalersGetter
 }
 
-// AutoscalingInternalVersionClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
-type AutoscalingInternalVersionClient struct {
+// AutoscalingClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
+type AutoscalingClient struct {
 	restClient restclient.Interface
 }
 
-func (c *AutoscalingInternalVersionClient) HorizontalPodAutoscalers(namespace string) HorizontalPodAutoscalerInterface {
+func (c *AutoscalingClient) HorizontalPodAutoscalers(namespace string) HorizontalPodAutoscalerInterface {
 	return newHorizontalPodAutoscalers(c, namespace)
 }
 
-// NewForConfig creates a new AutoscalingInternalVersionClient for the given config.
-func NewForConfig(c *restclient.Config) (*AutoscalingInternalVersionClient, error) {
+// NewForConfig creates a new AutoscalingClient for the given config.
+func NewForConfig(c *restclient.Config) (*AutoscalingClient, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -46,12 +46,12 @@ func NewForConfig(c *restclient.Config) (*AutoscalingInternalVersionClient, erro
 	if err != nil {
 		return nil, err
 	}
-	return &AutoscalingInternalVersionClient{client}, nil
+	return &AutoscalingClient{client}, nil
 }
 
-// NewForConfigOrDie creates a new AutoscalingInternalVersionClient for the given config and
+// NewForConfigOrDie creates a new AutoscalingClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *AutoscalingInternalVersionClient {
+func NewForConfigOrDie(c *restclient.Config) *AutoscalingClient {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -59,9 +59,9 @@ func NewForConfigOrDie(c *restclient.Config) *AutoscalingInternalVersionClient {
 	return client
 }
 
-// New creates a new AutoscalingInternalVersionClient for the given RESTClient.
-func New(c restclient.Interface) *AutoscalingInternalVersionClient {
-	return &AutoscalingInternalVersionClient{c}
+// New creates a new AutoscalingClient for the given RESTClient.
+func New(c restclient.Interface) *AutoscalingClient {
+	return &AutoscalingClient{c}
 }
 
 func setConfigDefaults(config *restclient.Config) error {
@@ -91,7 +91,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *AutoscalingInternalVersionClient) RESTClient() restclient.Interface {
+func (c *AutoscalingClient) RESTClient() restclient.Interface {
 	if c == nil {
 		return nil
 	}

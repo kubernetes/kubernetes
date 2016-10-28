@@ -47,7 +47,7 @@ type componentStatuses struct {
 }
 
 // newComponentStatuses returns a ComponentStatuses
-func newComponentStatuses(c *CoreInternalVersionClient) *componentStatuses {
+func newComponentStatuses(c *CoreClient) *componentStatuses {
 	return &componentStatuses{
 		client: c.RESTClient(),
 	}

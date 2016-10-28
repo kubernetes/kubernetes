@@ -49,7 +49,7 @@ type resourceQuotas struct {
 }
 
 // newResourceQuotas returns a ResourceQuotas
-func newResourceQuotas(c *CoreInternalVersionClient, namespace string) *resourceQuotas {
+func newResourceQuotas(c *CoreClient, namespace string) *resourceQuotas {
 	return &resourceQuotas{
 		client: c.RESTClient(),
 		ns:     namespace,

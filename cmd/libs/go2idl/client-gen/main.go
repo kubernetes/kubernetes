@@ -93,7 +93,7 @@ func parsePathGroupVersion(pgvString string) (gvPath string, gvString string) {
 }
 
 func parseInputVersions() (paths []string, groups []types.GroupVersions, gvToPath map[types.GroupVersion]string, err error) {
-	var seenGroups = make(map[string]*types.GroupVersions)
+	var seenGroups = make(map[types.Group]*types.GroupVersions)
 	gvToPath = make(map[types.GroupVersion]string)
 	for _, input := range *inputVersions {
 		gvPath, gvString := parsePathGroupVersion(input)
@@ -106,21 +106,21 @@ func parseInputVersions() (paths []string, groups []types.GroupVersions, gvToPat
 		} else {
 			seenGroups[gv.Group] = &types.GroupVersions{
 				Group:    gv.Group,
-				Versions: []string{gv.Version},
+				Versions: []types.Version{gv.Version},
 			}
 		}
 
-		path := versionToPath(gvPath, gv.Group, gv.Version)
+		path := versionToPath(gvPath, gv.Group.String(), gv.Version.String())
 		paths = append(paths, path)
 		gvToPath[gv] = path
 	}
 	var groupNames []string
 	for groupName := range seenGroups {
-		groupNames = append(groupNames, groupName)
+		groupNames = append(groupNames, groupName.String())
 	}
 	sort.Strings(groupNames)
 	for _, groupName := range groupNames {
-		groups = append(groups, *seenGroups[groupName])
+		groups = append(groups, *seenGroups[types.Group(groupName)])
 	}
 
 	return paths, groups, gvToPath, nil
@@ -168,12 +168,12 @@ func main() {
 
 	if *test {
 		arguments.InputDirs = append(dependencies, []string{
-			"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup.k8s.io",
+			"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup",
 		}...)
 		arguments.CustomArgs = clientgenargs.Args{
-			Groups: []types.GroupVersions{{Group: "testgroup.k8s.io", Versions: []string{""}}},
+			Groups: []types.GroupVersions{{Group: "testgroup", Versions: []types.Version{""}}},
 			GroupVersionToInputPath: map[types.GroupVersion]string{
-				types.GroupVersion{Group: "testgroup.k8s.io", Version: ""}: "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup.k8s.io",
+				types.GroupVersion{Group: "testgroup", Version: ""}: "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup",
 			},
 			ClientsetName:       "test_internalclientset",
 			ClientsetOutputPath: "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/",

@@ -48,7 +48,7 @@ type configMaps struct {
 }
 
 // newConfigMaps returns a ConfigMaps
-func newConfigMaps(c *CoreInternalVersionClient, namespace string) *configMaps {
+func newConfigMaps(c *CoreClient, namespace string) *configMaps {
 	return &configMaps{
 		client: c.RESTClient(),
 		ns:     namespace,

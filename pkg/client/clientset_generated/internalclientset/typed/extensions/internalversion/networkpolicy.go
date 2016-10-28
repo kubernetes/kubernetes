@@ -49,7 +49,7 @@ type networkPolicies struct {
 }
 
 // newNetworkPolicies returns a NetworkPolicies
-func newNetworkPolicies(c *ExtensionsInternalVersionClient, namespace string) *networkPolicies {
+func newNetworkPolicies(c *ExtensionsClient, namespace string) *networkPolicies {
 	return &networkPolicies{
 		client: c.RESTClient(),
 		ns:     namespace,

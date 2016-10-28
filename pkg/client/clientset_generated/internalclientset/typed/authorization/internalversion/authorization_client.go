@@ -22,32 +22,32 @@ import (
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
-type AuthorizationInternalVersionInterface interface {
+type AuthorizationInterface interface {
 	RESTClient() restclient.Interface
 	LocalSubjectAccessReviewsGetter
 	SelfSubjectAccessReviewsGetter
 	SubjectAccessReviewsGetter
 }
 
-// AuthorizationInternalVersionClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
-type AuthorizationInternalVersionClient struct {
+// AuthorizationClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
+type AuthorizationClient struct {
 	restClient restclient.Interface
 }
 
-func (c *AuthorizationInternalVersionClient) LocalSubjectAccessReviews(namespace string) LocalSubjectAccessReviewInterface {
+func (c *AuthorizationClient) LocalSubjectAccessReviews(namespace string) LocalSubjectAccessReviewInterface {
 	return newLocalSubjectAccessReviews(c, namespace)
 }
 
-func (c *AuthorizationInternalVersionClient) SelfSubjectAccessReviews() SelfSubjectAccessReviewInterface {
+func (c *AuthorizationClient) SelfSubjectAccessReviews() SelfSubjectAccessReviewInterface {
 	return newSelfSubjectAccessReviews(c)
 }
 
-func (c *AuthorizationInternalVersionClient) SubjectAccessReviews() SubjectAccessReviewInterface {
+func (c *AuthorizationClient) SubjectAccessReviews() SubjectAccessReviewInterface {
 	return newSubjectAccessReviews(c)
 }
 
-// NewForConfig creates a new AuthorizationInternalVersionClient for the given config.
-func NewForConfig(c *restclient.Config) (*AuthorizationInternalVersionClient, error) {
+// NewForConfig creates a new AuthorizationClient for the given config.
+func NewForConfig(c *restclient.Config) (*AuthorizationClient, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -56,12 +56,12 @@ func NewForConfig(c *restclient.Config) (*AuthorizationInternalVersionClient, er
 	if err != nil {
 		return nil, err
 	}
-	return &AuthorizationInternalVersionClient{client}, nil
+	return &AuthorizationClient{client}, nil
 }
 
-// NewForConfigOrDie creates a new AuthorizationInternalVersionClient for the given config and
+// NewForConfigOrDie creates a new AuthorizationClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *AuthorizationInternalVersionClient {
+func NewForConfigOrDie(c *restclient.Config) *AuthorizationClient {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -69,9 +69,9 @@ func NewForConfigOrDie(c *restclient.Config) *AuthorizationInternalVersionClient
 	return client
 }
 
-// New creates a new AuthorizationInternalVersionClient for the given RESTClient.
-func New(c restclient.Interface) *AuthorizationInternalVersionClient {
-	return &AuthorizationInternalVersionClient{c}
+// New creates a new AuthorizationClient for the given RESTClient.
+func New(c restclient.Interface) *AuthorizationClient {
+	return &AuthorizationClient{c}
 }
 
 func setConfigDefaults(config *restclient.Config) error {
@@ -101,7 +101,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *AuthorizationInternalVersionClient) RESTClient() restclient.Interface {
+func (c *AuthorizationClient) RESTClient() restclient.Interface {
 	if c == nil {
 		return nil
 	}

@@ -22,45 +22,45 @@ import (
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
-type FakeExtensionsInternalVersion struct {
+type FakeExtensions struct {
 	*core.Fake
 }
 
-func (c *FakeExtensionsInternalVersion) DaemonSets(namespace string) internalversion.DaemonSetInterface {
+func (c *FakeExtensions) DaemonSets(namespace string) internalversion.DaemonSetInterface {
 	return &FakeDaemonSets{c, namespace}
 }
 
-func (c *FakeExtensionsInternalVersion) Deployments(namespace string) internalversion.DeploymentInterface {
+func (c *FakeExtensions) Deployments(namespace string) internalversion.DeploymentInterface {
 	return &FakeDeployments{c, namespace}
 }
 
-func (c *FakeExtensionsInternalVersion) Ingresses(namespace string) internalversion.IngressInterface {
+func (c *FakeExtensions) Ingresses(namespace string) internalversion.IngressInterface {
 	return &FakeIngresses{c, namespace}
 }
 
-func (c *FakeExtensionsInternalVersion) NetworkPolicies(namespace string) internalversion.NetworkPolicyInterface {
+func (c *FakeExtensions) NetworkPolicies(namespace string) internalversion.NetworkPolicyInterface {
 	return &FakeNetworkPolicies{c, namespace}
 }
 
-func (c *FakeExtensionsInternalVersion) PodSecurityPolicies() internalversion.PodSecurityPolicyInterface {
+func (c *FakeExtensions) PodSecurityPolicies() internalversion.PodSecurityPolicyInterface {
 	return &FakePodSecurityPolicies{c}
 }
 
-func (c *FakeExtensionsInternalVersion) ReplicaSets(namespace string) internalversion.ReplicaSetInterface {
+func (c *FakeExtensions) ReplicaSets(namespace string) internalversion.ReplicaSetInterface {
 	return &FakeReplicaSets{c, namespace}
 }
 
-func (c *FakeExtensionsInternalVersion) Scales(namespace string) internalversion.ScaleInterface {
+func (c *FakeExtensions) Scales(namespace string) internalversion.ScaleInterface {
 	return &FakeScales{c, namespace}
 }
 
-func (c *FakeExtensionsInternalVersion) ThirdPartyResources() internalversion.ThirdPartyResourceInterface {
+func (c *FakeExtensions) ThirdPartyResources() internalversion.ThirdPartyResourceInterface {
 	return &FakeThirdPartyResources{c}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeExtensionsInternalVersion) RESTClient() restclient.Interface {
+func (c *FakeExtensions) RESTClient() restclient.Interface {
 	var ret *restclient.RESTClient
 	return ret
 }

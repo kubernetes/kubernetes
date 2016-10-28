@@ -27,7 +27,7 @@ import (
 
 // FakeDeployments implements DeploymentInterface
 type FakeDeployments struct {
-	Fake *FakeExtensionsInternalVersion
+	Fake *FakeExtensions
 	ns   string
 }
 

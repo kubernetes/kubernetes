@@ -22,29 +22,29 @@ import (
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
-type FakeRbacInternalVersion struct {
+type FakeRbac struct {
 	*core.Fake
 }
 
-func (c *FakeRbacInternalVersion) ClusterRoles() internalversion.ClusterRoleInterface {
+func (c *FakeRbac) ClusterRoles() internalversion.ClusterRoleInterface {
 	return &FakeClusterRoles{c}
 }
 
-func (c *FakeRbacInternalVersion) ClusterRoleBindings() internalversion.ClusterRoleBindingInterface {
+func (c *FakeRbac) ClusterRoleBindings() internalversion.ClusterRoleBindingInterface {
 	return &FakeClusterRoleBindings{c}
 }
 
-func (c *FakeRbacInternalVersion) Roles(namespace string) internalversion.RoleInterface {
+func (c *FakeRbac) Roles(namespace string) internalversion.RoleInterface {
 	return &FakeRoles{c, namespace}
 }
 
-func (c *FakeRbacInternalVersion) RoleBindings(namespace string) internalversion.RoleBindingInterface {
+func (c *FakeRbac) RoleBindings(namespace string) internalversion.RoleBindingInterface {
 	return &FakeRoleBindings{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeRbacInternalVersion) RESTClient() restclient.Interface {
+func (c *FakeRbac) RESTClient() restclient.Interface {
 	var ret *restclient.RESTClient
 	return ret
 }

@@ -48,7 +48,7 @@ type serviceAccounts struct {
 }
 
 // newServiceAccounts returns a ServiceAccounts
-func newServiceAccounts(c *CoreInternalVersionClient, namespace string) *serviceAccounts {
+func newServiceAccounts(c *CoreClient, namespace string) *serviceAccounts {
 	return &serviceAccounts{
 		client: c.RESTClient(),
 		ns:     namespace,

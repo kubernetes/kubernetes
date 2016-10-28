@@ -66,32 +66,17 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 
 var _ clientset.Interface = &Clientset{}
 
-// CoreInternalVersion retrieves the CoreInternalVersionClient
-func (c *Clientset) CoreInternalVersion() internalversioncore.CoreInternalVersionInterface {
-	return &fakeinternalversioncore.FakeCoreInternalVersion{Fake: &c.Fake}
+// Core retrieves the CoreClient
+func (c *Clientset) Core() internalversioncore.CoreInterface {
+	return &fakeinternalversioncore.FakeCore{Fake: &c.Fake}
 }
 
-// Core retrieves the CoreInternalVersionClient
-func (c *Clientset) Core() internalversioncore.CoreInternalVersionInterface {
-	return &fakeinternalversioncore.FakeCoreInternalVersion{Fake: &c.Fake}
+// Extensions retrieves the ExtensionsClient
+func (c *Clientset) Extensions() internalversionextensions.ExtensionsInterface {
+	return &fakeinternalversionextensions.FakeExtensions{Fake: &c.Fake}
 }
 
-// ExtensionsInternalVersion retrieves the ExtensionsInternalVersionClient
-func (c *Clientset) ExtensionsInternalVersion() internalversionextensions.ExtensionsInternalVersionInterface {
-	return &fakeinternalversionextensions.FakeExtensionsInternalVersion{Fake: &c.Fake}
-}
-
-// Extensions retrieves the ExtensionsInternalVersionClient
-func (c *Clientset) Extensions() internalversionextensions.ExtensionsInternalVersionInterface {
-	return &fakeinternalversionextensions.FakeExtensionsInternalVersion{Fake: &c.Fake}
-}
-
-// FederationInternalVersion retrieves the FederationInternalVersionClient
-func (c *Clientset) FederationInternalVersion() internalversionfederation.FederationInternalVersionInterface {
-	return &fakeinternalversionfederation.FakeFederationInternalVersion{Fake: &c.Fake}
-}
-
-// Federation retrieves the FederationInternalVersionClient
-func (c *Clientset) Federation() internalversionfederation.FederationInternalVersionInterface {
-	return &fakeinternalversionfederation.FakeFederationInternalVersion{Fake: &c.Fake}
+// Federation retrieves the FederationClient
+func (c *Clientset) Federation() internalversionfederation.FederationInterface {
+	return &fakeinternalversionfederation.FakeFederation{Fake: &c.Fake}
 }

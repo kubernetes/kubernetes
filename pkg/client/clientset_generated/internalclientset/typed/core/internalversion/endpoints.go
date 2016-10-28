@@ -48,7 +48,7 @@ type endpoints struct {
 }
 
 // newEndpoints returns a Endpoints
-func newEndpoints(c *CoreInternalVersionClient, namespace string) *endpoints {
+func newEndpoints(c *CoreClient, namespace string) *endpoints {
 	return &endpoints{
 		client: c.RESTClient(),
 		ns:     namespace,

@@ -15,4 +15,5 @@ limitations under the License.
 */
 
 // +k8s:openapi-gen=true
+// +groupName=testgroup.k8s.io
 package v1

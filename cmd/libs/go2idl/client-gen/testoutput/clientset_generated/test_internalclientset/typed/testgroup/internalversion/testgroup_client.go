@@ -22,22 +22,22 @@ import (
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
-type TestgroupInternalVersionInterface interface {
+type TestgroupInterface interface {
 	RESTClient() restclient.Interface
 	TestTypesGetter
 }
 
-// TestgroupInternalVersionClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
-type TestgroupInternalVersionClient struct {
+// TestgroupClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
+type TestgroupClient struct {
 	restClient restclient.Interface
 }
 
-func (c *TestgroupInternalVersionClient) TestTypes(namespace string) TestTypeInterface {
+func (c *TestgroupClient) TestTypes(namespace string) TestTypeInterface {
 	return newTestTypes(c, namespace)
 }
 
-// NewForConfig creates a new TestgroupInternalVersionClient for the given config.
-func NewForConfig(c *restclient.Config) (*TestgroupInternalVersionClient, error) {
+// NewForConfig creates a new TestgroupClient for the given config.
+func NewForConfig(c *restclient.Config) (*TestgroupClient, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -46,12 +46,12 @@ func NewForConfig(c *restclient.Config) (*TestgroupInternalVersionClient, error)
 	if err != nil {
 		return nil, err
 	}
-	return &TestgroupInternalVersionClient{client}, nil
+	return &TestgroupClient{client}, nil
 }
 
-// NewForConfigOrDie creates a new TestgroupInternalVersionClient for the given config and
+// NewForConfigOrDie creates a new TestgroupClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *TestgroupInternalVersionClient {
+func NewForConfigOrDie(c *restclient.Config) *TestgroupClient {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -59,9 +59,9 @@ func NewForConfigOrDie(c *restclient.Config) *TestgroupInternalVersionClient {
 	return client
 }
 
-// New creates a new TestgroupInternalVersionClient for the given RESTClient.
-func New(c restclient.Interface) *TestgroupInternalVersionClient {
-	return &TestgroupInternalVersionClient{c}
+// New creates a new TestgroupClient for the given RESTClient.
+func New(c restclient.Interface) *TestgroupClient {
+	return &TestgroupClient{c}
 }
 
 func setConfigDefaults(config *restclient.Config) error {
@@ -91,7 +91,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *TestgroupInternalVersionClient) RESTClient() restclient.Interface {
+func (c *TestgroupClient) RESTClient() restclient.Interface {
 	if c == nil {
 		return nil
 	}

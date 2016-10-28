@@ -22,21 +22,21 @@ import (
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
-type FakeBatchInternalVersion struct {
+type FakeBatch struct {
 	*core.Fake
 }
 
-func (c *FakeBatchInternalVersion) Jobs(namespace string) internalversion.JobInterface {
+func (c *FakeBatch) Jobs(namespace string) internalversion.JobInterface {
 	return &FakeJobs{c, namespace}
 }
 
-func (c *FakeBatchInternalVersion) ScheduledJobs(namespace string) internalversion.ScheduledJobInterface {
+func (c *FakeBatch) ScheduledJobs(namespace string) internalversion.ScheduledJobInterface {
 	return &FakeScheduledJobs{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeBatchInternalVersion) RESTClient() restclient.Interface {
+func (c *FakeBatch) RESTClient() restclient.Interface {
 	var ret *restclient.RESTClient
 	return ret
 }

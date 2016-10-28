@@ -27,7 +27,7 @@ import (
 
 // FakePodDisruptionBudgets implements PodDisruptionBudgetInterface
 type FakePodDisruptionBudgets struct {
-	Fake *FakePolicyInternalVersion
+	Fake *FakePolicy
 	ns   string
 }
 

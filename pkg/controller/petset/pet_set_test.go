@@ -285,13 +285,13 @@ type fakeClient struct {
 	statefulsetClient *fakeStatefulSetClient
 }
 
-func (c *fakeClient) Apps() internalversion.AppsInternalVersionInterface {
-	return &fakeApps{c, &fake.FakeAppsInternalVersion{}}
+func (c *fakeClient) Apps() internalversion.AppsInterface {
+	return &fakeApps{c, &fake.FakeApps{}}
 }
 
 type fakeApps struct {
 	*fakeClient
-	*fake.FakeAppsInternalVersion
+	*fake.FakeApps
 }
 
 func (c *fakeApps) StatefulSets(namespace string) internalversion.StatefulSetInterface {

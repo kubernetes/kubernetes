@@ -22,27 +22,27 @@ import (
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
-type BatchInternalVersionInterface interface {
+type BatchInterface interface {
 	RESTClient() restclient.Interface
 	JobsGetter
 	ScheduledJobsGetter
 }
 
-// BatchInternalVersionClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
-type BatchInternalVersionClient struct {
+// BatchClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
+type BatchClient struct {
 	restClient restclient.Interface
 }
 
-func (c *BatchInternalVersionClient) Jobs(namespace string) JobInterface {
+func (c *BatchClient) Jobs(namespace string) JobInterface {
 	return newJobs(c, namespace)
 }
 
-func (c *BatchInternalVersionClient) ScheduledJobs(namespace string) ScheduledJobInterface {
+func (c *BatchClient) ScheduledJobs(namespace string) ScheduledJobInterface {
 	return newScheduledJobs(c, namespace)
 }
 
-// NewForConfig creates a new BatchInternalVersionClient for the given config.
-func NewForConfig(c *restclient.Config) (*BatchInternalVersionClient, error) {
+// NewForConfig creates a new BatchClient for the given config.
+func NewForConfig(c *restclient.Config) (*BatchClient, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -51,12 +51,12 @@ func NewForConfig(c *restclient.Config) (*BatchInternalVersionClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &BatchInternalVersionClient{client}, nil
+	return &BatchClient{client}, nil
 }
 
-// NewForConfigOrDie creates a new BatchInternalVersionClient for the given config and
+// NewForConfigOrDie creates a new BatchClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *BatchInternalVersionClient {
+func NewForConfigOrDie(c *restclient.Config) *BatchClient {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -64,9 +64,9 @@ func NewForConfigOrDie(c *restclient.Config) *BatchInternalVersionClient {
 	return client
 }
 
-// New creates a new BatchInternalVersionClient for the given RESTClient.
-func New(c restclient.Interface) *BatchInternalVersionClient {
-	return &BatchInternalVersionClient{c}
+// New creates a new BatchClient for the given RESTClient.
+func New(c restclient.Interface) *BatchClient {
+	return &BatchClient{c}
 }
 
 func setConfigDefaults(config *restclient.Config) error {
@@ -96,7 +96,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *BatchInternalVersionClient) RESTClient() restclient.Interface {
+func (c *BatchClient) RESTClient() restclient.Interface {
 	if c == nil {
 		return nil
 	}

@@ -22,7 +22,7 @@ import (
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 )
 
-type RbacInternalVersionInterface interface {
+type RbacInterface interface {
 	RESTClient() restclient.Interface
 	ClusterRolesGetter
 	ClusterRoleBindingsGetter
@@ -30,29 +30,29 @@ type RbacInternalVersionInterface interface {
 	RoleBindingsGetter
 }
 
-// RbacInternalVersionClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
-type RbacInternalVersionClient struct {
+// RbacClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
+type RbacClient struct {
 	restClient restclient.Interface
 }
 
-func (c *RbacInternalVersionClient) ClusterRoles() ClusterRoleInterface {
+func (c *RbacClient) ClusterRoles() ClusterRoleInterface {
 	return newClusterRoles(c)
 }
 
-func (c *RbacInternalVersionClient) ClusterRoleBindings() ClusterRoleBindingInterface {
+func (c *RbacClient) ClusterRoleBindings() ClusterRoleBindingInterface {
 	return newClusterRoleBindings(c)
 }
 
-func (c *RbacInternalVersionClient) Roles(namespace string) RoleInterface {
+func (c *RbacClient) Roles(namespace string) RoleInterface {
 	return newRoles(c, namespace)
 }
 
-func (c *RbacInternalVersionClient) RoleBindings(namespace string) RoleBindingInterface {
+func (c *RbacClient) RoleBindings(namespace string) RoleBindingInterface {
 	return newRoleBindings(c, namespace)
 }
 
-// NewForConfig creates a new RbacInternalVersionClient for the given config.
-func NewForConfig(c *restclient.Config) (*RbacInternalVersionClient, error) {
+// NewForConfig creates a new RbacClient for the given config.
+func NewForConfig(c *restclient.Config) (*RbacClient, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -61,12 +61,12 @@ func NewForConfig(c *restclient.Config) (*RbacInternalVersionClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &RbacInternalVersionClient{client}, nil
+	return &RbacClient{client}, nil
 }
 
-// NewForConfigOrDie creates a new RbacInternalVersionClient for the given config and
+// NewForConfigOrDie creates a new RbacClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *RbacInternalVersionClient {
+func NewForConfigOrDie(c *restclient.Config) *RbacClient {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -74,9 +74,9 @@ func NewForConfigOrDie(c *restclient.Config) *RbacInternalVersionClient {
 	return client
 }
 
-// New creates a new RbacInternalVersionClient for the given RESTClient.
-func New(c restclient.Interface) *RbacInternalVersionClient {
-	return &RbacInternalVersionClient{c}
+// New creates a new RbacClient for the given RESTClient.
+func New(c restclient.Interface) *RbacClient {
+	return &RbacClient{c}
 }
 
 func setConfigDefaults(config *restclient.Config) error {
@@ -106,7 +106,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *RbacInternalVersionClient) RESTClient() restclient.Interface {
+func (c *RbacClient) RESTClient() restclient.Interface {
 	if c == nil {
 		return nil
 	}

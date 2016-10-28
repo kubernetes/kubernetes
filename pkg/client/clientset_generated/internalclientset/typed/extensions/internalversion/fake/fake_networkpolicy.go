@@ -27,7 +27,7 @@ import (
 
 // FakeNetworkPolicies implements NetworkPolicyInterface
 type FakeNetworkPolicies struct {
-	Fake *FakeExtensionsInternalVersion
+	Fake *FakeExtensions
 	ns   string
 }
 

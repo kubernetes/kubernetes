@@ -25,7 +25,6 @@ import (
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
-	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/normalization"
 	clientgentypes "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/types"
 )
 
@@ -59,14 +58,11 @@ func (g *genClientset) Filter(c *generator.Context, t *types.Type) bool {
 func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports, g.imports.ImportLines()...)
 	for _, group := range g.groups {
-		groupString := normalization.Group(group.Group)
 		for _, version := range group.Versions {
-			versionString := normalization.Version(version)
-			undotted_group := normalization.BeforeFirstDot(groupString)
-			typedClientPath := filepath.Join(g.typedClientPath, groupString, versionString)
-			imports = append(imports, strings.ToLower(fmt.Sprintf("%s%s \"%s\"", versionString, undotted_group, typedClientPath)))
+			typedClientPath := filepath.Join(g.typedClientPath, group.Group.NonEmpty(), version.NonEmpty())
+			imports = append(imports, strings.ToLower(fmt.Sprintf("%s%s \"%s\"", version.NonEmpty(), group.Group.NonEmpty(), typedClientPath)))
 			fakeTypedClientPath := filepath.Join(typedClientPath, "fake")
-			imports = append(imports, strings.ToLower(fmt.Sprintf("fake%s%s \"%s\"", versionString, undotted_group, fakeTypedClientPath)))
+			imports = append(imports, strings.ToLower(fmt.Sprintf("fake%s%s \"%s\"", version.NonEmpty(), group.Group.NonEmpty(), fakeTypedClientPath)))
 		}
 	}
 	// the package that has the clientset Interface
@@ -98,7 +94,8 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 
 	for _, g := range allGroups {
 		sw.Do(clientsetInterfaceImplTemplate, g)
-		if g.IsDefaultVersion {
+		// don't generated the default method if generating internalversion clientset
+		if g.IsDefaultVersion && g.Version != "" {
 			sw.Do(clientsetInterfaceDefaultVersionImpl, g)
 		}
 	}

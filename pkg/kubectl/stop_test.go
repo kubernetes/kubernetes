@@ -543,17 +543,17 @@ type reaperFake struct {
 	noSuchPod, noDeleteService bool
 }
 
-func (c *reaperFake) Core() coreclient.CoreInternalVersionInterface {
+func (c *reaperFake) Core() coreclient.CoreInterface {
 	return &reaperCoreFake{c.Clientset.Core(), c.noSuchPod, c.noDeleteService}
 }
 
 type reaperCoreFake struct {
-	coreclient.CoreInternalVersionInterface
+	coreclient.CoreInterface
 	noSuchPod, noDeleteService bool
 }
 
 func (c *reaperCoreFake) Pods(namespace string) coreclient.PodInterface {
-	pods := c.CoreInternalVersionInterface.Pods(namespace)
+	pods := c.CoreInterface.Pods(namespace)
 	if c.noSuchPod {
 		return &noSuchPod{pods}
 	}
@@ -561,7 +561,7 @@ func (c *reaperCoreFake) Pods(namespace string) coreclient.PodInterface {
 }
 
 func (c *reaperCoreFake) Services(namespace string) coreclient.ServiceInterface {
-	services := c.CoreInternalVersionInterface.Services(namespace)
+	services := c.CoreInterface.Services(namespace)
 	if c.noDeleteService {
 		return &noDeleteService{services}
 	}

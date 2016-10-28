@@ -50,7 +50,7 @@ type scheduledJobs struct {
 }
 
 // newScheduledJobs returns a ScheduledJobs
-func newScheduledJobs(c *BatchInternalVersionClient, namespace string) *scheduledJobs {
+func newScheduledJobs(c *BatchClient, namespace string) *scheduledJobs {
 	return &scheduledJobs{
 		client: c.RESTClient(),
 		ns:     namespace,

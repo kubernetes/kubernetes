@@ -29,75 +29,44 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
-	CoreInternalVersion() internalversioncore.CoreInternalVersionInterface
-	// Deprecated: please explicitly pick a version if possible.
-	Core() internalversioncore.CoreInternalVersionInterface
-	ExtensionsInternalVersion() internalversionextensions.ExtensionsInternalVersionInterface
-	// Deprecated: please explicitly pick a version if possible.
-	Extensions() internalversionextensions.ExtensionsInternalVersionInterface
-	FederationInternalVersion() internalversionfederation.FederationInternalVersionInterface
-	// Deprecated: please explicitly pick a version if possible.
-	Federation() internalversionfederation.FederationInternalVersionInterface
+	Core() internalversioncore.CoreInterface
+
+	Extensions() internalversionextensions.ExtensionsInterface
+
+	Federation() internalversionfederation.FederationInterface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	*internalversioncore.CoreInternalVersionClient
-	*internalversionextensions.ExtensionsInternalVersionClient
-	*internalversionfederation.FederationInternalVersionClient
+	*internalversioncore.CoreClient
+	*internalversionextensions.ExtensionsClient
+	*internalversionfederation.FederationClient
 }
 
-// CoreInternalVersion retrieves the CoreInternalVersionClient
-func (c *Clientset) CoreInternalVersion() internalversioncore.CoreInternalVersionInterface {
+// Core retrieves the CoreClient
+func (c *Clientset) Core() internalversioncore.CoreInterface {
 	if c == nil {
 		return nil
 	}
-	return c.CoreInternalVersionClient
+	return c.CoreClient
 }
 
-// Deprecated: Core retrieves the default version of CoreClient.
-// Please explicitly pick a version.
-func (c *Clientset) Core() internalversioncore.CoreInternalVersionInterface {
+// Extensions retrieves the ExtensionsClient
+func (c *Clientset) Extensions() internalversionextensions.ExtensionsInterface {
 	if c == nil {
 		return nil
 	}
-	return c.CoreInternalVersionClient
+	return c.ExtensionsClient
 }
 
-// ExtensionsInternalVersion retrieves the ExtensionsInternalVersionClient
-func (c *Clientset) ExtensionsInternalVersion() internalversionextensions.ExtensionsInternalVersionInterface {
+// Federation retrieves the FederationClient
+func (c *Clientset) Federation() internalversionfederation.FederationInterface {
 	if c == nil {
 		return nil
 	}
-	return c.ExtensionsInternalVersionClient
-}
-
-// Deprecated: Extensions retrieves the default version of ExtensionsClient.
-// Please explicitly pick a version.
-func (c *Clientset) Extensions() internalversionextensions.ExtensionsInternalVersionInterface {
-	if c == nil {
-		return nil
-	}
-	return c.ExtensionsInternalVersionClient
-}
-
-// FederationInternalVersion retrieves the FederationInternalVersionClient
-func (c *Clientset) FederationInternalVersion() internalversionfederation.FederationInternalVersionInterface {
-	if c == nil {
-		return nil
-	}
-	return c.FederationInternalVersionClient
-}
-
-// Deprecated: Federation retrieves the default version of FederationClient.
-// Please explicitly pick a version.
-func (c *Clientset) Federation() internalversionfederation.FederationInternalVersionInterface {
-	if c == nil {
-		return nil
-	}
-	return c.FederationInternalVersionClient
+	return c.FederationClient
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -113,15 +82,15 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	}
 	var clientset Clientset
 	var err error
-	clientset.CoreInternalVersionClient, err = internalversioncore.NewForConfig(&configShallowCopy)
+	clientset.CoreClient, err = internalversioncore.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.ExtensionsInternalVersionClient, err = internalversionextensions.NewForConfig(&configShallowCopy)
+	clientset.ExtensionsClient, err = internalversionextensions.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.FederationInternalVersionClient, err = internalversionfederation.NewForConfig(&configShallowCopy)
+	clientset.FederationClient, err = internalversionfederation.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -138,9 +107,9 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *restclient.Config) *Clientset {
 	var clientset Clientset
-	clientset.CoreInternalVersionClient = internalversioncore.NewForConfigOrDie(c)
-	clientset.ExtensionsInternalVersionClient = internalversionextensions.NewForConfigOrDie(c)
-	clientset.FederationInternalVersionClient = internalversionfederation.NewForConfigOrDie(c)
+	clientset.CoreClient = internalversioncore.NewForConfigOrDie(c)
+	clientset.ExtensionsClient = internalversionextensions.NewForConfigOrDie(c)
+	clientset.FederationClient = internalversionfederation.NewForConfigOrDie(c)
 
 	clientset.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &clientset
@@ -149,9 +118,9 @@ func NewForConfigOrDie(c *restclient.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c restclient.Interface) *Clientset {
 	var clientset Clientset
-	clientset.CoreInternalVersionClient = internalversioncore.New(c)
-	clientset.ExtensionsInternalVersionClient = internalversionextensions.New(c)
-	clientset.FederationInternalVersionClient = internalversionfederation.New(c)
+	clientset.CoreClient = internalversioncore.New(c)
+	clientset.ExtensionsClient = internalversionextensions.New(c)
+	clientset.FederationClient = internalversionfederation.New(c)
 
 	clientset.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &clientset

@@ -27,7 +27,7 @@ import (
 
 // FakeScheduledJobs implements ScheduledJobInterface
 type FakeScheduledJobs struct {
-	Fake *FakeBatchInternalVersion
+	Fake *FakeBatch
 	ns   string
 }
 

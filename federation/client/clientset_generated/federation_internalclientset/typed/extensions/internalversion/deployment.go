@@ -50,7 +50,7 @@ type deployments struct {
 }
 
 // newDeployments returns a Deployments
-func newDeployments(c *ExtensionsInternalVersionClient, namespace string) *deployments {
+func newDeployments(c *ExtensionsClient, namespace string) *deployments {
 	return &deployments{
 		client: c.RESTClient(),
 		ns:     namespace,

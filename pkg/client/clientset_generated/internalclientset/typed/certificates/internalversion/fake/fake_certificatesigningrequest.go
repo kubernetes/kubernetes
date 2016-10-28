@@ -27,7 +27,7 @@ import (
 
 // FakeCertificateSigningRequests implements CertificateSigningRequestInterface
 type FakeCertificateSigningRequests struct {
-	Fake *FakeCertificatesInternalVersion
+	Fake *FakeCertificates
 }
 
 var certificatesigningrequestsResource = unversioned.GroupVersionResource{Group: "certificates.k8s.io", Version: "", Resource: "certificatesigningrequests"}

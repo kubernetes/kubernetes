@@ -34,7 +34,7 @@ import (
 
 // ConnectionDetails represents a master API endpoint connection
 type ConnectionDetails struct {
-	CertClient *certclient.CertificatesInternalVersionClient
+	CertClient *certclient.CertificatesClient
 	Endpoint   string
 	CACert     []byte
 	NodeName   types.NodeName
@@ -82,7 +82,7 @@ func EstablishMasterConnection(s *kubeadmapi.NodeConfiguration, clusterInfo *kub
 				// connection established, stop all wait threads
 				close(stopChan)
 				result <- &ConnectionDetails{
-					CertClient: clientSet.CertificatesInternalVersionClient,
+					CertClient: clientSet.CertificatesClient,
 					Endpoint:   apiEndpoint,
 					CACert:     caCert,
 					NodeName:   nodeName,

@@ -84,10 +84,6 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 	if canonicalGroup == "core" {
 		canonicalGroup = ""
 	}
-	canonicalVersion := g.version
-	if canonicalVersion == "internalVersion" {
-		canonicalVersion = ""
-	}
 
 	groupName := g.group
 	if g.group == "core" {
@@ -109,7 +105,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		"GroupVersion":         namer.IC(g.group) + namer.IC(g.version),
 		"group":                canonicalGroup,
 		"groupName":            groupName,
-		"version":              canonicalVersion,
+		"version":              g.version,
 		"watchInterface":       c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/watch", Name: "Interface"}),
 		"GroupVersionResource": c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api/unversioned", Name: "GroupVersionResource"}),
 		"PatchType":            c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "PatchType"}),
@@ -138,7 +134,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 		"ExtractFromListOptions":         c.Universe.Function(types.Name{Package: pkgTestingCore, Name: "ExtractFromListOptions"}),
 	}
 
-	if g.version == "internalVersion" {
+	if g.version == "" {
 		m["DeleteOptions"] = c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "DeleteOptions"})
 		m["ListOptions"] = c.Universe.Type(types.Name{Package: "k8s.io/kubernetes/pkg/api", Name: "ListOptions"})
 	} else {

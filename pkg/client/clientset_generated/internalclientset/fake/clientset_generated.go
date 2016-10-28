@@ -82,112 +82,57 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 
 var _ clientset.Interface = &Clientset{}
 
-// CoreInternalVersion retrieves the CoreInternalVersionClient
-func (c *Clientset) CoreInternalVersion() internalversioncore.CoreInternalVersionInterface {
-	return &fakeinternalversioncore.FakeCoreInternalVersion{Fake: &c.Fake}
+// Core retrieves the CoreClient
+func (c *Clientset) Core() internalversioncore.CoreInterface {
+	return &fakeinternalversioncore.FakeCore{Fake: &c.Fake}
 }
 
-// Core retrieves the CoreInternalVersionClient
-func (c *Clientset) Core() internalversioncore.CoreInternalVersionInterface {
-	return &fakeinternalversioncore.FakeCoreInternalVersion{Fake: &c.Fake}
+// Apps retrieves the AppsClient
+func (c *Clientset) Apps() internalversionapps.AppsInterface {
+	return &fakeinternalversionapps.FakeApps{Fake: &c.Fake}
 }
 
-// AppsInternalVersion retrieves the AppsInternalVersionClient
-func (c *Clientset) AppsInternalVersion() internalversionapps.AppsInternalVersionInterface {
-	return &fakeinternalversionapps.FakeAppsInternalVersion{Fake: &c.Fake}
+// Authentication retrieves the AuthenticationClient
+func (c *Clientset) Authentication() internalversionauthentication.AuthenticationInterface {
+	return &fakeinternalversionauthentication.FakeAuthentication{Fake: &c.Fake}
 }
 
-// Apps retrieves the AppsInternalVersionClient
-func (c *Clientset) Apps() internalversionapps.AppsInternalVersionInterface {
-	return &fakeinternalversionapps.FakeAppsInternalVersion{Fake: &c.Fake}
+// Authorization retrieves the AuthorizationClient
+func (c *Clientset) Authorization() internalversionauthorization.AuthorizationInterface {
+	return &fakeinternalversionauthorization.FakeAuthorization{Fake: &c.Fake}
 }
 
-// AuthenticationInternalVersion retrieves the AuthenticationInternalVersionClient
-func (c *Clientset) AuthenticationInternalVersion() internalversionauthentication.AuthenticationInternalVersionInterface {
-	return &fakeinternalversionauthentication.FakeAuthenticationInternalVersion{Fake: &c.Fake}
+// Autoscaling retrieves the AutoscalingClient
+func (c *Clientset) Autoscaling() internalversionautoscaling.AutoscalingInterface {
+	return &fakeinternalversionautoscaling.FakeAutoscaling{Fake: &c.Fake}
 }
 
-// Authentication retrieves the AuthenticationInternalVersionClient
-func (c *Clientset) Authentication() internalversionauthentication.AuthenticationInternalVersionInterface {
-	return &fakeinternalversionauthentication.FakeAuthenticationInternalVersion{Fake: &c.Fake}
+// Batch retrieves the BatchClient
+func (c *Clientset) Batch() internalversionbatch.BatchInterface {
+	return &fakeinternalversionbatch.FakeBatch{Fake: &c.Fake}
 }
 
-// AuthorizationInternalVersion retrieves the AuthorizationInternalVersionClient
-func (c *Clientset) AuthorizationInternalVersion() internalversionauthorization.AuthorizationInternalVersionInterface {
-	return &fakeinternalversionauthorization.FakeAuthorizationInternalVersion{Fake: &c.Fake}
+// Certificates retrieves the CertificatesClient
+func (c *Clientset) Certificates() internalversioncertificates.CertificatesInterface {
+	return &fakeinternalversioncertificates.FakeCertificates{Fake: &c.Fake}
 }
 
-// Authorization retrieves the AuthorizationInternalVersionClient
-func (c *Clientset) Authorization() internalversionauthorization.AuthorizationInternalVersionInterface {
-	return &fakeinternalversionauthorization.FakeAuthorizationInternalVersion{Fake: &c.Fake}
+// Extensions retrieves the ExtensionsClient
+func (c *Clientset) Extensions() internalversionextensions.ExtensionsInterface {
+	return &fakeinternalversionextensions.FakeExtensions{Fake: &c.Fake}
 }
 
-// AutoscalingInternalVersion retrieves the AutoscalingInternalVersionClient
-func (c *Clientset) AutoscalingInternalVersion() internalversionautoscaling.AutoscalingInternalVersionInterface {
-	return &fakeinternalversionautoscaling.FakeAutoscalingInternalVersion{Fake: &c.Fake}
+// Policy retrieves the PolicyClient
+func (c *Clientset) Policy() internalversionpolicy.PolicyInterface {
+	return &fakeinternalversionpolicy.FakePolicy{Fake: &c.Fake}
 }
 
-// Autoscaling retrieves the AutoscalingInternalVersionClient
-func (c *Clientset) Autoscaling() internalversionautoscaling.AutoscalingInternalVersionInterface {
-	return &fakeinternalversionautoscaling.FakeAutoscalingInternalVersion{Fake: &c.Fake}
+// Rbac retrieves the RbacClient
+func (c *Clientset) Rbac() internalversionrbac.RbacInterface {
+	return &fakeinternalversionrbac.FakeRbac{Fake: &c.Fake}
 }
 
-// BatchInternalVersion retrieves the BatchInternalVersionClient
-func (c *Clientset) BatchInternalVersion() internalversionbatch.BatchInternalVersionInterface {
-	return &fakeinternalversionbatch.FakeBatchInternalVersion{Fake: &c.Fake}
-}
-
-// Batch retrieves the BatchInternalVersionClient
-func (c *Clientset) Batch() internalversionbatch.BatchInternalVersionInterface {
-	return &fakeinternalversionbatch.FakeBatchInternalVersion{Fake: &c.Fake}
-}
-
-// CertificatesInternalVersion retrieves the CertificatesInternalVersionClient
-func (c *Clientset) CertificatesInternalVersion() internalversioncertificates.CertificatesInternalVersionInterface {
-	return &fakeinternalversioncertificates.FakeCertificatesInternalVersion{Fake: &c.Fake}
-}
-
-// Certificates retrieves the CertificatesInternalVersionClient
-func (c *Clientset) Certificates() internalversioncertificates.CertificatesInternalVersionInterface {
-	return &fakeinternalversioncertificates.FakeCertificatesInternalVersion{Fake: &c.Fake}
-}
-
-// ExtensionsInternalVersion retrieves the ExtensionsInternalVersionClient
-func (c *Clientset) ExtensionsInternalVersion() internalversionextensions.ExtensionsInternalVersionInterface {
-	return &fakeinternalversionextensions.FakeExtensionsInternalVersion{Fake: &c.Fake}
-}
-
-// Extensions retrieves the ExtensionsInternalVersionClient
-func (c *Clientset) Extensions() internalversionextensions.ExtensionsInternalVersionInterface {
-	return &fakeinternalversionextensions.FakeExtensionsInternalVersion{Fake: &c.Fake}
-}
-
-// PolicyInternalVersion retrieves the PolicyInternalVersionClient
-func (c *Clientset) PolicyInternalVersion() internalversionpolicy.PolicyInternalVersionInterface {
-	return &fakeinternalversionpolicy.FakePolicyInternalVersion{Fake: &c.Fake}
-}
-
-// Policy retrieves the PolicyInternalVersionClient
-func (c *Clientset) Policy() internalversionpolicy.PolicyInternalVersionInterface {
-	return &fakeinternalversionpolicy.FakePolicyInternalVersion{Fake: &c.Fake}
-}
-
-// RbacInternalVersion retrieves the RbacInternalVersionClient
-func (c *Clientset) RbacInternalVersion() internalversionrbac.RbacInternalVersionInterface {
-	return &fakeinternalversionrbac.FakeRbacInternalVersion{Fake: &c.Fake}
-}
-
-// Rbac retrieves the RbacInternalVersionClient
-func (c *Clientset) Rbac() internalversionrbac.RbacInternalVersionInterface {
-	return &fakeinternalversionrbac.FakeRbacInternalVersion{Fake: &c.Fake}
-}
-
-// StorageInternalVersion retrieves the StorageInternalVersionClient
-func (c *Clientset) StorageInternalVersion() internalversionstorage.StorageInternalVersionInterface {
-	return &fakeinternalversionstorage.FakeStorageInternalVersion{Fake: &c.Fake}
-}
-
-// Storage retrieves the StorageInternalVersionClient
-func (c *Clientset) Storage() internalversionstorage.StorageInternalVersionInterface {
-	return &fakeinternalversionstorage.FakeStorageInternalVersion{Fake: &c.Fake}
+// Storage retrieves the StorageClient
+func (c *Clientset) Storage() internalversionstorage.StorageInterface {
+	return &fakeinternalversionstorage.FakeStorage{Fake: &c.Fake}
 }

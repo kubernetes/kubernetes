@@ -48,7 +48,7 @@ type podTemplates struct {
 }
 
 // newPodTemplates returns a PodTemplates
-func newPodTemplates(c *CoreInternalVersionClient, namespace string) *podTemplates {
+func newPodTemplates(c *CoreClient, namespace string) *podTemplates {
 	return &podTemplates{
 		client: c.RESTClient(),
 		ns:     namespace,
