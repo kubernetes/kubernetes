@@ -6388,6 +6388,25 @@ func TestValidateServiceUpdate(t *testing.T) {
 			},
 			numErrs: 0,
 		},
+		{
+			name: "add loadBalancerSourceRanges",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.Type = api.ServiceTypeLoadBalancer
+				newSvc.Spec.Type = api.ServiceTypeLoadBalancer
+				newSvc.Spec.LoadBalancerSourceRanges = []string{"10.0.0.0/8"}
+			},
+			numErrs: 1,
+		},
+		{
+			name: "update loadBalancerSourceRanges",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.Type = api.ServiceTypeLoadBalancer
+				oldSvc.Spec.LoadBalancerSourceRanges = []string{"10.0.0.0/8"}
+				newSvc.Spec.Type = api.ServiceTypeLoadBalancer
+				newSvc.Spec.LoadBalancerSourceRanges = []string{"10.180.0.0/16"}
+			},
+			numErrs: 1,
+		},
 	}
 
 	for _, tc := range testCases {
