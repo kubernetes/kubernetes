@@ -32,6 +32,7 @@ import (
 	"github.com/emicklei/go-restful"
 	"github.com/golang/glog"
 
+	"k8s.io/client-go/pkg/version"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -429,6 +430,43 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 	}, nil
 }
 
+// TODO: Remove in 1.6. Returns if kubectl is older than v1.5.0
+func isOldKubectl(userAgent string) bool {
+	// example userAgent string: kubectl-1.3/v1.3.8 (linux/amd64) kubernetes/e328d5b
+	if !strings.Contains(userAgent, "kubectl") {
+		return false
+	}
+	userAgent = strings.Split(userAgent, " ")[0]
+	subs := strings.Split(userAgent, "/")
+	if len(subs) != 2 {
+		return false
+	}
+	kubectlVersion, versionErr := version.Parse(subs[1])
+	if versionErr != nil {
+		return false
+	}
+	return kubectlVersion.LT(version.MustParse("v1.5.0"))
+}
+
+// TODO: Remove in 1.6. This is for backward compatibility with 1.4 kubectl.
+// See https://github.com/kubernetes/kubernetes/issues/35791
+var groupsWithNewVersionsIn1_5 = sets.NewString("apps", "policy")
+
+func filterAPIGroups(req *restful.Request, groups []unversioned.APIGroup) []unversioned.APIGroup {
+	if !isOldKubectl(req.HeaderParameter("User-Agent")) {
+		return groups
+	}
+	// hide API group that has new versions added in 1.5.
+	var ret []unversioned.APIGroup
+	for _, group := range groups {
+		if groupsWithNewVersionsIn1_5.Has(group.Name) {
+			continue
+		}
+		ret = append(ret, group)
+	}
+	return ret
+}
+
 // DynamicApisDiscovery returns a webservice serving api group discovery.
 // Note: during the server runtime apiGroupsForDiscovery might change.
 func (s *GenericAPIServer) DynamicApisDiscovery() *restful.WebService {
@@ -453,7 +491,8 @@ func (s *GenericAPIServer) DynamicApisDiscovery() *restful.WebService {
 			groups[i] = sortedGroups[i]
 			groups[i].ServerAddressByClientCIDRs = serverCIDR
 		}
-		return groups
+		filteredGroups := filterAPIGroups(req, groups)
+		return filteredGroups
 	})
 }
 
