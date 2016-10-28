@@ -1,15 +1,15 @@
-# CockroachDB on Kubernetes as a PetSet
+# CockroachDB on Kubernetes as a StatefulSet
 
 This example deploys [CockroachDB](https://cockroachlabs.com) on Kubernetes as
-a PetSet. CockroachDB is a distributed, scalable NewSQL database. Please see
+a StatefulSet. CockroachDB is a distributed, scalable NewSQL database. Please see
 [the homepage](https://cockroachlabs.com) and the
 [documentation](https://www.cockroachlabs.com/docs/) for details.
 
 ## Limitations
 
-### PetSet limitations
+### StatefulSet limitations
 
-Standard PetSet limitations apply: There is currently no possibility to use
+Standard StatefulSet limitations apply: There is currently no possibility to use
 node-local storage (outside of single-node tests), and so there is likely
 a performance hit associated with running CockroachDB on some external storage.
 Note that CockroachDB already does replication and thus should not be deployed on
@@ -40,7 +40,7 @@ Follow the steps in [minikube.sh](minikube.sh) (or simply run that file).
 
 ## Accessing the database
 
-Along with our PetSet configuration, we expose a standard Kubernetes service
+Along with our StatefulSet configuration, we expose a standard Kubernetes service
 that offers a load-balanced virtual IP for clients to access the database
 with. In our example, we've called this service `cockroachdb-public`.
 
@@ -77,7 +77,7 @@ database and ensuring the other replicas have all data that was written.
 
 ## Scaling up or down
 
-Simply edit the PetSet (but note that you may need to create a new persistent
+Simply edit the StatefulSet (but note that you may need to create a new persistent
 volume claim first). If you ran `minikube.sh`, there's a spare volume so you
 can immediately scale up by one. Convince yourself that the new node
 immediately serves reads and writes.
@@ -88,7 +88,7 @@ Because all of the resources in this example have been tagged with the label `ap
 we can clean up everything that we created in one quick command using a selector on that label:
 
 ```shell
-kubectl delete petsets,pods,persistentvolumes,persistentvolumeclaims,services -l app=cockroachdb
+kubectl delete statefulsets,pods,persistentvolumes,persistentvolumeclaims,services -l app=cockroachdb
 ```
 
 

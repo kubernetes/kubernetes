@@ -165,7 +165,7 @@ due to a CVE that just came out (fictional scenario).  In this scenario:
   up and not scale down the old one.
 - an existing replicaSet will be unable to create Pods that replace ones which are terminated.  If this is due to
   slow loss of nodes, then there should be time to react before significant loss of capacity.
-- For non-replicated things (size 1 ReplicaSet, PetSet), a single node failure may disable it.
+- For non-replicated things (size 1 ReplicaSet, StatefulSet), a single node failure may disable it.
 - a node rolling update will eventually check for liveness of replacements, and would be throttled if
   in the case when the image was no longer allowed and so replacements could not be started.
 - rapid node restarts will cause existing pod objects to be restarted by kubelet.

@@ -11,7 +11,7 @@ Anyone making user facing changes to kubernetes.  This is especially important f
 ### When making Api changes
 
 *e.g. adding Deployments*
-* Always make sure docs for downstream effects are updated *(PetSet -> PVC, Deployment -> ReplicationController)*
+* Always make sure docs for downstream effects are updated *(StatefulSet -> PVC, Deployment -> ReplicationController)*
 * Add or update the corresponding *[Glossary](http://kubernetes.io/docs/reference/)* item
 * Verify the guides / walkthroughs do not require any changes:
   * **If your change will be recommended over the approaches shown in these guides, then they must be updated to reflect your change**
