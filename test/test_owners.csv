@@ -455,6 +455,10 @@ k8s.io/kubernetes/cmd/kube-proxy/app,luxas,1
 k8s.io/kubernetes/cmd/kubeadm/app/cmd,davidopp,1
 k8s.io/kubernetes/cmd/kubeadm/app/images,saad-ali,1
 k8s.io/kubernetes/cmd/kubeadm/app/util,eparis,1
+k8s.io/kubernetes/cmd/kubeadm/app/cmd,vishh,1
+k8s.io/kubernetes/cmd/kubeadm/app/images,davidopp,1
+k8s.io/kubernetes/cmd/kubeadm/app/preflight,apprenda,0
+k8s.io/kubernetes/cmd/kubeadm/app/util,krousey,1
 k8s.io/kubernetes/cmd/kubelet/app,hurf,1
 k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup.k8s.io/unversioned,eparis,1
 k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen/generators,davidopp,1
