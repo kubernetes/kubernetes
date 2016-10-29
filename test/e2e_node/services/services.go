@@ -82,7 +82,11 @@ func (e *E2EServices) Start() error {
 		// Start kubelet
 		// Create the manifest path for kubelet.
 		// TODO(random-liu): Remove related logic when we move kubelet starting logic out of the test.
-		framework.TestContext.ManifestPath, err = ioutil.TempDir("", "node-e2e-pod")
+		cwd, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get current working directory: %v", err)
+		}
+		framework.TestContext.ManifestPath, err = ioutil.TempDir(cwd, "pod-manifest")
 		if err != nil {
 			return fmt.Errorf("failed to create static pod manifest directory: %v", err)
 		}
