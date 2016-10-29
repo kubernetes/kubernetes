@@ -47,8 +47,8 @@ func Resource(resource string) unversioned.GroupResource {
 func addKnownTypes(scheme *runtime.Scheme) error {
 	// TODO this will get cleaned up with the scheme types are fixed
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&PetSet{},
-		&PetSetList{},
+		&StatefulSet{},
+		&StatefulSetList{},
 		&api.ListOptions{},
 		&api.DeleteOptions{},
 	)

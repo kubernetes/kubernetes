@@ -16,6 +16,10 @@ limitations under the License.
 
 package v1beta1
 
+import (
+	rest "k8s.io/client-go/rest"
+)
+
 // LocalSubjectAccessReviewsGetter has a method to return a LocalSubjectAccessReviewInterface.
 // A group's client should implement this interface.
 type LocalSubjectAccessReviewsGetter interface {
@@ -29,14 +33,14 @@ type LocalSubjectAccessReviewInterface interface {
 
 // localSubjectAccessReviews implements LocalSubjectAccessReviewInterface
 type localSubjectAccessReviews struct {
-	client *AuthorizationClient
+	client rest.Interface
 	ns     string
 }
 
 // newLocalSubjectAccessReviews returns a LocalSubjectAccessReviews
 func newLocalSubjectAccessReviews(c *AuthorizationClient, namespace string) *localSubjectAccessReviews {
 	return &localSubjectAccessReviews{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

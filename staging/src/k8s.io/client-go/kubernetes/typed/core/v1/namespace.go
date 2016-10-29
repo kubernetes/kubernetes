@@ -20,6 +20,7 @@ import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // NamespacesGetter has a method to return a NamespaceInterface.
@@ -44,13 +45,13 @@ type NamespaceInterface interface {
 
 // namespaces implements NamespaceInterface
 type namespaces struct {
-	client *CoreClient
+	client rest.Interface
 }
 
 // newNamespaces returns a Namespaces
 func newNamespaces(c *CoreClient) *namespaces {
 	return &namespaces{
-		client: c,
+		client: c.RESTClient(),
 	}
 }
 

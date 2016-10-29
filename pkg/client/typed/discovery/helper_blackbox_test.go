@@ -31,8 +31,8 @@ import (
 	uapi "k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
-	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 

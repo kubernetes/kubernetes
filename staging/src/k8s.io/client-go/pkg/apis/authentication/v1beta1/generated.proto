@@ -21,11 +21,11 @@ syntax = 'proto2';
 
 package k8s.io.kubernetes.pkg.apis.authentication.v1beta1;
 
-import "k8s.io/client-go/pkg/api/resource/generated.proto";
-import "k8s.io/client-go/pkg/api/unversioned/generated.proto";
-import "k8s.io/client-go/pkg/api/v1/generated.proto";
-import "k8s.io/client-go/pkg/runtime/generated.proto";
-import "k8s.io/client-go/pkg/util/intstr/generated.proto";
+import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
+import "k8s.io/kubernetes/pkg/api/unversioned/generated.proto";
+import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
+import "k8s.io/kubernetes/pkg/runtime/generated.proto";
+import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1beta1";
@@ -43,30 +43,36 @@ message ExtraValue {
 // Note: TokenReview requests may be cached by the webhook token authenticator
 // plugin in the kube-apiserver.
 message TokenReview {
+  // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
   // Spec holds information about the request being evaluated
   optional TokenReviewSpec spec = 2;
 
   // Status is filled in by the server and indicates whether the request can be authenticated.
+  // +optional
   optional TokenReviewStatus status = 3;
 }
 
 // TokenReviewSpec is a description of the token authentication request.
 message TokenReviewSpec {
   // Token is the opaque bearer token.
+  // +optional
   optional string token = 1;
 }
 
 // TokenReviewStatus is the result of the token authentication request.
 message TokenReviewStatus {
   // Authenticated indicates that the token was associated with a known user.
+  // +optional
   optional bool authenticated = 1;
 
   // User is the UserInfo associated with the provided token.
+  // +optional
   optional UserInfo user = 2;
 
   // Error indicates that the token couldn't be checked
+  // +optional
   optional string error = 3;
 }
 
@@ -74,17 +80,21 @@ message TokenReviewStatus {
 // user.Info interface.
 message UserInfo {
   // The name that uniquely identifies this user among all active users.
+  // +optional
   optional string username = 1;
 
   // A unique value that identifies this user across time. If this user is
   // deleted and another user by the same name is added, they will have
   // different UIDs.
+  // +optional
   optional string uid = 2;
 
   // The names of groups this user is a part of.
+  // +optional
   repeated string groups = 3;
 
   // Any additional information provided by the authenticator.
+  // +optional
   map<string, ExtraValue> extra = 4;
 }
 

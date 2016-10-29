@@ -21,6 +21,7 @@ import (
 	v1 "k8s.io/client-go/pkg/api/v1"
 	v1beta1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // DeploymentsGetter has a method to return a DeploymentInterface.
@@ -45,14 +46,14 @@ type DeploymentInterface interface {
 
 // deployments implements DeploymentInterface
 type deployments struct {
-	client *ExtensionsClient
+	client rest.Interface
 	ns     string
 }
 
 // newDeployments returns a Deployments
 func newDeployments(c *ExtensionsClient, namespace string) *deployments {
 	return &deployments{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }
