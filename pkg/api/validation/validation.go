@@ -2845,6 +2845,17 @@ func ValidateNodeUpdate(node, oldNode *api.Node) field.ErrorList {
 	// 	allErrs = append(allErrs, field.Invalid("status", node.Status, "must be empty"))
 	// }
 
+	// Validate resource quantities in capacity.
+	for k, v := range node.Status.Capacity {
+		resPath := field.NewPath("status", "capacity", string(k))
+		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
+	}
+	// Validate resource quantities in allocatable.
+	for k, v := range node.Status.Allocatable {
+		resPath := field.NewPath("status", "allocatable", string(k))
+		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
+	}
+
 	// Validte no duplicate addresses in node status.
 	addresses := make(map[api.NodeAddress]bool)
 	for i, address := range node.Status.Addresses {
@@ -3236,9 +3247,10 @@ func ValidateResourceRequirements(requirements *api.ResourceRequirements, fldPat
 		fldPath := limPath.Key(string(resourceName))
 		// Validate resource name.
 		allErrs = append(allErrs, validateContainerResourceName(string(resourceName), fldPath)...)
-		if api.IsStandardResourceName(string(resourceName)) {
-			allErrs = append(allErrs, validateBasicResource(quantity, fldPath.Key(string(resourceName)))...)
-		}
+
+		// Validate resource quantity.
+		allErrs = append(allErrs, ValidateResourceQuantityValue(string(resourceName), quantity, fldPath)...)
+
 		// Check that request <= limit.
 		requestQuantity, exists := requirements.Requests[resourceName]
 		if exists {
@@ -3254,10 +3266,10 @@ func ValidateResourceRequirements(requirements *api.ResourceRequirements, fldPat
 		fldPath := reqPath.Key(string(resourceName))
 		// Validate resource name.
 		allErrs = append(allErrs, validateContainerResourceName(string(resourceName), fldPath)...)
-		if api.IsStandardResourceName(string(resourceName)) {
-			allErrs = append(allErrs, validateBasicResource(quantity, fldPath.Key(string(resourceName)))...)
-		}
+		// Validate resource quantity.
+		allErrs = append(allErrs, ValidateResourceQuantityValue(string(resourceName), quantity, fldPath)...)
 	}
+
 	return allErrs
 }
 
