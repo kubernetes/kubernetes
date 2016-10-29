@@ -321,6 +321,9 @@ type Volumes interface {
 
 	// Check if the volume is already attached to the node with the specified NodeName
 	DiskIsAttached(diskName string, nodeName types.NodeName) (bool, error)
+
+	// Check if a list of volumes are attached to the node with the specified NodeName
+	DisksAreAttached(diskNames []string, nodeName types.NodeName) (map[string]bool, error)
 }
 
 // InstanceGroups is an interface for managing cloud-managed instance groups / autoscaling instance groups
@@ -1772,6 +1775,41 @@ func (c *Cloud) DiskIsAttached(diskName string, nodeName types.NodeName) (bool, 
 		}
 	}
 	return false, nil
+}
+
+func (c *Cloud) DisksAreAttached(diskNames []string, nodeName types.NodeName) (map[string]bool, error) {
+	attached := make(map[string]bool)
+	for _, diskName := range diskNames {
+		attached[diskName] = false
+	}
+	awsInstance, err := c.getAwsInstance(nodeName)
+	if err != nil {
+		if err == cloudprovider.InstanceNotFound {
+			// If instance no longer exists, safe to assume volume is not attached.
+			glog.Warningf(
+				"Node %q does not exist. DisksAreAttached will assume disks %v are not attached to it.",
+				nodeName,
+				diskNames)
+			return attached, nil
+		}
+
+		return attached, err
+	}
+	info, err := awsInstance.describeInstance()
+	if err != nil {
+		return attached, err
+	}
+	for _, blockDevice := range info.BlockDeviceMappings {
+		volumeId := aws.StringValue(blockDevice.Ebs.VolumeId)
+		for _, diskName := range diskNames {
+			if volumeId == diskName {
+				// Disk is still attached to node
+				attached[diskName] = true
+			}
+		}
+	}
+
+	return attached, nil
 }
 
 // Gets the current load balancer state
