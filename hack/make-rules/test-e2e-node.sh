@@ -26,7 +26,6 @@ skip=${SKIP:-""}
 # Currently, parallelism only affects when REMOTE=true. For local test,
 # ginkgo default parallelism (cores - 1) is used.
 parallelism=${PARALLELISM:-8}
-report=${REPORT:-"/tmp/"}
 artifacts=${ARTIFACTS:-"/tmp/_artifacts"}
 remote=${REMOTE:-"false"}
 run_until_failure=${RUN_UNTIL_FAILURE:-"false"}
@@ -166,10 +165,13 @@ else
      fi
   fi
 
+  # Set report directory to $artifacts/local
+  artifacts=$artifacts/local
+
   # Test using the host the script was run on
   # Provided for backwards compatibility
   go run test/e2e_node/runner/local/run_local.go --ginkgo-flags="$ginkgoflags" \
-    --test-flags="--alsologtostderr --v 4 --report-dir=${report} --node-name $(hostname) \
-    $test_args" --build-dependencies=true
+    --test-flags="--alsologtostderr --v 4 --report-dir=${artifacts} --node-name $(hostname) \
+    $test_args" --build-dependencies=true 2>&1 | tee "${artifacts}/build-log.txt"
   exit $?
 fi

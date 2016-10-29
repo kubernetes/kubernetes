@@ -20,7 +20,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"os"
 	"os/exec"
 	"os/user"
@@ -169,23 +168,23 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 
 	// Create the temp staging directory
 	glog.Infof("Staging test binaries on %s", host)
-	tmp := fmt.Sprintf("/tmp/gcloud-e2e-%d", rand.Int31())
-	_, err := RunSshCommand("ssh", GetHostnameOrIp(host), "--", "mkdir", tmp)
+	workspace := fmt.Sprintf("/tmp/node-e2e-%s", getTimestamp())
+	_, err := RunSshCommand("ssh", GetHostnameOrIp(host), "--", "mkdir", workspace)
 	if err != nil {
 		// Exit failure with the error
 		return "", false, err
 	}
 	if cleanup {
 		defer func() {
-			output, err := RunSshCommand("ssh", GetHostnameOrIp(host), "--", "rm", "-rf", tmp)
+			output, err := RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sudo", "rm", "-rf", workspace)
 			if err != nil {
-				glog.Errorf("failed to cleanup tmp directory %s on host %v.  Output:\n%s", tmp, err, output)
+				glog.Errorf("failed to cleanup workspace %s on host %v.  Output:\n%s", workspace, err, output)
 			}
 		}()
 	}
 
 	// Install the cni plugin.
-	cniPath := filepath.Join(tmp, CNIDirectory)
+	cniPath := filepath.Join(workspace, CNIDirectory)
 	if _, err := RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sh", "-c",
 		getSshCommand(" ; ", fmt.Sprintf("sudo mkdir -p %s", cniPath),
 			fmt.Sprintf("sudo wget -O - %s | sudo tar -xz -C %s", CNIURL, cniPath))); err != nil {
@@ -215,7 +214,7 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 	}
 
 	// Copy the archive to the staging directory
-	_, err = RunSshCommand("scp", archive, fmt.Sprintf("%s:%s/", GetHostnameOrIp(host), tmp))
+	_, err = RunSshCommand("scp", archive, fmt.Sprintf("%s:%s/", GetHostnameOrIp(host), workspace))
 	if err != nil {
 		// Exit failure with the error
 		return "", false, err
@@ -234,7 +233,7 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 	RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sh", "-c", cmd)
 
 	// Extract the archive
-	cmd = getSshCommand(" && ", fmt.Sprintf("cd %s", tmp), fmt.Sprintf("tar -xzvf ./%s", archiveName))
+	cmd = getSshCommand(" && ", fmt.Sprintf("cd %s", workspace), fmt.Sprintf("tar -xzvf ./%s", archiveName))
 	glog.Infof("Extracting tar on %s", host)
 	output, err = RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sh", "-c", cmd)
 	if err != nil {
@@ -243,7 +242,7 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 	}
 
 	// If we are testing on a GCI node, we chmod 544 the mounter and specify a different mounter path in the test args.
-	// We do this here because the local var `tmp` tells us which /tmp/gcloud-e2e-%d is relevant to the current test run.
+	// We do this here because the local var `workspace` tells us which /tmp/node-e2e-%d is relevant to the current test run.
 
 	// Determine if the GCI mounter script exists locally.
 	k8sDir, err := builder.GetK8sRootDir()
@@ -267,7 +266,7 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 	if strings.Contains(output, "ID=gci") {
 		// Note this implicitly requires the script to be where we expect in the tarball, so if that location changes the error
 		// here will tell us to update the remote test runner.
-		mounterPath := filepath.Join(tmp, "cluster/gce/gci/mounter/mounter")
+		mounterPath := filepath.Join(workspace, "cluster/gce/gci/mounter/mounter")
 		output, err = RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sh", "-c", fmt.Sprintf("'chmod 544 %s'", mounterPath))
 		if err != nil {
 			glog.Errorf("Unable to chmod 544 GCI mounter script. Err: %v, Output:\n%s", err, output)
@@ -281,9 +280,9 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 
 	// Run the tests
 	cmd = getSshCommand(" && ",
-		fmt.Sprintf("cd %s", tmp),
+		fmt.Sprintf("cd %s", workspace),
 		fmt.Sprintf("timeout -k 30s %fs ./ginkgo %s ./e2e_node.test -- --logtostderr --v 4 --node-name=%s --report-dir=%s/results --report-prefix=%s %s",
-			testTimeoutSeconds.Seconds(), ginkgoFlags, host, tmp, junitFilePrefix, testArgs),
+			testTimeoutSeconds.Seconds(), ginkgoFlags, host, workspace, junitFilePrefix, testArgs),
 	)
 	aggErrs := []error{}
 
@@ -295,7 +294,7 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 	}
 
 	glog.Infof("Copying test artifacts from %s", host)
-	scpErr := getTestArtifacts(host, tmp)
+	scpErr := getTestArtifacts(host, workspace)
 	if scpErr != nil {
 		aggErrs = append(aggErrs, scpErr)
 	}
@@ -303,14 +302,24 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 	return output, len(aggErrs) == 0, utilerrors.NewAggregate(aggErrs)
 }
 
+func getTimestamp() string {
+	t := time.Now()
+	return fmt.Sprintf("%d-%02d-%02dT%02d-%02d-%02d", t.Year(), t.Month(), t.Day(),
+		t.Hour(), t.Minute(), t.Second())
+}
+
 func getTestArtifacts(host, testDir string) error {
-	_, err := RunSshCommand("scp", "-r", fmt.Sprintf("%s:%s/results/", GetHostnameOrIp(host), testDir), fmt.Sprintf("%s/%s", *resultsDir, host))
+	logPath := filepath.Join(*resultsDir, host)
+	if err := os.MkdirAll(logPath, 0755); err != nil {
+		return fmt.Errorf("failed to create log directory %q: %v", logPath, err)
+	}
+	// Copy logs to artifacts/hostname
+	_, err := RunSshCommand("scp", "-r", fmt.Sprintf("%s:%s/results/*.log", GetHostnameOrIp(host), testDir), logPath)
 	if err != nil {
 		return err
 	}
-
 	// Copy junit to the top of artifacts
-	_, err = RunSshCommand("scp", fmt.Sprintf("%s:%s/results/junit*", GetHostnameOrIp(host), testDir), fmt.Sprintf("%s/", *resultsDir))
+	_, err = RunSshCommand("scp", fmt.Sprintf("%s:%s/results/junit*", GetHostnameOrIp(host), testDir), *resultsDir)
 	if err != nil {
 		return err
 	}
