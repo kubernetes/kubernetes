@@ -41,7 +41,7 @@ NODE_OS_DISTRIBUTION=${KUBE_NODE_OS_DISTRIBUTION:-${KUBE_OS_DISTRIBUTION:-debian
 # containervm. If you are updating the containervm version, update this
 # variable. Also please update corresponding image for node e2e at:
 # https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/jenkins/image-config.yaml
-CVM_VERSION=container-v1-3-v20160604
+CVM_VERSION=container-vm-v20161025
 GCI_VERSION="gci-dev-55-8872-18-0"
 MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
