@@ -359,6 +359,14 @@ func (cont *GCEIngressController) deleteAddresses(del bool) string {
 		if err := gcloudDelete("addresses", cont.staticIPName, cont.cloud.ProjectID, "--global"); err == nil {
 			cont.staticIPName = ""
 		}
+	} else {
+		e2eIPs := []compute.Address{}
+		gcloudList("addresses", "e2e-.*", cont.cloud.ProjectID, &e2eIPs)
+		ips := []string{}
+		for _, ip := range e2eIPs {
+			ips = append(ips, ip.Name)
+		}
+		framework.Logf("None of the remaining %d static-ips were created by this e2e: %v", len(ips), strings.Join(ips, ", "))
 	}
 	return msg
 }
@@ -605,6 +613,8 @@ func (cont *GCEIngressController) staticIP(name string) string {
 		}
 		framework.Failf("Failed to allocated static ip %v: %v", name, err)
 	}
+	cont.staticIPName = ip.Name
+	framework.Logf("Reserved static ip %v: %v", cont.staticIPName, ip.Address)
 	return ip.Address
 }
 
