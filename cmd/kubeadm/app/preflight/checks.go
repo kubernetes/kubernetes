@@ -25,9 +25,9 @@ import (
 	"os/exec"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/util/initsystem"
 	"k8s.io/kubernetes/pkg/util/node"
-	"k8s.io/kubernetes/pkg/api/validation"
 )
 
 type PreFlightError struct {
@@ -174,7 +174,7 @@ func (ipc InPathCheck) Check() (warnings, errors []error) {
 
 // HostnameCheck checks if hostname match dns sub domain regex.
 // If hostname doesn't match this regex, kubelet will not launch static pods like kube-apiserver/kube-controller-manager and so on.
-type HostnameCheck struct {}
+type HostnameCheck struct{}
 
 func (hc HostnameCheck) Check() (warnings, errors []error) {
 	errors = []error{}
