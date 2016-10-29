@@ -71,6 +71,7 @@ type podGetter interface {
 
 type kubeGenericRuntimeManager struct {
 	runtimeName         string
+	nodeRef             *api.ObjectReference
 	recorder            record.EventRecorder
 	osInterface         kubecontainer.OSInterface
 	containerRefManager *kubecontainer.RefManager
@@ -113,6 +114,7 @@ type kubeGenericRuntimeManager struct {
 // NewKubeGenericRuntimeManager creates a new kubeGenericRuntimeManager
 func NewKubeGenericRuntimeManager(
 	recorder record.EventRecorder,
+	nodeRef *api.ObjectReference,
 	livenessManager proberesults.Manager,
 	containerRefManager *kubecontainer.RefManager,
 	machineInfo *cadvisorapi.MachineInfo,
@@ -131,6 +133,7 @@ func NewKubeGenericRuntimeManager(
 ) (kubecontainer.Runtime, error) {
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:            recorder,
+		nodeRef:             nodeRef,
 		cpuCFSQuota:         cpuCFSQuota,
 		livenessManager:     livenessManager,
 		containerRefManager: containerRefManager,
@@ -262,10 +265,18 @@ func (m *kubeGenericRuntimeManager) APIVersion() (kubecontainer.Version, error) 
 
 // Status returns error if the runtime is unhealthy; nil otherwise.
 func (m *kubeGenericRuntimeManager) Status() error {
-	_, err := m.runtimeService.Version(kubeRuntimeAPIVersion)
+	status, err := m.runtimeService.Status()
 	if err != nil {
 		glog.Errorf("Checkout remote runtime status failed: %v", err)
 		return err
+	}
+
+	switch status.GetState() {
+	case runtimeApi.RuntimeState_ERROR:
+		m.recorder.Eventf(m.nodeRef, api.EventTypeWarning, events.RuntimeNotReady, status.GetMessage())
+		return fmt.Errorf("Runtime %q is unhealthy: %q", m.runtimeName, status.GetMessage())
+	case runtimeApi.RuntimeState_WARNING:
+		m.recorder.Eventf(m.nodeRef, api.EventTypeWarning, events.RuntimeReady, status.GetMessage())
 	}
 
 	return nil

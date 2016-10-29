@@ -5,8 +5,10 @@ package runtime;
 
 // Runtime service defines the public APIs for remote container runtimes
 service RuntimeService {
-    // Version returns the runtime name, runtime version and runtime API version
+    // Version returns the runtime name, runtime version and runtime API version.
     rpc Version(VersionRequest) returns (VersionResponse) {}
+    // Status returns the status of the runtime service.
+    rpc Status(StatusRequest) returns (StatusResponse) {}
 
     // RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
     // the sandbox is in ready state.
@@ -81,6 +83,24 @@ message VersionResponse {
     // The API version of the container runtime. The string should be
     // semver-compatible.
     optional string runtime_api_version = 4;
+}
+
+enum RuntimeState {
+    // ACTIVE indicates the runtime service is ready to run.
+    ACTIVE = 0;
+    // WARNING indicates the runtime service is ready to run, but with some non-cirtical warnings.
+    WARNING = 1;
+    // ERROR indicates the runtime service is in critical error.
+    ERROR = 2;
+}
+
+message StatusRequest {}
+
+message StatusResponse {
+    // The state of the runtime service.
+    optional RuntimeState state = 1;
+    // The message indicates why the service is in current state.
+    optional string message = 2;
 }
 
 // DNSConfig specifies the DNS servers and search domains of a sandbox.

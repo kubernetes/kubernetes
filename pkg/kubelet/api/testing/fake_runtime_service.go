@@ -360,3 +360,8 @@ func (r *FakeRuntimeService) Exec(containerID string, cmd []string, tty bool, st
 func (r *FakeRuntimeService) UpdateRuntimeConfig(runtimeCOnfig *runtimeApi.RuntimeConfig) error {
 	return nil
 }
+
+func (r *FakeRuntimeService) Status() (*runtimeApi.StatusResponse, error) {
+	state := runtimeApi.RuntimeState_ACTIVE
+	return &runtimeApi.StatusResponse{State: &state}, nil
+}

@@ -114,3 +114,20 @@ func (ds *dockerService) Version(_ string) (*runtimeApi.VersionResponse, error) 
 func (ds *dockerService) UpdateRuntimeConfig(runtimeConfig *runtimeApi.RuntimeConfig) error {
 	return nil
 }
+
+// Status returns the status of the runtime service.
+// TODO: check status of network plugins.
+func (ds *dockerService) Status() (*runtimeApi.StatusResponse, error) {
+	state := runtimeApi.RuntimeState_ACTIVE
+	message := ""
+
+	if _, err := ds.Version(""); err != nil {
+		state = runtimeApi.RuntimeState_ERROR
+		message = fmt.Sprintf("cound not get version from docker (error: %v)", err)
+	}
+
+	return &runtimeApi.StatusResponse{
+		State:   &state,
+		Message: &message,
+	}, nil
+}
