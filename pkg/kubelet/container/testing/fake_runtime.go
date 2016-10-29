@@ -118,6 +118,11 @@ func (f *FakeRuntime) ClearCalls() {
 	f.StatusErr = nil
 }
 
+// UpdatePodCIDR fulfills the cri interface.
+func (f *FakeRuntime) UpdatePodCIDR(c string) error {
+	return nil
+}
+
 func (f *FakeRuntime) assertList(expect []string, test []string) error {
 	if !reflect.DeepEqual(expect, test) {
 		return fmt.Errorf("expected %#v, got %#v", expect, test)

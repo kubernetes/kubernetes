@@ -55,6 +55,10 @@ func (_m *MockNetworkPlugin) Capabilities() sets.Int {
 	return ret0
 }
 
+func (_m *MockNetworkPlugin) Finish() {
+	_m.ctrl.Finish()
+}
+
 func (_mr *_MockNetworkPluginRecorder) Capabilities() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Capabilities")
 }
