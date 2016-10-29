@@ -456,7 +456,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	}
 	glog.Infof("Hairpin mode set to %q", klet.hairpinMode)
 
-	if plug, err := network.InitNetworkPlugin(kubeDeps.NetworkPlugins, kubeCfg.NetworkPluginName, &networkHost{klet}, klet.hairpinMode, klet.nonMasqueradeCIDR, int(kubeCfg.NetworkPluginMTU)); err != nil {
+	if plug, err := network.InitNetworkPlugin(kubeDeps.NetworkPlugins, kubeCfg.NetworkPluginName, &criNetworkHost{&networkHost{klet}}, klet.hairpinMode, klet.nonMasqueradeCIDR, int(kubeCfg.NetworkPluginMTU)); err != nil {
 		return nil, err
 	} else {
 		klet.networkPlugin = plug
@@ -482,6 +482,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		}
 	}
 
+	// TODO: These need to become arguments to a standalone docker shim.
 	binDir := kubeCfg.CNIBinDir
 	if binDir == "" {
 		binDir = kubeCfg.NetworkPluginDir
@@ -493,8 +494,13 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		PluginConfDir:     kubeCfg.CNIConfDir,
 		PluginBinDir:      binDir,
 		MTU:               int(kubeCfg.NetworkPluginMTU),
-		RuntimeHost:       &networkHost{klet},
 	}
+
+	// Remote runtime shim just cannot talk back to kubelet, so it doesn't
+	// support bandwidth shaping or hostports till #35457. To enable legacy
+	// features, replace with networkHost.
+	var nl *noOpLegacyHost
+	pluginSettings.LegacyRuntimeHost = nl
 
 	// Initialize the runtime.
 	switch kubeCfg.ContainerRuntime {
