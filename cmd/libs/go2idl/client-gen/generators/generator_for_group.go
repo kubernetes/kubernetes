@@ -22,7 +22,6 @@ import (
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
-	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators/normalization"
 )
 
 // genGroup produces a file for a group client, e.g. ExtensionsClient for the extension group.
@@ -62,6 +61,8 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	const pkgRegistered = "k8s.io/kubernetes/pkg/apimachinery/registered"
 	const pkgAPI = "k8s.io/kubernetes/pkg/api"
 	const pkgSerializer = "k8s.io/kubernetes/pkg/runtime/serializer"
+	const pkgUnversioned = "k8s.io/kubernetes/pkg/api/unversioned"
+
 	apiPath := func(group string) string {
 		if len(g.apiPath) > 0 {
 			return `"` + g.apiPath + `"`
@@ -83,16 +84,19 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	}
 
 	m := map[string]interface{}{
-		"group":                      normalization.BeforeFirstDot(g.group),
-		"Group":                      namer.IC(normalization.BeforeFirstDot(g.group)),
+		"group":                      g.group,
+		"version":                    g.version,
+		"GroupVersion":               namer.IC(g.group) + namer.IC(g.version),
 		"groupName":                  groupName,
 		"types":                      g.types,
 		"Config":                     c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "Config"}),
 		"DefaultKubernetesUserAgent": c.Universe.Function(types.Name{Package: pkgRESTClient, Name: "DefaultKubernetesUserAgent"}),
 		"RESTClientInterface":        c.Universe.Type(types.Name{Package: pkgRESTClient, Name: "Interface"}),
 		"RESTClientFor":              c.Universe.Function(types.Name{Package: pkgRESTClient, Name: "RESTClientFor"}),
-		"latestGroup":                c.Universe.Variable(types.Name{Package: pkgRegistered, Name: "Group"}),
+		"Group":                      c.Universe.Variable(types.Name{Package: pkgRegistered, Name: "Group"}),
 		"GroupOrDie":                 c.Universe.Variable(types.Name{Package: pkgRegistered, Name: "GroupOrDie"}),
+		"IsEnabledVersion":           c.Universe.Variable(types.Name{Package: pkgRegistered, Name: "IsEnabledVersion"}),
+		"ParseGroupVersion":          c.Universe.Function(types.Name{Package: pkgUnversioned, Name: "ParseGroupVersion"}),
 		"apiPath":                    apiPath(g.group),
 		"codecs":                     c.Universe.Variable(types.Name{Package: pkgAPI, Name: "Codecs"}),
 		"directCodecFactory":         c.Universe.Variable(types.Name{Package: pkgSerializer, Name: "DirectCodecFactory"}),
@@ -102,8 +106,8 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	sw.Do(groupClientTemplate, m)
 	for _, t := range g.types {
 		wrapper := map[string]interface{}{
-			"type":  t,
-			"Group": namer.IC(normalization.BeforeFirstDot(g.group)),
+			"type":         t,
+			"GroupVersion": namer.IC(g.group) + namer.IC(g.version),
 		}
 		namespaced := !extractBoolTagOrDie("nonNamespaced", t.SecondClosestCommentLines)
 		if namespaced {
@@ -116,7 +120,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	sw.Do(newClientForConfigTemplate, m)
 	sw.Do(newClientForConfigOrDieTemplate, m)
 	sw.Do(newClientForRESTClientTemplate, m)
-	if g.version == "unversioned" {
+	if g.version == "" {
 		sw.Do(setInternalVersionClientDefaultsTemplate, m)
 	} else {
 		sw.Do(setClientDefaultsTemplate, m)
@@ -127,7 +131,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 }
 
 var groupInterfaceTemplate = `
-type $.Group$Interface interface {
+type $.GroupVersion$Interface interface {
     RESTClient() $.RESTClientInterface|raw$
     $range .types$ $.|publicPlural$Getter
     $end$
@@ -135,27 +139,27 @@ type $.Group$Interface interface {
 `
 
 var groupClientTemplate = `
-// $.Group$Client is used to interact with features provided by the $.Group$ group.
-type $.Group$Client struct {
+// $.GroupVersion$Client is used to interact with features provided by the $.Group$ group.
+type $.GroupVersion$Client struct {
 	restClient $.RESTClientInterface|raw$
 }
 `
 
 var getterImplNamespaced = `
-func (c *$.Group$Client) $.type|publicPlural$(namespace string) $.type|public$Interface {
+func (c *$.GroupVersion$Client) $.type|publicPlural$(namespace string) $.type|public$Interface {
 	return new$.type|publicPlural$(c, namespace)
 }
 `
 
 var getterImplNonNamespaced = `
-func (c *$.Group$Client) $.type|publicPlural$() $.type|public$Interface {
+func (c *$.GroupVersion$Client) $.type|publicPlural$() $.type|public$Interface {
 	return new$.type|publicPlural$(c)
 }
 `
 
 var newClientForConfigTemplate = `
-// NewForConfig creates a new $.Group$Client for the given config.
-func NewForConfig(c *$.Config|raw$) (*$.Group$Client, error) {
+// NewForConfig creates a new $.GroupVersion$Client for the given config.
+func NewForConfig(c *$.Config|raw$) (*$.GroupVersion$Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -164,14 +168,14 @@ func NewForConfig(c *$.Config|raw$) (*$.Group$Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &$.Group$Client{client}, nil
+	return &$.GroupVersion$Client{client}, nil
 }
 `
 
 var newClientForConfigOrDieTemplate = `
-// NewForConfigOrDie creates a new $.Group$Client for the given config and
+// NewForConfigOrDie creates a new $.GroupVersion$Client for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *$.Config|raw$) *$.Group$Client {
+func NewForConfigOrDie(c *$.Config|raw$) *$.GroupVersion$Client {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -183,7 +187,7 @@ func NewForConfigOrDie(c *$.Config|raw$) *$.Group$Client {
 var getRESTClient = `
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *$.Group$Client) RESTClient() $.RESTClientInterface|raw$ {
+func (c *$.GroupVersion$Client) RESTClient() $.RESTClientInterface|raw$ {
 	if c == nil {
 		return nil
 	}
@@ -192,15 +196,15 @@ func (c *$.Group$Client) RESTClient() $.RESTClientInterface|raw$ {
 `
 
 var newClientForRESTClientTemplate = `
-// New creates a new $.Group$Client for the given RESTClient.
-func New(c $.RESTClientInterface|raw$) *$.Group$Client {
-	return &$.Group$Client{c}
+// New creates a new $.GroupVersion$Client for the given RESTClient.
+func New(c $.RESTClientInterface|raw$) *$.GroupVersion$Client {
+	return &$.GroupVersion$Client{c}
 }
 `
 var setInternalVersionClientDefaultsTemplate = `
 func setConfigDefaults(config *$.Config|raw$) error {
 	// if $.group$ group is not registered, return an error
-	g, err := $.latestGroup|raw$("$.groupName$")
+	g, err := $.Group|raw$("$.groupName$")
 	if err != nil {
 		return err
 	}
@@ -226,20 +230,20 @@ func setConfigDefaults(config *$.Config|raw$) error {
 
 var setClientDefaultsTemplate = `
 func setConfigDefaults(config *$.Config|raw$) error {
-	// if $.group$ group is not registered, return an error
-	g, err := $.latestGroup|raw$("$.groupName$")
+	gv, err := $.ParseGroupVersion|raw$("$.groupName$/$.version$")
 	if err != nil {
 		return err
+	}
+	// if $.groupName$/$.version$ is not enabled, return an error
+	if ! $.IsEnabledVersion|raw$(gv) {
+		return $.Errorf|raw$("$.groupName$/$.version$ is not enabled")
 	}
 	config.APIPath = $.apiPath$
 	if config.UserAgent == "" {
 		config.UserAgent = $.DefaultKubernetesUserAgent|raw$()
 	}
-	// TODO: Unconditionally set the config.Version, until we fix the config.
-	//if config.Version == "" {
-	copyGroupVersion := g.GroupVersion
+	copyGroupVersion := gv
 	config.GroupVersion = &copyGroupVersion
-	//}
 
 	config.NegotiatedSerializer = $.directCodecFactory|raw${CodecFactory: $.codecs|raw$}
 

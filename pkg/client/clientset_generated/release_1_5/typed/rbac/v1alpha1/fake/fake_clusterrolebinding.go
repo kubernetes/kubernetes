@@ -28,7 +28,7 @@ import (
 
 // FakeClusterRoleBindings implements ClusterRoleBindingInterface
 type FakeClusterRoleBindings struct {
-	Fake *FakeRbac
+	Fake *FakeRbacV1alpha1
 }
 
 var clusterrolebindingsResource = unversioned.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Resource: "clusterrolebindings"}

@@ -21,6 +21,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
+// +genclient=true
+
 // Job represents the configuration of a single job.
 type Job struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -191,6 +193,8 @@ type JobCondition struct {
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
 }
+
+// +genclient=true
 
 // ScheduledJob represents the configuration of a single scheduled job.
 type ScheduledJob struct {
