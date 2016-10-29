@@ -19,16 +19,16 @@ package cmd
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"reflect"
 	gruntime "runtime"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -38,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/crlf"
-	"k8s.io/kubernetes/pkg/util/strategicpatch"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/util/yaml"
 
@@ -219,7 +218,7 @@ func RunEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 					file: file,
 				}
 				containsError = true
-				fmt.Fprintln(out, results.addError(errors.NewInvalid(api.Kind(""), "", field.ErrorList{field.Invalid(nil, "The edited file failed validation", fmt.Sprintf("%v", err))}), info))
+				fmt.Fprintln(out, results.addError(apierrors.NewInvalid(api.Kind(""), "", field.ErrorList{field.Invalid(nil, "The edited file failed validation", fmt.Sprintf("%v", err))}), info))
 				continue
 			}
 
@@ -271,7 +270,7 @@ func RunEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 				meta.SetList(updates.Object, mutatedObjects)
 			}
 
-			err = visitToPatch(originalObj, updates, mapper, resourceMapper, encoder, out, errOut, defaultVersion, &results, file)
+			err = visitToReplace(originalObj, updates, mapper, resourceMapper, encoder, out, errOut, defaultVersion, &results, file)
 			if err != nil {
 				return preservedFile(err, results.file, errOut)
 			}
@@ -361,9 +360,9 @@ func getMapperAndResult(f cmdutil.Factory, args []string, options *resource.File
 	return mapper, resourceMapper, r, cmdNamespace, err
 }
 
-func visitToPatch(originalObj runtime.Object, updates *resource.Info, mapper meta.RESTMapper, resourceMapper *resource.Mapper, encoder runtime.Encoder, out, errOut io.Writer, defaultVersion unversioned.GroupVersion, results *editResults, file string) error {
-	patchVisitor := resource.NewFlattenListVisitor(updates, resourceMapper)
-	err := patchVisitor.Visit(func(info *resource.Info, incomingErr error) error {
+func visitToReplace(originalObj runtime.Object, updates *resource.Info, mapper meta.RESTMapper, resourceMapper *resource.Mapper, encoder runtime.Encoder, out, errOut io.Writer, defaultVersion unversioned.GroupVersion, results *editResults, file string) error {
+	replaceVisitor := resource.NewFlattenListVisitor(updates, resourceMapper)
+	err := replaceVisitor.Visit(func(info *resource.Info, incomingErr error) error {
 		currOriginalObj := originalObj
 
 		// if we're editing a list, then navigate the list to find the item that we're currently trying to edit
@@ -396,54 +395,48 @@ func visitToPatch(originalObj runtime.Object, updates *resource.Info, mapper met
 
 		}
 
-		originalSerialization, err := runtime.Encode(encoder, currOriginalObj)
+		ok, err := validateImmutableAPIFields(currOriginalObj, info.Object)
 		if err != nil {
 			return err
 		}
-		editedSerialization, err := runtime.Encode(encoder, info.Object)
-		if err != nil {
-			return err
-		}
-
-		// compute the patch on a per-item basis
-		// use strategic merge to create a patch
-		originalJS, err := yaml.ToJSON(originalSerialization)
-		if err != nil {
-			return err
-		}
-		editedJS, err := yaml.ToJSON(editedSerialization)
-		if err != nil {
-			return err
-		}
-
-		if reflect.DeepEqual(originalJS, editedJS) {
-			// no edit, so just skip it.
-			cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, false, "skipped")
-			return nil
-		}
-
-		preconditions := []strategicpatch.PreconditionFunc{strategicpatch.RequireKeyUnchanged("apiVersion"),
-			strategicpatch.RequireKeyUnchanged("kind"), strategicpatch.RequireMetadataKeyUnchanged("name")}
-		patch, err := strategicpatch.CreateTwoWayMergePatch(originalJS, editedJS, currOriginalObj, preconditions...)
-		if err != nil {
-			glog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
-			if strategicpatch.IsPreconditionFailed(err) {
-				return preservedFile(nil, file, errOut)
-			}
-			return err
+		if !ok {
+			return errors.New("The following fields must not be changed: apiVersion, kind, and metadata.name")
 		}
 
 		results.version = defaultVersion
-		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch)
+		replaced, err := resource.NewHelper(info.Client, info.Mapping).Replace(info.Namespace, info.Name, true, info.Object)
 		if err != nil {
 			fmt.Fprintln(out, results.addError(err, info))
 			return nil
 		}
-		info.Refresh(patched, true)
+		info.Refresh(replaced, true)
 		cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, false, "edited")
 		return nil
 	})
 	return err
+}
+
+func validateImmutableAPIFields(oldObj, newObj runtime.Object) (bool, error) {
+	oldMetaAccessor, err := meta.Accessor(oldObj)
+	if err != nil {
+		return false, err
+	}
+	newMetaAccessor, err := meta.Accessor(newObj)
+	if err != nil {
+		return false, err
+	}
+	oldTypeAccessor, err := meta.TypeAccessor(oldObj)
+	if err != nil {
+		return false, err
+	}
+	newTypeAccessor, err := meta.TypeAccessor(newObj)
+	if err != nil {
+		return false, err
+	}
+	return oldMetaAccessor.GetName() == newMetaAccessor.GetName() &&
+			oldTypeAccessor.GetKind() == newTypeAccessor.GetKind() &&
+			oldTypeAccessor.GetAPIVersion() == newTypeAccessor.GetAPIVersion(),
+		nil
 }
 
 func visitAnnotation(cmd *cobra.Command, f cmdutil.Factory, updates *resource.Info, resourceMapper *resource.Mapper, encoder runtime.Encoder) ([]runtime.Object, error) {
@@ -523,12 +516,12 @@ type editResults struct {
 
 func (r *editResults) addError(err error, info *resource.Info) string {
 	switch {
-	case errors.IsInvalid(err):
+	case apierrors.IsInvalid(err):
 		r.edit = append(r.edit, info)
 		reason := editReason{
 			head: fmt.Sprintf("%s %q was not valid", info.Mapping.Resource, info.Name),
 		}
-		if err, ok := err.(errors.APIStatus); ok {
+		if err, ok := err.(apierrors.APIStatus); ok {
 			if details := err.Status().Details; details != nil {
 				for _, cause := range details.Causes {
 					reason.other = append(reason.other, fmt.Sprintf("%s: %s", cause.Field, cause.Message))
@@ -537,7 +530,7 @@ func (r *editResults) addError(err error, info *resource.Info) string {
 		}
 		r.header.reasons = append(r.header.reasons, reason)
 		return fmt.Sprintf("error: %s %q is invalid", info.Mapping.Resource, info.Name)
-	case errors.IsNotFound(err):
+	case apierrors.IsNotFound(err):
 		r.notfound++
 		return fmt.Sprintf("error: %s %q could not be found on the server", info.Mapping.Resource, info.Name)
 	default:
