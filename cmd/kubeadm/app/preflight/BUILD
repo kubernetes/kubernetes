@@ -21,3 +21,11 @@ go_library(
         "//pkg/util/node:go_default_library",
     ],
 )
+
+go_test(
+    name = "go_default_test",
+    srcs = ["checks_test.go"],
+    library = "go_default_library",
+    tags = ["automanaged"],
+    deps = [],
+)
