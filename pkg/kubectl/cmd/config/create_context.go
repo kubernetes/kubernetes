@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/flag"
 )
 
@@ -61,12 +62,8 @@ func NewCmdConfigSetContext(out io.Writer, configAccess clientcmd.ConfigAccess) 
 				return
 			}
 
-			err := options.run()
-			if err != nil {
-				fmt.Fprintf(out, "%v\n", err)
-			} else {
-				fmt.Fprintf(out, "context %q set.\n", options.name)
-			}
+			cmdutil.CheckErr(options.run())
+			fmt.Fprintf(out, "Context %q set.\n", options.name)
 		},
 	}
 
