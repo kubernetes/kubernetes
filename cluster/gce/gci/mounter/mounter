@@ -18,7 +18,7 @@ set -e
 set -o pipefail
 
 MOUNTER_DOCKER_IMAGE=gcr.io/google_containers/gci-mounter
-MOUNTER_DOCKER_VERSION=v1
+MOUNTER_DOCKER_VERSION=v2
 MOUNTER_USER=root
 RKT_BINARY=/home/kubernetes/bin/rkt
 
