@@ -95,7 +95,11 @@ func TestGenerateToken(t *testing.T) {
 	}
 
 	for _, rt := range genTest {
-		GenerateToken(&rt.s)
+		err := GenerateToken(&rt.s)
+		if err != nil {
+			t.Errorf("failed GenerateToken with error: %s", err)
+		}
+
 		givenToken := strings.Split(strings.ToLower(rt.s.GivenToken), ".")
 		if len(givenToken) != rt.l {
 			t.Errorf(
@@ -126,7 +130,10 @@ func TestUseGivenTokenIfValid(t *testing.T) {
 	}
 
 	for _, rt := range tokenTest {
-		actual, _ := UseGivenTokenIfValid(&rt.s)
+		actual, err := UseGivenTokenIfValid(&rt.s)
+		if err != nil {
+			t.Errorf("failed UseGivenTokenIfValid with error: %s", err)
+		}
 		if actual != rt.expected {
 			t.Errorf(
 				"failed UseGivenTokenIfValid:\n\texpected: %t\n\t  actual: %t\n\t token:%s",
