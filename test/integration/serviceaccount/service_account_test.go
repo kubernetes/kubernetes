@@ -40,6 +40,8 @@ import (
 	"k8s.io/kubernetes/pkg/auth/user"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/informers"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -416,14 +418,16 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	stopCh := make(chan struct{})
 	tokenController := serviceaccountcontroller.NewTokensController(rootClientset, serviceaccountcontroller.TokensControllerOptions{TokenGenerator: serviceaccount.JWTTokenGenerator(serviceAccountKey)})
 	go tokenController.Run(1, stopCh)
-	serviceAccountController := serviceaccountcontroller.NewServiceAccountsController(rootClientset, serviceaccountcontroller.DefaultServiceAccountsControllerOptions())
-	serviceAccountController.Run()
+
+	informers := informers.NewSharedInformerFactory(rootClientset, controller.NoResyncPeriodFunc())
+	serviceAccountController := serviceaccountcontroller.NewServiceAccountsController(informers.ServiceAccounts(), informers.Namespaces(), rootClientset, serviceaccountcontroller.DefaultServiceAccountsControllerOptions())
+	informers.Start(stopCh)
+	go serviceAccountController.Run(5, stopCh)
 	// Start the admission plugin reflectors
 	serviceAccountAdmission.Run()
 
 	stop := func() {
 		close(stopCh)
-		serviceAccountController.Stop()
 		serviceAccountAdmission.Stop()
 		apiServer.Close()
 	}
