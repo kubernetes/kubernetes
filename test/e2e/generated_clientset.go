@@ -239,6 +239,23 @@ func newTestingScheduledJob(name string, value string) *v2alpha1.ScheduledJob {
 var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 	f := framework.NewDefaultFramework("clientset")
 	It("should create v2alpha1 scheduleJobs, delete scheduleJobs, watch scheduleJobs", func() {
+		var enabled bool
+		groupList, err := f.ClientSet_1_5.Discovery().ServerGroups()
+		ExpectNoError(err)
+		for _, group := range groupList.Groups {
+			if group.Name == v2alpha1.GroupName {
+				for _, version := range group.Versions {
+					if version.Version == v2alpha1.SchemeGroupVersion.Version {
+						enabled = true
+						break
+					}
+				}
+			}
+		}
+		if !enabled {
+			framework.Logf("%s is not enabled, test skipped", v2alpha1.SchemeGroupVersion)
+			return
+		}
 		scheduleJobClient := f.ClientSet_1_5.BatchV2alpha1().ScheduledJobs(f.Namespace.Name)
 		By("constructing the scheduledJob")
 		name := "scheduledjob" + string(uuid.NewUUID())
