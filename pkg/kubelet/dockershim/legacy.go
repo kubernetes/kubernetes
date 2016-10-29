@@ -17,7 +17,6 @@ limitations under the License.
 package dockershim
 
 import (
-	"fmt"
 	"io"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -31,8 +30,8 @@ import (
 // directly.
 
 // TODO: implement the methods in this file.
-func (ds *dockerService) AttachContainer(id kubecontainer.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) (err error) {
-	return dockertools.AttachContainer(ds.client, id, stdin, stdout, stderr, tty, resize)
+func (ds *dockerService) LegacyAttach(id kubecontainer.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) (err error) {
+	return ds.streamingRuntime.Attach(id.ID, stdin, stdout, stderr, resize)
 }
 
 func (ds *dockerService) GetContainerLogs(pod *api.Pod, containerID kubecontainer.ContainerID, logOptions *api.PodLogOptions, stdout, stderr io.Writer) (err error) {
@@ -43,19 +42,10 @@ func (ds *dockerService) GetContainerLogs(pod *api.Pod, containerID kubecontaine
 	return dockertools.GetContainerLogs(ds.client, pod, containerID, logOptions, stdout, stderr, container.Config.Tty)
 }
 
-func (ds *dockerService) PortForward(sandboxID string, port uint16, stream io.ReadWriteCloser) error {
-	return dockertools.PortForward(ds.client, sandboxID, port, stream)
+func (ds *dockerService) LegacyPortForward(sandboxID string, port uint16, stream io.ReadWriteCloser) error {
+	return ds.streamingRuntime.PortForward(sandboxID, int32(port), stream)
 }
 
-func (ds *dockerService) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
-	container, err := ds.client.InspectContainer(containerID.ID)
-	if err != nil {
-		return err
-	}
-	if !container.State.Running {
-		return fmt.Errorf("container not running (%s)", container.ID)
-	}
-
-	handler := &dockertools.NativeExecHandler{}
-	return handler.ExecInContainer(ds.client, container, cmd, stdin, stdout, stderr, tty, resize)
+func (ds *dockerService) LegacyExec(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
+	return ds.streamingRuntime.Exec(containerID.ID, cmd, stdin, stdout, stderr, tty, resize)
 }

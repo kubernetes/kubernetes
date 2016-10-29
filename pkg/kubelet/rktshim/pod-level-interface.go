@@ -57,3 +57,8 @@ func (*PodSandboxManager) PodSandboxStatus(string) (*runtimeApi.PodSandboxStatus
 func (*PodSandboxManager) ListPodSandbox(*runtimeApi.PodSandboxFilter) ([]*runtimeApi.PodSandbox, error) {
 	panic("not implemented")
 }
+
+// PortForward prepares a streaming endpoint to forward ports from a PodSandbox, and returns the address.
+func (*PodSandboxManager) PortForward(*runtimeApi.PortForwardRequest) (*runtimeApi.PortForwardResponse, error) {
+	panic("not implemented")
+}
