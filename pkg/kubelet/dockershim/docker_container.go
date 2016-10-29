@@ -18,7 +18,6 @@ package dockershim
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -387,11 +386,4 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 		Labels:      labels,
 		Annotations: annotations,
 	}, nil
-}
-
-// Exec execute a command in the container.
-// TODO: Need to handle terminal resizing before implementing this function.
-// https://github.com/kubernetes/kubernetes/issues/29579.
-func (ds *dockerService) Exec(containerID string, cmd []string, tty bool, stdin io.Reader, stdout, stderr io.WriteCloser) error {
-	return fmt.Errorf("not implemented")
 }

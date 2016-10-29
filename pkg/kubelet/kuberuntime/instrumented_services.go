@@ -17,7 +17,6 @@ limitations under the License.
 package kuberuntime
 
 import (
-	"io"
 	"time"
 
 	internalApi "k8s.io/kubernetes/pkg/kubelet/api"
@@ -123,13 +122,31 @@ func (in instrumentedRuntimeService) ContainerStatus(containerID string) (*runti
 	return out, err
 }
 
-func (in instrumentedRuntimeService) Exec(containerID string, cmd []string, tty bool, stdin io.Reader, stdout, stderr io.WriteCloser) error {
+func (in instrumentedRuntimeService) ExecSync(containerID string, cmd []string, timeout time.Duration) ([]byte, []byte, error) {
+	const operation = "exec_sync"
+	defer recordOperation(operation, time.Now())
+
+	stdout, stderr, err := in.service.ExecSync(containerID, cmd, timeout)
+	recordError(operation, err)
+	return stdout, stderr, err
+}
+
+func (in instrumentedRuntimeService) Exec(req *runtimeApi.ExecRequest) (*runtimeApi.ExecResponse, error) {
 	const operation = "exec"
 	defer recordOperation(operation, time.Now())
 
-	err := in.service.Exec(containerID, cmd, tty, stdin, stdout, stderr)
+	resp, err := in.service.Exec(req)
 	recordError(operation, err)
-	return err
+	return resp, err
+}
+
+func (in instrumentedRuntimeService) Attach(req *runtimeApi.AttachRequest) (*runtimeApi.AttachResponse, error) {
+	const operation = "attach"
+	defer recordOperation(operation, time.Now())
+
+	resp, err := in.service.Attach(req)
+	recordError(operation, err)
+	return resp, err
 }
 
 func (in instrumentedRuntimeService) RunPodSandbox(config *runtimeApi.PodSandboxConfig) (string, error) {
@@ -175,6 +192,15 @@ func (in instrumentedRuntimeService) ListPodSandbox(filter *runtimeApi.PodSandbo
 	out, err := in.service.ListPodSandbox(filter)
 	recordError(operation, err)
 	return out, err
+}
+
+func (in instrumentedRuntimeService) PortForward(req *runtimeApi.PortForwardRequest) (*runtimeApi.PortForwardResponse, error) {
+	const operation = "port_forward"
+	defer recordOperation(operation, time.Now())
+
+	resp, err := in.service.PortForward(req)
+	recordError(operation, err)
+	return resp, err
 }
 
 func (in instrumentedRuntimeService) UpdateRuntimeConfig(runtimeConfig *runtimeApi.RuntimeConfig) error {

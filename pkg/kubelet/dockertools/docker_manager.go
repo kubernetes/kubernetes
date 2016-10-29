@@ -1269,16 +1269,16 @@ func (dm *DockerManager) ExecInContainer(containerID kubecontainer.ContainerID, 
 }
 
 func (dm *DockerManager) AttachContainer(containerID kubecontainer.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
-	return AttachContainer(dm.client, containerID, stdin, stdout, stderr, tty, resize)
+	return AttachContainer(dm.client, containerID.ID, stdin, stdout, stderr, tty, resize)
 }
 
 // Temporarily export this function to share with dockershim.
 // TODO: clean this up.
-func AttachContainer(client DockerInterface, containerID kubecontainer.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
+func AttachContainer(client DockerInterface, containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
 	// Have to start this before the call to client.AttachToContainer because client.AttachToContainer is a blocking
 	// call :-( Otherwise, resize events don't get processed and the terminal never resizes.
 	kubecontainer.HandleResizing(resize, func(size term.Size) {
-		client.ResizeContainerTTY(containerID.ID, int(size.Height), int(size.Width))
+		client.ResizeContainerTTY(containerID, int(size.Height), int(size.Width))
 	})
 
 	// TODO(random-liu): Do we really use the *Logs* field here?
@@ -1294,7 +1294,7 @@ func AttachContainer(client DockerInterface, containerID kubecontainer.Container
 		ErrorStream:  stderr,
 		RawTerminal:  tty,
 	}
-	return client.AttachToContainer(containerID.ID, opts, sopts)
+	return client.AttachToContainer(containerID, opts, sopts)
 }
 
 func noPodInfraContainerError(podName, podNamespace string) error {
