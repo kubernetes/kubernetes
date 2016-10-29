@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	internalApi "k8s.io/kubernetes/pkg/kubelet/api"
@@ -82,9 +83,10 @@ type NetworkPluginSettings struct {
 
 	// RuntimeHost is an interface that serves as a trap-door from plugin back
 	// into the kubelet.
-	// TODO: This shouldn't be required, remove once we move host
-	// ports into CNI.
-	RuntimeHost network.Host
+	// TODO: This shouldn't be required, remove once we move host ports into CNI
+	// and figure out bandwidth shaping. See corresponding comments above
+	// network.Host interface.
+	LegacyRuntimeHost network.LegacyHost
 }
 
 var internalLabelKeys []string = []string{containerTypeLabelKey, containerLogPathLabelKey, sandboxIDLabelKey}
@@ -113,11 +115,16 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 	// dockershim currently only supports CNI plugins.
 	cniPlugins := cni.ProbeNetworkPlugins(pluginSettings.PluginConfDir, pluginSettings.PluginBinDir)
 	cniPlugins = append(cniPlugins, kubenet.NewPlugin(pluginSettings.PluginBinDir))
-	plug, err := network.InitNetworkPlugin(cniPlugins, pluginSettings.PluginName, pluginSettings.RuntimeHost, pluginSettings.HairpinMode, pluginSettings.NonMasqueradeCIDR, pluginSettings.MTU)
+	netHost := &dockerNetworkHost{
+		pluginSettings.LegacyRuntimeHost,
+		&namespaceGetter{ds},
+	}
+	plug, err := network.InitNetworkPlugin(cniPlugins, pluginSettings.PluginName, netHost, pluginSettings.HairpinMode, pluginSettings.NonMasqueradeCIDR, pluginSettings.MTU)
 	if err != nil {
 		return nil, fmt.Errorf("didn't find compatible CNI plugin with given settings %+v: %v", pluginSettings, err)
 	}
 	ds.networkPlugin = plug
+	glog.Infof("Docker cri networking managed by %v", plug.Name())
 	return ds, nil
 }
 
@@ -181,4 +188,29 @@ func (ds *dockerService) UpdateRuntimeConfig(runtimeConfig *runtimeApi.RuntimeCo
 		ds.networkPlugin.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, event)
 	}
 	return
+}
+
+// namespaceGetter is a wrapper around the dockerService that implements
+// the network.NamespaceGetter interface.
+type namespaceGetter struct {
+	*dockerService
+}
+
+// GetNetNS returns the network namespace of the given containerID. The ID
+// supplied is typically the ID of a pod sandbox. This getter doesn't try
+// to map non-sandbox IDs to their respective sandboxes.
+func (ds *dockerService) GetNetNS(podSandboxID string) (string, error) {
+	r, err := ds.client.InspectContainer(podSandboxID)
+	if err != nil {
+		return "", err
+	}
+	return getNetworkNamespace(r), nil
+}
+
+// dockerNetworkHost implements network.Host by wrapping the legacy host
+// passed in by the kubelet and adding NamespaceGetter methods. The legacy
+// host methods are slated for deletion.
+type dockerNetworkHost struct {
+	network.LegacyHost
+	*namespaceGetter
 }
