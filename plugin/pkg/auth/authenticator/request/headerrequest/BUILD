@@ -12,29 +12,21 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "doc.go",
-        "x509.go",
-    ],
+    srcs = ["requestheader.go"],
     tags = ["automanaged"],
     deps = [
         "//pkg/auth/authenticator:go_default_library",
         "//pkg/auth/user:go_default_library",
-        "//pkg/util/errors:go_default_library",
+        "//pkg/util/cert:go_default_library",
         "//pkg/util/sets:go_default_library",
-        "//vendor:github.com/golang/glog",
+        "//plugin/pkg/auth/authenticator/request/x509:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = ["x509_test.go"],
-    data = glob(["testdata/*"]),
+    srcs = ["requestheader_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/auth/authenticator:go_default_library",
-        "//pkg/auth/user:go_default_library",
-        "//pkg/util/sets:go_default_library",
-    ],
+    deps = ["//pkg/auth/user:go_default_library"],
 )
