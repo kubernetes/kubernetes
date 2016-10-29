@@ -17,36 +17,36 @@ limitations under the License.
 package util
 
 import (
-        "fmt"
-        "testing"
+	"fmt"
+	"testing"
 
-        "k8s.io/kubernetes/cmd/kubeadm/app/preflight"
+	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 )
 
 func TestCheckErr(t *testing.T) {
-        var codeReturned int
-        errHandle := func(err string, code int) {
-                codeReturned = code
-        }
+	var codeReturned int
+	errHandle := func(err string, code int) {
+		codeReturned = code
+	}
 
-        var tokenTest = []struct {
-                e        error
-                expected int
-        }{
-                {nil, 0},
-                {fmt.Errorf(""), DefaultErrorExitCode},
-                {&preflight.PreFlightError{}, PreFlight},
-        }
+	var tokenTest = []struct {
+		e        error
+		expected int
+	}{
+		{nil, 0},
+		{fmt.Errorf(""), DefaultErrorExitCode},
+		{&preflight.PreFlightError{}, PreFlight},
+	}
 
-        for _, rt := range tokenTest {
-                codeReturned = 0
-                checkErr("", rt.e, errHandle)
-                if codeReturned != rt.expected {
-                        t.Errorf(
-                                "failed checkErr:\n\texpected: %d\n\t  actual: %d",
-                                rt.expected,
-                                codeReturned,
-                        )
-                }
-        }
+	for _, rt := range tokenTest {
+		codeReturned = 0
+		checkErr("", rt.e, errHandle)
+		if codeReturned != rt.expected {
+			t.Errorf(
+				"failed checkErr:\n\texpected: %d\n\t  actual: %d",
+				rt.expected,
+				codeReturned,
+			)
+		}
+	}
 }

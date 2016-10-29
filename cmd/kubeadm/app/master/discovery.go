@@ -69,7 +69,7 @@ func newKubeDiscoveryPodSpec(cfg *kubeadmapi.MasterConfiguration) api.PodSpec {
 		SecurityContext: &api.PodSecurityContext{HostNetwork: true},
 		Containers: []api.Container{{
 			Name:    kubeDiscoveryName,
-                        Image:   kubeadmapi.GlobalEnvParams.DiscoveryImage,
+			Image:   kubeadmapi.GlobalEnvParams.DiscoveryImage,
 			Command: []string{"/usr/local/bin/kube-discovery"},
 			VolumeMounts: []api.VolumeMount{{
 				Name:      kubeDiscoverySecretName,
