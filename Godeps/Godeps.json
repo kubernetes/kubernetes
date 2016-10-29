@@ -2592,6 +2592,10 @@
 			"Rev": "6a1c24d7f08e671c244023ca9367d2dfbfaf57fc"
 		},
 		{
+			"ImportPath": "k8s.io/gengo/examples/go-to-protobuf/protobuf",
+			"Rev": "9d004f4877d8dc116a678d35e43498404625599d"
+		},
+		{
 			"ImportPath": "k8s.io/gengo/examples/import-boss/generators",
 			"Rev": "6a1c24d7f08e671c244023ca9367d2dfbfaf57fc"
 		},
