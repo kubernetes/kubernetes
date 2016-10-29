@@ -120,6 +120,22 @@ func IsStandardContainerResourceName(str string) bool {
 	return standardContainerResources.Has(str)
 }
 
+// IsOpaqueIntResourceName returns true if the resource name has the opaque
+// integer resource prefix.
+func IsOpaqueIntResourceName(name ResourceName) bool {
+	return strings.HasPrefix(string(name), ResourceOpaqueIntPrefix)
+}
+
+// OpaqueIntResourceName returns a ResourceName with the canonical opaque
+// integer prefix prepended. If the argument already has the prefix, it is
+// returned unmodified.
+func OpaqueIntResourceName(name string) ResourceName {
+	if IsOpaqueIntResourceName(ResourceName(name)) {
+		return ResourceName(name)
+	}
+	return ResourceName(fmt.Sprintf("%s%s", ResourceOpaqueIntPrefix, name))
+}
+
 var standardLimitRangeTypes = sets.NewString(
 	string(LimitTypePod),
 	string(LimitTypeContainer),
@@ -193,7 +209,7 @@ var integerResources = sets.NewString(
 
 // IsIntegerResourceName returns true if the resource is measured in integer values
 func IsIntegerResourceName(str string) bool {
-	return integerResources.Has(str)
+	return integerResources.Has(str) || IsOpaqueIntResourceName(ResourceName(str))
 }
 
 // NewDeleteOptions returns a DeleteOptions indicating the resource should
