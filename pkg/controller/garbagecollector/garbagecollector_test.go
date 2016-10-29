@@ -94,6 +94,7 @@ func (f *fakeActionHandler) ServeHTTP(response http.ResponseWriter, request *htt
 		fakeResponse.statusCode = 200
 		fakeResponse.content = []byte("{\"kind\": \"List\"}")
 	}
+	response.Header().Set("Content-Type", "application/json")
 	response.WriteHeader(fakeResponse.statusCode)
 	response.Write(fakeResponse.content)
 }
