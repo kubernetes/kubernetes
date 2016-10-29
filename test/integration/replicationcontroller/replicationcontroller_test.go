@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/controller/replication"
@@ -104,7 +104,7 @@ func newMatchingPod(podName, namespace string) *v1.Pod {
 func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespace string, rcNum, podNum int) (bool, error) {
 	rcClient := clientSet.Core().ReplicationControllers(namespace)
 	podClient := clientSet.Core().Pods(namespace)
-	pods, err := podClient.List(api.ListOptions{})
+	pods, err := podClient.List(v1.ListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("Failed to list pods: %v", err)
 	}
@@ -113,7 +113,7 @@ func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespa
 		ret = false
 		t.Logf("expect %d pods, got %d pods", podNum, len(pods.Items))
 	}
-	rcs, err := rcClient.List(api.ListOptions{})
+	rcs, err := rcClient.List(v1.ListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("Failed to list replication controllers: %v", err)
 	}
