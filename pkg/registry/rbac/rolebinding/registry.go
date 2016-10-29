@@ -26,7 +26,7 @@ import (
 // Registry is an interface for things that know how to store RoleBindings.
 type Registry interface {
 	ListRoleBindings(ctx api.Context, options *api.ListOptions) (*rbac.RoleBindingList, error)
-	CreateRoleBinding(ctx api.Context, roleBinding *rbac.RoleBinding) error
+	CreateRoleBinding(ctx api.Context, roleBinding *rbac.RoleBinding) (*rbac.RoleBinding, error)
 	UpdateRoleBinding(ctx api.Context, roleBinding *rbac.RoleBinding) error
 	GetRoleBinding(ctx api.Context, name string) (*rbac.RoleBinding, error)
 	DeleteRoleBinding(ctx api.Context, name string) error
@@ -53,10 +53,13 @@ func (s *storage) ListRoleBindings(ctx api.Context, options *api.ListOptions) (*
 	return obj.(*rbac.RoleBindingList), nil
 }
 
-func (s *storage) CreateRoleBinding(ctx api.Context, roleBinding *rbac.RoleBinding) error {
+func (s *storage) CreateRoleBinding(ctx api.Context, roleBinding *rbac.RoleBinding) (*rbac.RoleBinding, error) {
 	// TODO(ericchiang): add additional validation
-	_, err := s.Create(ctx, roleBinding)
-	return err
+	obj, err := s.Create(ctx, roleBinding)
+	if err != nil {
+		return nil, err
+	}
+	return obj.(*rbac.RoleBinding), err
 }
 
 func (s *storage) UpdateRoleBinding(ctx api.Context, roleBinding *rbac.RoleBinding) error {

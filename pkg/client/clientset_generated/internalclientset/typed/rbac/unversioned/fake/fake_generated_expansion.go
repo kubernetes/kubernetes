@@ -14,14 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package fake
 
-type AddRoleRequestExpansion interface{}
+import (
+	rbacapi "k8s.io/kubernetes/pkg/apis/rbac"
 
-type ClusterRoleExpansion interface{}
+	"k8s.io/kubernetes/pkg/client/testing/core"
+)
 
-type ClusterRoleBindingExpansion interface{}
-
-type RoleExpansion interface{}
-
-type RoleBindingExpansion interface{}
+func (c *FakeAddRoleRequests) Create(sar *rbacapi.AddRoleRequest) (result *rbacapi.AddRoleRequest, err error) {
+	obj, err := c.Fake.Invokes(core.NewRootCreateAction(rbacapi.SchemeGroupVersion.WithResource("addrolerequests"), sar), &rbacapi.AddRoleRequest{})
+	return obj.(*rbacapi.AddRoleRequest), err
+}

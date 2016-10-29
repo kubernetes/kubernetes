@@ -25,6 +25,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -475,4 +476,180 @@ func TestBootstrapping(t *testing.T) {
 	}
 
 	t.Errorf("missing cluster-admin: %v", clusterRoles)
+}
+
+func TestRoleRequest(t *testing.T) {
+	superUser := "admin"
+
+	bootstrapRoles := bootstrapRoles{
+		clusterRoles: []v1alpha1.ClusterRole{
+			{
+				ObjectMeta: v1.ObjectMeta{Name: "allow-all"},
+				Rules:      []v1alpha1.PolicyRule{ruleAllowAll},
+			},
+			{
+				ObjectMeta: v1.ObjectMeta{Name: "read-pods"},
+				Rules:      []v1alpha1.PolicyRule{ruleReadPods},
+			},
+		},
+		clusterRoleBindings: []v1alpha1.ClusterRoleBinding{
+			{
+				ObjectMeta: v1.ObjectMeta{Name: "read-pods"},
+				Subjects: []v1alpha1.Subject{
+					{Kind: "User", Name: "pod-reader"},
+				},
+				RoleRef: v1.ObjectReference{Kind: "ClusterRole", Name: "read-pods"},
+			},
+		},
+	}
+
+	localRoles := []*rbacapi.Role{
+		{
+			ObjectMeta: api.ObjectMeta{Name: "local-allow-all"},
+			Rules:      []rbacapi.PolicyRule{ruleAllowAll},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "local-read-pods"},
+			Rules:      []rbacapi.PolicyRule{ruleReadPods},
+		},
+	}
+
+	tests := []struct {
+		name string
+
+		addRoleRequest *rbacapi.AddRoleRequest
+
+		expectedErr         string
+		expectedRoleBinding *rbacapi.RoleBinding
+	}{
+		{
+			name: "add one",
+			addRoleRequest: &rbacapi.AddRoleRequest{
+				Spec: rbacapi.AddRoleRequestSpec{
+					RoleRef:  api.ObjectReference{APIVersion: rbacapi.GroupName + "/", Kind: "ClusterRole", Name: "read-pods"},
+					Subjects: []rbacapi.Subject{{Kind: "User", Name: "first"}},
+				},
+			},
+			expectedRoleBinding: &rbacapi.RoleBinding{
+				RoleRef:  api.ObjectReference{APIVersion: rbacapi.GroupName + "/", Kind: "ClusterRole", Name: "read-pods"},
+				Subjects: []rbacapi.Subject{{Kind: "User", Name: "first"}},
+			},
+		},
+		{
+			name: "add multiple",
+			addRoleRequest: &rbacapi.AddRoleRequest{
+				Spec: rbacapi.AddRoleRequestSpec{
+					RoleRef:  api.ObjectReference{APIVersion: rbacapi.GroupName + "/", Kind: "ClusterRole", Name: "read-pods"},
+					Subjects: []rbacapi.Subject{{Kind: "User", Name: "first"}, {Kind: "User", Name: "second"}},
+				},
+			},
+			expectedRoleBinding: &rbacapi.RoleBinding{
+				RoleRef:  api.ObjectReference{APIVersion: rbacapi.GroupName + "/", Kind: "ClusterRole", Name: "read-pods"},
+				Subjects: []rbacapi.Subject{{Kind: "User", Name: "first"}, {Kind: "User", Name: "second"}},
+			},
+		},
+		{
+			name: "de-dupe",
+			addRoleRequest: &rbacapi.AddRoleRequest{
+				Spec: rbacapi.AddRoleRequestSpec{
+					RoleRef:  api.ObjectReference{APIVersion: rbacapi.GroupName + "/", Kind: "ClusterRole", Name: "read-pods"},
+					Subjects: []rbacapi.Subject{{Kind: "User", Name: "first"}, {Kind: "User", Name: "first"}},
+				},
+			},
+			expectedRoleBinding: &rbacapi.RoleBinding{
+				RoleRef:  api.ObjectReference{APIVersion: rbacapi.GroupName + "/", Kind: "ClusterRole", Name: "read-pods"},
+				Subjects: []rbacapi.Subject{{Kind: "User", Name: "first"}},
+			},
+		},
+		{
+			name: "local role",
+			addRoleRequest: &rbacapi.AddRoleRequest{
+				Spec: rbacapi.AddRoleRequestSpec{
+					RoleRef:  api.ObjectReference{APIVersion: rbacapi.GroupName + "/", Kind: "Role", Name: "local-read-pods"},
+					Subjects: []rbacapi.Subject{{Kind: "User", Name: "first"}},
+				},
+			},
+			expectedRoleBinding: &rbacapi.RoleBinding{
+				RoleRef:  api.ObjectReference{APIVersion: rbacapi.GroupName + "/", Kind: "Role", Name: "local-read-pods"},
+				Subjects: []rbacapi.Subject{{Kind: "User", Name: "first"}},
+			},
+		},
+		{
+			name: "missing roleref",
+			addRoleRequest: &rbacapi.AddRoleRequest{
+				Spec: rbacapi.AddRoleRequestSpec{
+					Subjects: []rbacapi.Subject{{Kind: "User", Name: "first"}},
+				},
+			},
+			expectedErr: `AddRoleRequest.rbac.authorization.k8s.io "" is invalid`,
+		},
+	}
+
+	// Create an API Server.
+	masterConfig := framework.NewIntegrationTestMasterConfig()
+	masterConfig.Authorizer = newRBACAuthorizer(t, superUser, masterConfig)
+	masterConfig.Authenticator = newFakeAuthenticator()
+	masterConfig.AuthorizerRBACSuperUser = superUser
+	_, s := framework.RunAMaster(masterConfig)
+	defer s.Close()
+
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+
+	if err := bootstrapRoles.bootstrap(clientForUser(superUser), s.URL); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+test_loop:
+	for i, tc := range tests {
+		namespace := fmt.Sprintf("ns-%d", i)
+
+		for _, localRole := range localRoles {
+			if _, err := clientset.Rbac().Roles(namespace).Create(localRole); err != nil {
+				t.Errorf("%s: unexpected error %v", tc.name, err)
+				continue test_loop
+			}
+		}
+
+		tc.addRoleRequest.Namespace = namespace
+		addRoleResult, err := clientset.Rbac().AddRoleRequests(namespace).Create(tc.addRoleRequest)
+		switch {
+		case err == nil && len(tc.expectedErr) == 0:
+		case err == nil && len(tc.expectedErr) != 0:
+			t.Errorf("%s: missing expected error %v", tc.name, tc.expectedErr)
+			continue
+		case err != nil && len(tc.expectedErr) == 0:
+			t.Errorf("%s: unexpected error %v", tc.name, err)
+			continue
+		case err != nil && !strings.Contains(err.Error(), tc.expectedErr):
+			t.Errorf("%s: expected %v, got %v", tc.name, tc.expectedErr, err)
+			continue // nothing else to test
+		}
+
+		if tc.expectedRoleBinding == nil {
+			continue
+		}
+
+		roleBindings, err := clientset.Rbac().RoleBindings(namespace).List(api.ListOptions{})
+		if err != nil {
+			t.Errorf("%s: unexpected error %v", tc.name, err)
+			continue
+		}
+		if e, a := 1, len(roleBindings.Items); e != a {
+			t.Errorf("%s: expected %v, got %v", tc.name, e, a)
+			continue
+		}
+		roleBinding := roleBindings.Items[0]
+		if e, a := addRoleResult.Status.RoleBindingRef.Name, roleBinding.Name; e != a {
+			t.Errorf("%s: expected %v, got %v", tc.name, e, a)
+			continue
+		}
+		if e, a := tc.expectedRoleBinding.Subjects, roleBinding.Subjects; !reflect.DeepEqual(e, a) {
+			t.Errorf("%s: expected %v, got %v", tc.name, e, a)
+			continue
+		}
+		if e, a := tc.expectedRoleBinding.RoleRef, roleBinding.RoleRef; !reflect.DeepEqual(e, a) {
+			t.Errorf("%s: expected %v, got %v", tc.name, e, a)
+			continue
+		}
+	}
 }

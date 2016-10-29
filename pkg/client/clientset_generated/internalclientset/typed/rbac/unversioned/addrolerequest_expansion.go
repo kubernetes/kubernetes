@@ -14,14 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package unversioned
 
-type AddRoleRequestExpansion interface{}
+import (
+	rbacapi "k8s.io/kubernetes/pkg/apis/rbac"
+)
 
-type ClusterRoleExpansion interface{}
+type AddRoleRequestExpansion interface {
+	Create(obj *rbacapi.AddRoleRequest) (result *rbacapi.AddRoleRequest, err error)
+}
 
-type ClusterRoleBindingExpansion interface{}
-
-type RoleExpansion interface{}
-
-type RoleBindingExpansion interface{}
+func (c *addRoleRequests) Create(obj *rbacapi.AddRoleRequest) (result *rbacapi.AddRoleRequest, err error) {
+	result = &rbacapi.AddRoleRequest{}
+	err = c.client.Post().
+		Namespace(c.ns).
+		Resource("addrolerequests").
+		Body(obj).
+		Do().
+		Into(result)
+	return
+}

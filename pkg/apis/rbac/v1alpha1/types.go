@@ -191,3 +191,31 @@ type ClusterRoleList struct {
 	// Items is a list of ClusterRoles
 	Items []ClusterRole `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
+
+// +genclient=true
+// +noMethods=true
+
+// AddRoleRequest is a namespaced request to bind a Role or ClusterRole to a list of subjects
+type AddRoleRequest struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	Spec   AddRoleRequestSpec   `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+	Status AddRoleRequestStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+}
+
+// AddRoleRequestSpec indicates what the caller would like to bind
+type AddRoleRequestSpec struct {
+	// RoleRef is a reference to the Role or ClusterRole that you'd like to bind
+	RoleRef RoleRef `json:"roleRef" protobuf:"bytes,1,opt,name=roleRef"`
+
+	// Subjects are the subjects that you want to bind to the role
+	Subjects []Subject `json:"subjects" protobuf:"bytes,2,rep,name=subjects"`
+}
+
+// AddRoleRequestStatus indicates how the request was handled
+type AddRoleRequestStatus struct {
+	// RoleBindingRef is a reference to the RoleBinding that was used to satisfy the request
+	RoleBindingRef RoleRef `json:"roleBindingRef" protobuf:"bytes,1,opt,name=roleBindingRef"`
+}

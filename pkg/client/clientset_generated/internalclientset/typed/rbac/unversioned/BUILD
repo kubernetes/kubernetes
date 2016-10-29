@@ -13,6 +13,8 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "addrolerequest.go",
+        "addrolerequest_expansion.go",
         "clusterrole.go",
         "clusterrolebinding.go",
         "doc.go",

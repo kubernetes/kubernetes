@@ -14,14 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package fake
 
-type AddRoleRequestExpansion interface{}
-
-type ClusterRoleExpansion interface{}
-
-type ClusterRoleBindingExpansion interface{}
-
-type RoleExpansion interface{}
-
-type RoleBindingExpansion interface{}
+// FakeAddRoleRequests implements AddRoleRequestInterface
+type FakeAddRoleRequests struct {
+	Fake *FakeRbac
+	ns   string
+}
