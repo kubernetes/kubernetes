@@ -183,9 +183,9 @@ func (x *ConfChangeType) UnmarshalJSON(data []byte) error {
 func (ConfChangeType) EnumDescriptor() ([]byte, []int) { return fileDescriptorRaft, []int{2} }
 
 type Entry struct {
-	Type             EntryType `protobuf:"varint,1,opt,name=Type,json=type,enum=raftpb.EntryType" json:"Type"`
 	Term             uint64    `protobuf:"varint,2,opt,name=Term,json=term" json:"Term"`
 	Index            uint64    `protobuf:"varint,3,opt,name=Index,json=index" json:"Index"`
+	Type             EntryType `protobuf:"varint,1,opt,name=Type,json=type,enum=raftpb.EntryType" json:"Type"`
 	Data             []byte    `protobuf:"bytes,4,opt,name=Data,json=data" json:"Data,omitempty"`
 	XXX_unrecognized []byte    `json:"-"`
 }
