@@ -47,13 +47,13 @@ func SetEnvParams() *EnvParams {
 		}
 	}
 
-        return &EnvParams{
-                KubernetesDir:     envParams["kubernetes_dir"],
-                HostPKIPath:       envParams["host_pki_path"],
-                HostEtcdPath:      envParams["host_etcd_path"],
-                HyperkubeImage:    envParams["hyperkube_image"],
-                DiscoveryImage:    envParams["discovery_image"],
-                EtcdImage:         envParams["etcd_image"],
-                ComponentLoglevel: envParams["component_loglevel"],
-        }
+	return &EnvParams{
+		KubernetesDir:     envParams["kubernetes_dir"],
+		HostPKIPath:       envParams["host_pki_path"],
+		HostEtcdPath:      envParams["host_etcd_path"],
+		HyperkubeImage:    envParams["hyperkube_image"],
+		DiscoveryImage:    envParams["discovery_image"],
+		EtcdImage:         envParams["etcd_image"],
+		ComponentLoglevel: envParams["component_loglevel"],
+	}
 }
