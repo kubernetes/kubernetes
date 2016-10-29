@@ -21,7 +21,6 @@ import (
 
 	"k8s.io/client-go/pkg/labels"
 	"k8s.io/client-go/pkg/selection"
-	"k8s.io/client-go/pkg/util/sets"
 )
 
 // LabelSelectorAsSelector converts the LabelSelector api type into a struct that implements
@@ -36,7 +35,7 @@ func LabelSelectorAsSelector(ps *LabelSelector) (labels.Selector, error) {
 	}
 	selector := labels.NewSelector()
 	for k, v := range ps.MatchLabels {
-		r, err := labels.NewRequirement(k, selection.Equals, sets.NewString(v))
+		r, err := labels.NewRequirement(k, selection.Equals, []string{v})
 		if err != nil {
 			return nil, err
 		}
@@ -56,7 +55,7 @@ func LabelSelectorAsSelector(ps *LabelSelector) (labels.Selector, error) {
 		default:
 			return nil, fmt.Errorf("%q is not a valid pod selector operator", expr.Operator)
 		}
-		r, err := labels.NewRequirement(expr.Key, op, sets.NewString(expr.Values...))
+		r, err := labels.NewRequirement(expr.Key, op, append([]string(nil), expr.Values...))
 		if err != nil {
 			return nil, err
 		}

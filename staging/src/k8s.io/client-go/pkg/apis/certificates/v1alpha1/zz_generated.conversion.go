@@ -21,7 +21,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	api "k8s.io/client-go/pkg/api"
 	certificates "k8s.io/client-go/pkg/apis/certificates"
 	conversion "k8s.io/client-go/pkg/conversion"
 	runtime "k8s.io/client-go/pkg/runtime"
@@ -49,9 +48,6 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha1_CertificateSigningRequest_To_certificates_CertificateSigningRequest(in *CertificateSigningRequest, out *certificates.CertificateSigningRequest, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
 	// TODO: Inefficient conversion - can we improve it?
 	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
 		return err
@@ -70,9 +66,6 @@ func Convert_v1alpha1_CertificateSigningRequest_To_certificates_CertificateSigni
 }
 
 func autoConvert_certificates_CertificateSigningRequest_To_v1alpha1_CertificateSigningRequest(in *certificates.CertificateSigningRequest, out *CertificateSigningRequest, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
 	// TODO: Inefficient conversion - can we improve it?
 	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
 		return err
@@ -94,9 +87,7 @@ func autoConvert_v1alpha1_CertificateSigningRequestCondition_To_certificates_Cer
 	out.Type = certificates.RequestConditionType(in.Type)
 	out.Reason = in.Reason
 	out.Message = in.Message
-	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastUpdateTime, &out.LastUpdateTime, s); err != nil {
-		return err
-	}
+	out.LastUpdateTime = in.LastUpdateTime
 	return nil
 }
 
@@ -108,9 +99,7 @@ func autoConvert_certificates_CertificateSigningRequestCondition_To_v1alpha1_Cer
 	out.Type = RequestConditionType(in.Type)
 	out.Reason = in.Reason
 	out.Message = in.Message
-	if err := api.Convert_unversioned_Time_To_unversioned_Time(&in.LastUpdateTime, &out.LastUpdateTime, s); err != nil {
-		return err
-	}
+	out.LastUpdateTime = in.LastUpdateTime
 	return nil
 }
 
@@ -119,12 +108,7 @@ func Convert_certificates_CertificateSigningRequestCondition_To_v1alpha1_Certifi
 }
 
 func autoConvert_v1alpha1_CertificateSigningRequestList_To_certificates_CertificateSigningRequestList(in *CertificateSigningRequestList, out *certificates.CertificateSigningRequestList, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
-		return err
-	}
+	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]certificates.CertificateSigningRequest, len(*in))
@@ -144,12 +128,7 @@ func Convert_v1alpha1_CertificateSigningRequestList_To_certificates_CertificateS
 }
 
 func autoConvert_certificates_CertificateSigningRequestList_To_v1alpha1_CertificateSigningRequestList(in *certificates.CertificateSigningRequestList, out *CertificateSigningRequestList, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
-	if err := api.Convert_unversioned_ListMeta_To_unversioned_ListMeta(&in.ListMeta, &out.ListMeta, s); err != nil {
-		return err
-	}
+	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]CertificateSigningRequest, len(*in))

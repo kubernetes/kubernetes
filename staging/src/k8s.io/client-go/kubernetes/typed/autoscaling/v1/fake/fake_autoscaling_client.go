@@ -30,8 +30,9 @@ func (c *FakeAutoscaling) HorizontalPodAutoscalers(namespace string) v1.Horizont
 	return &FakeHorizontalPodAutoscalers{c, namespace}
 }
 
-// GetRESTClient returns a RESTClient that is used to communicate
+// RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeAutoscaling) GetRESTClient() *rest.RESTClient {
-	return nil
+func (c *FakeAutoscaling) RESTClient() rest.Interface {
+	var ret *rest.RESTClient
+	return ret
 }

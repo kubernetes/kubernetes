@@ -153,6 +153,7 @@ func Convert_bool_To_Pointer_bool(in *bool, out **bool, s conversion.Scope) erro
 	return nil
 }
 
+// +k8s:conversion-fn=drop
 func Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(in, out *unversioned.TypeMeta, s conversion.Scope) error {
 	// These values are explicitly not copied
 	//out.APIVersion = in.APIVersion
@@ -160,16 +161,19 @@ func Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(in, out *unversioned.T
 	return nil
 }
 
+// +k8s:conversion-fn=copy-only
 func Convert_unversioned_ListMeta_To_unversioned_ListMeta(in, out *unversioned.ListMeta, s conversion.Scope) error {
 	*out = *in
 	return nil
 }
 
+// +k8s:conversion-fn=copy-only
 func Convert_intstr_IntOrString_To_intstr_IntOrString(in, out *intstr.IntOrString, s conversion.Scope) error {
 	*out = *in
 	return nil
 }
 
+// +k8s:conversion-fn=copy-only
 func Convert_unversioned_Time_To_unversioned_Time(in *unversioned.Time, out *unversioned.Time, s conversion.Scope) error {
 	// Cannot deep copy these, because time.Time has unexported fields.
 	*out = *in
@@ -219,6 +223,7 @@ func Convert_fields_Selector_To_string(in *fields.Selector, out *string, s conve
 	return nil
 }
 
+// +k8s:conversion-fn=copy-only
 func Convert_resource_Quantity_To_resource_Quantity(in *resource.Quantity, out *resource.Quantity, s conversion.Scope) error {
 	*out = *in
 	return nil

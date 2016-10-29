@@ -21,6 +21,7 @@ import (
 	v1 "k8s.io/client-go/pkg/api/v1"
 	v1beta1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // PodSecurityPoliciesGetter has a method to return a PodSecurityPolicyInterface.
@@ -44,13 +45,13 @@ type PodSecurityPolicyInterface interface {
 
 // podSecurityPolicies implements PodSecurityPolicyInterface
 type podSecurityPolicies struct {
-	client *ExtensionsClient
+	client rest.Interface
 }
 
 // newPodSecurityPolicies returns a PodSecurityPolicies
 func newPodSecurityPolicies(c *ExtensionsClient) *podSecurityPolicies {
 	return &podSecurityPolicies{
-		client: c,
+		client: c.RESTClient(),
 	}
 }
 

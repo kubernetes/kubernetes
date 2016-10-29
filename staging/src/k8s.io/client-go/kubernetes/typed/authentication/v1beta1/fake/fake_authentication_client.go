@@ -30,8 +30,9 @@ func (c *FakeAuthentication) TokenReviews() v1beta1.TokenReviewInterface {
 	return &FakeTokenReviews{c}
 }
 
-// GetRESTClient returns a RESTClient that is used to communicate
+// RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeAuthentication) GetRESTClient() *rest.RESTClient {
-	return nil
+func (c *FakeAuthentication) RESTClient() rest.Interface {
+	var ret *rest.RESTClient
+	return ret
 }

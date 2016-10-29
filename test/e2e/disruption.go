@@ -266,7 +266,7 @@ func createReplicaSetOrDie(cs *kubernetes.Clientset, ns string, size int32, excl
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Replicas: &size,
-			Selector: &extensions.LabelSelector{
+			Selector: &unversioned.LabelSelector{
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
 			Template: api.PodTemplateSpec{
