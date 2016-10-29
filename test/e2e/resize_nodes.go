@@ -18,6 +18,8 @@ package e2e
 
 import (
 	"fmt"
+	"net"
+	"net/url"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -51,7 +53,16 @@ const (
 	podNotReadyTimeout        = 1 * time.Minute
 	podReadyTimeout           = 2 * time.Minute
 	testPort                  = 9376
+
+	// TODO(justinsb): Avoid hardcoding this.
+	awsMasterIP = "172.20.0.9"
 )
+
+type Address struct {
+	internalIP string
+	externalIP string
+	hostname   string
+}
 
 func ResizeGroup(group string, size int32) error {
 	if framework.TestContext.ReportDir != "" {
@@ -259,27 +270,49 @@ func resizeRC(c clientset.Interface, ns, name string, replicas int32) error {
 	return err
 }
 
-func getMaster(c clientset.Interface) string {
-	master := ""
+// getMaster populates the externalIP, internalIP and hostname fields of the master.
+// If any of these is unavailable, it is set to "".
+func getMaster(c clientset.Interface) Address {
+	master := Address{}
+
+	// Populate the internal IP.
+	eps, err := c.Core().Endpoints(api.NamespaceDefault).Get("kubernetes")
+	if err != nil {
+		framework.Failf("Failed to get kubernetes endpoints: %v", err)
+	}
+	if len(eps.Subsets) != 1 || len(eps.Subsets[0].Addresses) != 1 {
+		framework.Failf("There are more than 1 endpoints for kubernetes service: %+v", eps)
+	}
+	master.internalIP = eps.Subsets[0].Addresses[0].IP
+
+	// Populate the external IP/hostname.
+	url, err := url.Parse(framework.TestContext.Host)
+	if err != nil {
+		framework.Failf("Failed to parse hostname: %v", err)
+	}
+	if net.ParseIP(url.Host) != nil {
+		// TODO: Check that it is external IP (not having a reserved IP address as per RFC1918).
+		master.externalIP = url.Host
+	} else {
+		master.hostname = url.Host
+	}
+
+	return master
+}
+
+// getMasterAddress returns the hostname/external IP/internal IP as appropriate for e2e tests on a particular provider
+// which is the address of the interface used for communication with the kubelet.
+func getMasterAddress(c clientset.Interface) string {
+	master := getMaster(c)
 	switch framework.TestContext.Provider {
-	case "gce":
-		eps, err := c.Core().Endpoints(api.NamespaceDefault).Get("kubernetes")
-		if err != nil {
-			framework.Failf("Fail to get kubernetes endpoinds: %v", err)
-		}
-		if len(eps.Subsets) != 1 || len(eps.Subsets[0].Addresses) != 1 {
-			framework.Failf("There are more than 1 endpoints for kubernetes service: %+v", eps)
-		}
-		master = eps.Subsets[0].Addresses[0].IP
-	case "gke":
-		master = strings.TrimPrefix(framework.TestContext.Host, "https://")
+	case "gce", "gke":
+		return master.externalIP
 	case "aws":
-		// TODO(justinsb): Avoid hardcoding this.
-		master = "172.20.0.9"
+		return awsMasterIP
 	default:
 		framework.Failf("This test is not supported for provider %s and should be disabled", framework.TestContext.Provider)
 	}
-	return master
+	return ""
 }
 
 // Return node external IP concatenated with port 22 for ssh
@@ -308,7 +341,7 @@ func getNodeExternalIP(node *api.Node) string {
 // environments.
 func performTemporaryNetworkFailure(c clientset.Interface, ns, rcName string, replicas int32, podNameToDisappear string, node *api.Node) {
 	host := getNodeExternalIP(node)
-	master := getMaster(c)
+	master := getMasterAddress(c)
 	By(fmt.Sprintf("block network traffic from node %s to the master", node.Name))
 	defer func() {
 		// This code will execute even if setting the iptables rule failed.
@@ -614,7 +647,7 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 
 				By(fmt.Sprintf("Block traffic from node %s to the master", node.Name))
 				host := getNodeExternalIP(&node)
-				master := getMaster(c)
+				master := getMasterAddress(c)
 				defer func() {
 					By(fmt.Sprintf("Unblock traffic from node %s to the master", node.Name))
 					framework.UnblockNetwork(host, master)
