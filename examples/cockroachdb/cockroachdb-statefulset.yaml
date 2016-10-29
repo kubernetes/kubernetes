@@ -29,8 +29,8 @@ metadata:
     prometheus.io/path: "_status/vars"
     prometheus.io/port: "8080"
   # This service only exists to create DNS entries for each pod in the stateful set such that they
-  # can resolve # each other's IP addresses. It does not create a load-balanced ClusterIP and
-  # should not be used # directly by clients in most circumstances.
+  # can resolve each other's IP addresses. It does not create a load-balanced ClusterIP and
+  # should not be used directly by clients in most circumstances.
   name: cockroachdb
   labels:
     app: cockroachdb

@@ -7,7 +7,7 @@
   - [Cassandra Docker](#cassandra-docker)
   - [Quickstart](#quickstart)
   - [Step 1: Create a Cassandra Headless Service](#step-1-create-a-cassandra-headless-service)
-  - [Step 2: Use a StatefulSet to create Cassandra Ring](#step-2-create-a-cassandra-statefulset)
+  - [Step 2: Use a StatefulSet to create Cassandra Ring](#step-2-use-a-statefulset-to-create-cassandra-ring)
   - [Step 3: Validate and Modify The Cassandra StatefulSet](#step-3-validate-and-modify-the-cassandra-statefulset)
   - [Step 4: Delete Cassandra StatefulSet](#step-4-delete-cassandra-statefulset)
   - [Step 5: Use a Replication Controller to create Cassandra node pods](#step-5-use-a-replication-controller-to-create-cassandra-node-pods)
@@ -30,7 +30,7 @@ This example also uses some of the core components of Kubernetes:
 - [_Pods_](../../../docs/user-guide/pods.md)
 - [ _Services_](../../../docs/user-guide/services.md)
 - [_Replication Controllers_](../../../docs/user-guide/replication-controller.md)
-- [_StatefulSets_](http://kubernetes.io/docs/user-guide/statefulset/)
+- [_PetSets_](http://kubernetes.io/docs/user-guide/petset/)
 - [_Daemon Sets_](../../../docs/admin/daemons.md)
 
 ## Prerequisites
@@ -171,7 +171,7 @@ StatefulSets are a new feature that was added as an <i>Alpha</i> component in Ku
 1.3.  Deploying stateful distributed applications, like Cassandra, within a clustered
 environment can be challenging.  We implemented StatefulSet to greatly simplify this
 process.  Multiple StatefulSet features are used within this example, but is out of
-scope of this documentation.  [Please refer to the StatefulSet documentation.](http://kubernetes.io/docs/user-guide/statefulset/)
+scope of this documentation.  [Please refer to the PetSet documentation.](http://kubernetes.io/docs/user-guide/petset/)
 
 The StatefulSet manifest that is included below, creates a Cassandra ring that consists
 of three pods.
@@ -393,12 +393,12 @@ NAME        DESIRED   CURRENT   AGE
 cassandra   4         4         36m
 ```
 
-For the Alpha release of Kubernetes 1.3 the StatefulSet resource does not have `kubectl scale`
+For the Kubernetes 1.5 release, the beta StatefulSet resource does not have `kubectl scale`
 functionality, like a Deployment, ReplicaSet, Replication Controller, or Job.
 
 ## Step 4: Delete Cassandra StatefulSet
 
-There are some limitations with the Alpha release of StatefulSet in 1.3. From the [documentation](http://kubernetes.io/docs/user-guide/statefulset/):
+There are some limitations with the Alpha release of PetSet in 1.3. From the [documentation](http://kubernetes.io/docs/user-guide/petset/):
 
 "Deleting the StatefulSet will not delete any pods. You will either have to manually scale it down to 0 pods first, or delete the pods yourself.
 Deleting and/or scaling a StatefulSet down will not delete the volumes associated with the StatefulSet. This is done to ensure safety first, your data is more valuable than an auto purge of all related StatefulSet resources. Deleting the Persistent Volume Claims will result in a deletion of the associated volumes."

@@ -65,7 +65,7 @@ spec:
           timeoutSeconds: 5
         # These volume mounts are persistent. They are like inline claims,
         # but not exactly because the names need to match exactly one of
-        # the pet volumes.
+        # the stateful pod volumes.
         volumeMounts:
         - name: cassandra-data
           mountPath: /cassandra_data

@@ -885,8 +885,8 @@ possible. However, StatefulSet differs in several key respects:
 
 - StatefulSet is for ones to tens of instances.  Indexed job should work with tens of
 thousands of instances.
-- When you have few instances, you may want to given them pet names. When you
-have many instances, you that many instances, integer indexes make more sense.
+- When you have few instances, you may want to give them names. When you have many instances,
+integer indexes make more sense.
 - When you have thousands of instances, storing the work-list in the JobSpec
 is verbose.  For StatefulSet, this is less of a problem.
 - StatefulSets (apparently) need to differ in more fields than indexed Jobs.
