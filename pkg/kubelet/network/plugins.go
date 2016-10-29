@@ -95,16 +95,53 @@ type PodNetworkStatus struct {
 	IP net.IP `json:"ip" description:"Primary IP address of the pod"`
 }
 
-// Host is an interface that plugins can use to access the kubelet.
-type Host interface {
+// LegacyHost implements the methods required by network plugins that
+// were directly invoked by the kubelet. Implementations of this interface
+// that do not wish to support these features can simply return false
+// to SupportsLegacyFeatures.
+type LegacyHost interface {
 	// Get the pod structure by its name, namespace
+	// Only used for hostport management and bw shaping
 	GetPodByName(namespace, name string) (*api.Pod, bool)
 
 	// GetKubeClient returns a client interface
+	// Only used in testing
 	GetKubeClient() clientset.Interface
 
 	// GetContainerRuntime returns the container runtime that implements the containers (e.g. docker/rkt)
+	// Only used for hostport management
 	GetRuntime() kubecontainer.Runtime
+
+	// SupportsLegacyFeaturs returns true if this host can support hostports
+	// and bandwidth shaping. Both will either get added to CNI or dropped,
+	// so differnt implementations can choose to ignore them.
+	SupportsLegacyFeatures() bool
+}
+
+// Host is an interface that plugins can use to access the kubelet.
+// TODO(#35457): get rid of this backchannel to the kubelet. The scope of
+// the back channel is restricted to host-ports/testing, and restricted
+// to kubenet. No other network plugin wrapper needs it. Other plugins
+// only require a way to access namespace information, which they can do
+// directly through the embedded NamespaceGetter.
+type Host interface {
+	// NamespaceGetter is a getter for sandbox namespace information.
+	// It's the only part of this interface that isn't currently deprecated.
+	NamespaceGetter
+
+	// LegacyHost contains methods that trap back into the Kubelet. Dependence
+	// *do not* add more dependencies in this interface. In a post-cri world,
+	// network plugins will be invoked by the runtime shim, and should only
+	// require NamespaceGetter.
+	LegacyHost
+}
+
+// NamespaceGetter is an interface to retrieve namespace information for a given
+// sandboxID. Typically implemented by runtime shims that are closely coupled to
+// CNI plugin wrappers like kubenet.
+type NamespaceGetter interface {
+	// GetNetNS returns network namespace information for the given containerID.
+	GetNetNS(containerID string) (string, error)
 }
 
 // InitNetworkPlugin inits the plugin that matches networkPluginName. Plugins must have unique names.
