@@ -19,6 +19,8 @@ package authenticator
 import (
 	"time"
 
+	"github.com/cloudflare/cfssl/revoke"
+
 	"github.com/go-openapi/spec"
 
 	"k8s.io/kubernetes/pkg/auth/authenticator"
@@ -56,6 +58,9 @@ type AuthenticatorConfig struct {
 	KeystoneURL                 string
 	WebhookTokenAuthnConfigFile string
 	WebhookTokenAuthnCacheTTL   time.Duration
+	CRLCheck                    bool
+	CRLHardFail                 bool
+	CRLFile                     string
 }
 
 // New returns an authenticator.Request or an error that supports the standard
@@ -86,7 +91,7 @@ func New(config AuthenticatorConfig) (authenticator.Request, *spec.SecurityDefin
 
 	// X509 methods
 	if len(config.ClientCAFile) > 0 {
-		certAuth, err := newAuthenticatorFromClientCAFile(config.ClientCAFile)
+		certAuth, err := newAuthenticatorFromClientCAFile(&config)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -245,8 +250,10 @@ func newServiceAccountAuthenticator(keyfiles []string, lookup bool, serviceAccou
 }
 
 // newAuthenticatorFromClientCAFile returns an authenticator.Request or an error
-func newAuthenticatorFromClientCAFile(clientCAFile string) (authenticator.Request, error) {
-	roots, err := certutil.NewPool(clientCAFile)
+func newAuthenticatorFromClientCAFile(config *AuthenticatorConfig) (authenticator.Request, error) {
+	var rvc *revoke.Revoke
+
+	roots, err := crypto.CertPoolFromFile((*config).ClientCAFile)
 	if err != nil {
 		return nil, err
 	}
@@ -254,7 +261,14 @@ func newAuthenticatorFromClientCAFile(clientCAFile string) (authenticator.Reques
 	opts := x509.DefaultVerifyOptions()
 	opts.Roots = roots
 
-	return x509.New(opts, x509.CommonNameUserConversion), nil
+	if (*config).CRLCheck {
+		rvc = revoke.New((*config).CRLHardFail)
+		if err = rvc.SetLocalCRL((*config).CRLFile); err != nil {
+			return nil, err
+		}
+	}
+
+	return x509.New(opts, x509.CommonNameUserConversion, rvc), nil
 }
 
 // newAuthenticatorFromTokenFile returns an authenticator.Request or an error

@@ -204,6 +204,11 @@ func Run(s *options.APIServer) error {
 		}
 	}
 
+	// Enable CRL check when CRL path was set
+	if s.CRLFile != "" && s.CRLCheck == false {
+		s.CRLCheck = true
+	}
+
 	var serviceAccountGetter serviceaccount.ServiceAccountTokenGetter
 	if s.ServiceAccountLookup {
 		// If we need to look up service accounts and tokens,
@@ -232,6 +237,9 @@ func Run(s *options.APIServer) error {
 		KeystoneURL:                 s.KeystoneURL,
 		WebhookTokenAuthnConfigFile: s.WebhookTokenAuthnConfigFile,
 		WebhookTokenAuthnCacheTTL:   s.WebhookTokenAuthnCacheTTL,
+		CRLCheck:                    s.CRLCheck,
+		CRLHardFail:                 s.CRLHardFail,
+		CRLFile:                     s.CRLFile,
 	})
 
 	if err != nil {
