@@ -18,11 +18,17 @@ package x509
 
 import (
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/asn1"
+	"fmt"
 	"net/http"
 
+	"github.com/golang/glog"
+
+	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/user"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // UserConversion defines an interface for extracting user info from a client certificate chain
@@ -83,6 +89,58 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (user.Info, bool,
 		}
 	}
 	return nil, false, utilerrors.NewAggregate(errlist)
+}
+
+// Verifier implements request.Authenticator by verifying a client cert on the request, then delegating to the wrapped auth
+type Verifier struct {
+	opts x509.VerifyOptions
+	auth authenticator.Request
+
+	// allowedCommonNames contains the common names which a verified certificate is allowed to have.
+	// If empty, all verified certificates are allowed.
+	allowedCommonNames sets.String
+}
+
+// NewVerifier create a request.Authenticator by verifying a client cert on the request, then delegating to the wrapped auth
+func NewVerifier(opts x509.VerifyOptions, auth authenticator.Request, allowedCommonNames sets.String) authenticator.Request {
+	return &Verifier{opts, auth, allowedCommonNames}
+}
+
+// AuthenticateRequest verifies the presented client certificate, then delegates to the wrapped auth
+func (a *Verifier) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
+	if req.TLS == nil || len(req.TLS.PeerCertificates) == 0 {
+		return nil, false, nil
+	}
+
+	// Use intermediates, if provided
+	optsCopy := a.opts
+	if optsCopy.Intermediates == nil && len(req.TLS.PeerCertificates) > 1 {
+		optsCopy.Intermediates = x509.NewCertPool()
+		for _, intermediate := range req.TLS.PeerCertificates[1:] {
+			optsCopy.Intermediates.AddCert(intermediate)
+		}
+	}
+
+	if _, err := req.TLS.PeerCertificates[0].Verify(optsCopy); err != nil {
+		return nil, false, err
+	}
+	if err := a.verifySubject(req.TLS.PeerCertificates[0].Subject); err != nil {
+		return nil, false, err
+	}
+	return a.auth.AuthenticateRequest(req)
+}
+
+func (a *Verifier) verifySubject(subject pkix.Name) error {
+	// No CN restrictions
+	if len(a.allowedCommonNames) == 0 {
+		return nil
+	}
+	// Enforce CN restrictions
+	if a.allowedCommonNames.Has(subject.CommonName) {
+		return nil
+	}
+	glog.Warningf("x509: subject with cn=%s is not in the allowed list: %v", subject.CommonName, a.allowedCommonNames.List())
+	return fmt.Errorf("x509: subject with cn=%s is not allowed", subject.CommonName)
 }
 
 // DefaultVerifyOptions returns VerifyOptions that use the system root certificates, current time,
