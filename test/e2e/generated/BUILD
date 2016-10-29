@@ -21,7 +21,7 @@ go_library(
 genrule(
     name = "bindata",
     srcs = [
-        "//examples:sources",
+        "//examples:sources1",
         "//test/images:sources",
         "//test/fixtures:sources",
         "//test/e2e/testing-manifests:sources",

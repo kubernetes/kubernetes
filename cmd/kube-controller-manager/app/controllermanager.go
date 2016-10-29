@@ -34,10 +34,12 @@ import (
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
+	versionedclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -176,8 +178,10 @@ func Run(s *options.CMServer) error {
 		} else {
 			clientBuilder = rootClientBuilder
 		}
-
-		err := StartControllers(s, kubeconfig, rootClientBuilder, clientBuilder, stop, recorder)
+		versionedRootClientBuilder := controller.SimpleVersionedControllerClientBuilder{
+			ClientConfig: kubeconfig,
+		}
+		err := StartControllers(s, kubeconfig, rootClientBuilder, clientBuilder, versionedRootClientBuilder, stop, recorder)
 		glog.Fatalf("error running controllers: %v", err)
 		panic("unreachable")
 	}
@@ -220,9 +224,15 @@ func Run(s *options.CMServer) error {
 	panic("unreachable")
 }
 
-func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootClientBuilder, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}, recorder record.EventRecorder) error {
+func StartControllers(s *options.CMServer, kubeconfig *restclient.Config,
+	rootClientBuilder, clientBuilder controller.ControllerClientBuilder,
+	versionedRootClientBuilder controller.SimpleVersionedControllerClientBuilder,
+	stop <-chan struct{}, recorder record.EventRecorder) error {
 	client := func(serviceAccountName string) clientset.Interface {
 		return rootClientBuilder.ClientOrDie(serviceAccountName)
+	}
+	versionedClient := func(serviceAccountName string) versionedclientset.Interface {
+		return versionedRootClientBuilder.ClientOrDie(serviceAccountName)
 	}
 	discoveryClient := client("controller-discovery").Discovery()
 	sharedInformers := informers.NewSharedInformerFactory(client("shared-informers"), ResyncPeriod(s)())
@@ -368,12 +378,13 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 
 	// Find the list of namespaced resources via discovery that the namespace controller must manage
 	namespaceKubeClient := client("namespace-controller")
+	namespaceVersionedClient := versionedClient("namespace-controller")
 	namespaceClientPool := dynamic.NewClientPool(restclient.AddUserAgent(kubeconfig, "namespace-controller"), restMapper, dynamic.LegacyAPIPathResolverFunc)
 	groupVersionResources, err := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources()
 	if err != nil {
 		glog.Fatalf("Failed to get supported resources from server: %v", err)
 	}
-	namespaceController := namespacecontroller.NewNamespaceController(namespaceKubeClient, namespaceClientPool, groupVersionResources, s.NamespaceSyncPeriod.Duration, api.FinalizerKubernetes)
+	namespaceController := namespacecontroller.NewNamespaceController(namespaceKubeClient, namespaceVersionedClient, namespaceClientPool, groupVersionResources, s.NamespaceSyncPeriod.Duration, v1.FinalizerKubernetes)
 	go namespaceController.Run(int(s.ConcurrentNamespaceSyncs), wait.NeverStop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
