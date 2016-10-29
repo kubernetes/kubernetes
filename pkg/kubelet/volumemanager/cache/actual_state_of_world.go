@@ -193,6 +193,7 @@ type actualStateOfWorld struct {
 	// The key in this map is the name of the volume and the value is an object
 	// containing more information about the attached volume.
 	attachedVolumes map[api.UniqueVolumeName]attachedVolume
+
 	// volumePluginMgr is the volume plugin manager used to create volume
 	// plugin objects.
 	volumePluginMgr *volume.VolumePluginMgr
