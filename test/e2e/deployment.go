@@ -1239,11 +1239,11 @@ func testOverlappingDeployment(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred(), "Failed creating the second deployment")
 
 	// Wait for overlapping annotation updated to both deployments
-	By("Waiting for both deployments to have overlapping annotations")
-	err = framework.WaitForOverlappingAnnotationMatch(c, ns, deploy.Name, deployOverlapping.Name)
-	Expect(err).NotTo(HaveOccurred(), "Failed to update the first deployment's overlapping annotation")
+	By("Waiting for the overlapping deployment to have overlapping annotation")
 	err = framework.WaitForOverlappingAnnotationMatch(c, ns, deployOverlapping.Name, deploy.Name)
 	Expect(err).NotTo(HaveOccurred(), "Failed to update the second deployment's overlapping annotation")
+	err = framework.WaitForOverlappingAnnotationMatch(c, ns, deploy.Name, "")
+	Expect(err).NotTo(HaveOccurred(), "The deployment that holds the oldest selector shouldn't have the overlapping annotation")
 
 	// Only the first deployment is synced
 	By("Checking only the first overlapping deployment is synced")
@@ -1295,11 +1295,11 @@ func testOverlappingDeployment(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Wait for overlapping annotation updated to both deployments
-	By("Waiting for both deployments to have overlapping annotations")
-	err = framework.WaitForOverlappingAnnotationMatch(c, ns, deployOverlapping.Name, deployLater.Name)
-	Expect(err).NotTo(HaveOccurred(), "Failed to update the second deployment's overlapping annotation")
+	By("Waiting for the third deployment to have the overlapping annotation")
 	err = framework.WaitForOverlappingAnnotationMatch(c, ns, deployLater.Name, deployOverlapping.Name)
 	Expect(err).NotTo(HaveOccurred(), "Failed to update the third deployment's overlapping annotation")
+	err = framework.WaitForOverlappingAnnotationMatch(c, ns, deployOverlapping.Name, "")
+	Expect(err).NotTo(HaveOccurred(), "The deployment that holds the oldest selector shouldn't have the overlapping annotation")
 
 	// The second deployment shouldn't be synced
 	By("Checking the second deployment is not synced")
