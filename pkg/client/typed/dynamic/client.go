@@ -241,13 +241,22 @@ func (dynamicCodec) Encode(obj runtime.Object, w io.Writer) error {
 
 // ContentConfig returns a restclient.ContentConfig for dynamic types.
 func ContentConfig() restclient.ContentConfig {
-	// TODO: it's questionable that this should be using anything other than unstructured schema and JSON
-	codec := dynamicCodec{}
-	streamingInfo, _ := api.Codecs.StreamingSerializerForMediaType("application/json;stream=watch", nil)
+	var jsonInfo runtime.SerializerInfo
+	// TODO: api.Codecs here should become "pkg/apis/server/scheme" which is the minimal core you need
+	// to talk to a kubernetes server
+	for _, info := range api.Codecs.SupportedMediaTypes() {
+		if info.MediaType == runtime.ContentTypeJSON {
+			jsonInfo = info
+			break
+		}
+	}
+
+	jsonInfo.Serializer = dynamicCodec{}
+	jsonInfo.PrettySerializer = nil
 	return restclient.ContentConfig{
 		AcceptContentTypes:   runtime.ContentTypeJSON,
 		ContentType:          runtime.ContentTypeJSON,
-		NegotiatedSerializer: serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec}, streamingInfo),
+		NegotiatedSerializer: serializer.NegotiatedSerializerWrapper(jsonInfo),
 	}
 }
 
