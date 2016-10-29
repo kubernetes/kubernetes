@@ -22,77 +22,77 @@ import (
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
-type FakeCore struct {
+type FakeCoreV1 struct {
 	*core.Fake
 }
 
-func (c *FakeCore) ComponentStatuses() v1.ComponentStatusInterface {
+func (c *FakeCoreV1) ComponentStatuses() v1.ComponentStatusInterface {
 	return &FakeComponentStatuses{c}
 }
 
-func (c *FakeCore) ConfigMaps(namespace string) v1.ConfigMapInterface {
+func (c *FakeCoreV1) ConfigMaps(namespace string) v1.ConfigMapInterface {
 	return &FakeConfigMaps{c, namespace}
 }
 
-func (c *FakeCore) Endpoints(namespace string) v1.EndpointsInterface {
+func (c *FakeCoreV1) Endpoints(namespace string) v1.EndpointsInterface {
 	return &FakeEndpoints{c, namespace}
 }
 
-func (c *FakeCore) Events(namespace string) v1.EventInterface {
+func (c *FakeCoreV1) Events(namespace string) v1.EventInterface {
 	return &FakeEvents{c, namespace}
 }
 
-func (c *FakeCore) LimitRanges(namespace string) v1.LimitRangeInterface {
+func (c *FakeCoreV1) LimitRanges(namespace string) v1.LimitRangeInterface {
 	return &FakeLimitRanges{c, namespace}
 }
 
-func (c *FakeCore) Namespaces() v1.NamespaceInterface {
+func (c *FakeCoreV1) Namespaces() v1.NamespaceInterface {
 	return &FakeNamespaces{c}
 }
 
-func (c *FakeCore) Nodes() v1.NodeInterface {
+func (c *FakeCoreV1) Nodes() v1.NodeInterface {
 	return &FakeNodes{c}
 }
 
-func (c *FakeCore) PersistentVolumes() v1.PersistentVolumeInterface {
+func (c *FakeCoreV1) PersistentVolumes() v1.PersistentVolumeInterface {
 	return &FakePersistentVolumes{c}
 }
 
-func (c *FakeCore) PersistentVolumeClaims(namespace string) v1.PersistentVolumeClaimInterface {
+func (c *FakeCoreV1) PersistentVolumeClaims(namespace string) v1.PersistentVolumeClaimInterface {
 	return &FakePersistentVolumeClaims{c, namespace}
 }
 
-func (c *FakeCore) Pods(namespace string) v1.PodInterface {
+func (c *FakeCoreV1) Pods(namespace string) v1.PodInterface {
 	return &FakePods{c, namespace}
 }
 
-func (c *FakeCore) PodTemplates(namespace string) v1.PodTemplateInterface {
+func (c *FakeCoreV1) PodTemplates(namespace string) v1.PodTemplateInterface {
 	return &FakePodTemplates{c, namespace}
 }
 
-func (c *FakeCore) ReplicationControllers(namespace string) v1.ReplicationControllerInterface {
+func (c *FakeCoreV1) ReplicationControllers(namespace string) v1.ReplicationControllerInterface {
 	return &FakeReplicationControllers{c, namespace}
 }
 
-func (c *FakeCore) ResourceQuotas(namespace string) v1.ResourceQuotaInterface {
+func (c *FakeCoreV1) ResourceQuotas(namespace string) v1.ResourceQuotaInterface {
 	return &FakeResourceQuotas{c, namespace}
 }
 
-func (c *FakeCore) Secrets(namespace string) v1.SecretInterface {
+func (c *FakeCoreV1) Secrets(namespace string) v1.SecretInterface {
 	return &FakeSecrets{c, namespace}
 }
 
-func (c *FakeCore) Services(namespace string) v1.ServiceInterface {
+func (c *FakeCoreV1) Services(namespace string) v1.ServiceInterface {
 	return &FakeServices{c, namespace}
 }
 
-func (c *FakeCore) ServiceAccounts(namespace string) v1.ServiceAccountInterface {
+func (c *FakeCoreV1) ServiceAccounts(namespace string) v1.ServiceAccountInterface {
 	return &FakeServiceAccounts{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeCore) RESTClient() restclient.Interface {
+func (c *FakeCoreV1) RESTClient() restclient.Interface {
 	var ret *restclient.RESTClient
 	return ret
 }

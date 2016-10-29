@@ -28,17 +28,17 @@ type CoreInterface interface {
 	ServicesGetter
 }
 
-// CoreClient is used to interact with features provided by the Core group.
-type CoreClient struct {
+// CoreUnversionedClient is used to interact with features provided by the Core group.
+type CoreUnversionedClient struct {
 	*restclient.RESTClient
 }
 
-func (c *CoreClient) Services(namespace string) ServiceInterface {
+func (c *CoreUnversionedClient) Services(namespace string) ServiceInterface {
 	return newServices(c, namespace)
 }
 
-// NewForConfig creates a new CoreClient for the given config.
-func NewForConfig(c *restclient.Config) (*CoreClient, error) {
+// NewForConfig creates a new CoreUnversionedClient for the given config.
+func NewForConfig(c *restclient.Config) (*CoreUnversionedClient, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -47,12 +47,12 @@ func NewForConfig(c *restclient.Config) (*CoreClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &CoreClient{client}, nil
+	return &CoreUnversionedClient{client}, nil
 }
 
-// NewForConfigOrDie creates a new CoreClient for the given config and
+// NewForConfigOrDie creates a new CoreUnversionedClient for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *CoreClient {
+func NewForConfigOrDie(c *restclient.Config) *CoreUnversionedClient {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -60,9 +60,9 @@ func NewForConfigOrDie(c *restclient.Config) *CoreClient {
 	return client
 }
 
-// New creates a new CoreClient for the given RESTClient.
-func New(c *restclient.RESTClient) *CoreClient {
-	return &CoreClient{c}
+// New creates a new CoreUnversionedClient for the given RESTClient.
+func New(c *restclient.RESTClient) *CoreUnversionedClient {
+	return &CoreUnversionedClient{c}
 }
 
 func setConfigDefaults(config *restclient.Config) error {
@@ -88,7 +88,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // GetRESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *CoreClient) GetRESTClient() *restclient.RESTClient {
+func (c *CoreUnversionedClient) GetRESTClient() *restclient.RESTClient {
 	if c == nil {
 		return nil
 	}

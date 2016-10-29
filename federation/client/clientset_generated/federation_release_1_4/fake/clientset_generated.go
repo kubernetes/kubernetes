@@ -71,7 +71,7 @@ func (c *Clientset) Federation() v1beta1federation.FederationInterface {
 	return &fakev1beta1federation.FakeFederation{Fake: &c.Fake}
 }
 
-// Core retrieves the CoreClient
+// Core retrieves the CoreUnversionedClient
 func (c *Clientset) Core() v1core.CoreInterface {
 	return &fakev1core.FakeCore{Fake: &c.Fake}
 }

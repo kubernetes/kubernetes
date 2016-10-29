@@ -18,7 +18,7 @@ package test_internalclientset
 
 import (
 	"github.com/golang/glog"
-	unversionedtestgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup.k8s.io/unversioned"
+	internalversiontestgroup "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	discovery "k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
@@ -27,18 +27,18 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
-	Testgroup() unversionedtestgroup.TestgroupInterface
+	Testgroup() internalversiontestgroup.TestgroupInterface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	*unversionedtestgroup.TestgroupClient
+	*internalversiontestgroup.TestgroupClient
 }
 
 // Testgroup retrieves the TestgroupClient
-func (c *Clientset) Testgroup() unversionedtestgroup.TestgroupInterface {
+func (c *Clientset) Testgroup() internalversiontestgroup.TestgroupInterface {
 	if c == nil {
 		return nil
 	}
@@ -58,7 +58,7 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	}
 	var clientset Clientset
 	var err error
-	clientset.TestgroupClient, err = unversionedtestgroup.NewForConfig(&configShallowCopy)
+	clientset.TestgroupClient, err = internalversiontestgroup.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +75,7 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *restclient.Config) *Clientset {
 	var clientset Clientset
-	clientset.TestgroupClient = unversionedtestgroup.NewForConfigOrDie(c)
+	clientset.TestgroupClient = internalversiontestgroup.NewForConfigOrDie(c)
 
 	clientset.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &clientset
@@ -84,7 +84,7 @@ func NewForConfigOrDie(c *restclient.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c restclient.Interface) *Clientset {
 	var clientset Clientset
-	clientset.TestgroupClient = unversionedtestgroup.New(c)
+	clientset.TestgroupClient = internalversiontestgroup.New(c)
 
 	clientset.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &clientset

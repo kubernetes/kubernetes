@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup.k8s.io/v1"
+	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup/v1"
 
 	"github.com/golang/glog"
 	"github.com/stretchr/testify/assert"

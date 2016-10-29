@@ -149,7 +149,8 @@ Garbage collector should delete pods created by rc when not orphaning,justinsb,1
 Garbage collector should orphan pods created by rc if delete options say so,fabioy,1
 Garbage collector should orphan pods created by rc if deleteOptions.OrphanDependents is nil,zmerlynn,1
 "Generated release_1_5 clientset should create pods, delete pods, watch pods",ghodss,1
-HA-master pods survive addition/removal,davidopp,1
+"Generated release_1_5 clientset should create v2alpha1 scheduleJobs, delete scheduleJobs, watch scheduleJobs",caesarxuchao,0
+HA-master pods survive addition/removal,roberthbailey,1
 Hazelcast should create and scale hazelcast,mikedanese,1
 Horizontal pod autoscaling (scale resource: CPU) Deployment Should scale from 1 pod to 3 pods and from 3 to 5,jszczepkowski,0
 Horizontal pod autoscaling (scale resource: CPU) Deployment Should scale from 5 pods to 3 pods and from 3 to 1,jszczepkowski,0
@@ -456,7 +457,7 @@ k8s.io/kubernetes/cmd/kubeadm/app/cmd,davidopp,1
 k8s.io/kubernetes/cmd/kubeadm/app/images,saad-ali,1
 k8s.io/kubernetes/cmd/kubeadm/app/util,eparis,1
 k8s.io/kubernetes/cmd/kubelet/app,hurf,1
-k8s.io/kubernetes/cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup.k8s.io/unversioned,eparis,1
+k8s.io/kubernetes/cmd/libs/go2idl/client-gen/types,caesarxuchao,0
 k8s.io/kubernetes/cmd/libs/go2idl/go-to-protobuf/protobuf,smarterclayton,0
 k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen/generators,davidopp,1
 k8s.io/kubernetes/cmd/mungedocs,mwielgus,1

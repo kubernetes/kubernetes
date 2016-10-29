@@ -28,7 +28,7 @@ import (
 
 // FakeClusters implements ClusterInterface
 type FakeClusters struct {
-	Fake *FakeFederation
+	Fake *FakeFederationV1beta1
 }
 
 var clustersResource = unversioned.GroupVersionResource{Group: "federation", Version: "v1beta1", Resource: "clusters"}

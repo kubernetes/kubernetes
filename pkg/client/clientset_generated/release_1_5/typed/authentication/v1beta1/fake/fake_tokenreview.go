@@ -18,5 +18,5 @@ package fake
 
 // FakeTokenReviews implements TokenReviewInterface
 type FakeTokenReviews struct {
-	Fake *FakeAuthentication
+	Fake *FakeAuthenticationV1beta1
 }

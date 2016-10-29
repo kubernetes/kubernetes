@@ -20,7 +20,7 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/errors:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset/typed/core/unversioned:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/util/errors:go_default_library",
         "//pkg/util/hash:go_default_library",
         "//pkg/util/wait:go_default_library",

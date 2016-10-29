@@ -49,7 +49,7 @@ type clusterRoleBindings struct {
 }
 
 // newClusterRoleBindings returns a ClusterRoleBindings
-func newClusterRoleBindings(c *RbacClient) *clusterRoleBindings {
+func newClusterRoleBindings(c *RbacV1alpha1Client) *clusterRoleBindings {
 	return &clusterRoleBindings{
 		client: c.RESTClient(),
 	}
