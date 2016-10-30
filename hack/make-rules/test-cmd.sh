@@ -1164,6 +1164,14 @@ __EOF__
   # Clean up
   kubectl delete deployment nginx "${kube_flags[@]}"
 
+  ## kubectl run in dry-run mode
+  output_message=$(kubectl run busybox_test --image=busybox --restart=Never --dry-run -o yaml)
+  kube::test::if_has_string "${output_message}" "name: busybox_test"
+
+  ## kubectl run in dry-run mode with attach
+  output_message=$(kubectl run --rm -it busybox_test --image=busybox --restart=Never --dry-run -o yaml)
+  kube::test::if_has_string "${output_message}" "name: busybox_test"
+
   ###############
   # Kubectl get #
   ###############
