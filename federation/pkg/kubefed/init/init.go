@@ -27,6 +27,7 @@ limitations under the License.
 // 6. Add the ability to customize DNS domain suffix. It should probably be derived
 //    from cluster config.
 // 7. Make etcd PVC size configurable.
+// 8. Make API server and controller manager replicas customizable via the HA work.
 package init
 
 import (
@@ -383,6 +384,7 @@ func createAPIServer(clientset *client.Clientset, namespace, name, credentialsNa
 			Labels:    componentLabel,
 		},
 		Spec: extensions.DeploymentSpec{
+			Replicas: 1,
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Name:   name,
@@ -462,6 +464,7 @@ func createControllerManager(clientset *client.Clientset, namespace, name, kubec
 			Labels:    componentLabel,
 		},
 		Spec: extensions.DeploymentSpec{
+			Replicas: 1,
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Name:   name,
