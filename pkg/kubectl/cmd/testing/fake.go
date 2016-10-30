@@ -413,14 +413,23 @@ func (f *fakeAPIFactory) JSONEncoder() runtime.Encoder {
 }
 
 func (f *fakeAPIFactory) ClientSet() (*internalclientset.Clientset, error) {
-	// Swap out the HTTP client out of the client with the fake's version.
+	// Swap the HTTP client out of the REST client with the fake
+	// version.
 	fakeClient := f.tf.Client.(*fake.RESTClient)
-	restClient, err := restclient.RESTClientFor(f.tf.ClientConfig)
-	if err != nil {
-		panic(err)
-	}
-	restClient.Client = fakeClient.Client
-	return internalclientset.New(restClient), f.tf.Err
+	clientset := internalclientset.NewForConfigOrDie(f.tf.ClientConfig)
+	clientset.CoreClient.RESTClient.Client = fakeClient.Client
+	clientset.AuthenticationClient.RESTClient.Client = fakeClient.Client
+	clientset.AuthorizationClient.RESTClient.Client = fakeClient.Client
+	clientset.AutoscalingClient.RESTClient.Client = fakeClient.Client
+	clientset.BatchClient.RESTClient.Client = fakeClient.Client
+	clientset.CertificatesClient.RESTClient.Client = fakeClient.Client
+	clientset.ExtensionsClient.RESTClient.Client = fakeClient.Client
+	clientset.RbacClient.RESTClient.Client = fakeClient.Client
+	clientset.StorageClient.RESTClient.Client = fakeClient.Client
+	clientset.AppsClient.RESTClient.Client = fakeClient.Client
+	clientset.PolicyClient.RESTClient.Client = fakeClient.Client
+	clientset.DiscoveryClient.RESTClient.Client = fakeClient.Client
+	return clientset, f.tf.Err
 }
 
 func (f *fakeAPIFactory) RESTClient() (*restclient.RESTClient, error) {
