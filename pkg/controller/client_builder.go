@@ -119,7 +119,7 @@ func (b SAControllerClientBuilder) Config(name string) (*restclient.Config, erro
 			return b.CoreClient.Secrets(b.Namespace).Watch(options)
 		},
 	}
-	_, err = watch.ListWatchUntil(30*time.Second, lw,
+	_, err = cache.ListWatchUntil(30*time.Second, lw,
 		func(event watch.Event) (bool, error) {
 			switch event.Type {
 			case watch.Deleted:
