@@ -282,13 +282,13 @@ Opaque resources should account opaque integer resources in pods with multiple c
 Opaque resources should not break pods that do not consume opaque integer resources.,ConnorDoyle,0
 Opaque resources should not schedule pods that exceed the available amount of opaque integer resource.,ConnorDoyle,0
 Opaque resources should schedule pods that do consume opaque integer resources.,ConnorDoyle,0
-PersistentVolumes with Single PV - PVC pairs create a PV and a pre-bound PVC: test write access,roberthbailey,1
-PersistentVolumes with Single PV - PVC pairs create a PVC and a pre-bound PV: test write access,piosz,1
-PersistentVolumes with Single PV - PVC pairs create a PVC and non-pre-bound PV: test write access,sttts,1
-PersistentVolumes with Single PV - PVC pairs should create a non-pre-bound PV and PVC: test write access,yujuhong,1
-PersistentVolumes with multiple PVs and PVCs all in same ns should create 2 PVs and 4 PVCs: test write access,brendandburns,1
-PersistentVolumes with multiple PVs and PVCs all in same ns should create 3 PVs and 3 PVCs: test write access,hurf,1
-PersistentVolumes with multiple PVs and PVCs all in same ns should create 4 PVs and 2 PVCs: test write access,jlowdermilk,1
+PersistentVolumes with Single PV - PVC pairs create a PV and a pre-bound PVC: test write access,caesarxuchao,1
+PersistentVolumes with Single PV - PVC pairs create a PVC and a pre-bound PV: test write access,caesarxuchao,1
+PersistentVolumes with Single PV - PVC pairs create a PVC and non-pre-bound PV: test write access,caesarxuchao,1
+PersistentVolumes with Single PV - PVC pairs should create a non-pre-bound PV and PVC: test write access,caesarxuchao,1
+PersistentVolumes with multiple PVs and PVCs all in same ns should create 2 PVs and 4 PVCs: test write access,caesarxuchao,1
+PersistentVolumes with multiple PVs and PVCs all in same ns should create 3 PVs and 3 PVCs: test write access,caesarxuchao,1
+PersistentVolumes with multiple PVs and PVCs all in same ns should create 4 PVs and 2 PVCs: test write access,caesarxuchao,1
 Pet Store should scale to persist a nominal number ( * ) of transactions in * seconds,xiang90,1
 Pet set recreate should recreate evicted statefulset,roberthbailey,1
 "Pod Disks Should schedule a pod w/ a RW PD, gracefully remove it, then schedule it on another host",alex-mohr,1
@@ -453,10 +453,7 @@ k8s.io/kubernetes/cmd/kube-apiserver/app,nikhiljindal,0
 k8s.io/kubernetes/cmd/kube-apiserver/app/options,nikhiljindal,0
 k8s.io/kubernetes/cmd/kube-discovery/app,pmorie,1
 k8s.io/kubernetes/cmd/kube-proxy/app,luxas,1
-k8s.io/kubernetes/cmd/kubeadm/app/cmd,davidopp,1
-k8s.io/kubernetes/cmd/kubeadm/app/images,saad-ali,1
-k8s.io/kubernetes/cmd/kubeadm/app/util,eparis,1
-k8s.io/kubernetes/cmd/kubeadm/app/cmd,vishh,1
+k8s.io/kubernetes/cmd/kubeadm/app/cmd,caesarxuchao,1
 k8s.io/kubernetes/cmd/kubeadm/app/images,davidopp,1
 k8s.io/kubernetes/cmd/kubeadm/app/preflight,apprenda,0
 k8s.io/kubernetes/cmd/kubeadm/app/util,krousey,1
@@ -631,9 +628,9 @@ k8s.io/kubernetes/pkg/kubelet/qos,vishh,0
 k8s.io/kubernetes/pkg/kubelet/rkt,apelisse,1
 k8s.io/kubernetes/pkg/kubelet/rktshim,mml,1
 k8s.io/kubernetes/pkg/kubelet/server,timstclair,0
-k8s.io/kubernetes/pkg/kubelet/server/portforward,saad-ali,1
+k8s.io/kubernetes/pkg/kubelet/server/portforward,caesarxuchao,1
 k8s.io/kubernetes/pkg/kubelet/server/stats,timstclair,0
-k8s.io/kubernetes/pkg/kubelet/server/streaming,derekwaynecarr,1
+k8s.io/kubernetes/pkg/kubelet/server/streaming,caesarxuchao,1
 k8s.io/kubernetes/pkg/kubelet/status,mwielgus,1
 k8s.io/kubernetes/pkg/kubelet/sysctl,piosz,1
 k8s.io/kubernetes/pkg/kubelet/types,jlowdermilk,1
