@@ -874,7 +874,7 @@ admission time; it will need to understand indexes.
 previous container failures.
 - modify the job template, affecting all indexes.
 
-#### Comparison to StatefulSets
+#### Comparison to StatefulSets (previously named PetSets)
 
 The *Index substitution-only* option corresponds roughly to StatefulSet Proposal 1b.
 The `perCompletionArgs` approach is similar to StatefulSet Proposal 1e, but more
