@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	federationapi "k8s.io/kubernetes/federation/apis/federation"
+	kubefedtesting "k8s.io/kubernetes/federation/pkg/kubefed/testing"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -40,11 +41,11 @@ func TestUnjoinFederation(t *testing.T) {
 		cmdErrMsg = str
 	})
 
-	fakeKubeFiles, err := fakeKubeconfigFiles()
+	fakeKubeFiles, err := kubefedtesting.FakeKubeconfigFiles()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer rmFakeKubeconfigFiles(fakeKubeFiles)
+	defer kubefedtesting.RemoveFakeKubeconfigFiles(fakeKubeFiles)
 
 	testCases := []struct {
 		cluster            string
@@ -125,7 +126,7 @@ func TestUnjoinFederation(t *testing.T) {
 		errBuf := bytes.NewBuffer([]byte{})
 
 		hostFactory := fakeUnjoinHostFactory(tc.cluster)
-		adminConfig, err := newFakeAdminConfig(hostFactory, tc.kubeconfigGlobal)
+		adminConfig, err := kubefedtesting.NewFakeAdminConfig(hostFactory, tc.kubeconfigGlobal)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -165,7 +166,7 @@ func testUnjoinFederationFactory(name, server, secret string) cmdutil.Factory {
 
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	codec := testapi.Federation.Codec()
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfig = kubefedtesting.DefaultClientConfig()
 	ns := testapi.Federation.NegotiatedSerializer()
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -180,12 +181,12 @@ func testUnjoinFederationFactory(name, server, secret string) cmdutil.Factory {
 
 				switch m {
 				case http.MethodGet:
-					return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &cluster)}, nil
+					return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &cluster)}, nil
 				case http.MethodDelete:
 					status := unversioned.Status{
 						Status: "Success",
 					}
-					return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &status)}, nil
+					return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &status)}, nil
 				default:
 					return nil, fmt.Errorf("unexpected method: %#v\n%#v", req.URL, req)
 				}
@@ -202,7 +203,7 @@ func fakeUnjoinHostFactory(name string) cmdutil.Factory {
 	urlPrefix := "/api/v1/namespaces/federation-system/secrets/"
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	ns := dynamic.ContentConfig().NegotiatedSerializer
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfig = kubefedtesting.DefaultClientConfig()
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -215,7 +216,7 @@ func fakeUnjoinHostFactory(name string) cmdutil.Factory {
 				status := unversioned.Status{
 					Status: "Success",
 				}
-				return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &status)}, nil
+				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &status)}, nil
 			default:
 				return nil, fmt.Errorf("unexpected request: %#v\n%#v", req.URL, req)
 			}
