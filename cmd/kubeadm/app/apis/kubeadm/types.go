@@ -18,6 +18,16 @@ package kubeadm
 
 import "k8s.io/kubernetes/pkg/api/unversioned"
 
+type EnvParams struct {
+	KubernetesDir     string
+	HostPKIPath       string
+	HostEtcdPath      string
+	HyperkubeImage    string
+	DiscoveryImage    string
+	EtcdImage         string
+	ComponentLoglevel string
+}
+
 type MasterConfiguration struct {
 	unversioned.TypeMeta
 
