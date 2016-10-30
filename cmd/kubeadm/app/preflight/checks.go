@@ -216,7 +216,7 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		InPathCheck{executable: "touch", mandatory: false},
 	}
 
-	return runChecks(checks)
+	return runChecks(checks, os.Stderr)
 }
 
 func RunJoinNodeChecks() error {
@@ -240,7 +240,7 @@ func RunJoinNodeChecks() error {
 		InPathCheck{executable: "touch", mandatory: false},
 	}
 
-	return runChecks(checks)
+	return runChecks(checks, os.Stderr)
 }
 
 func RunResetCheck() error {
@@ -248,17 +248,17 @@ func RunResetCheck() error {
 		IsRootCheck{root: true},
 	}
 
-	return runChecks(checks)
+	return runChecks(checks, os.Stderr)
 }
 
 // runChecks runs each check, displays it's warnings/errors, and once all
 // are processed will exit if any errors occurred.
-func runChecks(checks []PreFlightCheck) error {
+func runChecks(checks []PreFlightCheck, ww io.Writer) error {
 	found := []error{}
 	for _, c := range checks {
 		warnings, errs := c.Check()
 		for _, w := range warnings {
-			fmt.Printf("WARNING: %s\n", w)
+			io.WriteString(ww, fmt.Sprintf("WARNING: %s\n", w))
 		}
 		for _, e := range errs {
 			found = append(found, e)
