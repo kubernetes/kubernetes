@@ -167,8 +167,8 @@ If an error is returned the service create failed.
 
 ## Step 2: Use a StatefulSet to create Cassandra Ring
 
-StatefulSets are a new feature that was added as an <i>Alpha</i> component in Kubernetes
-1.3.  Deploying stateful distributed applications, like Cassandra, within a clustered
+StatefulSets (previously PetSets) are a new feature that was added as an <i>Alpha</i> component in
+Kubernetes 1.3.  Deploying stateful distributed applications, like Cassandra, within a clustered
 environment can be challenging.  We implemented StatefulSet to greatly simplify this
 process.  Multiple StatefulSet features are used within this example, but is out of
 scope of this documentation.  [Please refer to the PetSet documentation.](http://kubernetes.io/docs/user-guide/petset/)
