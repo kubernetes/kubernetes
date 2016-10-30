@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -658,11 +659,11 @@ func createPods(ifCreateNewPods bool) (map[string]api.Pod, []api.Pod) {
 		if ifCreateNewPods {
 			uid = types.UID(i)
 		} else {
-			uid = types.UID(string(i) + string(i))
+			uid = types.UID(strconv.Itoa(i) + strconv.Itoa(i))
 		}
 		pod := api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				Name:       "pod" + string(i),
+				Name:       "pod" + strconv.Itoa(i),
 				Namespace:  "default",
 				UID:        uid,
 				Generation: int64(i),
