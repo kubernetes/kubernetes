@@ -24,6 +24,8 @@ import (
 	"testing"
 
 	federationapi "k8s.io/kubernetes/federation/apis/federation"
+	kubefedtesting "k8s.io/kubernetes/federation/pkg/kubefed/testing"
+	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -109,7 +111,7 @@ func TestUnjoinFederation(t *testing.T) {
 		errBuf := bytes.NewBuffer([]byte{})
 
 		hostFactory := fakeUnjoinHostFactory(tc.cluster)
-		adminConfig, err := newFakeAdminConfig(hostFactory, tc.kubeconfigGlobal)
+		adminConfig, err := kubefedtesting.NewFakeAdminConfig(hostFactory, tc.kubeconfigGlobal)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -149,7 +151,7 @@ func testUnjoinFederationFactory(name, server, secret string) cmdutil.Factory {
 
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	codec := testapi.Federation.Codec()
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfig = kubefedtesting.DefaultClientConfig()
 	ns := testapi.Federation.NegotiatedSerializer()
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -186,7 +188,7 @@ func fakeUnjoinHostFactory(name string) cmdutil.Factory {
 	urlPrefix := "/api/v1/namespaces/federation-system/secrets/"
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	ns := dynamic.ContentConfig().NegotiatedSerializer
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfig = kubefedtesting.DefaultClientConfig()
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {

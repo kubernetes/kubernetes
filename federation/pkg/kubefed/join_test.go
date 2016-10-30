@@ -26,6 +26,8 @@ import (
 	"testing"
 
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
+	kubefedtesting "k8s.io/kubernetes/federation/pkg/kubefed/testing"
+	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -110,7 +112,7 @@ func TestJoinFederation(t *testing.T) {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
 
-		adminConfig, err := newFakeAdminConfig(hostFactory, tc.kubeconfigGlobal)
+		adminConfig, err := kubefedtesting.NewFakeAdminConfig(hostFactory, tc.kubeconfigGlobal)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -171,30 +173,6 @@ func testJoinFederationFactory(name, server string) cmdutil.Factory {
 	return f
 }
 
-type fakeAdminConfig struct {
-	pathOptions *clientcmd.PathOptions
-	hostFactory cmdutil.Factory
-}
-
-func newFakeAdminConfig(f cmdutil.Factory, kubeconfigGlobal string) (AdminConfig, error) {
-	pathOptions := clientcmd.NewDefaultPathOptions()
-	pathOptions.GlobalFile = kubeconfigGlobal
-	pathOptions.EnvVar = ""
-
-	return &fakeAdminConfig{
-		pathOptions: pathOptions,
-		hostFactory: f,
-	}, nil
-}
-
-func (f *fakeAdminConfig) PathOptions() *clientcmd.PathOptions {
-	return f.pathOptions
-}
-
-func (f *fakeAdminConfig) HostFactory(host, kubeconfigPath string) cmdutil.Factory {
-	return f.hostFactory
-}
-
 func fakeJoinHostFactory(name, server, token string) (cmdutil.Factory, error) {
 	kubeconfig := clientcmdapi.Config{
 		Clusters: map[string]*clientcmdapi.Cluster{
@@ -226,7 +204,7 @@ func fakeJoinHostFactory(name, server, token string) (cmdutil.Factory, error) {
 		},
 		ObjectMeta: v1.ObjectMeta{
 			Name:      name,
-			Namespace: "federation-system",
+			Namespace: util.DefaultFederationSystemNamespace,
 		},
 		Data: map[string][]byte{
 			"kubeconfig": configBytes,
@@ -235,7 +213,7 @@ func fakeJoinHostFactory(name, server, token string) (cmdutil.Factory, error) {
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	ns := dynamic.ContentConfig().NegotiatedSerializer
-	tf.ClientConfig = defaultClientConfig()
+	tf.ClientConfig = kubefedtesting.DefaultClientConfig()
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -276,116 +254,6 @@ func fakeCluster(name, server string) federationapi.Cluster {
 			SecretRef: &v1.LocalObjectReference{
 				Name: name,
 			},
-		},
-	}
-}
-
-func fakeKubeconfigFiles() ([]string, error) {
-	kubeconfigs := []clientcmdapi.Config{
-		{
-			Clusters: map[string]*clientcmdapi.Cluster{
-				"syndicate": {
-					Server: "https://10.20.30.40",
-				},
-			},
-			AuthInfos: map[string]*clientcmdapi.AuthInfo{
-				"syndicate": {
-					Token: "badge",
-				},
-			},
-			Contexts: map[string]*clientcmdapi.Context{
-				"syndicate": {
-					Cluster:  "syndicate",
-					AuthInfo: "syndicate",
-				},
-			},
-			CurrentContext: "syndicate",
-		},
-		{
-			Clusters: map[string]*clientcmdapi.Cluster{
-				"ally": {
-					Server: "ally256.example.com:80",
-				},
-			},
-			AuthInfos: map[string]*clientcmdapi.AuthInfo{
-				"ally": {
-					Token: "souvenir",
-				},
-			},
-			Contexts: map[string]*clientcmdapi.Context{
-				"ally": {
-					Cluster:  "ally",
-					AuthInfo: "ally",
-				},
-			},
-			CurrentContext: "ally",
-		},
-		{
-			Clusters: map[string]*clientcmdapi.Cluster{
-				"ally": {
-					Server: "https://ally64.example.com",
-				},
-				"confederate": {
-					Server: "10.8.8.8",
-				},
-			},
-			AuthInfos: map[string]*clientcmdapi.AuthInfo{
-				"ally": {
-					Token: "souvenir",
-				},
-				"confederate": {
-					Token: "totem",
-				},
-			},
-			Contexts: map[string]*clientcmdapi.Context{
-				"ally": {
-					Cluster:  "ally",
-					AuthInfo: "ally",
-				},
-				"confederate": {
-					Cluster:  "confederate",
-					AuthInfo: "confederate",
-				},
-			},
-			CurrentContext: "confederate",
-		},
-	}
-	kubefiles := []string{}
-	for _, cfg := range kubeconfigs {
-		fakeKubeFile, _ := ioutil.TempFile("", "")
-		err := clientcmd.WriteToFile(cfg, fakeKubeFile.Name())
-		if err != nil {
-			return nil, err
-		}
-
-		kubefiles = append(kubefiles, fakeKubeFile.Name())
-	}
-	return kubefiles, nil
-}
-
-func rmFakeKubeconfigFiles(kubefiles []string) {
-	for _, file := range kubefiles {
-		os.Remove(file)
-	}
-}
-
-func defaultHeader() http.Header {
-	header := http.Header{}
-	header.Set("Content-Type", runtime.ContentTypeJSON)
-	return header
-}
-
-func objBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
-	return ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, obj))))
-}
-
-func defaultClientConfig() *restclient.Config {
-	return &restclient.Config{
-		APIPath: "/api",
-		ContentConfig: restclient.ContentConfig{
-			NegotiatedSerializer: api.Codecs,
-			ContentType:          runtime.ContentTypeJSON,
-			GroupVersion:         &registered.GroupOrDie(api.GroupName).GroupVersion,
 		},
 	}
 }
