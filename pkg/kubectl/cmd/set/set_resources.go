@@ -52,7 +52,7 @@ var (
 		kubectl set resources deployment nginx --limits=cpu=0,memory=0 --requests=cpu=0,memory=0
 
 		# Print the result (in yaml format) of updating nginx container limits from a local, without hitting the server
-		kubectl set resources -f path/to/file.yaml --limits=cpu=200m,memory=512Mi --dry-run -o yaml`)
+		kubectl set resources -f path/to/file.yaml --limits=cpu=200m,memory=512Mi --local -o yaml`)
 )
 
 // ResourcesOptions is the start of the data required to perform the operation. As new fields are added, add them here instead of
@@ -72,6 +72,7 @@ type ResourcesOptions struct {
 	All               bool
 	Record            bool
 	ChangeCause       string
+	Local             bool
 	Cmd               *cobra.Command
 
 	Limits               string
@@ -114,6 +115,7 @@ func NewCmdResources(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.
 	cmd.Flags().BoolVar(&options.All, "all", false, "select all resources in the namespace of the specified resource types")
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().StringVarP(&options.ContainerSelector, "containers", "c", "*", "The names of containers in the selected pod templates to change, all containers are selected by default - may use wildcards")
+	cmd.Flags().BoolVar(&options.Local, "local", false, "If true, set resources will NOT contact api-server but run locally.")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmd.Flags().StringVar(&options.Limits, "limits", options.Limits, "The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges.")
@@ -142,7 +144,7 @@ func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 		//FilenameParam(enforceNamespace, o.Filenames...).
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		Flatten()
-	if !cmdutil.GetDryRunFlag(cmd) {
+	if !o.Local {
 		builder = builder.
 			SelectorParam(o.Selector).
 			ResourceTypeOrNameArgs(o.All, args...).
@@ -159,7 +161,7 @@ func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 func (o *ResourcesOptions) Validate() error {
 	var err error
 	if len(o.Limits) == 0 && len(o.Requests) == 0 {
-		return fmt.Errorf("you must specify an update to requests or limits or  (in the form of --requests/--limits)")
+		return fmt.Errorf("you must specify an update to requests or limits (in the form of --requests/--limits)")
 	}
 
 	o.ResourceRequirements, err = kubectl.HandleResourceRequirements(map[string]string{"limits": o.Limits, "requests": o.Requests})
@@ -178,7 +180,19 @@ func (o *ResourcesOptions) Run() error {
 			containers, _ := selectContainers(spec.Containers, o.ContainerSelector)
 			if len(containers) != 0 {
 				for i := range containers {
-					containers[i].Resources = o.ResourceRequirements
+					if len(o.Limits) != 0 && len(containers[i].Resources.Limits) == 0 {
+						containers[i].Resources.Limits = make(api.ResourceList)
+					}
+					for key, value := range o.ResourceRequirements.Limits {
+						containers[i].Resources.Limits[key] = value
+					}
+
+					if len(o.Requests) != 0 && len(containers[i].Resources.Requests) == 0 {
+						containers[i].Resources.Requests = make(api.ResourceList)
+					}
+					for key, value := range o.ResourceRequirements.Requests {
+						containers[i].Resources.Requests[key] = value
+					}
 					transformed = true
 				}
 			} else {
@@ -202,8 +216,7 @@ func (o *ResourcesOptions) Run() error {
 			continue
 		}
 
-		if cmdutil.GetDryRunFlag(o.Cmd) {
-			fmt.Fprintln(o.Err, "info: running in local mode...")
+		if o.Local || cmdutil.GetDryRunFlag(o.Cmd) {
 			return o.PrintObject(o.Cmd, o.Mapper, info.Object, o.Out)
 		}
 
