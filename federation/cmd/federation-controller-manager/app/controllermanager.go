@@ -24,9 +24,11 @@ import (
 	"net"
 	"net/http"
 	"net/http/pprof"
+	"os"
 	"strconv"
 
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
+	//federationinternalclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/federation/cmd/federation-controller-manager/app/options"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	clustercontroller "k8s.io/kubernetes/federation/pkg/federation-controller/cluster"
@@ -38,6 +40,12 @@ import (
 	secretcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/secret"
 	servicecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/service"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	"k8s.io/kubernetes/pkg/api"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
+	"k8s.io/kubernetes/pkg/client/leaderelection"
+	"k8s.io/kubernetes/pkg/client/leaderelection/resourcelock"
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/healthz"
@@ -111,6 +119,25 @@ func Run(s *options.CMServer) error {
 	// Override restClientCfg qps/burst settings from flags
 	restClientCfg.QPS = s.APIServerQPS
 	restClientCfg.Burst = s.APIServerBurst
+	if err != nil {
+		glog.Fatalf("Invalid API configuration: %v", err)
+	}
+
+	kubeconfig, err := clientcmd.BuildConfigFromFlags(s.Master, s.Kubeconfig)
+	if err != nil {
+		return err
+	}
+
+	kubeconfig.ContentConfig.ContentType = s.ContentType
+	// Override kubeconfig qps/burst settings from flags
+	kubeconfig.QPS = s.APIServerQPS
+	kubeconfig.Burst = s.APIServerBurst
+	kubeClient, err := clientset.NewForConfig(restclient.AddUserAgent(kubeconfig, "federation-controller-manager"))
+	if err != nil {
+		glog.Fatalf("Invalid API configuration: %v", err)
+	}
+	leaderElectionClient := clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "leader-election"))
+	//leaderElectionClient := federationinternalclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "leader-election"))
 
 	go func() {
 		mux := http.NewServeMux()
@@ -129,12 +156,54 @@ func Run(s *options.CMServer) error {
 		glog.Fatal(server.ListenAndServe())
 	}()
 
-	run := func() {
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartLogging(glog.Infof)
+	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: kubeClient.Core().Events("")})
+	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "federation-controller-manager"})
+
+	//run := func() {
+	run := func(stop <-chan struct{}) {
 		err := StartControllers(s, restClientCfg)
 		glog.Fatalf("error running controllers: %v", err)
 		panic("unreachable")
 	}
-	run()
+
+	if !s.LeaderElection.LeaderElect {
+		run(nil)
+		panic("unreachable")
+	}
+
+	id, err := os.Hostname()
+	if err != nil {
+		return err
+	}
+
+	// TODO: enable other lock types
+	rl := resourcelock.EndpointsLock{
+		EndpointsMeta: api.ObjectMeta{
+			Namespace: "federation",
+			Name:      "federation-controller-manager",
+		},
+		Client: leaderElectionClient,
+		LockConfig: resourcelock.ResourceLockConfig{
+			Identity:      id,
+			EventRecorder: recorder,
+		},
+	}
+
+	leaderelection.RunOrDie(leaderelection.LeaderElectionConfig{
+		Lock:          &rl,
+		LeaseDuration: s.LeaderElection.LeaseDuration.Duration,
+		RenewDeadline: s.LeaderElection.RenewDeadline.Duration,
+		RetryPeriod:   s.LeaderElection.RetryPeriod.Duration,
+		Callbacks: leaderelection.LeaderCallbacks{
+			OnStartedLeading: run,
+			OnStoppedLeading: func() {
+				glog.Fatalf("leaderelection lost")
+			},
+		},
+	})
+	//run()
 	panic("unreachable")
 }
 
