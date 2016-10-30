@@ -94,14 +94,14 @@ var (
 
 // NewCmdInit defines the `init` command that bootstraps a federation
 // control plane inside a set of host clusters.
-func NewCmdInit(f cmdutil.Factory, cmdOut io.Writer, config util.AdminConfig) *cobra.Command {
+func NewCmdInit(cmdOut io.Writer, config util.AdminConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "init FEDERATION_NAME --host-cluster-context=HOST_CONTEXT",
 		Short:   "init initializes a federation control plane",
 		Long:    init_long,
 		Example: init_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := initFederation(f, cmdOut, config, cmd, args)
+			err := initFederation(cmdOut, config, cmd, args)
 			cmdutil.CheckErr(err)
 		},
 	}
@@ -120,7 +120,7 @@ type entityKeyPairs struct {
 // initFederation initializes a federation control plane.
 // See the design doc in https://github.com/kubernetes/kubernetes/pull/34484
 // for details.
-func initFederation(f cmdutil.Factory, cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Command, args []string) error {
+func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Command, args []string) error {
 	initFlags, err := util.GetSubcommandFlags(cmd, args)
 	if err != nil {
 		return err
