@@ -242,7 +242,7 @@ func waitForLoadBalancerAddress(clientset *client.Clientset, svc *api.Service) (
 	ips := []string{}
 	hostnames := []string{}
 
-	err := wait.PollInfinite(lbAddrRetryInterval, func() (bool, error) {
+	err := pollImmediateInfinite(lbAddrRetryInterval, func() (bool, error) {
 		pollSvc, err := clientset.Core().Services(svc.Namespace).Get(svc.Name)
 		if err != nil {
 			return false, nil
@@ -528,3 +528,13 @@ func printSuccess(cmdOut io.Writer, ips, hostnames []string) error {
 	return err
 }
 
+func pollImmediateInfinite(interval time.Duration, condition wait.ConditionFunc) error {
+	done, err := condition()
+	if err != nil {
+		return err
+	}
+	if done {
+		return nil
+	}
+	return wait.PollInfinite(interval, condition)
+}
