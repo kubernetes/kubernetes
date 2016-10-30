@@ -234,6 +234,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 				NewCmdExplain(f, out, err),
 				NewCmdEdit(f, out, err),
 				NewCmdDelete(f, out),
+				NewCmdJoin(f, out),
 			},
 		},
 		{
