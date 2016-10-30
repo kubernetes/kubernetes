@@ -10669,7 +10669,7 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//vendor:github.com/juju/ratelimit",
+        "//pkg/util/ratelimit:go_default_library",
         "//vendor:k8s.io/client-go/pkg/util/clock",
         "//vendor:k8s.io/client-go/pkg/util/integer",
     ],
