@@ -33,6 +33,7 @@ docs/man/man1/kubectl-config-view.1
 docs/man/man1/kubectl-config.1
 docs/man/man1/kubectl-convert.1
 docs/man/man1/kubectl-cordon.1
+docs/man/man1/kubectl-cp.1
 docs/man/man1/kubectl-create-configmap.1
 docs/man/man1/kubectl-create-deployment.1
 docs/man/man1/kubectl-create-namespace.1
@@ -107,6 +108,7 @@ docs/user-guide/kubectl/kubectl_config_use-context.md
 docs/user-guide/kubectl/kubectl_config_view.md
 docs/user-guide/kubectl/kubectl_convert.md
 docs/user-guide/kubectl/kubectl_cordon.md
+docs/user-guide/kubectl/kubectl_cp.md
 docs/user-guide/kubectl/kubectl_create.md
 docs/user-guide/kubectl/kubectl_create_configmap.md
 docs/user-guide/kubectl/kubectl_create_deployment.md
@@ -165,6 +167,7 @@ docs/yaml/kubectl/kubectl_completion.yaml
 docs/yaml/kubectl/kubectl_config.yaml
 docs/yaml/kubectl/kubectl_convert.yaml
 docs/yaml/kubectl/kubectl_cordon.yaml
+docs/yaml/kubectl/kubectl_cp.yaml
 docs/yaml/kubectl/kubectl_create.yaml
 docs/yaml/kubectl/kubectl_delete.yaml
 docs/yaml/kubectl/kubectl_describe.yaml
