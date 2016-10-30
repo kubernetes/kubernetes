@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/maps"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
@@ -49,14 +50,24 @@ var ErrNoNodesAvailable = fmt.Errorf("no nodes available to schedule pods")
 func (f *FitError) Error() string {
 	var buf bytes.Buffer
 	buf.WriteString(fmt.Sprintf("pod (%s) failed to fit in any node\n", f.Pod.Name))
-	for node, predicates := range f.FailedPredicates {
-		reasons := make([]string, 0)
+	reasons := maps.NewCounter()
+	for _, predicates := range f.FailedPredicates {
 		for _, pred := range predicates {
-			reasons = append(reasons, pred.GetReason())
+			reasons.Incr(pred.GetReason())
 		}
-		reasonMsg := fmt.Sprintf("fit failure on node (%s): %s\n", node, strings.Join(reasons, ", "))
-		buf.WriteString(reasonMsg)
 	}
+
+	sortReasonsHistogram := func() []string {
+		reasonStrings := []string{}
+		for k, v := range reasons.Values() {
+			reasonStrings = append(reasonStrings, fmt.Sprintf("%v (%v)", k, v))
+		}
+		sort.Strings(reasonStrings)
+		return reasonStrings
+	}
+
+	reasonMsg := fmt.Sprintf("fit failure summary on nodes : %v", strings.Join(sortReasonsHistogram(), ","))
+	buf.WriteString(reasonMsg)
 	return buf.String()
 }
 
