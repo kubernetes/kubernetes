@@ -25,7 +25,9 @@ import (
 	"os/exec"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/util/initsystem"
+	"k8s.io/kubernetes/pkg/util/node"
 )
 
 type PreFlightError struct {
@@ -170,10 +172,24 @@ func (ipc InPathCheck) Check() (warnings, errors []error) {
 	return nil, nil
 }
 
+// HostnameCheck checks if hostname match dns sub domain regex.
+// If hostname doesn't match this regex, kubelet will not launch static pods like kube-apiserver/kube-controller-manager and so on.
+type HostnameCheck struct{}
+
+func (hc HostnameCheck) Check() (warnings, errors []error) {
+	errors = []error{}
+	hostname := node.GetHostname("")
+	for _, msg := range validation.ValidateNodeName(hostname, false) {
+		errors = append(errors, fmt.Errorf("hostname \"%s\" %s", hostname, msg))
+	}
+	return nil, errors
+}
+
 func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 	// TODO: Some of these ports should come from kubeadm config eventually:
 	checks := []PreFlightCheck{
 		IsRootCheck{root: true},
+		HostnameCheck{},
 		ServiceCheck{Service: "kubelet"},
 		ServiceCheck{Service: "docker"},
 		PortOpenCheck{port: int(cfg.API.BindPort)},
@@ -207,6 +223,7 @@ func RunJoinNodeChecks() error {
 	// TODO: Some of these ports should come from kubeadm config eventually:
 	checks := []PreFlightCheck{
 		IsRootCheck{root: true},
+		HostnameCheck{},
 		ServiceCheck{Service: "docker"},
 		ServiceCheck{Service: "kubelet"},
 		PortOpenCheck{port: 10250},
