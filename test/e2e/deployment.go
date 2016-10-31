@@ -1136,6 +1136,9 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	err = framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
 	Expect(err).NotTo(HaveOccurred())
 
+	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment)))
+	Expect(framework.WaitForDeploymentStatusValid(c, deployment)).NotTo(HaveOccurred())
+
 	oldRSs, _, rs, err := deploymentutil.GetAllReplicaSets(deployment, c)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -1148,10 +1151,6 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 		err = fmt.Errorf("unexpected desiredReplicas annotation %d for replica set %q", desired, rs.Name)
 		Expect(err).NotTo(HaveOccurred())
 	}
-
-	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment)))
-	err = framework.WaitForDeploymentStatusValid(c, deployment)
-	Expect(err).NotTo(HaveOccurred())
 
 	// Update the deployment with a non-existent image so that the new replica set will be blocked.
 	By(fmt.Sprintf("Updating deployment %q with a non-existent image", deploymentName))
@@ -1197,6 +1196,9 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	err = framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
 	Expect(err).NotTo(HaveOccurred())
 
+	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment)))
+	Expect(framework.WaitForDeploymentStatusValid(c, deployment)).NotTo(HaveOccurred())
+
 	oldRSs, _, rs, err = deploymentutil.GetAllReplicaSets(deployment, c)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -1209,10 +1211,6 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 		err = fmt.Errorf("unexpected desiredReplicas annotation %d for replica set %q", desired, rs.Name)
 		Expect(err).NotTo(HaveOccurred())
 	}
-
-	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment)))
-	err = framework.WaitForDeploymentStatusValid(c, deployment)
-	Expect(err).NotTo(HaveOccurred())
 }
 
 func testOverlappingDeployment(f *framework.Framework) {
