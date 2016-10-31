@@ -66,7 +66,9 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	server, storageConfig := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
 
 	config := &Config{
-		GenericConfig: genericapiserver.NewConfig(),
+		GenericConfig:        genericapiserver.NewConfig(),
+		APIServerServicePort: 443,
+		MasterCount:          1,
 	}
 
 	resourceEncoding := genericapiserver.NewDefaultResourceEncodingConfig()
@@ -140,16 +142,6 @@ func newLimitedMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Confi
 	}
 
 	return master, etcdserver, config, assert
-}
-
-// TestNew verifies that the New function returns a Master
-// using the configuration properly.
-func TestNew(t *testing.T) {
-	master, etcdserver, _, assert := newMaster(t)
-	defer etcdserver.Terminate(t)
-
-	// these values get defaulted
-	assert.Equal(master.GenericAPIServer.MasterCount, 1)
 }
 
 // TestVersion tests /version

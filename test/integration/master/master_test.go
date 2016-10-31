@@ -425,11 +425,11 @@ func TestMasterService(t *testing.T) {
 
 func TestServiceAlloc(t *testing.T) {
 	cfg := framework.NewIntegrationTestMasterConfig()
-	_, cidr, err := net.ParseCIDR("192.168.0.0/30")
+	_, cidr, err := net.ParseCIDR("192.168.0.0/29")
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)
 	}
-	cfg.GenericConfig.ServiceClusterIPRange = cidr
+	cfg.ServiceIPRange = *cidr
 	_, s := framework.RunAMaster(cfg)
 	defer s.Close()
 
@@ -460,13 +460,15 @@ func TestServiceAlloc(t *testing.T) {
 		t.Fatalf("creating kubernetes service timed out")
 	}
 
-	// Make a service.
-	if _, err := client.Core().Services(api.NamespaceDefault).Create(svc(1)); err != nil {
-		t.Fatalf("got unexpected error: %v", err)
+	// make 5 more services to take up all IPs
+	for i := 0; i < 5; i++ {
+		if _, err := client.Core().Services(api.NamespaceDefault).Create(svc(i)); err != nil {
+			t.Error(err)
+		}
 	}
 
-	// Make a second service. It will fail because we're out of cluster IPs
-	if _, err := client.Core().Services(api.NamespaceDefault).Create(svc(2)); err != nil {
+	// Make another service. It will fail because we're out of cluster IPs
+	if _, err := client.Core().Services(api.NamespaceDefault).Create(svc(8)); err != nil {
 		if !strings.Contains(err.Error(), "range is full") {
 			t.Errorf("unexpected error text: %v", err)
 		}
@@ -488,7 +490,7 @@ func TestServiceAlloc(t *testing.T) {
 	}
 
 	// This time creating the second service should work.
-	if _, err := client.Core().Services(api.NamespaceDefault).Create(svc(2)); err != nil {
+	if _, err := client.Core().Services(api.NamespaceDefault).Create(svc(8)); err != nil {
 		t.Fatalf("got unexpected error: %v", err)
 	}
 }
