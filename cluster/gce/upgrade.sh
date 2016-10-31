@@ -250,7 +250,7 @@ function do-node-upgrade() {
   for group in ${INSTANCE_GROUPS[@]}; do
     old_templates+=($(gcloud compute instance-groups managed list \
         --project="${PROJECT}" \
-        --zone="${ZONE}" \
+        --zones="${ZONE}" \
         --regexp="${group}" \
         --format='value(instanceTemplate)' || true))
     update=$(gcloud alpha compute rolling-updates \
