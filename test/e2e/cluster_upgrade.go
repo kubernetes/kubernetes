@@ -25,13 +25,13 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/chaosmonkey"
+	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 )
 
 // TODO(mikedanese): Add setup, validate, and teardown for:
-//  - secrets
 //  - volumes
 //  - persistent volumes
 var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
@@ -48,6 +48,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 			cm.Register(func(sem *chaosmonkey.Semaphore) {
 				// Close over f.
 				testServiceRemainsUp(f, sem)
+				testSecretsDuringUpgrade(f, sem)
 			})
 			cm.Do()
 		})
@@ -64,6 +65,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 			cm.Register(func(sem *chaosmonkey.Semaphore) {
 				// Close over f.
 				testServiceUpBeforeAndAfter(f, sem)
+				testSecretsBeforeAndAfterUpgrade(f, sem)
 			})
 			cm.Do()
 		})
@@ -78,6 +80,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 			cm.Register(func(sem *chaosmonkey.Semaphore) {
 				// Close over f.
 				testServiceRemainsUp(f, sem)
+				testSecretsDuringUpgrade(f, sem)
 			})
 			cm.Do()
 		})
@@ -96,6 +99,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 			cm.Register(func(sem *chaosmonkey.Semaphore) {
 				// Close over f.
 				testServiceUpBeforeAndAfter(f, sem)
+				testSecretsBeforeAndAfterUpgrade(f, sem)
 			})
 			cm.Do()
 		})
@@ -112,6 +116,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 			cm.Register(func(sem *chaosmonkey.Semaphore) {
 				// Close over f.
 				testServiceRemainsUp(f, sem)
+				testSecretsDuringUpgrade(f, sem)
 			})
 			cm.Do()
 		})
@@ -227,4 +232,41 @@ func checkNodesVersions(cs clientset.Interface, want string) error {
 		}
 	}
 	return nil
+}
+
+func testSecretsBeforeAndAfterUpgrade(f *framework.Framework, sem *chaosmonkey.Semaphore) {
+	testSecrets(f, sem, false)
+}
+
+func testSecretsDuringUpgrade(f *framework.Framework, sem *chaosmonkey.Semaphore) {
+	testSecrets(f, sem, true)
+}
+
+func testSecrets(f *framework.Framework, sem *chaosmonkey.Semaphore, testDuringDisruption bool) {
+	// Setup
+	pod, expectedOutput := common.DoSecretE2EMultipleVolumesSetup(f)
+
+	// Validate
+	By("consume secret before upgrade")
+	common.DoSecretE2EMultipleVolumesValidate(f, pod, expectedOutput)
+
+	sem.Ready()
+
+	if testDuringDisruption {
+		// Continuously validate
+		wait.Until(func() {
+			By("consume secret during upgrade")
+			common.DoSecretE2EMultipleVolumesValidate(f, pod, expectedOutput)
+		}, framework.Poll, sem.StopCh)
+	} else {
+		// Block until chaosmonkey is done
+		By("waiting for upgrade to finish without consuming secrets")
+		<-sem.StopCh
+	}
+
+	// Validate after upgrade
+	By("consume secret after upgrade")
+	common.DoSecretE2EMultipleVolumesValidate(f, pod, expectedOutput)
+
+	// Teardown
 }
