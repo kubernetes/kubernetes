@@ -165,6 +165,7 @@ TARGET_STORAGE="etcd3" \
   ETCD=$(which etcd) \
   ETCDCTL=$(which etcdctl) \
   ATTACHLEASE="${KUBE_OUTPUT_HOSTBIN}/attachlease" \
+  DO_NOT_MOVE_BINARIES="true" \
   ${KUBE_ROOT}/cluster/images/etcd/migrate-if-needed.sh
 kube::etcd::start
 
