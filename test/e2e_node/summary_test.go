@@ -74,7 +74,7 @@ var _ = framework.KubeDescribe("Summary API", func() {
 					// We don't limit system container memory.
 					"AvailableBytes":  BeNil(),
 					"UsageBytes":      bounded(1*mb, 10*gb),
-					"WorkingSetBytes": bounded(1*mb, 1*gb),
+					"WorkingSetBytes": bounded(1*mb, 10*gb),
 					"RSSBytes":        bounded(1*mb, 1*gb),
 					"PageFaults":      bounded(1000, 1E9),
 					"MajorPageFaults": bounded(0, 100000),
