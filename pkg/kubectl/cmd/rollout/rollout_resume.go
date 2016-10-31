@@ -17,12 +17,15 @@ limitations under the License.
 package rollout
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -35,10 +38,11 @@ import (
 type ResumeConfig struct {
 	resource.FilenameOptions
 
-	ResumeObject func(object runtime.Object) (bool, error)
-	Mapper       meta.RESTMapper
-	Typer        runtime.ObjectTyper
-	Infos        []*resource.Info
+	Resumer func(object *resource.Info) (bool, error)
+	Mapper  meta.RESTMapper
+	Typer   runtime.ObjectTyper
+	Encoder runtime.Encoder
+	Infos   []*resource.Info
 
 	Out io.Writer
 }
@@ -94,7 +98,9 @@ func (o *ResumeConfig) CompleteResume(f cmdutil.Factory, cmd *cobra.Command, out
 	}
 
 	o.Mapper, o.Typer = f.Object()
-	o.ResumeObject = f.ResumeObject
+	o.Encoder = f.JSONEncoder()
+
+	o.Resumer = f.Resumer
 	o.Out = out
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
@@ -130,17 +136,28 @@ func (o *ResumeConfig) CompleteResume(f cmdutil.Factory, cmd *cobra.Command, out
 
 func (o ResumeConfig) RunResume() error {
 	allErrs := []error{}
-	for _, info := range o.Infos {
-		isAlreadyResumed, err := o.ResumeObject(info.Object)
-		if err != nil {
-			allErrs = append(allErrs, cmdutil.AddSourceToErr("resuming", info.Source, err))
+	for _, patch := range set.CalculatePatches(o.Infos, o.Encoder, o.Resumer) {
+		info := patch.Info
+
+		if patch.Err != nil {
+			allErrs = append(allErrs, fmt.Errorf("error: %s %q %v", info.Mapping.Resource, info.Name, patch.Err))
 			continue
 		}
-		if isAlreadyResumed {
+
+		if string(patch.Patch) == "{}" || len(patch.Patch) == 0 {
 			cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "already resumed")
 			continue
 		}
+
+		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch.Patch)
+		if err != nil {
+			allErrs = append(allErrs, fmt.Errorf("failed to patch: %v", err))
+			continue
+		}
+
+		info.Refresh(obj, true)
 		cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, false, "resumed")
 	}
+
 	return utilerrors.NewAggregate(allErrs)
 }

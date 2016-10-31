@@ -129,10 +129,10 @@ type Factory interface {
 	LabelsForObject(object runtime.Object) (map[string]string, error)
 	// LogsForObject returns a request for the logs associated with the provided object
 	LogsForObject(object, options runtime.Object) (*restclient.Request, error)
-	// PauseObject marks the provided object as paused ie. it will not be reconciled by its controller.
-	PauseObject(object runtime.Object) (bool, error)
-	// ResumeObject resumes a paused object ie. it will be reconciled by its controller.
-	ResumeObject(object runtime.Object) (bool, error)
+	// Pauser marks the object in the info as paused ie. it will not be reconciled by its controller.
+	Pauser(info *resource.Info) (bool, error)
+	// Resumer resumes a paused object inside the info ie. it will be reconciled by its controller.
+	Resumer(info *resource.Info) (bool, error)
 	// Returns a schema that can validate objects stored on disk.
 	Validator(validate bool, cacheDir string) (validation.Schema, error)
 	// SwaggerSchema returns the schema declaration for the provided group version kind.
@@ -644,49 +644,29 @@ func (f *factory) LogsForObject(object, options runtime.Object) (*restclient.Req
 	}
 }
 
-func (f *factory) PauseObject(object runtime.Object) (bool, error) {
-	clientset, err := f.clients.ClientSetForVersion(nil)
-	if err != nil {
-		return false, err
-	}
-
-	switch t := object.(type) {
+func (f *factory) Pauser(info *resource.Info) (bool, error) {
+	switch obj := info.Object.(type) {
 	case *extensions.Deployment:
-		if t.Spec.Paused {
-			return true, nil
+		if obj.Spec.Paused {
+			return true, errors.New("is already paused")
 		}
-		t.Spec.Paused = true
-		_, err := clientset.Extensions().Deployments(t.Namespace).Update(t)
-		return false, err
+		obj.Spec.Paused = true
+		return true, nil
 	default:
-		gvks, _, err := api.Scheme.ObjectKinds(object)
-		if err != nil {
-			return false, err
-		}
-		return false, fmt.Errorf("cannot pause %v", gvks[0])
+		return false, fmt.Errorf("pausing is not supported")
 	}
 }
 
-func (f *factory) ResumeObject(object runtime.Object) (bool, error) {
-	clientset, err := f.clients.ClientSetForVersion(nil)
-	if err != nil {
-		return false, err
-	}
-
-	switch t := object.(type) {
+func (f *factory) Resumer(info *resource.Info) (bool, error) {
+	switch obj := info.Object.(type) {
 	case *extensions.Deployment:
-		if !t.Spec.Paused {
-			return true, nil
+		if !obj.Spec.Paused {
+			return true, errors.New("is not paused")
 		}
-		t.Spec.Paused = false
-		_, err := clientset.Extensions().Deployments(t.Namespace).Update(t)
-		return false, err
+		obj.Spec.Paused = false
+		return true, nil
 	default:
-		gvks, _, err := api.Scheme.ObjectKinds(object)
-		if err != nil {
-			return false, err
-		}
-		return false, fmt.Errorf("cannot resume %v", gvks[0])
+		return false, fmt.Errorf("resuming is not supported")
 	}
 }
 

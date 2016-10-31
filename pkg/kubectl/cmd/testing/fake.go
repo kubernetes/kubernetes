@@ -261,11 +261,11 @@ func (f *FakeFactory) LogsForObject(object, options runtime.Object) (*restclient
 	return nil, nil
 }
 
-func (f *FakeFactory) PauseObject(runtime.Object) (bool, error) {
+func (f *FakeFactory) Pauser(info *resource.Info) (bool, error) {
 	return false, nil
 }
 
-func (f *FakeFactory) ResumeObject(runtime.Object) (bool, error) {
+func (f *FakeFactory) Resumer(info *resource.Info) (bool, error) {
 	return false, nil
 }
 
