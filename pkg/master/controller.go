@@ -50,7 +50,7 @@ type Controller struct {
 
 	ServiceClusterIPRegistry rangeallocation.RangeRegistry
 	ServiceClusterIPInterval time.Duration
-	ServiceClusterIPRange    *net.IPNet
+	ServiceClusterIPRange    net.IPNet
 
 	ServiceNodePortRegistry rangeallocation.RangeRegistry
 	ServiceNodePortInterval time.Duration
@@ -87,21 +87,21 @@ func (c *Config) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTSto
 		SystemNamespacesInterval: 1 * time.Minute,
 
 		ServiceClusterIPRegistry: legacyRESTStorage.ServiceClusterIPAllocator,
-		ServiceClusterIPRange:    c.GenericConfig.ServiceClusterIPRange,
+		ServiceClusterIPRange:    c.ServiceIPRange,
 		ServiceClusterIPInterval: 3 * time.Minute,
 
 		ServiceNodePortRegistry: legacyRESTStorage.ServiceNodePortAllocator,
-		ServiceNodePortRange:    c.GenericConfig.ServiceNodePortRange,
+		ServiceNodePortRange:    c.ServiceNodePortRange,
 		ServiceNodePortInterval: 3 * time.Minute,
 
 		PublicIP: c.GenericConfig.PublicAddress,
 
-		ServiceIP:                 c.GenericConfig.ServiceReadWriteIP,
-		ServicePort:               c.GenericConfig.ServiceReadWritePort,
-		ExtraServicePorts:         c.GenericConfig.ExtraServicePorts,
-		ExtraEndpointPorts:        c.GenericConfig.ExtraEndpointPorts,
+		ServiceIP:                 c.APIServerServiceIP,
+		ServicePort:               c.APIServerServicePort,
+		ExtraServicePorts:         c.ExtraServicePorts,
+		ExtraEndpointPorts:        c.ExtraEndpointPorts,
 		PublicServicePort:         c.GenericConfig.ReadWritePort,
-		KubernetesServiceNodePort: c.GenericConfig.KubernetesServiceNodePort,
+		KubernetesServiceNodePort: c.KubernetesServiceNodePort,
 	}
 }
 
@@ -117,7 +117,7 @@ func (c *Controller) Start() {
 		return
 	}
 
-	repairClusterIPs := servicecontroller.NewRepair(c.ServiceClusterIPInterval, c.ServiceRegistry, c.ServiceClusterIPRange, c.ServiceClusterIPRegistry)
+	repairClusterIPs := servicecontroller.NewRepair(c.ServiceClusterIPInterval, c.ServiceRegistry, &c.ServiceClusterIPRange, c.ServiceClusterIPRegistry)
 	repairNodePorts := portallocatorcontroller.NewRepair(c.ServiceNodePortInterval, c.ServiceRegistry, c.ServiceNodePortRange, c.ServiceNodePortRegistry)
 
 	// run all of the controllers once prior to returning from Start.

@@ -50,10 +50,12 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/healthz"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/master/thirdparty"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
@@ -101,6 +103,35 @@ type Config struct {
 	EnableUISupport   bool
 	EnableLogsSupport bool
 	ProxyTransport    http.RoundTripper
+
+	// these values are used to build the IP addresses used by discovery
+	// The range of IPs to be assigned to services with type=ClusterIP or greater
+	ServiceIPRange net.IPNet
+	// The IP address for the GenericAPIServer service (must be inside ServiceIPRange)
+	APIServerServiceIP net.IP
+	// Port for the apiserver service.
+	APIServerServicePort int
+
+	// The range of ports to be assigned to services with type=NodePort or greater
+	ServiceNodePortRange utilnet.PortRange
+	// Additional ports to be exposed on the GenericAPIServer service
+	// extraServicePorts is injectable in the event that more ports
+	// (other than the default 443/tcp) are exposed on the GenericAPIServer
+	// and those ports need to be load balanced by the GenericAPIServer
+	// service because this pkg is linked by out-of-tree projects
+	// like openshift which want to use the GenericAPIServer but also do
+	// more stuff.
+	ExtraServicePorts []api.ServicePort
+	// Additional ports to be exposed on the GenericAPIServer endpoints
+	// Port names should align with ports defined in ExtraServicePorts
+	ExtraEndpointPorts []api.EndpointPort
+	// If non-zero, the "kubernetes" services uses this port as NodePort.
+	// TODO(sttts): move into master
+	KubernetesServiceNodePort int
+
+	// Number of masters running; all masters must be started with the
+	// same value for this field. (Numbers > 1 currently untested.)
+	MasterCount int
 }
 
 // EndpointReconcilerConfig holds the endpoint reconciler and endpoint reconciliation interval to be
@@ -134,6 +165,31 @@ type completedConfig struct {
 func (c *Config) Complete() completedConfig {
 	c.GenericConfig.Complete()
 
+	serviceIPRange, apiServerServiceIP, err := genericapiserver.DefaultServiceIPRange(c.ServiceIPRange)
+	if err != nil {
+		glog.Fatalf("Error determining service IP ranges: %v", err)
+	}
+	if c.ServiceIPRange.IP == nil {
+		c.ServiceIPRange = serviceIPRange
+	}
+	if c.APIServerServiceIP == nil {
+		c.APIServerServiceIP = apiServerServiceIP
+	}
+
+	discoveryAddresses := genericapiserver.DefaultDiscoveryAddresses{DefaultAddress: c.GenericConfig.ExternalAddress}
+	discoveryAddresses.DiscoveryCIDRRules = append(discoveryAddresses.DiscoveryCIDRRules,
+		genericapiserver.DiscoveryCIDRRule{IPRange: c.ServiceIPRange, Address: net.JoinHostPort(c.APIServerServiceIP.String(), strconv.Itoa(c.APIServerServicePort))})
+	c.GenericConfig.DiscoveryAddresses = discoveryAddresses
+
+	if c.ServiceNodePortRange.Size == 0 {
+		// TODO: Currently no way to specify an empty range (do we need to allow this?)
+		// We should probably allow this for clouds that don't require NodePort to do load-balancing (GCE)
+		// but then that breaks the strict nestedness of ServiceType.
+		// Review post-v1
+		c.ServiceNodePortRange = options.DefaultServiceNodePortRange
+		glog.Infof("Node port range unspecified. Defaulting to %v.", c.ServiceNodePortRange)
+	}
+
 	// enable swagger UI only if general UI support is on
 	c.GenericConfig.EnableSwaggerUI = c.GenericConfig.EnableSwaggerUI && c.EnableUISupport
 
@@ -144,7 +200,7 @@ func (c *Config) Complete() completedConfig {
 	if c.EndpointReconcilerConfig.Reconciler == nil {
 		// use a default endpoint reconciler if nothing is set
 		endpointClient := coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-		c.EndpointReconcilerConfig.Reconciler = NewMasterCountEndpointReconciler(c.GenericConfig.MasterCount, endpointClient)
+		c.EndpointReconcilerConfig.Reconciler = NewMasterCountEndpointReconciler(c.MasterCount, endpointClient)
 	}
 
 	return completedConfig{c}
@@ -202,8 +258,8 @@ func (c completedConfig) New() (*Master, error) {
 			ProxyTransport:            c.ProxyTransport,
 			KubeletClientConfig:       c.KubeletClientConfig,
 			EventTTL:                  c.EventTTL,
-			ServiceClusterIPRange:     c.GenericConfig.ServiceClusterIPRange,
-			ServiceNodePortRange:      c.GenericConfig.ServiceNodePortRange,
+			ServiceIPRange:            c.ServiceIPRange,
+			ServiceNodePortRange:      c.ServiceNodePortRange,
 			ComponentStatusServerFunc: func() map[string]apiserver.Server { return getServersToValidate(c.StorageFactory) },
 			LoopbackClientConfig:      c.GenericConfig.LoopbackClientConfig,
 		}

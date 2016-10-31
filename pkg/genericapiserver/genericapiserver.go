@@ -141,10 +141,6 @@ type GenericAPIServer struct {
 	postStartHooks       map[string]PostStartHookFunc
 	postStartHookLock    sync.Mutex
 	postStartHooksCalled bool
-
-	// See Config.$name for documentation of these flags:
-
-	MasterCount int
 }
 
 func init() {

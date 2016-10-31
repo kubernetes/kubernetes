@@ -25,7 +25,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
-	"strconv"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -376,20 +375,17 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 }
 
 func TestGetServerAddressByClientCIDRs(t *testing.T) {
-	s, etcdserver, config, _ := newMaster(t)
-	defer etcdserver.Terminate(t)
-
 	publicAddressCIDRMap := []unversioned.ServerAddressByClientCIDR{
 		{
 			ClientCIDR:    "0.0.0.0/0",
-			ServerAddress: config.ExternalAddress,
+			ServerAddress: "ExternalAddress",
 		},
 	}
 	internalAddressCIDRMap := []unversioned.ServerAddressByClientCIDR{
 		publicAddressCIDRMap[0],
 		{
-			ClientCIDR:    config.ServiceClusterIPRange.String(),
-			ServerAddress: net.JoinHostPort(config.ServiceReadWriteIP.String(), strconv.Itoa(config.ServiceReadWritePort)),
+			ClientCIDR:    "10.0.0.0/24",
+			ServerAddress: "serviceIP",
 		},
 	}
 	internalIP := "10.0.0.1"
@@ -455,8 +451,13 @@ func TestGetServerAddressByClientCIDRs(t *testing.T) {
 		},
 	}
 
+	_, ipRange, _ := net.ParseCIDR("10.0.0.0/24")
+	discoveryAddresses := DefaultDiscoveryAddresses{DefaultAddress: "ExternalAddress"}
+	discoveryAddresses.DiscoveryCIDRRules = append(discoveryAddresses.DiscoveryCIDRRules,
+		DiscoveryCIDRRule{IPRange: *ipRange, Address: "serviceIP"})
+
 	for i, test := range testCases {
-		if a, e := s.discoveryAddresses.ServerAddressByClientCIDRs(utilnet.GetClientIP(&test.Request)), test.ExpectedMap; reflect.DeepEqual(e, a) != true {
+		if a, e := discoveryAddresses.ServerAddressByClientCIDRs(utilnet.GetClientIP(&test.Request)), test.ExpectedMap; reflect.DeepEqual(e, a) != true {
 			t.Fatalf("test case %d failed. expected: %v, actual: %v", i+1, e, a)
 		}
 	}
