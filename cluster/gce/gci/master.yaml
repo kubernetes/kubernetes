@@ -33,6 +33,7 @@ write_files:
       [Service]
       Type=oneshot
       RemainAfterExit=yes
+      ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/configure-helper.sh
       ExecStart=/home/kubernetes/bin/configure-helper.sh
 
       [Install]
@@ -51,6 +52,7 @@ write_files:
       RestartSec=10
       RemainAfterExit=yes
       RemainAfterExit=yes
+      ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/health-monitor.sh
       ExecStart=/home/kubernetes/bin/health-monitor.sh docker
 
       [Install]
@@ -69,6 +71,7 @@ write_files:
       RestartSec=10
       RemainAfterExit=yes
       RemainAfterExit=yes
+      ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/health-monitor.sh
       ExecStart=/home/kubernetes/bin/health-monitor.sh kubelet
 
       [Install]
