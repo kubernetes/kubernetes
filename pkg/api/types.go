@@ -180,6 +180,8 @@ const (
 	NamespaceNone string = ""
 	// NamespaceSystem is the system namespace where we place system components.
 	NamespaceSystem string = "kube-system"
+	// NamespacePublic is the namespace where we place public info (ConfigMaps)
+	NamespacePublic string = "kube-public"
 	// TerminationMessagePathDefault means the default path to capture the application termination message running in a container
 	TerminationMessagePathDefault string = "/dev/termination-log"
 )
@@ -3304,6 +3306,31 @@ const (
 	TLSCertKey = "tls.crt"
 	// TLSPrivateKeyKey is the key for the private key field in a TLS secret.
 	TLSPrivateKeyKey = "tls.key"
+
+	// SecretBootstrapToken is used during the automated bootstrap process (first
+	// implemented by kubeadm). It stores tokens that are used to sign well known
+	// ConfigMaps. They may also eventually be used for authentication.
+	SecretTypeBootstrapToken SecretType = "bootstrap.kubernetes.io/token"
+
+	// BootstrapTokenIdKey is the id of this token. This can be transmitted in the
+	// clear and encoded in the name of the secret. It should be a random 6
+	// character string. Required
+	BootstrapTokenIdKey = "token-id"
+
+	// BootstrapTokenSecretKey is the actual secret. Typically this is a random 16
+	// character string. Required.
+	BootstrapTokenSecretKey = "token-secret"
+
+	// BootstrapTokenExpirationKey is when this token should be expired and no
+	// longer used. A controller will delete this resource after this time. This
+	// is an absolute UTC time using RFC3339. If this cannot be parsed, the token
+	// should be considered invalid. Optional.
+	BootstrapTokenExpirationKey = "expiration"
+
+	// BootstrapTokenUsageSigningKey signals that this token should be used to
+	// sign configs as part of the bootstrap process. Value must be "true". Any
+	// other value is assumed to be false. Optional.
+	BootstrapTokenUsageSigningKey = "usage-bootstrap-signing"
 )
 
 type SecretList struct {

@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/bootstrap"
 	certcontroller "k8s.io/kubernetes/pkg/controller/certificates"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/deployment"
@@ -556,6 +557,12 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 			go garbageCollector.Run(workers, wait.NeverStop)
 		}
 	}
+
+	bootstrap.NewBootstrapSigner(
+		client("bootstrap-signer"),
+		bootstrap.DefaultBootstrapSignerOptions(),
+	).Run()
+	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	sharedInformers.Start(stop)
 
