@@ -33,7 +33,7 @@ _tmp="${KUBE_ROOT}/_tmp"
 
 mkdir -p "${_tmp}"
 cp -a "${SPECROOT}" "${TMP_SPECROOT}"
-trap "cp -a ${TMP_SPECROOT} \"${KUBE_ROOT}/api\"; rm -rf ${_tmp}" EXIT SIGINT
+trap "rm -rf \"${SPECROOT}/*\"; cp -a \"${TMP_SPECROOT}/*\" \"${SPECROOT}\"; rm -rf ${_tmp}" EXIT SIGINT
 rm ${SPECROOT}/*
 cp ${TMP_SPECROOT}/BUILD ${SPECROOT}/BUILD 
 
