@@ -49,3 +49,7 @@ func (ds *dockerService) LegacyPortForward(sandboxID string, port uint16, stream
 func (ds *dockerService) LegacyExec(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
 	return ds.streamingRuntime.Exec(containerID.ID, cmd, stdin, stdout, stderr, tty, resize)
 }
+
+func (ds *dockerService) isImageRoot(image string) (bool, error) {
+	return dockertools.IsImageRoot(ds.client, image)
+}
