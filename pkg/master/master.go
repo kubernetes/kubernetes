@@ -229,7 +229,9 @@ func (c completedConfig) New() (*Master, error) {
 	c.RESTStorageProviders[storage.GroupName] = storagerest.RESTStorageProvider{}
 	m.InstallAPIs(c.Config, restOptionsFactory.NewFor)
 
-	m.installTunneler(c.Tunneler)
+	if c.Tunneler != nil {
+		m.installTunneler(c.Tunneler)
+	}
 
 	return m, nil
 }
@@ -253,10 +255,6 @@ func (m *Master) InstallLegacyAPI(c *Config, restOptionsGetter genericapiserver.
 }
 
 func (m *Master) installTunneler(tunneler genericapiserver.Tunneler) {
-	if tunneler == nil {
-		return
-	}
-
 	tunneler.Run(m.getNodeAddresses)
 	m.GenericAPIServer.AddHealthzChecks(healthz.NamedCheck("SSH Tunnel Check", genericapiserver.TunnelSyncHealthChecker(tunneler)))
 	prometheus.NewGaugeFunc(prometheus.GaugeOpts{

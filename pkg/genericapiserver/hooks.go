@@ -72,13 +72,12 @@ func (s *GenericAPIServer) AddPostStartHook(name string, hook PostStartHookFunc)
 	if s.postStartHooksCalled {
 		return fmt.Errorf("unable to add %q because PostStartHooks have already been called", name)
 	}
-	if s.postStartHooks == nil {
-		s.postStartHooks = map[string]postStartHookEntry{}
-	}
 	if _, exists := s.postStartHooks[name]; exists {
 		return fmt.Errorf("unable to add %q because it is already registered", name)
 	}
 
+	// done is closed when the poststarthook is finished.  This is used the health check to be able to indicate
+	// that the poststarthook is finished
 	done := make(chan struct{})
 	s.AddHealthzChecks(postStartHookHealthz{name: "poststarthook/" + name, done: done})
 	s.postStartHooks[name] = postStartHookEntry{hook: hook, done: done}
@@ -114,6 +113,8 @@ func runPostStartHook(name string, entry postStartHookEntry, context PostStartHo
 	close(entry.done)
 }
 
+// postStartHookHealthz implements a healthz check for poststarthooks.  It will return a "hookNotFinished"
+// error until the poststarthook is finished.
 type postStartHookHealthz struct {
 	name string
 
@@ -127,13 +128,13 @@ func (h postStartHookHealthz) Name() string {
 	return h.name
 }
 
-var notFinished = errors.New("not finished")
+var hookNotFinished = errors.New("not finished")
 
 func (h postStartHookHealthz) Check(req *http.Request) error {
 	select {
 	case <-h.done:
 		return nil
 	default:
-		return notFinished
+		return hookNotFinished
 	}
 }
