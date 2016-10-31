@@ -359,6 +359,8 @@ func NewMasterConfig() *master.Config {
 		EnableCoreControllers: true,
 		EnableWatchCache:      true,
 		KubeletClientConfig:   kubeletclient.KubeletClientConfig{Port: 10250},
+		APIServerServicePort:  443,
+		MasterCount:           1,
 	}
 }
 

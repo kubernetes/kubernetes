@@ -19,7 +19,6 @@ package genericapiserver
 import (
 	"fmt"
 	"mime"
-	"net"
 	"net/http"
 	"sort"
 	"strings"
@@ -147,10 +146,6 @@ type GenericAPIServer struct {
 	healthzLock    sync.Mutex
 	healthzChecks  []healthz.HealthzChecker
 	healthzCreated bool
-
-	// See Config.$name for documentation of these flags:
-
-	MasterCount int
 }
 
 func init() {
