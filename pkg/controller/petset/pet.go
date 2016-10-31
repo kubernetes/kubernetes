@@ -21,13 +21,14 @@ import (
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
+	apiErrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/runtime"
 
 	"github.com/golang/glog"
+	"errors"
 )
 
 // petLifeCycleEvent is used to communicate high level actions the controller
@@ -45,6 +46,8 @@ const (
 	// pet has finished initializing itself.
 	// TODO: Replace this with init container status.
 	StatefulSetInitAnnotation = "pod.alpha.kubernetes.io/initialized"
+
+	StatefulSetReplicasAnnotation = "pod.alpha.kubernetes.io/replicas"
 )
 
 // pcb is the control block used to transmit all updates about a single pet.
@@ -61,6 +64,53 @@ type pcb struct {
 	id string
 	// parent is a pointer to the parent statefulset.
 	parent *apps.StatefulSet
+}
+
+func getReplicas(pod *api.Pod) int32 {
+	if pod == nil {
+		return -1
+	} else if replicaStr,exists := pod.Annotations[StatefulSetReplicasAnnotation]; !exists{
+		glog.Errorf("Pod %s has no annotation for %s",pod.Name,StatefulSetReplicasAnnotation)
+		return -1
+	} else if replicas64, err := strconv.ParseInt(replicaStr,10,32); err != nil {
+		glog.Errorf("Pod %s has invalid value %s for annotation %s",
+			pod.Name,replicaStr,StatefulSetReplicasAnnotation)
+		return -1
+	} else {
+		return int32(replicas64)
+	}
+}
+
+func setReplicas(p *api.Pod, replicas int32) {
+	p.Annotations[StatefulSetReplicasAnnotation] = strconv.FormatInt(int64(replicas),10)
+}
+
+func update (set *apps.StatefulSet, id string, pod *api.Pod, desired *api.Pod) (bool,error) {
+	if set == nil {
+		return false,errors.New("nil StatefulSet parameter")
+	} else if (pod == nil){
+		return false,errors.New("nil source supplied")
+	} else if (desired == nil ) {
+		return false,errors.New("nil target supplied")
+	}
+
+	mappers := newIdentityMappers(set)
+	violated := make([]identityMapper,0,len(mappers))
+	for _,mapper := range(mappers){
+		if mapper.Identity(pod) != mapper.Identity(desired) {
+			violated = append(violated,mapper)
+		}
+	}
+	if len(violated) == 0 && getReplicas(pod) == set.Spec.Replicas {
+		return true, nil
+	}
+
+	for _,mapper := range(violated) {
+		mapper.SetIdentity(id,pod)
+	}
+	setReplicas(pod,set.Spec.Replicas)
+	return true, nil
+
 }
 
 // pvcClient is a client for managing persistent volume claims.
@@ -184,7 +234,7 @@ type apiServerPetClient struct {
 func (p *apiServerPetClient) Get(pet *pcb) (*pcb, bool, error) {
 	ns := pet.parent.Namespace
 	pod, err := p.c.Core().Pods(ns).Get(pet.pod.Name)
-	if errors.IsNotFound(err) {
+	if apiErrors.IsNotFound(err) {
 		return nil, false, nil
 	}
 	if err != nil {
@@ -198,7 +248,7 @@ func (p *apiServerPetClient) Get(pet *pcb) (*pcb, bool, error) {
 // Delete deletes the pet in the pcb from the apiserver.
 func (p *apiServerPetClient) Delete(pet *pcb) error {
 	err := p.c.Core().Pods(pet.parent.Namespace).Delete(pet.pod.Name, nil)
-	if errors.IsNotFound(err) {
+	if apiErrors.IsNotFound(err) {
 		err = nil
 	}
 	p.event(pet.parent, "Delete", fmt.Sprintf("pet: %v", pet.pod.Name), err)
@@ -215,24 +265,25 @@ func (p *apiServerPetClient) Create(pet *pcb) error {
 // Update updates the pet in the 'pet' pcb to match the pet in the 'expectedPet' pcb.
 // If the pod object of a pet which to be updated has been changed in server side, we
 // will get the actual value and set pet identity before retries.
-func (p *apiServerPetClient) Update(pet *pcb, expectedPet *pcb) (updateErr error) {
+func (p *apiServerPetClient) Update(pet *pcb, expectedPet *pcb) error {
 	pc := p.c.Core().Pods(pet.parent.Namespace)
 
 	for i := 0; ; i++ {
-		updatePod, needsUpdate, err := copyPetID(pet, expectedPet)
-		if err != nil || !needsUpdate {
+		mutated, err := update(pet.parent,pet.id,pet.pod,expectedPet.pod)
+
+		if err != nil || !mutated {
 			return err
 		}
 		glog.Infof("Resetting pet %v/%v to match StatefulSet %v spec", pet.pod.Namespace, pet.pod.Name, pet.parent.Name)
-		_, updateErr = pc.Update(&updatePod)
-		if updateErr == nil || i >= updateRetries {
-			return updateErr
+		_, err = pc.Update(pet.pod)
+		if err == nil || i >= updateRetries {
+			return err
 		}
-		getPod, getErr := pc.Get(updatePod.Name)
+		pod, getErr := pc.Get(pet.pod.Name)
 		if getErr != nil {
 			return getErr
 		}
-		pet.pod = getPod
+		pet.pod = pod
 	}
 }
 
@@ -259,7 +310,7 @@ func (p *apiServerPetClient) SyncPVCs(pet *pcb) error {
 	for i, pvc := range pet.pvcs {
 		_, err := p.getPVC(pvc.Name, pet.parent.Namespace)
 		if err != nil {
-			if errors.IsNotFound(err) {
+			if apiErrors.IsNotFound(err) {
 				var err error
 				if err = p.createPVC(&pet.pvcs[i]); err != nil {
 					errmsg += fmt.Sprintf("Failed to create %v: %v", pvc.Name, err)
