@@ -449,6 +449,8 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 
 		enableOpenAPISupport: c.EnableOpenAPISupport,
 		openAPIConfig:        c.OpenAPIConfig,
+
+		postStartHooks: map[string]postStartHookEntry{},
 	}
 
 	s.HandlerContainer = mux.NewAPIContainer(http.NewServeMux(), c.Serializer)

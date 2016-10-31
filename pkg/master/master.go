@@ -192,6 +192,9 @@ func (c completedConfig) New() (*Master, error) {
 	}
 	m.InstallAPIs(c.Config.GenericConfig.APIResourceConfigSource, restOptionsFactory.NewFor, restStorageProviders...)
 
+	if c.Tunneler != nil {
+		m.installTunneler(c.Tunneler, coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes())
+	}
 	m.InstallGeneralEndpoints(c.Config)
 
 	return m, nil
@@ -215,29 +218,23 @@ func (m *Master) InstallLegacyAPI(c *Config, restOptionsGetter genericapiserver.
 	}
 }
 
+func (m *Master) installTunneler(tunneler genericapiserver.Tunneler, nodeClient coreclient.NodeInterface) {
+	tunneler.Run(nodeAddressProvider{nodeClient}.externalAddresses)
+	m.GenericAPIServer.AddHealthzChecks(healthz.NamedCheck("SSH Tunnel Check", genericapiserver.TunnelSyncHealthChecker(tunneler)))
+	prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+		Name: "apiserver_proxy_tunnel_sync_latency_secs",
+		Help: "The time since the last successful synchronization of the SSH tunnels for proxy requests.",
+	}, func() float64 { return float64(tunneler.SecondsSinceSync()) })
+}
+
 // TODO this needs to be refactored so we have a way to add general health checks to genericapiserver
 // TODO profiling should be generic
 func (m *Master) InstallGeneralEndpoints(c *Config) {
-	// Run the tunneler.
-	healthzChecks := []healthz.HealthzChecker{}
-	if c.Tunneler != nil {
-		nodeClient := coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes()
-		c.Tunneler.Run(nodeAddressProvider{nodeClient}.externalAddresses)
-
-		healthzChecks = append(healthzChecks, healthz.NamedCheck("SSH Tunnel Check", genericapiserver.TunnelSyncHealthChecker(c.Tunneler)))
-		prometheus.NewGaugeFunc(prometheus.GaugeOpts{
-			Name: "apiserver_proxy_tunnel_sync_latency_secs",
-			Help: "The time since the last successful synchronization of the SSH tunnels for proxy requests.",
-		}, func() float64 { return float64(c.Tunneler.SecondsSinceSync()) })
-	}
-	healthz.InstallHandler(&m.GenericAPIServer.HandlerContainer.NonSwaggerRoutes, healthzChecks...)
-
 	if c.GenericConfig.EnableProfiling {
 		routes.MetricsWithReset{}.Install(m.GenericAPIServer.HandlerContainer)
 	} else {
 		routes.DefaultMetrics{}.Install(m.GenericAPIServer.HandlerContainer)
 	}
-
 }
 
 // InstallAPIs will install the APIs for the restStorageProviders if they are enabled.

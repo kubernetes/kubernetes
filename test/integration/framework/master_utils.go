@@ -235,6 +235,12 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 		masterReceiver.SetMaster(m)
 	}
 
+	// TODO have this start method actually use the normal start sequence for the API server
+	// this method never actually calls the `Run` method for the API server
+	// fire the post hooks ourselves
+	m.GenericAPIServer.PrepareRun()
+	m.GenericAPIServer.RunPostStartHooks()
+
 	cfg := *masterConfig.GenericConfig.LoopbackClientConfig
 	cfg.ContentConfig.GroupVersion = &unversioned.GroupVersion{}
 	privilegedClient, err := restclient.RESTClientFor(&cfg)
@@ -253,12 +259,6 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	if err != nil {
 		glog.Fatal(err)
 	}
-
-	// TODO have this start method actually use the normal start sequence for the API server
-	// this method never actually calls the `Run` method for the API server
-	// fire the post hooks ourselves
-	m.GenericAPIServer.PrepareRun()
-	m.GenericAPIServer.RunPostStartHooks()
 
 	// wait for services to be ready
 	if masterConfig.EnableCoreControllers {
@@ -350,6 +350,7 @@ func NewMasterConfig() *master.Config {
 	genericConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
 	genericConfig.Authorizer = authorizer.NewAlwaysAllowAuthorizer()
 	genericConfig.AdmissionControl = admit.NewAlwaysAdmit()
+	genericConfig.EnableMetrics = true
 
 	return &master.Config{
 		GenericConfig:         genericConfig,
