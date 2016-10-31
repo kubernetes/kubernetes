@@ -69,7 +69,7 @@ func (ds *dockerService) ListContainers(filter *runtimeApi.ContainerFilter) ([]*
 
 		converted, err := toRuntimeAPIContainer(&c)
 		if err != nil {
-			glog.V(5).Infof("Unable to convert docker to runtime API container: %v", err)
+			glog.V(4).Infof("Unable to convert docker to runtime API container: %v", err)
 			continue
 		}
 
