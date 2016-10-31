@@ -51,6 +51,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 				testSecretsDuringUpgrade(f, sem)
 				testConfigMapsDuringUpgrade(f, sem)
 				testGuestbookApplicationDuringUpgrade(f, sem)
+				testDaemonSetDuringUpgrade(f, sem)
 			})
 			cm.Do()
 		})
@@ -70,6 +71,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 				testSecretsBeforeAndAfterUpgrade(f, sem)
 				testConfigMapsBeforeAndAfterUpgrade(f, sem)
 				testGuestbookApplicationBeforeAndAfterUpgrade(f, sem)
+				testDaemonSetBeforeAndAfterUpgrade(f, sem)
 			})
 			cm.Do()
 		})
@@ -87,6 +89,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 				testSecretsDuringUpgrade(f, sem)
 				testConfigMapsDuringUpgrade(f, sem)
 				testGuestbookApplicationDuringUpgrade(f, sem)
+				testDaemonSetDuringUpgrade(f, sem)
 			})
 			cm.Do()
 		})
@@ -108,6 +111,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 				testSecretsBeforeAndAfterUpgrade(f, sem)
 				testConfigMapsBeforeAndAfterUpgrade(f, sem)
 				testGuestbookApplicationBeforeAndAfterUpgrade(f, sem)
+				testDaemonSetBeforeAndAfterUpgrade(f, sem)
 			})
 			cm.Do()
 		})
@@ -127,6 +131,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 				testSecretsDuringUpgrade(f, sem)
 				testConfigMapsDuringUpgrade(f, sem)
 				testGuestbookApplicationDuringUpgrade(f, sem)
+				testDaemonSetDuringUpgrade(f, sem)
 			})
 			cm.Do()
 		})
@@ -356,4 +361,46 @@ func testGuestbookApplication(f *framework.Framework, sem *chaosmonkey.Semaphore
 	// Teardown
 	By("teardown guestbook app")
 	GuestbookApplicationTeardown(f.ClientSet, f.Namespace.Name)
+}
+
+func testDaemonSetBeforeAndAfterUpgrade(f *framework.Framework, sem *chaosmonkey.Semaphore) {
+	testDaemonSet(f, sem, false)
+}
+
+func testDaemonSetDuringUpgrade(f *framework.Framework, sem *chaosmonkey.Semaphore) {
+	testDaemonSet(f, sem, true)
+}
+
+func testDaemonSet(f *framework.Framework, sem *chaosmonkey.Semaphore, testDuringDisruption bool) {
+	image := "gcr.io/google_containers/serve_hostname:v1.4"
+	dsName := "daemon-set"
+	// Setup
+	By("setup daemonset")
+	complexLabel, nodeSelector := TestDaemonSetWithNodeAffinitySetup(f, dsName, image)
+
+	// Validate
+	By("validate daemonset before upgrade")
+	TestDaemonSetWithNodeAffinityValidate(f, dsName, complexLabel, nodeSelector)
+
+	sem.Ready()
+
+	if testDuringDisruption {
+		// Continuously validate
+		wait.Until(func() {
+			By("validate daemonset during upgrade")
+			TestDaemonSetWithNodeAffinityValidate(f, dsName, complexLabel, nodeSelector)
+		}, framework.Poll, sem.StopCh)
+	} else {
+		// Block until chaosmonkey is done
+		By("waiting for upgrade to finish without validating daemonset")
+		<-sem.StopCh
+	}
+
+	// Validate after upgrade
+	By("validate daemonset after upgrade")
+	TestDaemonSetWithNodeAffinityValidate(f, dsName, complexLabel, nodeSelector)
+
+	// Teardown
+	By("teardown daemonset")
+	TestDaemonSetWithNodeAffinityTeardown(f, dsName)
 }
