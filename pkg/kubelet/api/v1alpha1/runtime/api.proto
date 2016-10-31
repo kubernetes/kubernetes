@@ -428,6 +428,19 @@ message ContainerMetadata {
     optional uint32 attempt = 2;
 }
 
+// Device specifies a host device to mount into a container.
+message Device {
+    // The path of the device within the container.
+    optional string container_path = 1;
+    // The path of the device on the host.
+    optional string host_path = 2;
+    // Cgroups permissions of the device, candidates are one or more of
+    // * r - allows container to read from the specified device.
+    // * w - allows container to write to the specified device.
+    // * m - allows container to create device files that do not yet exist.
+    optional string permissions = 3;
+}
+
 // ContainerConfig holds all the required and optional fields for creating a
 // container.
 message ContainerConfig {
@@ -444,25 +457,27 @@ message ContainerConfig {
     repeated string args = 4;
     // Current working directory of the command.
     optional string working_dir = 5;
-    // List of environment variable to set in the container
+    // List of environment variable to set in the container.
     repeated KeyValue envs = 6;
-    // Mounts specifies mounts for the container
+    // Mounts specifies mounts for the container.
     repeated Mount mounts = 7;
+    // Devices specifies devices for the container.
+    repeated Device devices = 8;
     // Labels are key value pairs that may be used to scope and select individual resources.
     // Label keys are of the form:
     //     label-key ::= prefixed-name | name
     //     prefixed-name ::= prefix '/' name
     //     prefix ::= DNS_SUBDOMAIN
     //     name ::= DNS_LABEL
-    map<string, string> labels = 8;
+    map<string, string> labels = 9;
     // Annotations is an unstructured key value map that may be set by external
     // tools to store and retrieve arbitrary metadata.
-    map<string, string> annotations = 9;
+    map<string, string> annotations = 10;
     // If set, run container in privileged mode.
     // Processes in privileged containers are essentially equivalent to root on the host.
-    optional bool privileged = 10;
+    optional bool privileged = 11;
     // If set, the root filesystem of the container is read-only.
-    optional bool readonly_rootfs = 11;
+    optional bool readonly_rootfs = 12;
     // Path relative to PodSandboxConfig.LogDirectory for container to store
     // the log (STDOUT and STDERR) on the host.
     // E.g.,
@@ -473,19 +488,19 @@ message ContainerConfig {
     // container logs are under active discussion in
     // https://issues.k8s.io/24677. There *may* be future change of direction
     // for logging as the discussion carries on.
-    optional string log_path = 12;
+    optional string log_path = 13;
     // The hash of container config
 
     // Variables for interactive containers, these have very specialized
     // use-cases (e.g. debugging).
     // TODO: Determine if we need to continue supporting these fields that are
     // part of Kubernetes's Container Spec.
-    optional bool stdin = 13;
-    optional bool stdin_once = 14;
-    optional bool tty = 15;
+    optional bool stdin = 14;
+    optional bool stdin_once = 15;
+    optional bool tty = 16;
 
     // Linux contains configuration specific to Linux containers.
-    optional LinuxContainerConfig linux = 16;
+    optional LinuxContainerConfig linux = 17;
 }
 
 message CreateContainerRequest {
