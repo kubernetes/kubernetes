@@ -20,6 +20,7 @@ import (
 	"sync"
 )
 
+// Counter counts the occurences of a item, it is thread safe.
 type Counter struct {
 	mu     sync.Mutex
 	values map[string]int64
@@ -32,12 +33,14 @@ func NewCounter() *Counter {
 	}
 }
 
+// Get returns the count for a given value.
 func (c *Counter) Get(key string) int64 {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.values[key]
 }
 
+// Incr increases the count for a given value by 1.
 func (c *Counter) Incr(key string) int64 {
 	c.mu.Lock()
 	defer c.mu.Unlock()
