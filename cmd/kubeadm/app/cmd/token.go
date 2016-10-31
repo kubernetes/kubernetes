@@ -45,14 +45,17 @@ func NewCmdToken(out io.Writer) *cobra.Command {
 		Short: "Manage bootstrap tokens",
 	}
 
+	var tokenDuration string
 	createCmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create discovery tokens on the server.",
 		Run: func(tokenCmd *cobra.Command, args []string) {
-			err := RunCreateToken(out, tokenCmd)
+			err := RunCreateToken(out, tokenCmd, tokenDuration)
 			kubeadmutil.CheckErr(err)
 		},
 	}
+	createCmd.PersistentFlags().StringVar(&tokenDuration,
+		"duration", "8h", "Duration the token should be valid")
 	tokenCmd.AddCommand(createCmd)
 
 	listCmd := &cobra.Command{
@@ -80,8 +83,13 @@ func NewCmdToken(out io.Writer) *cobra.Command {
 
 // TODO: Add support for user specified tokens.
 // RunCreateToken generates a new bootstrap token and stores it as a secret on the server.
-func RunCreateToken(out io.Writer, cmd *cobra.Command) error {
+func RunCreateToken(out io.Writer, cmd *cobra.Command, tokenDurationStr string) error {
 	client, err := createAPIClient()
+	if err != nil {
+		return err
+	}
+
+	tokenDuration, err := time.ParseDuration(tokenDurationStr)
 	if err != nil {
 		return err
 	}
@@ -97,7 +105,7 @@ func RunCreateToken(out io.Writer, cmd *cobra.Command) error {
 			Name: fmt.Sprintf("%s%s", bootstrapTokenSecretPrefix, tokenSecret.TokenID),
 		},
 		Type: api.SecretTypeBootstrapToken,
-		Data: encodeTokenSecretData(tokenSecret),
+		Data: encodeTokenSecretData(tokenSecret, tokenDuration),
 	}
 	if _, err := client.Secrets(api.NamespaceSystem).Create(secret); err != nil {
 		return fmt.Errorf("<cmd/token> failed to bootstrap token [%v]", err)
@@ -107,7 +115,7 @@ func RunCreateToken(out io.Writer, cmd *cobra.Command) error {
 	return nil
 }
 
-func encodeTokenSecretData(tokenSecret *kubeadmapi.Secrets) map[string][]byte {
+func encodeTokenSecretData(tokenSecret *kubeadmapi.Secrets, duration time.Duration) map[string][]byte {
 	var (
 		data = map[string][]byte{}
 	)
@@ -115,10 +123,8 @@ func encodeTokenSecretData(tokenSecret *kubeadmapi.Secrets) map[string][]byte {
 	data["token-id"] = []byte(tokenSecret.TokenID)
 	data["token-secret"] = []byte(tokenSecret.BearerToken)
 
-	// TODO: Configurable token expiration time.
-	// Expire tokens in 24 hours:
 	t := time.Now()
-	t = t.Add(24 * time.Hour)
+	t = t.Add(duration)
 	data["expiration"] = []byte(t.Format(time.RFC3339))
 
 	return data
