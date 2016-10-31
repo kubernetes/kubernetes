@@ -2036,7 +2036,7 @@ func (r *Runtime) AttachContainer(containerID kubecontainer.ContainerID, stdin i
 // Note: In rkt, the container ID is in the form of "UUID:appName", where UUID is
 // the rkt UUID, and appName is the container name.
 // TODO(yifan): If the rkt is using lkvm as the stage1 image, then this function will fail.
-func (r *Runtime) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
+func (r *Runtime) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error {
 	glog.V(4).Infof("Rkt execing in container.")
 
 	id, err := parseContainerID(containerID)
@@ -2067,28 +2067,37 @@ func (r *Runtime) ExecInContainer(containerID kubecontainer.ContainerID, cmd []s
 		if stdout != nil {
 			go io.Copy(stdout, p)
 		}
-		return newRktExitError(command.Wait())
-	}
-	if stdin != nil {
-		// Use an os.Pipe here as it returns true *os.File objects.
-		// This way, if you run 'kubectl exec <pod> -i bash' (no tty) and type 'exit',
-		// the call below to command.Run() can unblock because its Stdin is the read half
-		// of the pipe.
-		r, w, err := r.os.Pipe()
-		if err != nil {
-			return newRktExitError(err)
-		}
-		go io.Copy(w, stdin)
+	} else {
+		if stdin != nil {
+			// Use an os.Pipe here as it returns true *os.File objects.
+			// This way, if you run 'kubectl exec <pod> -i bash' (no tty) and type 'exit',
+			// the call below to command.Run() can unblock because its Stdin is the read half
+			// of the pipe.
+			r, w, err := r.os.Pipe()
+			if err != nil {
+				return newRktExitError(err)
+			}
+			go io.Copy(w, stdin)
 
-		command.Stdin = r
+			command.Stdin = r
+		}
+		if stdout != nil {
+			command.Stdout = stdout
+		}
+		if stderr != nil {
+			command.Stderr = stderr
+		}
+		if err := command.Start(); err != nil {
+			return err
+		}
 	}
-	if stdout != nil {
-		command.Stdout = stdout
+	if timeout > 0 {
+		t := time.AfterFunc(timeout, func() {
+			command.Process.Kill()
+		})
+		defer t.Stop()
 	}
-	if stderr != nil {
-		command.Stderr = stderr
-	}
-	return newRktExitError(command.Run())
+	return newRktExitError(command.Wait())
 }
 
 // PortForward executes socat in the pod's network namespace and copies

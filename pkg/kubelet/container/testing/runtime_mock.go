@@ -18,6 +18,7 @@ package testing
 
 import (
 	"io"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 	"k8s.io/kubernetes/pkg/api"
@@ -89,7 +90,7 @@ func (r *Mock) GetPodStatus(uid types.UID, name, namespace string) (*PodStatus, 
 	return args.Get(0).(*PodStatus), args.Error(1)
 }
 
-func (r *Mock) ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
+func (r *Mock) ExecInContainer(containerID ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error {
 	args := r.Called(containerID, cmd, stdin, stdout, stderr, tty)
 	return args.Error(0)
 }

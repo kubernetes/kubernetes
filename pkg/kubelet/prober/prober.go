@@ -145,7 +145,7 @@ func (pb *prober) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, con
 	timeout := time.Duration(p.TimeoutSeconds) * time.Second
 	if p.Exec != nil {
 		glog.V(4).Infof("Exec-Probe Pod: %v, Container: %v, Command: %v", pod, container, p.Exec.Command)
-		return pb.exec.Probe(pb.newExecInContainer(container, containerID, p.Exec.Command))
+		return pb.exec.Probe(pb.newExecInContainer(container, containerID, p.Exec.Command, timeout))
 	}
 	if p.HTTPGet != nil {
 		scheme := strings.ToLower(string(p.HTTPGet.Scheme))
@@ -228,11 +228,11 @@ type execInContainer struct {
 	run func() ([]byte, error)
 }
 
-func (p *prober) newExecInContainer(container api.Container, containerID kubecontainer.ContainerID, cmd []string) exec.Cmd {
+func (p *prober) newExecInContainer(container api.Container, containerID kubecontainer.ContainerID, cmd []string, timeout time.Duration) exec.Cmd {
 	return execInContainer{func() ([]byte, error) {
 		var buffer bytes.Buffer
 		output := ioutils.WriteCloserWrapper(&buffer)
-		err := p.runner.ExecInContainer(containerID, cmd, nil, output, output, false, nil)
+		err := p.runner.ExecInContainer(containerID, cmd, nil, output, output, false, nil, timeout)
 		// Even if err is non-nil, there still may be output (e.g. the exec wrote to stdout or stderr but
 		// the command returned a nonzero exit code). Therefore, always return the output along with the
 		// error.

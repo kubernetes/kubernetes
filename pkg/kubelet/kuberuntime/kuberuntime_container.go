@@ -688,7 +688,7 @@ func (m *kubeGenericRuntimeManager) GetContainerLogs(pod *api.Pod, containerID k
 // Attaches the processes stdin, stdout, and stderr. Optionally uses a
 // tty.
 // TODO: handle terminal resizing, refer https://github.com/kubernetes/kubernetes/issues/29579
-func (m *kubeGenericRuntimeManager) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
+func (m *kubeGenericRuntimeManager) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error {
 	// Use `docker exec` directly for in-process docker integration for
 	// now to unblock other tests.
 	// TODO: remove this hack after exec is defined in CRI.
