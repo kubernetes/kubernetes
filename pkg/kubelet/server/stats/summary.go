@@ -115,8 +115,18 @@ func (sb *summaryBuilder) build() (*stats.Summary, error) {
 		return nil, fmt.Errorf("Missing stats for root container")
 	}
 
-	nodeFsInodesUsed := *sb.rootFsInfo.Inodes - *sb.rootFsInfo.InodesFree
-	imageFsInodesUsed := *sb.imageFsInfo.Inodes - *sb.imageFsInfo.InodesFree
+	var nodeFsInodesUsed *uint64
+	if sb.rootFsInfo.Inodes != nil && sb.rootFsInfo.InodesFree != nil {
+		nodeFsIU := *sb.rootFsInfo.Inodes - *sb.rootFsInfo.InodesFree
+		nodeFsInodesUsed = &nodeFsIU
+	}
+
+	var imageFsInodesUsed *uint64
+	if sb.imageFsInfo.Inodes != nil && sb.imageFsInfo.InodesFree != nil {
+		imageFsIU := *sb.imageFsInfo.Inodes - *sb.imageFsInfo.InodesFree
+		imageFsInodesUsed = &imageFsIU
+	}
+
 	rootStats := sb.containerInfoV2ToStats("", &rootInfo)
 	nodeStats := stats.NodeStats{
 		NodeName: sb.node.Name,
@@ -129,7 +139,7 @@ func (sb *summaryBuilder) build() (*stats.Summary, error) {
 			UsedBytes:      &sb.rootFsInfo.Usage,
 			InodesFree:     sb.rootFsInfo.InodesFree,
 			Inodes:         sb.rootFsInfo.Inodes,
-			InodesUsed:     &nodeFsInodesUsed,
+			InodesUsed:     nodeFsInodesUsed,
 		},
 		StartTime: rootStats.StartTime,
 		Runtime: &stats.RuntimeStats{
@@ -139,7 +149,7 @@ func (sb *summaryBuilder) build() (*stats.Summary, error) {
 				UsedBytes:      &sb.imageStats.TotalStorageBytes,
 				InodesFree:     sb.imageFsInfo.InodesFree,
 				Inodes:         sb.imageFsInfo.Inodes,
-				InodesUsed:     &imageFsInodesUsed,
+				InodesUsed:     imageFsInodesUsed,
 			},
 		},
 	}
