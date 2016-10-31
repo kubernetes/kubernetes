@@ -25,6 +25,7 @@ go_library(
         "kuberuntime_sandbox.go",
         "labels.go",
         "legacy.go",
+        "security_context.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -52,6 +53,7 @@ go_library(
         "//pkg/util/flowcontrol:go_default_library",
         "//pkg/util/parsers:go_default_library",
         "//pkg/util/runtime:go_default_library",
+        "//pkg/util/selinux:go_default_library",
         "//pkg/util/sets:go_default_library",
         "//pkg/util/term:go_default_library",
         "//vendor:github.com/coreos/go-semver/semver",
