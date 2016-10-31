@@ -24,15 +24,15 @@ import (
 	"reflect"
 
 	"github.com/golang/glog"
-	v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
+	"k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationcache "k8s.io/kubernetes/federation/client/cache"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
-	cache "k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/cache"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
@@ -406,34 +406,33 @@ func (s *ServiceController) deleteClusterService(clusterName string, cachedServi
 
 func (s *ServiceController) ensureClusterService(cachedService *cachedService, clusterName string, service *v1.Service, client *kubeclientset.Clientset) error {
 	var err error
-	var needUpdate bool
 	for i := 0; i < clientRetryCount; i++ {
 		svc, err := client.Core().Services(service.Namespace).Get(service.Name)
 		if err == nil {
 			// service exists
 			glog.V(5).Infof("Found service %s/%s from cluster %s", service.Namespace, service.Name, clusterName)
-			//reserve immutable fields
-			service.Spec.ClusterIP = svc.Spec.ClusterIP
+			// we tend to update the new spec and
+			// current service spec(might have random cluster ip and node port) in the cluster identical
 
-			//reserve auto assigned field
+			// cluster ip is not specified, update the auto assigned one to new service spec
+			if service.Spec.ClusterIP == "" {
+				service.Spec.ClusterIP = svc.Spec.ClusterIP
+			}
+
 			for i, oldPort := range svc.Spec.Ports {
 				for _, port := range service.Spec.Ports {
+					// node port is not specified, update the auto assigned one to new service spec
 					if port.NodePort == 0 {
 						if !portEqualExcludeNodePort(&oldPort, &port) {
-							svc.Spec.Ports[i] = port
-							needUpdate = true
-						}
-					} else {
-						if !portEqualForLB(&oldPort, &port) {
-							svc.Spec.Ports[i] = port
-							needUpdate = true
+							service.Spec.Ports[i] = oldPort
 						}
 					}
 				}
 			}
 
-			if needUpdate {
-				// we only apply spec update
+			if util.ObjectMetaAndSpecEquivalent(svc, service) {
+				glog.V(4).Infof("Service %q in cluster %q does not need an update: cluster service is equivalent to federated service", svc, clusterName)
+			} else {
 				svc.Spec = service.Spec
 				_, err = client.Core().Services(svc.Namespace).Update(svc)
 				if err == nil {
@@ -442,9 +441,6 @@ func (s *ServiceController) ensureClusterService(cachedService *cachedService, c
 				} else {
 					glog.V(4).Infof("Failed to update %+v", err)
 				}
-			} else {
-				glog.V(5).Infof("Service %s/%s is not updated to cluster %s as the spec are identical", svc.Namespace, svc.Name, clusterName)
-				return nil
 			}
 		} else if errors.IsNotFound(err) {
 			// Create service if it is not found
@@ -596,26 +592,13 @@ func portSlicesEqualForLB(x, y []*v1.ServicePort) bool {
 }
 
 func portEqualForLB(x, y *v1.ServicePort) bool {
-	// TODO: Should we check name?  (In theory, an LB could expose it)
-	if x.Name != y.Name {
-		return false
-	}
-
-	if x.Protocol != y.Protocol {
-		return false
-	}
-
-	if x.Port != y.Port {
-		return false
-	}
 	if x.NodePort != y.NodePort {
 		return false
 	}
-	return true
+	return portEqualExcludeNodePort(x, y)
 }
 
 func portEqualExcludeNodePort(x, y *v1.ServicePort) bool {
-	// TODO: Should we check name?  (In theory, an LB could expose it)
 	if x.Name != y.Name {
 		return false
 	}
