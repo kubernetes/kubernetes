@@ -99,7 +99,7 @@ func TestPodConstraintsFunc(t *testing.T) {
 
 func TestPodEvaluatorUsage(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset()
-	evaluator := NewPodEvaluator(kubeClient)
+	evaluator := NewPodEvaluator(kubeClient, nil)
 	testCases := map[string]struct {
 		pod   *api.Pod
 		usage api.ResourceList
