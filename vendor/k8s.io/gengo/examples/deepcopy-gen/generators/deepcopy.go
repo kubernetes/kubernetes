@@ -368,10 +368,18 @@ func (g *genDeepCopy) Init(c *generator.Context, w io.Writer) error {
 	cloner := c.Universe.Type(types.Name{Package: conversionPackagePath, Name: "Cloner"})
 	g.imports.AddType(cloner)
 	if !g.registerTypes {
-		// TODO: We should come up with a solution to register all generated
-		// deep-copy functions. However, for now, to avoid import cycles
-		// we register only those explicitly requested.
-		return nil
+		sw := generator.NewSnippetWriter(w, c, "$", "$")
+		sw.Do("// GetGeneratedDeepCopyFuncs returns the generated funcs, since we aren't registering them.\n", nil)
+		sw.Do("func GetGeneratedDeepCopyFuncs() []conversion.GeneratedDeepCopyFunc{\n", nil)
+		sw.Do("return []conversion.GeneratedDeepCopyFunc{\n", nil)
+		for _, t := range g.typesForInit {
+			args := argsFromType(t).
+				With("typeof", c.Universe.Package("reflect").Function("TypeOf"))
+			sw.Do("{Fn: $.type|dcFnName$, InType: $.typeof|raw$(&$.type|raw${})},\n", args)
+		}
+		sw.Do("}\n", nil)
+		sw.Do("}\n\n", nil)
+		return sw.Error()
 	}
 	glog.V(5).Infof("registering types in pkg %q", g.targetPackage)
 
@@ -538,7 +546,14 @@ func (g *genDeepCopy) doStruct(t *types.Type, sw *generator.SnippetWriter) {
 	if len(t.Members) == 0 {
 		// at least do something with in/out to avoid "declared and not used" errors
 		sw.Do("_ = in\n_ = out\n", nil)
+		return
 	}
+
+	if hasDeepCopyMethod(t) {
+		sw.Do("*out = in.DeepCopy()\n", nil)
+		return
+	}
+
 	for _, m := range t.Members {
 		t := m.Type
 		if t.Kind == types.Alias {
@@ -579,11 +594,17 @@ func (g *genDeepCopy) doStruct(t *types.Type, sw *generator.SnippetWriter) {
 		default:
 			sw.Do("if in.$.name$ == nil {\n", args)
 			sw.Do("out.$.name$ = nil\n", args)
-			sw.Do("} else if newVal, err := c.DeepCopy(&in.$.name$); err != nil {\n", args)
-			sw.Do("return err\n", nil)
-			sw.Do("} else {\n", nil)
-			sw.Do("out.$.name$ = *newVal.(*$.type|raw$)\n", args)
-			sw.Do("}\n", nil)
+			if hasDeepCopyMethod(t) {
+				sw.Do("} else {\n", nil)
+				sw.Do("out.$.name$ = in.$.name$.DeepCopy()\n", args)
+				sw.Do("}\n", nil)
+			} else {
+				sw.Do("} else if newVal, err := c.DeepCopy(&in.$.name$); err != nil {\n", args)
+				sw.Do("return err\n", nil)
+				sw.Do("} else {\n", nil)
+				sw.Do("out.$.name$ = *newVal.(*$.type|raw$)\n", args)
+				sw.Do("}\n", nil)
+			}
 		}
 	}
 }
