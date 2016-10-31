@@ -81,6 +81,7 @@ type Config struct {
 	// allow downstream consumers to disable the index route
 	EnableIndex             bool
 	EnableProfiling         bool
+	EnableMetrics           bool
 	EnableGarbageCollection bool
 
 	Version               *version.Info
@@ -523,6 +524,13 @@ func (s *GenericAPIServer) installAPI(c *Config) {
 	}
 	if c.EnableProfiling {
 		routes.Profiling{}.Install(s.HandlerContainer)
+	}
+	if c.EnableMetrics {
+		if c.EnableProfiling {
+			routes.MetricsWithReset{}.Install(s.HandlerContainer)
+		} else {
+			routes.DefaultMetrics{}.Install(s.HandlerContainer)
+		}
 	}
 	routes.Version{Version: c.Version}.Install(s.HandlerContainer)
 	s.HandlerContainer.Add(s.DynamicApisDiscovery())
