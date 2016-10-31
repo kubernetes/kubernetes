@@ -1476,6 +1476,9 @@ func printNode(node *api.Node, w io.Writer, options PrintOptions) error {
 	if node.Spec.Unschedulable {
 		status = append(status, "SchedulingDisabled")
 	}
+	if role := findNodeRole(node); role != "" {
+		status = append(status, role)
+	}
 
 	if _, err := fmt.Fprintf(w, "%s\t%s\t%s", name, strings.Join(status, ","), translateTimestamp(node.CreationTimestamp)); err != nil {
 		return err
@@ -1503,6 +1506,34 @@ func getNodeExternalIP(node *api.Node) string {
 	}
 
 	return "<none>"
+}
+
+// findNodeRole returns the role of a given node, or "" if none found.
+// The role is determined by looking in order for:
+// * a kubernetes.io/role label
+// * a kubeadm.alpha.kubernetes.io/role label
+// * a taint with Key 'dedicated'
+// If no role is found, ("") is returned
+func findNodeRole(node *api.Node) string {
+	if role := node.Labels["kubernetes.io/role"]; role != "" {
+		return role
+	}
+	if role := node.Labels["kubeadm.alpha.kubernetes.io/role"]; role != "" {
+		return role
+	}
+
+	taints, err := api.GetTaintsFromNodeAnnotations(node.Annotations)
+	if err != nil {
+		glog.Warningf("error parsing node taints for node %q: %v", node.Name, err)
+	} else {
+		for _, taint := range taints {
+			if taint.Key == "dedicated" {
+				return taint.Value
+			}
+		}
+	}
+	// No role found
+	return ""
 }
 
 func printNodeList(list *api.NodeList, w io.Writer, options PrintOptions) error {
