@@ -33,35 +33,35 @@ type mockVolumes struct {
 
 var _ aws.Volumes = &mockVolumes{}
 
-func (v *mockVolumes) AttachDisk(diskName string, instanceName string, readOnly bool) (string, error) {
+func (v *mockVolumes) AttachDisk(diskName aws.KubernetesVolumeID, nodeName string, readOnly bool) (string, error) {
 	return "", fmt.Errorf("not implemented")
 }
 
-func (v *mockVolumes) DetachDisk(diskName string, instanceName string) (string, error) {
+func (v *mockVolumes) DetachDisk(diskName aws.KubernetesVolumeID, nodeName string) (string, error) {
 	return "", fmt.Errorf("not implemented")
 }
 
-func (v *mockVolumes) CreateDisk(volumeOptions *aws.VolumeOptions) (volumeName string, err error) {
+func (v *mockVolumes) CreateDisk(volumeOptions *aws.VolumeOptions) (volumeName aws.KubernetesVolumeID, err error) {
 	return "", fmt.Errorf("not implemented")
 }
 
-func (v *mockVolumes) DeleteDisk(volumeName string) (bool, error) {
+func (v *mockVolumes) DeleteDisk(volumeName aws.KubernetesVolumeID) (bool, error) {
 	return false, fmt.Errorf("not implemented")
 }
 
-func (v *mockVolumes) GetVolumeLabels(volumeName string) (map[string]string, error) {
+func (v *mockVolumes) GetVolumeLabels(volumeName aws.KubernetesVolumeID) (map[string]string, error) {
 	return v.volumeLabels, v.volumeLabelsError
 }
 
-func (c *mockVolumes) GetDiskPath(volumeName string) (string, error) {
+func (c *mockVolumes) GetDiskPath(volumeName aws.KubernetesVolumeID) (string, error) {
 	return "", fmt.Errorf("not implemented")
 }
 
-func (c *mockVolumes) DiskIsAttached(volumeName, instanceID string) (bool, error) {
+func (c *mockVolumes) DiskIsAttached(volumeName aws.KubernetesVolumeID, nodeName string) (bool, error) {
 	return false, fmt.Errorf("not implemented")
 }
 
-func (c *mockVolumes) DisksAreAttached(diskNames []string, nodeName string) (map[string]bool, error) {
+func (c *mockVolumes) DisksAreAttached(diskNames []aws.KubernetesVolumeID, nodeName string) (map[aws.KubernetesVolumeID]bool, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 

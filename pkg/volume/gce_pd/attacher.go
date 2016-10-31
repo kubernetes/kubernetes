@@ -241,7 +241,7 @@ func (plugin *gcePersistentDiskPlugin) NewDetacher() (volume.Detacher, error) {
 // attached to the specified node. If the volume is not attached, it succeeds
 // (returns nil). If it is attached, Detach issues a call to the GCE cloud
 // provider to attach it.
-// Callers are responsible for retryinging on failure.
+// Callers are responsible for retrying on failure.
 // Callers are responsible for thread safety between concurrent attach and detach
 // operations.
 func (detacher *gcePersistentDiskDetacher) Detach(deviceMountPath string, hostName string) error {
