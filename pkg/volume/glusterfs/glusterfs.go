@@ -623,7 +623,7 @@ func (d *glusterfsVolumeDeleter) deleteEndpointService(namespace string, epServi
 
 // parseSecret finds a given Secret instance and reads user password from it.
 func parseSecret(namespace, secretName string, kubeClient clientset.Interface) (string, error) {
-	secretMap, err := volutil.GetSecret(namespace, secretName, kubeClient)
+	secretMap, err := volutil.GetSecretForPV(namespace, secretName, glusterfsPluginName, kubeClient)
 	if err != nil {
 		glog.Errorf("failed to get secret from [%q/%q]", namespace, secretName)
 		return "", fmt.Errorf("failed to get secret from [%q/%q]", namespace, secretName)

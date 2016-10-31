@@ -112,16 +112,34 @@ func PathExists(path string) (bool, error) {
 	}
 }
 
-// GetSecret locates secret by name and namespace and returns secret map
-func GetSecret(namespace, secretName string, kubeClient clientset.Interface) (map[string]string, error) {
+// GetSecretForPod locates secret by name in the pod's namespace and returns secret map
+func GetSecretForPod(pod *api.Pod, secretName string, kubeClient clientset.Interface) (map[string]string, error) {
 	secret := make(map[string]string)
 	if kubeClient == nil {
 		return secret, fmt.Errorf("Cannot get kube client")
 	}
-
-	secrets, err := kubeClient.Core().Secrets(namespace).Get(secretName)
+	secrets, err := kubeClient.Core().Secrets(pod.Namespace).Get(secretName)
 	if err != nil {
 		return secret, err
+	}
+	for name, data := range secrets.Data {
+		secret[name] = string(data)
+	}
+	return secret, nil
+}
+
+// GetSecretForPV locates secret by name and namespace, verifies the secret type, and returns secret map
+func GetSecretForPV(secretNamespace, secretName, volumePluginName string, kubeClient clientset.Interface) (map[string]string, error) {
+	secret := make(map[string]string)
+	if kubeClient == nil {
+		return secret, fmt.Errorf("Cannot get kube client")
+	}
+	secrets, err := kubeClient.Core().Secrets(secretNamespace).Get(secretName)
+	if err != nil {
+		return secret, err
+	}
+	if secrets.Type != api.SecretType(volumePluginName) {
+		return secret, fmt.Errorf("Cannot get secret of type %s", volumePluginName)
 	}
 	for name, data := range secrets.Data {
 		secret[name] = string(data)
