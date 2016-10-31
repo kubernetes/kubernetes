@@ -17,6 +17,8 @@ limitations under the License.
 package cmd
 
 import (
+	"crypto/rsa"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -30,6 +32,8 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -137,6 +141,41 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		"Port for JWS discovery service to bind to",
 	)
 
+	cmd.PersistentFlags().BoolVar(
+		&cfg.FeatureFlags.All, "feature-all", true,
+		"Opt-in feature flag to provide all required steps",
+	)
+
+	cmd.PersistentFlags().BoolVar(
+		&cfg.FeatureFlags.Tokens, "feature-tokens", false,
+		"Opt-in feature flag to provide only tokens",
+	)
+
+	cmd.PersistentFlags().BoolVar(
+		&cfg.FeatureFlags.Discovery, "feature-discovery", false,
+		"Opt-in feature flag to provide only discovery. Requires a control plane and certificates.",
+	)
+
+	cmd.PersistentFlags().BoolVar(
+		&cfg.FeatureFlags.Certificates, "feature-certificates", false,
+		"Opt-in feature flag to provide only pki/certificates",
+	)
+
+	cmd.PersistentFlags().BoolVar(
+		&cfg.FeatureFlags.Pods, "feature-pods", false,
+		"Opt-in feature flag to provide only static pods definitions",
+	)
+
+	cmd.PersistentFlags().BoolVar(
+		&cfg.FeatureFlags.Addons, "feature-addons", false,
+		"Opt-in feature flag to provide only essential cluster addons. Requires a control plane.",
+	)
+
+	cmd.PersistentFlags().BoolVar(
+		&cfg.FeatureFlags.ControlPlane, "feature-control-plane", false,
+		"Opt-in feature flag to provide a control plane",
+	)
+
 	return cmd
 }
 
@@ -186,24 +225,46 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 	return &Init{cfg: cfg}, nil
 }
 
-// Run executes master node provisioning, including certificates, needed static pod manifests, etc.
+// Run executes master node provisioning, including certificates, needed static pod manifests,
+// etc. based on opt-in feature flags
 func (i *Init) Run(out io.Writer) error {
-	if err := kubemaster.CreateTokenAuthFile(&i.cfg.Secrets); err != nil {
-		return err
+	var fftokens bool = i.cfg.FeatureFlags.Tokens
+	var ffpods bool = i.cfg.FeatureFlags.Pods
+	var ffcerts bool = i.cfg.FeatureFlags.Certificates
+	var ffdisc bool = i.cfg.FeatureFlags.Discovery
+	var ffcp bool = i.cfg.FeatureFlags.ControlPlane
+	var ffads bool = i.cfg.FeatureFlags.Addons
+	// Mask "feature-all" off, if any of the opt-in flags have been requested
+	var ffall bool = i.cfg.FeatureFlags.All && !(fftokens || ffpods || ffcerts || ffdisc || ffcp || ffads)
+
+	var kubeconfigs map[string]*clientcmdapi.Config
+	var caKey *rsa.PrivateKey = nil
+	var caCert *x509.Certificate = nil
+	var client *clientset.Clientset = nil
+	var err error
+
+	if ffall || fftokens {
+		if err = kubemaster.CreateTokenAuthFile(&i.cfg.Secrets); err != nil {
+			return err
+		}
 	}
 
-	if err := kubemaster.WriteStaticPodManifests(i.cfg); err != nil {
-		return err
+	if ffall || ffpods {
+		if err = kubemaster.WriteStaticPodManifests(i.cfg); err != nil {
+			return err
+		}
 	}
 
-	caKey, caCert, err := kubemaster.CreatePKIAssets(i.cfg)
-	if err != nil {
-		return err
-	}
+	if ffall || ffcerts || ffdisc || ffcp {
+		caKey, caCert, err = kubemaster.CreatePKIAssets(i.cfg)
+		if err != nil {
+			return err
+		}
 
-	kubeconfigs, err := kubemaster.CreateCertsAndConfigForClients(i.cfg.API, []string{"kubelet", "admin"}, caKey, caCert)
-	if err != nil {
-		return err
+		kubeconfigs, err = kubemaster.CreateCertsAndConfigForClients(i.cfg.API, []string{"kubelet", "admin"}, caKey, caCert)
+		if err != nil {
+			return err
+		}
 	}
 
 	// kubeadm is responsible for writing the following kubeconfig file, which
@@ -215,28 +276,34 @@ func (i *Init) Run(out io.Writer) error {
 	// we need to decide how to handle existing files (it may be handy to support
 	// importing existing files, may be we could even make our command idempotant,
 	// or at least allow for external PKI and stuff)
-	for name, kubeconfig := range kubeconfigs {
-		if err := kubeadmutil.WriteKubeconfigIfNotExists(name, kubeconfig); err != nil {
+	if ffall || ffcp {
+		for name, kubeconfig := range kubeconfigs {
+			if err = kubeadmutil.WriteKubeconfigIfNotExists(name, kubeconfig); err != nil {
+				return err
+			}
+		}
+
+		client, err = kubemaster.CreateClientAndWaitForAPI(kubeconfigs["admin"])
+		if err != nil {
 			return err
 		}
-	}
 
-	client, err := kubemaster.CreateClientAndWaitForAPI(kubeconfigs["admin"])
-	if err != nil {
-		return err
-	}
+		schedulePodsOnMaster := false
+		if err = kubemaster.UpdateMasterRoleLabelsAndTaints(client, schedulePodsOnMaster); err != nil {
+			return err
+		}
 
-	schedulePodsOnMaster := false
-	if err := kubemaster.UpdateMasterRoleLabelsAndTaints(client, schedulePodsOnMaster); err != nil {
-		return err
-	}
+		if ffall || ffdisc {
+			if err = kubemaster.CreateDiscoveryDeploymentAndSecret(i.cfg, client, caCert); err != nil {
+				return err
+			}
+		}
 
-	if err := kubemaster.CreateDiscoveryDeploymentAndSecret(i.cfg, client, caCert); err != nil {
-		return err
-	}
-
-	if err := kubemaster.CreateEssentialAddons(i.cfg, client); err != nil {
-		return err
+		if ffall || ffads {
+			if err = kubemaster.CreateEssentialAddons(i.cfg, client); err != nil {
+				return err
+			}
+		}
 	}
 
 	// TODO(phase1+) we could probably use templates for this logic, and reference struct fields directly etc

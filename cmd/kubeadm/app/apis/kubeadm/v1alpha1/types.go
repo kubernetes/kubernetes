@@ -21,13 +21,14 @@ import "k8s.io/kubernetes/pkg/api/unversioned"
 type MasterConfiguration struct {
 	unversioned.TypeMeta `json:",inline"`
 
-	Secrets           Secrets    `json:"secrets"`
-	API               API        `json:"api"`
-	Etcd              Etcd       `json:"etcd"`
-	Discovery         Discovery  `json:"discovery"`
-	Networking        Networking `json:"networking"`
-	KubernetesVersion string     `json:"kubernetesVersion"`
-	CloudProvider     string     `json:"cloudProvider"`
+	Secrets           Secrets      `json:"secrets"`
+	API               API          `json:"api"`
+	Etcd              Etcd         `json:"etcd"`
+	Discovery         Discovery    `json:"discovery"`
+	Networking        Networking   `json:"networking"`
+	KubernetesVersion string       `json:"kubernetesVersion"`
+	CloudProvider     string       `json:"cloudProvider"`
+	FeatureFlags      FeatureFlags `json:"featureFlags"`
 }
 
 type API struct {
@@ -75,4 +76,15 @@ type ClusterInfo struct {
 	// TODO(phase1+) this may become simply `api.Config`
 	CertificateAuthorities []string `json:"certificateAuthorities"`
 	Endpoints              []string `json:"endpoints"`
+}
+
+// Opt-in feature flags
+type FeatureFlags struct {
+	All          bool `json:"all"`
+	Tokens       bool `json:"tokens"`
+	Discovery    bool `json:"discoveryFF"`
+	Certificates bool `json:"certificates"`
+	Pods         bool `json:"pods"`
+	Addons       bool `json:"addons"`
+	ControlPlane bool `json:"controlPlane"`
 }

@@ -28,6 +28,7 @@ type MasterConfiguration struct {
 	Networking        Networking
 	KubernetesVersion string
 	CloudProvider     string
+	FeatureFlags      FeatureFlags
 }
 
 type API struct {
@@ -75,4 +76,15 @@ type ClusterInfo struct {
 	// TODO(phase1+) this may become simply `api.Config`
 	CertificateAuthorities []string `json:"certificateAuthorities"`
 	Endpoints              []string `json:"endpoints"`
+}
+
+// Opt-in feature flags
+type FeatureFlags struct {
+	All          bool `json:"all"`
+	Tokens       bool `json:"tokens"`
+	Discovery    bool `json:"discoveryFF"`
+	Certificates bool `json:"certificates"`
+	Pods         bool `json:"pods"`
+	Addons       bool `json:"addons"`
+	ControlPlane bool `json:"controlPlane"`
 }
