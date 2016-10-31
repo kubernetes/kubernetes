@@ -50,6 +50,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 				testServiceRemainsUp(f, sem)
 				testSecretsDuringUpgrade(f, sem)
 				testConfigMapsDuringUpgrade(f, sem)
+				testGuestbookApplicationDuringUpgrade(f, sem)
 			})
 			cm.Do()
 		})
@@ -68,6 +69,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 				testServiceUpBeforeAndAfter(f, sem)
 				testSecretsBeforeAndAfterUpgrade(f, sem)
 				testConfigMapsBeforeAndAfterUpgrade(f, sem)
+				testGuestbookApplicationBeforeAndAfterUpgrade(f, sem)
 			})
 			cm.Do()
 		})
@@ -84,6 +86,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 				testServiceRemainsUp(f, sem)
 				testSecretsDuringUpgrade(f, sem)
 				testConfigMapsDuringUpgrade(f, sem)
+				testGuestbookApplicationDuringUpgrade(f, sem)
 			})
 			cm.Do()
 		})
@@ -104,6 +107,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 				testServiceUpBeforeAndAfter(f, sem)
 				testSecretsBeforeAndAfterUpgrade(f, sem)
 				testConfigMapsBeforeAndAfterUpgrade(f, sem)
+				testGuestbookApplicationBeforeAndAfterUpgrade(f, sem)
 			})
 			cm.Do()
 		})
@@ -122,6 +126,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 				testServiceRemainsUp(f, sem)
 				testSecretsDuringUpgrade(f, sem)
 				testConfigMapsDuringUpgrade(f, sem)
+				testGuestbookApplicationDuringUpgrade(f, sem)
 			})
 			cm.Do()
 		})
@@ -311,4 +316,44 @@ func testConfigMaps(f *framework.Framework, sem *chaosmonkey.Semaphore, testDuri
 	common.DoConfigMapE2EWithoutMappingsValidate(f, pod, expectedOutput)
 
 	// Teardown
+}
+
+func testGuestbookApplicationBeforeAndAfterUpgrade(f *framework.Framework, sem *chaosmonkey.Semaphore) {
+	testGuestbookApplication(f, sem, false)
+}
+
+func testGuestbookApplicationDuringUpgrade(f *framework.Framework, sem *chaosmonkey.Semaphore) {
+	testGuestbookApplication(f, sem, true)
+}
+
+func testGuestbookApplication(f *framework.Framework, sem *chaosmonkey.Semaphore, testDuringDisruption bool) {
+	// Setup
+	By("setup guestbook app")
+	GuestbookApplicationSetup(f.ClientSet, f.Namespace.Name)
+
+	// Validate
+	By("validate guestbook app before upgrade")
+	GuestbookApplicationValidate(f.ClientSet, f.Namespace.Name)
+
+	sem.Ready()
+
+	if testDuringDisruption {
+		// Continuously validate
+		wait.Until(func() {
+			By("validate guestbook app during upgrade")
+			GuestbookApplicationValidate(f.ClientSet, f.Namespace.Name)
+		}, framework.Poll, sem.StopCh)
+	} else {
+		// Block until chaosmonkey is done
+		By("waiting for upgrade to finish without validating guestbook app")
+		<-sem.StopCh
+	}
+
+	// Validate after upgrade
+	By("validate guestbook app after upgrade")
+	GuestbookApplicationValidate(f.ClientSet, f.Namespace.Name)
+
+	// Teardown
+	By("teardown guestbook app")
+	GuestbookApplicationTeardown(f.ClientSet, f.Namespace.Name)
 }
