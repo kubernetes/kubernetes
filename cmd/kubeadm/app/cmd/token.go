@@ -79,6 +79,7 @@ func NewCmdToken(out io.Writer) *cobra.Command {
 }
 
 // TODO: Add support for user specified tokens.
+// RunCreateToken generates a new bootstrap token and stores it as a secret on the server.
 func RunCreateToken(out io.Writer, cmd *cobra.Command) error {
 	client, err := createAPIClient()
 	if err != nil {
@@ -144,6 +145,7 @@ func createAPIClient() (*clientset.Clientset, error) {
 	return client, nil
 }
 
+// RunListTokens lists details on all existing bootstrap tokens on the server.
 func RunListTokens(out io.Writer, cmd *cobra.Command) error {
 	client, err := createAPIClient()
 	if err != nil {
@@ -181,6 +183,7 @@ func RunListTokens(out io.Writer, cmd *cobra.Command) error {
 	return nil
 }
 
+// RunDeleteToken removes a bootstrap token from the server.
 func RunDeleteToken(out io.Writer, cmd *cobra.Command, tokenId string) error {
 	client, err := createAPIClient()
 	if err != nil {

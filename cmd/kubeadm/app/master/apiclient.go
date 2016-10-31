@@ -36,7 +36,6 @@ import (
 const apiCallRetryInterval = 500 * time.Millisecond
 
 func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Clientset, error) {
-
 	adminClientConfig, err := clientcmd.NewDefaultClientConfig(
 		*adminConfig,
 		&clientcmd.ConfigOverrides{},
