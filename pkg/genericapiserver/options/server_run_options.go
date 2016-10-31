@@ -393,7 +393,7 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"The number of apiservers running in the cluster.")
 
 	fs.StringVar(&s.MasterServiceNamespace, "master-service-namespace", s.MasterServiceNamespace, ""+
-		"The namespace from which the kubernetes master services should be injected into pods.")
+		"DEPRECATED: the namespace from which the kubernetes master services should be injected into pods.")
 
 	fs.IntVar(&s.MaxRequestsInFlight, "max-requests-inflight", s.MaxRequestsInFlight, ""+
 		"The maximum number of requests in flight at a given time. When the server exceeds this, "+

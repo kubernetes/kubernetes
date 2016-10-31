@@ -28,9 +28,9 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// APIServer runs a kubernetes api server.
-type APIServer struct {
-	*genericoptions.ServerRunOptions
+// ServerRunOptions runs a kubernetes api server.
+type ServerRunOptions struct {
+	GenericServerRunOptions     *genericoptions.ServerRunOptions
 	AllowPrivileged             bool
 	EventTTL                    time.Duration
 	KubeletConfig               kubeletclient.KubeletClientConfig
@@ -43,11 +43,11 @@ type APIServer struct {
 	WebhookTokenAuthnCacheTTL   time.Duration
 }
 
-// NewAPIServer creates a new APIServer object with default parameters
-func NewAPIServer() *APIServer {
-	s := APIServer{
-		ServerRunOptions: genericoptions.NewServerRunOptions().WithEtcdOptions(),
-		EventTTL:         1 * time.Hour,
+// NewServerRunOptions creates a new ServerRunOptions object with default parameters
+func NewServerRunOptions() *ServerRunOptions {
+	s := ServerRunOptions{
+		GenericServerRunOptions: genericoptions.NewServerRunOptions().WithEtcdOptions(),
+		EventTTL:                1 * time.Hour,
 		KubeletConfig: kubeletclient.KubeletClientConfig{
 			Port:        ports.KubeletPort,
 			EnableHttps: true,
@@ -59,11 +59,11 @@ func NewAPIServer() *APIServer {
 }
 
 // AddFlags adds flags for a specific APIServer to the specified FlagSet
-func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
+func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	// Add the generic flags.
-	s.ServerRunOptions.AddUniversalFlags(fs)
+	s.GenericServerRunOptions.AddUniversalFlags(fs)
 	//Add etcd specific flags.
-	s.ServerRunOptions.AddEtcdStorageFlags(fs)
+	s.GenericServerRunOptions.AddEtcdStorageFlags(fs)
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.
 

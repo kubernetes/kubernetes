@@ -84,14 +84,12 @@ type Config struct {
 	EnableGarbageCollection bool
 
 	Version               *version.Info
-	APIGroupPrefix        string
 	CorsAllowedOriginList []string
 	Authenticator         authenticator.Request
 	// TODO(roberthbailey): Remove once the server no longer supports http basic auth.
-	SupportsBasicAuth      bool
-	Authorizer             authorizer.Authorizer
-	AdmissionControl       admission.Interface
-	MasterServiceNamespace string
+	SupportsBasicAuth bool
+	Authorizer        authorizer.Authorizer
+	AdmissionControl  admission.Interface
 	// TODO(ericchiang): Determine if policy escalation checks should be an admission controller.
 	AuthorizerRBACSuperUser string
 
@@ -275,6 +273,7 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 		c.InsecureServingInfo = insecureServingInfo
 	}
 
+	c.AuthorizerRBACSuperUser = options.AuthorizationRBACSuperUser
 	c.CorsAllowedOriginList = options.CorsAllowedOriginList
 	c.EnableGarbageCollection = options.EnableGarbageCollection
 	c.EnableProfiling = options.EnableProfiling
@@ -282,11 +281,12 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 	c.ExternalHost = options.ExternalHost
 	c.KubernetesServiceNodePort = options.KubernetesServiceNodePort
 	c.MasterCount = options.MasterCount
+	c.MaxRequestsInFlight = options.MaxRequestsInFlight
 	c.MinRequestTimeout = options.MinRequestTimeout
 	c.PublicAddress = options.AdvertiseAddress
 	c.ServiceClusterIPRange = &options.ServiceClusterIPRange
 	c.ServiceNodePortRange = options.ServiceNodePortRange
-	c.MaxRequestsInFlight = options.MaxRequestsInFlight
+	c.SupportsBasicAuth = len(options.BasicAuthFile) > 0
 
 	return c
 }
