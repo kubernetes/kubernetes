@@ -29,7 +29,7 @@ function gc {
 # Garbage collect old rkt containers on exit
 trap gc EXIT
 
-${RKT_BINARY} run --stage1-name="coreos.com/rkt/stage1-fly:1.17.0" \
+${RKT_BINARY} run --stage1-name="coreos.com/rkt/stage1-fly:1.18.0" \
 	--insecure-options=image \
 	--volume=rootfs,kind=host,source=/,readOnly=false,recursive=true \
 	--mount volume=rootfs,target=/media/root \
