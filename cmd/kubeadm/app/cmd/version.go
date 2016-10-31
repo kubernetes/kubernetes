@@ -22,7 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -32,7 +32,7 @@ func NewCmdVersion(out io.Writer) *cobra.Command {
 		Short: "Print the version of kubeadm",
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunVersion(out, cmd)
-			cmdutil.CheckErr(err)
+			kubeadmutil.CheckErr(err)
 		},
 	}
 	return cmd
