@@ -460,7 +460,10 @@ func (s *Scheme) Copy(src Object) (Object, error) {
 	return dst.(Object), nil
 }
 
-// Performs a deep copy of the given object.
+// DeepCopy performs a deep copy of the given object.
+// If custom or generated copy functions are registered only for pointers to the source type
+// (or any types contained within it), an addressable value (e.g. a pointer, not a struct)
+// must be passed to DeepCopy().
 func (s *Scheme) DeepCopy(src interface{}) (interface{}, error) {
 	return s.cloner.DeepCopy(src)
 }
