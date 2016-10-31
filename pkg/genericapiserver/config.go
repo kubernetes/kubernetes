@@ -118,8 +118,8 @@ type Config struct {
 	// Defaults to 6443 if not set.
 	ReadWritePort int
 
-	// ExternalHost is the host name to use for external (public internet) facing URLs (e.g. Swagger)
-	ExternalHost string
+	// ExternalAddress is the host name to use for external (public internet) facing URLs (e.g. Swagger)
+	ExternalAddress string
 
 	// PublicAddress is the IP address where members of the cluster (kubelet,
 	// kube-proxy, services, etc.) can reach the GenericAPIServer.
@@ -317,7 +317,7 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 	c.EnableGarbageCollection = options.EnableGarbageCollection
 	c.EnableProfiling = options.EnableProfiling
 	c.EnableSwaggerUI = options.EnableSwaggerUI
-	c.ExternalHost = options.ExternalHost
+	c.ExternalAddress = options.ExternalHost
 	c.KubernetesServiceNodePort = options.KubernetesServiceNodePort
 	c.MasterCount = options.MasterCount
 	c.MaxRequestsInFlight = options.MaxRequestsInFlight
@@ -366,12 +366,12 @@ func (c *Config) Complete() completedConfig {
 		c.ServiceNodePortRange = options.DefaultServiceNodePortRange
 		glog.Infof("Node port range unspecified. Defaulting to %v.", c.ServiceNodePortRange)
 	}
-	if len(c.ExternalHost) == 0 && c.PublicAddress != nil {
+	if len(c.ExternalAddress) == 0 && c.PublicAddress != nil {
 		hostAndPort := c.PublicAddress.String()
 		if c.ReadWritePort != 0 {
 			hostAndPort = net.JoinHostPort(hostAndPort, strconv.Itoa(c.ReadWritePort))
 		}
-		c.ExternalHost = hostAndPort
+		c.ExternalAddress = hostAndPort
 	}
 	// All APIs will have the same authentication for now.
 	if c.OpenAPIConfig != nil && c.OpenAPIConfig.SecurityDefinitions != nil {
@@ -430,8 +430,14 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 		return nil, fmt.Errorf("Genericapiserver.New() called with config.Serializer == nil")
 	}
 
+	discoveryAddresses := DefaultDiscoveryAddresses{DefaultAddress: c.ExternalAddress}
+	if c.ServiceClusterIPRange != nil {
+		discoveryAddresses.DiscoveryCIDRRules = append(discoveryAddresses.DiscoveryCIDRRules,
+			DiscoveryCIDRRule{IPRange: *c.ServiceClusterIPRange, Address: net.JoinHostPort(c.ServiceReadWriteIP.String(), strconv.Itoa(c.ServiceReadWritePort))})
+	}
+
 	s := &GenericAPIServer{
-		ServiceClusterIPRange:  c.ServiceClusterIPRange,
+		discoveryAddresses:     discoveryAddresses,
 		LoopbackClientConfig:   c.LoopbackClientConfig,
 		legacyAPIGroupPrefixes: c.LegacyAPIGroupPrefixes,
 		admissionControl:       c.AdmissionControl,
@@ -441,15 +447,12 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 		minRequestTimeout:    time.Duration(c.MinRequestTimeout) * time.Second,
 		enableSwaggerSupport: c.EnableSwaggerSupport,
 
-		MasterCount:          c.MasterCount,
-		SecureServingInfo:    c.SecureServingInfo,
-		InsecureServingInfo:  c.InsecureServingInfo,
-		ExternalAddress:      c.ExternalHost,
-		ServiceReadWriteIP:   c.ServiceReadWriteIP,
-		ServiceReadWritePort: c.ServiceReadWritePort,
+		MasterCount:         c.MasterCount,
+		SecureServingInfo:   c.SecureServingInfo,
+		InsecureServingInfo: c.InsecureServingInfo,
+		ExternalAddress:     c.ExternalAddress,
 
-		KubernetesServiceNodePort: c.KubernetesServiceNodePort,
-		apiGroupsForDiscovery:     map[string]unversioned.APIGroup{},
+		apiGroupsForDiscovery: map[string]unversioned.APIGroup{},
 
 		enableOpenAPISupport: c.EnableOpenAPISupport,
 		openAPIConfig:        c.OpenAPIConfig,
@@ -555,7 +558,7 @@ func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
 	}
 	glog.Infof("Will report %v as public IP address.", options.AdvertiseAddress)
 
-	// Set default value for ExternalHost if not specified.
+	// Set default value for ExternalAddress if not specified.
 	if len(options.ExternalHost) == 0 {
 		// TODO: extend for other providers
 		if options.CloudProvider == "gce" {

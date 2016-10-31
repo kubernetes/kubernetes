@@ -37,8 +37,8 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
 	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
-	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
 
@@ -91,9 +91,6 @@ func TestNew(t *testing.T) {
 	assert.Equal(s.RequestContextMapper(), config.RequestContextMapper)
 
 	// these values get defaulted
-	_, serviceClusterIPRange, _ := net.ParseCIDR("10.0.0.0/24")
-	serviceReadWriteIP, _ := ipallocator.GetIndexedIP(serviceClusterIPRange, 1)
-	assert.Equal(s.ServiceReadWriteIP, serviceReadWriteIP)
 	assert.Equal(s.ExternalAddress, net.JoinHostPort(config.PublicAddress.String(), "6443"))
 }
 
@@ -366,7 +363,7 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 	assert.Equal(extensions.GroupName, groupListGroup.Name)
 	assert.Equal(extensionsVersions, groupListGroup.Versions)
 	assert.Equal(extensionsPreferredVersion, groupListGroup.PreferredVersion)
-	assert.Equal(master.getServerAddressByClientCIDRs(&http.Request{}), groupListGroup.ServerAddressByClientCIDRs)
+	assert.Equal(master.discoveryAddresses.ServerAddressByClientCIDRs(utilnet.GetClientIP(&http.Request{})), groupListGroup.ServerAddressByClientCIDRs)
 
 	// Remove the group.
 	master.RemoveAPIGroupForDiscovery(extensions.GroupName)
@@ -379,20 +376,20 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 }
 
 func TestGetServerAddressByClientCIDRs(t *testing.T) {
-	s, etcdserver, _, _ := newMaster(t)
+	s, etcdserver, config, _ := newMaster(t)
 	defer etcdserver.Terminate(t)
 
 	publicAddressCIDRMap := []unversioned.ServerAddressByClientCIDR{
 		{
 			ClientCIDR:    "0.0.0.0/0",
-			ServerAddress: s.ExternalAddress,
+			ServerAddress: config.ExternalAddress,
 		},
 	}
 	internalAddressCIDRMap := []unversioned.ServerAddressByClientCIDR{
 		publicAddressCIDRMap[0],
 		{
-			ClientCIDR:    s.ServiceClusterIPRange.String(),
-			ServerAddress: net.JoinHostPort(s.ServiceReadWriteIP.String(), strconv.Itoa(s.ServiceReadWritePort)),
+			ClientCIDR:    config.ServiceClusterIPRange.String(),
+			ServerAddress: net.JoinHostPort(config.ServiceReadWriteIP.String(), strconv.Itoa(config.ServiceReadWritePort)),
 		},
 	}
 	internalIP := "10.0.0.1"
@@ -459,7 +456,7 @@ func TestGetServerAddressByClientCIDRs(t *testing.T) {
 	}
 
 	for i, test := range testCases {
-		if a, e := s.getServerAddressByClientCIDRs(&test.Request), test.ExpectedMap; reflect.DeepEqual(e, a) != true {
+		if a, e := s.discoveryAddresses.ServerAddressByClientCIDRs(utilnet.GetClientIP(&test.Request)), test.ExpectedMap; reflect.DeepEqual(e, a) != true {
 			t.Fatalf("test case %d failed. expected: %v, actual: %v", i+1, e, a)
 		}
 	}
