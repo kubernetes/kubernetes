@@ -37,6 +37,7 @@ import (
 
 const (
 	bootstrapTokenSecretPrefix = "bootstrap-token-"
+	defaultTokenDuration       = time.Duration(8) * time.Hour
 )
 
 func NewCmdToken(out io.Writer) *cobra.Command {
@@ -45,7 +46,7 @@ func NewCmdToken(out io.Writer) *cobra.Command {
 		Short: "Manage bootstrap tokens",
 	}
 
-	var tokenDuration string
+	var tokenDuration time.Duration
 	tokenSecret := &kubeadmapi.Secrets{}
 	createCmd := &cobra.Command{
 		Use:   "create",
@@ -55,8 +56,8 @@ func NewCmdToken(out io.Writer) *cobra.Command {
 			kubeadmutil.CheckErr(err)
 		},
 	}
-	createCmd.PersistentFlags().StringVar(&tokenDuration,
-		"duration", "8h", "Duration the token should be valid")
+	createCmd.PersistentFlags().DurationVar(&tokenDuration,
+		"duration", defaultTokenDuration, "Duration the token should be valid")
 	createCmd.PersistentFlags().StringVar(
 		&tokenSecret.GivenToken, "token", "",
 		"Shared secret used to secure cluster bootstrap; if none is provided, one will be generated for you",
@@ -87,13 +88,8 @@ func NewCmdToken(out io.Writer) *cobra.Command {
 }
 
 // RunCreateToken generates a new bootstrap token and stores it as a secret on the server.
-func RunCreateToken(out io.Writer, cmd *cobra.Command, tokenDurationStr string, tokenSecret *kubeadmapi.Secrets) error {
+func RunCreateToken(out io.Writer, cmd *cobra.Command, tokenDuration time.Duration, tokenSecret *kubeadmapi.Secrets) error {
 	client, err := createAPIClient()
-	if err != nil {
-		return err
-	}
-
-	tokenDuration, err := time.ParseDuration(tokenDurationStr)
 	if err != nil {
 		return err
 	}
