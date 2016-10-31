@@ -248,6 +248,28 @@ func NewNodeController(
 
 	nodeEventHandlerFuncs := cache.ResourceEventHandlerFuncs{}
 	if nc.allocateNodeCIDRs {
+		var nodeList *api.NodeList
+		var err error
+		// We must poll because apiserver might not be up. This error causes
+		// controller manager to restart.
+		if pollErr := wait.Poll(10*time.Second, apiserverStartupGracePeriod, func() (bool, error) {
+			nodeList, err = kubeClient.Core().Nodes().List(api.ListOptions{
+				FieldSelector: fields.Everything(),
+				LabelSelector: labels.Everything(),
+			})
+			if err != nil {
+				glog.Errorf("Failed to list all nodes: %v", err)
+				return false, nil
+			}
+			return true, nil
+		}); pollErr != nil {
+			return nil, fmt.Errorf("Failed to list all nodes in %v, cannot proceed without updating CIDR map", apiserverStartupGracePeriod)
+		}
+		nc.cidrAllocator, err = NewCIDRRangeAllocator(kubeClient, clusterCIDR, serviceCIDR, nodeCIDRMaskSize, nodeList)
+		if err != nil {
+			return nil, err
+		}
+
 		nodeEventHandlerFuncs = cache.ResourceEventHandlerFuncs{
 			AddFunc: func(originalObj interface{}) {
 				obj, err := api.Scheme.DeepCopy(originalObj)
@@ -326,30 +348,6 @@ func NewNodeController(
 	nc.nodeStore = *nodeInformer.Lister()
 
 	nc.daemonSetStore = *daemonSetInformer.Lister()
-
-	if allocateNodeCIDRs {
-		var nodeList *api.NodeList
-		var err error
-		// We must poll because apiserver might not be up. This error causes
-		// controller manager to restart.
-		if pollErr := wait.Poll(10*time.Second, apiserverStartupGracePeriod, func() (bool, error) {
-			nodeList, err = kubeClient.Core().Nodes().List(api.ListOptions{
-				FieldSelector: fields.Everything(),
-				LabelSelector: labels.Everything(),
-			})
-			if err != nil {
-				glog.Errorf("Failed to list all nodes: %v", err)
-				return false, nil
-			}
-			return true, nil
-		}); pollErr != nil {
-			return nil, fmt.Errorf("Failed to list all nodes in %v, cannot proceed without updating CIDR map", apiserverStartupGracePeriod)
-		}
-		nc.cidrAllocator, err = NewCIDRRangeAllocator(kubeClient, clusterCIDR, serviceCIDR, nodeCIDRMaskSize, nodeList)
-		if err != nil {
-			return nil, err
-		}
-	}
 
 	return nc, nil
 }
