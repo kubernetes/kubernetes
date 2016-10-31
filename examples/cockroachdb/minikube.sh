@@ -35,7 +35,7 @@ kubectl delete petsets,pods,persistentvolumes,persistentvolumeclaims,services -l
 # claims here manually even though that sounds counter-intuitive. For details
 # see https://github.com/kubernetes/contrib/pull/1295#issuecomment-230180894.
 # Note that we make an extra volume here so you can manually test scale-up.
-for i in $(seq 0 5); do
+for i in $(seq 0 3); do
   cat <<EOF | kubectl create -f -
 kind: PersistentVolume
 apiVersion: v1
