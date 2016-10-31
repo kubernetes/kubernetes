@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/digitalocean"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/photon"
@@ -52,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/quobyte"
 	"k8s.io/kubernetes/pkg/volume/rbd"
 	"k8s.io/kubernetes/pkg/volume/vsphere_volume"
+	"k8s.io/kubernetes/pkg/volume/digitalocean_volume"
 )
 
 // ProbeAttachableVolumePlugins collects all volume plugins for the attach/
@@ -70,6 +72,7 @@ func ProbeAttachableVolumePlugins(config componentconfig.VolumeConfiguration) []
 	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, photon_pd.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, digitalocean_volume.ProbeVolumePlugins()...)
 	return allPlugins
 }
 
@@ -129,6 +132,8 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config componen
 			allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
 		case photon.ProviderName == cloud.ProviderName():
 			allPlugins = append(allPlugins, photon_pd.ProbeVolumePlugins()...)
+		case digitalocean.ProviderName == cloud.ProviderName():
+			allPlugins = append(allPlugins, digitalocean_volume.ProbeVolumePlugins()...)
 		}
 	}
 
@@ -161,6 +166,8 @@ func NewAlphaVolumeProvisioner(cloud cloudprovider.Interface, config componentco
 		return getProvisionablePluginFromVolumePlugins(azure_dd.ProbeVolumePlugins())
 	case cloud != nil && photon.ProviderName == cloud.ProviderName():
 		return getProvisionablePluginFromVolumePlugins(photon_pd.ProbeVolumePlugins())
+	case cloud != nil && digitalocean.ProviderName == cloud.ProviderName():
+		return getProvisionablePluginFromVolumePlugins(digitalocean_volume.ProbeVolumePlugins())
 	}
 	return nil, nil
 }

@@ -91,6 +91,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_DaemonEndpoint_To_v1_DaemonEndpoint,
 		Convert_v1_DeleteOptions_To_api_DeleteOptions,
 		Convert_api_DeleteOptions_To_v1_DeleteOptions,
+		Convert_v1_DigitalOceanVolumeSource_To_api_DigitalOceanVolumeSource,
+		Convert_api_DigitalOceanVolumeSource_To_v1_DigitalOceanVolumeSource,
 		Convert_v1_DownwardAPIVolumeFile_To_api_DownwardAPIVolumeFile,
 		Convert_api_DownwardAPIVolumeFile_To_v1_DownwardAPIVolumeFile,
 		Convert_v1_DownwardAPIVolumeSource_To_api_DownwardAPIVolumeSource,
@@ -1014,6 +1016,28 @@ func autoConvert_api_DeleteOptions_To_v1_DeleteOptions(in *api.DeleteOptions, ou
 
 func Convert_api_DeleteOptions_To_v1_DeleteOptions(in *api.DeleteOptions, out *DeleteOptions, s conversion.Scope) error {
 	return autoConvert_api_DeleteOptions_To_v1_DeleteOptions(in, out, s)
+}
+
+func autoConvert_v1_DigitalOceanVolumeSource_To_api_DigitalOceanVolumeSource(in *DigitalOceanVolumeSource, out *api.DigitalOceanVolumeSource, s conversion.Scope) error {
+	out.VolumeID = in.VolumeID
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
+func Convert_v1_DigitalOceanVolumeSource_To_api_DigitalOceanVolumeSource(in *DigitalOceanVolumeSource, out *api.DigitalOceanVolumeSource, s conversion.Scope) error {
+	return autoConvert_v1_DigitalOceanVolumeSource_To_api_DigitalOceanVolumeSource(in, out, s)
+}
+
+func autoConvert_api_DigitalOceanVolumeSource_To_v1_DigitalOceanVolumeSource(in *api.DigitalOceanVolumeSource, out *DigitalOceanVolumeSource, s conversion.Scope) error {
+	out.VolumeID = in.VolumeID
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
+func Convert_api_DigitalOceanVolumeSource_To_v1_DigitalOceanVolumeSource(in *api.DigitalOceanVolumeSource, out *DigitalOceanVolumeSource, s conversion.Scope) error {
+	return autoConvert_api_DigitalOceanVolumeSource_To_v1_DigitalOceanVolumeSource(in, out, s)
 }
 
 func autoConvert_v1_DownwardAPIVolumeFile_To_api_DownwardAPIVolumeFile(in *DownwardAPIVolumeFile, out *api.DownwardAPIVolumeFile, s conversion.Scope) error {
@@ -2652,6 +2676,7 @@ func autoConvert_v1_PersistentVolumeSource_To_api_PersistentVolumeSource(in *Per
 	out.Quobyte = (*api.QuobyteVolumeSource)(unsafe.Pointer(in.Quobyte))
 	out.AzureDisk = (*api.AzureDiskVolumeSource)(unsafe.Pointer(in.AzureDisk))
 	out.PhotonPersistentDisk = (*api.PhotonPersistentDiskVolumeSource)(unsafe.Pointer(in.PhotonPersistentDisk))
+	out.DigitalOceanVolume = (*api.DigitalOceanVolumeSource)(unsafe.Pointer(in.DigitalOceanVolume))
 	return nil
 }
 
@@ -2677,6 +2702,7 @@ func autoConvert_api_PersistentVolumeSource_To_v1_PersistentVolumeSource(in *api
 	out.VsphereVolume = (*VsphereVirtualDiskVolumeSource)(unsafe.Pointer(in.VsphereVolume))
 	out.AzureDisk = (*AzureDiskVolumeSource)(unsafe.Pointer(in.AzureDisk))
 	out.PhotonPersistentDisk = (*PhotonPersistentDiskVolumeSource)(unsafe.Pointer(in.PhotonPersistentDisk))
+	out.DigitalOceanVolume = (*DigitalOceanVolumeSource)(unsafe.Pointer(in.DigitalOceanVolume))
 	return nil
 }
 
@@ -4291,6 +4317,7 @@ func autoConvert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.
 	out.Quobyte = (*api.QuobyteVolumeSource)(unsafe.Pointer(in.Quobyte))
 	out.AzureDisk = (*api.AzureDiskVolumeSource)(unsafe.Pointer(in.AzureDisk))
 	out.PhotonPersistentDisk = (*api.PhotonPersistentDiskVolumeSource)(unsafe.Pointer(in.PhotonPersistentDisk))
+	out.DigitalOceanVolume = (*api.DigitalOceanVolumeSource)(unsafe.Pointer(in.DigitalOceanVolume))
 	return nil
 }
 
@@ -4322,6 +4349,7 @@ func autoConvert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *
 	out.VsphereVolume = (*VsphereVirtualDiskVolumeSource)(unsafe.Pointer(in.VsphereVolume))
 	out.AzureDisk = (*AzureDiskVolumeSource)(unsafe.Pointer(in.AzureDisk))
 	out.PhotonPersistentDisk = (*PhotonPersistentDiskVolumeSource)(unsafe.Pointer(in.PhotonPersistentDisk))
+	out.DigitalOceanVolume = (*DigitalOceanVolumeSource)(unsafe.Pointer(in.DigitalOceanVolume))
 	return nil
 }
 

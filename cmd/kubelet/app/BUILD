@@ -98,6 +98,7 @@ go_library(
         "//pkg/volume/rbd:go_default_library",
         "//pkg/volume/secret:go_default_library",
         "//pkg/volume/vsphere_volume:go_default_library",
+        "//pkg/volume/digitalocean_volume:go_default_library",
         "//plugin/pkg/auth/authenticator/request/anonymous:go_default_library",
         "//plugin/pkg/auth/authenticator/request/union:go_default_library",
         "//plugin/pkg/auth/authenticator/request/x509:go_default_library",

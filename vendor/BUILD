@@ -11716,3 +11716,31 @@ go_library(
     srcs = ["k8s.io/client-go/pkg/util/ratelimit/bucket.go"],
     tags = ["automanaged"],
 )
+
+go_library(
+    name = "github.com/digitalocean/godo/",
+    srcs = [
+			"github.com/digitalocean/godo/account.go",
+			"github.com/digitalocean/godo/action.go",
+			"github.com/digitalocean/godo/doc.go",
+			"github.com/digitalocean/godo/domains.go",
+			"github.com/digitalocean/godo/droplet_actions.go",
+			"github.com/digitalocean/godo/droplets.go",
+			"github.com/digitalocean/godo/errors.go",
+			"github.com/digitalocean/godo/floating_ips_actions.go",
+			"github.com/digitalocean/godo/floating_ips.go",
+			"github.com/digitalocean/godo/godo.go",
+			"github.com/digitalocean/godo/image_actions.go",
+			"github.com/digitalocean/godo/images.go",
+			"github.com/digitalocean/godo/keys.go",
+			"github.com/digitalocean/godo/links.go",
+			"github.com/digitalocean/godo/regions.go",
+			"github.com/digitalocean/godo/sizes.go",
+			"github.com/digitalocean/godo/storage_actions.go",
+			"github.com/digitalocean/godo/storage.go",
+			"github.com/digitalocean/godo/strings.go",
+			"github.com/digitalocean/godo/tags.go",
+			"github.com/digitalocean/godo/timestamp.go",
+		],
+    tags = ["automanaged"],
+)

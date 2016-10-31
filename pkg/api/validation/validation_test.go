@@ -2220,6 +2220,20 @@ func TestValidateVolumes(t *testing.T) {
 			errtype:  field.ErrorTypeRequired,
 			errfield: "azureDisk.diskURI",
 		},
+		// digitaloceanVolume
+		{
+			name: "valid digitaloceanVolume",
+			vol: api.Volume{
+				Name: "digitalocean-volume",
+				VolumeSource: api.VolumeSource{
+					DigitalOceanVolume: &api.DigitalOceanVolumeSource{
+						VolumeID:  "my-PD",
+						FSType:    "ext4",
+						ReadOnly:  false,
+					},
+				},
+			},
+		},
 	}
 
 	for i, tc := range testCases {

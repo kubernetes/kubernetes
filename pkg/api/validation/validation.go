@@ -677,6 +677,14 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path) field.E
 		numVolumes++
 		allErrs = append(allErrs, validateAzureDisk(source.AzureDisk, fldPath.Child("azureDisk"))...)
 	}
+	if source.DigitalOceanVolume != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("digitaloceanVolume"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validateDigitalOceanVolumeSource(source.DigitalOceanVolume, fldPath.Child("digitaloceanVolume"))...)
+		}
+	}
 
 	if numVolumes == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, "must specify a volume type"))
@@ -1007,6 +1015,14 @@ func validateAzureDisk(azure *api.AzureDiskVolumeSource, fldPath *field.Path) fi
 	}
 	return allErrs
 }
+func validateDigitalOceanVolumeSource(do *api.DigitalOceanVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(do.VolumeID) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("volumeID"), ""))
+	}
+	return allErrs
+}
+
 
 func validateVsphereVolumeSource(cd *api.VsphereVirtualDiskVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -1186,6 +1202,14 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 	if pv.Spec.AzureDisk != nil {
 		numVolumes++
 		allErrs = append(allErrs, validateAzureDisk(pv.Spec.AzureDisk, specPath.Child("azureDisk"))...)
+	}
+	if pv.Spec.DigitalOceanVolume != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("digitaloceanVolume"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validateDigitalOceanVolumeSource(pv.Spec.DigitalOceanVolume, specPath.Child("digitaloceanVolume"))...)
+		}
 	}
 
 	if numVolumes == 0 {

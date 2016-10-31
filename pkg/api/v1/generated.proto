@@ -614,6 +614,26 @@ message DeleteOptions {
   optional bool orphanDependents = 3;
 }
 
+// Represents a digitalocean volume resource.
+message DigitalOceanVolumeSource {
+  // volume id used to identify the volume in cinder
+  // More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
+  optional string volumeID = 1;
+
+  // Filesystem type to mount.
+  // Must be a filesystem type supported by the host operating system.
+  // Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  // More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
+  // +optional
+  optional string fsType = 2;
+
+  // Optional: Defaults to false (read/write). ReadOnly here will force
+  // the ReadOnly setting in VolumeMounts.
+  // More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
+  // +optional
+  optional bool readOnly = 3;
+}
+
 // DownwardAPIVolumeFile represents information to create the file containing the pod field
 message DownwardAPIVolumeFile {
   // Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'
@@ -2036,6 +2056,10 @@ message PersistentVolumeSource {
 
   // PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine
   optional PhotonPersistentDiskVolumeSource photonPersistentDisk = 17;
+
+  // digitaloceanVolume represents an Digital Ocean Volume mount on the host and bind mount to the pod.
+  // +optional
+  optional DigitalOceanVolumeSource digitaloceanVolume = 18;
 }
 
 // PersistentVolumeSpec is the specification of a persistent volume.
@@ -3558,6 +3582,10 @@ message VolumeSource {
 
   // PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine
   optional PhotonPersistentDiskVolumeSource photonPersistentDisk = 23;
+
+  // DigitalOceanVolume represents an DigitalOcean Volume mount on the host and bind mount to the pod.
+  // +optional
+  optional DigitalOceanVolumeSource digitaloceanVolume = 24;
 }
 
 // Represents a vSphere volume resource.

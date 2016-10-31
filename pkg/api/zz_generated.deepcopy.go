@@ -66,6 +66,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ConversionError, InType: reflect.TypeOf(&ConversionError{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_DaemonEndpoint, InType: reflect.TypeOf(&DaemonEndpoint{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_DeleteOptions, InType: reflect.TypeOf(&DeleteOptions{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_DigitalOceanVolumeSource, InType: reflect.TypeOf(&DigitalOceanVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_DownwardAPIVolumeFile, InType: reflect.TypeOf(&DownwardAPIVolumeFile{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_DownwardAPIVolumeSource, InType: reflect.TypeOf(&DownwardAPIVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_EmptyDirVolumeSource, InType: reflect.TypeOf(&EmptyDirVolumeSource{})},
@@ -801,6 +802,17 @@ func DeepCopy_api_DeleteOptions(in interface{}, out interface{}, c *conversion.C
 		} else {
 			out.OrphanDependents = nil
 		}
+		return nil
+	}
+}
+
+func DeepCopy_api_DigitalOceanVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*DigitalOceanVolumeSource)
+		out := out.(*DigitalOceanVolumeSource)
+		out.VolumeID = in.VolumeID
+		out.FSType = in.FSType
+		out.ReadOnly = in.ReadOnly
 		return nil
 	}
 }
@@ -2298,6 +2310,13 @@ func DeepCopy_api_PersistentVolumeSource(in interface{}, out interface{}, c *con
 		} else {
 			out.PhotonPersistentDisk = nil
 		}
+		if in.DigitalOceanVolume != nil {
+			in, out := &in.DigitalOceanVolume, &out.DigitalOceanVolume
+			*out = new(DigitalOceanVolumeSource)
+			**out = **in
+		} else {
+			out.DigitalOceanVolume = nil
+		}
 		return nil
 	}
 }
@@ -3776,6 +3795,13 @@ func DeepCopy_api_VolumeSource(in interface{}, out interface{}, c *conversion.Cl
 			**out = **in
 		} else {
 			out.PhotonPersistentDisk = nil
+		}
+		if in.DigitalOceanVolume != nil {
+			in, out := &in.DigitalOceanVolume, &out.DigitalOceanVolume
+			*out = new(DigitalOceanVolumeSource)
+			**out = **in
+		} else {
+			out.DigitalOceanVolume = nil
 		}
 		return nil
 	}
