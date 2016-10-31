@@ -46,16 +46,21 @@ func NewCmdToken(out io.Writer) *cobra.Command {
 	}
 
 	var tokenDuration string
+	tokenSecret := &kubeadmapi.Secrets{}
 	createCmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create discovery tokens on the server.",
 		Run: func(tokenCmd *cobra.Command, args []string) {
-			err := RunCreateToken(out, tokenCmd, tokenDuration)
+			err := RunCreateToken(out, tokenCmd, tokenDuration, tokenSecret)
 			kubeadmutil.CheckErr(err)
 		},
 	}
 	createCmd.PersistentFlags().StringVar(&tokenDuration,
 		"duration", "8h", "Duration the token should be valid")
+	createCmd.PersistentFlags().StringVar(
+		&tokenSecret.GivenToken, "token", "",
+		"Shared secret used to secure cluster bootstrap; if none is provided, one will be generated for you",
+	)
 	tokenCmd.AddCommand(createCmd)
 
 	listCmd := &cobra.Command{
@@ -81,9 +86,8 @@ func NewCmdToken(out io.Writer) *cobra.Command {
 	return tokenCmd
 }
 
-// TODO: Add support for user specified tokens.
 // RunCreateToken generates a new bootstrap token and stores it as a secret on the server.
-func RunCreateToken(out io.Writer, cmd *cobra.Command, tokenDurationStr string) error {
+func RunCreateToken(out io.Writer, cmd *cobra.Command, tokenDurationStr string, tokenSecret *kubeadmapi.Secrets) error {
 	client, err := createAPIClient()
 	if err != nil {
 		return err
@@ -94,8 +98,7 @@ func RunCreateToken(out io.Writer, cmd *cobra.Command, tokenDurationStr string) 
 		return err
 	}
 
-	tokenSecret := &kubeadmapi.Secrets{}
-	err = kubeadmutil.GenerateToken(tokenSecret)
+	err = kubeadmutil.GenerateTokenIfNeeded(tokenSecret)
 	if err != nil {
 		return err
 	}
