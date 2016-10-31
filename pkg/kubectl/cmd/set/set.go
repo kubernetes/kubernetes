@@ -32,7 +32,6 @@ var (
 	set_example = dedent.Dedent(``)
 )
 
-
 func NewCmdSet(f *cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "set SUBCOMMAND",
@@ -45,7 +44,7 @@ func NewCmdSet(f *cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	}
 
 	// add subcommands
-	cmd.AddCommand(NewCmdImage(f, out))
+	cmd.AddCommand(NewCmdImage(f, out, err))
 	cmd.AddCommand(NewCmdResources(f, out, err))
 
 	return cmd

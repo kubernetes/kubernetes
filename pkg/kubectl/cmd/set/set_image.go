@@ -80,9 +80,10 @@ var (
 		kubectl set image -f path/to/file.yaml nginx=nginx:1.9.1 --local -o yaml`)
 )
 
-func NewCmdImage(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdImage(f *cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	options := &ImageOptions{
 		Out: out,
+		Err: err,
 	}
 
 	cmd := &cobra.Command{
@@ -210,7 +211,7 @@ func (o *ImageOptions) Run() error {
 		}
 
 		if o.Local {
-			fmt.Fprintln(o.Out, "running in local mode...")
+			fmt.Fprintln(o.Err, "running in local mode...")
 			return o.PrintObject(o.Cmd, o.Mapper, info.Object, o.Out)
 		}
 
