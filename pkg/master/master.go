@@ -226,6 +226,7 @@ func (c completedConfig) New() (*Master, error) {
 	c.RESTStorageProviders[storage.GroupName] = storagerest.RESTStorageProvider{}
 	m.InstallAPIs(c.Config, restOptionsFactory.NewFor)
 
+	m.installTunneler(c.Tunneler)
 	m.InstallGeneralEndpoints(c.Config)
 
 	return m, nil
@@ -249,27 +250,27 @@ func (m *Master) InstallLegacyAPI(c *Config, restOptionsGetter genericapiserver.
 	}
 }
 
+func (m *Master) installTunneler(tunneler genericapiserver.Tunneler) {
+	if tunneler == nil {
+		return
+	}
+
+	tunneler.Run(m.getNodeAddresses)
+	m.GenericAPIServer.AddHealthzChecks(healthz.NamedCheck("SSH Tunnel Check", genericapiserver.TunnelSyncHealthChecker(tunneler)))
+	prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+		Name: "apiserver_proxy_tunnel_sync_latency_secs",
+		Help: "The time since the last successful synchronization of the SSH tunnels for proxy requests.",
+	}, func() float64 { return float64(tunneler.SecondsSinceSync()) })
+}
+
 // TODO this needs to be refactored so we have a way to add general health checks to genericapiserver
 // TODO profiling should be generic
 func (m *Master) InstallGeneralEndpoints(c *Config) {
-	// Run the tunneler.
-	healthzChecks := []healthz.HealthzChecker{}
-	if c.Tunneler != nil {
-		c.Tunneler.Run(m.getNodeAddresses)
-		healthzChecks = append(healthzChecks, healthz.NamedCheck("SSH Tunnel Check", genericapiserver.TunnelSyncHealthChecker(c.Tunneler)))
-		prometheus.NewGaugeFunc(prometheus.GaugeOpts{
-			Name: "apiserver_proxy_tunnel_sync_latency_secs",
-			Help: "The time since the last successful synchronization of the SSH tunnels for proxy requests.",
-		}, func() float64 { return float64(c.Tunneler.SecondsSinceSync()) })
-	}
-	healthz.InstallHandler(&m.GenericAPIServer.HandlerContainer.NonSwaggerRoutes, healthzChecks...)
-
 	if c.GenericConfig.EnableProfiling {
 		routes.MetricsWithReset{}.Install(m.GenericAPIServer.HandlerContainer)
 	} else {
 		routes.DefaultMetrics{}.Install(m.GenericAPIServer.HandlerContainer)
 	}
-
 }
 
 func (m *Master) InstallAPIs(c *Config, restOptionsGetter genericapiserver.RESTOptionsGetter) {

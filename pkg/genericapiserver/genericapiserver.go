@@ -43,6 +43,7 @@ import (
 	genericmux "k8s.io/kubernetes/pkg/genericapiserver/mux"
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 	"k8s.io/kubernetes/pkg/genericapiserver/routes"
+	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/runtime"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -143,9 +144,14 @@ type GenericAPIServer struct {
 	// PostStartHooks are each called after the server has started listening, in a separate go func for each
 	// with no guaranteee of ordering between them.  The map key is a name used for error reporting.
 	// It may kill the process with a panic if it wishes to by returning an error
-	postStartHooks       map[string]PostStartHookFunc
+	postStartHooks       map[string]postStartHookEntry
 	postStartHookLock    sync.Mutex
 	postStartHooksCalled bool
+
+	// healthz checks
+	healthzChecks  []healthz.HealthzChecker
+	healthzLock    sync.Mutex
+	healthzCreated bool
 
 	// See Config.$name for documentation of these flags:
 
@@ -189,6 +195,10 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 			Config: s.openAPIConfig,
 		}.Install(s.HandlerContainer)
 	}
+
+	// unconditionally install the healthz checks for this server
+	s.installHealthz()
+
 	return preparedGenericAPIServer{s}
 }
 
