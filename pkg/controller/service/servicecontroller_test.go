@@ -329,4 +329,110 @@ func TestGetNodeConditionPredicate(t *testing.T) {
 	}
 }
 
+func TestDedicatedMaster(t *testing.T) {
+	tests := []struct {
+		node   api.Node
+		expect bool
+	}{
+		{
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo1",
+				},
+			},
+			expect: false,
+		},
+		{
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo2",
+				},
+				Spec: api.NodeSpec{
+					Unschedulable: true,
+				},
+			},
+			expect: false,
+		},
+		{
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo3",
+					Labels: map[string]string{"kubernetes.io/role": "master"},
+				},
+			},
+			expect: true,
+		},
+		{
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo4",
+					Labels: map[string]string{"kubernetes.io/role": "node"},
+				},
+			},
+			expect: false,
+		},
+		{
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo5",
+					Labels: map[string]string{"kubeadm.alpha.kubernetes.io/role": "master"},
+				},
+			},
+			expect: true,
+		},
+		{
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo6",
+					Labels: map[string]string{"kubeadm.alpha.kubernetes.io/role": "node"},
+				},
+			},
+			expect: false,
+		},
+		{
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Name:        "foo7",
+					Annotations: map[string]string{"scheduler.alpha.kubernetes.io/taints": "[{\"key\":\"dedicated\",\"value\":\"master\",\"effect\":\"NoSchedule\"}]"},
+				},
+			},
+			expect: true,
+		},
+		{
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Name:        "foo8",
+					Annotations: map[string]string{"scheduler.alpha.kubernetes.io/taints": "[{\"key\":\"somethingelse\",\"value\":\"master\",\"effect\":\"NoSchedule\"}]"},
+				},
+			},
+			expect: false,
+		},
+		{
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Name:        "foo9",
+					Annotations: map[string]string{"scheduler.alpha.kubernetes.io/taints": "unparseable"},
+				},
+			},
+			expect: false,
+		},
+		{
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo10",
+					Labels: map[string]string{"kubernetes.io/random": "master"},
+				},
+			},
+			expect: false,
+		},
+	}
+
+	for _, test := range tests {
+		actual := isDedicatedMaster(&test.node)
+		if actual != test.expect {
+			t.Errorf("Test failed for %s, expected %v, saw %v", test.node.Name, test.expect, actual)
+		}
+	}
+}
+
 // TODO(a-robinson): Add tests for update/sync/delete.
