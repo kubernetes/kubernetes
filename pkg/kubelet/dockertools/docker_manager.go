@@ -1890,7 +1890,7 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubecontainer.Do
 	}
 
 	// Currently we don't care about restart count of infra container, just set it to 0.
-	id, err := dm.runContainerInPod(pod, container, netNamespace, getIPCMode(pod), getPidMode(pod), "", 0)
+	id, err := dm.runContainerInPod(pod, container, netNamespace, getIPCMode(pod), getPidMode(pod, ""), "", 0)
 	if err != nil {
 		return "", kubecontainer.ErrRunContainer, err.Error()
 	}
@@ -2224,11 +2224,19 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 	}
 
 	// Note: when configuring the pod's containers anything that can be configured by pointing
-	// to the namespace of the infra container should use namespaceMode.  This includes things like the net namespace
-	// and IPC namespace.  PID mode cannot point to another container right now.
-	// See createPodInfraContainer for infra container setup.
+	// to the namespace of the infra container should use namespaceMode.  This includes things
+	// like the net namespace and IPC namespace.
 	namespaceMode := fmt.Sprintf("container:%v", podInfraContainerID)
-	pidMode := getPidMode(pod)
+
+	// We can also enable the PID namespace if we have the appropriate docker version
+	version, err := dm.Version()
+	pidMode := getPidMode(pod, "")
+	ok, err := version.Compare("1.11.0")
+	if err == nil && ok > 0 {
+		pidMode = getPidMode(pod, namespaceMode)
+	} else {
+		glog.Infof("Docker Daemon should be greater than 1.11.0 to enable PID Namespaces")
+	}
 
 	if next != nil {
 		if len(containerChanges.ContainersToStart) == 0 {
@@ -2508,10 +2516,12 @@ func (dm *DockerManager) doBackOff(pod *api.Pod, container *api.Container, podSt
 }
 
 // getPidMode returns the pid mode to use on the docker container based on pod.Spec.HostPID.
-func getPidMode(pod *api.Pod) string {
+func getPidMode(pod *api.Pod, namespaceModeContainer string) string {
 	pidMode := ""
 	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostPID {
 		pidMode = namespaceModeHost
+	} else {
+		pidMode = namespaceModeContainer
 	}
 	return pidMode
 }
