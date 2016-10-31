@@ -49,6 +49,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 				// Close over f.
 				testServiceRemainsUp(f, sem)
 				testSecretsDuringUpgrade(f, sem)
+				testConfigMapsDuringUpgrade(f, sem)
 			})
 			cm.Do()
 		})
@@ -66,6 +67,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 				// Close over f.
 				testServiceUpBeforeAndAfter(f, sem)
 				testSecretsBeforeAndAfterUpgrade(f, sem)
+				testConfigMapsBeforeAndAfterUpgrade(f, sem)
 			})
 			cm.Do()
 		})
@@ -81,6 +83,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 				// Close over f.
 				testServiceRemainsUp(f, sem)
 				testSecretsDuringUpgrade(f, sem)
+				testConfigMapsDuringUpgrade(f, sem)
 			})
 			cm.Do()
 		})
@@ -100,6 +103,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 				// Close over f.
 				testServiceUpBeforeAndAfter(f, sem)
 				testSecretsBeforeAndAfterUpgrade(f, sem)
+				testConfigMapsBeforeAndAfterUpgrade(f, sem)
 			})
 			cm.Do()
 		})
@@ -117,6 +121,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 				// Close over f.
 				testServiceRemainsUp(f, sem)
 				testSecretsDuringUpgrade(f, sem)
+				testConfigMapsDuringUpgrade(f, sem)
 			})
 			cm.Do()
 		})
@@ -267,6 +272,43 @@ func testSecrets(f *framework.Framework, sem *chaosmonkey.Semaphore, testDuringD
 	// Validate after upgrade
 	By("consume secret after upgrade")
 	common.DoSecretE2EMultipleVolumesValidate(f, pod, expectedOutput)
+
+	// Teardown
+}
+
+func testConfigMapsBeforeAndAfterUpgrade(f *framework.Framework, sem *chaosmonkey.Semaphore) {
+	testConfigMaps(f, sem, false)
+}
+
+func testConfigMapsDuringUpgrade(f *framework.Framework, sem *chaosmonkey.Semaphore) {
+	testConfigMaps(f, sem, true)
+}
+
+func testConfigMaps(f *framework.Framework, sem *chaosmonkey.Semaphore, testDuringDisruption bool) {
+	// Setup
+	pod, expectedOutput := common.DoConfigMapE2EWithoutMappingsSetup(f, 0, 0, nil)
+
+	// Validate
+	By("consume config-maps before upgrade")
+	common.DoConfigMapE2EWithoutMappingsValidate(f, pod, expectedOutput)
+
+	sem.Ready()
+
+	if testDuringDisruption {
+		// Continuously validate
+		wait.Until(func() {
+			By("consume config-maps during upgrade")
+			common.DoConfigMapE2EWithoutMappingsValidate(f, pod, expectedOutput)
+		}, framework.Poll, sem.StopCh)
+	} else {
+		// Block until chaosmonkey is done
+		By("waiting for upgrade to finish without consuming config-maps")
+		<-sem.StopCh
+	}
+
+	// Validate after upgrade
+	By("consume config-maps after upgrade")
+	common.DoConfigMapE2EWithoutMappingsValidate(f, pod, expectedOutput)
 
 	// Teardown
 }
