@@ -126,12 +126,15 @@ type RESTStorageProvider interface {
 	NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (groupInfo genericapiserver.APIGroupInfo, enabled bool)
 }
 
-type completedConfig struct {
+// finalizedConfig wraps a Config considered to be final. A finalizedConfig is not supposed
+// to be modified anymore.
+type finalizedConfig struct {
 	*Config
 }
 
-// Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
-func (c *Config) Complete() completedConfig {
+// Complete fills in any fields not set that are required to have valid data.
+// It's mutating the receiver. It is idem-potent.
+func (c *Config) Complete() finalizedConfig {
 	c.GenericConfig.Complete()
 
 	// enable swagger UI only if general UI support is on
@@ -147,24 +150,28 @@ func (c *Config) Complete() completedConfig {
 		c.EndpointReconcilerConfig.Reconciler = NewMasterCountEndpointReconciler(c.GenericConfig.MasterCount, endpointClient)
 	}
 
-	return completedConfig{c}
+	return finalizedConfig{c}
 }
 
 // SkipComplete provides a way to construct a server instance without config completion.
-func (c *Config) SkipComplete() completedConfig {
-	return completedConfig{c}
+func (c *Config) SkipComplete() finalizedConfig {
+	return finalizedConfig{c}
 }
 
 // New returns a new instance of Master from the given config.
 // Certain config fields will be set to a default value if unset.
 // Certain config fields must be specified, including:
 //   KubeletClientConfig
-func (c completedConfig) New() (*Master, error) {
+func (c finalizedConfig) New() (*Master, error) {
 	if reflect.DeepEqual(c.KubeletClientConfig, kubeletclient.KubeletClientConfig{}) {
 		return nil, fmt.Errorf("Master.New() called with empty config.KubeletClientConfig")
 	}
 
-	s, err := c.Config.GenericConfig.SkipComplete().New() // completion is done in Complete, no need for a second time
+	completedGenericConfig := c.Config.GenericConfig.SkipComplete() // completion is done in Complete, no need for a second time
+	if err := completedGenericConfig.MaybeGenerateServingCerts(); err != nil {
+		return nil, fmt.Errorf("Failed to generate service certificate: %v", err)
+	}
+	s, err := completedGenericConfig.New()
 	if err != nil {
 		return nil, err
 	}

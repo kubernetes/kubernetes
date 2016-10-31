@@ -291,13 +291,15 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 	return c
 }
 
-type completedConfig struct {
+// finalizedConfig wraps a Config considered to be final. A finalizedConfig is not supposed
+// to be modified anymore.
+type finalizedConfig struct {
 	*Config
 }
 
 // Complete fills in any fields not set that are required to have valid data and can be derived
-// from other fields.  If you're going to `ApplyOptions`, do that first.  It's mutating the receiver.
-func (c *Config) Complete() completedConfig {
+// from other fields. It's mutating the receiver. It is idem-potent.
+func (c *Config) Complete() finalizedConfig {
 	if c.ServiceClusterIPRange == nil || c.ServiceClusterIPRange.IP == nil {
 		defaultNet := "10.0.0.0/24"
 		glog.Warningf("Network range for service cluster IPs is unspecified. Defaulting to %v.", defaultNet)
@@ -356,12 +358,12 @@ func (c *Config) Complete() completedConfig {
 			}
 		}
 	}
-	return completedConfig{c}
+	return finalizedConfig{c}
 }
 
 // SkipComplete provides a way to construct a server instance without config completion.
-func (c *Config) SkipComplete() completedConfig {
-	return completedConfig{c}
+func (c *Config) SkipComplete() finalizedConfig {
+	return finalizedConfig{c}
 }
 
 // New returns a new instance of GenericAPIServer from the given config.
@@ -386,7 +388,7 @@ func (c *Config) SkipComplete() completedConfig {
 //   If the caller wants to add additional endpoints not using the GenericAPIServer's
 //   auth, then the caller should create a handler for those endpoints, which delegates the
 //   any unhandled paths to "Handler".
-func (c completedConfig) New() (*GenericAPIServer, error) {
+func (c finalizedConfig) New() (*GenericAPIServer, error) {
 	if c.Serializer == nil {
 		return nil, fmt.Errorf("Genericapiserver.New() called with config.Serializer == nil")
 	}
@@ -426,7 +428,7 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 }
 
 // MaybeGenerateServingCerts generates serving certificates if requested and needed.
-func (c completedConfig) MaybeGenerateServingCerts() error {
+func (c finalizedConfig) MaybeGenerateServingCerts() error {
 	// It would be nice to set a fqdn subject alt name, but only the kubelets know, the apiserver is clueless
 	// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
 	if c.SecureServingInfo != nil && c.SecureServingInfo.ServerCert.Generate && !certutil.CanReadCertOrKey(c.SecureServingInfo.ServerCert.CertFile, c.SecureServingInfo.ServerCert.KeyFile) {

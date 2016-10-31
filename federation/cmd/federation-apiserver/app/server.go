@@ -69,13 +69,7 @@ cluster's shared state through which all other components interact.`,
 func Run(s *options.ServerRunOptions) error {
 	genericvalidation.VerifyEtcdServersList(s.ServerRunOptions)
 	genericapiserver.DefaultAndValidateRunOptions(s.ServerRunOptions)
-	genericConfig := genericapiserver.NewConfig(). // create the new config
-							ApplyOptions(s.ServerRunOptions). // apply the options selected
-							Complete()                        // set default values based on the known values
-
-	if err := genericConfig.MaybeGenerateServingCerts(); err != nil {
-		glog.Fatalf("Failed to generate service certificate: %v", err)
-	}
+	genericConfig := genericapiserver.NewConfig().ApplyOptions(s.ServerRunOptions)
 
 	// TODO: register cluster federation resources here.
 	resourceConfig := genericapiserver.NewResourceConfig()
@@ -199,15 +193,19 @@ func Run(s *options.ServerRunOptions) error {
 	genericConfig.EnableOpenAPISupport = true
 	genericConfig.OpenAPIConfig.SecurityDefinitions = securityDefinitions
 
+	completedGenericConfig := genericConfig.Complete()
+	if err := completedGenericConfig.MaybeGenerateServingCerts(); err != nil {
+		glog.Fatalf("Failed to generate service certificate: %v", err)
+	}
+	m, err := completedGenericConfig.New()
+	if err != nil {
+		return err
+	}
+
 	// TODO: Move this to generic api server (Need to move the command line flag).
 	if s.EnableWatchCache {
 		cachesize.InitializeWatchCacheSizes(s.TargetRAMMB)
 		cachesize.SetWatchCacheSizes(s.WatchCacheSizes)
-	}
-
-	m, err := genericConfig.New()
-	if err != nil {
-		return err
 	}
 
 	routes.UIRedirect{}.Install(m.HandlerContainer)
