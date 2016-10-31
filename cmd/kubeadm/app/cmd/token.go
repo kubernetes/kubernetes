@@ -40,22 +40,16 @@ const (
 )
 
 func NewCmdToken(out io.Writer) *cobra.Command {
-	var skipPreFlight bool
 	tokenCmd := &cobra.Command{
 		Use:   "token",
 		Short: "Manage bootstrap tokens",
 	}
 
-	tokenCmd.PersistentFlags().BoolVar(
-		&skipPreFlight, "skip-preflight-checks", false,
-		"skip preflight checks normally run before modifying the system",
-	)
-
 	createCmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create discovery tokens on the server.",
 		Run: func(tokenCmd *cobra.Command, args []string) {
-			err := RunCreateToken(out, tokenCmd, skipPreFlight)
+			err := RunCreateToken(out, tokenCmd)
 			kubeadmutil.CheckErr(err)
 		},
 	}
@@ -65,7 +59,7 @@ func NewCmdToken(out io.Writer) *cobra.Command {
 		Use:   "list",
 		Short: "List discovery tokens on the server.",
 		Run: func(tokenCmd *cobra.Command, args []string) {
-			err := RunListTokens(out, tokenCmd, skipPreFlight)
+			err := RunListTokens(out, tokenCmd)
 			kubeadmutil.CheckErr(err)
 		},
 	}
@@ -75,7 +69,7 @@ func NewCmdToken(out io.Writer) *cobra.Command {
 		Use:   "delete",
 		Short: "Delete discovery tokens on the server.",
 		Run: func(tokenCmd *cobra.Command, args []string) {
-			err := RunDeleteToken(out, tokenCmd, skipPreFlight, args[0])
+			err := RunDeleteToken(out, tokenCmd, args[0])
 			kubeadmutil.CheckErr(err)
 		},
 	}
@@ -85,14 +79,7 @@ func NewCmdToken(out io.Writer) *cobra.Command {
 }
 
 // TODO: Add support for user specified tokens.
-func RunCreateToken(out io.Writer, cmd *cobra.Command, skipPreFlight bool) error {
-	if !skipPreFlight {
-		fmt.Println("Running pre-flight checks")
-		// TODO
-	} else {
-		fmt.Println("Skipping pre-flight checks")
-	}
-
+func RunCreateToken(out io.Writer, cmd *cobra.Command) error {
 	client, err := createAPIClient()
 	if err != nil {
 		return err
@@ -157,14 +144,7 @@ func createAPIClient() (*clientset.Clientset, error) {
 	return client, nil
 }
 
-func RunListTokens(out io.Writer, cmd *cobra.Command, skipPreFlight bool) error {
-	if !skipPreFlight {
-		fmt.Println("Running pre-flight checks")
-		// TODO
-	} else {
-		fmt.Println("Skipping pre-flight checks")
-	}
-
+func RunListTokens(out io.Writer, cmd *cobra.Command) error {
 	client, err := createAPIClient()
 	if err != nil {
 		return err
@@ -201,14 +181,7 @@ func RunListTokens(out io.Writer, cmd *cobra.Command, skipPreFlight bool) error 
 	return nil
 }
 
-func RunDeleteToken(out io.Writer, cmd *cobra.Command, skipPreFlight bool, tokenId string) error {
-	if !skipPreFlight {
-		fmt.Println("Running pre-flight checks")
-		// TODO
-	} else {
-		fmt.Println("Skipping pre-flight checks")
-	}
-
+func RunDeleteToken(out io.Writer, cmd *cobra.Command, tokenId string) error {
 	client, err := createAPIClient()
 	if err != nil {
 		return err
