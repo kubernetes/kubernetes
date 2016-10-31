@@ -25,7 +25,6 @@ go_binary(
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/dockertools:go_default_library",
         "//pkg/kubemark:go_default_library",
-        "//pkg/proxy/config:go_default_library",
         "//pkg/util/flag:go_default_library",
         "//pkg/util/iptables/testing:go_default_library",
         "//pkg/util/sets:go_default_library",

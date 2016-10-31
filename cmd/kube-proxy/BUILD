@@ -16,7 +16,6 @@ go_binary(
     tags = ["automanaged"],
     deps = [
         "//cmd/kube-proxy/app:go_default_library",
-        "//cmd/kube-proxy/app/options:go_default_library",
         "//pkg/client/metrics/prometheus:go_default_library",
         "//pkg/healthz:go_default_library",
         "//pkg/util/flag:go_default_library",

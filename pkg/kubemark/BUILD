@@ -19,7 +19,6 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//cmd/kube-proxy/app:go_default_library",
-        "//cmd/kube-proxy/app/options:go_default_library",
         "//cmd/kubelet/app:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
@@ -32,7 +31,6 @@ go_library(
         "//pkg/kubelet/container/testing:go_default_library",
         "//pkg/kubelet/dockertools:go_default_library",
         "//pkg/kubelet/types:go_default_library",
-        "//pkg/proxy/config:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util:go_default_library",
         "//pkg/util/io:go_default_library",
