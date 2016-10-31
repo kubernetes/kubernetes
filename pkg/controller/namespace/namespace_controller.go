@@ -21,9 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -62,12 +60,10 @@ type NamespaceController struct {
 	queue workqueue.RateLimitingInterface
 	// function to list of preferred resources for namespace deletion
 	discoverResourcesFn func() ([]*metav1.APIResourceList, error)
-	// opCache is a cache to remember if a particular operation is not supported to aid dynamic client.
-	opCache *deletion.OperationNotSupportedCache
 	// finalizerToken is the finalizer token managed by this controller
 	finalizerToken v1.FinalizerName
 	// helper to delete all resources in the namespace when the namespace is deleted.
-	namespacedResourcesDeleter *deletion.NamespacedResourcesDeleter
+	namespacedResourcesDeleter deletion.NamespacedResourcesDeleterInterface
 }
 
 // NewNamespaceController creates a new NamespaceController
@@ -78,52 +74,14 @@ func NewNamespaceController(
 	resyncPeriod time.Duration,
 	finalizerToken v1.FinalizerName) *NamespaceController {
 
-	opCache := &deletion.OperationNotSupportedCache{
-		M: make(map[deletion.OperationKey]bool),
-	}
-
-	// pre-fill opCache with the discovery info
-	//
-	// TODO(sttts): get rid of opCache and http 405 logic around it and trust discovery info
-	resources, err := discoverResourcesFn()
-	if err != nil {
-		glog.Fatalf("Failed to get supported resources: %v", err)
-	}
-	deletableGroupVersionResources := []schema.GroupVersionResource{}
-	for _, rl := range resources {
-		gv, err := schema.ParseGroupVersion(rl.GroupVersion)
-		if err != nil {
-			glog.Errorf("Failed to parse GroupVersion %q, skipping: %v", rl.GroupVersion, err)
-			continue
-		}
-
-		for _, r := range rl.APIResources {
-			gvr := schema.GroupVersionResource{Group: gv.Group, Version: gv.Version, Resource: r.Name}
-			verbs := sets.NewString([]string(r.Verbs)...)
-
-			if !verbs.Has("delete") {
-				glog.V(6).Infof("Skipping resource %v because it cannot be deleted.", gvr)
-			}
-
-			for _, op := range []deletion.Operation{deletion.OperationList, deletion.OperationDeleteCollection} {
-				if !verbs.Has(string(op)) {
-					opCache.SetNotSupported(deletion.OperationKey{Operation: op, Gvr: gvr})
-				}
-			}
-
-			deletableGroupVersionResources = append(deletableGroupVersionResources, gvr)
-		}
-	}
-
 	// create the controller so we can inject the enqueue function
 	namespaceController := &NamespaceController{
 		kubeClient:                 kubeClient,
 		clientPool:                 clientPool,
 		queue:                      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "namespace"),
 		discoverResourcesFn:        discoverResourcesFn,
-		opCache:                    opCache,
 		finalizerToken:             finalizerToken,
-		namespacedResourcesDeleter: deletion.NewNamespacedResourcesDeleter(kubeClient.Core().Namespaces(), clientPool, opCache, discoverResourcesFn, finalizerToken, true),
+		namespacedResourcesDeleter: deletion.NewNamespacedResourcesDeleter(kubeClient.Core().Namespaces(), clientPool, kubeClient.Core(), discoverResourcesFn, finalizerToken, true),
 	}
 
 	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {

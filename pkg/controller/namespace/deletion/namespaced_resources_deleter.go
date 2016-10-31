@@ -18,6 +18,7 @@ package deletion
 
 import (
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
@@ -26,29 +27,39 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	v1clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 )
 
+// Interface to delete a namespace with all resources in it.
+type NamespacedResourcesDeleterInterface interface {
+	Delete(nsName string) error
+}
+
 func NewNamespacedResourcesDeleter(nsClient v1clientset.NamespaceInterface,
-	clientPool dynamic.ClientPool, opCache *OperationNotSupportedCache,
+	clientPool dynamic.ClientPool, podsGetter v1clientset.PodsGetter,
 	discoverResourcesFn func() ([]*metav1.APIResourceList, error),
-	finalizerToken v1.FinalizerName, deleteNamespaceWhenDone bool) *NamespacedResourcesDeleter {
-	return &NamespacedResourcesDeleter{
-		nsClient:                nsClient,
-		clientPool:              clientPool,
-		opCache:                 opCache,
+	finalizerToken v1.FinalizerName, deleteNamespaceWhenDone bool) NamespacedResourcesDeleterInterface {
+	d := &NamespacedResourcesDeleter{
+		nsClient:   nsClient,
+		clientPool: clientPool,
+		podsGetter: podsGetter,
+		opCache: &operationNotSupportedCache{
+			m: make(map[operationKey]bool),
+		},
 		discoverResourcesFn:     discoverResourcesFn,
 		finalizerToken:          finalizerToken,
 		deleteNamespaceWhenDone: deleteNamespaceWhenDone,
 	}
+	d.initOpCache()
+	return d
 }
+
+var _ NamespacedResourcesDeleterInterface = &NamespacedResourcesDeleter{}
 
 // NamespacedResourcesDeleter is used to delete all resources in a given namespace.
 type NamespacedResourcesDeleter struct {
@@ -56,8 +67,10 @@ type NamespacedResourcesDeleter struct {
 	nsClient v1clientset.NamespaceInterface
 	// Dynamic client to list and delete all namespaced resources.
 	clientPool dynamic.ClientPool
+	// Interface to get PodInterface.
+	podsGetter v1clientset.PodsGetter
 	// Cache of what operations are not supported on each group version resource.
-	opCache             *OperationNotSupportedCache
+	opCache             *operationNotSupportedCache
 	discoverResourcesFn func() ([]*metav1.APIResourceList, error)
 	// The finalizer token that should be removed from the namespace
 	// when all resources in that namespace have been deleted.
@@ -145,6 +158,40 @@ func (d *NamespacedResourcesDeleter) Delete(nsName string) error {
 	return nil
 }
 
+func (d *NamespacedResourcesDeleter) initOpCache() {
+	// pre-fill opCache with the discovery info
+	//
+	// TODO(sttts): get rid of opCache and http 405 logic around it and trust discovery info
+	resources, err := d.discoverResourcesFn()
+	if err != nil {
+		glog.Fatalf("Failed to get supported resources: %v", err)
+	}
+	deletableGroupVersionResources := []schema.GroupVersionResource{}
+	for _, rl := range resources {
+		gv, err := schema.ParseGroupVersion(rl.GroupVersion)
+		if err != nil {
+			glog.Errorf("Failed to parse GroupVersion %q, skipping: %v", rl.GroupVersion, err)
+			continue
+		}
+
+		for _, r := range rl.APIResources {
+			gvr := schema.GroupVersionResource{Group: gv.Group, Version: gv.Version, Resource: r.Name}
+			verbs := sets.NewString([]string(r.Verbs)...)
+
+			if !verbs.Has("delete") {
+				glog.V(6).Infof("Skipping resource %v because it cannot be deleted.", gvr)
+			}
+
+			for _, op := range []operation{operationList, operationDeleteCollection} {
+				if !verbs.Has(string(op)) {
+					d.opCache.setNotSupported(operationKey{operation: op, gvr: gvr})
+				}
+			}
+			deletableGroupVersionResources = append(deletableGroupVersionResources, gvr)
+		}
+	}
+}
+
 // Deletes the given namespace.
 func (d *NamespacedResourcesDeleter) deleteNamespace(namespace *v1.Namespace) error {
 	var opts *v1.DeleteOptions
@@ -169,39 +216,39 @@ func (e *ResourcesRemainingError) Error() string {
 }
 
 // operation is used for caching if an operation is supported on a dynamic client.
-type Operation string
+type operation string
 
 const (
-	OperationDeleteCollection Operation = "deleteCollection"
-	OperationList             Operation = "list"
+	operationDeleteCollection operation = "deleteCollection"
+	operationList             operation = "list"
 	// assume a default estimate for finalizers to complete when found on items pending deletion.
 	finalizerEstimateSeconds int64 = int64(15)
 )
 
 // operationKey is an entry in a cache.
-type OperationKey struct {
-	Operation Operation
-	Gvr       schema.GroupVersionResource
+type operationKey struct {
+	operation operation
+	gvr       schema.GroupVersionResource
 }
 
 // operationNotSupportedCache is a simple cache to remember if an operation is not supported for a resource.
 // if the operationKey maps to true, it means the operation is not supported.
-type OperationNotSupportedCache struct {
+type operationNotSupportedCache struct {
 	lock sync.RWMutex
-	M    map[OperationKey]bool
+	m    map[operationKey]bool
 }
 
 // isSupported returns true if the operation is supported
-func (o *OperationNotSupportedCache) isSupported(key OperationKey) bool {
+func (o *operationNotSupportedCache) isSupported(key operationKey) bool {
 	o.lock.RLock()
 	defer o.lock.RUnlock()
-	return !o.M[key]
+	return !o.m[key]
 }
 
-func (o *OperationNotSupportedCache) SetNotSupported(key OperationKey) {
+func (o *operationNotSupportedCache) setNotSupported(key operationKey) {
 	o.lock.Lock()
 	defer o.lock.Unlock()
-	o.M[key] = true
+	o.m[key] = true
 }
 
 // updateNamespaceFunc is a function that makes an update to a namespace
@@ -282,7 +329,7 @@ func (d *NamespacedResourcesDeleter) deleteCollection(
 	namespace string) (bool, error) {
 	glog.V(5).Infof("namespace controller - deleteCollection - namespace: %s, gvr: %v", namespace, gvr)
 
-	key := OperationKey{Operation: OperationDeleteCollection, Gvr: gvr}
+	key := operationKey{operation: operationDeleteCollection, gvr: gvr}
 	if !d.opCache.isSupported(key) {
 		glog.V(5).Infof("namespace controller - deleteCollection ignored since not supported - namespace: %s, gvr: %v", namespace, gvr)
 		return false, nil
@@ -308,7 +355,7 @@ func (d *NamespacedResourcesDeleter) deleteCollection(
 	// remember next time that this resource does not support delete collection...
 	if errors.IsMethodNotSupported(err) || errors.IsNotFound(err) {
 		glog.V(5).Infof("namespace controller - deleteCollection not supported - namespace: %s, gvr: %v", namespace, gvr)
-		d.opCache.SetNotSupported(key)
+		d.opCache.setNotSupported(key)
 		return false, nil
 	}
 
@@ -325,7 +372,7 @@ func (d *NamespacedResourcesDeleter) listCollection(
 	dynamicClient *dynamic.Client, gvr schema.GroupVersionResource, namespace string) (*unstructured.UnstructuredList, bool, error) {
 	glog.V(5).Infof("namespace controller - listCollection - namespace: %s, gvr: %v", namespace, gvr)
 
-	key := OperationKey{Operation: OperationList, Gvr: gvr}
+	key := operationKey{operation: operationList, gvr: gvr}
 	if !d.opCache.isSupported(key) {
 		glog.V(5).Infof("namespace controller - listCollection ignored since not supported - namespace: %s, gvr: %v", namespace, gvr)
 		return nil, false, nil
@@ -349,7 +396,7 @@ func (d *NamespacedResourcesDeleter) listCollection(
 	// remember next time that this resource does not support delete collection...
 	if errors.IsMethodNotSupported(err) || errors.IsNotFound(err) {
 		glog.V(5).Infof("namespace controller - listCollection not supported - namespace: %s, gvr: %v", namespace, gvr)
-		d.opCache.SetNotSupported(key)
+		d.opCache.setNotSupported(key)
 		return nil, false, nil
 	}
 
@@ -478,11 +525,7 @@ func (d *NamespacedResourcesDeleter) estimateGracefulTermination(gvr schema.Grou
 	var err error
 	switch groupResource {
 	case schema.GroupResource{Group: "", Resource: "pods"}:
-		dynamicClient, err := d.clientPool.ClientForGroupVersionResource(gvr)
-		if err != nil {
-			return estimate, fmt.Errorf("error in creating dynamic client for resource: %s", gvr)
-		}
-		estimate, err = d.estimateGracefulTerminationForPods(dynamicClient, ns)
+		estimate, err = d.estimateGracefulTerminationForPods(ns)
 	}
 	if err != nil {
 		return estimate, err
@@ -497,27 +540,19 @@ func (d *NamespacedResourcesDeleter) estimateGracefulTermination(gvr schema.Grou
 }
 
 // estimateGracefulTerminationForPods determines the graceful termination period for pods in the namespace
-func (d *NamespacedResourcesDeleter) estimateGracefulTerminationForPods(dynamicClient *dynamic.Client, ns string) (int64, error) {
+func (d *NamespacedResourcesDeleter) estimateGracefulTerminationForPods(ns string) (int64, error) {
 	glog.V(5).Infof("namespace controller - estimateGracefulTerminationForPods - namespace %s", ns)
 	estimate := int64(0)
-	resource := &metav1.APIResource{
-		Namespaced: true,
-		Kind:       "Pod",
+	podsGetter := d.podsGetter
+	if podsGetter == nil || reflect.ValueOf(podsGetter).IsNil() {
+		return estimate, fmt.Errorf("unexpected: podsGetter is nil. Cannot estimate grace period seconds for pods")
 	}
-	listResponse, err := dynamicClient.Resource(resource, ns).List(&metav1.ListOptions{})
+	items, err := podsGetter.Pods(ns).List(metav1.ListOptions{})
 	if err != nil {
 		return estimate, err
 	}
-	items, ok := listResponse.(*unstructured.UnstructuredList)
-	if !ok {
-		return estimate, fmt.Errorf("unexpected: expected type unstructured.UnstructuredList, got: %#v", listResponse)
-	}
 	for i := range items.Items {
-		item := items.Items[i]
-		pod, err := unstructuredToPod(item)
-		if err != nil {
-			return estimate, fmt.Errorf("unexpected: expected type v1.Pod, got: %#v", item)
-		}
+		pod := items.Items[i]
 		// filter out terminal pods
 		phase := pod.Status.Phase
 		if v1.PodSucceeded == phase || v1.PodFailed == phase {
@@ -531,14 +566,4 @@ func (d *NamespacedResourcesDeleter) estimateGracefulTerminationForPods(dynamicC
 		}
 	}
 	return estimate, nil
-}
-
-func unstructuredToPod(obj *unstructured.Unstructured) (*v1.Pod, error) {
-	json, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
-	if err != nil {
-		return nil, err
-	}
-	pod := new(v1.Pod)
-	err = runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, pod)
-	return pod, err
 }

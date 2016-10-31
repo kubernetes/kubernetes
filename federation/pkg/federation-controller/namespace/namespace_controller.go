@@ -35,7 +35,9 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/namespace/deletion"
 
 	"github.com/golang/glog"
 )
@@ -74,6 +76,9 @@ type NamespaceController struct {
 
 	deletionHelper *deletionhelper.DeletionHelper
 
+	// Helper to delete all resources in a namespace.
+	namespacedResourcesDeleter deletion.NamespacedResourcesDeleterInterface
+
 	namespaceReviewDelay  time.Duration
 	clusterAvailableDelay time.Duration
 	smallDelay            time.Duration
@@ -81,7 +86,7 @@ type NamespaceController struct {
 }
 
 // NewNamespaceController returns a new namespace controller
-func NewNamespaceController(client federationclientset.Interface) *NamespaceController {
+func NewNamespaceController(client federationclientset.Interface, dynamicClientPool dynamic.ClientPool) *NamespaceController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(client))
 	recorder := broadcaster.NewRecorder(apiv1.EventSource{Component: "federated-namespace-controller"})
@@ -179,6 +184,11 @@ func NewNamespaceController(client federationclientset.Interface) *NamespaceCont
 		nc.namespaceFederatedInformer,
 		nc.federatedUpdater,
 	)
+
+	discoverResourcesFn := nc.federatedApiClient.Discovery().ServerPreferredNamespacedResources
+	nc.namespacedResourcesDeleter = deletion.NewNamespacedResourcesDeleter(
+		client.Core().Namespaces(), dynamicClientPool, nil,
+		discoverResourcesFn, apiv1.FinalizerKubernetes, false)
 	return nc
 }
 
@@ -462,11 +472,16 @@ func (nc *NamespaceController) delete(namespace *apiv1.Namespace) error {
 
 	if nc.hasFinalizerFuncInSpec(updatedNamespace, apiv1.FinalizerKubernetes) {
 		// Delete resources in this namespace.
-		updatedNamespace, err = nc.removeKubernetesFinalizer(updatedNamespace)
+		err = nc.namespacedResourcesDeleter.Delete(updatedNamespace.Name)
 		if err != nil {
 			return fmt.Errorf("error in deleting resources in namespace %s: %v", namespace.Name, err)
 		}
 		glog.V(2).Infof("Removed kubernetes finalizer from ns %s", namespace.Name)
+		// Fetch the updated Namespace.
+		updatedNamespace, err = nc.federatedApiClient.Core().Namespaces().Get(updatedNamespace.Name, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("error in fetching updated namespace %s: %s", updatedNamespace.Name, err)
+		}
 	}
 
 	// Delete the namespace from all underlying clusters.
@@ -485,45 +500,4 @@ func (nc *NamespaceController) delete(namespace *apiv1.Namespace) error {
 		}
 	}
 	return nil
-}
-
-// Ensures that all resources in this namespace are deleted and then removes the kubernetes finalizer.
-func (nc *NamespaceController) removeKubernetesFinalizer(namespace *apiv1.Namespace) (*apiv1.Namespace, error) {
-	// Right now there are just 7 types of objects: Deployments, DaemonSets, ReplicaSet, Secret, Ingress, Events and Service.
-	// Temporarily these items are simply deleted one by one to squeeze this code into 1.4.
-	// TODO: Make it generic (like in the regular namespace controller) and parallel.
-	err := nc.federatedApiClient.Core().Services(namespace.Name).DeleteCollection(&apiv1.DeleteOptions{}, metav1.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to delete service list: %v", err)
-	}
-	err = nc.federatedApiClient.Extensions().ReplicaSets(namespace.Name).DeleteCollection(&apiv1.DeleteOptions{}, metav1.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to delete replicaset list from namespace: %v", err)
-	}
-	err = nc.federatedApiClient.Core().Secrets(namespace.Name).DeleteCollection(&apiv1.DeleteOptions{}, metav1.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to delete secret list from namespace: %v", err)
-	}
-	err = nc.federatedApiClient.Extensions().Ingresses(namespace.Name).DeleteCollection(&apiv1.DeleteOptions{}, metav1.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to delete ingresses list from namespace: %v", err)
-	}
-	err = nc.federatedApiClient.Extensions().DaemonSets(namespace.Name).DeleteCollection(&apiv1.DeleteOptions{}, metav1.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to delete daemonsets list from namespace: %v", err)
-	}
-	err = nc.federatedApiClient.Extensions().Deployments(namespace.Name).DeleteCollection(&apiv1.DeleteOptions{}, metav1.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to delete deployments list from namespace: %v", err)
-	}
-	err = nc.federatedApiClient.Core().Events(namespace.Name).DeleteCollection(&apiv1.DeleteOptions{}, metav1.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to delete events list from namespace: %v", err)
-	}
-
-	// Remove kube_api.FinalizerKubernetes
-	if len(namespace.Spec.Finalizers) != 0 {
-		return nc.removeFinalizerFromSpec(namespace, apiv1.FinalizerKubernetes)
-	}
-	return namespace, nil
 }
