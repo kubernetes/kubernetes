@@ -63,7 +63,7 @@ func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, hostName
 		return "", err
 	}
 
-	volumeID := volumeSource.VolumeID
+	volumeID := aws.KubernetesVolumeID(volumeSource.VolumeID)
 
 	// awsCloud.AttachDisk checks if disk is already attached to node and
 	// succeeds in that case, so no need to do that separately.
@@ -78,8 +78,8 @@ func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, hostName
 
 func (attacher *awsElasticBlockStoreAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName string) (map[*volume.Spec]bool, error) {
 	volumesAttachedCheck := make(map[*volume.Spec]bool)
-	volumeSpecMap := make(map[string]*volume.Spec)
-	volumeIDList := []string{}
+	volumeSpecMap := make(map[aws.KubernetesVolumeID]*volume.Spec)
+	volumeIDList := []aws.KubernetesVolumeID{}
 	for _, spec := range specs {
 		volumeSource, _, err := getVolumeSource(spec)
 		if err != nil {
@@ -87,9 +87,10 @@ func (attacher *awsElasticBlockStoreAttacher) VolumesAreAttached(specs []*volume
 			continue
 		}
 
-		volumeIDList = append(volumeIDList, volumeSource.VolumeID)
+		name := aws.KubernetesVolumeID(volumeSource.VolumeID)
+		volumeIDList = append(volumeIDList, name)
 		volumesAttachedCheck[spec] = true
-		volumeSpecMap[volumeSource.VolumeID] = spec
+		volumeSpecMap[name] = spec
 	}
 	attachedResult, err := attacher.awsVolumes.DisksAreAttached(volumeIDList, nodeName)
 	if err != nil {
@@ -162,7 +163,7 @@ func (attacher *awsElasticBlockStoreAttacher) GetDeviceMountPath(
 		return "", err
 	}
 
-	return makeGlobalPDPath(attacher.host, volumeSource.VolumeID), nil
+	return makeGlobalPDPath(attacher.host, aws.KubernetesVolumeID(volumeSource.VolumeID)), nil
 }
 
 // FIXME: this method can be further pruned.
@@ -220,7 +221,7 @@ func (plugin *awsElasticBlockStorePlugin) NewDetacher() (volume.Detacher, error)
 }
 
 func (detacher *awsElasticBlockStoreDetacher) Detach(deviceMountPath string, hostName string) error {
-	volumeID := path.Base(deviceMountPath)
+	volumeID := aws.KubernetesVolumeID(path.Base(deviceMountPath))
 
 	attached, err := detacher.awsVolumes.DiskIsAttached(volumeID, hostName)
 	if err != nil {
