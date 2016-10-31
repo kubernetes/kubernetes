@@ -100,13 +100,13 @@ func pvPvcMapCleanup(c clientset.Interface, ns string, pvols pvmap, claims pvcma
 // Delete the PV.
 func deletePersistentVolume(c clientset.Interface, pvName string) {
 	if c != nil && len(pvName) > 0 {
-	        _, err := c.Core().PersistentVolumes().Get(pvName)
-        	if !apierrs.IsNotFound(err) {
-        		Expect(err).NotTo(HaveOccurred())
-        		framework.Logf("Deleting PersistentVolume %v", pvName)
-        		err := c.Core().PersistentVolumes().Delete(pvName, nil)
-        		Expect(err).NotTo(HaveOccurred())
-        	} else {
+		_, err := c.Core().PersistentVolumes().Get(pvName)
+		if !apierrs.IsNotFound(err) {
+			Expect(err).NotTo(HaveOccurred())
+			framework.Logf("Deleting PersistentVolume %v", pvName)
+			err := c.Core().PersistentVolumes().Delete(pvName, nil)
+			Expect(err).NotTo(HaveOccurred())
+		} else {
 			framework.Logf("", pvName)
 		}
 	}
@@ -115,13 +115,13 @@ func deletePersistentVolume(c clientset.Interface, pvName string) {
 // Delete the Claim
 func deletePersistentVolumeClaim(c clientset.Interface, pvcName string, ns string) {
 	if c != nil && len(pvcName) > 0 {
-	        _, err := c.Core().PersistentVolumeClaims(ns).Get(pvcName)
-        	if !apierrs.IsNotFound(err) {
-        		Expect(err).NotTo(HaveOccurred())
-        		framework.Logf("Deleting PersistentVolumeClaim %v", pvcName)
-        		err := c.Core().PersistentVolumeClaims(ns).Delete(pvcName, nil)
-        		Expect(err).NotTo(HaveOccurred())
-        	}
+		_, err := c.Core().PersistentVolumeClaims(ns).Get(pvcName)
+		if !apierrs.IsNotFound(err) {
+			Expect(err).NotTo(HaveOccurred())
+			framework.Logf("Deleting PersistentVolumeClaim %v", pvcName)
+			err := c.Core().PersistentVolumeClaims(ns).Delete(pvcName, nil)
+			Expect(err).NotTo(HaveOccurred())
+		}
 	}
 }
 
@@ -711,7 +711,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 
 			By("Deleting the Claim")
 			deletePersistentVolumeClaim(c, pvc.Name, ns)
-			verifyDiskAttached(diskName, node)
+			verifyGCEDiskAttached(diskName, node)
 
 			By("Deleting the Pod")
 			deletePod(f, c, ns, clientPod)
@@ -734,7 +734,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 
 			By("Deleting the Persistent Volume")
 			deletePersistentVolume(c, pv.Name)
-			verifyDiskAttached(diskName, node)
+			verifyGCEDiskAttached(diskName, node)
 
 			By("Deleting the client pod")
 			deletePod(f, c, ns, clientPod)
@@ -747,14 +747,13 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 })
 
 // Sanity check for GCE testing.  Verify the persistent disk attached to the node.
-func verifyDiskAttached(diskName string, nodeName types.NodeName) bool {
+func verifyGCEDiskAttached(diskName string, nodeName types.NodeName) bool {
 	gceCloud, err := getGCECloud()
 	Expect(err).NotTo(HaveOccurred())
 	isAttached, err := gceCloud.DiskIsAttached(diskName, nodeName)
 	Expect(err).NotTo(HaveOccurred())
 	return isAttached
 }
-
 
 // Return a pvckey struct.
 func makePvcKey(ns, name string) types.NamespacedName {
