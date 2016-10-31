@@ -17,6 +17,7 @@ limitations under the License.
 package api_test
 
 import (
+	"bytes"
 	"math/rand"
 	"reflect"
 	"testing"
@@ -56,6 +57,27 @@ func doDeepCopyTest(t *testing.T, kind unversioned.GroupVersionKind, f *fuzz.Fuz
 
 	if !reflect.DeepEqual(item, itemCopy) {
 		t.Errorf("\nexpected: %#v\n\ngot:      %#v\n\ndiff:      %v", item, itemCopy, diff.ObjectReflectDiff(item, itemCopy))
+	}
+
+	prefuzzData := &bytes.Buffer{}
+	if err := api.Codecs.LegacyCodec(kind.GroupVersion()).Encode(item, prefuzzData); err != nil {
+		t.Errorf("Could not encode a %v: %s", kind, err)
+		return
+	}
+
+	// Refuzz the copy, which should have no effect on the original
+	f.Fuzz(itemCopy)
+
+	postfuzzData := &bytes.Buffer{}
+	if err := api.Codecs.LegacyCodec(kind.GroupVersion()).Encode(item, postfuzzData); err != nil {
+		t.Errorf("Could not encode a %v: %s", kind, err)
+		return
+	}
+
+	if bytes.Compare(prefuzzData.Bytes(), postfuzzData.Bytes()) != 0 {
+		t.Log(diff.StringDiff(prefuzzData.String(), postfuzzData.String()))
+		t.Errorf("Fuzzing copy modified original of %#v", kind)
+		return
 	}
 }
 
