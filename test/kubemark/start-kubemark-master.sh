@@ -76,8 +76,8 @@ function mount-master-pd() {
 
 mount-master-pd
 
-ETCD_QUOTA_BYTES=
-if [ "${TEST_ETCD_VERSION:0:2}" == "3." ]; then
+ETCD_QUOTA_BYTES=""
+if [ "${KUBEMARK_ETCD_VERSION:0:2}" == "3." ]; then
   # TODO: Set larger quota to see if that helps with
   # 'mvcc: database space exceeded' errors. If so, pipe
   # though our setup scripts.
