@@ -702,6 +702,10 @@ NUM_NODES: $(yaml-quote ${NUM_NODES})
 STORAGE_BACKEND: $(yaml-quote ${STORAGE_BACKEND:-})
 ENABLE_GARBAGE_COLLECTOR: $(yaml-quote ${ENABLE_GARBAGE_COLLECTOR:-})
 EOF
+    if [ -n "${ETCD_IMAGE:-}" ]; then
+      cat >>$file <<EOF
+ETCD_IMAGE: $(yaml-quota ${ETCD_IMAGE})
+EOF
     if [ -n "${ETCD_VERSION:-}" ]; then
       cat >>$file <<EOF
 ETCD_VERSION: $(yaml-quote ${ETCD_VERSION})
