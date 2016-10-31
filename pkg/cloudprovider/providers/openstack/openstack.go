@@ -466,6 +466,9 @@ func (i *Instances) NodeAddresses(name string) ([]api.NodeAddress, error) {
 func (i *Instances) ExternalID(name string) (string, error) {
 	srv, err := getServerByName(i.compute, name)
 	if err != nil {
+		if err == ErrNotFound {
+			return "", cloudprovider.InstanceNotFound
+		}
 		return "", err
 	}
 	return srv.ID, nil
