@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -44,4 +45,12 @@ func SetDefaults_StatefulSet(obj *StatefulSet) {
 		obj.Spec.Replicas = new(int32)
 		*obj.Spec.Replicas = 1
 	}
+
+	// set default safe-deletion flag.
+	finalizers := sets.NewString(obj.Spec.Template.Finalizers...)
+	if finalizers.Has("k8s.io/safe-delete") {
+		return
+	}
+	finalizers.Insert("k8s.io/safe-delete")
+	obj.Spec.Template.SetFinalizers(finalizers.List())
 }
