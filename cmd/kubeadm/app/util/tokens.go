@@ -60,6 +60,25 @@ func GenerateToken(s *kubeadmapi.Secrets) error {
 	return nil
 }
 
+func GenerateTokenIfNeeded(s *kubeadmapi.Secrets) error {
+	ok, err := UseGivenTokenIfValid(s)
+	// TODO(phase1+) @krousey: I know it won't happen with the way it is currently implemented, but this doesn't handle case where ok is true and err is non-nil.
+	if !ok {
+		if err != nil {
+			return err
+		}
+		err = GenerateToken(s)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("<util/tokens> generated token: %q\n", s.GivenToken)
+	} else {
+		fmt.Println("<util/tokens> accepted provided token")
+	}
+
+	return nil
+}
+
 func UseGivenTokenIfValid(s *kubeadmapi.Secrets) (bool, error) {
 	if s.GivenToken == "" {
 		return false, nil // not given
