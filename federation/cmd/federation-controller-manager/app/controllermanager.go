@@ -26,6 +26,7 @@ import (
 	"net/http/pprof"
 	"strconv"
 
+	fedinternalclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	"k8s.io/kubernetes/federation/cmd/federation-controller-manager/app/options"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
@@ -40,6 +41,7 @@ import (
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	client_helper "k8s.io/kubernetes/pkg/controller/client"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -150,7 +152,8 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 
 	glog.Infof("Loading client config for namespace controller %q", "namespace-controller")
 	nsClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "namespace-controller"))
-	namespaceController := namespacecontroller.NewNamespaceController(nsClientset)
+	nsUnversionedClientset := fedinternalclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "namespace-controller"))
+	namespaceController := namespacecontroller.NewNamespaceController(nsClientset, nsUnversionedClientset, client_helper.NewDynamicClientPool(restclient.AddUserAgent(restClientCfg, "namespace-controller")))
 	glog.Infof("Running namespace controller")
 	namespaceController.Run(wait.NeverStop)
 

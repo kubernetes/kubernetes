@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	certcontroller "k8s.io/kubernetes/pkg/controller/certificates"
+	client_helper "k8s.io/kubernetes/pkg/controller/client"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/deployment"
 	"k8s.io/kubernetes/pkg/controller/disruption"
@@ -363,12 +364,9 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 		glog.Fatalf("Failed to get supported resources from server: %v", err)
 	}
 
-	// TODO: should use a dynamic RESTMapper built from the discovery results.
-	restMapper := registered.RESTMapper()
-
 	// Find the list of namespaced resources via discovery that the namespace controller must manage
 	namespaceKubeClient := client("namespace-controller")
-	namespaceClientPool := dynamic.NewClientPool(restclient.AddUserAgent(kubeconfig, "namespace-controller"), restMapper, dynamic.LegacyAPIPathResolverFunc)
+	namespaceClientPool := client_helper.NewDynamicClientPool(restclient.AddUserAgent(kubeconfig, "namespace-controller"))
 	groupVersionResources, err := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources()
 	if err != nil {
 		glog.Fatalf("Failed to get supported resources from server: %v", err)
@@ -545,9 +543,10 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 
 		config := restclient.AddUserAgent(kubeconfig, "generic-garbage-collector")
 		config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
-		metaOnlyClientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
+		metaOnlyClientPool := client_helper.NewDynamicClientPool(config)
 		config.ContentConfig = dynamic.ContentConfig()
-		clientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
+		clientPool := client_helper.NewDynamicClientPool(config)
+		restMapper := registered.RESTMapper()
 		garbageCollector, err := garbagecollector.NewGarbageCollector(metaOnlyClientPool, clientPool, restMapper, groupVersionResources)
 		if err != nil {
 			glog.Errorf("Failed to start the generic garbage collector: %v", err)
