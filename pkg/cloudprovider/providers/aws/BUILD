@@ -21,6 +21,7 @@ go_library(
         "log_handler.go",
         "retry_handler.go",
         "sets_ippermissions.go",
+        "volumes.go",
     ],
     tags = ["automanaged"],
     deps = [
