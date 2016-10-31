@@ -14,12 +14,38 @@ cluster/gce/configure-vm.sh:  cloud_config: ${CLOUD_CONFIG}
 cluster/gce/configure-vm.sh:  env-to-grains "feature_gates"
 cluster/gce/configure-vm.sh:  env-to-grains "runtime_config"
 cluster/gce/configure-vm.sh:  kubelet_api_servers: '${KUBELET_APISERVER}'
+cluster/gce/coreos/configure-helper.sh:      reconcile_cidr="false"
+cluster/gce/coreos/configure-helper.sh:  local api_servers="--master=https://${KUBERNETES_MASTER_NAME}"
+cluster/gce/coreos/configure-helper.sh:  local reconcile_cidr="true"
+cluster/gce/coreos/configure-helper.sh:  sed -i -e "s@{{ *storage_backend *}}@${STORAGE_BACKEND:-}@g" "${temp_file}"
+cluster/gce/coreos/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
+cluster/gce/coreos/configure-helper_BACKUP_13950.sh:      reconcile_cidr="false"
+cluster/gce/coreos/configure-helper_BACKUP_13950.sh:  local api_servers="--master=https://${KUBERNETES_MASTER_NAME}"
+cluster/gce/coreos/configure-helper_BACKUP_13950.sh:  local reconcile_cidr="true"
+cluster/gce/coreos/configure-helper_BACKUP_13950.sh:  sed -i -e "s@{{ *storage_backend *}}@${STORAGE_BACKEND:-}@g" "${temp_file}"
+cluster/gce/coreos/configure-helper_BACKUP_13950.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
+cluster/gce/coreos/configure-helper_BASE_13950.sh:      reconcile_cidr="false"
+cluster/gce/coreos/configure-helper_BASE_13950.sh:  local api_servers="--master=https://${KUBERNETES_MASTER_NAME}"
+cluster/gce/coreos/configure-helper_BASE_13950.sh:  local reconcile_cidr="true"
+cluster/gce/coreos/configure-helper_BASE_13950.sh:  sed -i -e "s@{{ *storage_backend *}}@${STORAGE_BACKEND:-}@g" "${temp_file}"
+cluster/gce/coreos/configure-helper_BASE_13950.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
+cluster/gce/coreos/configure-helper_LOCAL_13950.sh:      reconcile_cidr="false"
+cluster/gce/coreos/configure-helper_LOCAL_13950.sh:  local api_servers="--master=https://${KUBERNETES_MASTER_NAME}"
+cluster/gce/coreos/configure-helper_LOCAL_13950.sh:  local reconcile_cidr="true"
+cluster/gce/coreos/configure-helper_LOCAL_13950.sh:  sed -i -e "s@{{ *storage_backend *}}@${STORAGE_BACKEND:-}@g" "${temp_file}"
+cluster/gce/coreos/configure-helper_LOCAL_13950.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
+cluster/gce/coreos/configure-helper_REMOTE_13950.sh:      reconcile_cidr="false"
+cluster/gce/coreos/configure-helper_REMOTE_13950.sh:  local api_servers="--master=https://${KUBERNETES_MASTER_NAME}"
+cluster/gce/coreos/configure-helper_REMOTE_13950.sh:  local reconcile_cidr="true"
+cluster/gce/coreos/configure-helper_REMOTE_13950.sh:  sed -i -e "s@{{ *storage_backend *}}@${STORAGE_BACKEND:-}@g" "${temp_file}"
+cluster/gce/coreos/configure-helper_REMOTE_13950.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
 cluster/gce/gci/configure-helper.sh:  local api_servers="--master=https://${KUBERNETES_MASTER_NAME}"
 cluster/gce/gci/configure-helper.sh:  sed -i -e "s@{{ *storage_backend *}}@${STORAGE_BACKEND:-}@g" "${temp_file}"
 cluster/gce/gci/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
 cluster/gce/trusty/configure-helper.sh:  sed -i -e "s@{{ *storage_backend *}}@${STORAGE_BACKEND:-}@g" "${temp_file}"
 cluster/gce/trusty/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
 cluster/gce/util.sh:    local node_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
+cluster/gce/util.sh.orig:    local node_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
 cluster/juju/layers/kubernetes/reactive/k8s.py:    check_call(split(cmd.format(kubeconfig, cluster_name, server, ca)))
 cluster/juju/layers/kubernetes/reactive/k8s.py:    check_call(split(cmd.format(kubeconfig, context, cluster_name, user)))
 cluster/juju/layers/kubernetes/reactive/k8s.py:    client_key = '/srv/kubernetes/client.key'
