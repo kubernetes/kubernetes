@@ -338,7 +338,7 @@ function detect-node-names {
   detect-project
   INSTANCE_GROUPS=()
   INSTANCE_GROUPS+=($(gcloud compute instance-groups managed list \
-    --zone "${ZONE}" --project "${PROJECT}" \
+    --zones "${ZONE}" --project "${PROJECT}" \
     --regexp "${NODE_INSTANCE_PREFIX}-.+" \
     --format='value(instanceGroup)' || true))
   NODE_NAMES=()
@@ -1030,7 +1030,7 @@ function kube-down {
   # Find out what minions are running.
   local -a minions
   minions=( $(gcloud compute instances list \
-                --project "${PROJECT}" --zone "${ZONE}" \
+                --project "${PROJECT}" --zones "${ZONE}" \
                 --regexp "${NODE_INSTANCE_PREFIX}-.+" \
                 --format='value(name)') )
   # If any minions are running, delete them in batches.
@@ -1150,7 +1150,7 @@ function check-resources {
   # Find out what minions are running.
   local -a minions
   minions=( $(gcloud compute instances list \
-                --project "${PROJECT}" --zone "${ZONE}" \
+                --project "${PROJECT}" --zones "${ZONE}" \
                 --regexp "${NODE_INSTANCE_PREFIX}-.+" \
                 --format='value(name)') )
   if (( "${#minions[@]}" > 0 )); then
