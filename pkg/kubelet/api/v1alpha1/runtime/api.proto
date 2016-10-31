@@ -133,6 +133,41 @@ message NamespaceOption {
     optional bool host_ipc = 3;
 }
 
+// SandboxSecurityContext holds security configuration that will be applied to a sandbox.
+message SandboxSecurityContext {
+    // The configurations for the sandbox's namespaces.
+    // This will be used only if the PodSandbox uses namespace for isolation.
+    optional NamespaceOption namespace_options = 1;
+    // Optional SELinux context to be applied. Only for sandbox. Containers should
+    // confirm to SecurityContext.SelinuxOptions.
+    optional SELinuxOption selinux_options = 2;
+    // The UID to run the entrypoint of the container process.
+    // Defaults to user specified in image metadata if unspecified.
+    // Only for sandbox. Containers should confirm to SecurityContext.RunAsUser.
+    optional int64 run_as_user = 3;
+    // Indicates that the container must run as a non-root user.
+    // If true, the runtime should validate the image at runtime to ensure that it
+    // does not run as UID 0 (root) and fail to start the container if it does.
+    // If unset or false, no such validation will be performed.
+    // Only for sandbox. Containers should confirm to SecurityContext.RunAsNonRoot.
+    optional bool run_as_non_root = 4;
+    // If set, the root filesystem of the container is read-only.
+    optional bool readonly_rootfs = 5;
+    // A list of groups applied to the first process run in the sandbox, in addition
+    // to the container's primary GID.  If unspecified, no groups will be added.
+    repeated int64 supplemental_groups = 6;
+    // A special supplemental group that applies to the sandbox.
+    // Some volume types allow the Kubelet to change the ownership of that volume
+    // to be owned by the pod:
+    //
+    // 1. The owning GID will be the FSGroup
+    // 2. The setgid bit is set (new files created in the volume will be owned by FSGroup)
+    // 3. The permission bits are OR'd with rw-rw----
+    //
+    // If unset, the Kubelet will not modify the ownership and permissions of any volume.
+    optional int64 fs_group = 7;
+}
+
 // LinuxPodSandboxConfig holds platform-specific configurations for Linux
 // host platforms and Linux-based containers.
 message LinuxPodSandboxConfig {
@@ -140,9 +175,8 @@ message LinuxPodSandboxConfig {
     // The cgroupfs style syntax will be used, but the container runtime can
     // convert it to systemd semantics if needed.
     optional string cgroup_parent = 1;
-    // The configurations for the sandbox's namespaces.
-    // This will be used only if the PodSandbox uses namespace for isolation.
-    optional NamespaceOption namespace_options = 2;
+    // SandboxSecurityContext holds sandbox security attributes.
+    optional SandboxSecurityContext security_context = 2;
 }
 
 // PodSandboxMetadata holds all necessary information for building the sandbox name.
@@ -394,26 +428,49 @@ message Capability {
     repeated string drop_capabilities = 2;
 }
 
+// SecurityContext holds security configuration that will be applied to a container.
+message SecurityContext {
+    // Capabilities to add or drop.
+    optional Capability capabilities = 1;
+    // If set, run container in privileged mode.
+    optional bool privileged = 2;
+    // The configurations for the container's namespaces.
+    // This will be used only if the container uses namespace for isolation.
+    optional NamespaceOption namespace_options = 3;
+    // Optional SELinux context to be applied.
+    optional SELinuxOption selinux_options = 4;
+    // The UID to run the the container process.
+    // Defaults to user specified in image metadata if unspecified.
+    optional int64 run_as_user = 5;
+    // Indicates that the container must run as a non-root user.
+    // If true, the runtime should validate the image at runtime to ensure that it
+    // does not run as UID 0 (root) and fail to start the container if it does.
+    // If unset or false, no such validation will be performed.
+    optional bool run_as_non_root = 6;
+    // If set, the root filesystem of the container is read-only.
+    optional bool readonly_rootfs = 7;
+    // A list of groups applied to the first process run in the container, in addition
+    // to the container's primary GID.  If unspecified, no groups will be added.
+    repeated int64 supplemental_groups = 8;
+    // A special supplemental group that applies to the container.
+    // Some volume types allow the Kubelet to change the ownership of that volume
+    // to be owned by the pod:
+    //
+    // 1. The owning GID will be the FSGroup
+    // 2. The setgid bit is set (new files created in the volume will be owned by FSGroup)
+    // 3. The permission bits are OR'd with rw-rw----
+    //
+    // If unset, the Kubelet will not modify the ownership and permissions of any volume.
+    optional int64 fs_group = 9;
+}
+
 // LinuxContainerConfig contains platform-specific configuration for
 // Linux-based containers.
 message LinuxContainerConfig {
     // Resources specification for the container.
     optional LinuxContainerResources resources = 1;
-    // Capabilities to add or drop.
-    optional Capability capabilities = 2;
-    // Optional SELinux context to be applied.
-    optional SELinuxOption selinux_options = 3;
-    // User contains the user for the container process.
-    optional LinuxUser user = 4;
-}
-
-message LinuxUser {
-    // uid specifies the user ID the container process has.
-    optional int64 uid = 1;
-    // gid specifies the group ID the container process has.
-    optional int64 gid = 2;
-    // additional_gids specifies additional GIDs the container process has.
-    repeated int64 additional_gids = 3;
+    // SecurityContext configuration for the container.
+    optional SecurityContext security_context = 2;
 }
 
 // ContainerMetadata holds all necessary information for building the container
@@ -458,11 +515,7 @@ message ContainerConfig {
     // Annotations is an unstructured key value map that may be set by external
     // tools to store and retrieve arbitrary metadata.
     map<string, string> annotations = 9;
-    // If set, run container in privileged mode.
-    // Processes in privileged containers are essentially equivalent to root on the host.
-    optional bool privileged = 10;
-    // If set, the root filesystem of the container is read-only.
-    optional bool readonly_rootfs = 11;
+
     // Path relative to PodSandboxConfig.LogDirectory for container to store
     // the log (STDOUT and STDERR) on the host.
     // E.g.,
@@ -473,19 +526,18 @@ message ContainerConfig {
     // container logs are under active discussion in
     // https://issues.k8s.io/24677. There *may* be future change of direction
     // for logging as the discussion carries on.
-    optional string log_path = 12;
-    // The hash of container config
+    optional string log_path = 10;
 
     // Variables for interactive containers, these have very specialized
     // use-cases (e.g. debugging).
     // TODO: Determine if we need to continue supporting these fields that are
     // part of Kubernetes's Container Spec.
-    optional bool stdin = 13;
-    optional bool stdin_once = 14;
-    optional bool tty = 15;
+    optional bool stdin = 11;
+    optional bool stdin_once = 12;
+    optional bool tty = 13;
 
     // Linux contains configuration specific to Linux containers.
-    optional LinuxContainerConfig linux = 16;
+    optional LinuxContainerConfig linux = 14;
 }
 
 message CreateContainerRequest {
