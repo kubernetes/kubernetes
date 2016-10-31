@@ -17,8 +17,11 @@ limitations under the License.
 package api_test
 
 import (
+	"bytes"
+	"fmt"
 	"math/rand"
 	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -56,6 +59,53 @@ func doDeepCopyTest(t *testing.T, kind unversioned.GroupVersionKind, f *fuzz.Fuz
 
 	if !reflect.DeepEqual(item, itemCopy) {
 		t.Errorf("\nexpected: %#v\n\ngot:      %#v\n\ndiff:      %v", item, itemCopy, diff.ObjectReflectDiff(item, itemCopy))
+	}
+
+	prefuzzData := &bytes.Buffer{}
+	if err := api.Codecs.LegacyCodec(kind.GroupVersion()).Encode(item, prefuzzData); err != nil {
+		t.Error(err)
+		return
+	}
+
+	// Refuzz the copy, which should have no effect on the original
+	f.Fuzz(itemCopy)
+
+	postfuzzData := &bytes.Buffer{}
+	if err := api.Codecs.LegacyCodec(kind.GroupVersion()).Encode(item, postfuzzData); err != nil {
+		t.Errorf("Could not deep copy a %v: %s", kind, err)
+		return
+	}
+
+	if bytes.Compare(prefuzzData.Bytes(), postfuzzData.Bytes()) != 0 {
+		t.Errorf("Fuzzing copy modified original of %#v", kind)
+		return
+	}
+
+	// Most runtime.Objects are pointers
+	// Make sure calling DeepCopy() with a non-pointer struct either errors, or actually deep copies
+	itemValue := reflect.ValueOf(item)
+	if itemValue.Kind() == reflect.Ptr {
+		itemStructValue := itemValue.Elem()
+		fmt.Println(itemStructValue.Type())
+		itemStruct := itemStructValue.Interface()
+		itemStructCopy, err := api.Scheme.DeepCopy(itemStruct)
+		if err == nil || strings.Contains(err.Error(), "must pass addressable value") {
+			return
+		}
+		if err != nil {
+			t.Errorf("Could not deep copy struct of %v: %s", kind, err)
+			return
+		}
+		if !reflect.DeepEqual(itemStruct, itemStructCopy) {
+			t.Errorf("\nexpected: %#v\n\ngot:      %#v\n\ndiff:      %v", itemStruct, itemStructCopy, diff.ObjectReflectDiff(itemStruct, itemStructCopy))
+			return
+		}
+		// Refuzz the copy, which should have no effect on the original
+		f.Fuzz(itemStructCopy)
+		if reflect.DeepEqual(itemStruct, itemStructCopy) {
+			t.Errorf("Fuzzing struct copy modified original of %#v", kind)
+			return
+		}
 	}
 }
 

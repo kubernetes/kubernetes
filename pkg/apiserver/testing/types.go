@@ -27,7 +27,9 @@ type Simple struct {
 	// +optional
 	Other string `json:"other,omitempty"`
 	// +optional
-	Labels map[string]string `json:"labels,omitempty"`
+	Labels     map[string]string `json:"labels,omitempty"`
+	TimePtr    *unversioned.Time `json:"timePtr,omitempty"`
+	TimeStruct unversioned.Time  `json:"timeStruct,omitempty"`
 }
 
 func (obj *Simple) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
