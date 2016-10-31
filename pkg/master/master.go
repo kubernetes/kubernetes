@@ -119,6 +119,9 @@ func (c *Config) Complete() completedConfig {
 		c.EndpointReconcilerConfig.Reconciler = NewMasterCountEndpointReconciler(c.GenericConfig.MasterCount, endpointClient)
 	}
 
+	// this has always been hardcoded true in the past
+	c.GenericConfig.EnableMetrics = true
+
 	return completedConfig{c}
 }
 
@@ -195,7 +198,6 @@ func (c completedConfig) New() (*Master, error) {
 	if c.Tunneler != nil {
 		m.installTunneler(c.Tunneler, coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes())
 	}
-	m.InstallGeneralEndpoints(c.Config)
 
 	return m, nil
 }
@@ -225,16 +227,6 @@ func (m *Master) installTunneler(tunneler genericapiserver.Tunneler, nodeClient 
 		Name: "apiserver_proxy_tunnel_sync_latency_secs",
 		Help: "The time since the last successful synchronization of the SSH tunnels for proxy requests.",
 	}, func() float64 { return float64(tunneler.SecondsSinceSync()) })
-}
-
-// TODO this needs to be refactored so we have a way to add general health checks to genericapiserver
-// TODO profiling should be generic
-func (m *Master) InstallGeneralEndpoints(c *Config) {
-	if c.GenericConfig.EnableProfiling {
-		routes.MetricsWithReset{}.Install(m.GenericAPIServer.HandlerContainer)
-	} else {
-		routes.DefaultMetrics{}.Install(m.GenericAPIServer.HandlerContainer)
-	}
 }
 
 // InstallAPIs will install the APIs for the restStorageProviders if they are enabled.
