@@ -20,10 +20,7 @@ limitations under the License.
 
 package unversioned
 
-import (
-	conversion "k8s.io/client-go/pkg/conversion"
-	time "time"
-)
+import conversion "k8s.io/client-go/pkg/conversion"
 
 func DeepCopy_unversioned_APIGroup(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
@@ -360,11 +357,8 @@ func DeepCopy_unversioned_Time(in interface{}, out interface{}, c *conversion.Cl
 	{
 		in := in.(*Time)
 		out := out.(*Time)
-		if newVal, err := c.DeepCopy(&in.Time); err != nil {
-			return err
-		} else {
-			out.Time = *newVal.(*time.Time)
-		}
+		outCopy := in.DeepCopy()
+		*out = outCopy
 		return nil
 	}
 }
