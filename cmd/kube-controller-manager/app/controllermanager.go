@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/bootstrap"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	nodecontroller "k8s.io/kubernetes/pkg/controller/node"
 	routecontroller "k8s.io/kubernetes/pkg/controller/route"
