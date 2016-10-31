@@ -316,7 +316,9 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName string, node s
 					ReadinessProbe: probe,
 				},
 			},
-			NodeName: node,
+			NodeSelector: map[string]string{
+				"kubernetes.io/hostname": node,
+			},
 		},
 	}
 	return pod
