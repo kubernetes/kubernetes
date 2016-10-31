@@ -47,7 +47,6 @@ import (
 	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
-	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
@@ -150,10 +149,7 @@ func TestNew(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	// these values get defaulted
-	_, serviceClusterIPRange, _ := net.ParseCIDR("10.0.0.0/24")
-	serviceReadWriteIP, _ := ipallocator.GetIndexedIP(serviceClusterIPRange, 1)
 	assert.Equal(master.GenericAPIServer.MasterCount, 1)
-	assert.Equal(master.GenericAPIServer.ServiceReadWriteIP, serviceReadWriteIP)
 }
 
 // TestVersion tests /version
