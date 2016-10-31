@@ -33,3 +33,23 @@ go_library(
         "//vendor:github.com/square/go-jose",
     ],
 )
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "bootstrap_test.go",
+        "csr_test.go",
+        "discovery_test.go",
+    ],
+    library = "go_default_library",
+    tags = ["automanaged"],
+    deps = [
+        "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
+        "//pkg/api/unversioned:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset/typed/certificates/internalversion:go_default_library",
+        "//pkg/client/restclient:go_default_library",
+        "//pkg/client/typed/discovery:go_default_library",
+        "//pkg/version:go_default_library",
+    ],
+)
