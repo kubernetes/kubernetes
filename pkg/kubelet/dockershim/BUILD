@@ -23,6 +23,7 @@ go_library(
         "helpers.go",
         "legacy.go",
         "naming.go",
+        "security_context.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -57,6 +58,7 @@ go_test(
         "docker_service_test.go",
         "helpers_test.go",
         "naming_test.go",
+        "security_context_test.go",
     ],
     library = "go_default_library",
     tags = ["automanaged"],
@@ -69,6 +71,7 @@ go_test(
         "//pkg/security/apparmor:go_default_library",
         "//pkg/util/clock:go_default_library",
         "//vendor:github.com/docker/engine-api/types",
+        "//vendor:github.com/docker/engine-api/types/container",
         "//vendor:github.com/stretchr/testify/assert",
     ],
 )

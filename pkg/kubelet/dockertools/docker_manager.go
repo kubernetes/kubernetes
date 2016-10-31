@@ -2437,7 +2437,13 @@ func (dm *DockerManager) verifyNonRoot(container *api.Container) error {
 // or the user is set to root.  If there is an error inspecting the image this method will return
 // false and return the error.
 func (dm *DockerManager) isImageRoot(image string) (bool, error) {
-	img, err := dm.client.InspectImageByRef(image)
+	return IsImageRoot(dm.client, image)
+}
+
+// Temporarily export this function to share with dockershim.
+// TODO: clean this up.
+func IsImageRoot(client DockerInterface, image string) (bool, error) {
+	img, err := client.InspectImageByRef(image)
 	if err != nil {
 		return false, err
 	}

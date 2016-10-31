@@ -203,6 +203,33 @@ func (ds *dockerService) ListPodSandbox(filter *runtimeApi.PodSandboxFilter) ([]
 	return result, nil
 }
 
+// applyLinuxSpecificOptions applies LinuxPodSandboxConfig to dockercontainer.HostConfig and dockercontainer.ContainerCreateConfig.
+func (ds *dockerService) applyLinuxSpecificOptions(hc *dockercontainer.HostConfig, lc *runtimeApi.LinuxPodSandboxConfig, createConfig *dockertypes.ContainerCreateConfig, image string) error {
+	// Apply Cgroup options.
+	// TODO: Check if this works with per-pod cgroups.
+	hc.CgroupParent = lc.GetCgroupParent()
+
+	// Verify RunAsNonRoot of security context.
+	if podSc := lc.GetSecurityContext(); podSc != nil && podSc.RunAsNonRoot != nil {
+		if podSc.RunAsUser != nil {
+			return fmt.Errorf("container's runAsUser breaks non-root policy")
+		}
+
+		imgRoot, err := ds.isImageRoot(image)
+		if err != nil {
+			return fmt.Errorf("can't tell if image runs as root: %v", err)
+		}
+		if imgRoot {
+			return fmt.Errorf("container has runAsNonRoot and image will run as root")
+		}
+	}
+
+	applySandboxSecurityContext(lc, createConfig.Config, hc)
+
+	return nil
+}
+
+// makeSandboxDockerConfig returns dockertypes.ContainerCreateConfig based on runtimeApi.PodSandboxConfig.
 func (ds *dockerService) makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig, image string) (*dockertypes.ContainerCreateConfig, error) {
 	// Merge annotations and labels because docker supports only labels.
 	labels := makeLabels(c.GetLabels(), c.GetAnnotations())
@@ -233,29 +260,11 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig,
 
 	// Apply linux-specific options.
 	if lc := c.GetLinux(); lc != nil {
-		// Apply Cgroup options.
-		// TODO: Check if this works with per-pod cgroups.
-		hc.CgroupParent = lc.GetCgroupParent()
-
-		// Apply namespace options.
-		hc.NetworkMode, hc.UTSMode, hc.PidMode = "", "", ""
-		nsOpts := lc.GetNamespaceOptions()
-		if nsOpts != nil {
-			if nsOpts.GetHostNetwork() {
-				hc.NetworkMode = namespaceModeHost
-			} else {
-				// Assume kubelet uses either the cni or the kubenet plugin.
-				// TODO: support docker networking.
-				hc.NetworkMode = "none"
-			}
-			if nsOpts.GetHostIpc() {
-				hc.IpcMode = namespaceModeHost
-			}
-			if nsOpts.GetHostPid() {
-				hc.PidMode = namespaceModeHost
-			}
+		if err := ds.applyLinuxSpecificOptions(hc, lc, createConfig, image); err != nil {
+			return nil, err
 		}
 	}
+
 	// Set port mappings.
 	exposedPorts, portBindings := makePortsAndBindings(c.GetPortMappings())
 	createConfig.Config.ExposedPorts = exposedPorts
@@ -272,10 +281,11 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig,
 	setSandboxResources(hc)
 
 	// Set security options.
-	hc.SecurityOpt, err = getSandboxSecurityOpts(c, ds.seccompProfileRoot)
+	securityOpts, err := getSandboxSecurityOpts(c, ds.seccompProfileRoot)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate sandbox security options for sandbox %q: %v", c.Metadata.GetName(), err)
 	}
+	hc.SecurityOpt = append(hc.SecurityOpt, securityOpts...)
 	return createConfig, nil
 }
 
