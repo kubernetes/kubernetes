@@ -52,6 +52,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 				testConfigMapsDuringUpgrade(f, sem)
 				testGuestbookApplicationDuringUpgrade(f, sem)
 				testDaemonSetDuringUpgrade(f, sem)
+				testJobsDuringUpgrade(f, sem)
 			})
 			cm.Do()
 		})
@@ -72,6 +73,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 				testConfigMapsBeforeAndAfterUpgrade(f, sem)
 				testGuestbookApplicationBeforeAndAfterUpgrade(f, sem)
 				testDaemonSetBeforeAndAfterUpgrade(f, sem)
+				testJobsBeforeAndAfterUpgrade(f, sem)
 			})
 			cm.Do()
 		})
@@ -90,6 +92,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 				testConfigMapsDuringUpgrade(f, sem)
 				testGuestbookApplicationDuringUpgrade(f, sem)
 				testDaemonSetDuringUpgrade(f, sem)
+				testJobsDuringUpgrade(f, sem)
 			})
 			cm.Do()
 		})
@@ -112,6 +115,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 				testConfigMapsBeforeAndAfterUpgrade(f, sem)
 				testGuestbookApplicationBeforeAndAfterUpgrade(f, sem)
 				testDaemonSetBeforeAndAfterUpgrade(f, sem)
+				testJobsBeforeAndAfterUpgrade(f, sem)
 			})
 			cm.Do()
 		})
@@ -132,6 +136,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 				testConfigMapsDuringUpgrade(f, sem)
 				testGuestbookApplicationDuringUpgrade(f, sem)
 				testDaemonSetDuringUpgrade(f, sem)
+				testJobsDuringUpgrade(f, sem)
 			})
 			cm.Do()
 		})
@@ -403,4 +408,44 @@ func testDaemonSet(f *framework.Framework, sem *chaosmonkey.Semaphore, testDurin
 	// Teardown
 	By("teardown daemonset")
 	TestDaemonSetWithNodeAffinityTeardown(f, dsName)
+}
+
+func testJobsBeforeAndAfterUpgrade(f *framework.Framework, sem *chaosmonkey.Semaphore) {
+	testJobs(f, sem, false)
+}
+
+func testJobsDuringUpgrade(f *framework.Framework, sem *chaosmonkey.Semaphore) {
+	testJobs(f, sem, true)
+}
+
+func testJobs(f *framework.Framework, sem *chaosmonkey.Semaphore, testDuringDisruption bool) {
+	parallelism := int32(2)
+	completions := int32(4)
+
+	// Setup
+	By("setup job")
+	job := TestJobsSetup("randomlySucceedOrFail", "rand-non-local", api.RestartPolicyNever, parallelism, completions)
+	// Validate
+	By("validate job before upgrade")
+	TestJobsValidate(f, job, completions)
+
+	sem.Ready()
+
+	if testDuringDisruption {
+		// Continuously validate
+		wait.Until(func() {
+			By("validate job during upgrade")
+			TestJobsValidate(f, job, completions)
+		}, framework.Poll, sem.StopCh)
+	} else {
+		// Block until chaosmonkey is done
+		By("waiting for upgrade to finish without validating job")
+		<-sem.StopCh
+	}
+
+	// Validate after upgrade
+	By("validate job after upgrade")
+	TestJobsValidate(f, job, completions)
+
+	// Teardown
 }
