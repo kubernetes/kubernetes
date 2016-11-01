@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/test/e2e/framework"
 
+	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	. "github.com/onsi/ginkgo"
@@ -159,25 +160,24 @@ func newSVCByName(c clientset.Interface, ns, name string) error {
 	return err
 }
 
-func rcByName(name string, replicas int32, image string, labels map[string]string) *api.ReplicationController {
-	return rcByNameContainer(name, replicas, image, labels, api.Container{
-		Name:  name,
-		Image: image,
-	})
-}
+func rcByNamePort(name string, replicas int32, image string, port int, protocol api.Protocol,
+	labels map[string]string, gracePeriod *int64) *api.ReplicationController {
 
-func rcByNamePort(name string, replicas int32, image string, port int, protocol api.Protocol, labels map[string]string) *api.ReplicationController {
 	return rcByNameContainer(name, replicas, image, labels, api.Container{
 		Name:  name,
 		Image: image,
 		Ports: []api.ContainerPort{{ContainerPort: int32(port), Protocol: protocol}},
-	})
+	}, gracePeriod)
 }
 
-func rcByNameContainer(name string, replicas int32, image string, labels map[string]string, c api.Container) *api.ReplicationController {
+func rcByNameContainer(name string, replicas int32, image string, labels map[string]string, c api.Container,
+	gracePeriod *int64) *api.ReplicationController {
+
 	// Add "name": name to the labels, overwriting if it exists.
 	labels["name"] = name
-	gracePeriod := int64(0)
+	if gracePeriod == nil {
+		gracePeriod = to.Int64Ptr(0)
+	}
 	return &api.ReplicationController{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "ReplicationController",
@@ -197,7 +197,7 @@ func rcByNameContainer(name string, replicas int32, image string, labels map[str
 				},
 				Spec: api.PodSpec{
 					Containers:                    []api.Container{c},
-					TerminationGracePeriodSeconds: &gracePeriod,
+					TerminationGracePeriodSeconds: gracePeriod,
 				},
 			},
 		},
@@ -205,10 +205,10 @@ func rcByNameContainer(name string, replicas int32, image string, labels map[str
 }
 
 // newRCByName creates a replication controller with a selector by name of name.
-func newRCByName(c clientset.Interface, ns, name string, replicas int32) (*api.ReplicationController, error) {
+func newRCByName(c clientset.Interface, ns, name string, replicas int32, gracePeriod *int64) (*api.ReplicationController, error) {
 	By(fmt.Sprintf("creating replication controller %s", name))
 	return c.Core().ReplicationControllers(ns).Create(rcByNamePort(
-		name, replicas, serveHostnameImage, 9376, api.ProtocolTCP, map[string]string{}))
+		name, replicas, serveHostnameImage, 9376, api.ProtocolTCP, map[string]string{}, gracePeriod))
 }
 
 func resizeRC(c clientset.Interface, ns, name string, replicas int32) error {
@@ -294,7 +294,7 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-delete-node"
 			replicas := int32(framework.TestContext.CloudConfig.NumNodes)
-			newRCByName(c, ns, name, replicas)
+			newRCByName(c, ns, name, replicas, nil)
 			err := framework.VerifyPods(c, ns, name, true, replicas)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -321,7 +321,7 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 			name := "my-hostname-add-node"
 			newSVCByName(c, ns, name)
 			replicas := int32(framework.TestContext.CloudConfig.NumNodes)
-			newRCByName(c, ns, name, replicas)
+			newRCByName(c, ns, name, replicas, nil)
 			err := framework.VerifyPods(c, ns, name, true, replicas)
 			Expect(err).NotTo(HaveOccurred())
 

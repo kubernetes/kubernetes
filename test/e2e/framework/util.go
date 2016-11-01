@@ -1682,11 +1682,16 @@ func PodsResponding(c clientset.Interface, ns, name string, wantName bool, pods 
 }
 
 func PodsCreated(c clientset.Interface, ns, name string, replicas int32) (*api.PodList, error) {
-	timeout := 2 * time.Minute
-	// List the pods, making sure we observe all the replicas.
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
+	return PodsCreatedByLabel(c, ns, name, replicas, label)
+}
+
+func PodsCreatedByLabel(c clientset.Interface, ns, name string, replicas int32, label labels.Selector) (*api.PodList, error) {
+	timeout := 2 * time.Minute
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
 		options := api.ListOptions{LabelSelector: label}
+
+		// List the pods, making sure we observe all the replicas.
 		pods, err := c.Core().Pods(ns).List(options)
 		if err != nil {
 			return nil, err

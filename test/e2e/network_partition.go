@@ -32,18 +32,16 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
+	"github.com/Azure/go-autorest/autorest/to"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-// Blocks outgoing network traffic on 'node'. Then verifies that 'podNameToDisappear',
-// that belongs to replication controller 'rcName', really disappeared.
-// Finally, it checks that the replication controller recreates the
-// pods on another node and that now the number of replicas is equal 'replicas'.
+// Blocks outgoing network traffic on 'node'. Then runs testFunc and returns its status.
 // At the end (even in case of errors), the network traffic is brought back to normal.
 // This function executes commands on a node so it will work only for some
 // environments.
-func performTemporaryNetworkFailure(c clientset.Interface, ns, rcName string, replicas int32, podNameToDisappear string, node *api.Node) {
+func testUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *api.Node, testFunc func()) {
 	host := framework.GetNodeExternalIP(node)
 	master := framework.GetMasterAddress(c)
 	By(fmt.Sprintf("block network traffic from node %s to the master", node.Name))
@@ -67,14 +65,7 @@ func performTemporaryNetworkFailure(c clientset.Interface, ns, rcName string, re
 		framework.Failf("Node %s did not become not-ready within %v", node.Name, resizeNodeNotReadyTimeout)
 	}
 
-	framework.Logf("Waiting for pod %s to be removed", podNameToDisappear)
-	err := framework.WaitForRCPodToDisappear(c, ns, rcName, podNameToDisappear)
-	Expect(err).NotTo(HaveOccurred())
-
-	By("verifying whether the pod from the unreachable node is recreated")
-	err = framework.VerifyPods(c, ns, rcName, true, replicas)
-	Expect(err).NotTo(HaveOccurred())
-
+	testFunc()
 	// network traffic is unblocked in a deferred function
 }
 
@@ -131,41 +122,6 @@ func newPodOnNode(c clientset.Interface, namespace, podName, nodeName string) er
 	return err
 }
 
-// Blocks outgoing network traffic on 'node'. Then verifies that 'podNameToDisappear',
-// that belongs to petset 'petSetName', _does not_ disappear due to forced deletion from the apiserver.
-// At the end (even in case of errors), the network traffic is brought back to normal.
-// This function executes commands on a node so it will work only for some
-// environments.
-func simulateStatefulSetNodeFailure(c clientset.Interface, ns, podName, resourceVersion string, node *api.Node) {
-	host := framework.GetNodeExternalIP(node)
-	master := framework.GetMasterAddress(c)
-	By(fmt.Sprintf("block network traffic from node %s to the master", node.Name))
-	defer func() {
-		// This code will execute even if setting the iptables rule failed.
-		// It is on purpose because we may have an error even if the new rule
-		// had been inserted. (yes, we could look at the error code and ssh error
-		// separately, but I prefer to stay on the safe side).
-		By(fmt.Sprintf("Unblock network traffic from node %s to the master", node.Name))
-		framework.UnblockNetwork(host, master)
-	}()
-
-	framework.Logf("Waiting %v to ensure node %s is ready before beginning test...", resizeNodeReadyTimeout, node.Name)
-	if !framework.WaitForNodeToBe(c, node.Name, api.NodeReady, true, resizeNodeReadyTimeout) {
-		framework.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
-	}
-	framework.BlockNetwork(host, master)
-
-	framework.Logf("Waiting %v for node %s to be not ready after simulated network failure", resizeNodeNotReadyTimeout, node.Name)
-	if !framework.WaitForNodeToBe(c, node.Name, api.NodeReady, false, resizeNodeNotReadyTimeout) {
-		framework.Failf("Node %s did not become not-ready within %v", node.Name, resizeNodeNotReadyTimeout)
-	}
-
-	framework.Logf("Checking that the NodeController does not force delete pet %v", podName)
-	err := framework.WaitTimeoutForPodNoLongerRunningInNamespace(c, podName, ns, resourceVersion, 10*time.Minute)
-	Expect(err).To(Equal(wait.ErrWaitTimeout), "Pet was not deleted during network partition.")
-	// network traffic is unblocked in a deferred function
-}
-
 var _ = framework.KubeDescribe("Network Partition [Disruptive]", func() {
 	f := framework.NewDefaultFramework("network-partition")
 	var systemPodsNo int32
@@ -187,68 +143,11 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive]", func() {
 		}
 	})
 
-	framework.KubeDescribe("Network", func() {
-		Context("when a node becomes unreachable", func() {
+	framework.KubeDescribe("Pods", func() {
+		Context("should return to running and ready state after network partition is healed", func() {
 			BeforeEach(func() {
 				framework.SkipUnlessProviderIs("gce", "gke", "aws")
 				framework.SkipUnlessNodeCountIsAtLeast(2)
-			})
-
-			// TODO marekbiskup 2015-06-19 #10085
-			// This test has nothing to do with resizing nodes so it should be moved elsewhere.
-			// Two things are tested here:
-			// 1. pods from a uncontactable nodes are rescheduled
-			// 2. when a node joins the cluster, it can host new pods.
-			// Factor out the cases into two separate tests.
-			It("[replication controller] recreates pods scheduled on the unreachable node "+
-				"AND allows scheduling of pods on a node after it rejoins the cluster", func() {
-
-				// Create a replication controller for a service that serves its hostname.
-				// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
-				name := "my-hostname-net"
-				newSVCByName(c, ns, name)
-				replicas := int32(framework.TestContext.CloudConfig.NumNodes)
-				newRCByName(c, ns, name, replicas)
-				err := framework.VerifyPods(c, ns, name, true, replicas)
-				Expect(err).NotTo(HaveOccurred(), "Each pod should start running and responding")
-
-				By("choose a node with at least one pod - we will block some network traffic on this node")
-				label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-				options := api.ListOptions{LabelSelector: label}
-				pods, err := c.Core().Pods(ns).List(options) // list pods after all have been scheduled
-				Expect(err).NotTo(HaveOccurred())
-				nodeName := pods.Items[0].Spec.NodeName
-
-				node, err := c.Core().Nodes().Get(nodeName)
-				Expect(err).NotTo(HaveOccurred())
-
-				By(fmt.Sprintf("block network traffic from node %s", node.Name))
-				performTemporaryNetworkFailure(c, ns, name, replicas, pods.Items[0].Name, node)
-				framework.Logf("Waiting %v for node %s to be ready once temporary network failure ends", resizeNodeReadyTimeout, node.Name)
-				if !framework.WaitForNodeToBeReady(c, node.Name, resizeNodeReadyTimeout) {
-					framework.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
-				}
-
-				// sleep a bit, to allow Watch in NodeController to catch up.
-				time.Sleep(5 * time.Second)
-
-				By("verify whether new pods can be created on the re-attached node")
-				// increasing the RC size is not a valid way to test this
-				// since we have no guarantees the pod will be scheduled on our node.
-				additionalPod := "additionalpod"
-				err = newPodOnNode(c, ns, additionalPod, node.Name)
-				Expect(err).NotTo(HaveOccurred())
-				err = framework.VerifyPods(c, ns, additionalPod, true, 1)
-				Expect(err).NotTo(HaveOccurred())
-
-				// verify that it is really on the requested node
-				{
-					pod, err := c.Core().Pods(ns).Get(additionalPod)
-					Expect(err).NotTo(HaveOccurred())
-					if pod.Spec.NodeName != node.Name {
-						framework.Logf("Pod %s found on invalid node: %s instead of %s", pod.Name, pod.Spec.NodeName, node.Name)
-					}
-				}
 			})
 
 			// What happens in this test:
@@ -349,11 +248,117 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive]", func() {
 		})
 	})
 
-	framework.KubeDescribe("PetSet should behave correctly during network disruptions [Slow] [Disruptive] [Feature:PetSet]", func() {
-		f := framework.NewDefaultFramework("pet-set-node-restart")
-		var c clientset.Interface
-		var ns string
+	framework.KubeDescribe("[ReplicationController]", func() {
+		It("should recreate pods scheduled on the unreachable node "+
+			"AND allow scheduling of pods on a node after it rejoins the cluster", func() {
 
+			// Create a replication controller for a service that serves its hostname.
+			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
+			name := "my-hostname-net"
+			newSVCByName(c, ns, name)
+			replicas := int32(framework.TestContext.CloudConfig.NumNodes)
+			newRCByName(c, ns, name, replicas, nil)
+			err := framework.VerifyPods(c, ns, name, true, replicas)
+			Expect(err).NotTo(HaveOccurred(), "Each pod should start running and responding")
+
+			By("choose a node with at least one pod - we will block some network traffic on this node")
+			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
+			options := api.ListOptions{LabelSelector: label}
+			pods, err := c.Core().Pods(ns).List(options) // list pods after all have been scheduled
+			Expect(err).NotTo(HaveOccurred())
+			nodeName := pods.Items[0].Spec.NodeName
+
+			node, err := c.Core().Nodes().Get(nodeName)
+			Expect(err).NotTo(HaveOccurred())
+
+			// This creates a temporary network partition, verifies that 'podNameToDisappear',
+			// that belongs to replication controller 'rcName', really disappeared (because its
+			// grace period is set to 0).
+			// Finally, it checks that the replication controller recreates the
+			// pods on another node and that now the number of replicas is equal 'replicas'.
+			By(fmt.Sprintf("blocking network traffic from node %s", node.Name))
+			testUnderTemporaryNetworkFailure(c, ns, node, func() {
+				framework.Logf("Waiting for pod %s to be removed", pods.Items[0].Name)
+				err := framework.WaitForRCPodToDisappear(c, ns, name, pods.Items[0].Name)
+				Expect(err).NotTo(HaveOccurred())
+
+				By("verifying whether the pod from the unreachable node is recreated")
+				err = framework.VerifyPods(c, ns, name, true, replicas)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			framework.Logf("Waiting %v for node %s to be ready once temporary network failure ends", resizeNodeReadyTimeout, node.Name)
+			if !framework.WaitForNodeToBeReady(c, node.Name, resizeNodeReadyTimeout) {
+				framework.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
+			}
+
+			// sleep a bit, to allow Watch in NodeController to catch up.
+			time.Sleep(5 * time.Second)
+
+			By("verify whether new pods can be created on the re-attached node")
+			// increasing the RC size is not a valid way to test this
+			// since we have no guarantees the pod will be scheduled on our node.
+			additionalPod := "additionalpod"
+			err = newPodOnNode(c, ns, additionalPod, node.Name)
+			Expect(err).NotTo(HaveOccurred())
+			err = framework.VerifyPods(c, ns, additionalPod, true, 1)
+			Expect(err).NotTo(HaveOccurred())
+
+			// verify that it is really on the requested node
+			{
+				pod, err := c.Core().Pods(ns).Get(additionalPod)
+				Expect(err).NotTo(HaveOccurred())
+				if pod.Spec.NodeName != node.Name {
+					framework.Logf("Pod %s found on invalid node: %s instead of %s", pod.Name, pod.Spec.NodeName, node.Name)
+				}
+			}
+		})
+
+		It("should eagerly create replacement pod during network partition when termination grace is non-zero", func() {
+			// Create a replication controller for a service that serves its hostname.
+			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
+			name := "my-hostname-net"
+
+			newSVCByName(c, ns, name)
+			replicas := int32(framework.TestContext.CloudConfig.NumNodes)
+			newRCByName(c, ns, name, replicas, to.Int64Ptr(30))
+			err := framework.VerifyPods(c, ns, name, true, replicas)
+			Expect(err).NotTo(HaveOccurred(), "Each pod should start running and responding")
+
+			By("choose a node with at least one pod - we will block some network traffic on this node")
+			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
+			options := api.ListOptions{LabelSelector: label}
+			pods, err := c.Core().Pods(ns).List(options) // list pods after all have been scheduled
+			Expect(err).NotTo(HaveOccurred())
+			nodeName := pods.Items[0].Spec.NodeName
+
+			node, err := c.Core().Nodes().Get(nodeName)
+			Expect(err).NotTo(HaveOccurred())
+
+			// This creates a temporary network partition, verifies that 'podNameToDisappear',
+			// that belongs to replication controller 'rcName', did not disappear (because its
+			// grace period is set to 30).
+			// Finally, it checks that the replication controller recreates the
+			// pods on another node and that now the number of replicas is equal 'replicas + 1'.
+			By(fmt.Sprintf("blocking network traffic from node %s", node.Name))
+			testUnderTemporaryNetworkFailure(c, ns, node, func() {
+				framework.Logf("Waiting for pod %s to be removed", pods.Items[0].Name)
+				err := framework.WaitForRCPodToDisappear(c, ns, name, pods.Items[0].Name)
+				Expect(err).To(Equal(wait.ErrWaitTimeout), "Pod was not deleted during network partition.")
+
+				By(fmt.Sprintf("verifying that there are %v running pods during partition", replicas))
+				_, err = framework.PodsCreated(c, ns, name, replicas)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			framework.Logf("Waiting %v for node %s to be ready once temporary network failure ends", resizeNodeReadyTimeout, node.Name)
+			if !framework.WaitForNodeToBeReady(c, node.Name, resizeNodeReadyTimeout) {
+				framework.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
+			}
+		})
+	})
+
+	framework.KubeDescribe("[StatefulSet]", func() {
 		psName := "pet"
 		labels := map[string]string{
 			"foo": "bar",
@@ -409,10 +414,65 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive]", func() {
 			node, err := c.Core().Nodes().Get(pod.Spec.NodeName)
 			framework.ExpectNoError(err)
 
-			simulateStatefulSetNodeFailure(c, ns, pod.Name, pod.ResourceVersion, node)
+			// Blocks outgoing network traffic on 'node'. Then verifies that 'podNameToDisappear',
+			// that belongs to StatefulSet 'petSetName', **does not** disappear due to forced deletion from the apiserver.
+			// The grace period on the petset pods is set to a value > 0.
+			testUnderTemporaryNetworkFailure(c, ns, node, func() {
+				framework.Logf("Checking that the NodeController does not force delete pet %v", pod.Name)
+				err := framework.WaitTimeoutForPodNoLongerRunningInNamespace(c, pod.Name, ns, pod.ResourceVersion, 10*time.Minute)
+				Expect(err).To(Equal(wait.ErrWaitTimeout), "Pod was not deleted during network partition.")
+			})
+
+			framework.Logf("Waiting %v for node %s to be ready once temporary network failure ends", resizeNodeReadyTimeout, node.Name)
+			if !framework.WaitForNodeToBeReady(c, node.Name, resizeNodeReadyTimeout) {
+				framework.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
+			}
 
 			By("waiting for pods to be running again")
 			pst.waitForRunning(ps.Spec.Replicas, ps)
+		})
+	})
+
+	framework.KubeDescribe("[Job]", func() {
+		It("should create new pod when node is partitioned", func() {
+			parallelism := int32(2)
+			completions := int32(4)
+
+			job := newTestJob("notTerminate", "network-partition", api.RestartPolicyNever, parallelism, completions)
+			job, err := createJob(f.ClientSet, f.Namespace.Name, job)
+			Expect(err).NotTo(HaveOccurred())
+			label := labels.SelectorFromSet(labels.Set(map[string]string{jobSelectorKey: job.Name}))
+
+			By(fmt.Sprintf("verifying that there are now %v running pods", parallelism))
+			_, err = framework.PodsCreatedByLabel(c, ns, job.Name, parallelism, label)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("choose a node with at least one pod - we will block some network traffic on this node")
+			options := api.ListOptions{LabelSelector: label}
+			pods, err := c.Core().Pods(ns).List(options) // list pods after all have been scheduled
+			Expect(err).NotTo(HaveOccurred())
+			nodeName := pods.Items[0].Spec.NodeName
+
+			node, err := c.Core().Nodes().Get(nodeName)
+			Expect(err).NotTo(HaveOccurred())
+
+			// This creates a temporary network partition, verifies that the job can go onto to completion
+			// even when the parallelism
+			By(fmt.Sprintf("blocking network traffic from node %s", node.Name))
+			testUnderTemporaryNetworkFailure(c, ns, node, func() {
+				framework.Logf("Waiting for pod %s to be removed", pods.Items[0].Name)
+				err := framework.WaitForPodToDisappear(c, ns, pods.Items[0].Name, label, 20*time.Second, 10*time.Minute)
+				Expect(err).NotTo(HaveOccurred())
+
+				By(fmt.Sprintf("verifying that there are now %v running pods", parallelism))
+				_, err = framework.PodsCreatedByLabel(c, ns, job.Name, parallelism, label)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			framework.Logf("Waiting %v for node %s to be ready once temporary network failure ends", resizeNodeReadyTimeout, node.Name)
+			if !framework.WaitForNodeToBeReady(c, node.Name, resizeNodeReadyTimeout) {
+				framework.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
+			}
 		})
 	})
 })
