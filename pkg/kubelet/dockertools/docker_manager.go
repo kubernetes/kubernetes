@@ -28,6 +28,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -57,7 +58,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/runtime"
+	kruntime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	kubetypes "k8s.io/kubernetes/pkg/types"
@@ -606,7 +607,7 @@ func (dm *DockerManager) runContainer(
 		// TODO: This is kind of hacky, we should really just encode the bits we need.
 		// TODO: This is hacky because the Kubelet should be parameterized to encode a specific version
 		//   and needs to be able to migrate this whenever we deprecate v1. Should be a member of DockerManager.
-		if data, err := runtime.Encode(api.Codecs.LegacyCodec(unversioned.GroupVersion{Group: api.GroupName, Version: "v1"}), pod); err == nil {
+		if data, err := kruntime.Encode(api.Codecs.LegacyCodec(unversioned.GroupVersion{Group: api.GroupName, Version: "v1"}), pod); err == nil {
 			labels[kubernetesPodLabel] = string(data)
 		} else {
 			glog.Errorf("Failed to encode pod: %s for prestop hook", pod.Name)
@@ -675,6 +676,12 @@ func (dm *DockerManager) runContainer(
 			Devices:    devices,
 		},
 		SecurityOpt: fmtSecurityOpts,
+	}
+
+	// There is no /etc/resolv.conf in Windows, DNS and DNSSearch options would have to be passed to Docker runtime instead
+	if runtime.GOOS == "windows" {
+		hc.DNS = opts.DNS
+		hc.DNSSearch = opts.DNSSearch
 	}
 
 	// Set sysctls if requested
@@ -1586,7 +1593,7 @@ func containerAndPodFromLabels(inspect *dockertypes.ContainerJSON) (pod *api.Pod
 	// the pod data may not be set
 	if body, found := labels[kubernetesPodLabel]; found {
 		pod = &api.Pod{}
-		if err = runtime.DecodeInto(api.Codecs.UniversalDecoder(), []byte(body), pod); err == nil {
+		if err = kruntime.DecodeInto(api.Codecs.UniversalDecoder(), []byte(body), pod); err == nil {
 			name := labels[types.KubernetesContainerNameLabel]
 			for ix := range pod.Spec.Containers {
 				if pod.Spec.Containers[ix].Name == name {
