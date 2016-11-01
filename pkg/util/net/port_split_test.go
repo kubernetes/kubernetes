@@ -28,16 +28,18 @@ func TestSplitSchemeNamePort(t *testing.T) {
 		normalized         bool
 	}{
 		{
-			in:    "aoeu:asdf",
-			name:  "aoeu",
-			port:  "asdf",
-			valid: true,
+			in:         "aoeu:asdf",
+			name:       "aoeu",
+			port:       "asdf",
+			valid:      true,
+			normalized: true,
 		}, {
-			in:     "http:aoeu:asdf",
-			scheme: "http",
-			name:   "aoeu",
-			port:   "asdf",
-			valid:  true,
+			in:         "http:aoeu:asdf",
+			scheme:     "http",
+			name:       "aoeu",
+			port:       "asdf",
+			valid:      true,
+			normalized: true,
 		}, {
 			in:         "https:aoeu:",
 			scheme:     "https",
@@ -46,16 +48,22 @@ func TestSplitSchemeNamePort(t *testing.T) {
 			valid:      true,
 			normalized: false,
 		}, {
-			in:     "https:aoeu:asdf",
-			scheme: "https",
-			name:   "aoeu",
-			port:   "asdf",
-			valid:  true,
+			in:         "https:aoeu:asdf",
+			scheme:     "https",
+			name:       "aoeu",
+			port:       "asdf",
+			valid:      true,
+			normalized: true,
 		}, {
 			in:         "aoeu:",
 			name:       "aoeu",
 			valid:      true,
 			normalized: false,
+		}, {
+			in:         "aoeu",
+			name:       "aoeu",
+			valid:      true,
+			normalized: true,
 		}, {
 			in:    ":asdf",
 			valid: false,
@@ -63,9 +71,11 @@ func TestSplitSchemeNamePort(t *testing.T) {
 			in:    "aoeu:asdf:htns",
 			valid: false,
 		}, {
-			in:    "aoeu",
-			name:  "aoeu",
-			valid: true,
+			in:    "http::asdf",
+			valid: false,
+		}, {
+			in:    "http::",
+			valid: false,
 		}, {
 			in:    "",
 			valid: false,
