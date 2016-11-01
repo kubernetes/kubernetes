@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package scheduledjob provides Registry interface and it's RESTStorage
+// Package cronjob provides Registry interface and it's RESTStorage
 // implementation for storing ScheduledJob api objects.
-package scheduledjob // import "k8s.io/kubernetes/pkg/registry/batch/scheduledjob"
+package cronjob // import "k8s.io/kubernetes/pkg/registry/batch/cronjob"

@@ -81,7 +81,7 @@ var (
 		# Start the perl container to compute π to 2000 places and print it out.
 		kubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'
 
-		# Start the scheduled job to compute π to 2000 places and print it out every 5 minutes.
+		# Start the cron job to compute π to 2000 places and print it out every 5 minutes.
 		kubectl run pi --schedule="0/5 * * * ?" --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'`)
 )
 
@@ -197,7 +197,7 @@ func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobr
 	generatorName := cmdutil.GetFlagString(cmd, "generator")
 	schedule := cmdutil.GetFlagString(cmd, "schedule")
 	if len(schedule) != 0 && len(generatorName) == 0 {
-		generatorName = "scheduledjob/v2alpha1"
+		generatorName = "cronjob/v2alpha1"
 	}
 	if len(generatorName) == 0 {
 		clientset, err := f.ClientSet()

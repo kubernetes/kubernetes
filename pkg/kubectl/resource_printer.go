@@ -477,7 +477,7 @@ var (
 	replicationControllerColumns = []string{"NAME", "DESIRED", "CURRENT", "READY", "AGE"}
 	replicaSetColumns            = []string{"NAME", "DESIRED", "CURRENT", "READY", "AGE"}
 	jobColumns                   = []string{"NAME", "DESIRED", "SUCCESSFUL", "AGE"}
-	scheduledJobColumns          = []string{"NAME", "SCHEDULE", "SUSPEND", "ACTIVE", "LAST-SCHEDULE"}
+	cronJobColumns               = []string{"NAME", "SCHEDULE", "SUSPEND", "ACTIVE", "LAST-SCHEDULE"}
 	serviceColumns               = []string{"NAME", "CLUSTER-IP", "EXTERNAL-IP", "PORT(S)", "AGE"}
 	ingressColumns               = []string{"NAME", "HOSTS", "ADDRESS", "PORTS", "AGE"}
 	statefulSetColumns           = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
@@ -544,8 +544,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(daemonSetColumns, printDaemonSetList)
 	h.Handler(jobColumns, printJob)
 	h.Handler(jobColumns, printJobList)
-	h.Handler(scheduledJobColumns, printScheduledJob)
-	h.Handler(scheduledJobColumns, printScheduledJobList)
+	h.Handler(cronJobColumns, printCronJob)
+	h.Handler(cronJobColumns, printCronJobList)
 	h.Handler(serviceColumns, printService)
 	h.Handler(serviceColumns, printServiceList)
 	h.Handler(ingressColumns, printIngress)
@@ -1028,9 +1028,9 @@ func printJobList(list *batch.JobList, w io.Writer, options PrintOptions) error 
 	return nil
 }
 
-func printScheduledJob(scheduledJob *batch.ScheduledJob, w io.Writer, options PrintOptions) error {
-	name := scheduledJob.Name
-	namespace := scheduledJob.Namespace
+func printCronJob(cronJob *batch.CronJob, w io.Writer, options PrintOptions) error {
+	name := cronJob.Name
+	namespace := cronJob.Namespace
 
 	if options.WithNamespace {
 		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
@@ -1039,14 +1039,14 @@ func printScheduledJob(scheduledJob *batch.ScheduledJob, w io.Writer, options Pr
 	}
 
 	lastScheduleTime := "<none>"
-	if scheduledJob.Status.LastScheduleTime != nil {
-		lastScheduleTime = scheduledJob.Status.LastScheduleTime.Time.Format(time.RFC1123Z)
+	if cronJob.Status.LastScheduleTime != nil {
+		lastScheduleTime = cronJob.Status.LastScheduleTime.Time.Format(time.RFC1123Z)
 	}
 	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\n",
 		name,
-		scheduledJob.Spec.Schedule,
-		printBoolPtr(scheduledJob.Spec.Suspend),
-		len(scheduledJob.Status.Active),
+		cronJob.Spec.Schedule,
+		printBoolPtr(cronJob.Spec.Suspend),
+		len(cronJob.Status.Active),
 		lastScheduleTime,
 	); err != nil {
 		return err
@@ -1055,9 +1055,9 @@ func printScheduledJob(scheduledJob *batch.ScheduledJob, w io.Writer, options Pr
 	return nil
 }
 
-func printScheduledJobList(list *batch.ScheduledJobList, w io.Writer, options PrintOptions) error {
-	for _, scheduledJob := range list.Items {
-		if err := printScheduledJob(&scheduledJob, w, options); err != nil {
+func printCronJobList(list *batch.CronJobList, w io.Writer, options PrintOptions) error {
+	for _, cronJob := range list.Items {
+		if err := printCronJob(&cronJob, w, options); err != nil {
 			return err
 		}
 	}

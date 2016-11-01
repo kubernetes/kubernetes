@@ -18,7 +18,7 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/api/rest:go_default_library",
         "//pkg/apis/batch:go_default_library",
-        "//pkg/registry/batch/scheduledjob:go_default_library",
+        "//pkg/registry/batch/cronjob:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/generic:go_default_library",
         "//pkg/registry/generic/registry:go_default_library",

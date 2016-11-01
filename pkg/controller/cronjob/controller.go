@@ -14,13 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduledjob
+package cronjob
 
 /*
 I did not use watch or expectations.  Those add a lot of corner cases, and we aren't
 expecting a large volume of jobs or scheduledJobs.  (We are favoring correctness
 over scalability.  If we find a single controller thread is too slow because
-there are a lot of Jobs or ScheduledJobs, we we can parallelize by Namespace.
+there are a lot of Jobs or CronJobs, we we can parallelize by Namespace.
 If we find the load on the API server is too high, we can use a watch and
 UndeltaStore.)
 
@@ -49,9 +49,9 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
-// Utilities for dealing with Jobs and ScheduledJobs and time.
+// Utilities for dealing with Jobs and CronJobs and time.
 
-type ScheduledJobController struct {
+type CronJobController struct {
 	kubeClient clientset.Interface
 	jobControl jobControlInterface
 	sjControl  sjControlInterface
@@ -59,51 +59,51 @@ type ScheduledJobController struct {
 	recorder   record.EventRecorder
 }
 
-func NewScheduledJobController(kubeClient clientset.Interface) *ScheduledJobController {
+func NewCronJobController(kubeClient clientset.Interface) *CronJobController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
 	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: kubeClient.Core().Events("")})
 
 	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("scheduledjob_controller", kubeClient.Core().RESTClient().GetRateLimiter())
+		metrics.RegisterMetricAndTrackRateLimiterUsage("cronjob_controller", kubeClient.Core().RESTClient().GetRateLimiter())
 	}
 
-	jm := &ScheduledJobController{
+	jm := &CronJobController{
 		kubeClient: kubeClient,
 		jobControl: realJobControl{KubeClient: kubeClient},
 		sjControl:  &realSJControl{KubeClient: kubeClient},
 		podControl: &realPodControl{KubeClient: kubeClient},
-		recorder:   eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduledjob-controller"}),
+		recorder:   eventBroadcaster.NewRecorder(api.EventSource{Component: "cronjob-controller"}),
 	}
 
 	return jm
 }
 
-func NewScheduledJobControllerFromClient(kubeClient clientset.Interface) *ScheduledJobController {
-	jm := NewScheduledJobController(kubeClient)
+func NewCronJobControllerFromClient(kubeClient clientset.Interface) *CronJobController {
+	jm := NewCronJobController(kubeClient)
 	return jm
 }
 
 // Run the main goroutine responsible for watching and syncing jobs.
-func (jm *ScheduledJobController) Run(stopCh <-chan struct{}) {
+func (jm *CronJobController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
-	glog.Infof("Starting ScheduledJob Manager")
+	glog.Infof("Starting CronJob Manager")
 	// Check things every 10 second.
 	go wait.Until(jm.SyncAll, 10*time.Second, stopCh)
 	<-stopCh
-	glog.Infof("Shutting down ScheduledJob Manager")
+	glog.Infof("Shutting down CronJob Manager")
 }
 
-// SyncAll lists all the ScheduledJobs and Jobs and reconciles them.
-func (jm *ScheduledJobController) SyncAll() {
-	sjl, err := jm.kubeClient.Batch().ScheduledJobs(api.NamespaceAll).List(api.ListOptions{})
+// SyncAll lists all the CronJobs and Jobs and reconciles them.
+func (jm *CronJobController) SyncAll() {
+	sjl, err := jm.kubeClient.Batch().CronJobs(api.NamespaceAll).List(api.ListOptions{})
 	if err != nil {
-		glog.Errorf("Error listing scheduledjobs: %v", err)
+		glog.Errorf("Error listing cronjobs: %v", err)
 		return
 	}
 	sjs := sjl.Items
-	glog.V(4).Infof("Found %d scheduledjobs", len(sjs))
+	glog.V(4).Infof("Found %d cronjobs", len(sjs))
 
 	jl, err := jm.kubeClient.Batch().Jobs(api.NamespaceAll).List(api.ListOptions{})
 	if err != nil {
@@ -121,11 +121,11 @@ func (jm *ScheduledJobController) SyncAll() {
 	}
 }
 
-// SyncOne reconciles a ScheduledJob with a list of any Jobs that it created.
+// SyncOne reconciles a CronJob with a list of any Jobs that it created.
 // All known jobs created by "sj" should be included in "js".
 // The current time is passed in to facilitate testing.
 // It has no receiver, to facilitate testing.
-func SyncOne(sj batch.ScheduledJob, js []batch.Job, now time.Time, jc jobControlInterface, sjc sjControlInterface, pc podControlInterface, recorder record.EventRecorder) {
+func SyncOne(sj batch.CronJob, js []batch.Job, now time.Time, jc jobControlInterface, sjc sjControlInterface, pc podControlInterface, recorder record.EventRecorder) {
 	nameForLog := fmt.Sprintf("%s/%s", sj.Namespace, sj.Name)
 
 	for i := range js {

@@ -401,9 +401,9 @@ func (JobV1) Generate(genericParams map[string]interface{}) (runtime.Object, err
 	return &job, nil
 }
 
-type ScheduledJobV2Alpha1 struct{}
+type CronJobV2Alpha1 struct{}
 
-func (ScheduledJobV2Alpha1) ParamNames() []GeneratorParam {
+func (CronJobV2Alpha1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"labels", false},
 		{"default-name", false},
@@ -425,7 +425,7 @@ func (ScheduledJobV2Alpha1) ParamNames() []GeneratorParam {
 	}
 }
 
-func (ScheduledJobV2Alpha1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
+func (CronJobV2Alpha1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
 	args, err := getArgs(genericParams)
 	if err != nil {
 		return nil, err
@@ -477,12 +477,12 @@ func (ScheduledJobV2Alpha1) Generate(genericParams map[string]interface{}) (runt
 	}
 	podSpec.RestartPolicy = restartPolicy
 
-	scheduledJob := batchv2alpha1.ScheduledJob{
+	cronJob := batchv2alpha1.CronJob{
 		ObjectMeta: v1.ObjectMeta{
 			Name:   name,
 			Labels: labels,
 		},
-		Spec: batchv2alpha1.ScheduledJobSpec{
+		Spec: batchv2alpha1.CronJobSpec{
 			Schedule:          params["schedule"],
 			ConcurrencyPolicy: batchv2alpha1.AllowConcurrent,
 			JobTemplate: batchv2alpha1.JobTemplateSpec{
@@ -498,7 +498,7 @@ func (ScheduledJobV2Alpha1) Generate(genericParams map[string]interface{}) (runt
 		},
 	}
 
-	return &scheduledJob, nil
+	return &cronJob, nil
 }
 
 type BasicReplicationController struct{}

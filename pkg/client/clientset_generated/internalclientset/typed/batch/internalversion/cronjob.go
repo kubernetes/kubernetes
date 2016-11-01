@@ -23,34 +23,34 @@ import (
 	watch "k8s.io/kubernetes/pkg/watch"
 )
 
-// ScheduledJobsGetter has a method to return a ScheduledJobInterface.
+// CronJobsGetter has a method to return a CronJobInterface.
 // A group's client should implement this interface.
-type ScheduledJobsGetter interface {
-	ScheduledJobs(namespace string) ScheduledJobInterface
+type CronJobsGetter interface {
+	CronJobs(namespace string) CronJobInterface
 }
 
-// ScheduledJobInterface has methods to work with ScheduledJob resources.
-type ScheduledJobInterface interface {
-	Create(*batch.ScheduledJob) (*batch.ScheduledJob, error)
-	Update(*batch.ScheduledJob) (*batch.ScheduledJob, error)
-	UpdateStatus(*batch.ScheduledJob) (*batch.ScheduledJob, error)
+// CronJobInterface has methods to work with CronJob resources.
+type CronJobInterface interface {
+	Create(*batch.CronJob) (*batch.CronJob, error)
+	Update(*batch.CronJob) (*batch.CronJob, error)
+	UpdateStatus(*batch.CronJob) (*batch.CronJob, error)
 	Delete(name string, options *api.DeleteOptions) error
 	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
-	Get(name string) (*batch.ScheduledJob, error)
-	List(opts api.ListOptions) (*batch.ScheduledJobList, error)
+	Get(name string) (*batch.CronJob, error)
+	List(opts api.ListOptions) (*batch.CronJobList, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *batch.ScheduledJob, err error)
-	ScheduledJobExpansion
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *batch.CronJob, err error)
+	CronJobExpansion
 }
 
-// scheduledJobs implements ScheduledJobInterface
+// scheduledJobs implements CronJobInterface
 type scheduledJobs struct {
 	client restclient.Interface
 	ns     string
 }
 
-// newScheduledJobs returns a ScheduledJobs
-func newScheduledJobs(c *BatchClient, namespace string) *scheduledJobs {
+// newCronJobs returns a CronJobs
+func newCronJobs(c *BatchClient, namespace string) *scheduledJobs {
 	return &scheduledJobs{
 		client: c.RESTClient(),
 		ns:     namespace,
@@ -58,11 +58,11 @@ func newScheduledJobs(c *BatchClient, namespace string) *scheduledJobs {
 }
 
 // Create takes the representation of a scheduledJob and creates it.  Returns the server's representation of the scheduledJob, and an error, if there is any.
-func (c *scheduledJobs) Create(scheduledJob *batch.ScheduledJob) (result *batch.ScheduledJob, err error) {
-	result = &batch.ScheduledJob{}
+func (c *scheduledJobs) Create(scheduledJob *batch.CronJob) (result *batch.CronJob, err error) {
+	result = &batch.CronJob{}
 	err = c.client.Post().
 		Namespace(c.ns).
-		Resource("scheduledjobs").
+		Resource("cronjobs").
 		Body(scheduledJob).
 		Do().
 		Into(result)
@@ -70,11 +70,11 @@ func (c *scheduledJobs) Create(scheduledJob *batch.ScheduledJob) (result *batch.
 }
 
 // Update takes the representation of a scheduledJob and updates it. Returns the server's representation of the scheduledJob, and an error, if there is any.
-func (c *scheduledJobs) Update(scheduledJob *batch.ScheduledJob) (result *batch.ScheduledJob, err error) {
-	result = &batch.ScheduledJob{}
+func (c *scheduledJobs) Update(scheduledJob *batch.CronJob) (result *batch.CronJob, err error) {
+	result = &batch.CronJob{}
 	err = c.client.Put().
 		Namespace(c.ns).
-		Resource("scheduledjobs").
+		Resource("cronjobs").
 		Name(scheduledJob.Name).
 		Body(scheduledJob).
 		Do().
@@ -82,11 +82,11 @@ func (c *scheduledJobs) Update(scheduledJob *batch.ScheduledJob) (result *batch.
 	return
 }
 
-func (c *scheduledJobs) UpdateStatus(scheduledJob *batch.ScheduledJob) (result *batch.ScheduledJob, err error) {
-	result = &batch.ScheduledJob{}
+func (c *scheduledJobs) UpdateStatus(scheduledJob *batch.CronJob) (result *batch.CronJob, err error) {
+	result = &batch.CronJob{}
 	err = c.client.Put().
 		Namespace(c.ns).
-		Resource("scheduledjobs").
+		Resource("cronjobs").
 		Name(scheduledJob.Name).
 		SubResource("status").
 		Body(scheduledJob).
@@ -99,7 +99,7 @@ func (c *scheduledJobs) UpdateStatus(scheduledJob *batch.ScheduledJob) (result *
 func (c *scheduledJobs) Delete(name string, options *api.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("scheduledjobs").
+		Resource("cronjobs").
 		Name(name).
 		Body(options).
 		Do().
@@ -110,7 +110,7 @@ func (c *scheduledJobs) Delete(name string, options *api.DeleteOptions) error {
 func (c *scheduledJobs) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
-		Resource("scheduledjobs").
+		Resource("cronjobs").
 		VersionedParams(&listOptions, api.ParameterCodec).
 		Body(options).
 		Do().
@@ -118,23 +118,23 @@ func (c *scheduledJobs) DeleteCollection(options *api.DeleteOptions, listOptions
 }
 
 // Get takes name of the scheduledJob, and returns the corresponding scheduledJob object, and an error if there is any.
-func (c *scheduledJobs) Get(name string) (result *batch.ScheduledJob, err error) {
-	result = &batch.ScheduledJob{}
+func (c *scheduledJobs) Get(name string) (result *batch.CronJob, err error) {
+	result = &batch.CronJob{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("scheduledjobs").
+		Resource("cronjobs").
 		Name(name).
 		Do().
 		Into(result)
 	return
 }
 
-// List takes label and field selectors, and returns the list of ScheduledJobs that match those selectors.
-func (c *scheduledJobs) List(opts api.ListOptions) (result *batch.ScheduledJobList, err error) {
-	result = &batch.ScheduledJobList{}
+// List takes label and field selectors, and returns the list of CronJobs that match those selectors.
+func (c *scheduledJobs) List(opts api.ListOptions) (result *batch.CronJobList, err error) {
+	result = &batch.CronJobList{}
 	err = c.client.Get().
 		Namespace(c.ns).
-		Resource("scheduledjobs").
+		Resource("cronjobs").
 		VersionedParams(&opts, api.ParameterCodec).
 		Do().
 		Into(result)
@@ -146,17 +146,17 @@ func (c *scheduledJobs) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).
-		Resource("scheduledjobs").
+		Resource("cronjobs").
 		VersionedParams(&opts, api.ParameterCodec).
 		Watch()
 }
 
 // Patch applies the patch and returns the patched scheduledJob.
-func (c *scheduledJobs) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *batch.ScheduledJob, err error) {
-	result = &batch.ScheduledJob{}
+func (c *scheduledJobs) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *batch.CronJob, err error) {
+	result = &batch.CronJob{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
-		Resource("scheduledjobs").
+		Resource("cronjobs").
 		SubResource(subresources...).
 		Name(name).
 		Body(data).

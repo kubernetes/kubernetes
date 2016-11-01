@@ -18,4 +18,4 @@ package internalversion
 
 type JobExpansion interface{}
 
-type ScheduledJobExpansion interface{}
+type CronJobExpansion interface{}

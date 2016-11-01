@@ -40,8 +40,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&Job{},
 		&JobList{},
 		&JobTemplate{},
-		&ScheduledJob{},
-		&ScheduledJobList{},
+		&CronJob{},
+		&CronJobList{},
 		&v1.ListOptions{},
 		&v1.DeleteOptions{},
 	)
