@@ -33,6 +33,7 @@ go_library(
         "//federation/pkg/federation-controller/service:go_default_library",
         "//federation/pkg/federation-controller/util:go_default_library",
         "//pkg/client/typed/discovery:go_default_library",
+        "//pkg/client/typed/dynamic:go_default_library",
         "//pkg/util/config:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//pkg/version:go_default_library",
