@@ -98,21 +98,21 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 		}
 	}
 
+	// TODO(phase1+) this we are missing args from the help text, there should be a way to tell cobra about it
+	if len(args) == 0 && len(cfg.MasterAddresses) == 0 {
+		return nil, fmt.Errorf("must specify master IP address (see --help)")
+	}
+	cfg.MasterAddresses = append(cfg.MasterAddresses, args...)
+
 	if !skipPreFlight {
 		fmt.Println("Running pre-flight checks")
-		err := preflight.RunJoinNodeChecks()
+		err := preflight.RunJoinNodeChecks(cfg)
 		if err != nil {
 			return nil, &preflight.PreFlightError{Msg: err.Error()}
 		}
 	} else {
 		fmt.Println("Skipping pre-flight checks")
 	}
-
-	// TODO(phase1+) this we are missing args from the help text, there should be a way to tell cobra about it
-	if len(args) == 0 && len(cfg.MasterAddresses) == 0 {
-		return nil, fmt.Errorf("must specify master IP address (see --help)")
-	}
-	cfg.MasterAddresses = append(cfg.MasterAddresses, args...)
 
 	ok, err := kubeadmutil.UseGivenTokenIfValid(&cfg.Secrets)
 	if !ok {
