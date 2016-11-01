@@ -208,6 +208,10 @@ type FsStats struct {
 	// Inodes represents the total inodes in the filesystem.
 	// +optional
 	Inodes *uint64 `json:"inodes,omitempty"`
+	// InodesUsed represents the inodes used by the filesystem
+	// This may not equal Inodes - InodesFree because this filesystem may share inodes with other "filesystems"
+	// e.g. For ContainerStats.Rootfs, this is the inodes used only by that container, and does not count inodes used by other containers.
+	InodesUsed *uint64 `json:"inodesUsed,omitempty"`
 }
 
 // UserDefinedMetricType defines how the metric should be interpreted by the user.
