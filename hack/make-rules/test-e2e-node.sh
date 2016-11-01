@@ -38,11 +38,11 @@ if [[ $parallelism > 1 ]]; then
 fi
 
 if [[ $focus != "" ]]; then
-  ginkgoflags="$ginkgoflags -focus=$focus "
+  ginkgoflags="$ginkgoflags -focus='$focus' "
 fi
 
 if [[ $skip != "" ]]; then
-  ginkgoflags="$ginkgoflags -skip=$skip "
+  ginkgoflags="$ginkgoflags -skip='$skip' "
 fi
 
 if [[ $run_until_failure != "" ]]; then
@@ -130,7 +130,7 @@ if [ $remote = true ] ; then
     --results-dir="$artifacts" --ginkgo-flags="$ginkgoflags" \
     --image-project="$image_project" --instance-name-prefix="$instance_prefix" --setup-node="true" \
     --delete-instances="$delete_instances" --test_args="$test_args" --instance-metadata="$metadata" \
-    2>&1 | tee "${artifacts}/build-log.txt"
+    2>&1 | tee -i "${artifacts}/build-log.txt"
   exit $?
 
 else
@@ -149,6 +149,6 @@ else
   # Provided for backwards compatibility
   go run test/e2e_node/runner/local/run_local.go --ginkgo-flags="$ginkgoflags" \
     --test-flags="--alsologtostderr --v 4 --report-dir=${artifacts} --node-name $(hostname) \
-    $test_args" --build-dependencies=true 2>&1 | tee "${artifacts}/build-log.txt"
+    $test_args" --build-dependencies=true 2>&1 | tee -i "${artifacts}/build-log.txt"
   exit $?
 fi
