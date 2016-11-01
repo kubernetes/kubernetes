@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	kcmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
@@ -61,7 +61,7 @@ func handlePodUpdateError(out io.Writer, err error, resource string) {
 				return
 			}
 		} else {
-			if ok := kcmdutil.PrintErrorWithCauses(err, out); ok {
+			if ok := cmdutil.PrintErrorWithCauses(err, out); ok {
 				return
 			}
 		}
@@ -120,8 +120,14 @@ type Patch struct {
 // CalculatePatches calls the mutation function on each provided info object, and generates a strategic merge patch for
 // the changes in the object. Encoder must be able to encode the info into the appropriate destination type. If mutateFn
 // returns false, the object is not included in the final list of patches.
-func CalculatePatches(infos []*resource.Info, encoder runtime.Encoder, mutateFn func(*resource.Info) (bool, error)) []*Patch {
+func CalculatePatches(f cmdutil.Factory, infos []*resource.Info, encoder runtime.Encoder, mutateFn func(*resource.Info) (bool, error)) []*Patch {
 	var patches []*Patch
+
+	ifUseNewPatchBehavior, err := cmdutil.TryToRunIfUseNewBehaviorForPatch(f)
+	if err != nil {
+		return patches
+	}
+
 	for _, info := range infos {
 		patch := &Patch{Info: info}
 		patch.Before, patch.Err = runtime.Encode(encoder, info.Object)
@@ -156,7 +162,7 @@ func CalculatePatches(infos []*resource.Info, encoder runtime.Encoder, mutateFn 
 			continue
 		}
 
-		patch.Patch, patch.Err = strategicpatch.CreateTwoWayMergePatch(patch.Before, patch.After, versioned)
+		patch.Patch, patch.Err = strategicpatch.CreateTwoWayMergePatch(patch.Before, patch.After, versioned, ifUseNewPatchBehavior)
 	}
 	return patches
 }

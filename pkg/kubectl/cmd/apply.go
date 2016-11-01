@@ -159,6 +159,11 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *App
 	visitedNamespacedRESTMappings := map[unversioned.GroupVersionKind]*meta.RESTMapping{}
 	visitedNonNamespacedRESTMappings := map[unversioned.GroupVersionKind]*meta.RESTMapping{}
 
+	ifUseNewPatchBehavior, err := cmdutil.TryToRunIfUseNewBehaviorForPatch(f)
+	if err != nil {
+		return err
+	}
+
 	count := 0
 	err = r.Visit(func(info *resource.Info, err error) error {
 		// In this method, info.Object contains the object retrieved from the server
@@ -218,15 +223,15 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *App
 		if !dryRun {
 			overwrite := cmdutil.GetFlagBool(cmd, "overwrite")
 			helper := resource.NewHelper(info.Client, info.Mapping)
-			patcher := NewPatcher(encoder, decoder, info.Mapping, helper, overwrite)
+			patcher := NewPatcher(encoder, decoder, info.Mapping, helper, f, overwrite)
 
-			patchBytes, err := patcher.patch(info.Object, modified, info.Source, info.Namespace, info.Name)
+			patchBytes, err := patcher.patch(info.Object, modified, info.Source, info.Namespace, info.Name, ifUseNewPatchBehavior)
 			if err != nil {
 				return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patchBytes, info), info.Source, err)
 			}
 
 			if cmdutil.ShouldRecord(cmd, info) {
-				patch, err := cmdutil.ChangeResourcePatch(info, f.Command())
+				patch, err := cmdutil.ChangeResourcePatch(info, f.Command(), ifUseNewPatchBehavior)
 				if err != nil {
 					return err
 				}
@@ -376,23 +381,25 @@ type patcher struct {
 
 	mapping *meta.RESTMapping
 	helper  *resource.Helper
+	f       cmdutil.Factory
 
 	overwrite bool
 	backOff   clockwork.Clock
 }
 
-func NewPatcher(encoder runtime.Encoder, decoder runtime.Decoder, mapping *meta.RESTMapping, helper *resource.Helper, overwrite bool) *patcher {
+func NewPatcher(encoder runtime.Encoder, decoder runtime.Decoder, mapping *meta.RESTMapping, helper *resource.Helper, f cmdutil.Factory, overwrite bool) *patcher {
 	return &patcher{
 		encoder:   encoder,
 		decoder:   decoder,
 		mapping:   mapping,
 		helper:    helper,
+		f:         f,
 		overwrite: overwrite,
 		backOff:   clockwork.NewRealClock(),
 	}
 }
 
-func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, namespace, name string) ([]byte, error) {
+func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, namespace, name string, ifUseNewPatchBehavior bool) ([]byte, error) {
 	// Serialize the current configuration of the object from the server.
 	current, err := runtime.Encode(p.encoder, obj)
 	if err != nil {
@@ -416,7 +423,8 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 	}
 
 	// Compute a three way strategic merge patch to send to server.
-	patch, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, versionedObject, p.overwrite)
+	patch, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, versionedObject, p.overwrite, ifUseNewPatchBehavior)
+
 	if err != nil {
 		format := "creating patch with:\noriginal:\n%s\nmodified:\n%s\ncurrent:\n%s\nfor:"
 		return nil, cmdutil.AddSourceToErr(fmt.Sprintf(format, original, modified, current), source, err)
@@ -426,9 +434,9 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 	return patch, err
 }
 
-func (p *patcher) patch(current runtime.Object, modified []byte, source, namespace, name string) ([]byte, error) {
+func (p *patcher) patch(current runtime.Object, modified []byte, source, namespace, name string, ifUseNewPatchBehavior bool) ([]byte, error) {
 	var getErr error
-	patchBytes, err := p.patchSimple(current, modified, source, namespace, name)
+	patchBytes, err := p.patchSimple(current, modified, source, namespace, name, ifUseNewPatchBehavior)
 	for i := 1; i <= maxPatchRetry && errors.IsConflict(err); i++ {
 		if i > triesBeforeBackOff {
 			p.backOff.Sleep(backOffPeriod)
@@ -437,7 +445,7 @@ func (p *patcher) patch(current runtime.Object, modified []byte, source, namespa
 		if getErr != nil {
 			return nil, getErr
 		}
-		patchBytes, err = p.patchSimple(current, modified, source, namespace, name)
+		patchBytes, err = p.patchSimple(current, modified, source, namespace, name, ifUseNewPatchBehavior)
 	}
 
 	return patchBytes, err

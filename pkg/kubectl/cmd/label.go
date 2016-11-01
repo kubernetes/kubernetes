@@ -197,6 +197,10 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 		return fmt.Errorf("--resource-version may only be used with a single resource")
 	}
 
+	ifUseNewPatchBehavior, err := cmdutil.TryToRunIfUseNewBehaviorForPatch(f)
+	if err != nil {
+		return err
+	}
 	// TODO: support bulk generic output a la Get
 	return r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
@@ -246,7 +250,7 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 			if !reflect.DeepEqual(oldData, newData) {
 				dataChangeMsg = "labeled"
 			}
-			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
+			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj, ifUseNewPatchBehavior)
 			createdPatch := err == nil
 			if err != nil {
 				glog.V(2).Infof("couldn't compute patch: %v", err)
