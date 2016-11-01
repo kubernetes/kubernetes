@@ -23,9 +23,11 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	release_1_4 "k8s.io/client-go/1.4/kubernetes"
+	api "k8s.io/client-go/1.4/pkg/api"
 	"k8s.io/client-go/1.4/pkg/api/unversioned"
-	api "k8s.io/client-go/1.4/pkg/api/v1"
+	apiv1 "k8s.io/client-go/1.4/pkg/api/v1"
 	policy "k8s.io/client-go/1.4/pkg/apis/policy/v1alpha1"
+	"k8s.io/client-go/1.4/pkg/labels"
 	"k8s.io/client-go/1.4/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -43,7 +45,7 @@ var _ = framework.KubeDescribe("DisruptionController [Feature:PodDisruptionbudge
 
 	It("should create a PodDisruptionBudget", func() {
 		pdb := policy.PodDisruptionBudget{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: apiv1.ObjectMeta{
 				Name:      "foo",
 				Namespace: ns,
 			},
@@ -58,7 +60,7 @@ var _ = framework.KubeDescribe("DisruptionController [Feature:PodDisruptionbudge
 
 	It("should update PodDisruptionBudget status", func() {
 		pdb := policy.PodDisruptionBudget{
-			ObjectMeta: api.ObjectMeta{
+			ObjectMeta: apiv1.ObjectMeta{
 				Name:      "foo",
 				Namespace: ns,
 			},
@@ -69,27 +71,10 @@ var _ = framework.KubeDescribe("DisruptionController [Feature:PodDisruptionbudge
 		}
 		_, err := cs.Policy().PodDisruptionBudgets(ns).Create(&pdb)
 		Expect(err).NotTo(HaveOccurred())
-		for i := 0; i < 3; i++ {
-			pod := &api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Name:      fmt.Sprintf("pod-%d", i),
-					Namespace: ns,
-					Labels:    map[string]string{"foo": "bar"},
-				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Name:  "busybox",
-							Image: "gcr.io/google_containers/echoserver:1.4",
-						},
-					},
-					RestartPolicy: api.RestartPolicyAlways,
-				},
-			}
 
-			_, err := cs.Pods(ns).Create(pod)
-			framework.ExpectNoError(err, "Creating pod %q in namespace %q", pod.Name, ns)
-		}
+		createPodsOrDie(cs, ns, 3)
+		waitForPodsOrDie(cs, ns, 3)
+
 		err = wait.PollImmediate(framework.Poll, 60*time.Second, func() (bool, error) {
 			pdb, err := cs.Policy().PodDisruptionBudgets(ns).Get("foo")
 			if err != nil {
@@ -102,3 +87,58 @@ var _ = framework.KubeDescribe("DisruptionController [Feature:PodDisruptionbudge
 	})
 
 })
+
+func createPodsOrDie(cs *release_1_4.Clientset, ns string, n int) {
+	for i := 0; i < n; i++ {
+		pod := &apiv1.Pod{
+			ObjectMeta: apiv1.ObjectMeta{
+				Name:      fmt.Sprintf("pod-%d", i),
+				Namespace: ns,
+				Labels:    map[string]string{"foo": "bar"},
+			},
+			Spec: apiv1.PodSpec{
+				Containers: []apiv1.Container{
+					{
+						Name:  "busybox",
+						Image: "gcr.io/google_containers/echoserver:1.4",
+					},
+				},
+				RestartPolicy: apiv1.RestartPolicyAlways,
+			},
+		}
+
+		_, err := cs.Pods(ns).Create(pod)
+		framework.ExpectNoError(err, "Creating pod %q in namespace %q", pod.Name, ns)
+	}
+}
+
+func waitForPodsOrDie(cs *release_1_4.Clientset, ns string, n int) {
+	By("Waiting for all pods to be running")
+	err := wait.PollImmediate(framework.Poll, 10*time.Minute, func() (bool, error) {
+		selector, err := labels.Parse("foo=bar")
+		framework.ExpectNoError(err, "Waiting for pods in namespace %q to be ready", ns)
+		pods, err := cs.Core().Pods(ns).List(api.ListOptions{LabelSelector: selector})
+		if err != nil {
+			return false, err
+		}
+		if pods == nil {
+			return false, fmt.Errorf("pods is nil")
+		}
+		if len(pods.Items) < n {
+			framework.Logf("pods: %v < %v", len(pods.Items), n)
+			return false, nil
+		}
+		ready := 0
+		for i := 0; i < n; i++ {
+			if pods.Items[i].Status.Phase == apiv1.PodRunning {
+				ready++
+			}
+		}
+		if ready < n {
+			framework.Logf("running pods: %v < %v", ready, n)
+			return false, nil
+		}
+		return true, nil
+	})
+	framework.ExpectNoError(err, "Waiting for pods in namespace %q to be ready", ns)
+}
