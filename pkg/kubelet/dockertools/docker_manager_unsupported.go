@@ -1,4 +1,4 @@
-// +build windows
+// +build !linux,!windows
 
 /*
 Copyright 2015 The Kubernetes Authors.
@@ -16,27 +16,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cm
+package dockertools
 
 import (
-	"github.com/golang/glog"
-
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
-	"k8s.io/kubernetes/pkg/util/mount"
+
+	dockertypes "github.com/docker/engine-api/types"
 )
 
-type containerManagerImpl struct {
-	containerManagerStub
+func getContainerIP(container *dockertypes.ContainerJSON) string {
+	return ""
 }
 
-var _ ContainerManager = &containerManagerImpl{}
-
-func (cm *containerManagerImpl) Start(_ *api.Node) error {
-	glog.V(2).Infof("Starting Windows stub container manager")
-	return nil
+func getNetworkingMode() string {
+	return ""
 }
 
-func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig) (ContainerManager, error) {
-	return &containerManagerImpl{}, nil
+func containerProvidesPodIP(name *KubeletContainerName) bool {
+	return false
+}
+
+// Returns nil as both Seccomp and AppArmor security options are not valid on Windows
+func (dm *DockerManager) getSecurityOpts(pod *api.Pod, ctrName string) ([]dockerOpt, error) {
+	return nil, nil
 }
