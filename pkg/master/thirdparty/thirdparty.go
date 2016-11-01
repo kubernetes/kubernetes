@@ -18,9 +18,11 @@ package thirdparty
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 
+	"github.com/emicklei/go-restful"
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -142,11 +144,40 @@ func (m *ThirdPartyResourceServer) RemoveThirdPartyResource(path string) error {
 		return err
 	}
 
+	var ws *restful.WebService = nil
 	services := m.genericAPIServer.HandlerContainer.RegisteredWebServices()
 	for ix := range services {
 		root := services[ix].RootPath()
 		if root == path || strings.HasPrefix(root, path+"/") {
-			m.genericAPIServer.HandlerContainer.Remove(services[ix])
+			ws = services[ix]
+			break
+		}
+	}
+
+	if ws != nil {
+		pattern := path + "/.*/" + resource + "/.*"
+		routesToRemove := []struct {
+			method string
+			path   string
+		}{}
+		routes := ws.Routes()
+		current := 0
+		for _, route := range routes {
+			match, _ := regexp.MatchString(pattern, route.Path)
+			if match {
+				routesToRemove[current] = struct{ method, path string }{route.Method, route.Path}
+			}
+			current = current + 1
+		}
+
+		for _, routeToeRemove := range routesToRemove {
+			ws.RemoveRoute(routeToeRemove.path, routeToeRemove.method)
+		}
+		m.thirdPartyResourcesLock.Lock()
+		_, found := m.thirdPartyResources[path]
+		m.thirdPartyResourcesLock.Unlock()
+		if !found {
+			m.genericAPIServer.HandlerContainer.Remove(ws)
 		}
 	}
 	return nil

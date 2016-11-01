@@ -106,6 +106,7 @@ func (a *APIInstaller) NewWebService() *restful.WebService {
 	mediaTypes, streamMediaTypes := mediaTypesForSerializer(a.group.Serializer)
 	ws.Produces(append(mediaTypes, streamMediaTypes...)...)
 	ws.ApiVersion(a.group.GroupVersion.String())
+	ws.SetDynamicRoutes(true)
 
 	return ws
 }

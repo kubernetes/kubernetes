@@ -21,6 +21,8 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
 	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
@@ -83,12 +85,17 @@ func (t *ThirdPartyController) syncResourceList(list runtime.Object) error {
 		for ix := range list.Items {
 			item := &list.Items[ix]
 			// extract the api group and resource kind from the schema
-			_, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(item)
+			kind, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(item)
 			if err != nil {
 				return err
 			}
+			plural, _ := meta.KindToResource(unversioned.GroupVersionKind{
+				Group:   group,
+				Version: item.Versions[0].Name,
+				Kind:    kind,
+			})
 			// place it in the set of resources that we expect, so that we don't delete it in the delete pass
-			existing.Insert(MakeThirdPartyPath(group))
+			existing.Insert(getFullThirdPartyPath(group, plural.Resource))
 			// ensure a RESTful resource for this schema exists on the master
 			if err := t.SyncOneResource(item); err != nil {
 				return err
@@ -103,7 +110,7 @@ func (t *ThirdPartyController) syncResourceList(list runtime.Object) error {
 		found := false
 		// search across the expected restful resources to see if this resource belongs to one of the expected ones
 		for _, apiPath := range existing.List() {
-			if installedAPI == apiPath || strings.HasPrefix(installedAPI, apiPath+"/") {
+			if installedAPI == apiPath {
 				found = true
 				break
 			}
@@ -124,6 +131,13 @@ func MakeThirdPartyPath(group string) string {
 		return thirdpartyprefix
 	}
 	return thirdpartyprefix + "/" + group
+}
+
+func getFullThirdPartyPath(group, resource string) string {
+	if len(group) == 0 {
+		return thirdpartyprefix
+	}
+	return thirdpartyprefix + "/" + group + "/" + resource
 }
 
 func GetThirdPartyGroupName(path string) string {
