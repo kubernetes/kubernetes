@@ -745,10 +745,6 @@ func FilterActivePods(pods []*v1.Pod) []*v1.Pod {
 	return result
 }
 
-func IsReplicaSetActive(r *extensions.ReplicaSet) bool {
-	return true
-}
-
 func IsPodActive(p *api.Pod) bool {
 	return api.PodSucceeded != p.Status.Phase &&
 		api.PodFailed != p.Status.Phase &&
