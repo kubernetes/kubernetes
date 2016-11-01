@@ -13,6 +13,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "batch.go",
         "core.go",
         "extensions.go",
         "factory.go",
@@ -24,11 +25,13 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/unversioned:go_default_library",
+        "//pkg/apis/batch:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//pkg/apis/storage:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
+        "//pkg/client/listers/batch/internalversion:go_default_library",
         "//pkg/client/listers/core/internalversion:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/watch:go_default_library",
