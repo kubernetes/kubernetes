@@ -97,6 +97,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		}
 
 		var gv clientgentypes.GroupVersion
+		var internalGVPkg string
 
 		if isInternal(objectMeta) {
 			lastSlash := strings.LastIndex(p.Path, "/")
@@ -104,10 +105,13 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 				glog.Fatalf("error constructing internal group version for package %q", p.Path)
 			}
 			gv.Group = clientgentypes.Group(p.Path[lastSlash+1:])
+			internalGVPkg = p.Path
 		} else {
 			parts := strings.Split(p.Path, "/")
 			gv.Group = clientgentypes.Group(parts[len(parts)-2])
 			gv.Version = clientgentypes.Version(parts[len(parts)-1])
+
+			internalGVPkg = strings.Join(parts[0:len(parts)-1], "/")
 		}
 
 		packageList = append(packageList, &generator.DefaultPackage{
@@ -126,6 +130,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 						},
 						outputPackage:  arguments.OutputPackagePath,
 						groupVersion:   gv,
+						internalGVPkg:  internalGVPkg,
 						typeToGenerate: t,
 						imports:        generator.NewImportTracker(),
 						objectMeta:     objectMeta,
@@ -175,6 +180,7 @@ type listerGenerator struct {
 	generator.DefaultGen
 	outputPackage  string
 	groupVersion   clientgentypes.GroupVersion
+	internalGVPkg  string
 	typeToGenerate *types.Type
 	imports        namer.ImportTracker
 	objectMeta     *types.Type
@@ -206,7 +212,7 @@ func (g *listerGenerator) GenerateType(c *generator.Context, t *types.Type, w io
 
 	glog.V(5).Infof("processing type %v", t)
 	m := map[string]interface{}{
-		"group":      g.groupVersion.Group.String(),
+		"Resource":   c.Universe.Function(types.Name{Package: g.internalGVPkg, Name: "Resource"}),
 		"type":       t,
 		"objectMeta": g.objectMeta,
 	}
@@ -295,7 +301,7 @@ func (s *$.type|private$Lister) Get(name string) (*$.type|raw$, error) {
     return nil, err
   }
   if !exists {
-    return nil, errors.NewNotFound($.group$.Resource("$.type|lowercaseSingular$"), name)
+    return nil, errors.NewNotFound($.Resource|raw$("$.type|lowercaseSingular$"), name)
   }
   return obj.(*$.type|raw$), nil
 }
@@ -338,7 +344,7 @@ func (s $.type|private$NamespaceLister) Get(name string) (*$.type|raw$, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound($.group$.Resource("$.type|lowercaseSingular$"), name)
+		return nil, errors.NewNotFound($.Resource|raw$("$.type|lowercaseSingular$"), name)
 	}
 	return obj.(*$.type|raw$), nil
 }
