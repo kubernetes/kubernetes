@@ -501,17 +501,20 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		hostname:                    "test-hostname",
 		portsMap:                    make(map[localPort]closeable),
 		portMapper:                  &fakePortOpener{[]*localPort{}},
+		masqueradeMark:              "0x4000/0x4000",
 	}
 }
 
-func hasJump(rules []iptablestest.Rule, destChain, destIP, destPort string) bool {
+func hasJump(rules []utiliptables.Rule, destChain utiliptables.Chain, destIP, destPort string) bool {
 	for _, r := range rules {
-		if r[iptablestest.Jump] == destChain {
+		if r.Jump == destChain {
 			if destIP != "" {
-				return strings.Contains(r[iptablestest.Destination], destIP)
+				_, ok := r.Options[iptablestest.Destination]
+				return ok
 			}
 			if destPort != "" {
-				return strings.Contains(r[iptablestest.DPort], destPort)
+				_, ok := r.Options[iptablestest.DPort]
+				return ok
 			}
 			return true
 		}
@@ -519,16 +522,18 @@ func hasJump(rules []iptablestest.Rule, destChain, destIP, destPort string) bool
 	return false
 }
 
-func hasDNAT(rules []iptablestest.Rule, endpoint string) bool {
+func hasDNAT(rules []utiliptables.Rule, endpoint string) bool {
 	for _, r := range rules {
-		if r[iptablestest.ToDest] == endpoint {
-			return true
+		if option, ok := r.Options[iptablestest.ToDest]; ok {
+			if option.Arg == endpoint {
+				return true
+			}
 		}
 	}
 	return false
 }
 
-func errorf(msg string, rules []iptablestest.Rule, t *testing.T) {
+func errorf(msg string, rules []utiliptables.Rule, t *testing.T) {
 	for _, r := range rules {
 		t.Logf("%v", r)
 	}
@@ -545,12 +550,18 @@ func TestClusterIPReject(t *testing.T) {
 	fp.serviceMap[svc] = newFakeServiceInfo(svc, svcIP, api.ProtocolTCP, false)
 	fp.syncProxyRules()
 
-	svcChain := string(servicePortChainName(svc, strings.ToLower(string(api.ProtocolTCP))))
-	svcRules := ipt.GetRules(svcChain)
+	svcChain := servicePortChainName(svc, strings.ToLower(string(api.ProtocolTCP)))
+	svcRules, err := ipt.GetRules(utiliptables.TableNAT, svcChain)
+	if err != nil {
+		errorf(fmt.Sprintf("%v", err), svcRules, t)
+	}
 	if len(svcRules) != 0 {
 		errorf(fmt.Sprintf("Unexpected rule for chain %v service %v without endpoints", svcChain, svcName), svcRules, t)
 	}
-	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
+	kubeSvcRules, err := ipt.GetRules(utiliptables.TableFilter, kubeServicesChain)
+	if err != nil {
+		errorf(fmt.Sprintf("%v", err), kubeSvcRules, t)
+	}
 	if !hasJump(kubeSvcRules, iptablestest.Reject, svcIP.String(), "") {
 		errorf(fmt.Sprintf("Failed to find a %v rule for service %v with no endpoints", iptablestest.Reject, svcName), kubeSvcRules, t)
 	}
@@ -569,19 +580,28 @@ func TestClusterIPEndpointsJump(t *testing.T) {
 
 	fp.syncProxyRules()
 
-	svcChain := string(servicePortChainName(svc, strings.ToLower(string(api.ProtocolTCP))))
-	epChain := string(servicePortEndpointChainName(svc, strings.ToLower(string(api.ProtocolTCP)), ep))
+	svcChain := servicePortChainName(svc, strings.ToLower(string(api.ProtocolTCP)))
+	epChain := servicePortEndpointChainName(svc, strings.ToLower(string(api.ProtocolTCP)), ep)
 
-	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
+	kubeSvcRules, err := ipt.GetRules(utiliptables.TableNAT, kubeServicesChain)
+	if err != nil {
+		errorf(fmt.Sprintf("%v", err), kubeSvcRules, t)
+	}
 	if !hasJump(kubeSvcRules, svcChain, svcIP.String(), "") {
 		errorf(fmt.Sprintf("Failed to find jump from KUBE-SERVICES to %v chain", svcChain), kubeSvcRules, t)
 	}
 
-	svcRules := ipt.GetRules(svcChain)
+	svcRules, err := ipt.GetRules(utiliptables.TableNAT, svcChain)
+	if err != nil {
+		errorf(fmt.Sprintf("%v", err), svcRules, t)
+	}
 	if !hasJump(svcRules, epChain, "", "") {
 		errorf(fmt.Sprintf("Failed to jump to ep chain %v", epChain), svcRules, t)
 	}
-	epRules := ipt.GetRules(epChain)
+	epRules, err := ipt.GetRules(utiliptables.TableNAT, epChain)
+	if err != nil {
+		errorf(fmt.Sprintf("%v", err), epRules, t)
+	}
 	if !hasDNAT(epRules, ep) {
 		errorf(fmt.Sprintf("Endpoint chain %v lacks DNAT to %v", epChain, ep), epRules, t)
 	}
@@ -611,17 +631,23 @@ func TestLoadBalancer(t *testing.T) {
 	fp.syncProxyRules()
 
 	proto := strings.ToLower(string(api.ProtocolTCP))
-	fwChain := string(serviceFirewallChainName(svc, proto))
-	svcChain := string(servicePortChainName(svc, strings.ToLower(string(api.ProtocolTCP))))
+	fwChain := serviceFirewallChainName(svc, proto)
+	svcChain := servicePortChainName(svc, strings.ToLower(string(api.ProtocolTCP)))
 	//lbChain := string(serviceLBChainName(svc, proto))
 
-	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
+	kubeSvcRules, err := ipt.GetRules(utiliptables.TableNAT, kubeServicesChain)
+	if err != nil {
+		errorf(fmt.Sprintf("%v", err), kubeSvcRules, t)
+	}
 	if !hasJump(kubeSvcRules, fwChain, svcInfo.loadBalancerStatus.Ingress[0].IP, "") {
 		errorf(fmt.Sprintf("Failed to find jump to firewall chain %v", fwChain), kubeSvcRules, t)
 	}
 
-	fwRules := ipt.GetRules(fwChain)
-	if !hasJump(fwRules, svcChain, "", "") || !hasJump(fwRules, string(KubeMarkMasqChain), "", "") {
+	fwRules, err := ipt.GetRules(utiliptables.TableNAT, fwChain)
+	if err != nil {
+		errorf(fmt.Sprintf("%v", err), fwRules, t)
+	}
+	if !hasJump(fwRules, svcChain, "", "") || !hasJump(fwRules, KubeMarkMasqChain, "", "") {
 		errorf(fmt.Sprintf("Failed to find jump from firewall chain %v to svc chain %v", fwChain, svcChain), fwRules, t)
 	}
 }
@@ -643,9 +669,12 @@ func TestNodePort(t *testing.T) {
 	fp.syncProxyRules()
 
 	proto := strings.ToLower(string(api.ProtocolTCP))
-	svcChain := string(servicePortChainName(svc, strings.ToLower(proto)))
+	svcChain := servicePortChainName(svc, strings.ToLower(proto))
 
-	kubeNodePortRules := ipt.GetRules(string(kubeNodePortsChain))
+	kubeNodePortRules, err := ipt.GetRules(utiliptables.TableNAT, kubeNodePortsChain)
+	if err != nil {
+		errorf(fmt.Sprintf("%v", err), kubeNodePortRules, t)
+	}
 	if !hasJump(kubeNodePortRules, svcChain, "", fmt.Sprintf("%v", svcInfo.nodePort)) {
 		errorf(fmt.Sprintf("Failed to find jump to svc chain %v", svcChain), kubeNodePortRules, t)
 	}
@@ -668,26 +697,35 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 	fp.syncProxyRules()
 
 	proto := strings.ToLower(string(api.ProtocolTCP))
-	fwChain := string(serviceFirewallChainName(svc, proto))
-	lbChain := string(serviceLBChainName(svc, proto))
+	fwChain := serviceFirewallChainName(svc, proto)
+	lbChain := serviceLBChainName(svc, proto)
 
-	nonLocalEpChain := string(servicePortEndpointChainName(svc, strings.ToLower(string(api.ProtocolTCP)), nonLocalEp))
-	localEpChain := string(servicePortEndpointChainName(svc, strings.ToLower(string(api.ProtocolTCP)), localEp))
+	nonLocalEpChain := servicePortEndpointChainName(svc, strings.ToLower(string(api.ProtocolTCP)), nonLocalEp)
+	localEpChain := servicePortEndpointChainName(svc, strings.ToLower(string(api.ProtocolTCP)), localEp)
 
-	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
+	kubeSvcRules, err := ipt.GetRules(utiliptables.TableNAT, kubeServicesChain)
+	if err != nil {
+		errorf(fmt.Sprintf("%v", err), kubeSvcRules, t)
+	}
 	if !hasJump(kubeSvcRules, fwChain, svcInfo.loadBalancerStatus.Ingress[0].IP, "") {
 		errorf(fmt.Sprintf("Failed to find jump to firewall chain %v", fwChain), kubeSvcRules, t)
 	}
 
-	fwRules := ipt.GetRules(fwChain)
+	fwRules, err := ipt.GetRules(utiliptables.TableNAT, fwChain)
+	if err != nil {
+		errorf(fmt.Sprintf("%v", err), fwRules, t)
+	}
 	if !hasJump(fwRules, lbChain, "", "") {
 		errorf(fmt.Sprintf("Failed to find jump from firewall chain %v to svc chain %v", fwChain, lbChain), fwRules, t)
 	}
-	if hasJump(fwRules, string(KubeMarkMasqChain), "", "") {
+	if hasJump(fwRules, KubeMarkMasqChain, "", "") {
 		errorf(fmt.Sprintf("Found jump from fw chain %v to MASQUERADE", fwChain), fwRules, t)
 	}
 
-	lbRules := ipt.GetRules(lbChain)
+	lbRules, err := ipt.GetRules(utiliptables.TableNAT, lbChain)
+	if err != nil {
+		errorf(fmt.Sprintf("%v", err), lbRules, t)
+	}
 	if hasJump(lbRules, nonLocalEpChain, "", "") {
 		errorf(fmt.Sprintf("Found jump from lb chain %v to non-local ep %v", lbChain, nonLocalEp), lbRules, t)
 	}
@@ -714,17 +752,23 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 	fp.syncProxyRules()
 
 	proto := strings.ToLower(string(api.ProtocolTCP))
-	lbChain := string(serviceLBChainName(svc, proto))
+	lbChain := serviceLBChainName(svc, proto)
 
-	nonLocalEpChain := string(servicePortEndpointChainName(svc, strings.ToLower(string(api.ProtocolTCP)), nonLocalEp))
-	localEpChain := string(servicePortEndpointChainName(svc, strings.ToLower(string(api.ProtocolTCP)), localEp))
+	nonLocalEpChain := servicePortEndpointChainName(svc, strings.ToLower(string(api.ProtocolTCP)), nonLocalEp)
+	localEpChain := servicePortEndpointChainName(svc, strings.ToLower(string(api.ProtocolTCP)), localEp)
 
-	kubeNodePortRules := ipt.GetRules(string(kubeNodePortsChain))
+	kubeNodePortRules, err := ipt.GetRules(utiliptables.TableNAT, kubeNodePortsChain)
+	if err != nil {
+		errorf(fmt.Sprintf("%v", err), kubeNodePortRules, t)
+	}
 	if !hasJump(kubeNodePortRules, lbChain, "", fmt.Sprintf("%v", svcInfo.nodePort)) {
 		errorf(fmt.Sprintf("Failed to find jump to lb chain %v", lbChain), kubeNodePortRules, t)
 	}
 
-	lbRules := ipt.GetRules(lbChain)
+	lbRules, err := ipt.GetRules(utiliptables.TableNAT, lbChain)
+	if err != nil {
+		errorf(fmt.Sprintf("%v", err), lbRules, t)
+	}
 	if hasJump(lbRules, nonLocalEpChain, "", "") {
 		errorf(fmt.Sprintf("Found jump from lb chain %v to non-local ep %v", lbChain, nonLocalEp), lbRules, t)
 	}
