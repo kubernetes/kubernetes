@@ -172,6 +172,7 @@ go_library(
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/utils:go_default_library",
+        "//vendor:github.com/Azure/go-autorest/autorest/to",
         "//vendor:github.com/aws/aws-sdk-go/aws",
         "//vendor:github.com/aws/aws-sdk-go/aws/awserr",
         "//vendor:github.com/aws/aws-sdk-go/aws/session",
