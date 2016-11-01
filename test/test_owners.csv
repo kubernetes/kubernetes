@@ -255,6 +255,7 @@ Namespaces should always delete fast (ALL of 100 namespaces in 150 seconds),rmmh
 Namespaces should delete fast enough (90 percent of 100 namespaces in 150 seconds),kevin-wangzefeng,1
 Namespaces should ensure that all pods are removed when a namespace is deleted.,xiang90,1
 Namespaces should ensure that all services are removed when a namespace is deleted.,pmorie,1
+Network should set TCP CLOSE_WAIT timeout,bowei,0
 Networking Granular Checks: Pods should function for intra-pod communication: http,stts,0
 Networking Granular Checks: Pods should function for intra-pod communication: udp,freehan,0
 Networking Granular Checks: Pods should function for node-pod communication: http,spxtr,1
