@@ -20,6 +20,7 @@ package options
 import (
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
 	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
@@ -49,7 +50,13 @@ func NewServerRunOptions() *ServerRunOptions {
 		GenericServerRunOptions: genericoptions.NewServerRunOptions().WithEtcdOptions(),
 		EventTTL:                1 * time.Hour,
 		KubeletConfig: kubeletclient.KubeletClientConfig{
-			Port:        ports.KubeletPort,
+			Port: ports.KubeletPort,
+			PreferredAddressTypes: []string{
+				string(api.NodeHostName),
+				string(api.NodeInternalIP),
+				string(api.NodeExternalIP),
+				string(api.NodeLegacyHostIP),
+			},
 			EnableHttps: true,
 			HTTPTimeout: time.Duration(5) * time.Second,
 		},
@@ -101,6 +108,9 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	// Kubelet related flags:
 	fs.BoolVar(&s.KubeletConfig.EnableHttps, "kubelet-https", s.KubeletConfig.EnableHttps,
 		"Use https for kubelet connections.")
+
+	fs.StringSliceVar(&s.KubeletConfig.PreferredAddressTypes, "kubelet-preferred-address-types", s.KubeletConfig.PreferredAddressTypes,
+		"List of the preferred NodeAddressTypes to use for kubelet connections.")
 
 	fs.UintVar(&s.KubeletConfig.Port, "kubelet-port", s.KubeletConfig.Port,
 		"DEPRECATED: kubelet port.")
