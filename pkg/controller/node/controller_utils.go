@@ -19,7 +19,6 @@ package node
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
