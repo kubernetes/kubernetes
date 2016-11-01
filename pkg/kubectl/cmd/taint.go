@@ -321,6 +321,11 @@ func (o TaintOptions) RunTaint() error {
 		return err
 	}
 
+	smPatchVersion, err := cmdutil.GetServerSupportedSMPatchVersionFromFactory(o.f)
+	if err != nil {
+		return err
+	}
+
 	return r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
@@ -343,7 +348,7 @@ func (o TaintOptions) RunTaint() error {
 		if err != nil {
 			return err
 		}
-		patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
+		patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj, smPatchVersion)
 		createdPatch := err == nil
 		if err != nil {
 			glog.V(2).Infof("couldn't compute patch: %v", err)

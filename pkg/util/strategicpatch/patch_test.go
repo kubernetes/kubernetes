@@ -17,6 +17,7 @@ limitations under the License.
 package strategicpatch
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -47,12 +48,12 @@ type StrategicMergePatchTestCase struct {
 }
 
 type StrategicMergePatchTestCaseData struct {
-	Original map[string]interface{}
-	TwoWay   map[string]interface{}
-	Modified map[string]interface{}
-	Current  map[string]interface{}
-	ThreeWay map[string]interface{}
-	Result   map[string]interface{}
+	Original []byte
+	TwoWay   []byte
+	Modified []byte
+	Current  []byte
+	ThreeWay []byte
+	Result   []byte
 }
 
 type MergeItem struct {
@@ -248,79 +249,140 @@ func TestSortMergeLists(t *testing.T) {
 // These are test cases for StrategicMergePatch that cannot be generated using
 // CreateTwoWayMergePatch because it doesn't use the replace directive, generate
 // duplicate integers for a merging list patch, or generate empty merging lists.
-var customStrategicMergePatchTestCaseData = []byte(`
-testCases:
-  - description: unique scalars when merging lists
-    original:
-      mergingIntList:
-        - 1
-        - 2
-    twoWay:
-      mergingIntList:
-        - 2
-        - 3
-    modified:
-      mergingIntList:
-        - 1
-        - 2
-        - 3
-  - description: delete map from nested map
-    original:
-      simpleMap:
-        key1: 1
-        key2: 1
-    twoWay:
-      simpleMap:
-        $patch: delete
-    modified:
-      simpleMap:
-        {}
-  - description: delete all items from merging list
-    original:
-      mergingList:
-        - name: 1
-        - name: 2
-    twoWay:
-      mergingList:
-        - $patch: replace
-    modified:
-      mergingList: []
-  - description: merge empty merging lists
-    original:
-      mergingList: []
-    twoWay:
-      mergingList: []
-    modified:
-      mergingList: []
-  - description: delete all keys from map
-    original:
-      name: 1
-      value: 1
-    twoWay:
-      $patch: replace
-    modified: {}
-  - description: add key and delete all keys from map
-    original:
-      name: 1
-      value: 1
-    twoWay:
-      other: a
-      $patch: replace
-    modified:
-      other: a
-`)
+var customStrategicMergePatchTestCaseData = StrategicMergePatchTestCases{
+	TestCases: []StrategicMergePatchTestCase{
+		{
+			Description: "unique scalars when merging lists using SMPatchVersion_1_0",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingIntList:
+  - 1
+  - 2
+`),
+				TwoWay: []byte(`
+mergingIntList:
+  - 2
+  - 3
+`),
+				Modified: []byte(`
+mergingIntList:
+  - 1
+  - 2
+  - 3
+`),
+			},
+		},
+		{
+			Description: "unique scalars when merging lists for list of primitives",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingIntList:
+  - 1
+  - 2
+`),
+				TwoWay: []byte(`
+mergingIntList:
+  $patch: mergeprimitiveslist
+  "2": 2
+  "3": 3
+`),
+				Modified: []byte(`
+mergingIntList:
+  - 1
+  - 2
+  - 3
+`),
+			},
+		},
+		{
+			Description: "delete map from nested map",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+simpleMap:
+  key1: 1
+  key2: 1
+`),
+				TwoWay: []byte(`
+simpleMap:
+  $patch: delete
+`),
+				Modified: []byte(`
+simpleMap:
+  {}
+`),
+			},
+		},
+		{
+			Description: "delete all items from merging list",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+`),
+				TwoWay: []byte(`
+mergingList:
+  - $patch: replace
+`),
+				Modified: []byte(`
+mergingList: []
+`),
+			},
+		},
+		{
+			Description: "merge empty merging lists",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList: []
+`),
+				TwoWay: []byte(`
+mergingList: []
+`),
+				Modified: []byte(`
+mergingList: []
+`),
+			},
+		},
+		{
+			Description: "delete all keys from map",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+name: 1
+value: 1
+`),
+				TwoWay: []byte(`
+$patch: replace
+`),
+				Modified: []byte(`
+{}
+`),
+			},
+		},
+		{
+			Description: "add key and delete all keys from map",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+name: 1
+value: 1
+`),
+				TwoWay: []byte(`
+other: a
+$patch: replace
+`),
+				Modified: []byte(`
+other: a
+`),
+			},
+		},
+	},
+}
 
 func TestCustomStrategicMergePatch(t *testing.T) {
-	tc := StrategicMergePatchTestCases{}
-	err := yaml.Unmarshal(customStrategicMergePatchTestCaseData, &tc)
-	if err != nil {
-		t.Errorf("can't unmarshal test cases: %v\n", err)
-		return
-	}
-
-	for _, c := range tc.TestCases {
-		original, twoWay, modified := twoWayTestCaseToJSONOrFail(t, c)
-		testPatchApplication(t, original, twoWay, modified, c.Description)
+	for _, c := range customStrategicMergePatchTestCaseData.TestCases {
+		originalJSON := yamlToJSONOrError(c.Original)
+		twoWayJSON := yamlToJSONOrError(c.TwoWay)
+		modifiedJSON := yamlToJSONOrError(c.Modified)
+		testPatchApplication(t, originalJSON, twoWayJSON, modifiedJSON, c.Description)
 	}
 }
 
@@ -328,1455 +390,2003 @@ func TestCustomStrategicMergePatch(t *testing.T) {
 // yields the correct outcome. They are also test cases for CreateTwoWayMergePatch
 // and CreateThreeWayMergePatch, to assert that they both generate the correct patch
 // for the given set of input documents.
-//
-var createStrategicMergePatchTestCaseData = []byte(`
-testCases:
-  - description: nil original
-    twoWay:
-      name: 1
-      value: 1
-    modified:
-      name: 1
-      value: 1
-    current:
-      name: 1
-      other: a
-    threeWay:
-      value: 1
-    result:
-      name: 1
-      value: 1
-      other: a
-  - description: nil patch
-    original:
-      name: 1
-    twoWay:
-      {}
-    modified:
-      name: 1
-    current:
-      name: 1
-    threeWay:
-      {}
-    result:
-      name: 1
-  - description: add field to map
-    original:
-      name: 1
-    twoWay:
-      value: 1
-    modified:
-      name: 1
-      value: 1
-    current:
-      name: 1
-      other: a
-    threeWay:
-      value: 1
-    result:
-      name: 1
-      value: 1
-      other: a
-  - description: add field to map with conflict
-    original:
-      name: 1
-    twoWay:
-      value: 1
-    modified:
-      name: 1
-      value: 1
-    current:
-      name: a
-      other: a
-    threeWay:
-      name: 1
-      value: 1
-    result:
-      name: 1
-      value: 1
-      other: a
-  - description: add field and delete field from map
-    original:
-      name: 1
-    twoWay:
-      name: null
-      value: 1
-    modified:
-      value: 1
-    current:
-      name: 1
-      other: a
-    threeWay:
-      name: null
-      value: 1
-    result:
-      value: 1
-      other: a
-  - description: add field and delete field from map with conflict
-    original:
-      name: 1
-    twoWay:
-      name: null
-      value: 1
-    modified:
-      value: 1
-    current:
-      name: a
-      other: a
-    threeWay:
-      name: null
-      value: 1
-    result:
-      value: 1
-      other: a
-  - description: delete field from nested map
-    original:
-      simpleMap:
-        key1: 1
-        key2: 1
-    twoWay:
-      simpleMap:
-        key2: null
-    modified:
-      simpleMap:
-        key1: 1
-    current:
-      simpleMap:
-        key1: 1
-        key2: 1
+var createStrategicMergePatchTestCaseData = StrategicMergePatchTestCases{
+	TestCases: []StrategicMergePatchTestCase{
+		{
+			Description: "nil original",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				TwoWay: []byte(`
+name: 1
+value: 1
+`),
+				Modified: []byte(`
+name: 1
+value: 1
+`),
+				Current: []byte(`
+name: 1
+other: a
+`),
+				ThreeWay: []byte(`
+value: 1
+`),
+				Result: []byte(`
+name: 1
+value: 1
+other: a
+`),
+			},
+		},
+		{
+			Description: "nil patch",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+name: 1
+`),
+				TwoWay: []byte(`
+{}
+`),
+				Modified: []byte(`
+name: 1
+`),
+				Current: []byte(`
+name: 1
+`),
+				ThreeWay: []byte(`
+{}
+`),
+				Result: []byte(`
+name: 1
+`),
+			},
+		},
+		{
+			Description: "add field to map",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+name: 1
+`),
+				TwoWay: []byte(`
+value: 1
+`),
+				Modified: []byte(`
+name: 1
+value: 1
+`),
+				Current: []byte(`
+name: 1
+other: a
+`),
+				ThreeWay: []byte(`
+value: 1
+`),
+				Result: []byte(`
+name: 1
+value: 1
+other: a
+`),
+			},
+		},
+		{
+			Description: "add field to map with conflict",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+name: 1
+`),
+				TwoWay: []byte(`
+value: 1
+`),
+				Modified: []byte(`
+name: 1
+value: 1
+`),
+				Current: []byte(`
+name: a
+other: a
+`),
+				ThreeWay: []byte(`
+name: 1
+value: 1
+`),
+				Result: []byte(`
+name: 1
+value: 1
+other: a
+`),
+			},
+		},
+		{
+			Description: "add field and delete field from map",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+name: 1
+`),
+				TwoWay: []byte(`
+name: null
+value: 1
+`),
+				Modified: []byte(`
+value: 1
+`),
+				Current: []byte(`
+name: 1
+other: a
+`),
+				ThreeWay: []byte(`
+name: null
+value: 1
+`),
+				Result: []byte(`
+value: 1
+other: a
+`),
+			},
+		},
+		{
+			Description: "add field and delete field from map with conflict",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+name: 1
+`),
+				TwoWay: []byte(`
+name: null
+value: 1
+`),
+				Modified: []byte(`
+value: 1
+`),
+				Current: []byte(`
+name: a
+other: a
+`),
+				ThreeWay: []byte(`
+name: null
+value: 1
+`),
+				Result: []byte(`
+value: 1
+other: a
+`),
+			},
+		},
+		{
+			Description: "delete field from nested map",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+simpleMap:
+  key1: 1
+  key2: 1
+`),
+				TwoWay: []byte(`
+simpleMap:
+  key2: null
+`),
+				Modified: []byte(`
+simpleMap:
+  key1: 1
+`),
+				Current: []byte(`
+simpleMap:
+  key1: 1
+  key2: 1
+  other: a
+`),
+				ThreeWay: []byte(`
+simpleMap:
+  key2: null
+`),
+				Result: []byte(`
+simpleMap:
+  key1: 1
+  other: a
+`),
+			},
+		},
+		{
+			Description: "delete field from nested map with conflict",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+simpleMap:
+  key1: 1
+  key2: 1
+`),
+				TwoWay: []byte(`
+simpleMap:
+  key2: null
+`),
+				Modified: []byte(`
+simpleMap:
+  key1: 1
+`),
+				Current: []byte(`
+simpleMap:
+  key1: a
+  key2: 1
+  other: a
+`),
+				ThreeWay: []byte(`
+simpleMap:
+  key1: 1
+  key2: null
+`),
+				Result: []byte(`
+simpleMap:
+  key1: 1
+  other: a
+`),
+			},
+		},
+		{
+			Description: "delete all fields from map",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+name: 1
+value: 1
+`),
+				TwoWay: []byte(`
+name: null
+value: null
+`),
+				Modified: []byte(`
+{}
+`),
+				Current: []byte(`
+name: 1
+value: 1
+other: a
+`),
+				ThreeWay: []byte(`
+name: null
+value: null
+`),
+				Result: []byte(`
+other: a
+`),
+			},
+		},
+		{
+			Description: "delete all fields from map with conflict",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+name: 1
+value: 1
+`),
+				TwoWay: []byte(`
+name: null
+value: null
+`),
+				Modified: []byte(`
+{}
+`),
+				Current: []byte(`
+name: 1
+value: a
+other: a
+`),
+				ThreeWay: []byte(`
+name: null
+value: null
+`),
+				Result: []byte(`
+other: a
+`),
+			},
+		},
+		{
+			Description: "add field and delete all fields from map",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+name: 1
+value: 1
+`),
+				TwoWay: []byte(`
+name: null
+value: null
+other: a
+`),
+				Modified: []byte(`
+other: a
+`),
+				Current: []byte(`
+name: 1
+value: 1
+other: a
+`),
+				ThreeWay: []byte(`
+name: null
+value: null
+`),
+				Result: []byte(`
+other: a
+`),
+			},
+		},
+		{
+			Description: "add field and delete all fields from map with conflict",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+name: 1
+value: 1
+`),
+				TwoWay: []byte(`
+name: null
+value: null
+other: a
+`),
+				Modified: []byte(`
+other: a
+`),
+				Current: []byte(`
+name: 1
+value: 1
+other: b
+`),
+				ThreeWay: []byte(`
+name: null
+value: null
+other: a
+`),
+				Result: []byte(`
+other: a
+`),
+			},
+		},
+		{
+			Description: "replace list of scalars",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+nonMergingIntList:
+  - 1
+  - 2
+`),
+				TwoWay: []byte(`
+nonMergingIntList:
+  - 2
+  - 3
+`),
+				Modified: []byte(`
+nonMergingIntList:
+  - 2
+  - 3
+`),
+				Current: []byte(`
+nonMergingIntList:
+  - 1
+  - 2
+`),
+				ThreeWay: []byte(`
+nonMergingIntList:
+  - 2
+  - 3
+`),
+				Result: []byte(`
+nonMergingIntList:
+  - 2
+  - 3
+`),
+			},
+		},
+		{
+			Description: "replace list of scalars with conflict",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+nonMergingIntList:
+  - 1
+  - 2
+`),
+				TwoWay: []byte(`
+nonMergingIntList:
+  - 2
+  - 3
+`),
+				Modified: []byte(`
+nonMergingIntList:
+  - 2
+  - 3
+`),
+				Current: []byte(`
+nonMergingIntList:
+  - 1
+  - 4
+`),
+				ThreeWay: []byte(`
+nonMergingIntList:
+  - 2
+  - 3
+`),
+				Result: []byte(`
+nonMergingIntList:
+  - 2
+  - 3
+`),
+			},
+		},
+		{
+			Description: "merge lists of scalars using SMPatchVersion_1_0",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingIntList:
+  - 1
+  - 2
+`),
+				TwoWay: []byte(`
+mergingIntList:
+  - 3
+`),
+				Modified: []byte(`
+mergingIntList:
+  - 1
+  - 2
+  - 3
+`),
+				Current: []byte(`
+mergingIntList:
+  - 1
+  - 2
+  - 4
+`),
+				ThreeWay: []byte(`
+mergingIntList:
+  - 3
+`),
+				Result: []byte(`
+mergingIntList:
+  - 1
+  - 2
+  - 3
+  - 4
+`),
+			},
+		},
+		{
+			Description: "merge lists of scalars for list of primitives",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingIntList:
+  - 1
+  - 2
+`),
+				TwoWay: []byte(`
+mergingIntList:
+  $patch: mergeprimitiveslist
+  "1": null
+  "3": 3
+`),
+				Modified: []byte(`
+mergingIntList:
+  - 2
+  - 3
+`),
+				Current: []byte(`
+mergingIntList:
+  - 1
+  - 2
+  - 4
+`),
+				ThreeWay: []byte(`
+mergingIntList:
+  $patch: mergeprimitiveslist
+  "1": null
+  "3": 3
+`),
+				Result: []byte(`
+mergingIntList:
+  - 2
+  - 3
+  - 4
+`),
+			},
+		},
+		{
+			Description: "another merge lists of scalars for list of primitives",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingIntList:
+  - 1
+  - 2
+`),
+				TwoWay: []byte(`
+mergingIntList:
+  $patch: mergeprimitiveslist
+  "1": null
+  "3": 3
+`),
+				Modified: []byte(`
+mergingIntList:
+  - 2
+  - 3
+`),
+				Current: []byte(`
+mergingIntList:
+  - 2
+  - 4
+`),
+				ThreeWay: []byte(`
+mergingIntList:
+  $patch: mergeprimitiveslist
+  "1": null
+  "3": 3
+`),
+				Result: []byte(`
+mergingIntList:
+  - 2
+  - 3
+  - 4
+`),
+			},
+		},
+		{
+			Description: "merge lists of maps",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    value: 2
+`),
+				TwoWay: []byte(`
+mergingList:
+  - name: 3
+    value: 3
+  - name: 4
+    value: 4
+`),
+				Modified: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    value: 2
+  - name: 3
+    value: 3
+  - name: 4
+    value: 4
+`),
+				Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+				ThreeWay: []byte(`
+mergingList:
+  - name: 3
+    value: 3
+  - name: 4
+    value: 4
+`),
+				Result: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+  - name: 3
+    value: 3
+  - name: 4
+    value: 4
+`),
+			},
+		},
+		{
+			Description: "merge lists of maps with conflict",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    value: 2
+`),
+				TwoWay: []byte(`
+mergingList:
+  - name: 3
+    value: 3
+`),
+				Modified: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    value: 2
+  - name: 3
+    value: 3
+`),
+				Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    value: 3
+    other: b
+`),
+				ThreeWay: []byte(`
+mergingList:
+  - name: 2
+    value: 2
+  - name: 3
+    value: 3
+`),
+				Result: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+  - name: 3
+    value: 3
+`),
+			},
+		},
+		{
+			Description: "add field to map in merging list",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    value: 2
+`),
+				TwoWay: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+`),
+				Modified: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+  - name: 2
+    value: 2
+`),
+				Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+				ThreeWay: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+`),
+				Result: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+			},
+		},
+		{
+			Description: "add field to map in merging list with conflict",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    value: 2
+`),
+				TwoWay: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+`),
+				Modified: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+  - name: 2
+    value: 2
+`),
+				Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 3
+    value: 2
+    other: b
+`),
+				ThreeWay: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+  - name: 2
+    value: 2
+`),
+				Result: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+    other: a
+  - name: 2
+    value: 2
+  - name: 3
+    value: 2
+    other: b
+`),
+			},
+		},
+		{
+			Description: "add duplicate field to map in merging list",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    value: 2
+`),
+				TwoWay: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+`),
+				Modified: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+  - name: 2
+    value: 2
+`),
+				Current: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+				ThreeWay: []byte(`
+{}
+`),
+				Result: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+			},
+		},
+		{
+			Description: "add duplicate field to map in merging list with conflict",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    value: 2
+`),
+				TwoWay: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+`),
+				Modified: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+  - name: 2
+    value: 2
+`),
+				Current: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+    other: a
+  - name: 2
+    value: 3
+    other: b
+`),
+				ThreeWay: []byte(`
+mergingList:
+  - name: 2
+    value: 2
+`),
+				Result: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+			},
+		},
+		{
+			Description: "replace map field value in merging list",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+  - name: 2
+    value: 2
+`),
+				TwoWay: []byte(`
+mergingList:
+  - name: 1
+    value: a
+`),
+				Modified: []byte(`
+mergingList:
+  - name: 1
+    value: a
+  - name: 2
+    value: 2
+`),
+				Current: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+				ThreeWay: []byte(`
+mergingList:
+  - name: 1
+    value: a
+`),
+				Result: []byte(`
+mergingList:
+  - name: 1
+    value: a
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+			},
+		},
+		{
+			Description: "replace map field value in merging list with conflict",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+  - name: 2
+    value: 2
+`),
+				TwoWay: []byte(`
+mergingList:
+  - name: 1
+    value: a
+`),
+				Modified: []byte(`
+mergingList:
+  - name: 1
+    value: a
+  - name: 2
+    value: 2
+`),
+				Current: []byte(`
+mergingList:
+  - name: 1
+    value: 3
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+				ThreeWay: []byte(`
+mergingList:
+  - name: 1
+    value: a
+`),
+				Result: []byte(`
+mergingList:
+  - name: 1
+    value: a
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+			},
+		},
+		{
+			Description: "delete map from merging list",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+`),
+				TwoWay: []byte(`
+mergingList:
+  - name: 1
+    $patch: delete
+`),
+				Modified: []byte(`
+mergingList:
+  - name: 2
+`),
+				Current: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    other: b
+`),
+				ThreeWay: []byte(`
+mergingList:
+  - name: 1
+    $patch: delete
+`),
+				Result: []byte(`
+mergingList:
+  - name: 2
+    other: b
+`),
+			},
+		},
+		{
+			Description: "delete map from merging list with conflict",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+`),
+				TwoWay: []byte(`
+mergingList:
+  - name: 1
+    $patch: delete
+`),
+				Modified: []byte(`
+mergingList:
+  - name: 2
+`),
+				Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    other: b
+`),
+				ThreeWay: []byte(`
+mergingList:
+  - name: 1
+    $patch: delete
+`),
+				Result: []byte(`
+mergingList:
+  - name: 2
+    other: b
+`),
+			},
+		},
+		{
+			Description: "delete missing map from merging list",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+`),
+				TwoWay: []byte(`
+mergingList:
+  - name: 1
+    $patch: delete
+`),
+				Modified: []byte(`
+mergingList:
+  - name: 2
+`),
+				Current: []byte(`
+mergingList:
+  - name: 2
+    other: b
+`),
+				ThreeWay: []byte(`
+mergingList:
+  - name: 1
+    $patch: delete
+`),
+				Result: []byte(`
+mergingList:
+  - name: 2
+    other: b
+`),
+			},
+		},
+		{
+			Description: "delete missing map from merging list with conflict",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+`),
+				TwoWay: []byte(`
+mergingList:
+  - name: 1
+    $patch: delete
+`),
+				Modified: []byte(`
+mergingList:
+  - name: 2
+`),
+				Current: []byte(`
+mergingList:
+  - name: 3
+    other: a
+`),
+				ThreeWay: []byte(`
+mergingList:
+  - name: 1
+    $patch: delete
+  - name: 2
+`),
+				Result: []byte(`
+mergingList:
+  - name: 2
+  - name: 3
+    other: a
+`),
+			},
+		},
+		{
+			Description: "add map and delete map from merging list",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+`),
+				TwoWay: []byte(`
+mergingList:
+  - name: 1
+    $patch: delete
+  - name: 3
+`),
+				Modified: []byte(`
+mergingList:
+  - name: 2
+  - name: 3
+`),
+				Current: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    other: b
+  - name: 4
+    other: c
+`),
+				ThreeWay: []byte(`
+mergingList:
+  - name: 1
+    $patch: delete
+  - name: 3
+`),
+				Result: []byte(`
+mergingList:
+  - name: 2
+    other: b
+  - name: 3
+  - name: 4
+    other: c
+`),
+			},
+		},
+		{
+			Description: "add map and delete map from merging list with conflict",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+`),
+				TwoWay: []byte(`
+mergingList:
+  - name: 1
+    $patch: delete
+  - name: 3
+`),
+				Modified: []byte(`
+mergingList:
+  - name: 2
+  - name: 3
+`),
+				Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 4
+    other: c
+`),
+				ThreeWay: []byte(`
+mergingList:
+  - name: 1
+    $patch: delete
+  - name: 2
+  - name: 3
+`),
+				Result: []byte(`
+mergingList:
+  - name: 2
+  - name: 3
+  - name: 4
+    other: c
+`),
+			},
+		},
+		{
+			Description: "delete all maps from merging list",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+`),
+				TwoWay: []byte(`
+mergingList:
+  - name: 1
+    $patch: delete
+  - name: 2
+    $patch: delete
+`),
+				Modified: []byte(`
+mergingList: []
+`),
+				Current: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+`),
+				ThreeWay: []byte(`
+mergingList:
+  - name: 1
+    $patch: delete
+  - name: 2
+    $patch: delete
+`),
+				Result: []byte(`
+mergingList: []
+`),
+			},
+		},
+		{
+			Description: "delete all maps from merging list with conflict",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+`),
+				TwoWay: []byte(`
+mergingList:
+  - name: 1
+    $patch: delete
+  - name: 2
+    $patch: delete
+`),
+				Modified: []byte(`
+mergingList: []
+`),
+				Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    other: b
+`),
+				ThreeWay: []byte(`
+mergingList:
+  - name: 1
+    $patch: delete
+  - name: 2
+    $patch: delete
+`),
+				Result: []byte(`
+mergingList: []
+`),
+			},
+		},
+		{
+			Description: "delete all maps from empty merging list",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+`),
+				TwoWay: []byte(`
+mergingList:
+  - name: 1
+    $patch: delete
+  - name: 2
+    $patch: delete
+`),
+				Modified: []byte(`
+mergingList: []
+`),
+				Current: []byte(`
+mergingList: []
+`),
+				ThreeWay: []byte(`
+mergingList:
+  - name: 1
+    $patch: delete
+  - name: 2
+    $patch: delete
+`),
+				Result: []byte(`
+mergingList: []
+`),
+			},
+		},
+		{
+			Description: "delete field from map in merging list",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+  - name: 2
+    value: 2
+`),
+				TwoWay: []byte(`
+mergingList:
+  - name: 1
+    value: null
+`),
+				Modified: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    value: 2
+`),
+				Current: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+				ThreeWay: []byte(`
+mergingList:
+  - name: 1
+    value: null
+`),
+				Result: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+			},
+		},
+		{
+			Description: "delete field from map in merging list with conflict",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+  - name: 2
+    value: 2
+`),
+				TwoWay: []byte(`
+mergingList:
+  - name: 1
+    value: null
+`),
+				Modified: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    value: 2
+`),
+				Current: []byte(`
+mergingList:
+  - name: 1
+    value: a
+    other: a
+  - name: 2
+    value: 2
+`),
+				ThreeWay: []byte(`
+mergingList:
+  - name: 1
+    value: null
+`),
+				Result: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    value: 2
+`),
+			},
+		},
+		{
+			Description: "delete missing field from map in merging list",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+  - name: 2
+    value: 2
+`),
+				TwoWay: []byte(`
+mergingList:
+  - name: 1
+    value: null
+`),
+				Modified: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    value: 2
+`),
+				Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+				ThreeWay: []byte(`
+mergingList:
+  - name: 1
+    value: null
+`),
+				Result: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+			},
+		},
+		{
+			Description: "delete missing field from map in merging list with conflict",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList:
+  - name: 1
+    value: 1
+  - name: 2
+    value: 2
+`),
+				TwoWay: []byte(`
+mergingList:
+  - name: 1
+    value: null
+`),
+				Modified: []byte(`
+mergingList:
+  - name: 1
+  - name: 2
+    value: 2
+`),
+				Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    other: b
+`),
+				ThreeWay: []byte(`
+mergingList:
+  - name: 1
+    value: null
+  - name: 2
+    value: 2
+`),
+				Result: []byte(`
+mergingList:
+  - name: 1
+    other: a
+  - name: 2
+    value: 2
+    other: b
+`),
+			},
+		},
+		{
+			Description: "replace non merging list nested in merging list",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList:
+  - name: 1
+    nonMergingList:
+      - name: 1
+      - name: 2
+        value: 2
+  - name: 2
+`),
+				TwoWay: []byte(`
+mergingList:
+  - name: 1
+    nonMergingList:
+      - name: 1
+        value: 1
+`),
+				Modified: []byte(`
+mergingList:
+  - name: 1
+    nonMergingList:
+      - name: 1
+        value: 1
+  - name: 2
+`),
+				Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+    nonMergingList:
+      - name: 1
+      - name: 2
+        value: 2
+  - name: 2
+    other: b
+`),
+				ThreeWay: []byte(`
+mergingList:
+  - name: 1
+    nonMergingList:
+      - name: 1
+        value: 1
+`),
+				Result: []byte(`
+mergingList:
+  - name: 1
+    other: a
+    nonMergingList:
+      - name: 1
+        value: 1
+  - name: 2
+    other: b
+`),
+			},
+		},
+		{
+			Description: "replace non merging list nested in merging list with value conflict",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList:
+  - name: 1
+    nonMergingList:
+      - name: 1
+      - name: 2
+        value: 2
+  - name: 2
+`),
+				TwoWay: []byte(`
+mergingList:
+  - name: 1
+    nonMergingList:
+      - name: 1
+        value: 1
+`),
+				Modified: []byte(`
+mergingList:
+  - name: 1
+    nonMergingList:
+      - name: 1
+        value: 1
+  - name: 2
+`),
+				Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+    nonMergingList:
+      - name: 1
+        value: c
+  - name: 2
+    other: b
+`),
+				ThreeWay: []byte(`
+mergingList:
+  - name: 1
+    nonMergingList:
+      - name: 1
+        value: 1
+`),
+				Result: []byte(`
+mergingList:
+  - name: 1
+    other: a
+    nonMergingList:
+      - name: 1
+        value: 1
+  - name: 2
+    other: b
+`),
+			},
+		},
+		{
+			Description: "replace non merging list nested in merging list with deletion conflict",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList:
+  - name: 1
+    nonMergingList:
+      - name: 1
+      - name: 2
+        value: 2
+  - name: 2
+`),
+				TwoWay: []byte(`
+mergingList:
+  - name: 1
+    nonMergingList:
+      - name: 1
+        value: 1
+`),
+				Modified: []byte(`
+mergingList:
+  - name: 1
+    nonMergingList:
+      - name: 1
+        value: 1
+  - name: 2
+`),
+				Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+    nonMergingList:
+      - name: 2
+        value: 2
+  - name: 2
+    other: b
+`),
+				ThreeWay: []byte(`
+mergingList:
+  - name: 1
+    nonMergingList:
+      - name: 1
+        value: 1
+`),
+				Result: []byte(`
+mergingList:
+  - name: 1
+    other: a
+    nonMergingList:
+      - name: 1
+        value: 1
+  - name: 2
+    other: b
+`),
+			},
+		},
+		{
+			Description: "add field to map in merging list nested in merging list",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList:
+  - name: 1
+    mergingList:
+      - name: 1
+      - name: 2
+        value: 2
+  - name: 2
+`),
+				TwoWay: []byte(`
+mergingList:
+  - name: 1
+    mergingList:
+      - name: 1
+        value: 1
+`),
+				Modified: []byte(`
+mergingList:
+  - name: 1
+    mergingList:
+      - name: 1
+        value: 1
+      - name: 2
+        value: 2
+  - name: 2
+`),
+				Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+    mergingList:
+      - name: 1
+      - name: 2
+        value: 2
+  - name: 2
+    other: b
+`),
+				ThreeWay: []byte(`
+mergingList:
+  - name: 1
+    mergingList:
+      - name: 1
+        value: 1
+`),
+				Result: []byte(`
+mergingList:
+  - name: 1
+    other: a
+    mergingList:
+      - name: 1
+        value: 1
+      - name: 2
+        value: 2
+  - name: 2
+    other: b
+`),
+			},
+		},
+		{
+			Description: "add field to map in merging list nested in merging list with value conflict",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList:
+  - name: 1
+    mergingList:
+      - name: 1
+      - name: 2
+        value: 2
+  - name: 2
+`),
+				TwoWay: []byte(`
+mergingList:
+  - name: 1
+    mergingList:
+      - name: 1
+        value: 1
+`),
+				Modified: []byte(`
+mergingList:
+  - name: 1
+    mergingList:
+      - name: 1
+        value: 1
+      - name: 2
+        value: 2
+  - name: 2
+`),
+				Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+    mergingList:
+      - name: 1
+        value: a
+        other: c
+      - name: 2
+        value: b
+        other: d
+  - name: 2
+    other: b
+`),
+				ThreeWay: []byte(`
+mergingList:
+  - name: 1
+    mergingList:
+      - name: 1
+        value: 1
+      - name: 2
+        value: 2
+`),
+				Result: []byte(`
+mergingList:
+  - name: 1
+    other: a
+    mergingList:
+      - name: 1
+        value: 1
+        other: c
+      - name: 2
+        value: 2
+        other: d
+  - name: 2
+    other: b
+`),
+			},
+		},
+		{
+			Description: "add field to map in merging list nested in merging list with deletion conflict",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList:
+  - name: 1
+    mergingList:
+      - name: 1
+      - name: 2
+        value: 2
+  - name: 2
+`),
+				TwoWay: []byte(`
+mergingList:
+  - name: 1
+    mergingList:
+      - name: 1
+        value: 1
+`),
+				Modified: []byte(`
+mergingList:
+  - name: 1
+    mergingList:
+      - name: 1
+        value: 1
+      - name: 2
+        value: 2
+  - name: 2
+`),
+				Current: []byte(`
+mergingList:
+  - name: 1
+    other: a
+    mergingList:
+      - name: 2
+        value: 2
+        other: d
+  - name: 2
+    other: b
+`),
+				ThreeWay: []byte(`
+mergingList:
+  - name: 1
+    mergingList:
+      - name: 1
+        value: 1
+`),
+				Result: []byte(`
+mergingList:
+  - name: 1
+    other: a
+    mergingList:
+      - name: 1
+        value: 1
+      - name: 2
+        value: 2
+        other: d
+  - name: 2
+    other: b
+`),
+			},
+		},
+		{
+			Description: "merge empty merging lists",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergingList: []
+`),
+				TwoWay: []byte(`
+{}
+`),
+				Modified: []byte(`
+mergingList: []
+`),
+				Current: []byte(`
+mergingList: []
+`),
+				ThreeWay: []byte(`
+{}
+`),
+				Result: []byte(`
+mergingList: []
+`),
+			},
+		},
+		{
+			Description: "add map to merging list by pointer",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergeItemPtr:
+  - name: 1
+`),
+				TwoWay: []byte(`
+mergeItemPtr:
+  - name: 2
+`),
+				Modified: []byte(`
+mergeItemPtr:
+  - name: 1
+  - name: 2
+`),
+				Current: []byte(`
+mergeItemPtr:
+  - name: 1
+    other: a
+  - name: 3
+`),
+				ThreeWay: []byte(`
+mergeItemPtr:
+  - name: 2
+`),
+				Result: []byte(`
+mergeItemPtr:
+  - name: 1
+    other: a
+  - name: 2
+  - name: 3
+`),
+			},
+		},
+		{
+			Description: "add map to merging list by pointer with conflict",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergeItemPtr:
+  - name: 1
+`),
+				TwoWay: []byte(`
+mergeItemPtr:
+  - name: 2
+`),
+				Modified: []byte(`
+mergeItemPtr:
+  - name: 1
+  - name: 2
+`),
+				Current: []byte(`
+mergeItemPtr:
+  - name: 3
+`),
+				ThreeWay: []byte(`
+mergeItemPtr:
+  - name: 1
+  - name: 2
+`),
+				Result: []byte(`
+mergeItemPtr:
+  - name: 1
+  - name: 2
+  - name: 3
+`),
+			},
+		},
+		{
+			Description: "add field to map in merging list by pointer",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergeItemPtr:
+  - name: 1
+    mergeItemPtr:
+      - name: 1
+      - name: 2
+        value: 2
+  - name: 2
+`),
+				TwoWay: []byte(`
+mergeItemPtr:
+  - name: 1
+    mergeItemPtr:
+      - name: 1
+        value: 1
+`),
+				Modified: []byte(`
+mergeItemPtr:
+  - name: 1
+    mergeItemPtr:
+      - name: 1
+        value: 1
+      - name: 2
+        value: 2
+  - name: 2
+`),
+				Current: []byte(`
+mergeItemPtr:
+  - name: 1
+    other: a
+    mergeItemPtr:
+      - name: 1
         other: a
-    threeWay:
-      simpleMap:
-        key2: null
-    result:
-      simpleMap:
-        key1: 1
+      - name: 2
+        value: 2
+        other: b
+  - name: 2
+    other: b
+`),
+				ThreeWay: []byte(`
+mergeItemPtr:
+  - name: 1
+    mergeItemPtr:
+      - name: 1
+        value: 1
+`),
+				Result: []byte(`
+mergeItemPtr:
+  - name: 1
+    other: a
+    mergeItemPtr:
+      - name: 1
+        value: 1
         other: a
-  - description: delete field from nested map with conflict
-    original:
-      simpleMap:
-        key1: 1
-        key2: 1
-    twoWay:
-      simpleMap:
-        key2: null
-    modified:
-      simpleMap:
-        key1: 1
-    current:
-      simpleMap:
-        key1: a
-        key2: 1
-        other: a
-    threeWay:
-      simpleMap:
-        key1: 1
-        key2: null
-    result:
-      simpleMap:
-        key1: 1
-        other: a
-  - description: delete all fields from map
-    original:
-      name: 1
-      value: 1
-    twoWay:
-      name: null
-      value: null
-    modified: {}
-    current:
-      name: 1
-      value: 1
-      other: a
-    threeWay:
-      name: null
-      value: null
-    result: 
-      other: a
-  - description: delete all fields from map with conflict
-    original:
-      name: 1
-      value: 1
-    twoWay:
-      name: null
-      value: null
-    modified: {}
-    current:
-      name: 1
-      value: a
-      other: a
-    threeWay:
-      name: null
-      value: null
-    result: 
-      other: a
-  - description: add field and delete all fields from map
-    original:
-      name: 1
-      value: 1
-    twoWay:
-      name: null
-      value: null
-      other: a
-    modified:
-      other: a
-    current:
-      name: 1
-      value: 1
-      other: a
-    threeWay:
-      name: null
-      value: null
-    result:
-      other: a
-  - description: add field and delete all fields from map with conflict
-    original:
-      name: 1
-      value: 1
-    twoWay:
-      name: null
-      value: null
-      other: a
-    modified:
-      other: a
-    current:
-      name: 1
-      value: 1
-      other: b
-    threeWay:
-      name: null
-      value: null
-      other: a
-    result:
-      other: a
-  - description: replace list of scalars
-    original:
-      nonMergingIntList:
-        - 1
-        - 2
-    twoWay:
-      nonMergingIntList:
-        - 2
-        - 3
-    modified:
-      nonMergingIntList:
-        - 2
-        - 3
-    current:
-      nonMergingIntList:
-        - 1
-        - 2
-    threeWay:
-      nonMergingIntList:
-        - 2
-        - 3
-    result:
-      nonMergingIntList:
-        - 2
-        - 3
-  - description: replace list of scalars with conflict
-    original:
-      nonMergingIntList:
-        - 1
-        - 2
-    twoWay:
-      nonMergingIntList:
-        - 2
-        - 3
-    modified:
-      nonMergingIntList:
-        - 2
-        - 3
-    current:
-      nonMergingIntList:
-        - 1
-        - 4
-    threeWay:
-      nonMergingIntList:
-        - 2
-        - 3
-    result:
-      nonMergingIntList:
-        - 2
-        - 3
-  - description: merge lists of scalars
-    original:
-      mergingIntList:
-        - 1
-        - 2
-    twoWay:
-      mergingIntList:
-        - 3
-    modified:
-      mergingIntList:
-        - 1
-        - 2
-        - 3
-    current:
-      mergingIntList:
-        - 1
-        - 2
-        - 4
-    threeWay:
-      mergingIntList:
-        - 3
-    result:
-      mergingIntList:
-        - 1
-        - 2
-        - 3
-        - 4
-  - description: merge lists of maps
-    original:
-      mergingList:
-        - name: 1
-        - name: 2
-          value: 2
-    twoWay:
-      mergingList:
-        - name: 3
-          value: 3
-        - name: 4 
-          value: 4 
-    modified:
-      mergingList:
-        - name: 4 
-          value: 4 
-        - name: 1
-        - name: 2
-          value: 2
-        - name: 3
-          value: 3
-    current:
-      mergingList:
-        - name: 1
-          other: a
-        - name: 2
-          value: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 3
-          value: 3
-        - name: 4 
-          value: 4 
-    result:
-      mergingList:
-        - name: 1
-          other: a
-        - name: 2
-          value: 2
-          other: b
-        - name: 3
-          value: 3
-        - name: 4 
-          value: 4 
-  - description: merge lists of maps with conflict
-    original:
-      mergingList:
-        - name: 1
-        - name: 2
-          value: 2
-    twoWay:
-      mergingList:
-        - name: 3
-          value: 3
-    modified:
-      mergingList:
-        - name: 1
-        - name: 2
-          value: 2
-        - name: 3
-          value: 3
-    current:
-      mergingList:
-        - name: 1
-          other: a
-        - name: 2
-          value: 3
-          other: b
-    threeWay:
-      mergingList:
-        - name: 2
-          value: 2
-        - name: 3
-          value: 3
-    result:
-      mergingList:
-        - name: 1
-          other: a
-        - name: 2
-          value: 2
-          other: b
-        - name: 3
-          value: 3
-  - description: add field to map in merging list
-    original:
-      mergingList:
-        - name: 1
-        - name: 2
-          value: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          value: 1
-    modified:
-      mergingList:
-        - name: 1
-          value: 1
-        - name: 2
-          value: 2
-    current:
-      mergingList:
-        - name: 1
-          other: a
-        - name: 2
-          value: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          value: 1
-    result:
-      mergingList:
-        - name: 1
-          value: 1
-          other: a
-        - name: 2
-          value: 2
-          other: b
-  - description: add field to map in merging list with conflict
-    original:
-      mergingList:
-        - name: 1
-        - name: 2
-          value: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          value: 1
-    modified:
-      mergingList:
-        - name: 1
-          value: 1
-        - name: 2
-          value: 2
-    current:
-      mergingList:
-        - name: 1
-          other: a
-        - name: 3
-          value: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          value: 1
-        - name: 2
-          value: 2
-    result:
-      mergingList:
-        - name: 1
-          value: 1
-          other: a
-        - name: 2
-          value: 2
-        - name: 3
-          value: 2
-          other: b
-  - description: add duplicate field to map in merging list
-    original:
-      mergingList:
-        - name: 1
-        - name: 2
-          value: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          value: 1
-    modified:
-      mergingList:
-        - name: 1
-          value: 1
-        - name: 2
-          value: 2
-    current:
-      mergingList:
-        - name: 1
-          value: 1
-          other: a
-        - name: 2
-          value: 2
-          other: b
-    threeWay:
-      {}
-    result:
-      mergingList:
-        - name: 1
-          value: 1
-          other: a
-        - name: 2
-          value: 2
-          other: b
-  - description: add duplicate field to map in merging list with conflict
-    original:
-      mergingList:
-        - name: 1
-        - name: 2
-          value: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          value: 1
-    modified:
-      mergingList:
-        - name: 1
-          value: 1
-        - name: 2
-          value: 2
-    current:
-      mergingList:
-        - name: 1
-          value: 1
-          other: a
-        - name: 2
-          value: 3
-          other: b
-    threeWay:
-      mergingList:
-        - name: 2
-          value: 2
-    result:
-      mergingList:
-        - name: 1
-          value: 1
-          other: a
-        - name: 2
-          value: 2
-          other: b
-  - description: replace map field value in merging list
-    original:
-      mergingList:
-        - name: 1
-          value: 1
-        - name: 2
-          value: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          value: a
-    modified:
-      mergingList:
-        - name: 1
-          value: a
-        - name: 2
-          value: 2
-    current:
-      mergingList:
-        - name: 1
-          value: 1
-          other: a
-        - name: 2
-          value: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          value: a
-    result:
-      mergingList:
-        - name: 1
-          value: a
-          other: a
-        - name: 2
-          value: 2
-          other: b
-  - description: replace map field value in merging list with conflict
-    original:
-      mergingList:
-        - name: 1
-          value: 1
-        - name: 2
-          value: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          value: a
-    modified:
-      mergingList:
-        - name: 1
-          value: a
-        - name: 2
-          value: 2
-    current:
-      mergingList:
-        - name: 1
-          value: 3
-          other: a
-        - name: 2
-          value: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          value: a
-    result:
-      mergingList:
-        - name: 1
-          value: a
-          other: a
-        - name: 2
-          value: 2
-          other: b
-  - description: delete map from merging list
-    original:
-      mergingList:
-        - name: 1
-        - name: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          $patch: delete
-    modified:
-      mergingList:
-        - name: 2
-    current:
-      mergingList:
-        - name: 1
-        - name: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          $patch: delete
-    result:
-      mergingList:
-        - name: 2
-          other: b
-  - description: delete map from merging list with conflict
-    original:
-      mergingList:
-        - name: 1
-        - name: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          $patch: delete
-    modified:
-      mergingList:
-        - name: 2
-    current:
-      mergingList:
-        - name: 1
-          other: a
-        - name: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          $patch: delete
-    result:
-      mergingList:
-        - name: 2
-          other: b
-  - description: delete missing map from merging list
-    original:
-      mergingList:
-        - name: 1
-        - name: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          $patch: delete
-    modified:
-      mergingList:
-        - name: 2
-    current:
-      mergingList:
-        - name: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          $patch: delete
-    result:
-      mergingList:
-        - name: 2
-          other: b
-  - description: delete missing map from merging list with conflict
-    original:
-      mergingList:
-        - name: 1
-        - name: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          $patch: delete
-    modified:
-      mergingList:
-        - name: 2
-    current:
-      mergingList:
-        - name: 3
-          other: a
-    threeWay:
-      mergingList:
-        - name: 1
-          $patch: delete
-        - name: 2
-    result:
-      mergingList:
-        - name: 2
-        - name: 3
-          other: a
-  - description: add map and delete map from merging list
-    original:
-      merginglist:
-        - name: 1
-        - name: 2
-    twoWay:
-      merginglist:
-        - name: 1
-          $patch: delete
-        - name: 3
-    modified:
-      merginglist:
-        - name: 2
-        - name: 3
-    current:
-      merginglist:
-        - name: 1
-        - name: 2
-          other: b
-        - name: 4
-          other: c
-    threeWay:
-      merginglist:
-        - name: 1
-          $patch: delete
-        - name: 3
-    result:
-      merginglist:
-        - name: 2
-          other: b
-        - name: 3
-        - name: 4
-          other: c
-  - description: add map and delete map from merging list with conflict
-    original:
-      merginglist:
-        - name: 1
-        - name: 2
-    twoWay:
-      merginglist:
-        - name: 1
-          $patch: delete
-        - name: 3
-    modified:
-      merginglist:
-        - name: 2
-        - name: 3
-    current:
-      merginglist:
-        - name: 1
-          other: a
-        - name: 4
-          other: c
-    threeWay:
-      merginglist:
-        - name: 1
-          $patch: delete
-        - name: 2
-        - name: 3
-    result:
-      merginglist:
-        - name: 2
-        - name: 3
-        - name: 4
-          other: c
-  - description: delete all maps from merging list
-    original:
-      mergingList:
-        - name: 1
-        - name: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          $patch: delete
-        - name: 2
-          $patch: delete
-    modified:
-      mergingList: []
-    current:
-      mergingList:
-        - name: 1
-        - name: 2
-    threeWay:
-      mergingList:
-        - name: 1
-          $patch: delete
-        - name: 2
-          $patch: delete
-    result:
-      mergingList: []
-  - description: delete all maps from merging list with conflict
-    original:
-      mergingList:
-        - name: 1
-        - name: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          $patch: delete
-        - name: 2
-          $patch: delete
-    modified:
-      mergingList: []
-    current:
-      mergingList:
-        - name: 1
-          other: a
-        - name: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          $patch: delete
-        - name: 2
-          $patch: delete
-    result:
-      mergingList: []
-  - description: delete all maps from empty merging list
-    original:
-      mergingList:
-        - name: 1
-        - name: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          $patch: delete
-        - name: 2
-          $patch: delete
-    modified:
-      mergingList: []
-    current:
-      mergingList: []
-    threeWay:
-      mergingList:
-        - name: 1
-          $patch: delete
-        - name: 2
-          $patch: delete
-    result:
-      mergingList: []
-  - description: delete field from map in merging list
-    original:
-      mergingList:
-        - name: 1
-          value: 1
-        - name: 2
-          value: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          value: null
-    modified:
-      mergingList:
-        - name: 1
-        - name: 2
-          value: 2
-    current:
-      mergingList:
-        - name: 1
-          value: 1
-          other: a
-        - name: 2
-          value: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          value: null
-    result:
-      mergingList:
-        - name: 1
-          other: a
-        - name: 2
-          value: 2
-          other: b
-  - description: delete field from map in merging list with conflict
-    original:
-      mergingList:
-        - name: 1
-          value: 1
-        - name: 2
-          value: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          value: null
-    modified:
-      mergingList:
-        - name: 1
-        - name: 2
-          value: 2
-    current:
-      mergingList:
-        - name: 1
-          value: a
-          other: a
-        - name: 2
-          value: 2
-    threeWay:
-      mergingList:
-        - name: 1
-          value: null
-    result:
-      mergingList:
-        - name: 1
-          other: a
-        - name: 2
-          value: 2
-  - description: delete missing field from map in merging list
-    original:
-      mergingList:
-        - name: 1
-          value: 1
-        - name: 2
-          value: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          value: null
-    modified:
-      mergingList:
-        - name: 1
-        - name: 2
-          value: 2
-    current:
-      mergingList:
-        - name: 1
-          other: a
-        - name: 2
-          value: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          value: null
-    result:
-      mergingList:
-        - name: 1
-          other: a
-        - name: 2
-          value: 2
-          other: b
-  - description: delete missing field from map in merging list with conflict
-    original:
-      mergingList:
-        - name: 1
-          value: 1
-        - name: 2
-          value: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          value: null
-    modified:
-      mergingList:
-        - name: 1
-        - name: 2
-          value: 2
-    current:
-      mergingList:
-        - name: 1
-          other: a
-        - name: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          value: null
-        - name: 2
-          value: 2
-    result:
-      mergingList:
-        - name: 1
-          other: a
-        - name: 2
-          value: 2
-          other: b
-  - description: replace non merging list nested in merging list
-    original:
-      mergingList:
-        - name: 1
-          nonMergingList:
-            - name: 1
-            - name: 2
-              value: 2
-        - name: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          nonMergingList:
-            - name: 1
-              value: 1
-    modified:
-      mergingList:
-        - name: 1
-          nonMergingList:
-            - name: 1
-              value: 1
-        - name: 2
-    current:
-      mergingList:
-        - name: 1
-          other: a
-          nonMergingList:
-            - name: 1
-            - name: 2
-              value: 2
-        - name: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          nonMergingList:
-            - name: 1
-              value: 1
-    result:
-      mergingList:
-        - name: 1
-          other: a
-          nonMergingList:
-            - name: 1
-              value: 1
-        - name: 2
-          other: b
-  - description: replace non merging list nested in merging list with value conflict
-    original:
-      mergingList:
-        - name: 1
-          nonMergingList:
-            - name: 1
-            - name: 2
-              value: 2
-        - name: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          nonMergingList:
-            - name: 1
-              value: 1
-    modified:
-      mergingList:
-        - name: 1
-          nonMergingList:
-            - name: 1
-              value: 1
-        - name: 2
-    current:
-      mergingList:
-        - name: 1
-          other: a
-          nonMergingList:
-            - name: 1
-              value: c
-        - name: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          nonMergingList:
-            - name: 1
-              value: 1
-    result:
-      mergingList:
-        - name: 1
-          other: a
-          nonMergingList:
-            - name: 1
-              value: 1
-        - name: 2
-          other: b
-  - description: replace non merging list nested in merging list with deletion conflict
-    original:
-      mergingList:
-        - name: 1
-          nonMergingList:
-            - name: 1
-            - name: 2
-              value: 2
-        - name: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          nonMergingList:
-            - name: 1
-              value: 1
-    modified:
-      mergingList:
-        - name: 1
-          nonMergingList:
-            - name: 1
-              value: 1
-        - name: 2
-    current:
-      mergingList:
-        - name: 1
-          other: a
-          nonMergingList:
-            - name: 2
-              value: 2
-        - name: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          nonMergingList:
-            - name: 1
-              value: 1
-    result:
-      mergingList:
-        - name: 1
-          other: a
-          nonMergingList:
-            - name: 1
-              value: 1
-        - name: 2
-          other: b
-  - description: add field to map in merging list nested in merging list
-    original:
-      mergingList:
-        - name: 1
-          mergingList:
-            - name: 1
-            - name: 2
-              value: 2
-        - name: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          mergingList:
-            - name: 1
-              value: 1
-    modified:
-      mergingList:
-        - name: 1
-          mergingList:
-            - name: 1
-              value: 1
-            - name: 2
-              value: 2
-        - name: 2
-    current:
-      mergingList:
-        - name: 1
-          other: a
-          mergingList:
-            - name: 1
-            - name: 2
-              value: 2
-        - name: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          mergingList:
-            - name: 1
-              value: 1
-    result:
-      mergingList:
-        - name: 1
-          other: a
-          mergingList:
-            - name: 1
-              value: 1
-            - name: 2
-              value: 2
-        - name: 2
-          other: b
-  - description: add field to map in merging list nested in merging list with value conflict
-    original:
-      mergingList:
-        - name: 1
-          mergingList:
-            - name: 1
-            - name: 2
-              value: 2
-        - name: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          mergingList:
-            - name: 1
-              value: 1
-    modified:
-      mergingList:
-        - name: 1
-          mergingList:
-            - name: 1
-              value: 1
-            - name: 2
-              value: 2
-        - name: 2
-    current:
-      mergingList:
-        - name: 1
-          other: a
-          mergingList:
-            - name: 1
-              value: a
-              other: c
-            - name: 2
-              value: b
-              other: d
-        - name: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          mergingList:
-            - name: 1
-              value: 1
-            - name: 2
-              value: 2
-    result:
-      mergingList:
-        - name: 1
-          other: a
-          mergingList:
-            - name: 1
-              value: 1
-              other: c
-            - name: 2
-              value: 2
-              other: d
-        - name: 2
-          other: b
-  - description: add field to map in merging list nested in merging list with deletion conflict
-    original:
-      mergingList:
-        - name: 1
-          mergingList:
-            - name: 1
-            - name: 2
-              value: 2
-        - name: 2
-    twoWay:
-      mergingList:
-        - name: 1
-          mergingList:
-            - name: 1
-              value: 1
-    modified:
-      mergingList:
-        - name: 1
-          mergingList:
-            - name: 1
-              value: 1
-            - name: 2
-              value: 2
-        - name: 2
-    current:
-      mergingList:
-        - name: 1
-          other: a
-          mergingList:
-            - name: 2
-              value: 2
-              other: d
-        - name: 2
-          other: b
-    threeWay:
-      mergingList:
-        - name: 1
-          mergingList:
-            - name: 1
-              value: 1
-    result:
-      mergingList:
-        - name: 1
-          other: a
-          mergingList:
-            - name: 1
-              value: 1
-            - name: 2
-              value: 2
-              other: d
-        - name: 2
-          other: b
-  - description: merge empty merging lists
-    original:
-      mergingList: []
-    twoWay:
-      {}
-    modified:
-      mergingList: []
-    current:
-      mergingList: []
-    threeWay:
-      {}
-    result:
-      mergingList: []
-  - description: add map to merging list by pointer
-    original:
-      mergeItemPtr:
-        - name: 1
-    twoWay:
-      mergeItemPtr:
-        - name: 2
-    modified:
-      mergeItemPtr:
-        - name: 1
-        - name: 2
-    current:
-      mergeItemPtr:
-        - name: 1
-          other: a
-        - name: 3
-    threeWay:
-      mergeItemPtr:
-        - name: 2
-    result:
-      mergeItemPtr:
-        - name: 1
-          other: a
-        - name: 2
-        - name: 3
-  - description: add map to merging list by pointer with conflict
-    original:
-      mergeItemPtr:
-        - name: 1
-    twoWay:
-      mergeItemPtr:
-        - name: 2
-    modified:
-      mergeItemPtr:
-        - name: 1
-        - name: 2
-    current:
-      mergeItemPtr:
-        - name: 3
-    threeWay:
-      mergeItemPtr:
-        - name: 1
-        - name: 2
-    result:
-      mergeItemPtr:
-        - name: 1
-        - name: 2
-        - name: 3
-  - description: add field to map in merging list by pointer
-    original:
-      mergeItemPtr:
-        - name: 1
-          mergeItemPtr:
-            - name: 1
-            - name: 2
-              value: 2
-        - name: 2
-    twoWay:
-      mergeItemPtr:
-        - name: 1
-          mergeItemPtr:
-            - name: 1
-              value: 1
-    modified:
-      mergeItemPtr:
-        - name: 1
-          mergeItemPtr:
-            - name: 1
-              value: 1
-            - name: 2
-              value: 2
-        - name: 2
-    current:
-      mergeItemPtr:
-        - name: 1
-          other: a
-          mergeItemPtr:
-            - name: 1
-              other: a
-            - name: 2
-              value: 2
-              other: b
-        - name: 2
-          other: b
-    threeWay:
-      mergeItemPtr:
-        - name: 1
-          mergeItemPtr:
-            - name: 1
-              value: 1
-    result:
-      mergeItemPtr:
-        - name: 1
-          other: a
-          mergeItemPtr:
-            - name: 1
-              value: 1
-              other: a
-            - name: 2
-              value: 2
-              other: b
-        - name: 2
-          other: b
-  - description: add field to map in merging list by pointer with conflict
-    original:
-      mergeItemPtr:
-        - name: 1
-          mergeItemPtr:
-            - name: 1
-            - name: 2
-              value: 2
-        - name: 2
-    twoWay:
-      mergeItemPtr:
-        - name: 1
-          mergeItemPtr:
-            - name: 1
-              value: 1
-    modified:
-      mergeItemPtr:
-        - name: 1
-          mergeItemPtr:
-            - name: 1
-              value: 1
-            - name: 2
-              value: 2
-        - name: 2
-    current:
-      mergeItemPtr:
-        - name: 1
-          other: a
-          mergeItemPtr:
-            - name: 1
-              value: a
-            - name: 2
-              value: 2
-              other: b
-        - name: 2
-          other: b
-    threeWay:
-      mergeItemPtr:
-        - name: 1
-          mergeItemPtr:
-            - name: 1
-              value: 1
-    result:
-      mergeItemPtr:
-        - name: 1
-          other: a
-          mergeItemPtr:
-            - name: 1
-              value: 1
-            - name: 2
-              value: 2
-              other: b
-        - name: 2
-          other: b
-`)
+      - name: 2
+        value: 2
+        other: b
+  - name: 2
+    other: b
+`),
+			},
+		},
+		{
+			Description: "add field to map in merging list by pointer with conflict",
+			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
+				Original: []byte(`
+mergeItemPtr:
+  - name: 1
+    mergeItemPtr:
+      - name: 1
+      - name: 2
+        value: 2
+  - name: 2
+`),
+				TwoWay: []byte(`
+mergeItemPtr:
+  - name: 1
+    mergeItemPtr:
+      - name: 1
+        value: 1
+`),
+				Modified: []byte(`
+mergeItemPtr:
+  - name: 1
+    mergeItemPtr:
+      - name: 1
+        value: 1
+      - name: 2
+        value: 2
+  - name: 2
+`),
+				Current: []byte(`
+mergeItemPtr:
+  - name: 1
+    other: a
+    mergeItemPtr:
+      - name: 1
+        value: a
+      - name: 2
+        value: 2
+        other: b
+  - name: 2
+    other: b
+`),
+				ThreeWay: []byte(`
+mergeItemPtr:
+  - name: 1
+    mergeItemPtr:
+      - name: 1
+        value: 1
+`),
+				Result: []byte(`
+mergeItemPtr:
+  - name: 1
+    other: a
+    mergeItemPtr:
+      - name: 1
+        value: 1
+      - name: 2
+        value: 2
+        other: b
+  - name: 2
+    other: b
+`),
+			},
+		},
+	},
+}
 
 func TestStrategicMergePatch(t *testing.T) {
 	testStrategicMergePatchWithCustomArguments(t, "bad original",
@@ -1788,14 +2398,7 @@ func TestStrategicMergePatch(t *testing.T) {
 	testStrategicMergePatchWithCustomArguments(t, "nil struct",
 		"{}", "{}", nil, fmt.Errorf(errBadArgTypeFmt, "struct", "nil"))
 
-	tc := StrategicMergePatchTestCases{}
-	err := yaml.Unmarshal(createStrategicMergePatchTestCaseData, &tc)
-	if err != nil {
-		t.Errorf("can't unmarshal test cases: %s\n", err)
-		return
-	}
-
-	for _, c := range tc.TestCases {
+	for _, c := range createStrategicMergePatchTestCaseData.TestCases {
 		testTwoWayPatch(t, c)
 		testThreeWayPatch(t, c)
 	}
@@ -1817,72 +2420,88 @@ func testStrategicMergePatchWithCustomArguments(t *testing.T, description, origi
 }
 
 func testTwoWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
-	original, expected, modified := twoWayTestCaseToJSONOrFail(t, c)
-
-	actual, err := CreateTwoWayMergePatch(original, modified, mergeItem)
+	originalJSON := yamlToJSONOrError(c.Original)
+	modifiedJSON := yamlToJSONOrError(c.Modified)
+	expectedJSON := yamlToJSONOrError(c.TwoWay)
+	smPatchVersion := SMPatchVersion_1_5
+	if strings.Contains(c.Description, "using SMPatchVersion_1_0") {
+		smPatchVersion = SMPatchVersion_1_0
+	}
+	actualJSON, err := CreateTwoWayMergePatch(originalJSON, modifiedJSON, mergeItem, smPatchVersion)
 	if err != nil {
-		t.Errorf("error: %s\nin test case: %s\ncannot create two way patch: %s:\n%s\n",
-			err, c.Description, original, toYAMLOrError(c.StrategicMergePatchTestCaseData))
+		t.Errorf("error: %s\nin test case: %s\ncannot create two way patch:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
+			err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
 		return
 	}
 
-	testPatchCreation(t, expected, actual, c.Description)
-	testPatchApplication(t, original, actual, modified, c.Description)
-}
-
-func twoWayTestCaseToJSONOrFail(t *testing.T, c StrategicMergePatchTestCase) ([]byte, []byte, []byte) {
-	return testObjectToJSONOrFail(t, c.Original, c.Description),
-		testObjectToJSONOrFail(t, c.TwoWay, c.Description),
-		testObjectToJSONOrFail(t, c.Modified, c.Description)
+	if !strings.Contains(c.Description, "for list of primitives") {
+		testPatchCreation(t, expectedJSON, actualJSON, c.Description)
+	} else {
+		testPatchCreationWithoutSorting(t, expectedJSON, actualJSON, c.Description)
+	}
+	testPatchApplication(t, originalJSON, actualJSON, modifiedJSON, c.Description)
 }
 
 func testThreeWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
-	original, modified, current, expected, result := threeWayTestCaseToJSONOrFail(t, c)
-	actual, err := CreateThreeWayMergePatch(original, modified, current, mergeItem, false)
+	originalJSON := yamlToJSONOrError(c.Original)
+	modifiedJSON := yamlToJSONOrError(c.Modified)
+	currentJSON := yamlToJSONOrError(c.Current)
+	expectedJSON := yamlToJSONOrError(c.ThreeWay)
+	resultJSON := yamlToJSONOrError(c.Result)
+	smPatchVersion := SMPatchVersion_1_5
+	if strings.Contains(c.Description, "using SMPatchVersion_1_0") {
+		smPatchVersion = SMPatchVersion_1_0
+	}
+	actualJSON, err := CreateThreeWayMergePatch(originalJSON, modifiedJSON, currentJSON, mergeItem, false, smPatchVersion)
 	if err != nil {
 		if !IsConflict(err) {
-			t.Errorf("error: %s\nin test case: %s\ncannot create three way patch:\n%s\n",
-				err, c.Description, toYAMLOrError(c.StrategicMergePatchTestCaseData))
+			t.Errorf("error: %s\nin test case: %s\ncannot create three way patch:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
+				err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
 			return
 		}
 
 		if !strings.Contains(c.Description, "conflict") {
-			t.Errorf("unexpected conflict: %s\nin test case: %s\ncannot create three way patch:\n%s\n",
-				err, c.Description, toYAMLOrError(c.StrategicMergePatchTestCaseData))
-			return
+			t.Errorf("unexpected conflict: %s\nin test case: %s\ncannot create three way patch:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
+				err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
 		}
 
 		if len(c.Result) > 0 {
-			actual, err := CreateThreeWayMergePatch(original, modified, current, mergeItem, true)
+			actualJSON, err := CreateThreeWayMergePatch(originalJSON, modifiedJSON, currentJSON, mergeItem, true, smPatchVersion)
 			if err != nil {
-				t.Errorf("error: %s\nin test case: %s\ncannot force three way patch application:\n%s\n",
-					err, c.Description, toYAMLOrError(c.StrategicMergePatchTestCaseData))
+				t.Errorf("error: %s\nin test case: %s\ncannot force three way patch application:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
+					err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
 				return
 			}
 
-			testPatchCreation(t, expected, actual, c.Description)
-			testPatchApplication(t, current, actual, result, c.Description)
+			if !strings.Contains(c.Description, "for list of primitives") {
+				testPatchCreation(t, expectedJSON, actualJSON, c.Description)
+			} else {
+				testPatchCreationWithoutSorting(t, expectedJSON, actualJSON, c.Description)
+			}
+			testPatchApplication(t, currentJSON, actualJSON, resultJSON, c.Description)
 		}
 
 		return
 	}
 
 	if strings.Contains(c.Description, "conflict") || len(c.Result) < 1 {
-		t.Errorf("error in test case: %s\nexpected conflict did not occur:\n%s\n",
-			c.Description, toYAMLOrError(c.StrategicMergePatchTestCaseData))
-		return
+		t.Errorf("error: %s\nin test case: %s\nexpected conflict did not occur:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
+			err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
 	}
 
-	testPatchCreation(t, expected, actual, c.Description)
-	testPatchApplication(t, current, actual, result, c.Description)
+	if !strings.Contains(c.Description, "for list of primitives") {
+		testPatchCreation(t, expectedJSON, actualJSON, c.Description)
+	} else {
+		testPatchCreationWithoutSorting(t, expectedJSON, actualJSON, c.Description)
+	}
+	testPatchApplication(t, currentJSON, actualJSON, resultJSON, c.Description)
 }
 
-func threeWayTestCaseToJSONOrFail(t *testing.T, c StrategicMergePatchTestCase) ([]byte, []byte, []byte, []byte, []byte) {
-	return testObjectToJSONOrFail(t, c.Original, c.Description),
-		testObjectToJSONOrFail(t, c.Modified, c.Description),
-		testObjectToJSONOrFail(t, c.Current, c.Description),
-		testObjectToJSONOrFail(t, c.ThreeWay, c.Description),
-		testObjectToJSONOrFail(t, c.Result, c.Description)
+func testPatchCreationWithoutSorting(t *testing.T, expectedYAML, actualYAML []byte, description string) {
+	if bytes.Compare(actualYAML, expectedYAML) != 0 {
+		t.Errorf("error in test case: %s\nexpected patch:\n%s\ngot:\n%s\n",
+			description, jsonToYAMLOrError(expectedYAML), jsonToYAMLOrError(actualYAML))
+	}
 }
 
 func testPatchCreation(t *testing.T, expected, actual []byte, description string) {
@@ -1907,7 +2526,6 @@ func testPatchApplication(t *testing.T, original, patch, expected []byte, descri
 			err, description, jsonToYAMLOrError(patch), jsonToYAMLOrError(original))
 		return
 	}
-
 	sorted, err := sortMergeListsByName(result, mergeItem)
 	if err != nil {
 		t.Errorf("error: %s\nin test case: %s\ncannot sort result object:\n%s\n",
@@ -1968,6 +2586,24 @@ func jsonToYAML(j []byte) ([]byte, error) {
 	}
 
 	return y, nil
+}
+
+func yamlToJSON(y []byte) ([]byte, error) {
+	j, err := yaml.YAMLToJSON(y)
+	if err != nil {
+		return nil, fmt.Errorf("yaml to json failed: %v\n%v\n", err, y)
+	}
+
+	return j, nil
+}
+
+func yamlToJSONOrError(y []byte) []byte {
+	j, err := yamlToJSON(y)
+	if err != nil {
+		return []byte(err.Error())
+	}
+
+	return j
 }
 
 func TestHasConflicts(t *testing.T) {
@@ -2095,7 +2731,7 @@ func TestNumberConversion(t *testing.T) {
 	}
 
 	for k, tc := range testcases {
-		patch, err := CreateTwoWayMergePatch([]byte(tc.Old), []byte(tc.New), precisionItem)
+		patch, err := CreateTwoWayMergePatch([]byte(tc.Old), []byte(tc.New), precisionItem, SMPatchVersionLatest)
 		if err != nil {
 			t.Errorf("%s: unexpected error %v", k, err)
 			continue

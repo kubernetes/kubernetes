@@ -281,7 +281,7 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 
 		switch editMode {
 		case NormalEditMode:
-			err = visitToPatch(originalObj, updates, mapper, resourceMapper, encoder, out, errOut, defaultVersion, &results, file)
+			err = visitToPatch(originalObj, updates, f, mapper, resourceMapper, encoder, out, errOut, defaultVersion, &results, file)
 		case EditBeforeCreateMode:
 			err = visitToCreate(updates, mapper, resourceMapper, out, errOut, defaultVersion, &results, file)
 		default:
@@ -393,9 +393,22 @@ func getMapperAndResult(f cmdutil.Factory, args []string, options *resource.File
 	return mapper, resourceMapper, r, cmdNamespace, err
 }
 
-func visitToPatch(originalObj runtime.Object, updates *resource.Info, mapper meta.RESTMapper, resourceMapper *resource.Mapper, encoder runtime.Encoder, out, errOut io.Writer, defaultVersion unversioned.GroupVersion, results *editResults, file string) error {
+func visitToPatch(originalObj runtime.Object, updates *resource.Info,
+	f cmdutil.Factory,
+	mapper meta.RESTMapper, resourceMapper *resource.Mapper,
+	encoder runtime.Encoder,
+	out, errOut io.Writer,
+	defaultVersion unversioned.GroupVersion,
+	results *editResults,
+	file string) error {
+
+	smPatchVersion, err := cmdutil.GetServerSupportedSMPatchVersionFromFactory(f)
+	if err != nil {
+		return err
+	}
+
 	patchVisitor := resource.NewFlattenListVisitor(updates, resourceMapper)
-	err := patchVisitor.Visit(func(info *resource.Info, incomingErr error) error {
+	err = patchVisitor.Visit(func(info *resource.Info, incomingErr error) error {
 		currOriginalObj := originalObj
 
 		// if we're editing a list, then navigate the list to find the item that we're currently trying to edit
@@ -456,7 +469,7 @@ func visitToPatch(originalObj runtime.Object, updates *resource.Info, mapper met
 
 		preconditions := []strategicpatch.PreconditionFunc{strategicpatch.RequireKeyUnchanged("apiVersion"),
 			strategicpatch.RequireKeyUnchanged("kind"), strategicpatch.RequireMetadataKeyUnchanged("name")}
-		patch, err := strategicpatch.CreateTwoWayMergePatch(originalJS, editedJS, currOriginalObj, preconditions...)
+		patch, err := strategicpatch.CreateTwoWayMergePatch(originalJS, editedJS, currOriginalObj, smPatchVersion, preconditions...)
 		if err != nil {
 			glog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
 			if strategicpatch.IsPreconditionFailed(err) {
