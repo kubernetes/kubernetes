@@ -21,6 +21,7 @@ package v1alpha1
 import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	imagepolicy "k8s.io/kubernetes/pkg/apis/imagepolicy"
 	v1alpha1 "k8s.io/kubernetes/pkg/apis/imagepolicy/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/labels"
