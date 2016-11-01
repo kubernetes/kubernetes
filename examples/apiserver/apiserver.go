@@ -60,7 +60,7 @@ func NewServerRunOptions() *genericoptions.ServerRunOptions {
 	return serverOptions
 }
 
-func Run(serverOptions *genericoptions.ServerRunOptions) error {
+func Run(serverOptions *genericoptions.ServerRunOptions, stopCh <-chan struct{}) error {
 	// Set ServiceClusterIPRange
 	_, serviceClusterIPRange, _ := net.ParseCIDR("10.0.0.0/24")
 	serverOptions.ServiceClusterIPRange = *serviceClusterIPRange
@@ -105,6 +105,6 @@ func Run(serverOptions *genericoptions.ServerRunOptions) error {
 	if err := s.InstallAPIGroup(&apiGroupInfo); err != nil {
 		return fmt.Errorf("Error in installing API: %v", err)
 	}
-	s.PrepareRun().Run()
+	s.PrepareRun().Run(stopCh)
 	return nil
 }

@@ -110,7 +110,7 @@ type Config struct {
 	// same value for this field. (Numbers > 1 currently untested.)
 	MasterCount int
 
-	SecureServingInfo   *ServingInfo
+	SecureServingInfo   *SecureServingInfo
 	InsecureServingInfo *ServingInfo
 
 	// The port on PublicAddress where a read-write server will be installed.
@@ -177,17 +177,36 @@ type Config struct {
 type ServingInfo struct {
 	// BindAddress is the ip:port to serve on
 	BindAddress string
+}
+
+type SecureServingInfo struct {
+	ServingInfo
+
 	// ServerCert is the TLS cert info for serving secure traffic
-	ServerCert CertInfo
+	ServerCert GeneratableKeyCert
+	// SNICerts are named CertKeys for serving secure traffic with SNI support.
+	SNICerts []NamedCertKey
 	// ClientCA is the certificate bundle for all the signers that you'll recognize for incoming client certificates
 	ClientCA string
 }
 
-type CertInfo struct {
+type CertKey struct {
 	// CertFile is a file containing a PEM-encoded certificate
 	CertFile string
 	// KeyFile is a file containing a PEM-encoded private key for the certificate specified by CertFile
 	KeyFile string
+}
+
+type NamedCertKey struct {
+	CertKey
+
+	// Names is a list of domain patterns: fully qualified domain names, possibly prefixed with
+	// wildcard segments.
+	Names []string
+}
+
+type GeneratableKeyCert struct {
+	CertKey
 	// Generate indicates that the cert/key pair should be generated if its not present.
 	Generate bool
 }
@@ -248,18 +267,34 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 	}
 
 	if options.SecurePort > 0 {
-		secureServingInfo := &ServingInfo{
-			BindAddress: net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort)),
-			ServerCert: CertInfo{
-				CertFile: options.TLSCertFile,
-				KeyFile:  options.TLSPrivateKeyFile,
+		secureServingInfo := &SecureServingInfo{
+			ServingInfo: ServingInfo{
+				BindAddress: net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort)),
 			},
+			ServerCert: GeneratableKeyCert{
+				CertKey: CertKey{
+					CertFile: options.TLSCertFile,
+					KeyFile:  options.TLSPrivateKeyFile,
+				},
+			},
+			SNICerts: []NamedCertKey{},
 			ClientCA: options.ClientCAFile,
 		}
 		if options.TLSCertFile == "" && options.TLSPrivateKeyFile == "" {
 			secureServingInfo.ServerCert.Generate = true
 			secureServingInfo.ServerCert.CertFile = path.Join(options.CertDirectory, "apiserver.crt")
 			secureServingInfo.ServerCert.KeyFile = path.Join(options.CertDirectory, "apiserver.key")
+		}
+
+		secureServingInfo.SNICerts = nil
+		for _, nkc := range options.SNICertKeys {
+			secureServingInfo.SNICerts = append(secureServingInfo.SNICerts, NamedCertKey{
+				CertKey: CertKey{
+					KeyFile:  nkc.KeyFile,
+					CertFile: nkc.CertFile,
+				},
+				Names: nkc.Names,
+			})
 		}
 
 		c.SecureServingInfo = secureServingInfo
@@ -434,9 +469,16 @@ func (c completedConfig) MaybeGenerateServingCerts() error {
 		alternateIPs := []net.IP{c.ServiceReadWriteIP}
 		alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes", "localhost"}
 
-		if err := certutil.GenerateSelfSignedCert(c.PublicAddress.String(), c.SecureServingInfo.ServerCert.CertFile, c.SecureServingInfo.ServerCert.KeyFile, alternateIPs, alternateDNS); err != nil {
-			return fmt.Errorf("Unable to generate self signed cert: %v", err)
+		if cert, key, err := certutil.GenerateSelfSignedCertKey(c.PublicAddress.String(), alternateIPs, alternateDNS); err != nil {
+			return fmt.Errorf("unable to generate self signed cert: %v", err)
 		} else {
+			if err := certutil.WriteCert(c.SecureServingInfo.ServerCert.CertFile, cert); err != nil {
+				return err
+			}
+
+			if err := certutil.WriteKey(c.SecureServingInfo.ServerCert.KeyFile, key); err != nil {
+				return err
+			}
 			glog.Infof("Generated self-signed cert (%s, %s)", c.SecureServingInfo.ServerCert.CertFile, c.SecureServingInfo.ServerCert.KeyFile)
 		}
 	}
