@@ -2552,7 +2552,7 @@ func testThreeWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
 	}
 
 	if strings.Contains(c.Description, "conflict") || len(c.Result) < 1 {
-		t.Errorf("error in test case: %s\nexpected conflict did not occur:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
+		t.Errorf("error: %s\nin test case: %s\nexpected conflict did not occur:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
 			err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
 	}
 
