@@ -134,6 +134,10 @@ func (c *Cloner) DeepCopy(in interface{}) (interface{}, error) {
 	return outValue.Interface(), nil
 }
 
+func (c *Cloner) ReflectDeepCopy() (src reflect.Value) (reflect.Value, error) {
+	return c.deepCopy(src)
+}
+
 func (c *Cloner) deepCopy(src reflect.Value) (reflect.Value, error) {
 	inType := src.Type()
 

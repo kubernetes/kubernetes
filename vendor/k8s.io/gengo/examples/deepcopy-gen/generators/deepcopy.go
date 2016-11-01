@@ -430,11 +430,20 @@ func (g *genDeepCopy) GenerateType(c *generator.Context, t *types.Type, w io.Wri
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	args := argsFromType(t).
 		With("clonerType", types.Ref(conversionPackagePath, "Cloner"))
-	sw.Do("func $.type|dcFnName$(in interface{}, out interface{}, c *$.clonerType|raw$) error {{\n", args)
-	sw.Do("in := in.(*$.type|raw$)\nout := out.(*$.type|raw$)\n", argsFromType(t))
+	sw.Do("// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.\n", nil)
+	sw.Do("func (in *$.type|raw$) DeepCopyInto(out *$.type|raw$) {{\n", args)
 	g.generateFor(t, sw)
-	sw.Do("return nil\n", nil)
+	sw.Do("return\n", nil)
 	sw.Do("}}\n\n", nil)
+
+	sw.Do("// DeepCopy will perform a deep copy of the receiver, creating a new object.\n", nil)
+	sw.Do("func (x *$.type|raw$) DeepCopy(c *Cloner) *$.type|raw$ {{\n", args)
+	sw.Do("if x == nil { return nil }\n", nil)
+	sw.Do("out := new($.type|raw$)\n", args)
+	sw.Do("x.DeepCopyInto(out)\n", nil)
+	sw.Do("return out\n", nil)
+	sw.Do("}}\n\n", nil)
+
 	return sw.Error()
 }
 
@@ -488,9 +497,7 @@ func (g *genDeepCopy) doMap(t *types.Type, sw *generator.SnippetWriter) {
 			sw.Do("for key, val := range *in {\n", nil)
 			if g.copyableAndInBounds(t.Elem) {
 				sw.Do("newVal := new($.|raw$)\n", t.Elem)
-				sw.Do("if err := $.type|dcFnName$(&val, newVal, c); err != nil {\n", argsFromType(t.Elem))
-				sw.Do("return err\n", nil)
-				sw.Do("}\n", nil)
+				sw.Do("val.DeepCopyInto(newVal)\n", nil)
 				sw.Do("(*out)[key] = *newVal\n", nil)
 			} else {
 				sw.Do("if newVal, err := c.DeepCopy(&val); err != nil {\n", nil)
@@ -520,7 +527,7 @@ func (g *genDeepCopy) doSlice(t *types.Type, sw *generator.SnippetWriter) {
 		} else if t.Elem.IsAssignable() {
 			sw.Do("(*out)[i] = (*in)[i]\n", nil)
 		} else if g.copyableAndInBounds(t.Elem) {
-			sw.Do("if err := $.type|dcFnName$(&(*in)[i], &(*out)[i], c); err != nil {\n", argsFromType(t.Elem))
+			sw.Do("$.type|dcFnName$(&(*in)[i], &(*out)[i], c); err != nil {\n", argsFromType(t.Elem))
 			sw.Do("return err\n", nil)
 			sw.Do("}\n", nil)
 		} else {
