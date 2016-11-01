@@ -29,6 +29,7 @@ go_library(
         "//pkg/apis/storage:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
+        "//pkg/client/listers/core/internalversion:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/watch:go_default_library",
     ],
