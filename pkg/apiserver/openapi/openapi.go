@@ -29,7 +29,21 @@ import (
 
 var verbs = util.CreateTrie([]string{"get", "log", "read", "replace", "patch", "delete", "deletecollection", "watch", "connect", "proxy", "list", "create", "patch"})
 
-// ToValidOperationID makes an string a valid op ID (e.g. removing punctuations and whitespaces and make it camel case)
+// forcePrefixForOpIDs contains list of operation IDs that will get a prefix (usually GroupVersion) to prevent duplicates.
+var forcePrefixForOpIDs = map[string]bool{
+	"getAPIResources": true,
+	"getAPIGroup":     true,
+	"getAPIVersions":  true,
+}
+
+// forcePrefixForTags contains list of tags which their Operation IDs will get a prefix (usually GroupVersion) to prevent duplicates.
+// It is preferred to put alpha/beta (e.g., *_v1beta1) tags in this list rather than released tags (e.g. CoreV1).
+// Tags are usually lowercase group or group_version
+var forcePrefixForTags = map[string]bool{
+	"extensions_v1beta1": true,
+}
+
+// ToValidOperationID makes an :string a valid op ID (e.g. removing punctuations and whitespaces and make it camel case)
 func ToValidOperationID(s string, capitalizeFirstLetter bool) string {
 	var buffer bytes.Buffer
 	capitalize := capitalizeFirstLetter
@@ -59,6 +73,7 @@ func GetOperationIDAndTags(servePath string, r *restful.Route) (string, []string
 	}
 	switch servePath {
 	case "/swagger.json":
+		forcePrefixForID, _ := forcePrefixForOpIDs[op]
 		prefix, exists := verbs.GetPrefix(op)
 		if !exists {
 			return op, tags, fmt.Errorf("operation names should start with a verb. Cannot determine operation verb from %v", op)
@@ -70,13 +85,16 @@ func GetOperationIDAndTags(servePath string, r *restful.Route) (string, []string
 			parts = append([]string{"apis", "core"}, parts[1:]...)
 		}
 		if len(parts) >= 2 && parts[0] == "apis" {
-			prefix = prefix + ToValidOperationID(strings.TrimSuffix(parts[1], ".k8s.io"), prefix != "")
+			p := ToValidOperationID(strings.TrimSuffix(parts[1], ".k8s.io"), prefix != "")
 			tag := ToValidOperationID(strings.TrimSuffix(parts[1], ".k8s.io"), false)
 			if len(parts) > 2 {
-				prefix = prefix + ToValidOperationID(parts[2], prefix != "")
+				p = p + ToValidOperationID(parts[2], prefix != "")
 				tag = tag + "_" + ToValidOperationID(parts[2], false)
 			}
 			tags = append(tags, tag)
+			if forcePrefixForTags[tag] || forcePrefixForID {
+				prefix = prefix + p
+			}
 		} else if len(parts) >= 1 {
 			tags = append(tags, ToValidOperationID(parts[0], false))
 		}
