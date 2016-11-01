@@ -33,9 +33,9 @@ import (
 )
 
 // Construct an instance of a plugin, by name.
-func makePluginUnderTest(t *testing.T, plugName, basePath, rootContext string) volume.VolumePlugin {
+func makePluginUnderTest(t *testing.T, plugName, basePath string) volume.VolumePlugin {
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(basePath, nil, nil, rootContext))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(basePath, nil, nil, "" /* rootContext */))
 
 	plug, err := plugMgr.FindPluginByName(plugName)
 	if err != nil {
@@ -50,7 +50,7 @@ func TestCanSupport(t *testing.T) {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", tmpDir, "" /* rootContext */)
+	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", tmpDir)
 
 	if plug.GetPluginName() != "kubernetes.io/empty-dir" {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
@@ -75,44 +75,13 @@ func (fake *fakeMountDetector) GetMountMedium(path string) (storageMedium, bool,
 func TestPluginEmptyRootContext(t *testing.T) {
 	doTestPlugin(t, pluginTestConfig{
 		medium:                 api.StorageMediumDefault,
-		rootContext:            "",
 		expectedSetupMounts:    0,
 		expectedTeardownMounts: 0})
-}
-
-func TestPluginRootContextSet(t *testing.T) {
-	if !selinuxEnabled() {
-		return
-	}
-
-	doTestPlugin(t, pluginTestConfig{
-		medium:                 api.StorageMediumDefault,
-		rootContext:            "user:role:type:range",
-		expectedSELinux:        "user:role:type:range",
-		expectedSetupMounts:    0,
-		expectedTeardownMounts: 0})
-}
-
-func TestPluginTmpfs(t *testing.T) {
-	if !selinuxEnabled() {
-		return
-	}
-
-	doTestPlugin(t, pluginTestConfig{
-		medium:                        api.StorageMediumMemory,
-		rootContext:                   "user:role:type:range",
-		expectedSELinux:               "user:role:type:range",
-		expectedSetupMounts:           1,
-		shouldBeMountedBeforeTeardown: true,
-		expectedTeardownMounts:        1})
 }
 
 type pluginTestConfig struct {
 	medium                        api.StorageMedium
-	rootContext                   string
-	SELinuxOptions                *api.SELinuxOptions
 	idempotent                    bool
-	expectedSELinux               string
 	expectedSetupMounts           int
 	shouldBeMountedBeforeTeardown bool
 	expectedTeardownMounts        int
@@ -130,7 +99,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 		volumePath  = path.Join(basePath, "pods/poduid/volumes/kubernetes.io~empty-dir/test-volume")
 		metadataDir = path.Join(basePath, "pods/poduid/plugins/kubernetes.io~empty-dir/test-volume")
 
-		plug       = makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath, config.rootContext)
+		plug       = makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath)
 		volumeName = "test-volume"
 		spec       = &api.Volume{
 			Name:         volumeName,
@@ -141,24 +110,6 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 		mountDetector   = fakeMountDetector{}
 		pod             = &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
 	)
-
-	// Set up the SELinux options on the pod
-	if config.SELinuxOptions != nil {
-		pod.Spec = api.PodSpec{
-			Containers: []api.Container{
-				{
-					SecurityContext: &api.SecurityContext{
-						SELinuxOptions: config.SELinuxOptions,
-					},
-					VolumeMounts: []api.VolumeMount{
-						{
-							Name: volumeName,
-						},
-					},
-				},
-			},
-		}
-	}
 
 	if config.idempotent {
 		physicalMounter.MountPoints = []mount.MountPoint{
@@ -258,7 +209,7 @@ func TestPluginBackCompat(t *testing.T) {
 	}
 	defer os.RemoveAll(basePath)
 
-	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath, "" /* rootContext */)
+	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", basePath)
 
 	spec := &api.Volume{
 		Name: "vol1",
@@ -287,7 +238,7 @@ func TestMetrics(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", tmpDir, "" /* rootContext */)
+	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir", tmpDir)
 
 	spec := &api.Volume{
 		Name: "vol1",
