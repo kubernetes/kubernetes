@@ -24,6 +24,7 @@ import (
 	storage "k8s.io/kubernetes/pkg/apis/storage"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
+	unsafe "unsafe"
 )
 
 func init() {
@@ -47,7 +48,7 @@ func autoConvert_v1beta1_StorageClass_To_storage_StorageClass(in *StorageClass, 
 		return err
 	}
 	out.Provisioner = in.Provisioner
-	out.Parameters = in.Parameters
+	out.Parameters = *(*map[string]string)(unsafe.Pointer(&in.Parameters))
 	return nil
 }
 
@@ -61,7 +62,7 @@ func autoConvert_storage_StorageClass_To_v1beta1_StorageClass(in *storage.Storag
 		return err
 	}
 	out.Provisioner = in.Provisioner
-	out.Parameters = in.Parameters
+	out.Parameters = *(*map[string]string)(unsafe.Pointer(&in.Parameters))
 	return nil
 }
 
@@ -71,17 +72,7 @@ func Convert_storage_StorageClass_To_v1beta1_StorageClass(in *storage.StorageCla
 
 func autoConvert_v1beta1_StorageClassList_To_storage_StorageClassList(in *StorageClassList, out *storage.StorageClassList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]storage.StorageClass, len(*in))
-		for i := range *in {
-			if err := Convert_v1beta1_StorageClass_To_storage_StorageClass(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]storage.StorageClass)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -91,17 +82,7 @@ func Convert_v1beta1_StorageClassList_To_storage_StorageClassList(in *StorageCla
 
 func autoConvert_storage_StorageClassList_To_v1beta1_StorageClassList(in *storage.StorageClassList, out *StorageClassList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]StorageClass, len(*in))
-		for i := range *in {
-			if err := Convert_storage_StorageClass_To_v1beta1_StorageClass(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]StorageClass)(unsafe.Pointer(&in.Items))
 	return nil
 }
 

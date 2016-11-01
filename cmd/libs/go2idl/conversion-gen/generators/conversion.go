@@ -713,17 +713,10 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 				sw.Do("out.$.name$ = ($.outType|raw$)($.Pointer|raw$(in.$.name$))\n", args)
 				continue
 			case types.Map:
-				sw.Do("{\n", nil)
-				sw.Do("m := (*$.outType|raw$)($.Pointer|raw$(&in.$.name$))\n", args)
-				sw.Do("out.$.name$ = *m\n", args)
-				sw.Do("}\n", nil)
+				sw.Do("out.$.name$ = *(*$.outType|raw$)($.Pointer|raw$(&in.$.name$))\n", args)
 				continue
 			case types.Slice:
-				sw.Do("{\n", nil)
-				sw.Do("outHdr := (*$.SliceHeader|raw$)($.Pointer|raw$(&out.$.name$))\n", args)
-				sw.Do("inHdr := (*$.SliceHeader|raw$)($.Pointer|raw$(&in.$.name$))\n", args)
-				sw.Do("*outHdr = *inHdr\n", nil)
-				sw.Do("}\n", nil)
+				sw.Do("out.$.name$ = *(*$.outType|raw$)($.Pointer|raw$(&in.$.name$))\n", args)
 				continue
 			}
 		}

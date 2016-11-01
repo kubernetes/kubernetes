@@ -24,6 +24,7 @@ import (
 	authentication "k8s.io/kubernetes/pkg/apis/authentication"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
+	unsafe "unsafe"
 )
 
 func init() {
@@ -128,21 +129,8 @@ func Convert_authentication_TokenReviewStatus_To_v1beta1_TokenReviewStatus(in *a
 func autoConvert_v1beta1_UserInfo_To_authentication_UserInfo(in *UserInfo, out *authentication.UserInfo, s conversion.Scope) error {
 	out.Username = in.Username
 	out.UID = in.UID
-	out.Groups = in.Groups
-	if in.Extra != nil {
-		in, out := &in.Extra, &out.Extra
-		*out = make(map[string]authentication.ExtraValue, len(*in))
-		for key, val := range *in {
-			newVal := new(authentication.ExtraValue)
-			// TODO: Inefficient conversion - can we improve it?
-			if err := s.Convert(&val, newVal, 0); err != nil {
-				return err
-			}
-			(*out)[key] = *newVal
-		}
-	} else {
-		out.Extra = nil
-	}
+	out.Groups = *(*[]string)(unsafe.Pointer(&in.Groups))
+	out.Extra = *(*map[string]authentication.ExtraValue)(unsafe.Pointer(&in.Extra))
 	return nil
 }
 
@@ -153,21 +141,8 @@ func Convert_v1beta1_UserInfo_To_authentication_UserInfo(in *UserInfo, out *auth
 func autoConvert_authentication_UserInfo_To_v1beta1_UserInfo(in *authentication.UserInfo, out *UserInfo, s conversion.Scope) error {
 	out.Username = in.Username
 	out.UID = in.UID
-	out.Groups = in.Groups
-	if in.Extra != nil {
-		in, out := &in.Extra, &out.Extra
-		*out = make(map[string]ExtraValue, len(*in))
-		for key, val := range *in {
-			newVal := new(ExtraValue)
-			// TODO: Inefficient conversion - can we improve it?
-			if err := s.Convert(&val, newVal, 0); err != nil {
-				return err
-			}
-			(*out)[key] = *newVal
-		}
-	} else {
-		out.Extra = nil
-	}
+	out.Groups = *(*[]string)(unsafe.Pointer(&in.Groups))
+	out.Extra = *(*map[string]ExtraValue)(unsafe.Pointer(&in.Extra))
 	return nil
 }
 
