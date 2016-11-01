@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	kclientcmd "k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	kdns "k8s.io/kubernetes/pkg/dns"
-	"k8s.io/kubernetes/pkg/version"
 )
 
 type KubeDNSServer struct {
@@ -47,9 +46,7 @@ type KubeDNSServer struct {
 }
 
 func NewKubeDNSServerDefault(config *options.KubeDNSConfig) *KubeDNSServer {
-	ks := KubeDNSServer{
-		domain: config.ClusterDomain,
-	}
+	ks := KubeDNSServer{domain: config.ClusterDomain}
 
 	kubeClient, err := newKubeClient(config)
 	if err != nil {
@@ -93,28 +90,32 @@ func newKubeClient(dnsConfig *options.KubeDNSConfig) (clientset.Interface, error
 		}
 	}
 
-	glog.Infof("Using %s for kubernetes master, kubernetes API: %v", config.Host, config.GroupVersion)
+	glog.V(0).Infof("Using %v for kubernetes master, kubernetes API: %v",
+		config.Host, config.GroupVersion)
 	return clientset.NewForConfig(config)
 }
 
 func (server *KubeDNSServer) Run() {
-	glog.Infof("%+v", version.Get())
 	pflag.VisitAll(func(flag *pflag.Flag) {
-		glog.Infof("FLAG: --%s=%q", flag.Name, flag.Value)
+		glog.V(0).Infof("FLAG: --%s=%q", flag.Name, flag.Value)
 	})
 	setupSignalHandlers()
 	server.startSkyDNSServer()
 	server.kd.Start()
-	server.setupHealthzHandlers()
-	glog.Infof("Setting up Healthz Handler(/readiness, /cache) on port :%d", server.healthzPort)
+	server.setupHandlers()
+
+	glog.V(0).Infof("Status HTTP port %v", server.healthzPort)
 	glog.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", server.healthzPort), nil))
 }
 
 // setupHealthzHandlers sets up a readiness and liveness endpoint for kube2sky.
-func (server *KubeDNSServer) setupHealthzHandlers() {
+func (server *KubeDNSServer) setupHandlers() {
+	glog.V(0).Infof("Setting up Healthz Handler (/readiness)")
 	http.HandleFunc("/readiness", func(w http.ResponseWriter, req *http.Request) {
 		fmt.Fprintf(w, "ok\n")
 	})
+
+	glog.V(0).Infof("Setting up cache handler (/cache)")
 	http.HandleFunc("/cache", func(w http.ResponseWriter, req *http.Request) {
 		serializedJSON, err := server.kd.GetCacheAsJSON()
 		if err == nil {
@@ -126,25 +127,32 @@ func (server *KubeDNSServer) setupHealthzHandlers() {
 	})
 }
 
-// setupSignalHandlers runs a goroutine that waits on SIGINT or SIGTERM and logs it
-// program will be terminated by SIGKILL when grace period ends.
+// setupSignalHandlers installs signal handler to ignore SIGINT and
+// SIGTERM. This daemon will be killed by SIGKILL after the grace
+// period to allow for some manner of graceful shutdown.
 func setupSignalHandlers() {
 	sigChan := make(chan os.Signal)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
-		glog.Infof("Received signal: %s, will exit when the grace period ends", <-sigChan)
+		glog.V(0).Infof("Ignoring signal %v (can only be terminated by SIGKILL)", <-sigChan)
 	}()
 }
 
 func (d *KubeDNSServer) startSkyDNSServer() {
-	glog.Infof("Starting SkyDNS server. Listening on %s:%d", d.dnsBindAddress, d.dnsPort)
-	skydnsConfig := &server.Config{Domain: d.domain, DnsAddr: fmt.Sprintf("%s:%d", d.dnsBindAddress, d.dnsPort)}
+	glog.V(0).Infof("Starting SkyDNS server (%v:%v)", d.dnsBindAddress, d.dnsPort)
+	skydnsConfig := &server.Config{
+		Domain:  d.domain,
+		DnsAddr: fmt.Sprintf("%s:%d", d.dnsBindAddress, d.dnsPort),
+	}
 	server.SetDefaults(skydnsConfig)
 	s := server.New(d.kd, skydnsConfig)
 	if err := metrics.Metrics(); err != nil {
-		glog.Fatalf("skydns: %s", err)
+		glog.Fatalf("Skydns metrics error: %s", err)
+	} else if metrics.Port != "" {
+		glog.V(0).Infof("Skydns metrics enabled (%v:%v)", metrics.Path, metrics.Port)
+	} else {
+		glog.V(0).Infof("Skydns metrics not enabled")
 	}
-	glog.Infof("skydns: metrics enabled on : %s:%s", metrics.Path, metrics.Port)
 
 	go s.Run()
 }

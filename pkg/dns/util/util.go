@@ -63,7 +63,8 @@ func ReverseArray(arr []string) []string {
 func GetSkyMsg(ip string, port int) (*msg.Service, string) {
 	msg := NewServiceRecord(ip, port)
 	hash := HashServiceRecord(msg)
-	glog.V(2).Infof("DNS Record:%s, hash:%s", fmt.Sprintf("%v", msg), hash)
+	glog.V(5).Infof("Constructed new DNS record: %s, hash:%s",
+		fmt.Sprintf("%v", msg), hash)
 	return msg, fmt.Sprintf("%x", hash)
 }
 
