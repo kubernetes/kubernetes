@@ -246,7 +246,7 @@ spec:
           timeoutSeconds: 5
         # These volume mounts are persistent. They are like inline claims,
         # but not exactly because the names need to match exactly one of
-        # the pod volumes.
+        # the stateful pod volumes.
         volumeMounts:
         - name: cassandra-data
           mountPath: /cassandra_data
@@ -357,7 +357,7 @@ the last line of the example below is the replicas line that you want to change.
 # and an empty file will abort the edit. If an error occurs while saving this file will be
 # reopened with the relevant failures.
 #
-apiVersion: apps/v1alpha1
+apiVersion: apps/v1beta1
 kind: StatefulSet
 metadata:
   creationTimestamp: 2016-08-13T18:40:58Z
