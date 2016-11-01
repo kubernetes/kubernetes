@@ -66,7 +66,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	var skipPreFlight bool
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Run this in order to set up the Kubernetes master.",
+		Short: "Run this in order to set up the Kubernetes master",
 		Run: func(cmd *cobra.Command, args []string) {
 			i, err := NewInit(cfgPath, cfg, skipPreFlight)
 			kubeadmutil.CheckErr(err)
