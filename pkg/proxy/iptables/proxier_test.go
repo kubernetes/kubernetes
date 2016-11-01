@@ -542,6 +542,23 @@ func errorf(msg string, rules []utiliptables.Rule, t *testing.T) {
 	t.Errorf("%v", msg)
 }
 
+func TestMasqueradeBits(t *testing.T) {
+	for i := 0; i < 33; i++ {
+		val, err := parseMasqueradeBit(i)
+		if i > 31 {
+			if err == nil {
+				t.Errorf("Expected error for masquerade bit %v", i)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("Unexpected error for masquerade bit %v: %v", i, err)
+			} else if val == "" {
+				t.Errorf("Unexpected empty value for masquerade bit %v", i)
+			}
+		}
+	}
+}
+
 func TestClusterIPReject(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)

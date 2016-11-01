@@ -216,6 +216,15 @@ func (l *listenPortOpener) OpenLocalPort(lp *localPort) (closeable, error) {
 // Proxier implements ProxyProvider
 var _ proxy.ProxyProvider = &Proxier{}
 
+func parseMasqueradeBit(masqueradeBit int) (string, error) {
+	// Generate the masquerade mark to use for SNAT rules.
+	if masqueradeBit < 0 || masqueradeBit > 31 {
+		return "", fmt.Errorf("invalid iptables-masquerade-bit %v not in [0, 31]", masqueradeBit)
+	}
+	masqueradeValue := uint(1 << uint(masqueradeBit))
+	return fmt.Sprintf("%#04x/%#04x", masqueradeValue, masqueradeValue), nil
+}
+
 // NewProxier returns a new Proxier given an iptables Interface instance.
 // Because of the iptables logic, it is assumed that there is only a single Proxier active on a machine.
 // An error will be returned if iptables fails to update or acquire the initial lock.
@@ -239,12 +248,10 @@ func NewProxier(ipt utiliptables.Interface, sysctl utilsysctl.Interface, exec ut
 		glog.Infof("missing br-netfilter module or unset sysctl br-nf-call-iptables; proxy may not work as intended")
 	}
 
-	// Generate the masquerade mark to use for SNAT rules.
-	if masqueradeBit < 0 || masqueradeBit > 31 {
-		return nil, fmt.Errorf("invalid iptables-masquerade-bit %v not in [0, 31]", masqueradeBit)
+	masqueradeMark, err := parseMasqueradeBit(masqueradeBit)
+	if err != nil {
+		return nil, err
 	}
-	masqueradeValue := 1 << uint(masqueradeBit)
-	masqueradeMark := fmt.Sprintf("%#04x/%#04x", masqueradeValue, masqueradeValue)
 
 	if nodeIP == nil {
 		glog.Warningf("invalid nodeIP, initialize kube-proxy with 127.0.0.1 as nodeIP")
