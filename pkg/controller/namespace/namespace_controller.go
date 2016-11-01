@@ -47,8 +47,8 @@ type NamespaceController struct {
 	controller *cache.Controller
 	// namespaces that have been queued up for processing by workers
 	queue workqueue.RateLimitingInterface
-	// list of preferred group versions and their corresponding resource set for namespace deletion
-	groupVersionResources []unversioned.GroupVersionResource
+	// function to list of preferred group versions and their corresponding resource set for namespace deletion
+	groupVersionResourcesFn func() ([]unversioned.GroupVersionResource, error)
 	// opCache is a cache to remember if a particular operation is not supported to aid dynamic client.
 	opCache *operationNotSupportedCache
 	// finalizerToken is the finalizer token managed by this controller
@@ -59,7 +59,7 @@ type NamespaceController struct {
 func NewNamespaceController(
 	kubeClient clientset.Interface,
 	clientPool dynamic.ClientPool,
-	groupVersionResources []unversioned.GroupVersionResource,
+	groupVersionResourcesFn func() ([]unversioned.GroupVersionResource, error),
 	resyncPeriod time.Duration,
 	finalizerToken api.FinalizerName) *NamespaceController {
 
@@ -86,9 +86,9 @@ func NewNamespaceController(
 		kubeClient: kubeClient,
 		clientPool: clientPool,
 		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "namespace"),
-		groupVersionResources: groupVersionResources,
-		opCache:               opCache,
-		finalizerToken:        finalizerToken,
+		groupVersionResourcesFn: groupVersionResourcesFn,
+		opCache:                 opCache,
+		finalizerToken:          finalizerToken,
 	}
 
 	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
@@ -191,7 +191,7 @@ func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
 		return err
 	}
 	namespace := obj.(*api.Namespace)
-	return syncNamespace(nm.kubeClient, nm.clientPool, nm.opCache, nm.groupVersionResources, namespace, nm.finalizerToken)
+	return syncNamespace(nm.kubeClient, nm.clientPool, nm.opCache, nm.groupVersionResourcesFn, namespace, nm.finalizerToken)
 }
 
 // Run starts observing the system with the specified number of workers.

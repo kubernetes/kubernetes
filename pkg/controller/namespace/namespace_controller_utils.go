@@ -371,7 +371,7 @@ func syncNamespace(
 	kubeClient clientset.Interface,
 	clientPool dynamic.ClientPool,
 	opCache *operationNotSupportedCache,
-	groupVersionResources []unversioned.GroupVersionResource,
+	groupVersionResourcesFn func() ([]unversioned.GroupVersionResource, error),
 	namespace *api.Namespace,
 	finalizerToken api.FinalizerName,
 ) error {
@@ -422,6 +422,10 @@ func syncNamespace(
 	}
 
 	// there may still be content for us to remove
+	groupVersionResources, err := groupVersionResourcesFn()
+	if err != nil {
+		return err
+	}
 	estimate, err := deleteAllContent(kubeClient, clientPool, opCache, groupVersionResources, namespace.Name, *namespace.DeletionTimestamp)
 	if err != nil {
 		return err
