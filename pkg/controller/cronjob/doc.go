@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package scheduledjob contains the controller for ScheduledJob objects.
-package scheduledjob
+// Package cronjob contains the controller for CronJob objects.
+package cronjob

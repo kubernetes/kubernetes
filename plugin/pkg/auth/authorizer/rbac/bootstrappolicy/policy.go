@@ -86,7 +86,7 @@ func ClusterRoles() []rbac.ClusterRole {
 
 				rbac.NewRule(ReadWrite...).Groups(autoscalingGroup).Resources("horizontalpodautoscalers").RuleOrDie(),
 
-				rbac.NewRule(ReadWrite...).Groups(batchGroup).Resources("jobs", "scheduledjobs").RuleOrDie(),
+				rbac.NewRule(ReadWrite...).Groups(batchGroup).Resources("jobs", "cronjobs").RuleOrDie(),
 
 				rbac.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("jobs", "daemonsets", "horizontalpodautoscalers",
 					"replicationcontrollers/scale", "replicasets", "replicasets/scale", "deployments", "deployments/scale").RuleOrDie(),
@@ -116,7 +116,7 @@ func ClusterRoles() []rbac.ClusterRole {
 
 				rbac.NewRule(ReadWrite...).Groups(autoscalingGroup).Resources("horizontalpodautoscalers").RuleOrDie(),
 
-				rbac.NewRule(ReadWrite...).Groups(batchGroup).Resources("jobs", "scheduledjobs").RuleOrDie(),
+				rbac.NewRule(ReadWrite...).Groups(batchGroup).Resources("jobs", "cronjobs").RuleOrDie(),
 
 				rbac.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("jobs", "daemonsets", "horizontalpodautoscalers",
 					"replicationcontrollers/scale", "replicasets", "replicasets/scale", "deployments", "deployments/scale").RuleOrDie(),
@@ -139,7 +139,7 @@ func ClusterRoles() []rbac.ClusterRole {
 
 				rbac.NewRule(Read...).Groups(autoscalingGroup).Resources("horizontalpodautoscalers").RuleOrDie(),
 
-				rbac.NewRule(Read...).Groups(batchGroup).Resources("jobs", "scheduledjobs").RuleOrDie(),
+				rbac.NewRule(Read...).Groups(batchGroup).Resources("jobs", "cronjobs").RuleOrDie(),
 
 				rbac.NewRule(Read...).Groups(extensionsGroup).Resources("jobs", "daemonsets", "horizontalpodautoscalers",
 					"replicationcontrollers/scale", "replicasets", "replicasets/scale", "deployments", "deployments/scale").RuleOrDie(),

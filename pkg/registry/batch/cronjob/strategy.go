@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduledjob
+package cronjob
 
 import (
 	"fmt"
@@ -36,7 +36,7 @@ type scheduledJobStrategy struct {
 	api.NameGenerator
 }
 
-// Strategy is the default logic that applies when creating and updating ScheduledJob objects.
+// Strategy is the default logic that applies when creating and updating CronJob objects.
 var Strategy = scheduledJobStrategy{api.Scheme, api.SimpleNameGenerator}
 
 // NamespaceScoped returns true because all scheduled jobs need to be within a namespace.
@@ -46,21 +46,21 @@ func (scheduledJobStrategy) NamespaceScoped() bool {
 
 // PrepareForCreate clears the status of a scheduled job before creation.
 func (scheduledJobStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
-	scheduledJob := obj.(*batch.ScheduledJob)
-	scheduledJob.Status = batch.ScheduledJobStatus{}
+	scheduledJob := obj.(*batch.CronJob)
+	scheduledJob.Status = batch.CronJobStatus{}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (scheduledJobStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
-	newScheduledJob := obj.(*batch.ScheduledJob)
-	oldScheduledJob := old.(*batch.ScheduledJob)
-	newScheduledJob.Status = oldScheduledJob.Status
+	newCronJob := obj.(*batch.CronJob)
+	oldCronJob := old.(*batch.CronJob)
+	newCronJob.Status = oldCronJob.Status
 }
 
 // Validate validates a new scheduled job.
 func (scheduledJobStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
-	scheduledJob := obj.(*batch.ScheduledJob)
-	return validation.ValidateScheduledJob(scheduledJob)
+	scheduledJob := obj.(*batch.CronJob)
+	return validation.ValidateCronJob(scheduledJob)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -78,7 +78,7 @@ func (scheduledJobStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (scheduledJobStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateScheduledJob(obj.(*batch.ScheduledJob))
+	return validation.ValidateCronJob(obj.(*batch.CronJob))
 }
 
 type scheduledJobStatusStrategy struct {
@@ -88,8 +88,8 @@ type scheduledJobStatusStrategy struct {
 var StatusStrategy = scheduledJobStatusStrategy{Strategy}
 
 func (scheduledJobStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
-	newJob := obj.(*batch.ScheduledJob)
-	oldJob := old.(*batch.ScheduledJob)
+	newJob := obj.(*batch.CronJob)
+	oldJob := old.(*batch.CronJob)
 	newJob.Spec = oldJob.Spec
 }
 
@@ -97,24 +97,24 @@ func (scheduledJobStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runti
 	return field.ErrorList{}
 }
 
-// ScheduledJobToSelectableFields returns a field set that represents the object for matching purposes.
-func ScheduledJobToSelectableFields(scheduledJob *batch.ScheduledJob) fields.Set {
+// CronJobToSelectableFields returns a field set that represents the object for matching purposes.
+func CronJobToSelectableFields(scheduledJob *batch.CronJob) fields.Set {
 	return generic.ObjectMetaFieldsSet(&scheduledJob.ObjectMeta, true)
 }
 
-// MatchScheduledJob is the filter used by the generic etcd backend to route
+// MatchCronJob is the filter used by the generic etcd backend to route
 // watch events from etcd to clients of the apiserver only interested in specific
 // labels/fields.
-func MatchScheduledJob(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
+func MatchCronJob(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 	return storage.SelectionPredicate{
 		Label: label,
 		Field: field,
 		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			scheduledJob, ok := obj.(*batch.ScheduledJob)
+			scheduledJob, ok := obj.(*batch.CronJob)
 			if !ok {
 				return nil, nil, fmt.Errorf("Given object is not a scheduled job.")
 			}
-			return labels.Set(scheduledJob.ObjectMeta.Labels), ScheduledJobToSelectableFields(scheduledJob), nil
+			return labels.Set(scheduledJob.ObjectMeta.Labels), CronJobToSelectableFields(scheduledJob), nil
 		},
 	}
 }

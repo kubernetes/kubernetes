@@ -14,10 +14,10 @@ go_library(
     name = "go_default_library",
     srcs = [
         "batch_client.go",
+        "cronjob.go",
         "doc.go",
         "generated_expansion.go",
         "job.go",
-        "scheduledjob.go",
     ],
     tags = ["automanaged"],
     deps = [

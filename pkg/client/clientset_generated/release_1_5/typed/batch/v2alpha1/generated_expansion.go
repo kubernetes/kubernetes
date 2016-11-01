@@ -18,4 +18,4 @@ package v2alpha1
 
 type JobExpansion interface{}
 
-type ScheduledJobExpansion interface{}
+type CronJobExpansion interface{}

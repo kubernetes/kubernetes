@@ -13,8 +13,8 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "zz_generated.cronjob.go",
         "zz_generated.job.go",
-        "zz_generated.scheduledjob.go",
     ],
     tags = ["automanaged"],
     deps = [

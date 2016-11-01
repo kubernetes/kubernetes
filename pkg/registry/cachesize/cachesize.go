@@ -52,7 +52,7 @@ const (
 	PodTemplates               Resource = "podtemplates"
 	Replicasets                Resource = "replicasets"
 	ResourceQuotas             Resource = "resourcequotas"
-	ScheduledJobs              Resource = "scheduledjobs"
+	CronJobs                   Resource = "cronjobs"
 	Roles                      Resource = "roles"
 	RoleBindings               Resource = "rolebindings"
 	Secrets                    Resource = "secrets"
