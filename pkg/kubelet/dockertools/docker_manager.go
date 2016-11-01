@@ -1321,6 +1321,12 @@ func (dm *DockerManager) PortForward(pod *kubecontainer.Pod, port uint16, stream
 	return PortForward(dm.client, podInfraContainer.ID.ID, port, stream)
 }
 
+// UpdatePodCIDR updates the podCIDR for the runtime.
+// Currently no-ops, just implemented to satisfy the cri.
+func (dm *DockerManager) UpdatePodCIDR(podCIDR string) error {
+	return nil
+}
+
 // Temporarily export this function to share with dockershim.
 func PortForward(client DockerInterface, podInfraContainerID string, port uint16, stream io.ReadWriteCloser) error {
 	container, err := client.InspectContainer(podInfraContainerID)

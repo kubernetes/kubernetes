@@ -191,7 +191,20 @@ func (kl *Kubelet) cleanupBandwidthLimits(allPods []*api.Pod) error {
 
 // syncNetworkStatus updates the network state
 func (kl *Kubelet) syncNetworkStatus() {
-	kl.runtimeState.setNetworkState(kl.networkPlugin.Status())
+	// TODO(#35701): cri shim handles network plugin but we currently
+	// don't have a cri status hook, so network plugin status isn't
+	// reported if --experimental-runtime-integration=cri. This isn't
+	// too bad, because kubenet is the only network plugin that
+	// implements status(), and it just checks for plugin binaries
+	// on the filesystem.
+	if kl.networkPlugin != nil {
+		kl.runtimeState.setNetworkState(kl.networkPlugin.Status())
+	} else if kl.runtimeState.podCIDR() != "" {
+		// Don't mark the node ready till we've successfully executed
+		// the first UpdatePodCIDR call through cri. See comment above
+		// setPodCIDR call.
+		kl.runtimeState.setNetworkState(nil)
+	}
 }
 
 // updatePodCIDR updates the pod CIDR in the runtime state if it is different
@@ -203,14 +216,26 @@ func (kl *Kubelet) updatePodCIDR(cidr string) {
 		return
 	}
 
-	glog.Infof("Setting Pod CIDR: %v -> %v", podCIDR, cidr)
-	kl.runtimeState.setPodCIDR(cidr)
-
+	// kubelet -> network plugin
+	// cri runtime shims are responsible for their own network plugins
 	if kl.networkPlugin != nil {
 		details := make(map[string]interface{})
 		details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = cidr
 		kl.networkPlugin.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, details)
 	}
+
+	// kubelet -> generic runtime -> runtime shim -> network plugin
+	// docker/rkt non-cri implementations have a passthrough UpdatePodCIDR
+	if err := kl.GetRuntime().UpdatePodCIDR(cidr); err != nil {
+		glog.Errorf("Failed to update pod CIDR: %v", err)
+		return
+	}
+
+	// We need to be careful about setting podCIDR. Till #35839 lands we're
+	// using it to indicate network plugin status for cri shims. See comment
+	// in syncNetworkStatus.
+	glog.Infof("Setting Pod CIDR: %v -> %v", podCIDR, cidr)
+	kl.runtimeState.setPodCIDR(cidr)
 }
 
 // shapingEnabled returns whether traffic shaping is enabled.
@@ -219,6 +244,16 @@ func (kl *Kubelet) shapingEnabled() bool {
 	if kl.networkPlugin != nil && kl.networkPlugin.Capabilities().Has(network.NET_PLUGIN_CAPABILITY_SHAPING) {
 		return false
 	}
+	// This is not strictly true but we need to figure out how to handle
+	// bandwidth shaping anyway. If the kubelet doesn't have a networkPlugin,
+	// it could mean:
+	// a. the kubelet is responsible for bandwidth shaping
+	// b. the kubelet is using cri, and the cri has a network plugin
+	// Today, the only plugin that understands bandwidth shaping is kubenet, and
+	// it doesn't support bandwidth shaping when invoked through cri, so it
+	// effectively boils down to letting the kubelet decide how to handle
+	// shaping annotations. The combination of (cri + network plugin that
+	// handles bandwidth shaping) may not work because of this.
 	return true
 }
 
