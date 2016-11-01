@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 
@@ -185,6 +186,33 @@ func (hc HostnameCheck) Check() (warnings, errors []error) {
 	return nil, errors
 }
 
+// HttpProxyCheck checks if https connection to specific host is going
+// to be done directly or over proxy. If proxy detected, it will return warning.
+type HttpProxyCheck struct {
+	Proto string
+	Host  string
+	Port  int
+}
+
+func (hst HttpProxyCheck) Check() (warnings, errors []error) {
+
+	url := fmt.Sprintf("%s://%s:%d", hst.Proto, hst.Host, hst.Port)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, []error{err}
+	}
+
+	proxy, err := http.DefaultTransport.(*http.Transport).Proxy(req)
+	if err != nil {
+		return nil, []error{err}
+	}
+	if proxy != nil {
+		return []error{fmt.Errorf("Connection to %q uses proxy %q. If that is not intended, adjust your proxy settings", url, proxy)}, nil
+	}
+	return nil, nil
+}
+
 func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 	// TODO: Some of these ports should come from kubeadm config eventually:
 	checks := []PreFlightCheck{
@@ -199,6 +227,7 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		PortOpenCheck{port: 10250},
 		PortOpenCheck{port: 10251},
 		PortOpenCheck{port: 10252},
+		HttpProxyCheck{Proto: "https", Host: cfg.API.AdvertiseAddresses[0], Port: int(cfg.API.BindPort)},
 		DirAvailableCheck{Path: "/etc/kubernetes/manifests"},
 		DirAvailableCheck{Path: "/etc/kubernetes/pki"},
 		DirAvailableCheck{Path: "/var/lib/etcd"},
@@ -219,7 +248,7 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 	return runChecks(checks, os.Stderr)
 }
 
-func RunJoinNodeChecks() error {
+func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 	// TODO: Some of these ports should come from kubeadm config eventually:
 	checks := []PreFlightCheck{
 		IsRootCheck{root: true},
@@ -227,6 +256,8 @@ func RunJoinNodeChecks() error {
 		ServiceCheck{Service: "docker"},
 		ServiceCheck{Service: "kubelet"},
 		PortOpenCheck{port: 10250},
+		HttpProxyCheck{Proto: "https", Host: cfg.MasterAddresses[0], Port: int(cfg.APIPort)},
+		HttpProxyCheck{Proto: "http", Host: cfg.MasterAddresses[0], Port: int(cfg.DiscoveryPort)},
 		DirAvailableCheck{Path: "/etc/kubernetes"},
 		DirAvailableCheck{Path: "/var/lib/kubelet"},
 		InPathCheck{executable: "ebtables", mandatory: true},
