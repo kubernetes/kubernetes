@@ -16,6 +16,6 @@ limitations under the License.
 
 package v2alpha1
 
-type JobExpansion interface{}
-
 type CronJobExpansion interface{}
+
+type JobExpansion interface{}
