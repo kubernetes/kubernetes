@@ -190,268 +190,267 @@ func RunEdit(f *cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args
 		return err
 	}
 
+	infos, err := r.Infos()
+	if err != nil {
+		return err
+	}
+
 	var (
 		windowsLineEndings = cmdutil.GetFlagBool(cmd, "windows-line-endings")
 		edit               = editor.NewDefaultEditor(f.EditorEnvs())
+		results            = editResults{}
+		original           = []byte{}
+		edited             = []byte{}
+		file               string
 	)
 
-	err = r.Visit(func(info *resource.Info, err error) error {
-		var (
-			results  = editResults{}
-			original = []byte{}
-			edited   = []byte{}
-			file     string
-		)
+	containsError := false
 
-		containsError := false
+	for {
+		originalObj, err := resource.AsVersionedObject(infos, false, defaultVersion, encoder)
+		if err != nil {
+			return err
+		}
 
-		for {
-			infos := []*resource.Info{info}
-			originalObj, err := resource.AsVersionedObject(infos, false, defaultVersion, encoder)
+		objToEdit := originalObj
+
+		// generate the file to edit
+		buf := &bytes.Buffer{}
+		var w io.Writer = buf
+		if windowsLineEndings {
+			w = crlf.NewCRLFWriter(w)
+		}
+
+		if addHeader {
+			results.header.writeTo(w)
+		}
+
+		if !containsError {
+			if err := printer.PrintObj(objToEdit, w); err != nil {
+				return preservedFile(err, results.file, errOut)
+			}
+			original = buf.Bytes()
+		} else {
+			// In case of an error, preserve the edited file.
+			// Remove the comments (header) from it since we already
+			// have included the latest header in the buffer above.
+			buf.Write(manualStrip(edited))
+		}
+
+		// launch the editor
+		editedDiff := edited
+		edited, file, err = edit.LaunchTempFile(fmt.Sprintf("%s-edit-", filepath.Base(os.Args[0])), ext, buf)
+		if err != nil {
+			return preservedFile(err, results.file, errOut)
+		}
+		if bytes.Equal(stripComments(editedDiff), stripComments(edited)) {
+			// Ugly hack right here. We will hit this either (1) when we try to
+			// save the same changes we tried to save in the previous iteration
+			// which means our changes are invalid or (2) when we exit the second
+			// time. The second case is more usual so we can probably live with it.
+			// TODO: A less hacky fix would be welcome :)
+			fmt.Fprintln(errOut, "Edit cancelled, no valid changes were saved.")
+			return nil
+		}
+
+		// cleanup any file from the previous pass
+		if len(results.file) > 0 {
+			os.Remove(results.file)
+		}
+		glog.V(4).Infof("User edited:\n%s", string(edited))
+
+		// Apply validation
+		schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
+		if err != nil {
+			return preservedFile(err, file, errOut)
+		}
+		err = schema.ValidateBytes(stripComments(edited))
+		if err != nil {
+			return preservedFile(err, file, errOut)
+		}
+
+		// Compare content without comments
+		if bytes.Equal(stripComments(original), stripComments(edited)) {
+			os.Remove(file)
+			fmt.Fprintln(errOut, "Edit cancelled, no changes made.")
+			return nil
+		}
+		lines, err := hasLines(bytes.NewBuffer(edited))
+		if err != nil {
+			return preservedFile(err, file, errOut)
+		}
+		if !lines {
+			os.Remove(file)
+			fmt.Fprintln(errOut, "Edit cancelled, saved file was empty.")
+			return nil
+		}
+
+		results = editResults{
+			file: file,
+		}
+
+		// parse the edited file
+		updates, err := resourceMapper.InfoForData(edited, "edited-file")
+		if err != nil {
+			// syntax error
+			containsError = true
+			results.header.reasons = append(results.header.reasons, editReason{head: fmt.Sprintf("The edited file had a syntax error: %v", err)})
+			continue
+		}
+		// not a syntax error as it turns out...
+		containsError = false
+
+		namespaceVisitor := resource.NewFlattenListVisitor(updates, resourceMapper)
+		// need to make sure the original namespace wasn't changed while editing
+		if err = namespaceVisitor.Visit(resource.RequireNamespace(cmdNamespace)); err != nil {
+			return preservedFile(err, file, errOut)
+		}
+
+		mutatedObjects := []runtime.Object{}
+		annotationVisitor := resource.NewFlattenListVisitor(updates, resourceMapper)
+		// iterate through all items to apply annotations
+		if err = annotationVisitor.Visit(func(info *resource.Info, incomingErr error) error {
+			// put configuration annotation in "updates"
+			if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, encoder); err != nil {
+				return err
+			}
+			if cmdutil.ShouldRecord(cmd, info) {
+				if err := cmdutil.RecordChangeCause(info.Object, f.Command()); err != nil {
+					return err
+				}
+			}
+			mutatedObjects = append(mutatedObjects, info.Object)
+
+			return nil
+
+		}); err != nil {
+			return preservedFile(err, file, errOut)
+		}
+
+		// if we mutated a list in the visitor, persist the changes on the overall object
+		if meta.IsListType(updates.Object) {
+			meta.SetList(updates.Object, mutatedObjects)
+		}
+
+		patchVisitor := resource.NewFlattenListVisitor(updates, resourceMapper)
+		err = patchVisitor.Visit(func(info *resource.Info, incomingErr error) error {
+			currOriginalObj := originalObj
+
+			// if we're editing a list, then navigate the list to find the item that we're currently trying to edit
+			if meta.IsListType(originalObj) {
+				currOriginalObj = nil
+				editObjUID, err := meta.NewAccessor().UID(info.Object)
+				if err != nil {
+					return err
+				}
+
+				listItems, err := meta.ExtractList(originalObj)
+				if err != nil {
+					return err
+				}
+
+				// iterate through the list to find the item with the matching UID
+				for i := range listItems {
+					originalObjUID, err := meta.NewAccessor().UID(listItems[i])
+					if err != nil {
+						return err
+					}
+					if editObjUID == originalObjUID {
+						currOriginalObj = listItems[i]
+						break
+					}
+				}
+				if currOriginalObj == nil {
+					return fmt.Errorf("no original object found for %#v", info.Object)
+				}
+
+			}
+
+			originalSerialization, err := runtime.Encode(encoder, currOriginalObj)
+			if err != nil {
+				return err
+			}
+			editedSerialization, err := runtime.Encode(encoder, info.Object)
 			if err != nil {
 				return err
 			}
 
-			objToEdit := originalObj
-
-			// generate the file to edit
-			buf := &bytes.Buffer{}
-			var w io.Writer = buf
-			if windowsLineEndings {
-				w = crlf.NewCRLFWriter(w)
+			// compute the patch on a per-item basis
+			// use strategic merge to create a patch
+			originalJS, err := yaml.ToJSON(originalSerialization)
+			if err != nil {
+				return err
+			}
+			editedJS, err := yaml.ToJSON(editedSerialization)
+			if err != nil {
+				return err
 			}
 
-			if addHeader {
-				results.header.writeTo(w)
+			if reflect.DeepEqual(originalJS, editedJS) {
+				// no edit, so just skip it.
+				cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, false, "skipped")
+				return nil
 			}
 
-			if !containsError {
-				if err := printer.PrintObj(objToEdit, w); err != nil {
-					return preservedFile(err, results.file, errOut)
-				}
-				original = buf.Bytes()
+			patch, err := strategicpatch.CreateStrategicMergePatch(originalJS, editedJS, currOriginalObj)
+			// TODO: change all jsonmerge to strategicpatch
+			// for checking preconditions
+			preconditions := []jsonmerge.PreconditionFunc{}
+			if err != nil {
+				glog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
+				return err
 			} else {
-				// In case of an error, preserve the edited file.
-				// Remove the comments (header) from it since we already
-				// have included the latest header in the buffer above.
-				buf.Write(manualStrip(edited))
+				preconditions = append(preconditions, jsonmerge.RequireKeyUnchanged("apiVersion"))
+				preconditions = append(preconditions, jsonmerge.RequireKeyUnchanged("kind"))
+				preconditions = append(preconditions, jsonmerge.RequireMetadataKeyUnchanged("name"))
+				results.version = defaultVersion
 			}
 
-			// launch the editor
-			editedDiff := edited
-			edited, file, err = edit.LaunchTempFile(fmt.Sprintf("%s-edit-", filepath.Base(os.Args[0])), ext, buf)
-			if err != nil {
-				return preservedFile(err, results.file, errOut)
+			if hold, msg := jsonmerge.TestPreconditionsHold(patch, preconditions); !hold {
+				fmt.Fprintf(errOut, "error: %s", msg)
+				return preservedFile(nil, file, errOut)
 			}
-			if bytes.Equal(stripComments(editedDiff), stripComments(edited)) {
-				// Ugly hack right here. We will hit this either (1) when we try to
-				// save the same changes we tried to save in the previous iteration
-				// which means our changes are invalid or (2) when we exit the second
-				// time. The second case is more usual so we can probably live with it.
-				// TODO: A less hacky fix would be welcome :)
-				fmt.Fprintln(errOut, "Edit cancelled, no valid changes were saved.")
+
+			patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch)
+			if err != nil {
+				fmt.Fprintln(out, results.addError(err, info))
 				return nil
 			}
-
-			// cleanup any file from the previous pass
-			if len(results.file) > 0 {
-				os.Remove(results.file)
-			}
-			glog.V(4).Infof("User edited:\n%s", string(edited))
-
-			// Apply validation
-			schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
-			if err != nil {
-				return preservedFile(err, file, errOut)
-			}
-			err = schema.ValidateBytes(stripComments(edited))
-			if err != nil {
-				return preservedFile(err, file, errOut)
-			}
-
-			// Compare content without comments
-			if bytes.Equal(stripComments(original), stripComments(edited)) {
-				os.Remove(file)
-				fmt.Fprintln(errOut, "Edit cancelled, no changes made.")
-				return nil
-			}
-			lines, err := hasLines(bytes.NewBuffer(edited))
-			if err != nil {
-				return preservedFile(err, file, errOut)
-			}
-			if !lines {
-				os.Remove(file)
-				fmt.Fprintln(errOut, "Edit cancelled, saved file was empty.")
-				return nil
-			}
-
-			results = editResults{
-				file: file,
-			}
-
-			// parse the edited file
-			updates, err := resourceMapper.InfoForData(edited, "edited-file")
-			if err != nil {
-				// syntax error
-				containsError = true
-				results.header.reasons = append(results.header.reasons, editReason{head: fmt.Sprintf("The edited file had a syntax error: %v", err)})
-				continue
-			}
-			// not a syntax error as it turns out...
-			containsError = false
-
-			namespaceVisitor := resource.NewFlattenListVisitor(updates, resourceMapper)
-			// need to make sure the original namespace wasn't changed while editing
-			if err = namespaceVisitor.Visit(resource.RequireNamespace(cmdNamespace)); err != nil {
-				return preservedFile(err, file, errOut)
-			}
-
-			mutatedObjects := []runtime.Object{}
-			annotationVisitor := resource.NewFlattenListVisitor(updates, resourceMapper)
-			// iterate through all items to apply annotations
-			if err = annotationVisitor.Visit(func(info *resource.Info, incomingErr error) error {
-				// put configuration annotation in "updates"
-				if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info, encoder); err != nil {
-					return err
-				}
-				if cmdutil.ShouldRecord(cmd, info) {
-					if err := cmdutil.RecordChangeCause(info.Object, f.Command()); err != nil {
-						return err
-					}
-				}
-				mutatedObjects = append(mutatedObjects, info.Object)
-
-				return nil
-
-			}); err != nil {
-				return preservedFile(err, file, errOut)
-			}
-
-			// if we mutated a list in the visitor, persist the changes on the overall object
-			if meta.IsListType(updates.Object) {
-				meta.SetList(updates.Object, mutatedObjects)
-			}
-
-			patchVisitor := resource.NewFlattenListVisitor(updates, resourceMapper)
-			err = patchVisitor.Visit(func(info *resource.Info, incomingErr error) error {
-				currOriginalObj := originalObj
-
-				// if we're editing a list, then navigate the list to find the item that we're currently trying to edit
-				if meta.IsListType(originalObj) {
-					currOriginalObj = nil
-					editObjUID, err := meta.NewAccessor().UID(info.Object)
-					if err != nil {
-						return err
-					}
-
-					listItems, err := meta.ExtractList(originalObj)
-					if err != nil {
-						return err
-					}
-
-					// iterate through the list to find the item with the matching UID
-					for i := range listItems {
-						originalObjUID, err := meta.NewAccessor().UID(listItems[i])
-						if err != nil {
-							return err
-						}
-						if editObjUID == originalObjUID {
-							currOriginalObj = listItems[i]
-							break
-						}
-					}
-					if currOriginalObj == nil {
-						return fmt.Errorf("no original object found for %#v", info.Object)
-					}
-
-				}
-
-				originalSerialization, err := runtime.Encode(encoder, currOriginalObj)
-				if err != nil {
-					return err
-				}
-				editedSerialization, err := runtime.Encode(encoder, info.Object)
-				if err != nil {
-					return err
-				}
-
-				// compute the patch on a per-item basis
-				// use strategic merge to create a patch
-				originalJS, err := yaml.ToJSON(originalSerialization)
-				if err != nil {
-					return err
-				}
-				editedJS, err := yaml.ToJSON(editedSerialization)
-				if err != nil {
-					return err
-				}
-
-				if reflect.DeepEqual(originalJS, editedJS) {
-					// no edit, so just skip it.
-					cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, false, "skipped")
-					return nil
-				}
-
-				patch, err := strategicpatch.CreateStrategicMergePatch(originalJS, editedJS, currOriginalObj)
-				// TODO: change all jsonmerge to strategicpatch
-				// for checking preconditions
-				preconditions := []jsonmerge.PreconditionFunc{}
-				if err != nil {
-					glog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
-					return err
-				} else {
-					preconditions = append(preconditions, jsonmerge.RequireKeyUnchanged("apiVersion"))
-					preconditions = append(preconditions, jsonmerge.RequireKeyUnchanged("kind"))
-					preconditions = append(preconditions, jsonmerge.RequireMetadataKeyUnchanged("name"))
-					results.version = defaultVersion
-				}
-
-				if hold, msg := jsonmerge.TestPreconditionsHold(patch, preconditions); !hold {
-					fmt.Fprintf(errOut, "error: %s", msg)
-					return preservedFile(nil, file, errOut)
-				}
-
-				patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch)
-				if err != nil {
-					fmt.Fprintln(out, results.addError(err, info))
-					return nil
-				}
-				info.Refresh(patched, true)
-				cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, false, "edited")
-				return nil
-			})
-			if err != nil {
-				return preservedFile(err, results.file, errOut)
-			}
-
-			// Handle all possible errors
-			//
-			// 1. retryable: propose kubectl replace -f
-			// 2. notfound: indicate the location of the saved configuration of the deleted resource
-			// 3. invalid: retry those on the spot by looping ie. reloading the editor
-			if results.retryable > 0 {
-				fmt.Fprintf(errOut, "You can run `%s replace -f %s` to try this update again.\n", filepath.Base(os.Args[0]), file)
-				return errExit
-			}
-			if results.notfound > 0 {
-				fmt.Fprintf(errOut, "The edits you made on deleted resources have been saved to %q\n", file)
-				return errExit
-			}
-
-			if len(results.edit) == 0 {
-				if results.notfound == 0 {
-					os.Remove(file)
-				} else {
-					fmt.Fprintf(out, "The edits you made on deleted resources have been saved to %q\n", file)
-				}
-				return nil
-			}
-
-			// loop again and edit the remaining items
-			infos = results.edit
+			info.Refresh(patched, true)
+			cmdutil.PrintSuccess(mapper, false, out, info.Mapping.Resource, info.Name, false, "edited")
+			return nil
+		})
+		if err != nil {
+			return preservedFile(err, results.file, errOut)
 		}
-	})
-	return err
+
+		// Handle all possible errors
+		//
+		// 1. retryable: propose kubectl replace -f
+		// 2. notfound: indicate the location of the saved configuration of the deleted resource
+		// 3. invalid: retry those on the spot by looping ie. reloading the editor
+		if results.retryable > 0 {
+			fmt.Fprintf(errOut, "You can run `%s replace -f %s` to try this update again.\n", filepath.Base(os.Args[0]), file)
+			return errExit
+		}
+		if results.notfound > 0 {
+			fmt.Fprintf(errOut, "The edits you made on deleted resources have been saved to %q\n", file)
+			return errExit
+		}
+
+		if len(results.edit) == 0 {
+			if results.notfound == 0 {
+				os.Remove(file)
+			} else {
+				fmt.Fprintf(out, "The edits you made on deleted resources have been saved to %q\n", file)
+			}
+			return nil
+		}
+
+		// loop again and edit the remaining items
+		infos = results.edit
+	}
+	return nil
 }
 
 // editReason preserves a message about the reason this file must be edited again
