@@ -51,3 +51,71 @@ func TestSpecSourceConverters(t *testing.T) {
 		t.Errorf("Expected %v but got %v", pv.Name, converted.Name())
 	}
 }
+
+func Test_ValidatePodTemplate(t *testing.T) {
+	timeout := int64(60)
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			GenerateName: "pv-recycler-",
+			Namespace:    api.NamespaceDefault,
+		},
+		Spec: api.PodSpec{
+			ActiveDeadlineSeconds: &timeout,
+			RestartPolicy:         api.RestartPolicyNever,
+			Volumes: []api.Volume{
+				{
+					Name:         "vol",
+					VolumeSource: api.VolumeSource{},
+				},
+			},
+			Containers: []api.Container{
+				{
+					Name:    "pv-recycler",
+					Image:   "gcr.io/google_containers/busybox",
+					Command: []string{"/bin/sh"},
+					Args:    []string{"-c", "test -e /scrub && rm -rf /scrub/..?* /scrub/.[!.]* /scrub/*  && test -z \"$(ls -A /scrub)\" || exit 1"},
+					VolumeMounts: []api.VolumeMount{
+						{
+							Name:      "vol",
+							MountPath: "/scrub",
+						},
+					},
+				},
+			},
+		},
+	}
+	var want error
+	if got := ValidateRecyclerPodTemplate(pod); got != want {
+		t.Errorf("isPodTemplateValid(%v) returned (%v), want (%v)", pod.String(), got.Error(), want)
+	}
+
+	// Check that the default recycle pod template is valid
+	pod = NewPersistentVolumeRecyclerPodTemplate()
+	want = nil
+	if got := ValidateRecyclerPodTemplate(pod); got != want {
+		t.Errorf("isPodTemplateValid(%v) returned (%v), want (%v)", pod.String(), got.Error(), want)
+	}
+
+	pod = &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			GenerateName: "pv-recycler-",
+			Namespace:    api.NamespaceDefault,
+		},
+		Spec: api.PodSpec{
+			ActiveDeadlineSeconds: &timeout,
+			RestartPolicy:         api.RestartPolicyNever,
+			Containers: []api.Container{
+				{
+					Name:    "pv-recycler",
+					Image:   "gcr.io/google_containers/busybox",
+					Command: []string{"/bin/sh"},
+					Args:    []string{"-c", "test -e /scrub && rm -rf /scrub/..?* /scrub/.[!.]* /scrub/*  && test -z \"$(ls -A /scrub)\" || exit 1"},
+				},
+			},
+		},
+	}
+	// want = an error
+	if got := ValidateRecyclerPodTemplate(pod); got == nil {
+		t.Errorf("isPodTemplateValid(%v) returned (%v), want (%v)", pod.String(), got, "Error: pod specification does not contain any volume(s).")
+	}
+}

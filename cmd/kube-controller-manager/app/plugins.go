@@ -24,9 +24,9 @@ import (
 	"fmt"
 
 	// Cloud providers
+
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
-
 	// Volume plugins
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -175,6 +175,9 @@ func AttemptToLoadRecycler(path string, config *volume.VolumeConfig) error {
 		recyclerPod, err := io.LoadPodFromFile(path)
 		if err != nil {
 			return err
+		}
+		if err = volume.ValidateRecyclerPodTemplate(recyclerPod); err != nil {
+			return fmt.Errorf("Pod specification (%v): %v", path, err)
 		}
 		config.RecyclerPodTemplate = recyclerPod
 	}
