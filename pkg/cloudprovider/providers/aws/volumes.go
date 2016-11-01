@@ -30,14 +30,15 @@ func (i awsVolumeID) awsString() *string {
 	return aws.String(string(i))
 }
 
-// kubernetesVolumeSpec represents the spec for a volume in the kubernetes API;
+// KubernetesVolumeID represents the id for a volume in the kubernetes API;
 // a few forms are recognized:
 //  * aws://<zone>/<id>
 //  * aws:///<id>
 //  * <id>
 type KubernetesVolumeID string
 
-func mapVolumeSpecToAwsID(name KubernetesVolumeID) (awsVolumeID, error) {
+// mapToAWSVolumeID extracts the awsVolumeID from the KubernetesVolumeID
+func (name KubernetesVolumeID) mapToAWSVolumeID() (awsVolumeID, error) {
 	// name looks like aws://availability-zone/id
 
 	// The original idea of the URL-style name was to put the AZ into the
@@ -51,6 +52,8 @@ func mapVolumeSpecToAwsID(name KubernetesVolumeID) (awsVolumeID, error) {
 	s := string(name)
 
 	if !strings.HasPrefix(s, "aws://") {
+		// Assume a bare aws volume id (vol-1234...)
+		// Build a URL with an empty host (AZ)
 		s = "aws://" + "" + "/" + s
 	}
 	url, err := url.Parse(s)
@@ -63,9 +66,7 @@ func mapVolumeSpecToAwsID(name KubernetesVolumeID) (awsVolumeID, error) {
 	}
 
 	awsID := url.Path
-	if len(awsID) > 1 && awsID[0] == '/' {
-		awsID = awsID[1:]
-	}
+	awsID = strings.Trim(awsID, "/")
 
 	// TODO: Regex match?
 	if strings.Contains(awsID, "/") || !strings.HasPrefix(awsID, "vol-") {
