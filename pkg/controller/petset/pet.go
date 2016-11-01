@@ -46,7 +46,8 @@ const (
 	// pet has finished initializing itself.
 	// TODO: Replace this with init container status.
 	StatefulSetInitAnnotation = "pod.alpha.kubernetes.io/initialized"
-
+	//StatefulSetReplicasAnnotation is used to communicate the current number of replicas
+	//configured for the Stateful Set to the StatefulSet's Pods
 	StatefulSetReplicasAnnotation = "pod.alpha.kubernetes.io/replicas"
 )
 
@@ -66,6 +67,9 @@ type pcb struct {
 	parent *apps.StatefulSet
 }
 
+//Gets the number of replicas stored in pod's StatefulSetReplicasAnnotation. If an the annotation
+//is not present, or if it contains an invalid value, -1 is returned. Otherwise, a 32 bit integer
+//representation of the annotation's value is returned.
 func getReplicas(pod *api.Pod) int32 {
 	if pod == nil {
 		return -1
@@ -81,11 +85,17 @@ func getReplicas(pod *api.Pod) int32 {
 	}
 }
 
+//Sets pod's StatefulSetReplicasAnnotation to the base 10 string value of replicas.
 func setReplicas(p *api.Pod, replicas int32) {
 	p.Annotations[StatefulSetReplicasAnnotation] = strconv.FormatInt(int64(replicas),10)
 }
 
+//Updates pod to be equivalent to desired, and to contain the number same number of replicas as set.
+//By equivalent, we mean that all of the IdentityMappers for StatefulSet produce equivalent values
+//for both pod and desired. The returned bool is true if pod has been mutated or false if no
+//mutation occurs. If the returned error is not nil, the returned bool is false.
 func update (set *apps.StatefulSet, id string, pod *api.Pod, desired *api.Pod) (bool,error) {
+	//preconditions
 	if set == nil {
 		return false,errors.New("nil StatefulSet parameter")
 	} else if (pod == nil){
@@ -94,6 +104,7 @@ func update (set *apps.StatefulSet, id string, pod *api.Pod, desired *api.Pod) (
 		return false,errors.New("nil target supplied")
 	}
 
+	//collect mappers that violate the equality condition
 	mappers := newIdentityMappers(set)
 	violated := make([]identityMapper,0,len(mappers))
 	for _,mapper := range(mappers){
@@ -101,12 +112,14 @@ func update (set *apps.StatefulSet, id string, pod *api.Pod, desired *api.Pod) (
 			violated = append(violated,mapper)
 		}
 	}
+
+	//return false if no mutations are necessary
 	if len(violated) == 0 && getReplicas(pod) == set.Spec.Replicas {
-		return true, nil
+		return false, nil
 	}
 
-	for _,mapper := range(violated) {
-		mapper.SetIdentity(id,pod)
+	for _, mapper := range (violated) {
+		mapper.SetIdentity(id, pod)
 	}
 	setReplicas(pod,set.Spec.Replicas)
 	return true, nil
