@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/node"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/version"
 
@@ -70,6 +71,14 @@ func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, n
 			continue
 		}
 
+		// Set reason and message in the pod object.
+		if updatedPod, err := setPodTerminationReason(kubeClient, &pod, nodeName); err != nil {
+			glog.Infof("Failed to update status for pod %q: %v", format.Pod(&pod), err)
+			return false, err
+		} else if updatedPod != nil {
+			pod = *updatedPod
+		}
+
 		glog.V(2).Infof("Starting deletion of pod %v", pod.Name)
 		recorder.Eventf(&pod, api.EventTypeNormal, "NodeControllerEviction", "Marking for deletion Pod %s from Node %s", pod.Name, nodeName)
 		if err := kubeClient.Core().Pods(pod.Namespace).Delete(pod.Name, nil); err != nil {
@@ -78,6 +87,21 @@ func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, n
 		remaining = true
 	}
 	return remaining, nil
+}
+
+// setPodTerminationReason attempts to set a reason and message in the pod status, updates it in the apiserver,
+// and returns an error if it encounters one.
+func setPodTerminationReason(kubeClient clientset.Interface, pod *api.Pod, nodeName string) (*api.Pod, error) {
+	updatedPod := pod
+	var err error
+	if pod.Status.Reason != node.NodeUnreachablePodReason {
+		pod.Status.Reason = node.NodeUnreachablePodReason
+		pod.Status.Message = fmt.Sprintf(node.NodeUnreachablePodMessage, nodeName, pod.Name)
+		if updatedPod, err = kubeClient.Core().Pods(pod.Namespace).UpdateStatus(pod); err != nil {
+			return nil, err
+		}
+	}
+	return updatedPod, nil
 }
 
 func forcefullyDeletePod(c clientset.Interface, pod *api.Pod) error {
