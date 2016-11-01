@@ -593,6 +593,7 @@ k8s.io/kubernetes/pkg/credentialprovider,justinsb,1
 k8s.io/kubernetes/pkg/credentialprovider/aws,zmerlynn,1
 k8s.io/kubernetes/pkg/credentialprovider/gcp,mml,1
 k8s.io/kubernetes/pkg/dns,jdef,1
+k8s.io/kubernetes/pkg/dns/treecache,bowei,0
 k8s.io/kubernetes/pkg/fieldpath,childsb,1
 k8s.io/kubernetes/pkg/fields,jsafrane,1
 k8s.io/kubernetes/pkg/genericapiserver,nikhiljindal,0
