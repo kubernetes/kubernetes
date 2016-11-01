@@ -300,38 +300,29 @@ func (c Command) Run(s HookState) error {
 	if err != nil {
 		return err
 	}
-	var stdout, stderr bytes.Buffer
 	cmd := exec.Cmd{
-		Path:   c.Path,
-		Args:   c.Args,
-		Env:    c.Env,
-		Stdin:  bytes.NewReader(b),
-		Stdout: &stdout,
-		Stderr: &stderr,
-	}
-	if err := cmd.Start(); err != nil {
-		return err
+		Path:  c.Path,
+		Args:  c.Args,
+		Env:   c.Env,
+		Stdin: bytes.NewReader(b),
 	}
 	errC := make(chan error, 1)
 	go func() {
-		err := cmd.Wait()
+		out, err := cmd.CombinedOutput()
 		if err != nil {
-			err = fmt.Errorf("error running hook: %v, stdout: %s, stderr: %s", err, stdout.String(), stderr.String())
+			err = fmt.Errorf("%s: %s", err, out)
 		}
 		errC <- err
 	}()
-	var timerCh <-chan time.Time
 	if c.Timeout != nil {
-		timer := time.NewTimer(*c.Timeout)
-		defer timer.Stop()
-		timerCh = timer.C
+		select {
+		case err := <-errC:
+			return err
+		case <-time.After(*c.Timeout):
+			cmd.Process.Kill()
+			cmd.Wait()
+			return fmt.Errorf("hook ran past specified timeout of %.1fs", c.Timeout.Seconds())
+		}
 	}
-	select {
-	case err := <-errC:
-		return err
-	case <-timerCh:
-		cmd.Process.Kill()
-		cmd.Wait()
-		return fmt.Errorf("hook ran past specified timeout of %.1fs", c.Timeout.Seconds())
-	}
+	return <-errC
 }

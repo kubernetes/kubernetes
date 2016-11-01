@@ -104,8 +104,6 @@ func (m *Manager) Apply(pid int) (err error) {
 	if m.Cgroups == nil {
 		return nil
 	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
 
 	var c = m.Cgroups
 
@@ -130,6 +128,8 @@ func (m *Manager) Apply(pid int) (err error) {
 		return cgroups.EnterPid(m.Paths, pid)
 	}
 
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	paths := make(map[string]string)
 	for _, sys := range subsystems {
 		if err := sys.Apply(d); err != nil {
@@ -195,10 +195,18 @@ func (m *Manager) Set(container *configs.Config) error {
 	if m.Cgroups.Paths != nil {
 		return nil
 	}
-
-	paths := m.GetPaths()
 	for _, sys := range subsystems {
-		path := paths[sys.Name()]
+		// Generate fake cgroup data.
+		d, err := getCgroupData(container.Cgroups, -1)
+		if err != nil {
+			return err
+		}
+		// Get the path, but don't error out if the cgroup wasn't found.
+		path, err := d.path(sys.Name())
+		if err != nil && !cgroups.IsNotFound(err) {
+			return err
+		}
+
 		if err := sys.Set(path, container.Cgroups); err != nil {
 			return err
 		}
@@ -215,8 +223,14 @@ func (m *Manager) Set(container *configs.Config) error {
 // Freeze toggles the container's freezer cgroup depending on the state
 // provided
 func (m *Manager) Freeze(state configs.FreezerState) error {
-	paths := m.GetPaths()
-	dir := paths["freezer"]
+	d, err := getCgroupData(m.Cgroups, 0)
+	if err != nil {
+		return err
+	}
+	dir, err := d.path("freezer")
+	if err != nil {
+		return err
+	}
 	prevState := m.Cgroups.Resources.Freezer
 	m.Cgroups.Resources.Freezer = state
 	freezer, err := subsystems.Get("freezer")
@@ -232,13 +246,28 @@ func (m *Manager) Freeze(state configs.FreezerState) error {
 }
 
 func (m *Manager) GetPids() ([]int, error) {
-	paths := m.GetPaths()
-	return cgroups.GetPids(paths["devices"])
+	dir, err := getCgroupPath(m.Cgroups)
+	if err != nil {
+		return nil, err
+	}
+	return cgroups.GetPids(dir)
 }
 
 func (m *Manager) GetAllPids() ([]int, error) {
-	paths := m.GetPaths()
-	return cgroups.GetAllPids(paths["devices"])
+	dir, err := getCgroupPath(m.Cgroups)
+	if err != nil {
+		return nil, err
+	}
+	return cgroups.GetAllPids(dir)
+}
+
+func getCgroupPath(c *configs.Cgroup) (string, error) {
+	d, err := getCgroupData(c, 0)
+	if err != nil {
+		return "", err
+	}
+
+	return d.path("devices")
 }
 
 func getCgroupData(c *configs.Cgroup, pid int) (*cgroupData, error) {

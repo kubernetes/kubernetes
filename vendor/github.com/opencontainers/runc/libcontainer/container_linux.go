@@ -35,6 +35,7 @@ type linuxContainer struct {
 	root                 string
 	config               *configs.Config
 	cgroupManager        cgroups.Manager
+	initPath             string
 	initArgs             []string
 	initProcess          parentProcess
 	initProcessStartTime string
@@ -85,14 +86,13 @@ type Container interface {
 	// Systemerror - System error.
 	Restore(process *Process, criuOpts *CriuOpts) error
 
-	// If the Container state is RUNNING or CREATED, sets the Container state to PAUSING and pauses
+	// If the Container state is RUNNING, sets the Container state to PAUSING and pauses
 	// the execution of any user processes. Asynchronously, when the container finished being paused the
 	// state is changed to PAUSED.
 	// If the Container state is PAUSED, do nothing.
 	//
 	// errors:
-	// ContainerNotExists - Container no longer exists,
-	// ContainerNotRunning - Container not running or created,
+	// ContainerDestroyed - Container no longer exists,
 	// Systemerror - System error.
 	Pause() error
 
@@ -101,8 +101,7 @@ type Container interface {
 	// If the Container state is RUNNING, do nothing.
 	//
 	// errors:
-	// ContainerNotExists - Container no longer exists,
-	// ContainerNotPaused - Container is not paused,
+	// ContainerDestroyed - Container no longer exists,
 	// Systemerror - System error.
 	Resume() error
 
@@ -309,7 +308,10 @@ func (c *linuxContainer) newParentProcess(p *Process, doInit bool) (parentProces
 }
 
 func (c *linuxContainer) commandTemplate(p *Process, childPipe, rootDir *os.File) (*exec.Cmd, error) {
-	cmd := exec.Command(c.initArgs[0], c.initArgs[1:]...)
+	cmd := &exec.Cmd{
+		Path: c.initPath,
+		Args: c.initArgs,
+	}
 	cmd.Stdin = p.Stdin
 	cmd.Stdout = p.Stdout
 	cmd.Stderr = p.Stderr
@@ -445,7 +447,7 @@ func (c *linuxContainer) Pause() error {
 			c: c,
 		})
 	}
-	return newGenericError(fmt.Errorf("container not running or created: %s", status), ContainerNotRunning)
+	return newGenericError(fmt.Errorf("container not running: %s", status), ContainerNotRunning)
 }
 
 func (c *linuxContainer) Resume() error {
@@ -1047,8 +1049,6 @@ func (c *linuxContainer) criuNotifications(resp *criurpc.CriuResp, process *Proc
 		}); err != nil {
 			return err
 		}
-		// create a timestamp indicating when the restored checkpoint was started
-		c.created = time.Now().UTC()
 		if _, err := c.updateState(r); err != nil {
 			return err
 		}

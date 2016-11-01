@@ -144,7 +144,7 @@ func finalizeNamespace(config *initConfig) error {
 	}
 	if config.Cwd != "" {
 		if err := syscall.Chdir(config.Cwd); err != nil {
-			return fmt.Errorf("chdir to cwd (%q) set in config.json failed: %v", config.Cwd, err)
+			return err
 		}
 	}
 	return nil

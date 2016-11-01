@@ -4,14 +4,10 @@
 
 package uritemplates
 
-// Expand parses then expands a URI template with a set of values to produce
-// the resultant URI. Two forms of the result are returned: one with all the
-// elements escaped, and one with the elements unescaped.
-func Expand(path string, values map[string]string) (escaped, unescaped string, err error) {
+func Expand(path string, values map[string]string) (string, error) {
 	template, err := parse(path)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
-	escaped, unescaped = template.Expand(values)
-	return escaped, unescaped, nil
+	return template.Expand(values), nil
 }

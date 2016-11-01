@@ -1,4 +1,4 @@
-// Copyright 2014 The Go Authors. All rights reserved.
+// Copyright 2014 The oauth2 Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -7,7 +7,6 @@ package oauth2
 import (
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -93,28 +92,14 @@ func (t *Token) WithExtra(extra interface{}) *Token {
 // Extra fields are key-value pairs returned by the server as a
 // part of the token retrieval response.
 func (t *Token) Extra(key string) interface{} {
+	if vals, ok := t.raw.(url.Values); ok {
+		// TODO(jbd): Cast numeric values to int64 or float64.
+		return vals.Get(key)
+	}
 	if raw, ok := t.raw.(map[string]interface{}); ok {
 		return raw[key]
 	}
-
-	vals, ok := t.raw.(url.Values)
-	if !ok {
-		return nil
-	}
-
-	v := vals.Get(key)
-	switch s := strings.TrimSpace(v); strings.Count(s, ".") {
-	case 0: // Contains no "."; try to parse as int
-		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
-			return i
-		}
-	case 1: // Contains a single "."; try to parse as float
-		if f, err := strconv.ParseFloat(s, 64); err == nil {
-			return f
-		}
-	}
-
-	return v
+	return nil
 }
 
 // expired reports whether the token is expired.
