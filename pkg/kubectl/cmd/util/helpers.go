@@ -522,7 +522,7 @@ func RecordChangeCause(obj runtime.Object, changeCause string) error {
 
 // ChangeResourcePatch creates a strategic merge patch between the origin input resource info
 // and the annotated with change-cause input resource info.
-func ChangeResourcePatch(info *resource.Info, changeCause string) ([]byte, error) {
+func ChangeResourcePatch(info *resource.Info, changeCause string, ifUseNewPatchBehavior bool) ([]byte, error) {
 	oldData, err := json.Marshal(info.Object)
 	if err != nil {
 		return nil, err
@@ -534,7 +534,7 @@ func ChangeResourcePatch(info *resource.Info, changeCause string) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
-	return strategicpatch.CreateTwoWayMergePatch(oldData, newData, info.Object)
+	return strategicpatch.CreateTwoWayMergePatch(oldData, newData, info.Object, ifUseNewPatchBehavior)
 }
 
 // containsChangeCause checks if input resource info contains change-cause annotation.
@@ -751,4 +751,27 @@ func IsSiblingCommandExists(cmd *cobra.Command, targetCmdName string) bool {
 	}
 
 	return false
+}
+
+func TryToRunIfUseNewBehaviorForPatch(f Factory) (bool, error) {
+	var ifUseNewPatchBehavior bool
+	err := func() error {
+		defer func() {
+			// Recover from the panic below.
+			panicInfo := recover()
+			if panicInfo != nil {
+				ifUseNewPatchBehavior = true
+			}
+		}()
+		clientset, err := f.ClientSet()
+		if err != nil {
+			return err
+		}
+		ifUseNewPatchBehavior, err = strategicpatch.IfUseNewBehaviorForPatch(clientset.Discovery())
+		return err
+	}()
+	if err != nil {
+		return ifUseNewPatchBehavior, err
+	}
+	return ifUseNewPatchBehavior, nil
 }

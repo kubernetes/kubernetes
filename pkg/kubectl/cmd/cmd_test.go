@@ -110,6 +110,10 @@ func objBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
 	return ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, obj))))
 }
 
+func jsonBody(bytesBody []byte) io.ReadCloser {
+	return ioutil.NopCloser(bytes.NewReader(bytesBody))
+}
+
 func stringBody(body string) io.ReadCloser {
 	return ioutil.NopCloser(bytes.NewReader([]byte(body)))
 }

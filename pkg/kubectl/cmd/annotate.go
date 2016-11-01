@@ -207,6 +207,11 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 		return fmt.Errorf("--resource-version may only be used with a single resource")
 	}
 
+	ifUseNewPatchBehavior, err := cmdutil.TryToRunIfUseNewBehaviorForPatch(f)
+	if err != nil {
+		return err
+	}
+
 	return r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
@@ -239,7 +244,7 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 			if err != nil {
 				return err
 			}
-			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
+			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj, ifUseNewPatchBehavior)
 			createdPatch := err == nil
 			if err != nil {
 				glog.V(2).Infof("couldn't compute patch: %v", err)
