@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/jonboulle/clockwork"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -46,6 +48,7 @@ type ApplyOptions struct {
 	Prune           bool
 	Cascade         bool
 	GracePeriod     int
+	PruneResources  []pruneResource
 }
 
 const (
@@ -101,6 +104,7 @@ func NewCmdApply(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.AddValidateFlags(cmd)
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().Bool("all", false, "[-all] to select all the specified resources.")
+	cmd.Flags().StringArrayP("prune-whitelist", "w", []string{}, "Overwrite the default whitelist with <group/version/kind> for --prune")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
@@ -123,6 +127,28 @@ func validatePruneAll(prune, all bool, selector string) error {
 	return nil
 }
 
+func parsePruneResources(gvks []string) ([]pruneResource, error) {
+	pruneResources := []pruneResource{}
+	for _, groupVersionKind := range gvks {
+		gvk := strings.Split(groupVersionKind, "/")
+		if len(gvk) != 3 {
+			return nil, fmt.Errorf("invalid GroupVersionKind format: %v, please follow <group/version/kind>", groupVersionKind)
+		}
+
+		namespaced := true
+		if gvk[2] == "Namespace" ||
+			gvk[2] == "Node" ||
+			gvk[2] == "PersistentVolume" {
+			namespaced = false
+		}
+		if gvk[0] == "core" {
+			gvk[0] = ""
+		}
+		pruneResources = append(pruneResources, pruneResource{gvk[0], gvk[1], gvk[2], namespaced})
+	}
+	return pruneResources, nil
+}
+
 func RunApply(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *ApplyOptions) error {
 	shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
 	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
@@ -133,6 +159,13 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *App
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
+	}
+
+	if options.Prune {
+		options.PruneResources, err = parsePruneResources(cmdutil.GetFlagStringArray(cmd, "prune-whitelist"))
+		if err != nil {
+			return err
+		}
 	}
 
 	mapper, typer := f.Object()
@@ -156,8 +189,6 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *App
 
 	visitedUids := sets.NewString()
 	visitedNamespaces := sets.NewString()
-	visitedNamespacedRESTMappings := map[unversioned.GroupVersionKind]*meta.RESTMapping{}
-	visitedNonNamespacedRESTMappings := map[unversioned.GroupVersionKind]*meta.RESTMapping{}
 
 	count := 0
 	err = r.Visit(func(info *resource.Info, err error) error {
@@ -169,9 +200,6 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *App
 
 		if info.Namespaced() {
 			visitedNamespaces.Insert(info.Namespace)
-			visitedNamespacedRESTMappings[info.Mapping.GroupVersionKind] = info.Mapping
-		} else {
-			visitedNonNamespacedRESTMappings[info.Mapping.GroupVersionKind] = info.Mapping
 		}
 
 		// Get the modified configuration of the object. Embed the result
@@ -271,24 +299,81 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *App
 		visitedUids: visitedUids,
 
 		cascade:     options.Cascade,
+		dryRun:      dryRun,
 		gracePeriod: options.GracePeriod,
 
 		out: out,
 	}
+
+	namespacedRESTMappings, nonNamespacedRESTMappings, err := getRESTMappings(&(options.PruneResources))
+	if err != nil {
+		return fmt.Errorf("error retrieving RESTMappings to prune: %v", err)
+	}
+
 	for n := range visitedNamespaces {
-		for _, m := range visitedNamespacedRESTMappings {
+		for _, m := range namespacedRESTMappings {
 			if err := p.prune(n, m, shortOutput); err != nil {
-				return fmt.Errorf("error pruning objects: %v", err)
+				return fmt.Errorf("error pruning namespaced object %v: %v", m.GroupVersionKind, err)
 			}
 		}
 	}
-	for _, m := range visitedNonNamespacedRESTMappings {
+	for _, m := range nonNamespacedRESTMappings {
 		if err := p.prune(api.NamespaceNone, m, shortOutput); err != nil {
-			return fmt.Errorf("error pruning objects: %v", err)
+			return fmt.Errorf("error pruning nonNamespaced object %v: %v", m.GroupVersionKind, err)
 		}
 	}
 
 	return nil
+}
+
+type pruneResource struct {
+	group      string
+	version    string
+	kind       string
+	namespaced bool
+}
+
+func (pr pruneResource) String() string {
+	return fmt.Sprintf("%v/%v, Kind=%v, Namespaced=%v", pr.group, pr.version, pr.kind, pr.namespaced)
+}
+
+func getRESTMappings(pruneResources *[]pruneResource) (namespaced, nonNamespaced []*meta.RESTMapping, err error) {
+	if len(*pruneResources) == 0 {
+		// default whitelist
+		// TODO: need to handle the older api versions - e.g. v1beta1 jobs. Github issue: #35991
+		*pruneResources = []pruneResource{
+			{"", "v1", "ConfigMap", true},
+			{"", "v1", "Endpoints", true},
+			{"", "v1", "Namespace", false},
+			{"", "v1", "PersistentVolumeClaim", true},
+			{"", "v1", "PersistentVolume", false},
+			{"", "v1", "Pod", true},
+			{"", "v1", "ReplicationController", true},
+			{"", "v1", "Secret", true},
+			{"", "v1", "Service", true},
+			{"batch", "v1", "Job", true},
+			{"extensions", "v1beta1", "DaemonSet", true},
+			{"extensions", "v1beta1", "Deployment", true},
+			{"extensions", "v1beta1", "HorizontalPodAutoscaler", true},
+			{"extensions", "v1beta1", "Ingress", true},
+			{"extensions", "v1beta1", "ReplicaSet", true},
+			{"apps", "v1beta1", "StatefulSet", true},
+		}
+	}
+	registeredMapper := registered.RESTMapper()
+	for _, resource := range *pruneResources {
+		addedMapping, err := registeredMapper.RESTMapping(unversioned.GroupKind{Group: resource.group, Kind: resource.kind}, resource.version)
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid resource %v: %v", resource, err)
+		}
+		if resource.namespaced {
+			namespaced = append(namespaced, addedMapping)
+		} else {
+			nonNamespaced = append(nonNamespaced, addedMapping)
+		}
+	}
+
+	return namespaced, nonNamespaced, nil
 }
 
 type pruner struct {
@@ -300,6 +385,7 @@ type pruner struct {
 	selector    labels.Selector
 
 	cascade     bool
+	dryRun      bool
 	gracePeriod int
 
 	out io.Writer
@@ -341,10 +427,12 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping, shortOutput 
 		if err != nil {
 			return err
 		}
-		if err := p.delete(namespace, name, mapping, c); err != nil {
-			return err
+		if !p.dryRun {
+			if err := p.delete(namespace, name, mapping, c); err != nil {
+				return err
+			}
 		}
-		cmdutil.PrintSuccess(p.mapper, shortOutput, p.out, mapping.Resource, name, false, "pruned")
+		cmdutil.PrintSuccess(p.mapper, shortOutput, p.out, mapping.Resource, name, p.dryRun, "pruned")
 	}
 	return nil
 }
