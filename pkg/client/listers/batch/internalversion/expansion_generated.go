@@ -18,14 +18,6 @@ limitations under the License.
 
 package internalversion
 
-// JobListerExpansion allows custom methods to be added to
-// JobLister.
-type JobListerExpansion interface{}
-
-// JobNamespaceListerExpansion allows custom methods to be added to
-// JobNamespaeLister.
-type JobNamespaceListerExpansion interface{}
-
 // ScheduledJobListerExpansion allows custom methods to be added to
 // ScheduledJobLister.
 type ScheduledJobListerExpansion interface{}
