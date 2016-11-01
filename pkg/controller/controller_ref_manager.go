@@ -162,14 +162,15 @@ func NewReplicaSetControllerRefManager(
 	return &ReplicaSetControllerRefManager{rsControl, controllerObject, controllerSelector, controllerKind}
 }
 
-// Classify first filters out inactive ReplicaSets, then it classify the remaining ReplicaSets
-// into three categories: 1. matchesAndControlled are the ReplicaSets whose labels
+// Classify, classifies the ReplicaSets into three categories:
+// 1. matchesAndControlled are the ReplicaSets whose labels
 // match the selector of the Deployment, and have a controllerRef pointing to the
-// controller 2. matchesNeedsController are the whose labels match the Deployment,
+// controller
+// 2. matchesNeedsController are ReplicaSets ,whose labels match the Deployment,
 // but don't have a controllerRef. (ReplicaSets with matching labels but with a
-// controllerRef pointing to other object are ignored) 3. controlledDoesNotMatch
-// are the ReplicaSets that have a controllerRef pointing to the controller, but their
-// labels no longer match the selector.
+// controllerRef pointing to other object are ignored)
+// 3. controlledDoesNotMatch are the ReplicaSets that have a controllerRef pointing
+// to the controller, but their labels no longer match the selector.
 func (m *ReplicaSetControllerRefManager) Classify(replicaSets []*extensions.ReplicaSet) (
 	matchesAndControlled []*extensions.ReplicaSet,
 	matchesNeedsController []*extensions.ReplicaSet,
@@ -207,8 +208,8 @@ func (m *ReplicaSetControllerRefManager) Classify(replicaSets []*extensions.Repl
 func (m *ReplicaSetControllerRefManager) AdoptReplicaSet(replicaSet *extensions.ReplicaSet) error {
 	// we should not adopt any ReplicaSets if the controller is about to be deleted
 	if m.controllerObject.DeletionTimestamp != nil {
-		return fmt.Errorf("cancel the adopt attempt for RS %s because the controlller is being deleted",
-			strings.Join([]string{replicaSet.Namespace, replicaSet.Name, string(replicaSet.UID)}, "_"))
+		return fmt.Errorf("cancel the adopt attempt for RS %s because the controller %v is being deleted",
+			strings.Join([]string{replicaSet.Namespace, replicaSet.Name, string(replicaSet.UID)}, "_"), m.controllerObject.Name)
 	}
 	addControllerPatch := fmt.Sprintf(
 		`{"metadata":{"ownerReferences":[{"apiVersion":"%s","kind":"%s","name":"%s","uid":"%s","controller":true}],"uid":"%s"}}`,
@@ -220,13 +221,13 @@ func (m *ReplicaSetControllerRefManager) AdoptReplicaSet(replicaSet *extensions.
 // ReleaseReplicaSet sends a patch to free the ReplicaSet from the control of the Deployment controller.
 // It returns the error if the patching fails. 404 and 422 errors are ignored.
 func (m *ReplicaSetControllerRefManager) ReleaseReplicaSet(replicaSet *extensions.ReplicaSet) error {
-	glog.V(2).Infof("patching pod %s_%s to remove its controllerRef to %s/%s:%s",
+	glog.V(2).Infof("patching ReplicaSet %s_%s to remove its controllerRef to %s/%s:%s",
 		replicaSet.Namespace, replicaSet.Name, m.controllerKind.GroupVersion(), m.controllerKind.Kind, m.controllerObject.Name)
 	deleteOwnerRefPatch := fmt.Sprintf(`{"metadata":{"ownerReferences":[{"$patch":"delete","uid":"%s"}],"uid":"%s"}}`, m.controllerObject.UID, replicaSet.UID)
 	err := m.rsControl.PatchReplicaSet(replicaSet.Namespace, replicaSet.Name, []byte(deleteOwnerRefPatch))
 	if err != nil {
 		if errors.IsNotFound(err) {
-			// If the ReplicaSet  no longer exists, ignore it.
+			// If the ReplicaSet no longer exists, ignore it.
 			return nil
 		}
 		if errors.IsInvalid(err) {
@@ -234,10 +235,6 @@ func (m *ReplicaSetControllerRefManager) ReleaseReplicaSet(replicaSet *extension
 			// has no owner reference, 2. the uid of the ReplicaSet doesn't
 			// match, which means the ReplicaSet is deleted and then recreated.
 			// In both cases, the error can be ignored.
-
-			// TODO: If the ReplicaSet has owner references, but none of them
-			// has the owner.UID, server will silently ignore the patch.
-			// Investigate why.
 			return nil
 		}
 	}

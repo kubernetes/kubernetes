@@ -301,6 +301,15 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 			Template:        newRSTemplate,
 		},
 	}
+	var trueVar = true
+	controllerRef := &api.OwnerReference{
+		APIVersion: getDeploymentKind().GroupVersion().String(),
+		Kind:       getDeploymentKind().Kind,
+		Name:       deployment.Name,
+		UID:        deployment.UID,
+		Controller: &trueVar,
+	}
+	newRS.OwnerReferences = append(newRS.OwnerReferences, *controllerRef)
 	allRSs := append(oldRSs, &newRS)
 	newReplicasCount, err := deploymentutil.NewRSNewReplicas(deployment, allRSs, &newRS)
 	if err != nil {

@@ -59,8 +59,8 @@ const (
 	MaxRetries = 5
 )
 
-func getDeploymentControllerKind() unversioned.GroupVersionKind {
-	return v1beta1.SchemeGroupVersion.WithKind("DeploymentController")
+func getDeploymentKind() unversioned.GroupVersionKind {
+	return v1beta1.SchemeGroupVersion.WithKind("Deployment")
 }
 
 // DeploymentController is responsible for synchronizing Deployment objects stored
@@ -320,6 +320,46 @@ func (dc *DeploymentController) handleErr(err error, key interface{}) {
 	dc.queue.Forget(key)
 }
 
+func (dc *DeploymentController) classifyReplicaSets(deployment *extensions.Deployment) error {
+	rsList, err := dc.rsLister.ReplicaSets(deployment.Namespace).List(labels.Everything())
+	if err != nil {
+		glog.Errorf("Error getting ReplicaSets for deployment %q: %v", deployment.Name, err)
+		return err
+	}
+
+	deploymentSelector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
+	if err != nil {
+		return fmt.Errorf("deployment %s/%s has invalid label selector: %v", deployment.Namespace, deployment.Name, err)
+	}
+	cm := controller.NewReplicaSetControllerRefManager(dc.rsControl, deployment.ObjectMeta, deploymentSelector, getDeploymentKind())
+	matchesAndControlled, matchesNeedsController, controlledDoesNotMatch := cm.Classify(rsList)
+	for _, replicaSet := range matchesNeedsController {
+		err := cm.AdoptReplicaSet(replicaSet)
+		// continue to next RS if adoption fails.
+		if err != nil {
+			// If the RS no longer exists, don't even log the error.
+			if !errors.IsNotFound(err) {
+				utilruntime.HandleError(err)
+			}
+		} else {
+			matchesAndControlled = append(matchesAndControlled, replicaSet)
+		}
+	}
+	// remove the controllerRef for the RS that no longer have matching labels
+	var errlist []error
+	for _, replicaSet := range controlledDoesNotMatch {
+		err := cm.ReleaseReplicaSet(replicaSet)
+		if err != nil {
+			errlist = append(errlist, cm.ReleaseReplicaSet(replicaSet))
+		}
+	}
+	if len(errlist) != 0 {
+		return utilerrors.NewAggregate(errlist)
+	}
+
+	return nil
+}
+
 // syncDeployment will sync the deployment with the given key.
 // This function is not meant to be invoked concurrently with the same key.
 func (dc *DeploymentController) syncDeployment(key string) error {
@@ -357,42 +397,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	}
 
 	if dc.garbageCollectorEnabled {
-		rsList, err := dc.rsLister.ReplicaSets(deployment.Namespace).List(labels.Everything())
-		if err != nil {
-			glog.Errorf("Error getting ReplicaSets for deployment %q: %v", deployment, err)
-			return err
-		}
-
-		deploymentSelector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
-		if err != nil {
-			return fmt.Errorf("deployment %s/%s has invalid label selector: %v", deployment.Namespace, deployment.Name, err)
-		}
-		cm := controller.NewReplicaSetControllerRefManager(dc.rsControl, deployment.ObjectMeta, deploymentSelector, getDeploymentControllerKind())
-		matchesAndControlled, matchesNeedsController, controlledDoesNotMatch := cm.Classify(rsList)
-		for _, replicaSet := range matchesNeedsController {
-			err := cm.AdoptReplicaSet(replicaSet)
-			// continue to next RS if adoption fails.
-			if err != nil {
-				// If the RS no longer exists, don't even log the error.
-				if !errors.IsNotFound(err) {
-					utilruntime.HandleError(err)
-				}
-			} else {
-				matchesAndControlled = append(matchesAndControlled, replicaSet)
-			}
-		}
-		// remove the controllerRef for the RS that no longer have matching labels
-		var errlist []error
-		for _, replicaSet := range controlledDoesNotMatch {
-			err := cm.ReleaseReplicaSet(replicaSet)
-			if err != nil {
-				errlist = append(errlist, cm.ReleaseReplicaSet(replicaSet))
-			}
-		}
-		if len(errlist) != 0 {
-			return utilerrors.NewAggregate(errlist)
-		}
-
+		dc.classifyReplicaSets(deployment)
 	}
 
 	if d.DeletionTimestamp != nil {
