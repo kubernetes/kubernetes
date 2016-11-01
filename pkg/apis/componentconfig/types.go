@@ -586,6 +586,9 @@ type KubeControllerManagerConfiguration struct {
 	Port int32 `json:"port"`
 	// address is the IP address to serve on (set to 0.0.0.0 for all interfaces).
 	Address string `json:"address"`
+	// useServiceAccountCredentials indicates whether controllers should be run with
+	// individual service account credentials.
+	UseServiceAccountCredentials bool `json:"useServiceAccountCredentials"`
 	// cloudProvider is the provider for cloud services.
 	CloudProvider string `json:"cloudProvider"`
 	// cloudConfigFile is the path to the cloud provider configuration file.

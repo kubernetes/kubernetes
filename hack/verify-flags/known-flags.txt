@@ -573,6 +573,7 @@ unix-socket
 update-period
 upgrade-image
 upgrade-target
+use-service-account-credentials
 use-kubernetes-cluster-service
 use-kubernetes-version
 user-whitelist
