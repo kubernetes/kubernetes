@@ -90,7 +90,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1ComponentStatus",
+     "operationId": "listComponentStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -165,7 +165,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1ComponentStatus",
+     "operationId": "readComponentStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -215,7 +215,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1ConfigMapForAllNamespaces",
+     "operationId": "listConfigMapForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -292,7 +292,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1EndpointsForAllNamespaces",
+     "operationId": "listEndpointsForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -369,7 +369,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1EventForAllNamespaces",
+     "operationId": "listEventForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -446,7 +446,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1LimitRangeForAllNamespaces",
+     "operationId": "listLimitRangeForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -523,7 +523,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1Namespace",
+     "operationId": "listNamespace",
      "parameters": [
       {
        "uniqueItems": true,
@@ -589,7 +589,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "createCoreV1Namespace",
+     "operationId": "createNamespace",
      "parameters": [
       {
        "name": "body",
@@ -628,7 +628,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1CollectionNamespace",
+     "operationId": "deleteCollectionNamespace",
      "parameters": [
       {
        "uniqueItems": true,
@@ -705,7 +705,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "createCoreV1NamespacedBinding",
+     "operationId": "createNamespacedBinding",
      "responses": {
       "200": {
        "description": "OK",
@@ -763,7 +763,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1NamespacedConfigMap",
+     "operationId": "listNamespacedConfigMap",
      "parameters": [
       {
        "uniqueItems": true,
@@ -829,7 +829,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "createCoreV1NamespacedConfigMap",
+     "operationId": "createNamespacedConfigMap",
      "parameters": [
       {
        "name": "body",
@@ -868,7 +868,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1CollectionNamespacedConfigMap",
+     "operationId": "deleteCollectionNamespacedConfigMap",
      "parameters": [
       {
        "uniqueItems": true,
@@ -953,7 +953,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1NamespacedConfigMap",
+     "operationId": "readNamespacedConfigMap",
      "parameters": [
       {
        "uniqueItems": true,
@@ -998,7 +998,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1NamespacedConfigMap",
+     "operationId": "replaceNamespacedConfigMap",
      "parameters": [
       {
        "name": "body",
@@ -1037,7 +1037,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1NamespacedConfigMap",
+     "operationId": "deleteNamespacedConfigMap",
      "parameters": [
       {
        "name": "body",
@@ -1078,7 +1078,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1NamespacedConfigMap",
+     "operationId": "patchNamespacedConfigMap",
      "parameters": [
       {
        "name": "body",
@@ -1146,7 +1146,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1NamespacedEndpoints",
+     "operationId": "listNamespacedEndpoints",
      "parameters": [
       {
        "uniqueItems": true,
@@ -1212,7 +1212,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "createCoreV1NamespacedEndpoints",
+     "operationId": "createNamespacedEndpoints",
      "parameters": [
       {
        "name": "body",
@@ -1251,7 +1251,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1CollectionNamespacedEndpoints",
+     "operationId": "deleteCollectionNamespacedEndpoints",
      "parameters": [
       {
        "uniqueItems": true,
@@ -1336,7 +1336,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1NamespacedEndpoints",
+     "operationId": "readNamespacedEndpoints",
      "parameters": [
       {
        "uniqueItems": true,
@@ -1381,7 +1381,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1NamespacedEndpoints",
+     "operationId": "replaceNamespacedEndpoints",
      "parameters": [
       {
        "name": "body",
@@ -1420,7 +1420,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1NamespacedEndpoints",
+     "operationId": "deleteNamespacedEndpoints",
      "parameters": [
       {
        "name": "body",
@@ -1461,7 +1461,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1NamespacedEndpoints",
+     "operationId": "patchNamespacedEndpoints",
      "parameters": [
       {
        "name": "body",
@@ -1529,7 +1529,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1NamespacedEvent",
+     "operationId": "listNamespacedEvent",
      "parameters": [
       {
        "uniqueItems": true,
@@ -1595,7 +1595,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "createCoreV1NamespacedEvent",
+     "operationId": "createNamespacedEvent",
      "parameters": [
       {
        "name": "body",
@@ -1634,7 +1634,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1CollectionNamespacedEvent",
+     "operationId": "deleteCollectionNamespacedEvent",
      "parameters": [
       {
        "uniqueItems": true,
@@ -1719,7 +1719,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1NamespacedEvent",
+     "operationId": "readNamespacedEvent",
      "parameters": [
       {
        "uniqueItems": true,
@@ -1764,7 +1764,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1NamespacedEvent",
+     "operationId": "replaceNamespacedEvent",
      "parameters": [
       {
        "name": "body",
@@ -1803,7 +1803,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1NamespacedEvent",
+     "operationId": "deleteNamespacedEvent",
      "parameters": [
       {
        "name": "body",
@@ -1844,7 +1844,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1NamespacedEvent",
+     "operationId": "patchNamespacedEvent",
      "parameters": [
       {
        "name": "body",
@@ -1912,7 +1912,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1NamespacedLimitRange",
+     "operationId": "listNamespacedLimitRange",
      "parameters": [
       {
        "uniqueItems": true,
@@ -1978,7 +1978,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "createCoreV1NamespacedLimitRange",
+     "operationId": "createNamespacedLimitRange",
      "parameters": [
       {
        "name": "body",
@@ -2017,7 +2017,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1CollectionNamespacedLimitRange",
+     "operationId": "deleteCollectionNamespacedLimitRange",
      "parameters": [
       {
        "uniqueItems": true,
@@ -2102,7 +2102,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1NamespacedLimitRange",
+     "operationId": "readNamespacedLimitRange",
      "parameters": [
       {
        "uniqueItems": true,
@@ -2147,7 +2147,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1NamespacedLimitRange",
+     "operationId": "replaceNamespacedLimitRange",
      "parameters": [
       {
        "name": "body",
@@ -2186,7 +2186,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1NamespacedLimitRange",
+     "operationId": "deleteNamespacedLimitRange",
      "parameters": [
       {
        "name": "body",
@@ -2227,7 +2227,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1NamespacedLimitRange",
+     "operationId": "patchNamespacedLimitRange",
      "parameters": [
       {
        "name": "body",
@@ -2295,7 +2295,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1NamespacedPersistentVolumeClaim",
+     "operationId": "listNamespacedPersistentVolumeClaim",
      "parameters": [
       {
        "uniqueItems": true,
@@ -2361,7 +2361,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "createCoreV1NamespacedPersistentVolumeClaim",
+     "operationId": "createNamespacedPersistentVolumeClaim",
      "parameters": [
       {
        "name": "body",
@@ -2400,7 +2400,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1CollectionNamespacedPersistentVolumeClaim",
+     "operationId": "deleteCollectionNamespacedPersistentVolumeClaim",
      "parameters": [
       {
        "uniqueItems": true,
@@ -2485,7 +2485,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1NamespacedPersistentVolumeClaim",
+     "operationId": "readNamespacedPersistentVolumeClaim",
      "parameters": [
       {
        "uniqueItems": true,
@@ -2530,7 +2530,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1NamespacedPersistentVolumeClaim",
+     "operationId": "replaceNamespacedPersistentVolumeClaim",
      "parameters": [
       {
        "name": "body",
@@ -2569,7 +2569,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1NamespacedPersistentVolumeClaim",
+     "operationId": "deleteNamespacedPersistentVolumeClaim",
      "parameters": [
       {
        "name": "body",
@@ -2610,7 +2610,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1NamespacedPersistentVolumeClaim",
+     "operationId": "patchNamespacedPersistentVolumeClaim",
      "parameters": [
       {
        "name": "body",
@@ -2676,7 +2676,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1NamespacedPersistentVolumeClaimStatus",
+     "operationId": "readNamespacedPersistentVolumeClaimStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -2705,7 +2705,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1NamespacedPersistentVolumeClaimStatus",
+     "operationId": "replaceNamespacedPersistentVolumeClaimStatus",
      "parameters": [
       {
        "name": "body",
@@ -2746,7 +2746,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1NamespacedPersistentVolumeClaimStatus",
+     "operationId": "patchNamespacedPersistentVolumeClaimStatus",
      "parameters": [
       {
        "name": "body",
@@ -2814,7 +2814,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1NamespacedPod",
+     "operationId": "listNamespacedPod",
      "parameters": [
       {
        "uniqueItems": true,
@@ -2880,7 +2880,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "createCoreV1NamespacedPod",
+     "operationId": "createNamespacedPod",
      "parameters": [
       {
        "name": "body",
@@ -2919,7 +2919,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1CollectionNamespacedPod",
+     "operationId": "deleteCollectionNamespacedPod",
      "parameters": [
       {
        "uniqueItems": true,
@@ -3004,7 +3004,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1NamespacedPod",
+     "operationId": "readNamespacedPod",
      "parameters": [
       {
        "uniqueItems": true,
@@ -3049,7 +3049,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1NamespacedPod",
+     "operationId": "replaceNamespacedPod",
      "parameters": [
       {
        "name": "body",
@@ -3088,7 +3088,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1NamespacedPod",
+     "operationId": "deleteNamespacedPod",
      "parameters": [
       {
        "name": "body",
@@ -3129,7 +3129,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1NamespacedPod",
+     "operationId": "patchNamespacedPod",
      "parameters": [
       {
        "name": "body",
@@ -3193,7 +3193,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1GetNamespacedPodAttach",
+     "operationId": "connectGetNamespacedPodAttach",
      "responses": {
       "200": {
        "description": "OK",
@@ -3220,7 +3220,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1PostNamespacedPodAttach",
+     "operationId": "connectPostNamespacedPodAttach",
      "responses": {
       "200": {
        "description": "OK",
@@ -3304,7 +3304,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "createCoreV1NamespacedBindingBinding",
+     "operationId": "createNamespacedBindingBinding",
      "responses": {
       "200": {
        "description": "OK",
@@ -3368,7 +3368,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "createCoreV1NamespacedEvictionEviction",
+     "operationId": "createNamespacedEvictionEviction",
      "responses": {
       "200": {
        "description": "OK",
@@ -3430,7 +3430,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1GetNamespacedPodExec",
+     "operationId": "connectGetNamespacedPodExec",
      "responses": {
       "200": {
        "description": "OK",
@@ -3457,7 +3457,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1PostNamespacedPodExec",
+     "operationId": "connectPostNamespacedPodExec",
      "responses": {
       "200": {
        "description": "OK",
@@ -3549,7 +3549,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1NamespacedPodLog",
+     "operationId": "readNamespacedPodLog",
      "responses": {
       "200": {
        "description": "OK",
@@ -3659,7 +3659,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1GetNamespacedPodPortforward",
+     "operationId": "connectGetNamespacedPodPortforward",
      "responses": {
       "200": {
        "description": "OK",
@@ -3686,7 +3686,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1PostNamespacedPodPortforward",
+     "operationId": "connectPostNamespacedPodPortforward",
      "responses": {
       "200": {
        "description": "OK",
@@ -3733,7 +3733,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1GetNamespacedPodProxy",
+     "operationId": "connectGetNamespacedPodProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -3760,7 +3760,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1PutNamespacedPodProxy",
+     "operationId": "connectPutNamespacedPodProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -3787,7 +3787,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1PostNamespacedPodProxy",
+     "operationId": "connectPostNamespacedPodProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -3814,7 +3814,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1DeleteNamespacedPodProxy",
+     "operationId": "connectDeleteNamespacedPodProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -3841,7 +3841,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1OptionsNamespacedPodProxy",
+     "operationId": "connectOptionsNamespacedPodProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -3868,7 +3868,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1HeadNamespacedPodProxy",
+     "operationId": "connectHeadNamespacedPodProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -3922,7 +3922,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1GetNamespacedPodProxyWithPath",
+     "operationId": "connectGetNamespacedPodProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -3949,7 +3949,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1PutNamespacedPodProxyWithPath",
+     "operationId": "connectPutNamespacedPodProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -3976,7 +3976,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1PostNamespacedPodProxyWithPath",
+     "operationId": "connectPostNamespacedPodProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -4003,7 +4003,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1DeleteNamespacedPodProxyWithPath",
+     "operationId": "connectDeleteNamespacedPodProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -4030,7 +4030,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1OptionsNamespacedPodProxyWithPath",
+     "operationId": "connectOptionsNamespacedPodProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -4057,7 +4057,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1HeadNamespacedPodProxyWithPath",
+     "operationId": "connectHeadNamespacedPodProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -4121,7 +4121,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1NamespacedPodStatus",
+     "operationId": "readNamespacedPodStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -4150,7 +4150,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1NamespacedPodStatus",
+     "operationId": "replaceNamespacedPodStatus",
      "parameters": [
       {
        "name": "body",
@@ -4191,7 +4191,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1NamespacedPodStatus",
+     "operationId": "patchNamespacedPodStatus",
      "parameters": [
       {
        "name": "body",
@@ -4259,7 +4259,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1NamespacedPodTemplate",
+     "operationId": "listNamespacedPodTemplate",
      "parameters": [
       {
        "uniqueItems": true,
@@ -4325,7 +4325,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "createCoreV1NamespacedPodTemplate",
+     "operationId": "createNamespacedPodTemplate",
      "parameters": [
       {
        "name": "body",
@@ -4364,7 +4364,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1CollectionNamespacedPodTemplate",
+     "operationId": "deleteCollectionNamespacedPodTemplate",
      "parameters": [
       {
        "uniqueItems": true,
@@ -4449,7 +4449,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1NamespacedPodTemplate",
+     "operationId": "readNamespacedPodTemplate",
      "parameters": [
       {
        "uniqueItems": true,
@@ -4494,7 +4494,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1NamespacedPodTemplate",
+     "operationId": "replaceNamespacedPodTemplate",
      "parameters": [
       {
        "name": "body",
@@ -4533,7 +4533,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1NamespacedPodTemplate",
+     "operationId": "deleteNamespacedPodTemplate",
      "parameters": [
       {
        "name": "body",
@@ -4574,7 +4574,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1NamespacedPodTemplate",
+     "operationId": "patchNamespacedPodTemplate",
      "parameters": [
       {
        "name": "body",
@@ -4642,7 +4642,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1NamespacedReplicationController",
+     "operationId": "listNamespacedReplicationController",
      "parameters": [
       {
        "uniqueItems": true,
@@ -4708,7 +4708,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "createCoreV1NamespacedReplicationController",
+     "operationId": "createNamespacedReplicationController",
      "parameters": [
       {
        "name": "body",
@@ -4747,7 +4747,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1CollectionNamespacedReplicationController",
+     "operationId": "deleteCollectionNamespacedReplicationController",
      "parameters": [
       {
        "uniqueItems": true,
@@ -4832,7 +4832,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1NamespacedReplicationController",
+     "operationId": "readNamespacedReplicationController",
      "parameters": [
       {
        "uniqueItems": true,
@@ -4877,7 +4877,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1NamespacedReplicationController",
+     "operationId": "replaceNamespacedReplicationController",
      "parameters": [
       {
        "name": "body",
@@ -4916,7 +4916,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1NamespacedReplicationController",
+     "operationId": "deleteNamespacedReplicationController",
      "parameters": [
       {
        "name": "body",
@@ -4957,7 +4957,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1NamespacedReplicationController",
+     "operationId": "patchNamespacedReplicationController",
      "parameters": [
       {
        "name": "body",
@@ -5023,7 +5023,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1NamespacedScaleScale",
+     "operationId": "readNamespacedScaleScale",
      "responses": {
       "200": {
        "description": "OK",
@@ -5052,7 +5052,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1NamespacedScaleScale",
+     "operationId": "replaceNamespacedScaleScale",
      "parameters": [
       {
        "name": "body",
@@ -5093,7 +5093,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1NamespacedScaleScale",
+     "operationId": "patchNamespacedScaleScale",
      "parameters": [
       {
        "name": "body",
@@ -5159,7 +5159,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1NamespacedReplicationControllerStatus",
+     "operationId": "readNamespacedReplicationControllerStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -5188,7 +5188,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1NamespacedReplicationControllerStatus",
+     "operationId": "replaceNamespacedReplicationControllerStatus",
      "parameters": [
       {
        "name": "body",
@@ -5229,7 +5229,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1NamespacedReplicationControllerStatus",
+     "operationId": "patchNamespacedReplicationControllerStatus",
      "parameters": [
       {
        "name": "body",
@@ -5297,7 +5297,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1NamespacedResourceQuota",
+     "operationId": "listNamespacedResourceQuota",
      "parameters": [
       {
        "uniqueItems": true,
@@ -5363,7 +5363,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "createCoreV1NamespacedResourceQuota",
+     "operationId": "createNamespacedResourceQuota",
      "parameters": [
       {
        "name": "body",
@@ -5402,7 +5402,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1CollectionNamespacedResourceQuota",
+     "operationId": "deleteCollectionNamespacedResourceQuota",
      "parameters": [
       {
        "uniqueItems": true,
@@ -5487,7 +5487,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1NamespacedResourceQuota",
+     "operationId": "readNamespacedResourceQuota",
      "parameters": [
       {
        "uniqueItems": true,
@@ -5532,7 +5532,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1NamespacedResourceQuota",
+     "operationId": "replaceNamespacedResourceQuota",
      "parameters": [
       {
        "name": "body",
@@ -5571,7 +5571,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1NamespacedResourceQuota",
+     "operationId": "deleteNamespacedResourceQuota",
      "parameters": [
       {
        "name": "body",
@@ -5612,7 +5612,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1NamespacedResourceQuota",
+     "operationId": "patchNamespacedResourceQuota",
      "parameters": [
       {
        "name": "body",
@@ -5678,7 +5678,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1NamespacedResourceQuotaStatus",
+     "operationId": "readNamespacedResourceQuotaStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -5707,7 +5707,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1NamespacedResourceQuotaStatus",
+     "operationId": "replaceNamespacedResourceQuotaStatus",
      "parameters": [
       {
        "name": "body",
@@ -5748,7 +5748,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1NamespacedResourceQuotaStatus",
+     "operationId": "patchNamespacedResourceQuotaStatus",
      "parameters": [
       {
        "name": "body",
@@ -5816,7 +5816,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1NamespacedSecret",
+     "operationId": "listNamespacedSecret",
      "parameters": [
       {
        "uniqueItems": true,
@@ -5882,7 +5882,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "createCoreV1NamespacedSecret",
+     "operationId": "createNamespacedSecret",
      "parameters": [
       {
        "name": "body",
@@ -5921,7 +5921,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1CollectionNamespacedSecret",
+     "operationId": "deleteCollectionNamespacedSecret",
      "parameters": [
       {
        "uniqueItems": true,
@@ -6006,7 +6006,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1NamespacedSecret",
+     "operationId": "readNamespacedSecret",
      "parameters": [
       {
        "uniqueItems": true,
@@ -6051,7 +6051,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1NamespacedSecret",
+     "operationId": "replaceNamespacedSecret",
      "parameters": [
       {
        "name": "body",
@@ -6090,7 +6090,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1NamespacedSecret",
+     "operationId": "deleteNamespacedSecret",
      "parameters": [
       {
        "name": "body",
@@ -6131,7 +6131,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1NamespacedSecret",
+     "operationId": "patchNamespacedSecret",
      "parameters": [
       {
        "name": "body",
@@ -6199,7 +6199,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1NamespacedServiceAccount",
+     "operationId": "listNamespacedServiceAccount",
      "parameters": [
       {
        "uniqueItems": true,
@@ -6265,7 +6265,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "createCoreV1NamespacedServiceAccount",
+     "operationId": "createNamespacedServiceAccount",
      "parameters": [
       {
        "name": "body",
@@ -6304,7 +6304,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1CollectionNamespacedServiceAccount",
+     "operationId": "deleteCollectionNamespacedServiceAccount",
      "parameters": [
       {
        "uniqueItems": true,
@@ -6389,7 +6389,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1NamespacedServiceAccount",
+     "operationId": "readNamespacedServiceAccount",
      "parameters": [
       {
        "uniqueItems": true,
@@ -6434,7 +6434,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1NamespacedServiceAccount",
+     "operationId": "replaceNamespacedServiceAccount",
      "parameters": [
       {
        "name": "body",
@@ -6473,7 +6473,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1NamespacedServiceAccount",
+     "operationId": "deleteNamespacedServiceAccount",
      "parameters": [
       {
        "name": "body",
@@ -6514,7 +6514,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1NamespacedServiceAccount",
+     "operationId": "patchNamespacedServiceAccount",
      "parameters": [
       {
        "name": "body",
@@ -6582,7 +6582,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1NamespacedService",
+     "operationId": "listNamespacedService",
      "parameters": [
       {
        "uniqueItems": true,
@@ -6648,7 +6648,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "createCoreV1NamespacedService",
+     "operationId": "createNamespacedService",
      "parameters": [
       {
        "name": "body",
@@ -6706,7 +6706,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1NamespacedService",
+     "operationId": "readNamespacedService",
      "parameters": [
       {
        "uniqueItems": true,
@@ -6751,7 +6751,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1NamespacedService",
+     "operationId": "replaceNamespacedService",
      "parameters": [
       {
        "name": "body",
@@ -6790,7 +6790,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1NamespacedService",
+     "operationId": "deleteNamespacedService",
      "responses": {
       "200": {
        "description": "OK",
@@ -6821,7 +6821,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1NamespacedService",
+     "operationId": "patchNamespacedService",
      "parameters": [
       {
        "name": "body",
@@ -6885,7 +6885,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1GetNamespacedServiceProxy",
+     "operationId": "connectGetNamespacedServiceProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -6912,7 +6912,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1PutNamespacedServiceProxy",
+     "operationId": "connectPutNamespacedServiceProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -6939,7 +6939,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1PostNamespacedServiceProxy",
+     "operationId": "connectPostNamespacedServiceProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -6966,7 +6966,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1DeleteNamespacedServiceProxy",
+     "operationId": "connectDeleteNamespacedServiceProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -6993,7 +6993,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1OptionsNamespacedServiceProxy",
+     "operationId": "connectOptionsNamespacedServiceProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -7020,7 +7020,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1HeadNamespacedServiceProxy",
+     "operationId": "connectHeadNamespacedServiceProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -7074,7 +7074,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1GetNamespacedServiceProxyWithPath",
+     "operationId": "connectGetNamespacedServiceProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -7101,7 +7101,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1PutNamespacedServiceProxyWithPath",
+     "operationId": "connectPutNamespacedServiceProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -7128,7 +7128,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1PostNamespacedServiceProxyWithPath",
+     "operationId": "connectPostNamespacedServiceProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -7155,7 +7155,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1DeleteNamespacedServiceProxyWithPath",
+     "operationId": "connectDeleteNamespacedServiceProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -7182,7 +7182,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1OptionsNamespacedServiceProxyWithPath",
+     "operationId": "connectOptionsNamespacedServiceProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -7209,7 +7209,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1HeadNamespacedServiceProxyWithPath",
+     "operationId": "connectHeadNamespacedServiceProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -7273,7 +7273,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1NamespacedServiceStatus",
+     "operationId": "readNamespacedServiceStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -7302,7 +7302,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1NamespacedServiceStatus",
+     "operationId": "replaceNamespacedServiceStatus",
      "parameters": [
       {
        "name": "body",
@@ -7343,7 +7343,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1NamespacedServiceStatus",
+     "operationId": "patchNamespacedServiceStatus",
      "parameters": [
       {
        "name": "body",
@@ -7409,7 +7409,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1Namespace",
+     "operationId": "readNamespace",
      "parameters": [
       {
        "uniqueItems": true,
@@ -7454,7 +7454,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1Namespace",
+     "operationId": "replaceNamespace",
      "parameters": [
       {
        "name": "body",
@@ -7493,7 +7493,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1Namespace",
+     "operationId": "deleteNamespace",
      "parameters": [
       {
        "name": "body",
@@ -7534,7 +7534,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1Namespace",
+     "operationId": "patchNamespace",
      "parameters": [
       {
        "name": "body",
@@ -7592,7 +7592,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1NamespaceFinalize",
+     "operationId": "replaceNamespaceFinalize",
      "responses": {
       "200": {
        "description": "OK",
@@ -7648,7 +7648,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1NamespaceStatus",
+     "operationId": "readNamespaceStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -7677,7 +7677,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1NamespaceStatus",
+     "operationId": "replaceNamespaceStatus",
      "parameters": [
       {
        "name": "body",
@@ -7718,7 +7718,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1NamespaceStatus",
+     "operationId": "patchNamespaceStatus",
      "parameters": [
       {
        "name": "body",
@@ -7778,7 +7778,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1Node",
+     "operationId": "listNode",
      "parameters": [
       {
        "uniqueItems": true,
@@ -7844,7 +7844,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "createCoreV1Node",
+     "operationId": "createNode",
      "parameters": [
       {
        "name": "body",
@@ -7883,7 +7883,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1CollectionNode",
+     "operationId": "deleteCollectionNode",
      "parameters": [
       {
        "uniqueItems": true,
@@ -7960,7 +7960,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1Node",
+     "operationId": "readNode",
      "parameters": [
       {
        "uniqueItems": true,
@@ -8005,7 +8005,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1Node",
+     "operationId": "replaceNode",
      "parameters": [
       {
        "name": "body",
@@ -8044,7 +8044,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1Node",
+     "operationId": "deleteNode",
      "parameters": [
       {
        "name": "body",
@@ -8085,7 +8085,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1Node",
+     "operationId": "patchNode",
      "parameters": [
       {
        "name": "body",
@@ -8141,7 +8141,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1GetNodeProxy",
+     "operationId": "connectGetNodeProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -8168,7 +8168,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1PutNodeProxy",
+     "operationId": "connectPutNodeProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -8195,7 +8195,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1PostNodeProxy",
+     "operationId": "connectPostNodeProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -8222,7 +8222,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1DeleteNodeProxy",
+     "operationId": "connectDeleteNodeProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -8249,7 +8249,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1OptionsNodeProxy",
+     "operationId": "connectOptionsNodeProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -8276,7 +8276,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1HeadNodeProxy",
+     "operationId": "connectHeadNodeProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -8322,7 +8322,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1GetNodeProxyWithPath",
+     "operationId": "connectGetNodeProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -8349,7 +8349,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1PutNodeProxyWithPath",
+     "operationId": "connectPutNodeProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -8376,7 +8376,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1PostNodeProxyWithPath",
+     "operationId": "connectPostNodeProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -8403,7 +8403,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1DeleteNodeProxyWithPath",
+     "operationId": "connectDeleteNodeProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -8430,7 +8430,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1OptionsNodeProxyWithPath",
+     "operationId": "connectOptionsNodeProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -8457,7 +8457,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "connectCoreV1HeadNodeProxyWithPath",
+     "operationId": "connectHeadNodeProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -8513,7 +8513,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1NodeStatus",
+     "operationId": "readNodeStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -8542,7 +8542,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1NodeStatus",
+     "operationId": "replaceNodeStatus",
      "parameters": [
       {
        "name": "body",
@@ -8583,7 +8583,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1NodeStatus",
+     "operationId": "patchNodeStatus",
      "parameters": [
       {
        "name": "body",
@@ -8643,7 +8643,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1PersistentVolumeClaimForAllNamespaces",
+     "operationId": "listPersistentVolumeClaimForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -8720,7 +8720,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1PersistentVolume",
+     "operationId": "listPersistentVolume",
      "parameters": [
       {
        "uniqueItems": true,
@@ -8786,7 +8786,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "createCoreV1PersistentVolume",
+     "operationId": "createPersistentVolume",
      "parameters": [
       {
        "name": "body",
@@ -8825,7 +8825,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1CollectionPersistentVolume",
+     "operationId": "deleteCollectionPersistentVolume",
      "parameters": [
       {
        "uniqueItems": true,
@@ -8902,7 +8902,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1PersistentVolume",
+     "operationId": "readPersistentVolume",
      "parameters": [
       {
        "uniqueItems": true,
@@ -8947,7 +8947,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1PersistentVolume",
+     "operationId": "replacePersistentVolume",
      "parameters": [
       {
        "name": "body",
@@ -8986,7 +8986,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1PersistentVolume",
+     "operationId": "deletePersistentVolume",
      "parameters": [
       {
        "name": "body",
@@ -9027,7 +9027,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1PersistentVolume",
+     "operationId": "patchPersistentVolume",
      "parameters": [
       {
        "name": "body",
@@ -9085,7 +9085,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1PersistentVolumeStatus",
+     "operationId": "readPersistentVolumeStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -9114,7 +9114,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1PersistentVolumeStatus",
+     "operationId": "replacePersistentVolumeStatus",
      "parameters": [
       {
        "name": "body",
@@ -9155,7 +9155,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1PersistentVolumeStatus",
+     "operationId": "patchPersistentVolumeStatus",
      "parameters": [
       {
        "name": "body",
@@ -9215,7 +9215,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1PodForAllNamespaces",
+     "operationId": "listPodForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -9292,7 +9292,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1PodTemplateForAllNamespaces",
+     "operationId": "listPodTemplateForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -9365,7 +9365,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1GETNamespacedPod",
+     "operationId": "proxyGETNamespacedPod",
      "responses": {
       "200": {
        "description": "OK",
@@ -9392,7 +9392,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1PUTNamespacedPod",
+     "operationId": "proxyPUTNamespacedPod",
      "responses": {
       "200": {
        "description": "OK",
@@ -9419,7 +9419,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1POSTNamespacedPod",
+     "operationId": "proxyPOSTNamespacedPod",
      "responses": {
       "200": {
        "description": "OK",
@@ -9446,7 +9446,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1DELETENamespacedPod",
+     "operationId": "proxyDELETENamespacedPod",
      "responses": {
       "200": {
        "description": "OK",
@@ -9473,7 +9473,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1OPTIONSNamespacedPod",
+     "operationId": "proxyOPTIONSNamespacedPod",
      "responses": {
       "200": {
        "description": "OK",
@@ -9500,7 +9500,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1HEADNamespacedPod",
+     "operationId": "proxyHEADNamespacedPod",
      "responses": {
       "200": {
        "description": "OK",
@@ -9547,7 +9547,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1GETNamespacedPodWithPath",
+     "operationId": "proxyGETNamespacedPodWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -9574,7 +9574,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1PUTNamespacedPodWithPath",
+     "operationId": "proxyPUTNamespacedPodWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -9601,7 +9601,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1POSTNamespacedPodWithPath",
+     "operationId": "proxyPOSTNamespacedPodWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -9628,7 +9628,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1DELETENamespacedPodWithPath",
+     "operationId": "proxyDELETENamespacedPodWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -9655,7 +9655,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1OPTIONSNamespacedPodWithPath",
+     "operationId": "proxyOPTIONSNamespacedPodWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -9682,7 +9682,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1HEADNamespacedPodWithPath",
+     "operationId": "proxyHEADNamespacedPodWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -9737,7 +9737,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1GETNamespacedService",
+     "operationId": "proxyGETNamespacedService",
      "responses": {
       "200": {
        "description": "OK",
@@ -9764,7 +9764,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1PUTNamespacedService",
+     "operationId": "proxyPUTNamespacedService",
      "responses": {
       "200": {
        "description": "OK",
@@ -9791,7 +9791,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1POSTNamespacedService",
+     "operationId": "proxyPOSTNamespacedService",
      "responses": {
       "200": {
        "description": "OK",
@@ -9818,7 +9818,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1DELETENamespacedService",
+     "operationId": "proxyDELETENamespacedService",
      "responses": {
       "200": {
        "description": "OK",
@@ -9845,7 +9845,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1OPTIONSNamespacedService",
+     "operationId": "proxyOPTIONSNamespacedService",
      "responses": {
       "200": {
        "description": "OK",
@@ -9872,7 +9872,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1HEADNamespacedService",
+     "operationId": "proxyHEADNamespacedService",
      "responses": {
       "200": {
        "description": "OK",
@@ -9919,7 +9919,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1GETNamespacedServiceWithPath",
+     "operationId": "proxyGETNamespacedServiceWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -9946,7 +9946,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1PUTNamespacedServiceWithPath",
+     "operationId": "proxyPUTNamespacedServiceWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -9973,7 +9973,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1POSTNamespacedServiceWithPath",
+     "operationId": "proxyPOSTNamespacedServiceWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -10000,7 +10000,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1DELETENamespacedServiceWithPath",
+     "operationId": "proxyDELETENamespacedServiceWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -10027,7 +10027,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1OPTIONSNamespacedServiceWithPath",
+     "operationId": "proxyOPTIONSNamespacedServiceWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -10054,7 +10054,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1HEADNamespacedServiceWithPath",
+     "operationId": "proxyHEADNamespacedServiceWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -10109,7 +10109,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1GETNode",
+     "operationId": "proxyGETNode",
      "responses": {
       "200": {
        "description": "OK",
@@ -10136,7 +10136,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1PUTNode",
+     "operationId": "proxyPUTNode",
      "responses": {
       "200": {
        "description": "OK",
@@ -10163,7 +10163,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1POSTNode",
+     "operationId": "proxyPOSTNode",
      "responses": {
       "200": {
        "description": "OK",
@@ -10190,7 +10190,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1DELETENode",
+     "operationId": "proxyDELETENode",
      "responses": {
       "200": {
        "description": "OK",
@@ -10217,7 +10217,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1OPTIONSNode",
+     "operationId": "proxyOPTIONSNode",
      "responses": {
       "200": {
        "description": "OK",
@@ -10244,7 +10244,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1HEADNode",
+     "operationId": "proxyHEADNode",
      "responses": {
       "200": {
        "description": "OK",
@@ -10283,7 +10283,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1GETNodeWithPath",
+     "operationId": "proxyGETNodeWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -10310,7 +10310,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1PUTNodeWithPath",
+     "operationId": "proxyPUTNodeWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -10337,7 +10337,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1POSTNodeWithPath",
+     "operationId": "proxyPOSTNodeWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -10364,7 +10364,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1DELETENodeWithPath",
+     "operationId": "proxyDELETENodeWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -10391,7 +10391,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1OPTIONSNodeWithPath",
+     "operationId": "proxyOPTIONSNodeWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -10418,7 +10418,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "proxyCoreV1HEADNodeWithPath",
+     "operationId": "proxyHEADNodeWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -10469,7 +10469,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1ReplicationControllerForAllNamespaces",
+     "operationId": "listReplicationControllerForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -10546,7 +10546,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1ResourceQuotaForAllNamespaces",
+     "operationId": "listResourceQuotaForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -10623,7 +10623,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1SecretForAllNamespaces",
+     "operationId": "listSecretForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -10700,7 +10700,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1ServiceAccountForAllNamespaces",
+     "operationId": "listServiceAccountForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -10777,7 +10777,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1ServiceForAllNamespaces",
+     "operationId": "listServiceForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -10854,7 +10854,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1ConfigMapListForAllNamespaces",
+     "operationId": "watchConfigMapListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -10931,7 +10931,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1EndpointsListForAllNamespaces",
+     "operationId": "watchEndpointsListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -11008,7 +11008,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1EventListForAllNamespaces",
+     "operationId": "watchEventListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -11085,7 +11085,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1LimitRangeListForAllNamespaces",
+     "operationId": "watchLimitRangeListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -11162,7 +11162,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespaceList",
+     "operationId": "watchNamespaceList",
      "responses": {
       "200": {
        "description": "OK",
@@ -11239,7 +11239,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedConfigMapList",
+     "operationId": "watchNamespacedConfigMapList",
      "responses": {
       "200": {
        "description": "OK",
@@ -11324,7 +11324,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedConfigMap",
+     "operationId": "watchNamespacedConfigMap",
      "responses": {
       "200": {
        "description": "OK",
@@ -11417,7 +11417,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedEndpointsList",
+     "operationId": "watchNamespacedEndpointsList",
      "responses": {
       "200": {
        "description": "OK",
@@ -11502,7 +11502,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedEndpoints",
+     "operationId": "watchNamespacedEndpoints",
      "responses": {
       "200": {
        "description": "OK",
@@ -11595,7 +11595,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedEventList",
+     "operationId": "watchNamespacedEventList",
      "responses": {
       "200": {
        "description": "OK",
@@ -11680,7 +11680,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedEvent",
+     "operationId": "watchNamespacedEvent",
      "responses": {
       "200": {
        "description": "OK",
@@ -11773,7 +11773,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedLimitRangeList",
+     "operationId": "watchNamespacedLimitRangeList",
      "responses": {
       "200": {
        "description": "OK",
@@ -11858,7 +11858,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedLimitRange",
+     "operationId": "watchNamespacedLimitRange",
      "responses": {
       "200": {
        "description": "OK",
@@ -11951,7 +11951,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedPersistentVolumeClaimList",
+     "operationId": "watchNamespacedPersistentVolumeClaimList",
      "responses": {
       "200": {
        "description": "OK",
@@ -12036,7 +12036,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedPersistentVolumeClaim",
+     "operationId": "watchNamespacedPersistentVolumeClaim",
      "responses": {
       "200": {
        "description": "OK",
@@ -12129,7 +12129,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedPodList",
+     "operationId": "watchNamespacedPodList",
      "responses": {
       "200": {
        "description": "OK",
@@ -12214,7 +12214,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedPod",
+     "operationId": "watchNamespacedPod",
      "responses": {
       "200": {
        "description": "OK",
@@ -12307,7 +12307,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedPodTemplateList",
+     "operationId": "watchNamespacedPodTemplateList",
      "responses": {
       "200": {
        "description": "OK",
@@ -12392,7 +12392,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedPodTemplate",
+     "operationId": "watchNamespacedPodTemplate",
      "responses": {
       "200": {
        "description": "OK",
@@ -12485,7 +12485,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedReplicationControllerList",
+     "operationId": "watchNamespacedReplicationControllerList",
      "responses": {
       "200": {
        "description": "OK",
@@ -12570,7 +12570,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedReplicationController",
+     "operationId": "watchNamespacedReplicationController",
      "responses": {
       "200": {
        "description": "OK",
@@ -12663,7 +12663,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedResourceQuotaList",
+     "operationId": "watchNamespacedResourceQuotaList",
      "responses": {
       "200": {
        "description": "OK",
@@ -12748,7 +12748,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedResourceQuota",
+     "operationId": "watchNamespacedResourceQuota",
      "responses": {
       "200": {
        "description": "OK",
@@ -12841,7 +12841,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedSecretList",
+     "operationId": "watchNamespacedSecretList",
      "responses": {
       "200": {
        "description": "OK",
@@ -12926,7 +12926,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedSecret",
+     "operationId": "watchNamespacedSecret",
      "responses": {
       "200": {
        "description": "OK",
@@ -13019,7 +13019,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedServiceAccountList",
+     "operationId": "watchNamespacedServiceAccountList",
      "responses": {
       "200": {
        "description": "OK",
@@ -13104,7 +13104,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedServiceAccount",
+     "operationId": "watchNamespacedServiceAccount",
      "responses": {
       "200": {
        "description": "OK",
@@ -13197,7 +13197,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedServiceList",
+     "operationId": "watchNamespacedServiceList",
      "responses": {
       "200": {
        "description": "OK",
@@ -13282,7 +13282,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedService",
+     "operationId": "watchNamespacedService",
      "responses": {
       "200": {
        "description": "OK",
@@ -13375,7 +13375,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1Namespace",
+     "operationId": "watchNamespace",
      "responses": {
       "200": {
        "description": "OK",
@@ -13460,7 +13460,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NodeList",
+     "operationId": "watchNodeList",
      "responses": {
       "200": {
        "description": "OK",
@@ -13537,7 +13537,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1Node",
+     "operationId": "watchNode",
      "responses": {
       "200": {
        "description": "OK",
@@ -13622,7 +13622,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1PersistentVolumeClaimListForAllNamespaces",
+     "operationId": "watchPersistentVolumeClaimListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -13699,7 +13699,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1PersistentVolumeList",
+     "operationId": "watchPersistentVolumeList",
      "responses": {
       "200": {
        "description": "OK",
@@ -13776,7 +13776,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1PersistentVolume",
+     "operationId": "watchPersistentVolume",
      "responses": {
       "200": {
        "description": "OK",
@@ -13861,7 +13861,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1PodListForAllNamespaces",
+     "operationId": "watchPodListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -13938,7 +13938,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1PodTemplateListForAllNamespaces",
+     "operationId": "watchPodTemplateListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -14015,7 +14015,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1ReplicationControllerListForAllNamespaces",
+     "operationId": "watchReplicationControllerListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -14092,7 +14092,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1ResourceQuotaListForAllNamespaces",
+     "operationId": "watchResourceQuotaListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -14169,7 +14169,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1SecretListForAllNamespaces",
+     "operationId": "watchSecretListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -14246,7 +14246,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1ServiceAccountListForAllNamespaces",
+     "operationId": "watchServiceAccountListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -14323,7 +14323,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1ServiceListForAllNamespaces",
+     "operationId": "watchServiceListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -14499,7 +14499,7 @@
      "tags": [
       "apps_v1alpha1"
      ],
-     "operationId": "listAppsV1alpha1NamespacedStatefulSet",
+     "operationId": "listNamespacedStatefulSet",
      "parameters": [
       {
        "uniqueItems": true,
@@ -14565,7 +14565,7 @@
      "tags": [
       "apps_v1alpha1"
      ],
-     "operationId": "createAppsV1alpha1NamespacedStatefulSet",
+     "operationId": "createNamespacedStatefulSet",
      "parameters": [
       {
        "name": "body",
@@ -14604,7 +14604,7 @@
      "tags": [
       "apps_v1alpha1"
      ],
-     "operationId": "deleteAppsV1alpha1CollectionNamespacedStatefulSet",
+     "operationId": "deleteCollectionNamespacedStatefulSet",
      "parameters": [
       {
        "uniqueItems": true,
@@ -14689,7 +14689,7 @@
      "tags": [
       "apps_v1alpha1"
      ],
-     "operationId": "readAppsV1alpha1NamespacedStatefulSet",
+     "operationId": "readNamespacedStatefulSet",
      "parameters": [
       {
        "uniqueItems": true,
@@ -14734,7 +14734,7 @@
      "tags": [
       "apps_v1alpha1"
      ],
-     "operationId": "replaceAppsV1alpha1NamespacedStatefulSet",
+     "operationId": "replaceNamespacedStatefulSet",
      "parameters": [
       {
        "name": "body",
@@ -14773,7 +14773,7 @@
      "tags": [
       "apps_v1alpha1"
      ],
-     "operationId": "deleteAppsV1alpha1NamespacedStatefulSet",
+     "operationId": "deleteNamespacedStatefulSet",
      "parameters": [
       {
        "name": "body",
@@ -14814,7 +14814,7 @@
      "tags": [
       "apps_v1alpha1"
      ],
-     "operationId": "patchAppsV1alpha1NamespacedStatefulSet",
+     "operationId": "patchNamespacedStatefulSet",
      "parameters": [
       {
        "name": "body",
@@ -14880,7 +14880,7 @@
      "tags": [
       "apps_v1alpha1"
      ],
-     "operationId": "readAppsV1alpha1NamespacedStatefulSetStatus",
+     "operationId": "readNamespacedStatefulSetStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -14909,7 +14909,7 @@
      "tags": [
       "apps_v1alpha1"
      ],
-     "operationId": "replaceAppsV1alpha1NamespacedStatefulSetStatus",
+     "operationId": "replaceNamespacedStatefulSetStatus",
      "parameters": [
       {
        "name": "body",
@@ -14950,7 +14950,7 @@
      "tags": [
       "apps_v1alpha1"
      ],
-     "operationId": "patchAppsV1alpha1NamespacedStatefulSetStatus",
+     "operationId": "patchNamespacedStatefulSetStatus",
      "parameters": [
       {
        "name": "body",
@@ -15018,7 +15018,7 @@
      "tags": [
       "apps_v1alpha1"
      ],
-     "operationId": "listAppsV1alpha1StatefulSetForAllNamespaces",
+     "operationId": "listStatefulSetForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -15095,7 +15095,7 @@
      "tags": [
       "apps_v1alpha1"
      ],
-     "operationId": "watchAppsV1alpha1NamespacedStatefulSetList",
+     "operationId": "watchNamespacedStatefulSetList",
      "responses": {
       "200": {
        "description": "OK",
@@ -15180,7 +15180,7 @@
      "tags": [
       "apps_v1alpha1"
      ],
-     "operationId": "watchAppsV1alpha1NamespacedStatefulSet",
+     "operationId": "watchNamespacedStatefulSet",
      "responses": {
       "200": {
        "description": "OK",
@@ -15273,7 +15273,7 @@
      "tags": [
       "apps_v1alpha1"
      ],
-     "operationId": "watchAppsV1alpha1StatefulSetListForAllNamespaces",
+     "operationId": "watchStatefulSetListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -15414,7 +15414,7 @@
      "tags": [
       "authentication_v1beta1"
      ],
-     "operationId": "createAuthenticationV1beta1TokenReview",
+     "operationId": "createTokenReview",
      "responses": {
       "200": {
        "description": "OK",
@@ -15528,7 +15528,7 @@
      "tags": [
       "authorization_v1beta1"
      ],
-     "operationId": "createAuthorizationV1beta1NamespacedLocalSubjectAccessReview",
+     "operationId": "createNamespacedLocalSubjectAccessReview",
      "responses": {
       "200": {
        "description": "OK",
@@ -15584,7 +15584,7 @@
      "tags": [
       "authorization_v1beta1"
      ],
-     "operationId": "createAuthorizationV1beta1SelfSubjectAccessReview",
+     "operationId": "createSelfSubjectAccessReview",
      "responses": {
       "200": {
        "description": "OK",
@@ -15632,7 +15632,7 @@
      "tags": [
       "authorization_v1beta1"
      ],
-     "operationId": "createAuthorizationV1beta1SubjectAccessReview",
+     "operationId": "createSubjectAccessReview",
      "responses": {
       "200": {
        "description": "OK",
@@ -15748,7 +15748,7 @@
      "tags": [
       "autoscaling_v1"
      ],
-     "operationId": "listAutoscalingV1HorizontalPodAutoscalerForAllNamespaces",
+     "operationId": "listHorizontalPodAutoscalerForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -15825,7 +15825,7 @@
      "tags": [
       "autoscaling_v1"
      ],
-     "operationId": "listAutoscalingV1NamespacedHorizontalPodAutoscaler",
+     "operationId": "listNamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
        "uniqueItems": true,
@@ -15891,7 +15891,7 @@
      "tags": [
       "autoscaling_v1"
      ],
-     "operationId": "createAutoscalingV1NamespacedHorizontalPodAutoscaler",
+     "operationId": "createNamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
        "name": "body",
@@ -15930,7 +15930,7 @@
      "tags": [
       "autoscaling_v1"
      ],
-     "operationId": "deleteAutoscalingV1CollectionNamespacedHorizontalPodAutoscaler",
+     "operationId": "deleteCollectionNamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
        "uniqueItems": true,
@@ -16015,7 +16015,7 @@
      "tags": [
       "autoscaling_v1"
      ],
-     "operationId": "readAutoscalingV1NamespacedHorizontalPodAutoscaler",
+     "operationId": "readNamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
        "uniqueItems": true,
@@ -16060,7 +16060,7 @@
      "tags": [
       "autoscaling_v1"
      ],
-     "operationId": "replaceAutoscalingV1NamespacedHorizontalPodAutoscaler",
+     "operationId": "replaceNamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
        "name": "body",
@@ -16099,7 +16099,7 @@
      "tags": [
       "autoscaling_v1"
      ],
-     "operationId": "deleteAutoscalingV1NamespacedHorizontalPodAutoscaler",
+     "operationId": "deleteNamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
        "name": "body",
@@ -16140,7 +16140,7 @@
      "tags": [
       "autoscaling_v1"
      ],
-     "operationId": "patchAutoscalingV1NamespacedHorizontalPodAutoscaler",
+     "operationId": "patchNamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
        "name": "body",
@@ -16206,7 +16206,7 @@
      "tags": [
       "autoscaling_v1"
      ],
-     "operationId": "readAutoscalingV1NamespacedHorizontalPodAutoscalerStatus",
+     "operationId": "readNamespacedHorizontalPodAutoscalerStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -16235,7 +16235,7 @@
      "tags": [
       "autoscaling_v1"
      ],
-     "operationId": "replaceAutoscalingV1NamespacedHorizontalPodAutoscalerStatus",
+     "operationId": "replaceNamespacedHorizontalPodAutoscalerStatus",
      "parameters": [
       {
        "name": "body",
@@ -16276,7 +16276,7 @@
      "tags": [
       "autoscaling_v1"
      ],
-     "operationId": "patchAutoscalingV1NamespacedHorizontalPodAutoscalerStatus",
+     "operationId": "patchNamespacedHorizontalPodAutoscalerStatus",
      "parameters": [
       {
        "name": "body",
@@ -16344,7 +16344,7 @@
      "tags": [
       "autoscaling_v1"
      ],
-     "operationId": "watchAutoscalingV1HorizontalPodAutoscalerListForAllNamespaces",
+     "operationId": "watchHorizontalPodAutoscalerListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -16421,7 +16421,7 @@
      "tags": [
       "autoscaling_v1"
      ],
-     "operationId": "watchAutoscalingV1NamespacedHorizontalPodAutoscalerList",
+     "operationId": "watchNamespacedHorizontalPodAutoscalerList",
      "responses": {
       "200": {
        "description": "OK",
@@ -16506,7 +16506,7 @@
      "tags": [
       "autoscaling_v1"
      ],
-     "operationId": "watchAutoscalingV1NamespacedHorizontalPodAutoscaler",
+     "operationId": "watchNamespacedHorizontalPodAutoscaler",
      "responses": {
       "200": {
        "description": "OK",
@@ -16665,7 +16665,7 @@
      "tags": [
       "batch_v1"
      ],
-     "operationId": "listBatchV1JobForAllNamespaces",
+     "operationId": "listJobForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -16742,7 +16742,7 @@
      "tags": [
       "batch_v1"
      ],
-     "operationId": "listBatchV1NamespacedJob",
+     "operationId": "listNamespacedJob",
      "parameters": [
       {
        "uniqueItems": true,
@@ -16808,7 +16808,7 @@
      "tags": [
       "batch_v1"
      ],
-     "operationId": "createBatchV1NamespacedJob",
+     "operationId": "createNamespacedJob",
      "parameters": [
       {
        "name": "body",
@@ -16847,7 +16847,7 @@
      "tags": [
       "batch_v1"
      ],
-     "operationId": "deleteBatchV1CollectionNamespacedJob",
+     "operationId": "deleteCollectionNamespacedJob",
      "parameters": [
       {
        "uniqueItems": true,
@@ -16932,7 +16932,7 @@
      "tags": [
       "batch_v1"
      ],
-     "operationId": "readBatchV1NamespacedJob",
+     "operationId": "readNamespacedJob",
      "parameters": [
       {
        "uniqueItems": true,
@@ -16977,7 +16977,7 @@
      "tags": [
       "batch_v1"
      ],
-     "operationId": "replaceBatchV1NamespacedJob",
+     "operationId": "replaceNamespacedJob",
      "parameters": [
       {
        "name": "body",
@@ -17016,7 +17016,7 @@
      "tags": [
       "batch_v1"
      ],
-     "operationId": "deleteBatchV1NamespacedJob",
+     "operationId": "deleteNamespacedJob",
      "parameters": [
       {
        "name": "body",
@@ -17057,7 +17057,7 @@
      "tags": [
       "batch_v1"
      ],
-     "operationId": "patchBatchV1NamespacedJob",
+     "operationId": "patchNamespacedJob",
      "parameters": [
       {
        "name": "body",
@@ -17123,7 +17123,7 @@
      "tags": [
       "batch_v1"
      ],
-     "operationId": "readBatchV1NamespacedJobStatus",
+     "operationId": "readNamespacedJobStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -17152,7 +17152,7 @@
      "tags": [
       "batch_v1"
      ],
-     "operationId": "replaceBatchV1NamespacedJobStatus",
+     "operationId": "replaceNamespacedJobStatus",
      "parameters": [
       {
        "name": "body",
@@ -17193,7 +17193,7 @@
      "tags": [
       "batch_v1"
      ],
-     "operationId": "patchBatchV1NamespacedJobStatus",
+     "operationId": "patchNamespacedJobStatus",
      "parameters": [
       {
        "name": "body",
@@ -17261,7 +17261,7 @@
      "tags": [
       "batch_v1"
      ],
-     "operationId": "watchBatchV1JobListForAllNamespaces",
+     "operationId": "watchJobListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -17338,7 +17338,7 @@
      "tags": [
       "batch_v1"
      ],
-     "operationId": "watchBatchV1NamespacedJobList",
+     "operationId": "watchNamespacedJobList",
      "responses": {
       "200": {
        "description": "OK",
@@ -17423,7 +17423,7 @@
      "tags": [
       "batch_v1"
      ],
-     "operationId": "watchBatchV1NamespacedJob",
+     "operationId": "watchNamespacedJob",
      "responses": {
       "200": {
        "description": "OK",
@@ -17615,7 +17615,7 @@
      "tags": [
       "certificates_v1alpha1"
      ],
-     "operationId": "listCertificatesV1alpha1CertificateSigningRequest",
+     "operationId": "listCertificateSigningRequest",
      "parameters": [
       {
        "uniqueItems": true,
@@ -17681,7 +17681,7 @@
      "tags": [
       "certificates_v1alpha1"
      ],
-     "operationId": "createCertificatesV1alpha1CertificateSigningRequest",
+     "operationId": "createCertificateSigningRequest",
      "parameters": [
       {
        "name": "body",
@@ -17720,7 +17720,7 @@
      "tags": [
       "certificates_v1alpha1"
      ],
-     "operationId": "deleteCertificatesV1alpha1CollectionCertificateSigningRequest",
+     "operationId": "deleteCollectionCertificateSigningRequest",
      "parameters": [
       {
        "uniqueItems": true,
@@ -17797,7 +17797,7 @@
      "tags": [
       "certificates_v1alpha1"
      ],
-     "operationId": "readCertificatesV1alpha1CertificateSigningRequest",
+     "operationId": "readCertificateSigningRequest",
      "parameters": [
       {
        "uniqueItems": true,
@@ -17842,7 +17842,7 @@
      "tags": [
       "certificates_v1alpha1"
      ],
-     "operationId": "replaceCertificatesV1alpha1CertificateSigningRequest",
+     "operationId": "replaceCertificateSigningRequest",
      "parameters": [
       {
        "name": "body",
@@ -17881,7 +17881,7 @@
      "tags": [
       "certificates_v1alpha1"
      ],
-     "operationId": "deleteCertificatesV1alpha1CertificateSigningRequest",
+     "operationId": "deleteCertificateSigningRequest",
      "parameters": [
       {
        "name": "body",
@@ -17922,7 +17922,7 @@
      "tags": [
       "certificates_v1alpha1"
      ],
-     "operationId": "patchCertificatesV1alpha1CertificateSigningRequest",
+     "operationId": "patchCertificateSigningRequest",
      "parameters": [
       {
        "name": "body",
@@ -17980,7 +17980,7 @@
      "tags": [
       "certificates_v1alpha1"
      ],
-     "operationId": "replaceCertificatesV1alpha1CertificateSigningRequestApproval",
+     "operationId": "replaceCertificateSigningRequestApproval",
      "responses": {
       "200": {
        "description": "OK",
@@ -18036,7 +18036,7 @@
      "tags": [
       "certificates_v1alpha1"
      ],
-     "operationId": "replaceCertificatesV1alpha1CertificateSigningRequestStatus",
+     "operationId": "replaceCertificateSigningRequestStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -18094,7 +18094,7 @@
      "tags": [
       "certificates_v1alpha1"
      ],
-     "operationId": "watchCertificatesV1alpha1CertificateSigningRequestList",
+     "operationId": "watchCertificateSigningRequestList",
      "responses": {
       "200": {
        "description": "OK",
@@ -18171,7 +18171,7 @@
      "tags": [
       "certificates_v1alpha1"
      ],
-     "operationId": "watchCertificatesV1alpha1CertificateSigningRequest",
+     "operationId": "watchCertificateSigningRequest",
      "responses": {
       "200": {
        "description": "OK",
@@ -25210,7 +25210,7 @@
      "tags": [
       "policy_v1alpha1"
      ],
-     "operationId": "listPolicyV1alpha1NamespacedPodDisruptionBudget",
+     "operationId": "listNamespacedPodDisruptionBudget",
      "parameters": [
       {
        "uniqueItems": true,
@@ -25276,7 +25276,7 @@
      "tags": [
       "policy_v1alpha1"
      ],
-     "operationId": "createPolicyV1alpha1NamespacedPodDisruptionBudget",
+     "operationId": "createNamespacedPodDisruptionBudget",
      "parameters": [
       {
        "name": "body",
@@ -25315,7 +25315,7 @@
      "tags": [
       "policy_v1alpha1"
      ],
-     "operationId": "deletePolicyV1alpha1CollectionNamespacedPodDisruptionBudget",
+     "operationId": "deleteCollectionNamespacedPodDisruptionBudget",
      "parameters": [
       {
        "uniqueItems": true,
@@ -25400,7 +25400,7 @@
      "tags": [
       "policy_v1alpha1"
      ],
-     "operationId": "readPolicyV1alpha1NamespacedPodDisruptionBudget",
+     "operationId": "readNamespacedPodDisruptionBudget",
      "parameters": [
       {
        "uniqueItems": true,
@@ -25445,7 +25445,7 @@
      "tags": [
       "policy_v1alpha1"
      ],
-     "operationId": "replacePolicyV1alpha1NamespacedPodDisruptionBudget",
+     "operationId": "replaceNamespacedPodDisruptionBudget",
      "parameters": [
       {
        "name": "body",
@@ -25484,7 +25484,7 @@
      "tags": [
       "policy_v1alpha1"
      ],
-     "operationId": "deletePolicyV1alpha1NamespacedPodDisruptionBudget",
+     "operationId": "deleteNamespacedPodDisruptionBudget",
      "parameters": [
       {
        "name": "body",
@@ -25525,7 +25525,7 @@
      "tags": [
       "policy_v1alpha1"
      ],
-     "operationId": "patchPolicyV1alpha1NamespacedPodDisruptionBudget",
+     "operationId": "patchNamespacedPodDisruptionBudget",
      "parameters": [
       {
        "name": "body",
@@ -25591,7 +25591,7 @@
      "tags": [
       "policy_v1alpha1"
      ],
-     "operationId": "readPolicyV1alpha1NamespacedPodDisruptionBudgetStatus",
+     "operationId": "readNamespacedPodDisruptionBudgetStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -25620,7 +25620,7 @@
      "tags": [
       "policy_v1alpha1"
      ],
-     "operationId": "replacePolicyV1alpha1NamespacedPodDisruptionBudgetStatus",
+     "operationId": "replaceNamespacedPodDisruptionBudgetStatus",
      "parameters": [
       {
        "name": "body",
@@ -25661,7 +25661,7 @@
      "tags": [
       "policy_v1alpha1"
      ],
-     "operationId": "patchPolicyV1alpha1NamespacedPodDisruptionBudgetStatus",
+     "operationId": "patchNamespacedPodDisruptionBudgetStatus",
      "parameters": [
       {
        "name": "body",
@@ -25729,7 +25729,7 @@
      "tags": [
       "policy_v1alpha1"
      ],
-     "operationId": "listPolicyV1alpha1PodDisruptionBudgetForAllNamespaces",
+     "operationId": "listPodDisruptionBudgetForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -25806,7 +25806,7 @@
      "tags": [
       "policy_v1alpha1"
      ],
-     "operationId": "watchPolicyV1alpha1NamespacedPodDisruptionBudgetList",
+     "operationId": "watchNamespacedPodDisruptionBudgetList",
      "responses": {
       "200": {
        "description": "OK",
@@ -25891,7 +25891,7 @@
      "tags": [
       "policy_v1alpha1"
      ],
-     "operationId": "watchPolicyV1alpha1NamespacedPodDisruptionBudget",
+     "operationId": "watchNamespacedPodDisruptionBudget",
      "responses": {
       "200": {
        "description": "OK",
@@ -25984,7 +25984,7 @@
      "tags": [
       "policy_v1alpha1"
      ],
-     "operationId": "watchPolicyV1alpha1PodDisruptionBudgetListForAllNamespaces",
+     "operationId": "watchPodDisruptionBudgetListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -26127,7 +26127,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "listRbacAuthorizationV1alpha1ClusterRoleBinding",
+     "operationId": "listClusterRoleBinding",
      "parameters": [
       {
        "uniqueItems": true,
@@ -26193,7 +26193,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "createRbacAuthorizationV1alpha1ClusterRoleBinding",
+     "operationId": "createClusterRoleBinding",
      "parameters": [
       {
        "name": "body",
@@ -26232,7 +26232,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "deleteRbacAuthorizationV1alpha1CollectionClusterRoleBinding",
+     "operationId": "deleteCollectionClusterRoleBinding",
      "parameters": [
       {
        "uniqueItems": true,
@@ -26309,7 +26309,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "readRbacAuthorizationV1alpha1ClusterRoleBinding",
+     "operationId": "readClusterRoleBinding",
      "responses": {
       "200": {
        "description": "OK",
@@ -26338,7 +26338,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "replaceRbacAuthorizationV1alpha1ClusterRoleBinding",
+     "operationId": "replaceClusterRoleBinding",
      "parameters": [
       {
        "name": "body",
@@ -26377,7 +26377,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "deleteRbacAuthorizationV1alpha1ClusterRoleBinding",
+     "operationId": "deleteClusterRoleBinding",
      "parameters": [
       {
        "name": "body",
@@ -26418,7 +26418,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "patchRbacAuthorizationV1alpha1ClusterRoleBinding",
+     "operationId": "patchClusterRoleBinding",
      "parameters": [
       {
        "name": "body",
@@ -26478,7 +26478,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "listRbacAuthorizationV1alpha1ClusterRole",
+     "operationId": "listClusterRole",
      "parameters": [
       {
        "uniqueItems": true,
@@ -26544,7 +26544,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "createRbacAuthorizationV1alpha1ClusterRole",
+     "operationId": "createClusterRole",
      "parameters": [
       {
        "name": "body",
@@ -26583,7 +26583,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "deleteRbacAuthorizationV1alpha1CollectionClusterRole",
+     "operationId": "deleteCollectionClusterRole",
      "parameters": [
       {
        "uniqueItems": true,
@@ -26660,7 +26660,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "readRbacAuthorizationV1alpha1ClusterRole",
+     "operationId": "readClusterRole",
      "responses": {
       "200": {
        "description": "OK",
@@ -26689,7 +26689,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "replaceRbacAuthorizationV1alpha1ClusterRole",
+     "operationId": "replaceClusterRole",
      "parameters": [
       {
        "name": "body",
@@ -26728,7 +26728,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "deleteRbacAuthorizationV1alpha1ClusterRole",
+     "operationId": "deleteClusterRole",
      "parameters": [
       {
        "name": "body",
@@ -26769,7 +26769,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "patchRbacAuthorizationV1alpha1ClusterRole",
+     "operationId": "patchClusterRole",
      "parameters": [
       {
        "name": "body",
@@ -26829,7 +26829,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "listRbacAuthorizationV1alpha1NamespacedRoleBinding",
+     "operationId": "listNamespacedRoleBinding",
      "parameters": [
       {
        "uniqueItems": true,
@@ -26895,7 +26895,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "createRbacAuthorizationV1alpha1NamespacedRoleBinding",
+     "operationId": "createNamespacedRoleBinding",
      "parameters": [
       {
        "name": "body",
@@ -26934,7 +26934,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "deleteRbacAuthorizationV1alpha1CollectionNamespacedRoleBinding",
+     "operationId": "deleteCollectionNamespacedRoleBinding",
      "parameters": [
       {
        "uniqueItems": true,
@@ -27019,7 +27019,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "readRbacAuthorizationV1alpha1NamespacedRoleBinding",
+     "operationId": "readNamespacedRoleBinding",
      "responses": {
       "200": {
        "description": "OK",
@@ -27048,7 +27048,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "replaceRbacAuthorizationV1alpha1NamespacedRoleBinding",
+     "operationId": "replaceNamespacedRoleBinding",
      "parameters": [
       {
        "name": "body",
@@ -27087,7 +27087,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "deleteRbacAuthorizationV1alpha1NamespacedRoleBinding",
+     "operationId": "deleteNamespacedRoleBinding",
      "parameters": [
       {
        "name": "body",
@@ -27128,7 +27128,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "patchRbacAuthorizationV1alpha1NamespacedRoleBinding",
+     "operationId": "patchNamespacedRoleBinding",
      "parameters": [
       {
        "name": "body",
@@ -27196,7 +27196,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "listRbacAuthorizationV1alpha1NamespacedRole",
+     "operationId": "listNamespacedRole",
      "parameters": [
       {
        "uniqueItems": true,
@@ -27262,7 +27262,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "createRbacAuthorizationV1alpha1NamespacedRole",
+     "operationId": "createNamespacedRole",
      "parameters": [
       {
        "name": "body",
@@ -27301,7 +27301,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "deleteRbacAuthorizationV1alpha1CollectionNamespacedRole",
+     "operationId": "deleteCollectionNamespacedRole",
      "parameters": [
       {
        "uniqueItems": true,
@@ -27386,7 +27386,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "readRbacAuthorizationV1alpha1NamespacedRole",
+     "operationId": "readNamespacedRole",
      "responses": {
       "200": {
        "description": "OK",
@@ -27415,7 +27415,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "replaceRbacAuthorizationV1alpha1NamespacedRole",
+     "operationId": "replaceNamespacedRole",
      "parameters": [
       {
        "name": "body",
@@ -27454,7 +27454,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "deleteRbacAuthorizationV1alpha1NamespacedRole",
+     "operationId": "deleteNamespacedRole",
      "parameters": [
       {
        "name": "body",
@@ -27495,7 +27495,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "patchRbacAuthorizationV1alpha1NamespacedRole",
+     "operationId": "patchNamespacedRole",
      "parameters": [
       {
        "name": "body",
@@ -27563,7 +27563,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "listRbacAuthorizationV1alpha1RoleBindingForAllNamespaces",
+     "operationId": "listRoleBindingForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -27640,7 +27640,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "listRbacAuthorizationV1alpha1RoleForAllNamespaces",
+     "operationId": "listRoleForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -27717,7 +27717,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "watchRbacAuthorizationV1alpha1ClusterRoleBindingList",
+     "operationId": "watchClusterRoleBindingList",
      "responses": {
       "200": {
        "description": "OK",
@@ -27794,7 +27794,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "watchRbacAuthorizationV1alpha1ClusterRoleBinding",
+     "operationId": "watchClusterRoleBinding",
      "responses": {
       "200": {
        "description": "OK",
@@ -27879,7 +27879,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "watchRbacAuthorizationV1alpha1ClusterRoleList",
+     "operationId": "watchClusterRoleList",
      "responses": {
       "200": {
        "description": "OK",
@@ -27956,7 +27956,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "watchRbacAuthorizationV1alpha1ClusterRole",
+     "operationId": "watchClusterRole",
      "responses": {
       "200": {
        "description": "OK",
@@ -28041,7 +28041,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "watchRbacAuthorizationV1alpha1NamespacedRoleBindingList",
+     "operationId": "watchNamespacedRoleBindingList",
      "responses": {
       "200": {
        "description": "OK",
@@ -28126,7 +28126,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "watchRbacAuthorizationV1alpha1NamespacedRoleBinding",
+     "operationId": "watchNamespacedRoleBinding",
      "responses": {
       "200": {
        "description": "OK",
@@ -28219,7 +28219,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "watchRbacAuthorizationV1alpha1NamespacedRoleList",
+     "operationId": "watchNamespacedRoleList",
      "responses": {
       "200": {
        "description": "OK",
@@ -28304,7 +28304,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "watchRbacAuthorizationV1alpha1NamespacedRole",
+     "operationId": "watchNamespacedRole",
      "responses": {
       "200": {
        "description": "OK",
@@ -28397,7 +28397,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "watchRbacAuthorizationV1alpha1RoleBindingListForAllNamespaces",
+     "operationId": "watchRoleBindingListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -28474,7 +28474,7 @@
      "tags": [
       "rbacAuthorization_v1alpha1"
      ],
-     "operationId": "watchRbacAuthorizationV1alpha1RoleListForAllNamespaces",
+     "operationId": "watchRoleListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -28617,7 +28617,7 @@
      "tags": [
       "storage_v1beta1"
      ],
-     "operationId": "listStorageV1beta1StorageClass",
+     "operationId": "listStorageClass",
      "parameters": [
       {
        "uniqueItems": true,
@@ -28683,7 +28683,7 @@
      "tags": [
       "storage_v1beta1"
      ],
-     "operationId": "createStorageV1beta1StorageClass",
+     "operationId": "createStorageClass",
      "parameters": [
       {
        "name": "body",
@@ -28722,7 +28722,7 @@
      "tags": [
       "storage_v1beta1"
      ],
-     "operationId": "deleteStorageV1beta1CollectionStorageClass",
+     "operationId": "deleteCollectionStorageClass",
      "parameters": [
       {
        "uniqueItems": true,
@@ -28799,7 +28799,7 @@
      "tags": [
       "storage_v1beta1"
      ],
-     "operationId": "readStorageV1beta1StorageClass",
+     "operationId": "readStorageClass",
      "parameters": [
       {
        "uniqueItems": true,
@@ -28844,7 +28844,7 @@
      "tags": [
       "storage_v1beta1"
      ],
-     "operationId": "replaceStorageV1beta1StorageClass",
+     "operationId": "replaceStorageClass",
      "parameters": [
       {
        "name": "body",
@@ -28883,7 +28883,7 @@
      "tags": [
       "storage_v1beta1"
      ],
-     "operationId": "deleteStorageV1beta1StorageClass",
+     "operationId": "deleteStorageClass",
      "parameters": [
       {
        "name": "body",
@@ -28924,7 +28924,7 @@
      "tags": [
       "storage_v1beta1"
      ],
-     "operationId": "patchStorageV1beta1StorageClass",
+     "operationId": "patchStorageClass",
      "parameters": [
       {
        "name": "body",
@@ -28984,7 +28984,7 @@
      "tags": [
       "storage_v1beta1"
      ],
-     "operationId": "watchStorageV1beta1StorageClassList",
+     "operationId": "watchStorageClassList",
      "responses": {
       "200": {
        "description": "OK",
@@ -29061,7 +29061,7 @@
      "tags": [
       "storage_v1beta1"
      ],
-     "operationId": "watchStorageV1beta1StorageClass",
+     "operationId": "watchStorageClass",
      "responses": {
       "200": {
        "description": "OK",
