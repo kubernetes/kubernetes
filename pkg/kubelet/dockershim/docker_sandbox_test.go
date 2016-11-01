@@ -63,7 +63,7 @@ func TestListSandboxes(t *testing.T) {
 
 	expected := []*runtimeApi.PodSandbox{}
 	state := runtimeApi.PodSandBoxState_READY
-	var createdAt int64 = 0
+	var createdAt int64
 	for i := range configs {
 		id, err := ds.RunPodSandbox(configs[i])
 		assert.NoError(t, err)

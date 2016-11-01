@@ -1338,7 +1338,7 @@ func TestVerifyNonRoot(t *testing.T) {
 	dm, fakeDocker := newTestDockerManager()
 
 	// setup test cases.
-	var rootUid int64 = 0
+	var rootUid int64
 	var nonRootUid int64 = 1
 
 	tests := map[string]struct {
