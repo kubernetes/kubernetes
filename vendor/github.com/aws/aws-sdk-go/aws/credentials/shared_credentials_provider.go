@@ -10,6 +10,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 )
 
+// SharedCredsProviderName provides a name of SharedCreds provider
+const SharedCredsProviderName = "SharedCredentialsProvider"
+
 var (
 	// ErrSharedCredentialsHomeNotFound is emitted when the user directory cannot be found.
 	//
@@ -55,12 +58,12 @@ func (p *SharedCredentialsProvider) Retrieve() (Value, error) {
 
 	filename, err := p.filename()
 	if err != nil {
-		return Value{}, err
+		return Value{ProviderName: SharedCredsProviderName}, err
 	}
 
 	creds, err := loadProfile(filename, p.profile())
 	if err != nil {
-		return Value{}, err
+		return Value{ProviderName: SharedCredsProviderName}, err
 	}
 
 	p.retrieved = true
@@ -78,23 +81,23 @@ func (p *SharedCredentialsProvider) IsExpired() bool {
 func loadProfile(filename, profile string) (Value, error) {
 	config, err := ini.Load(filename)
 	if err != nil {
-		return Value{}, awserr.New("SharedCredsLoad", "failed to load shared credentials file", err)
+		return Value{ProviderName: SharedCredsProviderName}, awserr.New("SharedCredsLoad", "failed to load shared credentials file", err)
 	}
 	iniProfile, err := config.GetSection(profile)
 	if err != nil {
-		return Value{}, awserr.New("SharedCredsLoad", "failed to get profile", err)
+		return Value{ProviderName: SharedCredsProviderName}, awserr.New("SharedCredsLoad", "failed to get profile", err)
 	}
 
 	id, err := iniProfile.GetKey("aws_access_key_id")
 	if err != nil {
-		return Value{}, awserr.New("SharedCredsAccessKey",
+		return Value{ProviderName: SharedCredsProviderName}, awserr.New("SharedCredsAccessKey",
 			fmt.Sprintf("shared credentials %s in %s did not contain aws_access_key_id", profile, filename),
 			err)
 	}
 
 	secret, err := iniProfile.GetKey("aws_secret_access_key")
 	if err != nil {
-		return Value{}, awserr.New("SharedCredsSecret",
+		return Value{ProviderName: SharedCredsProviderName}, awserr.New("SharedCredsSecret",
 			fmt.Sprintf("shared credentials %s in %s did not contain aws_secret_access_key", profile, filename),
 			nil)
 	}
@@ -106,6 +109,7 @@ func loadProfile(filename, profile string) (Value, error) {
 		AccessKeyID:     id.String(),
 		SecretAccessKey: secret.String(),
 		SessionToken:    token.String(),
+		ProviderName:    SharedCredsProviderName,
 	}, nil
 }
 

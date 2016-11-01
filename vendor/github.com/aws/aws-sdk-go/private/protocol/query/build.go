@@ -1,7 +1,7 @@
-// Package query provides serialisation of AWS query requests, and responses.
+// Package query provides serialization of AWS query requests, and responses.
 package query
 
-//go:generate go run ../../../models/protocol_tests/generate.go ../../../models/protocol_tests/input/query.json build_test.go
+//go:generate go run -tags codegen ../../../models/protocol_tests/generate.go ../../../models/protocol_tests/input/query.json build_test.go
 
 import (
 	"net/url"
@@ -10,6 +10,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/private/protocol/query/queryutil"
 )
+
+// BuildHandler is a named request handler for building query protocol requests
+var BuildHandler = request.NamedHandler{Name: "awssdk.query.Build", Fn: Build}
 
 // Build builds a request for an AWS Query service.
 func Build(r *request.Request) {

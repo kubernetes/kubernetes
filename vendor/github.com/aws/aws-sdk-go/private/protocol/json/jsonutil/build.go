@@ -1,4 +1,4 @@
-// Package jsonutil provides JSON serialisation of AWS requests and responses.
+// Package jsonutil provides JSON serialization of AWS requests and responses.
 package jsonutil
 
 import (
@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strconv"
 	"time"
+
+	"github.com/aws/aws-sdk-go/private/protocol"
 )
 
 var timeType = reflect.ValueOf(time.Time{}).Type()
@@ -85,11 +87,8 @@ func buildStruct(value reflect.Value, buf *bytes.Buffer, tag reflect.StructTag) 
 	first := true
 	for i := 0; i < t.NumField(); i++ {
 		member := value.Field(i)
-		if (member.Kind() == reflect.Ptr || member.Kind() == reflect.Slice || member.Kind() == reflect.Map) && member.IsNil() {
-			continue // ignore unset fields
-		}
-
 		field := t.Field(i)
+
 		if field.PkgPath != "" {
 			continue // ignore unexported fields
 		}
@@ -98,6 +97,15 @@ func buildStruct(value reflect.Value, buf *bytes.Buffer, tag reflect.StructTag) 
 		}
 		if field.Tag.Get("location") != "" {
 			continue // ignore non-body elements
+		}
+
+		if protocol.CanSetIdempotencyToken(member, field) {
+			token := protocol.GetIdempotencyToken()
+			member = reflect.ValueOf(&token)
+		}
+
+		if (member.Kind() == reflect.Ptr || member.Kind() == reflect.Slice || member.Kind() == reflect.Map) && member.IsNil() {
+			continue // ignore unset fields
 		}
 
 		if first {
@@ -112,7 +120,8 @@ func buildStruct(value reflect.Value, buf *bytes.Buffer, tag reflect.StructTag) 
 			name = locName
 		}
 
-		fmt.Fprintf(buf, "%q:", name)
+		writeString(name, buf)
+		buf.WriteString(`:`)
 
 		err := buildAny(member, buf, field.Tag)
 		if err != nil {
@@ -151,7 +160,7 @@ func (sv sortedValues) Less(i, j int) bool { return sv[i].String() < sv[j].Strin
 func buildMap(value reflect.Value, buf *bytes.Buffer, tag reflect.StructTag) error {
 	buf.WriteString("{")
 
-	var sv sortedValues = value.MapKeys()
+	sv := sortedValues(value.MapKeys())
 	sort.Sort(sv)
 
 	for i, k := range sv {
@@ -159,7 +168,9 @@ func buildMap(value reflect.Value, buf *bytes.Buffer, tag reflect.StructTag) err
 			buf.WriteByte(',')
 		}
 
-		fmt.Fprintf(buf, "%q:", k)
+		writeString(k.String(), buf)
+		buf.WriteString(`:`)
+
 		buildAny(value.MapIndex(k), buf, "")
 	}
 

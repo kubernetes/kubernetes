@@ -7,8 +7,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/aws/client/metadata"
 	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/aws/signer/v4"
 	"github.com/aws/aws-sdk-go/private/protocol/query"
-	"github.com/aws/aws-sdk-go/private/signer/v4"
 )
 
 // Auto Scaling is designed to automatically launch or terminate EC2 instances
@@ -60,11 +60,11 @@ func newClient(cfg aws.Config, handlers request.Handlers, endpoint, signingRegio
 	}
 
 	// Handlers
-	svc.Handlers.Sign.PushBack(v4.Sign)
-	svc.Handlers.Build.PushBack(query.Build)
-	svc.Handlers.Unmarshal.PushBack(query.Unmarshal)
-	svc.Handlers.UnmarshalMeta.PushBack(query.UnmarshalMeta)
-	svc.Handlers.UnmarshalError.PushBack(query.UnmarshalError)
+	svc.Handlers.Sign.PushBackNamed(v4.SignRequestHandler)
+	svc.Handlers.Build.PushBackNamed(query.BuildHandler)
+	svc.Handlers.Unmarshal.PushBackNamed(query.UnmarshalHandler)
+	svc.Handlers.UnmarshalMeta.PushBackNamed(query.UnmarshalMetaHandler)
+	svc.Handlers.UnmarshalError.PushBackNamed(query.UnmarshalErrorHandler)
 
 	// Run custom client initialization if present
 	if initClient != nil {

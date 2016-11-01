@@ -7,8 +7,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/aws/client/metadata"
 	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/aws/signer/v4"
 	"github.com/aws/aws-sdk-go/private/protocol/restxml"
-	"github.com/aws/aws-sdk-go/private/signer/v4"
 )
 
 // Route53 is a client for Route 53.
@@ -58,11 +58,11 @@ func newClient(cfg aws.Config, handlers request.Handlers, endpoint, signingRegio
 	}
 
 	// Handlers
-	svc.Handlers.Sign.PushBack(v4.Sign)
-	svc.Handlers.Build.PushBack(restxml.Build)
-	svc.Handlers.Unmarshal.PushBack(restxml.Unmarshal)
-	svc.Handlers.UnmarshalMeta.PushBack(restxml.UnmarshalMeta)
-	svc.Handlers.UnmarshalError.PushBack(restxml.UnmarshalError)
+	svc.Handlers.Sign.PushBackNamed(v4.SignRequestHandler)
+	svc.Handlers.Build.PushBackNamed(restxml.BuildHandler)
+	svc.Handlers.Unmarshal.PushBackNamed(restxml.UnmarshalHandler)
+	svc.Handlers.UnmarshalMeta.PushBackNamed(restxml.UnmarshalMetaHandler)
+	svc.Handlers.UnmarshalError.PushBackNamed(restxml.UnmarshalErrorHandler)
 
 	// Run custom client initialization if present
 	if initClient != nil {
