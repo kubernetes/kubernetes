@@ -599,6 +599,12 @@ elif [[ "${START_MODE}" == "nokubelet" ]]; then
 fi
 
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
+  auth_arg=""
+  if [[ -n "${ALLOW_ANY_TOKEN:-}"  ]]; then
+      auth_arg="--token=admin/system:masters"
+  else
+      auth_arg="--username=admin --password=admin"
+  fi
   echo
   cat <<EOF
 To start using your cluster, open up another terminal/tab and run:
@@ -606,7 +612,7 @@ To start using your cluster, open up another terminal/tab and run:
   export KUBERNETES_PROVIDER=local
 
   cluster/kubectl.sh config set-cluster local --server=https://${API_HOST}:${API_SECURE_PORT} --certificate-authority=${ROOT_CA_FILE}
-  cluster/kubectl.sh config set-credentials myself --username=admin --password=admin
+  cluster/kubectl.sh config set-credentials myself ${auth_arg}
   cluster/kubectl.sh config set-context local --cluster=local --user=myself
   cluster/kubectl.sh config use-context local
   cluster/kubectl.sh
