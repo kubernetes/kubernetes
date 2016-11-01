@@ -57,7 +57,6 @@ type DensityTestConfig struct {
 	ClientSet    internalclientset.Interface
 	PollInterval time.Duration
 	PodCount     int
-	Timeout      time.Duration
 }
 
 func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceConstraint {
@@ -193,8 +192,10 @@ func runDensityTest(dtc DensityTestConfig) time.Duration {
 		rcConfig := dtc.Configs[i]
 		go func() {
 			defer GinkgoRecover()
+			// Call wg.Done() in defer to avoid blocking whole test
+			// in case of error from RunRC.
+			defer wg.Done()
 			framework.ExpectNoError(framework.RunRC(rcConfig))
-			wg.Done()
 		}()
 	}
 	logStopCh := make(chan struct{})
@@ -389,7 +390,6 @@ var _ = framework.KubeDescribe("Density", func() {
 			fileHndl, err := os.Create(fmt.Sprintf(framework.TestContext.OutputDir+"/%s/pod_states.csv", uuid))
 			framework.ExpectNoError(err)
 			defer fileHndl.Close()
-			timeout := 10 * time.Minute
 
 			// nodeCountPerNamespace and CreateNamespaces are defined in load.go
 			numberOfRCs := (nodeCount + nodeCountPerNamespace - 1) / nodeCountPerNamespace
@@ -397,6 +397,10 @@ var _ = framework.KubeDescribe("Density", func() {
 			framework.ExpectNoError(err)
 
 			RCConfigs := make([]testutils.RCConfig, numberOfRCs)
+			// Since all RCs are created at the same time, timeout for each config
+			// has to assume that it will be run at the very end.
+			podThroughput := 20
+			timeout := time.Duration(totalPods/podThroughput)*time.Second + 3*time.Minute
 			for i := 0; i < numberOfRCs; i++ {
 				RCName := fmt.Sprintf("density%v-%v-%v", totalPods, i, uuid)
 				nsName := namespaces[i].Name
@@ -406,6 +410,7 @@ var _ = framework.KubeDescribe("Density", func() {
 					Namespace:            nsName,
 					Labels:               map[string]string{"type": "densityPod"},
 					PollInterval:         itArg.interval,
+					Timeout:              timeout,
 					PodStatusFile:        fileHndl,
 					Replicas:             (totalPods + numberOfRCs - 1) / numberOfRCs,
 					CpuRequest:           nodeCpuCapacity / 100,
@@ -420,7 +425,6 @@ var _ = framework.KubeDescribe("Density", func() {
 				Configs:      RCConfigs,
 				PodCount:     totalPods,
 				PollInterval: itArg.interval,
-				Timeout:      timeout,
 			}
 			e2eStartupTime = runDensityTest(dConfig)
 			if itArg.runLatencyTest {
@@ -530,8 +534,9 @@ var _ = framework.KubeDescribe("Density", func() {
 				wg.Wait()
 
 				By("Waiting for all Pods begin observed by the watch...")
+				waitTimeout := 10 * time.Minute
 				for start := time.Now(); len(watchTimes) < nodeCount; time.Sleep(10 * time.Second) {
-					if time.Since(start) < timeout {
+					if time.Since(start) < waitTimeout {
 						framework.Failf("Timeout reached waiting for all Pods being observed by the watch.")
 					}
 				}
@@ -671,7 +676,6 @@ var _ = framework.KubeDescribe("Density", func() {
 			Configs:      RCConfigs,
 			PodCount:     totalPods,
 			PollInterval: 10 * time.Second,
-			Timeout:      10 * time.Minute,
 		}
 		e2eStartupTime = runDensityTest(dConfig)
 		cleanupDensityTest(dConfig)
