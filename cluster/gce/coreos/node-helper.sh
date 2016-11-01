@@ -14,19 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# A library of helper functions and constant for GCI distro
-source "${KUBE_ROOT}/cluster/gce/gci/helper.sh"
+# A library of helper functions and constant for the CoreOS distro
+source "${KUBE_ROOT}/cluster/gce/coreos/helper.sh"
 
 # $1: template name (required).
 function create-node-instance-template {
   local template_name="$1"
-  ensure-gci-metadata-files
+
   create-node-template "$template_name" "${scope_flags[*]}" \
     "kube-env=${KUBE_TEMP}/node-kube-env.yaml" \
-    "user-data=${KUBE_ROOT}/cluster/gce/gci/node.yaml" \
-    "configure-sh=${KUBE_ROOT}/cluster/gce/gci/configure.sh" \
-    "cluster-name=${KUBE_TEMP}/cluster-name.txt" \
-    "gci-update-strategy=${KUBE_TEMP}/gci-update.txt" \
-    "gci-ensure-gke-docker=${KUBE_TEMP}/gci-ensure-gke-docker.txt" \
-    "gci-docker-version=${KUBE_TEMP}/gci-docker-version.txt"
+    "user-data=${KUBE_ROOT}/cluster/gce/coreos/node.yaml" \
+    "configure-sh=${KUBE_ROOT}/cluster/gce/coreos/configure.sh" \
+    "cluster-name=${KUBE_TEMP}/cluster-name.txt"
+  # TODO(euank): We should include update-strategy here. We should also switch to ignition
 }
