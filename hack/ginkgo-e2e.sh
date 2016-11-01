@@ -49,7 +49,7 @@ source "${KUBE_ROOT}/cluster/kube-util.sh"
 # ---- Do cloud-provider-specific setup
 if [[ -n "${KUBERNETES_CONFORMANCE_TEST:-}" ]]; then
     echo "Conformance test: not doing test setup."
-    KUBERNETES_PROVIDER="skeleton"
+    KUBERNETES_PROVIDER=${KUBERNETES_CONFORMANCE_PROVIDER:-"skeleton"}
 
     detect-master-from-kubeconfig
 
