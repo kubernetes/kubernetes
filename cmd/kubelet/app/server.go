@@ -321,6 +321,12 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		}
 	}
 
+	// Set feature gates based on the value in KubeletConfiguration
+	err = utilconfig.DefaultFeatureGate.Set(s.KubeletConfiguration.FeatureGates)
+	if err != nil {
+		return err
+	}
+
 	// Register current configuration with /configz endpoint
 	cfgz, cfgzErr := initConfigz(&s.KubeletConfiguration)
 	if utilconfig.DefaultFeatureGate.DynamicKubeletConfig() {
@@ -338,6 +344,11 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 					glog.Errorf("was unable to register configz before due to %s, will not be able to set now", cfgzErr)
 				} else {
 					setConfigz(cfgz, &s.KubeletConfiguration)
+				}
+				// Update feature gates from the new config
+				err = utilconfig.DefaultFeatureGate.Set(s.KubeletConfiguration.FeatureGates)
+				if err != nil {
+					return err
 				}
 			}
 		}
