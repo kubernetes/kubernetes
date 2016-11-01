@@ -20,11 +20,16 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	internalApi "k8s.io/kubernetes/pkg/kubelet/api"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/network/cni"
+	"k8s.io/kubernetes/pkg/kubelet/network/kubenet"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	"k8s.io/kubernetes/pkg/util/term"
 )
@@ -53,10 +58,41 @@ const (
 	sandboxIDLabelKey           = "io.kubernetes.sandbox.id"
 )
 
+// NetworkPluginArgs is the subset of kubelet runtime args we pass
+// to the container runtime shim so it can probe for network plugins.
+// In the future we will feed these directly to a standalone container
+// runtime process.
+type NetworkPluginSettings struct {
+	// HairpinMode is best described by comments surrounding the kubelet arg
+	HairpinMode componentconfig.HairpinMode
+	// NonMasqueradeCIDR is the range of ips which should *not* be included
+	// in any MASQUERADE rules applied by the plugin
+	NonMasqueradeCIDR string
+	// PluginName is the name of the plugin, runtime shim probes for
+	PluginName string
+	// PluginBinDir is the directory in which the binaries for the plugin with
+	// PluginName is kept. The admin is responsible for provisioning these
+	// binaries before-hand.
+	PluginBinDir string
+	// PluginConfDir is the directory in which the admin places a CNI conf.
+	// Depending on the plugin, this may be an optional field, eg: kubenet
+	// generates its own plugin conf.
+	PluginConfDir string
+	// MTU is the desired MTU for network devices created by the plugin.
+	MTU int
+
+	// RuntimeHost is an interface that serves as a trap-door from plugin back
+	// into the kubelet.
+	// TODO: This shouldn't be required, remove once we move host ports into CNI
+	// and figure out bandwidth shaping. See corresponding comments above
+	// network.Host interface.
+	LegacyRuntimeHost network.LegacyHost
+}
+
 var internalLabelKeys []string = []string{containerTypeLabelKey, containerLogPathLabelKey, sandboxIDLabelKey}
 
 // NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
-func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot string, podSandboxImage string, streamingConfig *streaming.Config) (DockerService, error) {
+func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot string, podSandboxImage string, streamingConfig *streaming.Config, pluginSettings *NetworkPluginSettings) (DockerService, error) {
 	ds := &dockerService{
 		seccompProfileRoot: seccompProfileRoot,
 		client:             dockertools.NewInstrumentedDockerInterface(client),
@@ -76,6 +112,19 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 			return nil, err
 		}
 	}
+	// dockershim currently only supports CNI plugins.
+	cniPlugins := cni.ProbeNetworkPlugins(pluginSettings.PluginConfDir, pluginSettings.PluginBinDir)
+	cniPlugins = append(cniPlugins, kubenet.NewPlugin(pluginSettings.PluginBinDir))
+	netHost := &dockerNetworkHost{
+		pluginSettings.LegacyRuntimeHost,
+		&namespaceGetter{ds},
+	}
+	plug, err := network.InitNetworkPlugin(cniPlugins, pluginSettings.PluginName, netHost, pluginSettings.HairpinMode, pluginSettings.NonMasqueradeCIDR, pluginSettings.MTU)
+	if err != nil {
+		return nil, fmt.Errorf("didn't find compatible CNI plugin with given settings %+v: %v", pluginSettings, err)
+	}
+	ds.networkPlugin = plug
+	glog.Infof("Docker cri networking managed by %v", plug.Name())
 	return ds, nil
 }
 
@@ -105,6 +154,7 @@ type dockerService struct {
 	podSandboxImage    string
 	streamingRuntime   *streamingRuntime
 	streamingServer    streaming.Server
+	networkPlugin      network.NetworkPlugin
 }
 
 // Version returns the runtime name, runtime version and runtime API version
@@ -126,6 +176,41 @@ func (ds *dockerService) Version(_ string) (*runtimeApi.VersionResponse, error) 
 	}, nil
 }
 
-func (ds *dockerService) UpdateRuntimeConfig(runtimeConfig *runtimeApi.RuntimeConfig) error {
-	return nil
+// UpdateRuntimeConfig updates the runtime config. Currently only handles podCIDR updates.
+func (ds *dockerService) UpdateRuntimeConfig(runtimeConfig *runtimeApi.RuntimeConfig) (err error) {
+	if runtimeConfig == nil {
+		return
+	}
+	glog.Infof("docker cri received runtime config %+v", runtimeConfig)
+	if ds.networkPlugin != nil && runtimeConfig.NetworkConfig.PodCidr != nil {
+		event := make(map[string]interface{})
+		event[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = *runtimeConfig.NetworkConfig.PodCidr
+		ds.networkPlugin.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, event)
+	}
+	return
+}
+
+// namespaceGetter is a wrapper around the dockerService that implements
+// the network.NamespaceGetter interface.
+type namespaceGetter struct {
+	*dockerService
+}
+
+// GetNetNS returns the network namespace of the given containerID. The ID
+// supplied is typically the ID of a pod sandbox. This getter doesn't try
+// to map non-sandbox IDs to their respective sandboxes.
+func (ds *dockerService) GetNetNS(podSandboxID string) (string, error) {
+	r, err := ds.client.InspectContainer(podSandboxID)
+	if err != nil {
+		return "", err
+	}
+	return getNetworkNamespace(r), nil
+}
+
+// dockerNetworkHost implements network.Host by wrapping the legacy host
+// passed in by the kubelet and adding NamespaceGetter methods. The legacy
+// host methods are slated for deletion.
+type dockerNetworkHost struct {
+	network.LegacyHost
+	*namespaceGetter
 }

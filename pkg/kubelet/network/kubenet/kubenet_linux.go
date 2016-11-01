@@ -334,6 +334,9 @@ func (plugin *kubenetNetworkPlugin) Capabilities() utilsets.Int {
 	return utilsets.NewInt(network.NET_PLUGIN_CAPABILITY_SHAPING)
 }
 
+// setup sets up networking through CNI using the given ns/name and sandbox ID.
+// TODO: Don't pass the pod to this method, it only needs it for bandwidth
+// shaping and hostport management.
 func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kubecontainer.ContainerID, pod *api.Pod) error {
 	// Bring up container loopback interface
 	if _, err := plugin.addContainerToNetwork(plugin.loConfig, "lo", namespace, name, id); err != nil {
@@ -384,6 +387,14 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 		plugin.syncEbtablesDedupRules(macAddr)
 	}
 
+	plugin.podIPs[id] = ip4.String()
+
+	// The host can choose to not support "legacy" features. The remote
+	// shim doesn't support it (#35457), but the kubelet does.
+	if !plugin.host.SupportsLegacyFeatures() {
+		return nil
+	}
+
 	// The first SetUpPod call creates the bridge; get a shaper for the sake of
 	// initialization
 	shaper := plugin.shaper()
@@ -397,8 +408,6 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 			return fmt.Errorf("Failed to add pod to shaper: %v", err)
 		}
 	}
-
-	plugin.podIPs[id] = ip4.String()
 
 	// Open any hostports the pod's containers want
 	activePods, err := plugin.getActivePods()
@@ -423,6 +432,7 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 		glog.V(4).Infof("SetUpPod took %v for %s/%s", time.Since(start), namespace, name)
 	}()
 
+	// TODO: Entire pod object only required for bw shaping and hostport.
 	pod, ok := plugin.host.GetPodByName(namespace, name)
 	if !ok {
 		return fmt.Errorf("pod %q cannot be found", name)
@@ -440,15 +450,20 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 			glog.V(4).Infof("Failed to clean up %s/%s after SetUpPod failure: %v", namespace, name, err)
 		}
 
-		// TODO: Remove this hack once we've figured out how to retrieve the netns
-		// of an exited container. Currently, restarting docker will leak a bunch of
-		// ips. This will exhaust available ip space unless we cleanup old ips. At the
-		// same time we don't want to try GC'ing them periodically as that could lead
-		// to a performance regression in starting pods. So on each setup failure, try
-		// GC on the assumption that the kubelet is going to retry pod creation, and
-		// when it does, there will be ips.
-		plugin.ipamGarbageCollection()
+		// TODO(#34278): Figure out if we need IP GC through the cri.
+		// The cri should always send us teardown events for stale sandboxes,
+		// this obviates the need for GC in the common case, for kubenet.
+		if plugin.host.SupportsLegacyFeatures() {
 
+			// TODO: Remove this hack once we've figured out how to retrieve the netns
+			// of an exited container. Currently, restarting docker will leak a bunch of
+			// ips. This will exhaust available ip space unless we cleanup old ips. At the
+			// same time we don't want to try GC'ing them periodically as that could lead
+			// to a performance regression in starting pods. So on each setup failure, try
+			// GC on the assumption that the kubelet is going to retry pod creation, and
+			// when it does, there will be ips.
+			plugin.ipamGarbageCollection()
+		}
 		return err
 	}
 
@@ -483,6 +498,12 @@ func (plugin *kubenetNetworkPlugin) teardown(namespace string, name string, id k
 		} else {
 			errList = append(errList, err)
 		}
+	}
+
+	// The host can choose to not support "legacy" features. The remote
+	// shim doesn't support it (#35457), but the kubelet does.
+	if !plugin.host.SupportsLegacyFeatures() {
+		return utilerrors.NewAggregate(errList)
 	}
 
 	activePods, err := plugin.getActivePods()
@@ -533,7 +554,7 @@ func (plugin *kubenetNetworkPlugin) GetPodNetworkStatus(namespace string, name s
 		return &network.PodNetworkStatus{IP: net.ParseIP(podIP)}, nil
 	}
 
-	netnsPath, err := plugin.host.GetRuntime().GetNetNS(id)
+	netnsPath, err := plugin.host.GetNetNS(id.ID)
 	if err != nil {
 		return nil, fmt.Errorf("Kubenet failed to retrieve network namespace path: %v", err)
 	}
@@ -722,7 +743,7 @@ func podIsExited(p *kubecontainer.Pod) bool {
 }
 
 func (plugin *kubenetNetworkPlugin) buildCNIRuntimeConf(ifName string, id kubecontainer.ContainerID) (*libcni.RuntimeConf, error) {
-	netnsPath, err := plugin.host.GetRuntime().GetNetNS(id)
+	netnsPath, err := plugin.host.GetNetNS(id.ID)
 	if err != nil {
 		return nil, fmt.Errorf("Kubenet failed to retrieve network namespace path: %v", err)
 	}

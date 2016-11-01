@@ -229,4 +229,40 @@ func TestGenerateMacAddress(t *testing.T) {
 	}
 }
 
+// TestInvocationWithoutRuntime invokes the plugin without a runtime.
+// This is how kubenet is invoked from the cri.
+func TestTearDownWithoutRuntime(t *testing.T) {
+	fhost := nettest.NewFakeHost(nil)
+	fhost.Legacy = false
+	fhost.Runtime = nil
+	mockcni := &mock_cni.MockCNI{}
+
+	fexec := &exec.FakeExec{
+		CommandScript: []exec.FakeCommandAction{},
+		LookPathFunc: func(file string) (string, error) {
+			return fmt.Sprintf("/fake-bin/%s", file), nil
+		},
+	}
+
+	kubenet := newFakeKubenetPlugin(map[kubecontainer.ContainerID]string{}, fexec, fhost)
+	kubenet.cniConfig = mockcni
+	kubenet.iptables = ipttest.NewFake()
+
+	details := make(map[string]interface{})
+	details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = "10.0.0.1/24"
+	kubenet.Event(network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE, details)
+
+	existingContainerID := kubecontainer.BuildContainerID("docker", "123")
+	kubenet.podIPs[existingContainerID] = "10.0.0.1"
+
+	mockcni.On("DelNetwork", mock.AnythingOfType("*libcni.NetworkConfig"), mock.AnythingOfType("*libcni.RuntimeConf")).Return(nil)
+
+	if err := kubenet.TearDownPod("namespace", "name", existingContainerID); err != nil {
+		t.Fatalf("Unexpected error in TearDownPod: %v", err)
+	}
+	// Assert that the CNI DelNetwork made it through and we didn't crash
+	// without a runtime.
+	mockcni.AssertExpectations(t)
+}
+
 //TODO: add unit test for each implementation of network plugin interface
