@@ -36,10 +36,7 @@ var _ = framework.KubeDescribe("ContainerLogPath", func() {
 				podClient := f.PodClient()
 				ns := f.Namespace.Name
 
-				rootfsDirVolumeName := "docker-dir-vol"
-
-				rootfsDir := "/root"
-				rootDir := "/"
+				logDirVolumeName := "log-dir-vol"
 				logDir := kubelet.ContainerLogsDir
 
 				logPodName := "logger-" + string(uuid.NewUUID())
@@ -89,11 +86,12 @@ var _ = framework.KubeDescribe("ContainerLogPath", func() {
 								// 1. If we find expected log file and contains right content, exit 0
 								// else, keep checking until test timeout
 								// 2. We have to mount `/` as rootfs since log file is symblink, container will try to get src of link.
-								Command: []string{"sh", "-c", "chroot " + rootfsDir + " while true; do if [ -e " + expectedlogFile + " ] && grep -q " + logString + " " + expectedlogFile + "; then exit 0; fi; sleep 1; done"},
+								Command: []string{"sh", "-c", "while true; do if [ -e " + expectedlogFile + " ] && grep -q " + logString + " " + expectedlogFile + "; then exit 0; fi; sleep 1; done"},
 								VolumeMounts: []api.VolumeMount{
 									{
-										Name:      rootfsDirVolumeName,
-										MountPath: rootfsDir,
+										Name: logDirVolumeName,
+										// mount ContainerLogsDir to the same path in container
+										MountPath: logDir,
 										ReadOnly:  true,
 									},
 								},
@@ -101,10 +99,10 @@ var _ = framework.KubeDescribe("ContainerLogPath", func() {
 						},
 						Volumes: []api.Volume{
 							{
-								Name: rootfsDirVolumeName,
+								Name: logDirVolumeName,
 								VolumeSource: api.VolumeSource{
 									HostPath: &api.HostPathVolumeSource{
-										Path: rootDir,
+										Path: logDir,
 									},
 								},
 							},
