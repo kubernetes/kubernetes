@@ -153,7 +153,7 @@ func generatePodSandboxLinuxConfig(pod *api.Pod, cgroupParent string) *runtimeAp
 func (m *kubeGenericRuntimeManager) getKubeletSandboxes(all bool) ([]*runtimeApi.PodSandbox, error) {
 	var filter *runtimeApi.PodSandboxFilter
 	if !all {
-		readyState := runtimeApi.PodSandBoxState_READY
+		readyState := runtimeApi.PodSandboxState_SANDBOX_READY
 		filter = &runtimeApi.PodSandboxFilter{
 			State: &readyState,
 		}
@@ -195,7 +195,7 @@ func (m *kubeGenericRuntimeManager) determinePodSandboxIP(podNamespace, podName 
 
 // getPodSandboxID gets the sandbox id by podUID and returns ([]sandboxID, error).
 // Param state could be nil in order to get all sandboxes belonging to same pod.
-func (m *kubeGenericRuntimeManager) getSandboxIDByPodUID(podUID string, state *runtimeApi.PodSandBoxState) ([]string, error) {
+func (m *kubeGenericRuntimeManager) getSandboxIDByPodUID(podUID string, state *runtimeApi.PodSandboxState) ([]string, error) {
 	filter := &runtimeApi.PodSandboxFilter{
 		State:         state,
 		LabelSelector: map[string]string{types.KubernetesPodUIDLabel: podUID},

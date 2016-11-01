@@ -192,9 +192,9 @@ func (ds *dockerService) PodSandboxStatus(podSandboxID string) (*runtimeApi.PodS
 	ct := createdAt.UnixNano()
 
 	// Translate container to sandbox state.
-	state := runtimeApi.PodSandBoxState_NOTREADY
+	state := runtimeApi.PodSandboxState_SANDBOX_NOTREADY
 	if r.State.Running {
-		state = runtimeApi.PodSandBoxState_READY
+		state = runtimeApi.PodSandboxState_SANDBOX_READY
 	}
 	IP, err := ds.getIP(r)
 	if err != nil {
@@ -244,11 +244,11 @@ func (ds *dockerService) ListPodSandbox(filter *runtimeApi.PodSandboxFilter) ([]
 			f.Add("id", filter.GetId())
 		}
 		if filter.State != nil {
-			if filter.GetState() == runtimeApi.PodSandBoxState_READY {
+			if filter.GetState() == runtimeApi.PodSandboxState_SANDBOX_READY {
 				// Only list running containers.
 				opts.All = false
 			} else {
-				// runtimeApi.PodSandBoxState_NOTREADY can mean the
+				// runtimeApi.PodSandboxState_SANDBOX_NOTREADY can mean the
 				// container is in any of the non-running state (e.g., created,
 				// exited). We can't tell docker to filter out running
 				// containers directly, so we'll need to filter them out
@@ -277,7 +277,7 @@ func (ds *dockerService) ListPodSandbox(filter *runtimeApi.PodSandboxFilter) ([]
 			glog.V(5).Infof("Unable to convert docker to runtime API sandbox: %v", err)
 			continue
 		}
-		if filterOutReadySandboxes && converted.GetState() == runtimeApi.PodSandBoxState_READY {
+		if filterOutReadySandboxes && converted.GetState() == runtimeApi.PodSandboxState_SANDBOX_READY {
 			continue
 		}
 

@@ -301,7 +301,7 @@ func (m *kubeGenericRuntimeManager) getKubeletContainers(allContainers bool) ([]
 		LabelSelector: map[string]string{kubernetesManagedLabel: "true"},
 	}
 	if !allContainers {
-		runningState := runtimeApi.ContainerState_RUNNING
+		runningState := runtimeApi.ContainerState_CONTAINER_RUNNING
 		filter.State = &runningState
 	}
 
@@ -390,7 +390,7 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 			CreatedAt:    time.Unix(0, status.GetCreatedAt()),
 		}
 
-		if c.GetState() == runtimeApi.ContainerState_RUNNING {
+		if c.GetState() == runtimeApi.ContainerState_CONTAINER_RUNNING {
 			cStatus.StartedAt = time.Unix(0, status.GetStartedAt())
 		} else {
 			cStatus.Reason = status.GetReason()
