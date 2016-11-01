@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver/metrics"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
+	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 
 	"github.com/emicklei/go-restful"
 )
@@ -610,9 +611,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				handler = CreateResource(creater, reqScope, a.group.Typer, admit)
 			}
 			handler = metrics.InstrumentRouteFunc(action.Verb, resource, handler)
-			doc := "create a " + kind
+			article := utilstrings.GetArticleForNoun(kind, " ")
+			doc := "create" + article + kind
 			if hasSubresource {
-				doc = "create " + subresource + " of a " + kind
+				doc = "create " + subresource + " of" + article + kind
 			}
 			route := ws.POST(action.Path).To(handler).
 				Doc(doc).
@@ -625,9 +627,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "DELETE": // Delete a resource.
-			doc := "delete a " + kind
+			article := utilstrings.GetArticleForNoun(kind, " ")
+			doc := "delete" + article + kind
 			if hasSubresource {
-				doc = "delete " + subresource + " of a " + kind
+				doc = "delete " + subresource + " of" + article + kind
 			}
 			handler := metrics.InstrumentRouteFunc(action.Verb, resource, DeleteResource(gracefulDeleter, isGracefulDeleter, reqScope, admit))
 			route := ws.DELETE(action.Path).To(handler).
