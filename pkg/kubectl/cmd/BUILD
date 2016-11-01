@@ -191,6 +191,7 @@ go_test(
         "//pkg/util/strings:go_default_library",
         "//pkg/util/term:go_default_library",
         "//pkg/util/wait:go_default_library",
+        "//pkg/version:go_default_library",
         "//pkg/watch:go_default_library",
         "//pkg/watch/versioned:go_default_library",
         "//vendor:github.com/spf13/cobra",
