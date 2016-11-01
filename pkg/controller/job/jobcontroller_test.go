@@ -18,7 +18,6 @@ package job
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
 	"time"
 
@@ -26,11 +25,13 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
@@ -84,6 +85,13 @@ func getKey(job *batch.Job, t *testing.T) string {
 	} else {
 		return key
 	}
+}
+
+func newJobControllerFromClient(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc) (*JobController, informers.SharedInformerFactory) {
+	sharedInformers := informers.NewSharedInformerFactory(kubeClient, resyncPeriod())
+	jm := NewJobController(sharedInformers.Pods().Informer(), sharedInformers.Jobs(), kubeClient)
+
+	return jm, sharedInformers
 }
 
 // create count pods with the given phase for the given job
@@ -220,10 +228,11 @@ func TestControllerSyncJob(t *testing.T) {
 	for name, tc := range testCases {
 		// job manager setup
 		clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
-		manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+		manager, sharedInformerFactory := newJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 		fakePodControl := controller.FakePodControl{Err: tc.podControllerError}
 		manager.podControl = &fakePodControl
 		manager.podStoreSynced = alwaysReady
+		manager.jobStoreSynced = alwaysReady
 		var actual *batch.Job
 		manager.updateHandler = func(job *batch.Job) error {
 			actual = job
@@ -236,18 +245,19 @@ func TestControllerSyncJob(t *testing.T) {
 			now := unversioned.Now()
 			job.DeletionTimestamp = &now
 		}
-		manager.jobStore.Store.Add(job)
+		sharedInformerFactory.Jobs().Informer().GetIndexer().Add(job)
+		podIndexer := sharedInformerFactory.Pods().Informer().GetIndexer()
 		for _, pod := range newPodList(tc.pendingPods, api.PodPending, job) {
-			manager.podStore.Indexer.Add(&pod)
+			podIndexer.Add(&pod)
 		}
 		for _, pod := range newPodList(tc.activePods, api.PodRunning, job) {
-			manager.podStore.Indexer.Add(&pod)
+			podIndexer.Add(&pod)
 		}
 		for _, pod := range newPodList(tc.succeededPods, api.PodSucceeded, job) {
-			manager.podStore.Indexer.Add(&pod)
+			podIndexer.Add(&pod)
 		}
 		for _, pod := range newPodList(tc.failedPods, api.PodFailed, job) {
-			manager.podStore.Indexer.Add(&pod)
+			podIndexer.Add(&pod)
 		}
 
 		// run
@@ -322,10 +332,11 @@ func TestSyncJobPastDeadline(t *testing.T) {
 	for name, tc := range testCases {
 		// job manager setup
 		clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
-		manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+		manager, sharedInformerFactory := newJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 		fakePodControl := controller.FakePodControl{}
 		manager.podControl = &fakePodControl
 		manager.podStoreSynced = alwaysReady
+		manager.jobStoreSynced = alwaysReady
 		var actual *batch.Job
 		manager.updateHandler = func(job *batch.Job) error {
 			actual = job
@@ -337,15 +348,16 @@ func TestSyncJobPastDeadline(t *testing.T) {
 		job.Spec.ActiveDeadlineSeconds = &tc.activeDeadlineSeconds
 		start := unversioned.Unix(unversioned.Now().Time.Unix()-tc.startTime, 0)
 		job.Status.StartTime = &start
-		manager.jobStore.Store.Add(job)
+		sharedInformerFactory.Jobs().Informer().GetIndexer().Add(job)
+		podIndexer := sharedInformerFactory.Pods().Informer().GetIndexer()
 		for _, pod := range newPodList(tc.activePods, api.PodRunning, job) {
-			manager.podStore.Indexer.Add(&pod)
+			podIndexer.Add(&pod)
 		}
 		for _, pod := range newPodList(tc.succeededPods, api.PodSucceeded, job) {
-			manager.podStore.Indexer.Add(&pod)
+			podIndexer.Add(&pod)
 		}
 		for _, pod := range newPodList(tc.failedPods, api.PodFailed, job) {
-			manager.podStore.Indexer.Add(&pod)
+			podIndexer.Add(&pod)
 		}
 
 		// run
@@ -392,10 +404,11 @@ func getCondition(job *batch.Job, condition batch.JobConditionType) bool {
 
 func TestSyncPastDeadlineJobFinished(t *testing.T) {
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
-	manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	manager, sharedInformerFactory := newJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
+	manager.jobStoreSynced = alwaysReady
 	var actual *batch.Job
 	manager.updateHandler = func(job *batch.Job) error {
 		actual = job
@@ -408,7 +421,7 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 	start := unversioned.Unix(unversioned.Now().Time.Unix()-15, 0)
 	job.Status.StartTime = &start
 	job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobFailed, "DeadlineExceeded", "Job was active longer than specified deadline"))
-	manager.jobStore.Store.Add(job)
+	sharedInformerFactory.Jobs().Informer().GetIndexer().Add(job)
 	err := manager.syncJob(getKey(job, t))
 	if err != nil {
 		t.Errorf("Unexpected error when syncing jobs %v", err)
@@ -426,23 +439,23 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 
 func TestSyncJobComplete(t *testing.T) {
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
-	manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	manager, sharedInformerFactory := newJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
+	manager.jobStoreSynced = alwaysReady
 
 	job := newJob(1, 1)
 	job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobComplete, "", ""))
-	manager.jobStore.Store.Add(job)
+	sharedInformerFactory.Jobs().Informer().GetIndexer().Add(job)
 	err := manager.syncJob(getKey(job, t))
 	if err != nil {
 		t.Fatalf("Unexpected error when syncing jobs %v", err)
 	}
-	uncastJob, _, err := manager.jobStore.Store.Get(job)
+	actual, err := manager.jobLister.Jobs(job.Namespace).Get(job.Name)
 	if err != nil {
 		t.Fatalf("Unexpected error when trying to get job from the store: %v", err)
 	}
-	actual := uncastJob.(*batch.Job)
 	// Verify that after syncing a complete job, the conditions are the same.
 	if got, expected := len(actual.Status.Conditions), 1; got != expected {
 		t.Fatalf("Unexpected job status conditions amount; expected %d, got %d", expected, got)
@@ -451,10 +464,11 @@ func TestSyncJobComplete(t *testing.T) {
 
 func TestSyncJobDeleted(t *testing.T) {
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
-	manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	manager, _ := newJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
+	manager.jobStoreSynced = alwaysReady
 	manager.updateHandler = func(job *batch.Job) error { return nil }
 	job := newJob(2, 2)
 	err := manager.syncJob(getKey(job, t))
@@ -471,17 +485,18 @@ func TestSyncJobDeleted(t *testing.T) {
 
 func TestSyncJobUpdateRequeue(t *testing.T) {
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
-	manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	manager, sharedInformerFactory := newJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
+	manager.jobStoreSynced = alwaysReady
 	updateError := fmt.Errorf("Update error")
 	manager.updateHandler = func(job *batch.Job) error {
 		manager.queue.AddRateLimited(getKey(job, t))
 		return updateError
 	}
 	job := newJob(2, 2)
-	manager.jobStore.Store.Add(job)
+	sharedInformerFactory.Jobs().Informer().GetIndexer().Add(job)
 	err := manager.syncJob(getKey(job, t))
 	if err == nil || err != updateError {
 		t.Errorf("Expected error %v when syncing jobs, got %v", updateError, err)
@@ -496,8 +511,9 @@ func TestSyncJobUpdateRequeue(t *testing.T) {
 
 func TestJobPodLookup(t *testing.T) {
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
-	manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	manager, sharedInformerFactory := newJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 	manager.podStoreSynced = alwaysReady
+	manager.jobStoreSynced = alwaysReady
 	testCases := []struct {
 		job *batch.Job
 		pod *api.Pod
@@ -560,7 +576,7 @@ func TestJobPodLookup(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		manager.jobStore.Add(tc.job)
+		sharedInformerFactory.Jobs().Informer().GetIndexer().Add(tc.job)
 		if job := manager.getPodJob(tc.pod); job != nil {
 			if tc.expectedName != job.Name {
 				t.Errorf("Got job %+v expected %+v", job.Name, tc.expectedName)
@@ -586,23 +602,25 @@ func (fe FakeJobExpectations) SatisfiedExpectations(controllerKey string) bool {
 // and checking expectations.
 func TestSyncJobExpectations(t *testing.T) {
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
-	manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	manager, sharedInformerFactory := newJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
+	manager.jobStoreSynced = alwaysReady
 	manager.updateHandler = func(job *batch.Job) error { return nil }
 
 	job := newJob(2, 2)
-	manager.jobStore.Store.Add(job)
+	sharedInformerFactory.Jobs().Informer().GetIndexer().Add(job)
 	pods := newPodList(2, api.PodPending, job)
-	manager.podStore.Indexer.Add(&pods[0])
+	podIndexer := sharedInformerFactory.Pods().Informer().GetIndexer()
+	podIndexer.Add(&pods[0])
 
 	manager.expectations = FakeJobExpectations{
 		controller.NewControllerExpectations(), true, func() {
 			// If we check active pods before checking expectataions, the job
 			// will create a new replica because it doesn't see this pod, but
 			// has fulfilled its expectations.
-			manager.podStore.Indexer.Add(&pods[1])
+			podIndexer.Add(&pods[1])
 		},
 	}
 	manager.syncJob(getKey(job, t))
@@ -618,8 +636,9 @@ func TestWatchJobs(t *testing.T) {
 	clientset := fake.NewSimpleClientset()
 	fakeWatch := watch.NewFake()
 	clientset.PrependWatchReactor("jobs", core.DefaultWatchReactor(fakeWatch, nil))
-	manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	manager, sharedInformerFactory := newJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 	manager.podStoreSynced = alwaysReady
+	manager.jobStoreSynced = alwaysReady
 
 	var testJob batch.Job
 	received := make(chan struct{})
@@ -627,28 +646,30 @@ func TestWatchJobs(t *testing.T) {
 	// The update sent through the fakeWatcher should make its way into the workqueue,
 	// and eventually into the syncHandler.
 	manager.syncHandler = func(key string) error {
-
-		obj, exists, err := manager.jobStore.Store.GetByKey(key)
-		if !exists || err != nil {
-			t.Errorf("Expected to find job under key %v", key)
+		defer close(received)
+		ns, name, err := cache.SplitMetaNamespaceKey(key)
+		if err != nil {
+			t.Errorf("Error getting namespace/name from key %v: %v", key, err)
 		}
-		job, ok := obj.(*batch.Job)
-		if !ok {
-			t.Fatalf("unexpected type: %v %#v", reflect.TypeOf(obj), obj)
+		job, err := manager.jobLister.Jobs(ns).Get(name)
+		if err != nil || job == nil {
+			t.Errorf("Expected to find job under key %v: %v", key, err)
+			return nil
 		}
 		if !api.Semantic.DeepDerivative(*job, testJob) {
 			t.Errorf("Expected %#v, but got %#v", testJob, *job)
 		}
-		close(received)
 		return nil
 	}
 	// Start only the job watcher and the workqueue, send a watch event,
 	// and make sure it hits the sync method.
 	stopCh := make(chan struct{})
 	defer close(stopCh)
+	sharedInformerFactory.Start(stopCh)
 	go manager.Run(1, stopCh)
 
 	// We're sending new job to see if it reaches syncHandler.
+	testJob.Namespace = "bar"
 	testJob.Name = "foo"
 	fakeWatch.Add(&testJob)
 	t.Log("Waiting for job to reach syncHandler")
@@ -660,26 +681,23 @@ func TestWatchPods(t *testing.T) {
 	clientset := fake.NewSimpleClientset(testJob)
 	fakeWatch := watch.NewFake()
 	clientset.PrependWatchReactor("pods", core.DefaultWatchReactor(fakeWatch, nil))
-	manager := NewJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	manager, sharedInformerFactory := newJobControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 	manager.podStoreSynced = alwaysReady
+	manager.jobStoreSynced = alwaysReady
 
 	// Put one job and one pod into the store
-	manager.jobStore.Store.Add(testJob)
+	sharedInformerFactory.Jobs().Informer().GetIndexer().Add(testJob)
 	received := make(chan struct{})
 	// The pod update sent through the fakeWatcher should figure out the managing job and
 	// send it into the syncHandler.
 	manager.syncHandler = func(key string) error {
-		obj, exists, err := manager.jobStore.Store.GetByKey(key)
-		if !exists || err != nil {
-			t.Errorf("Expected to find job under key %v", key)
-			close(received)
-			return nil
+		ns, name, err := cache.SplitMetaNamespaceKey(key)
+		if err != nil {
+			t.Errorf("Error getting namespace/name from key %v: %v", key, err)
 		}
-		job, ok := obj.(*batch.Job)
-		if !ok {
-			t.Errorf("unexpected type: %v %#v", reflect.TypeOf(obj), obj)
-			close(received)
-			return nil
+		job, err := manager.jobLister.Jobs(ns).Get(name)
+		if err != nil {
+			t.Errorf("Expected to find job under key %v: %v", key, err)
 		}
 		if !api.Semantic.DeepDerivative(job, testJob) {
 			t.Errorf("\nExpected %#v,\nbut got %#v", testJob, job)
@@ -693,7 +711,7 @@ func TestWatchPods(t *testing.T) {
 	// and make sure it hits the sync method for the right job.
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	go manager.internalPodInformer.Run(stopCh)
+	go sharedInformerFactory.Pods().Informer().Run(stopCh)
 	go wait.Until(manager.worker, 10*time.Millisecond, stopCh)
 
 	pods := newPodList(1, api.PodRunning, testJob)

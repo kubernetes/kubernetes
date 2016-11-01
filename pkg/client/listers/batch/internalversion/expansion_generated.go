@@ -18,10 +18,6 @@ limitations under the License.
 
 package internalversion
 
-type JobListerExpansion interface{}
-
-type JobNamespaceListerExpansion interface{}
-
 type ScheduledJobListerExpansion interface{}
 
 type ScheduledJobNamespaceListerExpansion interface{}
