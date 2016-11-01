@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -72,6 +73,7 @@ func TestCORSAllowedOrigins(t *testing.T) {
 			if response.Header.Get("Access-Control-Allow-Methods") == "" {
 				t.Errorf("Expected Access-Control-Allow-Methods header to be set")
 			}
+
 			if response.Header.Get("Access-Control-Expose-Headers") != "Date" {
 				t.Errorf("Expected Date in Access-Control-Expose-Headers header")
 			}
@@ -91,9 +93,66 @@ func TestCORSAllowedOrigins(t *testing.T) {
 			if response.Header.Get("Access-Control-Allow-Methods") != "" {
 				t.Errorf("Expected Access-Control-Allow-Methods header to not be set")
 			}
+
 			if response.Header.Get("Access-Control-Expose-Headers") == "Date" {
 				t.Errorf("Expected Date in Access-Control-Expose-Headers header")
 			}
 		}
 	}
+}
+
+func TestCORSAllowedMethods(t *testing.T) {
+	tests := []struct {
+		allowedMethods []string
+		method         string
+		allowed        bool
+	}{
+		{nil, "POST", true},
+		{nil, "GET", true},
+		{nil, "OPTIONS", true},
+		{nil, "PUT", true},
+		{nil, "DELETE", true},
+		{nil, "PATCH", true},
+		{[]string{"GET", "POST"}, "PATCH", false},
+	}
+
+	allowsMethod := func(res *http.Response, method string) bool {
+		allowedMethods := strings.Split(res.Header.Get("Access-Control-Allow-Methods"), ",")
+		for _, allowedMethod := range allowedMethods {
+			if strings.TrimSpace(allowedMethod) == method {
+				return true
+			}
+		}
+		return false
+	}
+
+	for _, test := range tests {
+		handler := WithCORS(
+			http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}),
+			[]string{".*"}, test.allowedMethods, nil, nil, "true",
+		)
+		server := httptest.NewServer(handler)
+		defer server.Close()
+		client := http.Client{}
+
+		request, err := http.NewRequest(test.method, server.URL+"/version", nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		request.Header.Set("Origin", "allowed.com")
+
+		response, err := client.Do(request)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		methodAllowed := allowsMethod(response, test.method)
+		switch {
+		case test.allowed && !methodAllowed:
+			t.Errorf("Expected %v to be allowed, Got only %#v", test.method, response.Header.Get("Access-Control-Allow-Methods"))
+		case !test.allowed && methodAllowed:
+			t.Errorf("Unexpected allowed method %v, Expected only %#v", test.method, response.Header.Get("Access-Control-Allow-Methods"))
+		}
+	}
+
 }
