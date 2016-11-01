@@ -120,7 +120,6 @@ go_test(
         "//pkg/registry/registrytest:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/storage/etcd/testing:go_default_library",
-        "//pkg/util/intstr:go_default_library",
         "//pkg/util/net:go_default_library",
         "//pkg/util/sets:go_default_library",
         "//pkg/version:go_default_library",

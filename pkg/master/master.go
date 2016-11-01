@@ -69,7 +69,7 @@ import (
 const (
 	// DefaultEndpointReconcilerInterval is the default amount of time for how often the endpoints for
 	// the kubernetes Service are reconciled.
-	DefaultEndpointReconcilerInterval = 10 * time.Second
+	DefaultEndpointReconcilerInterval = 5 * time.Second
 )
 
 type Config struct {
@@ -177,7 +177,7 @@ func (c *Config) Complete() completedConfig {
 	if c.EndpointReconcilerConfig.Reconciler == nil {
 		// use a default endpoint reconciler if nothing is set
 		endpointClient := coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-		c.EndpointReconcilerConfig.Reconciler = NewMasterCountEndpointReconciler(c.MasterCount, endpointClient)
+		c.EndpointReconcilerConfig.Reconciler = NewDynamicEndpointReconciler(endpointClient, endpointClient)
 	}
 
 	// this has always been hardcoded true in the past
