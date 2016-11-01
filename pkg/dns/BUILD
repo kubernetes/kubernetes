@@ -15,7 +15,6 @@ go_library(
     srcs = [
         "dns.go",
         "doc.go",
-        "treecache.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -24,6 +23,7 @@ go_library(
         "//pkg/api/unversioned:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
+        "//pkg/dns/treecache:go_default_library",
         "//pkg/dns/util:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/util/validation:go_default_library",
@@ -47,6 +47,7 @@ go_test(
         "//pkg/api/unversioned:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
+        "//pkg/dns/treecache:go_default_library",
         "//pkg/dns/util:go_default_library",
         "//pkg/util/sets:go_default_library",
         "//vendor:github.com/coreos/etcd/client",
