@@ -205,6 +205,7 @@ const (
 	SecretForDockerRegistryV1GeneratorName      = "secret-for-docker-registry/v1"
 	SecretForTLSV1GeneratorName                 = "secret-for-tls/v1"
 	ConfigMapV1GeneratorName                    = "configmap/v1"
+	ClusterV1Beta1GeneratorName                 = "cluster/v1beta1"
 )
 
 // DefaultGenerators returns the set of default generators for use in Factory instances
