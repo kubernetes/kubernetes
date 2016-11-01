@@ -33,9 +33,9 @@ type FakeCronJobs struct {
 
 var cronjobsResource = unversioned.GroupVersionResource{Group: "batch", Version: "", Resource: "cronjobs"}
 
-func (c *FakeCronJobs) Create(scheduledJob *batch.CronJob) (result *batch.CronJob, err error) {
+func (c *FakeCronJobs) Create(cronJob *batch.CronJob) (result *batch.CronJob, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewCreateAction(cronjobsResource, c.ns, scheduledJob), &batch.CronJob{})
+		Invokes(core.NewCreateAction(cronjobsResource, c.ns, cronJob), &batch.CronJob{})
 
 	if obj == nil {
 		return nil, err
@@ -43,9 +43,9 @@ func (c *FakeCronJobs) Create(scheduledJob *batch.CronJob) (result *batch.CronJo
 	return obj.(*batch.CronJob), err
 }
 
-func (c *FakeCronJobs) Update(scheduledJob *batch.CronJob) (result *batch.CronJob, err error) {
+func (c *FakeCronJobs) Update(cronJob *batch.CronJob) (result *batch.CronJob, err error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateAction(cronjobsResource, c.ns, scheduledJob), &batch.CronJob{})
+		Invokes(core.NewUpdateAction(cronjobsResource, c.ns, cronJob), &batch.CronJob{})
 
 	if obj == nil {
 		return nil, err
@@ -53,9 +53,9 @@ func (c *FakeCronJobs) Update(scheduledJob *batch.CronJob) (result *batch.CronJo
 	return obj.(*batch.CronJob), err
 }
 
-func (c *FakeCronJobs) UpdateStatus(scheduledJob *batch.CronJob) (*batch.CronJob, error) {
+func (c *FakeCronJobs) UpdateStatus(cronJob *batch.CronJob) (*batch.CronJob, error) {
 	obj, err := c.Fake.
-		Invokes(core.NewUpdateSubresourceAction(cronjobsResource, "status", c.ns, scheduledJob), &batch.CronJob{})
+		Invokes(core.NewUpdateSubresourceAction(cronjobsResource, "status", c.ns, cronJob), &batch.CronJob{})
 
 	if obj == nil {
 		return nil, err
@@ -108,14 +108,14 @@ func (c *FakeCronJobs) List(opts api.ListOptions) (result *batch.CronJobList, er
 	return list, err
 }
 
-// Watch returns a watch.Interface that watches the requested scheduledJobs.
+// Watch returns a watch.Interface that watches the requested cronJobs.
 func (c *FakeCronJobs) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(cronjobsResource, c.ns, opts))
 
 }
 
-// Patch applies the patch and returns the patched scheduledJob.
+// Patch applies the patch and returns the patched cronJob.
 func (c *FakeCronJobs) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *batch.CronJob, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewPatchSubresourceAction(cronjobsResource, c.ns, name, data, subresources...), &batch.CronJob{})
