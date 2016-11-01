@@ -486,7 +486,7 @@ func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string,
 }
 
 // Creates a PV, PVC, and ClientPod that will run until killed by test or clean up.
-func initializeTestSpec(c clientset.Interface, ns string, pvConfig persistentVolumeConfig, isPrebound bool) (*api.Pod, *api.PersistentVolume, *api.PersistentVolumeClaim) {
+func initializeGCETestSpec(c clientset.Interface, ns string, pvConfig persistentVolumeConfig, isPrebound bool) (*api.Pod, *api.PersistentVolume, *api.PersistentVolumeClaim) {
 	By("Creating the PV and PVC")
 	pv, pvc := createPVPVC(c, pvConfig, ns, isPrebound)
 	waitOnPVandPVC(c, ns, pv, pvc)
@@ -712,7 +712,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 		// Attach a persistent disk to a pod using a PVC.
 		// Delete the PVC and then the pod.  Expect the pod to succeed in unmounting and detaching PD on delete.
 		It("should test that deleting a PVC before the pod does not cause pod deletion to fail on PD detach", func() {
-			clientPod, pv, pvc = initializeTestSpec(c, ns, pvConfig, false)
+			clientPod, pv, pvc = initializeGCETestSpec(c, ns, pvConfig, false)
 			node := types.NodeName(clientPod.Spec.NodeName)
 
 			By("Deleting the Claim")
@@ -730,7 +730,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 		// Attach a persistent disk to a pod using a PVC.
 		// Delete the PV and then the pod.  Expect the pod to succeed in unmounting and detaching PD on delete.
 		It("should test that deleting the PV before the pod does not cause pod deletion to fail on PD detach", func() {
-			clientPod, pv, pvc = initializeTestSpec(c, ns, pvConfig, false)
+			clientPod, pv, pvc = initializeGCETestSpec(c, ns, pvConfig, false)
 			node := types.NodeName(clientPod.Spec.NodeName)
 
 			By("Deleting the Persistent Volume")
@@ -747,7 +747,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 
 		// Test that a Pod and PVC attached to a GCEPD successfully unmounts and detaches when the encompassing Namespace is deleted.
 		It("should test that deleting the Namespace of a PVC and Pod causes the successful detach of Persistent Disk", func() {
-			clientPod, pv, pvc = initializeTestSpec(c, ns, pvConfig, false)
+			clientPod, pv, pvc = initializeGCETestSpec(c, ns, pvConfig, false)
 			node := types.NodeName(clientPod.Spec.NodeName)
 
 			By("Deleting the Namespace")
