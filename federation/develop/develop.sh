@@ -117,7 +117,7 @@ function build_image() {
     make -C "${KUBE_ROOT}/cluster/images/hyperkube" build
 }
 
-function push() {
+function get_version() {
   local kube_version=""
   if [[ -n "${KUBE_VERSION:-}" ]]; then
     kube_version="${KUBE_VERSION}"
@@ -125,6 +125,11 @@ function push() {
     # Read the version back from the versions file if no version is given.
     kube_version="$(jq -r '.KUBE_VERSION' ${VERSIONS_FILE})"
   fi
+  echo "${kube_version}"
+}
+
+function push() {
+  local -r kube_version="$(get_version)"
 
   kube::log::status "Pushing hyperkube image to the registry"
   gcloud docker -- push "${KUBE_REGISTRY}/hyperkube-amd64:${kube_version}"
