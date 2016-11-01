@@ -46,7 +46,7 @@ func TestDeleteContext(t *testing.T) {
 		config:           conf,
 		contextToDelete:  "minikube",
 		expectedContexts: []string{"otherkube"},
-		expectedOut:      "deleted context minikube from %s",
+		expectedOut:      "deleted context minikube from %s\n",
 	}
 
 	test.run(t)
