@@ -38,6 +38,7 @@ import (
 type ResumeConfig struct {
 	resource.FilenameOptions
 
+	f       cmdutil.Factory
 	Resumer func(object *resource.Info) (bool, error)
 	Mapper  meta.RESTMapper
 	Typer   runtime.ObjectTyper
@@ -97,6 +98,7 @@ func (o *ResumeConfig) CompleteResume(f cmdutil.Factory, cmd *cobra.Command, out
 		return cmdutil.UsageError(cmd, cmd.Use)
 	}
 
+	o.f = f
 	o.Mapper, o.Typer = f.Object()
 	o.Encoder = f.JSONEncoder()
 
@@ -136,7 +138,7 @@ func (o *ResumeConfig) CompleteResume(f cmdutil.Factory, cmd *cobra.Command, out
 
 func (o ResumeConfig) RunResume() error {
 	allErrs := []error{}
-	for _, patch := range set.CalculatePatches(o.Infos, o.Encoder, o.Resumer) {
+	for _, patch := range set.CalculatePatches(o.f, o.Infos, o.Encoder, false, o.Resumer) {
 		info := patch.Info
 
 		if patch.Err != nil {
