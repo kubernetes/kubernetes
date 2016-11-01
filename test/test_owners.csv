@@ -315,6 +315,15 @@ Pet Store should scale to persist a nominal number ( * ) of transactions in * se
 Pet set recreate should recreate evicted statefulset,roberthbailey,1
 "Pod Disks Should schedule a pod w/ a RW PD, gracefully remove it, then schedule it on another host",alex-mohr,1
 "Pod Disks Should schedule a pod w/ a readonly PD on two hosts, then remove both gracefully.",ghodss,1
+Pet set recreate should recreate evicted petset,hurf,1
+PetSet Basic PetSet functionality should handle healthy pet restarts during scale,kevin-wangzefeng,1
+PetSet Basic PetSet functionality should provide basic identity,girishkalele,1
+PetSet Deploy clustered applications should creating a working mysql cluster,piosz,1
+PetSet Deploy clustered applications should creating a working redis cluster,mtaufen,1
+PetSet Deploy clustered applications should creating a working zookeeper cluster,rmmh,1
+"Pod Disks Should schedule a pod w/ a RW PD, gracefully remove it, then schedule it on another host",saad-ali,0
+"Pod Disks Should schedule a pod w/ a readonly PD on two hosts, then remove both gracefully.",saad-ali,0
+Pod Disks should be able to detach from a node which was deleted,rkouj,1
 "Pod Disks should schedule a pod w/ a RW PD shared between multiple containers, write to PD, delete pod, verify contents, and repeat in rapid succession",saad-ali,0
 "Pod Disks should schedule a pod w/ a RW PD, ungracefully remove it, then schedule it on another host",mml,1
 "Pod Disks should schedule a pod w/ a readonly PD on two hosts, then remove both ungracefully.",saad-ali,1
@@ -468,6 +477,7 @@ Volumes GlusterFS should be mountable,eparis,1
 Volumes NFS should be mountable,andyzheng0831,1
 Volumes PD should be mountable,caesarxuchao,1
 Volumes iSCSI should be mountable,jsafrane,1
+k8s.io/kubernetes/_output/release-stage/full/kubernetes/examples,rkouj,1
 k8s.io/kubernetes/cmd/genutils,rmmh,1
 k8s.io/kubernetes/cmd/hyperkube,jbeda,0
 k8s.io/kubernetes/cmd/kube-apiserver/app,nikhiljindal,0
@@ -657,6 +667,7 @@ k8s.io/kubernetes/pkg/kubelet/rkt,apelisse,1
 k8s.io/kubernetes/pkg/kubelet/rktshim,mml,1
 k8s.io/kubernetes/pkg/kubelet/server,timstclair,0
 k8s.io/kubernetes/pkg/kubelet/server/portforward,caesarxuchao,1
+k8s.io/kubernetes/pkg/kubelet/server/portforward,rkouj,1
 k8s.io/kubernetes/pkg/kubelet/server/stats,timstclair,0
 k8s.io/kubernetes/pkg/kubelet/server/streaming,caesarxuchao,1
 k8s.io/kubernetes/pkg/kubelet/status,mwielgus,1
