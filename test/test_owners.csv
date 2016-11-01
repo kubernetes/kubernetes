@@ -686,6 +686,7 @@ k8s.io/kubernetes/pkg/registry/core/podtemplate,thockin,1
 k8s.io/kubernetes/pkg/registry/core/podtemplate/etcd,brendandburns,1
 k8s.io/kubernetes/pkg/registry/core/resourcequota,vulpecula,1
 k8s.io/kubernetes/pkg/registry/core/resourcequota/etcd,ghodss,1
+k8s.io/kubernetes/pkg/registry/core/rest,deads2k,0
 k8s.io/kubernetes/pkg/registry/core/secret,jdef,1
 k8s.io/kubernetes/pkg/registry/core/secret/etcd,freehan,1
 k8s.io/kubernetes/pkg/registry/core/service,madhusudancs,1
