@@ -862,6 +862,142 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{},
 	},
+	"batch.CronJob": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CronJob represents the configuration of a single cron job.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+							Ref:         spec.MustCreateRef("#/definitions/api.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Spec is a structure defining the expected behavior of a job, including the schedule. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+							Ref:         spec.MustCreateRef("#/definitions/batch.CronJobSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status is a structure describing current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+							Ref:         spec.MustCreateRef("#/definitions/batch.CronJobStatus"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"api.ObjectMeta", "batch.CronJobSpec", "batch.CronJobStatus"},
+	},
+	"batch.CronJobList": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CronJobList is a collection of cron jobs.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Items is the list of CronJob.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/batch.CronJob"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"batch.CronJob", "unversioned.ListMeta"},
+	},
+	"batch.CronJobSpec": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CronJobSpec describes how the job execution will look like and when it will actually run.",
+				Properties: map[string]spec.Schema{
+					"schedule": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Schedule contains the schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"startingDeadlineSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Optional deadline in seconds for starting the job if it misses scheduled time for any reason.  Missed jobs executions will be counted as failed ones.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"concurrencyPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ConcurrencyPolicy specifies how to treat concurrent executions of a Job.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"suspend": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Suspend flag tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"jobTemplate": {
+						SchemaProps: spec.SchemaProps{
+							Description: "JobTemplate is the object that describes the job that will be created when executing a CronJob.",
+							Ref:         spec.MustCreateRef("#/definitions/batch.JobTemplateSpec"),
+						},
+					},
+				},
+				Required: []string{"schedule", "jobTemplate"},
+			},
+		},
+		Dependencies: []string{
+			"batch.JobTemplateSpec"},
+	},
+	"batch.CronJobStatus": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CronJobStatus represents the current state of a cron job.",
+				Properties: map[string]spec.Schema{
+					"active": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Active holds pointers to currently running jobs.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/api.ObjectReference"),
+									},
+								},
+							},
+						},
+					},
+					"lastScheduleTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "LastScheduleTime keeps information of when was the last time the job was successfully scheduled.",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.Time"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"api.ObjectReference", "unversioned.Time"},
+	},
 	"batch.Job": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -1128,142 +1264,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{
 			"api.ObjectMeta", "batch.JobSpec"},
-	},
-	"batch.ScheduledJob": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ScheduledJob represents the configuration of a single scheduled job.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/api.ObjectMeta"),
-						},
-					},
-					"spec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Spec is a structure defining the expected behavior of a job, including the schedule. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-							Ref:         spec.MustCreateRef("#/definitions/batch.ScheduledJobSpec"),
-						},
-					},
-					"status": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Status is a structure describing current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-							Ref:         spec.MustCreateRef("#/definitions/batch.ScheduledJobStatus"),
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"api.ObjectMeta", "batch.ScheduledJobSpec", "batch.ScheduledJobStatus"},
-	},
-	"batch.ScheduledJobList": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ScheduledJobList is a collection of scheduled jobs.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/unversioned.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Items is the list of ScheduledJob.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/batch.ScheduledJob"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-		},
-		Dependencies: []string{
-			"batch.ScheduledJob", "unversioned.ListMeta"},
-	},
-	"batch.ScheduledJobSpec": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ScheduledJobSpec describes how the job execution will look like and when it will actually run.",
-				Properties: map[string]spec.Schema{
-					"schedule": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Schedule contains the schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"startingDeadlineSeconds": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Optional deadline in seconds for starting the job if it misses scheduled time for any reason.  Missed jobs executions will be counted as failed ones.",
-							Type:        []string{"integer"},
-							Format:      "int64",
-						},
-					},
-					"concurrencyPolicy": {
-						SchemaProps: spec.SchemaProps{
-							Description: "ConcurrencyPolicy specifies how to treat concurrent executions of a Job.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"suspend": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Suspend flag tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"jobTemplate": {
-						SchemaProps: spec.SchemaProps{
-							Description: "JobTemplate is the object that describes the job that will be created when executing a ScheduledJob.",
-							Ref:         spec.MustCreateRef("#/definitions/batch.JobTemplateSpec"),
-						},
-					},
-				},
-				Required: []string{"schedule", "jobTemplate"},
-			},
-		},
-		Dependencies: []string{
-			"batch.JobTemplateSpec"},
-	},
-	"batch.ScheduledJobStatus": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ScheduledJobStatus represents the current state of a Job.",
-				Properties: map[string]spec.Schema{
-					"active": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Active holds pointers to currently running jobs.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/api.ObjectReference"),
-									},
-								},
-							},
-						},
-					},
-					"lastScheduleTime": {
-						SchemaProps: spec.SchemaProps{
-							Description: "LastScheduleTime keeps information of when was the last time the job was successfully scheduled.",
-							Ref:         spec.MustCreateRef("#/definitions/unversioned.Time"),
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"api.ObjectReference", "unversioned.Time"},
 	},
 	"certificates.CertificateSigningRequest": {
 		Schema: spec.Schema{
@@ -18387,6 +18387,142 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{},
 	},
+	"v2alpha1.CronJob": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CronJob represents the configuration of a single cron job.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Spec is a structure defining the expected behavior of a job, including the schedule. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.CronJobSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status is a structure describing current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
+							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.CronJobStatus"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"v1.ObjectMeta", "v2alpha1.CronJobSpec", "v2alpha1.CronJobStatus"},
+	},
+	"v2alpha1.CronJobList": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CronJobList is a collection of cron jobs.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Items is the list of CronJob.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/v2alpha1.CronJob"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"unversioned.ListMeta", "v2alpha1.CronJob"},
+	},
+	"v2alpha1.CronJobSpec": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CronJobSpec describes how the job execution will look like and when it will actually run.",
+				Properties: map[string]spec.Schema{
+					"schedule": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Schedule contains the schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"startingDeadlineSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Optional deadline in seconds for starting the job if it misses scheduled time for any reason.  Missed jobs executions will be counted as failed ones.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"concurrencyPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ConcurrencyPolicy specifies how to treat concurrent executions of a Job.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"suspend": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Suspend flag tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"jobTemplate": {
+						SchemaProps: spec.SchemaProps{
+							Description: "JobTemplate is the object that describes the job that will be created when executing a CronJob.",
+							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.JobTemplateSpec"),
+						},
+					},
+				},
+				Required: []string{"schedule", "jobTemplate"},
+			},
+		},
+		Dependencies: []string{
+			"v2alpha1.JobTemplateSpec"},
+	},
+	"v2alpha1.CronJobStatus": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CronJobStatus represents the current state of a cron job.",
+				Properties: map[string]spec.Schema{
+					"active": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Active holds pointers to currently running jobs.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/v1.ObjectReference"),
+									},
+								},
+							},
+						},
+					},
+					"lastScheduleTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "LastScheduleTime keeps information of when was the last time the job was successfully scheduled.",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.Time"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"unversioned.Time", "v1.ObjectReference"},
+	},
 	"v2alpha1.Job": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -18653,142 +18789,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{
 			"v1.ObjectMeta", "v2alpha1.JobSpec"},
-	},
-	"v2alpha1.ScheduledJob": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ScheduledJob represents the configuration of a single scheduled job.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
-						},
-					},
-					"spec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Spec is a structure defining the expected behavior of a job, including the schedule. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.ScheduledJobSpec"),
-						},
-					},
-					"status": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Status is a structure describing current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
-							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.ScheduledJobStatus"),
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.ObjectMeta", "v2alpha1.ScheduledJobSpec", "v2alpha1.ScheduledJobStatus"},
-	},
-	"v2alpha1.ScheduledJobList": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ScheduledJobList is a collection of scheduled jobs.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
-							Ref:         spec.MustCreateRef("#/definitions/unversioned.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Items is the list of ScheduledJob.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v2alpha1.ScheduledJob"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-		},
-		Dependencies: []string{
-			"unversioned.ListMeta", "v2alpha1.ScheduledJob"},
-	},
-	"v2alpha1.ScheduledJobSpec": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ScheduledJobSpec describes how the job execution will look like and when it will actually run.",
-				Properties: map[string]spec.Schema{
-					"schedule": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Schedule contains the schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"startingDeadlineSeconds": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Optional deadline in seconds for starting the job if it misses scheduled time for any reason.  Missed jobs executions will be counted as failed ones.",
-							Type:        []string{"integer"},
-							Format:      "int64",
-						},
-					},
-					"concurrencyPolicy": {
-						SchemaProps: spec.SchemaProps{
-							Description: "ConcurrencyPolicy specifies how to treat concurrent executions of a Job.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"suspend": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Suspend flag tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"jobTemplate": {
-						SchemaProps: spec.SchemaProps{
-							Description: "JobTemplate is the object that describes the job that will be created when executing a ScheduledJob.",
-							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.JobTemplateSpec"),
-						},
-					},
-				},
-				Required: []string{"schedule", "jobTemplate"},
-			},
-		},
-		Dependencies: []string{
-			"v2alpha1.JobTemplateSpec"},
-	},
-	"v2alpha1.ScheduledJobStatus": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ScheduledJobStatus represents the current state of a Job.",
-				Properties: map[string]spec.Schema{
-					"active": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Active holds pointers to currently running jobs.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1.ObjectReference"),
-									},
-								},
-							},
-						},
-					},
-					"lastScheduleTime": {
-						SchemaProps: spec.SchemaProps{
-							Description: "LastScheduleTime keeps information of when was the last time the job was successfully scheduled.",
-							Ref:         spec.MustCreateRef("#/definitions/unversioned.Time"),
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"unversioned.Time", "v1.ObjectReference"},
 	},
 	"version.Info": {
 		Schema: spec.Schema{

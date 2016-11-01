@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	certcontroller "k8s.io/kubernetes/pkg/controller/certificates"
+	"k8s.io/kubernetes/pkg/controller/cronjob"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/deployment"
 	"k8s.io/kubernetes/pkg/controller/disruption"
@@ -65,7 +66,6 @@ import (
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
 	routecontroller "k8s.io/kubernetes/pkg/controller/route"
-	"k8s.io/kubernetes/pkg/controller/scheduledjob"
 	servicecontroller "k8s.io/kubernetes/pkg/controller/service"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
@@ -466,11 +466,11 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 	resources, found = resourceMap[groupVersion]
 	if containsVersion(versions, groupVersion) && found {
 		glog.Infof("Starting %s apis", groupVersion)
-		if containsResource(resources, "scheduledjobs") {
-			glog.Infof("Starting scheduledjob controller")
+		if containsResource(resources, "cronjobs") {
+			glog.Infof("Starting cronjob controller")
 			// // TODO: this is a temp fix for allowing kubeClient list v2alpha1 sj, should switch to using clientset
 			kubeconfig.ContentConfig.GroupVersion = &unversioned.GroupVersion{Group: batch.GroupName, Version: "v2alpha1"}
-			go scheduledjob.NewScheduledJobController(client("scheduledjob-controller")).
+			go cronjob.NewCronJobController(client("cronjob-controller")).
 				Run(wait.NeverStop)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))

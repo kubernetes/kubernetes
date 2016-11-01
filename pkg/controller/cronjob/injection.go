@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduledjob
+package cronjob
 
 import (
 	"fmt"
@@ -27,10 +27,10 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 )
 
-// sjControlInterface is an interface that knows how to update ScheduledJob status
+// sjControlInterface is an interface that knows how to update CronJob status
 // created as an interface to allow testing.
 type sjControlInterface interface {
-	UpdateStatus(sj *batch.ScheduledJob) (*batch.ScheduledJob, error)
+	UpdateStatus(sj *batch.CronJob) (*batch.CronJob, error)
 }
 
 // realSJControl is the default implementation of sjControlInterface.
@@ -40,18 +40,18 @@ type realSJControl struct {
 
 var _ sjControlInterface = &realSJControl{}
 
-func (c *realSJControl) UpdateStatus(sj *batch.ScheduledJob) (*batch.ScheduledJob, error) {
-	return c.KubeClient.Batch().ScheduledJobs(sj.Namespace).UpdateStatus(sj)
+func (c *realSJControl) UpdateStatus(sj *batch.CronJob) (*batch.CronJob, error) {
+	return c.KubeClient.Batch().CronJobs(sj.Namespace).UpdateStatus(sj)
 }
 
 // fakeSJControl is the default implementation of sjControlInterface.
 type fakeSJControl struct {
-	Updates []batch.ScheduledJob
+	Updates []batch.CronJob
 }
 
 var _ sjControlInterface = &fakeSJControl{}
 
-func (c *fakeSJControl) UpdateStatus(sj *batch.ScheduledJob) (*batch.ScheduledJob, error) {
+func (c *fakeSJControl) UpdateStatus(sj *batch.CronJob) (*batch.CronJob, error) {
 	c.Updates = append(c.Updates, *sj)
 	return sj, nil
 }

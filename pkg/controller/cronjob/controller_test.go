@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduledjob
+package cronjob
 
 import (
 	"testing"
@@ -72,17 +72,17 @@ func justAfterThePriorHour() time.Time {
 	return T1
 }
 
-// returns a scheduledJob with some fields filled in.
-func scheduledJob() batch.ScheduledJob {
-	return batch.ScheduledJob{
+// returns a cronJob with some fields filled in.
+func cronJob() batch.CronJob {
+	return batch.CronJob{
 		ObjectMeta: api.ObjectMeta{
-			Name:              "myscheduledjob",
+			Name:              "mycronjob",
 			Namespace:         "snazzycats",
 			UID:               types.UID("1a2b3c"),
-			SelfLink:          "/apis/batch/v2alpha1/namespaces/snazzycats/scheduledjobs/myscheduledjob",
+			SelfLink:          "/apis/batch/v2alpha1/namespaces/snazzycats/cronjobs/mycronjob",
 			CreationTimestamp: unversioned.Time{Time: justBeforeTheHour()},
 		},
-		Spec: batch.ScheduledJobSpec{
+		Spec: batch.CronJobSpec{
 			Schedule:          "* * * * ?",
 			ConcurrencyPolicy: batch.AllowConcurrent,
 			JobTemplate: batch.JobTemplateSpec{
@@ -190,7 +190,7 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 		"still active, is time, not past deadline": {A, F, onTheHour, longDead, T, T, justAfterTheHour(), T, F, 2},
 	}
 	for name, tc := range testCases {
-		sj := scheduledJob()
+		sj := cronJob()
 		sj.Spec.ConcurrencyPolicy = tc.concurrencyPolicy
 		sj.Spec.Suspend = &tc.suspend
 		sj.Spec.Schedule = tc.schedule
@@ -338,7 +338,7 @@ func TestSyncOne_Status(t *testing.T) {
 
 	for name, tc := range testCases {
 		// Setup the test
-		sj := scheduledJob()
+		sj := cronJob()
 		sj.Spec.ConcurrencyPolicy = tc.concurrencyPolicy
 		sj.Spec.Suspend = &tc.suspend
 		sj.Spec.Schedule = tc.schedule

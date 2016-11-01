@@ -32,10 +32,10 @@ limitations under the License.
 		JobStatus
 		JobTemplate
 		JobTemplateSpec
-		ScheduledJob
-		ScheduledJobList
-		ScheduledJobSpec
-		ScheduledJobStatus
+		CronJob
+		CronJobList
+		CronJobSpec
+		CronJobStatus
 */
 package v2alpha1
 
@@ -88,21 +88,21 @@ func (m *JobTemplateSpec) Reset()                    { *m = JobTemplateSpec{} }
 func (*JobTemplateSpec) ProtoMessage()               {}
 func (*JobTemplateSpec) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{6} }
 
-func (m *ScheduledJob) Reset()                    { *m = ScheduledJob{} }
-func (*ScheduledJob) ProtoMessage()               {}
-func (*ScheduledJob) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{7} }
+func (m *CronJob) Reset()                    { *m = CronJob{} }
+func (*CronJob) ProtoMessage()               {}
+func (*CronJob) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{7} }
 
-func (m *ScheduledJobList) Reset()                    { *m = ScheduledJobList{} }
-func (*ScheduledJobList) ProtoMessage()               {}
-func (*ScheduledJobList) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{8} }
+func (m *CronJobList) Reset()                    { *m = CronJobList{} }
+func (*CronJobList) ProtoMessage()               {}
+func (*CronJobList) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{8} }
 
-func (m *ScheduledJobSpec) Reset()                    { *m = ScheduledJobSpec{} }
-func (*ScheduledJobSpec) ProtoMessage()               {}
-func (*ScheduledJobSpec) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{9} }
+func (m *CronJobSpec) Reset()                    { *m = CronJobSpec{} }
+func (*CronJobSpec) ProtoMessage()               {}
+func (*CronJobSpec) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{9} }
 
-func (m *ScheduledJobStatus) Reset()                    { *m = ScheduledJobStatus{} }
-func (*ScheduledJobStatus) ProtoMessage()               {}
-func (*ScheduledJobStatus) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{10} }
+func (m *CronJobStatus) Reset()                    { *m = CronJobStatus{} }
+func (*CronJobStatus) ProtoMessage()               {}
+func (*CronJobStatus) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{10} }
 
 func init() {
 	proto.RegisterType((*Job)(nil), "k8s.io.kubernetes.pkg.apis.batch.v2alpha1.Job")
@@ -112,10 +112,10 @@ func init() {
 	proto.RegisterType((*JobStatus)(nil), "k8s.io.kubernetes.pkg.apis.batch.v2alpha1.JobStatus")
 	proto.RegisterType((*JobTemplate)(nil), "k8s.io.kubernetes.pkg.apis.batch.v2alpha1.JobTemplate")
 	proto.RegisterType((*JobTemplateSpec)(nil), "k8s.io.kubernetes.pkg.apis.batch.v2alpha1.JobTemplateSpec")
-	proto.RegisterType((*ScheduledJob)(nil), "k8s.io.kubernetes.pkg.apis.batch.v2alpha1.ScheduledJob")
-	proto.RegisterType((*ScheduledJobList)(nil), "k8s.io.kubernetes.pkg.apis.batch.v2alpha1.ScheduledJobList")
-	proto.RegisterType((*ScheduledJobSpec)(nil), "k8s.io.kubernetes.pkg.apis.batch.v2alpha1.ScheduledJobSpec")
-	proto.RegisterType((*ScheduledJobStatus)(nil), "k8s.io.kubernetes.pkg.apis.batch.v2alpha1.ScheduledJobStatus")
+	proto.RegisterType((*CronJob)(nil), "k8s.io.kubernetes.pkg.apis.batch.v2alpha1.CronJob")
+	proto.RegisterType((*CronJobList)(nil), "k8s.io.kubernetes.pkg.apis.batch.v2alpha1.CronJobList")
+	proto.RegisterType((*CronJobSpec)(nil), "k8s.io.kubernetes.pkg.apis.batch.v2alpha1.CronJobSpec")
+	proto.RegisterType((*CronJobStatus)(nil), "k8s.io.kubernetes.pkg.apis.batch.v2alpha1.CronJobStatus")
 }
 func (m *Job) Marshal() (data []byte, err error) {
 	size := m.Size()
@@ -435,7 +435,7 @@ func (m *JobTemplateSpec) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *ScheduledJob) Marshal() (data []byte, err error) {
+func (m *CronJob) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
 	n, err := m.MarshalTo(data)
@@ -445,7 +445,7 @@ func (m *ScheduledJob) Marshal() (data []byte, err error) {
 	return data[:n], nil
 }
 
-func (m *ScheduledJob) MarshalTo(data []byte) (int, error) {
+func (m *CronJob) MarshalTo(data []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -477,7 +477,7 @@ func (m *ScheduledJob) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *ScheduledJobList) Marshal() (data []byte, err error) {
+func (m *CronJobList) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
 	n, err := m.MarshalTo(data)
@@ -487,7 +487,7 @@ func (m *ScheduledJobList) Marshal() (data []byte, err error) {
 	return data[:n], nil
 }
 
-func (m *ScheduledJobList) MarshalTo(data []byte) (int, error) {
+func (m *CronJobList) MarshalTo(data []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -515,7 +515,7 @@ func (m *ScheduledJobList) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *ScheduledJobSpec) Marshal() (data []byte, err error) {
+func (m *CronJobSpec) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
 	n, err := m.MarshalTo(data)
@@ -525,7 +525,7 @@ func (m *ScheduledJobSpec) Marshal() (data []byte, err error) {
 	return data[:n], nil
 }
 
-func (m *ScheduledJobSpec) MarshalTo(data []byte) (int, error) {
+func (m *CronJobSpec) MarshalTo(data []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -564,7 +564,7 @@ func (m *ScheduledJobSpec) MarshalTo(data []byte) (int, error) {
 	return i, nil
 }
 
-func (m *ScheduledJobStatus) Marshal() (data []byte, err error) {
+func (m *CronJobStatus) Marshal() (data []byte, err error) {
 	size := m.Size()
 	data = make([]byte, size)
 	n, err := m.MarshalTo(data)
@@ -574,7 +574,7 @@ func (m *ScheduledJobStatus) Marshal() (data []byte, err error) {
 	return data[:n], nil
 }
 
-func (m *ScheduledJobStatus) MarshalTo(data []byte) (int, error) {
+func (m *CronJobStatus) MarshalTo(data []byte) (int, error) {
 	var i int
 	_ = i
 	var l int
@@ -742,7 +742,7 @@ func (m *JobTemplateSpec) Size() (n int) {
 	return n
 }
 
-func (m *ScheduledJob) Size() (n int) {
+func (m *CronJob) Size() (n int) {
 	var l int
 	_ = l
 	l = m.ObjectMeta.Size()
@@ -754,7 +754,7 @@ func (m *ScheduledJob) Size() (n int) {
 	return n
 }
 
-func (m *ScheduledJobList) Size() (n int) {
+func (m *CronJobList) Size() (n int) {
 	var l int
 	_ = l
 	l = m.ListMeta.Size()
@@ -768,7 +768,7 @@ func (m *ScheduledJobList) Size() (n int) {
 	return n
 }
 
-func (m *ScheduledJobSpec) Size() (n int) {
+func (m *CronJobSpec) Size() (n int) {
 	var l int
 	_ = l
 	l = len(m.Schedule)
@@ -786,7 +786,7 @@ func (m *ScheduledJobSpec) Size() (n int) {
 	return n
 }
 
-func (m *ScheduledJobStatus) Size() (n int) {
+func (m *CronJobStatus) Size() (n int) {
 	var l int
 	_ = l
 	if len(m.Active) > 0 {
@@ -905,34 +905,34 @@ func (this *JobTemplateSpec) String() string {
 	}, "")
 	return s
 }
-func (this *ScheduledJob) String() string {
+func (this *CronJob) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ScheduledJob{`,
+	s := strings.Join([]string{`&CronJob{`,
 		`ObjectMeta:` + strings.Replace(strings.Replace(this.ObjectMeta.String(), "ObjectMeta", "k8s_io_kubernetes_pkg_api_v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
-		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "ScheduledJobSpec", "ScheduledJobSpec", 1), `&`, ``, 1) + `,`,
-		`Status:` + strings.Replace(strings.Replace(this.Status.String(), "ScheduledJobStatus", "ScheduledJobStatus", 1), `&`, ``, 1) + `,`,
+		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "CronJobSpec", "CronJobSpec", 1), `&`, ``, 1) + `,`,
+		`Status:` + strings.Replace(strings.Replace(this.Status.String(), "CronJobStatus", "CronJobStatus", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *ScheduledJobList) String() string {
+func (this *CronJobList) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ScheduledJobList{`,
+	s := strings.Join([]string{`&CronJobList{`,
 		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
-		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "ScheduledJob", "ScheduledJob", 1), `&`, ``, 1) + `,`,
+		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "CronJob", "CronJob", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *ScheduledJobSpec) String() string {
+func (this *CronJobSpec) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ScheduledJobSpec{`,
+	s := strings.Join([]string{`&CronJobSpec{`,
 		`Schedule:` + fmt.Sprintf("%v", this.Schedule) + `,`,
 		`StartingDeadlineSeconds:` + valueToStringGenerated(this.StartingDeadlineSeconds) + `,`,
 		`ConcurrencyPolicy:` + fmt.Sprintf("%v", this.ConcurrencyPolicy) + `,`,
@@ -942,11 +942,11 @@ func (this *ScheduledJobSpec) String() string {
 	}, "")
 	return s
 }
-func (this *ScheduledJobStatus) String() string {
+func (this *CronJobStatus) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&ScheduledJobStatus{`,
+	s := strings.Join([]string{`&CronJobStatus{`,
 		`Active:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Active), "ObjectReference", "k8s_io_kubernetes_pkg_api_v1.ObjectReference", 1), `&`, ``, 1) + `,`,
 		`LastScheduleTime:` + strings.Replace(fmt.Sprintf("%v", this.LastScheduleTime), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1) + `,`,
 		`}`,
@@ -2056,7 +2056,7 @@ func (m *JobTemplateSpec) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *ScheduledJob) Unmarshal(data []byte) error {
+func (m *CronJob) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -2079,10 +2079,10 @@ func (m *ScheduledJob) Unmarshal(data []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: ScheduledJob: wiretype end group for non-group")
+			return fmt.Errorf("proto: CronJob: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ScheduledJob: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: CronJob: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -2196,7 +2196,7 @@ func (m *ScheduledJob) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *ScheduledJobList) Unmarshal(data []byte) error {
+func (m *CronJobList) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -2219,10 +2219,10 @@ func (m *ScheduledJobList) Unmarshal(data []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: ScheduledJobList: wiretype end group for non-group")
+			return fmt.Errorf("proto: CronJobList: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ScheduledJobList: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: CronJobList: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -2281,7 +2281,7 @@ func (m *ScheduledJobList) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Items = append(m.Items, ScheduledJob{})
+			m.Items = append(m.Items, CronJob{})
 			if err := m.Items[len(m.Items)-1].Unmarshal(data[iNdEx:postIndex]); err != nil {
 				return err
 			}
@@ -2307,7 +2307,7 @@ func (m *ScheduledJobList) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *ScheduledJobSpec) Unmarshal(data []byte) error {
+func (m *CronJobSpec) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -2330,10 +2330,10 @@ func (m *ScheduledJobSpec) Unmarshal(data []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: ScheduledJobSpec: wiretype end group for non-group")
+			return fmt.Errorf("proto: CronJobSpec: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ScheduledJobSpec: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: CronJobSpec: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -2486,7 +2486,7 @@ func (m *ScheduledJobSpec) Unmarshal(data []byte) error {
 	}
 	return nil
 }
-func (m *ScheduledJobStatus) Unmarshal(data []byte) error {
+func (m *CronJobStatus) Unmarshal(data []byte) error {
 	l := len(data)
 	iNdEx := 0
 	for iNdEx < l {
@@ -2509,10 +2509,10 @@ func (m *ScheduledJobStatus) Unmarshal(data []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: ScheduledJobStatus: wiretype end group for non-group")
+			return fmt.Errorf("proto: CronJobStatus: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ScheduledJobStatus: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: CronJobStatus: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:

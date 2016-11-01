@@ -26,10 +26,10 @@ type JobListerExpansion interface{}
 // JobNamespaeLister.
 type JobNamespaceListerExpansion interface{}
 
-// ScheduledJobListerExpansion allows custom methods to be added to
-// ScheduledJobLister.
-type ScheduledJobListerExpansion interface{}
+// CronJobListerExpansion allows custom methods to be added to
+// CronJobLister.
+type CronJobListerExpansion interface{}
 
-// ScheduledJobNamespaceListerExpansion allows custom methods to be added to
-// ScheduledJobNamespaeLister.
-type ScheduledJobNamespaceListerExpansion interface{}
+// CronJobNamespaceListerExpansion allows custom methods to be added to
+// CronJobNamespaeLister.
+type CronJobNamespaceListerExpansion interface{}
