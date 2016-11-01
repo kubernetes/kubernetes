@@ -38,8 +38,9 @@ const (
 )
 
 var (
-	CronJobGroupVersionResource = unversioned.GroupVersionResource{Group: batch.GroupName, Version: "v2alpha1", Resource: "cronjobs"}
-	BatchV2Alpha1GroupVersion   = unversioned.GroupVersion{Group: batch.GroupName, Version: "v2alpha1"}
+	CronJobGroupVersionResource      = unversioned.GroupVersionResource{Group: batch.GroupName, Version: "v2alpha1", Resource: "cronjobs"}
+	ScheduledJobGroupVersionResource = unversioned.GroupVersionResource{Group: batch.GroupName, Version: "v2alpha1", Resource: "scheduledjobs"}
+	BatchV2Alpha1GroupVersion        = unversioned.GroupVersion{Group: batch.GroupName, Version: "v2alpha1"}
 )
 
 var _ = framework.KubeDescribe("CronJob", func() {
