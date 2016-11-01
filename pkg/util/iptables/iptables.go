@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 
@@ -574,4 +575,257 @@ func IsNotFoundError(err error) bool {
 		return true
 	}
 	return false
+}
+
+type RuleOption struct {
+	Arg     string
+	Negated bool
+}
+
+type Rule struct {
+	Modules []string
+	Jump    Chain
+	Comment string
+	Options map[string]RuleOption
+}
+
+// Split a line into space-separated arguments, handling simple quoting
+func splitLine(line string) ([]string, error) {
+	items := strings.Split(line, " ")
+	args := make([]string, 0)
+	for i := 0; i < len(items); i++ {
+		if items[i] == "" {
+			continue
+		}
+
+		if !strings.HasPrefix(items[i], "\"") {
+			args = append(args, items[i])
+			continue
+		}
+
+		// combine until we find a closing quote
+		var arg string
+		items[i] = items[i][1:]
+		for j := i; j < len(items); j++ {
+			if len(arg) > 0 {
+				arg += " "
+			}
+			arg += items[j]
+			if strings.HasSuffix(arg, "\"") {
+				args = append(args, arg[:len(arg)-1])
+				break
+			}
+			i++
+		}
+		if i == len(items) {
+			return nil, fmt.Errorf("invalid iptables rule (unterminated quote): %v", line)
+		}
+	}
+	return args, nil
+}
+
+func addRuleOption(rule *Rule, option string, ro RuleOption) error {
+	if rule.Options == nil {
+		rule.Options = make(map[string]RuleOption)
+	}
+	if _, ok := rule.Options[option]; ok {
+		return fmt.Errorf("invalid iptables rule (multiple %q args)", option)
+	}
+	rule.Options[option] = ro
+	return nil
+}
+
+type optionAttrs struct {
+	argRequired bool
+	canNegate   bool
+}
+
+func parseRule(line string, allowChains []Chain, allowChainPrefixes []string) (*Rule, Chain, error) {
+	optionAttrs := map[string]optionAttrs{
+		"-A":               {true, false},
+		"-j":               {true, false},
+		"-m":               {true, false},
+		"--comment":        {true, false},
+		"--name":           {true, false},
+		"--rcheck":         {false, true},
+		"--seconds":        {true, false},
+		"--reap":           {false, false},
+		"--rsource":        {false, false},
+		"--mark":           {true, false},
+		"-p":               {true, true},
+		"-d":               {true, true},
+		"-s":               {true, true},
+		"-i":               {true, true},
+		"-o":               {true, true},
+		"--dport":          {true, true},
+		"--dst-type":       {true, false},
+		"--set-xmark":      {true, false},
+		"--to-destination": {true, false},
+		"--set":            {false, false},
+		"--mask":           {true, false},
+		"--mode":           {true, false},
+		"--probability":    {true, false},
+		"--physdev-is-in":  {false, true},
+		"--src-type":       {true, true},
+	}
+
+	var rule Rule
+	var chain Chain
+
+	items, err := splitLine(line)
+	if err != nil {
+		return nil, "", err
+	}
+
+	var opt string
+	var negated bool
+	for i := 0; i < len(items); i++ {
+		if opt == "" {
+			// negation only valid at beginning of options
+			if items[i] == "!" {
+				negated = true
+				continue
+			}
+			opt = items[i]
+		}
+
+		attr, ok := optionAttrs[opt]
+		if !ok {
+			return nil, "", fmt.Errorf("Unknown iptables rule option %v", opt)
+		}
+		if !attr.canNegate && negated {
+			return nil, "", fmt.Errorf("invalid iptables rule (can't negate option '%v'): %v", opt, line)
+		}
+
+		if attr.argRequired {
+			i++
+			if i == len(items) {
+				return nil, "", fmt.Errorf("invalid iptables rule (not enough arguments): %v", line)
+			}
+
+			// Validate/process the required argument
+			switch opt {
+			case "-A":
+				if chain != "" {
+					return nil, "", fmt.Errorf("invalid iptables rule (multiple \"-A\" args): %v", line)
+				}
+				chain = Chain(items[i])
+				if !isChainAllowed(chain, allowChains, allowChainPrefixes) {
+					return nil, "", nil
+				}
+			case "-j":
+				if rule.Jump != "" {
+					return nil, "", fmt.Errorf("invalid iptables rule (multiple \"-j\" args): %v", line)
+				}
+				rule.Jump = Chain(items[i])
+			case "--comment":
+				rule.Comment = items[i]
+			case "-m":
+				rule.Modules = append(rule.Modules, items[i])
+			default:
+				if err := addRuleOption(&rule, opt, RuleOption{Arg: items[i], Negated: negated}); err != nil {
+					return nil, "", err
+				}
+			}
+		} else {
+			if err := addRuleOption(&rule, opt, RuleOption{Negated: negated}); err != nil {
+				return nil, "", err
+			}
+		}
+		opt = ""
+		negated = false
+	}
+	if negated {
+		// ! at end of line
+		return nil, "", fmt.Errorf("invalid iptables rule (not enough arguments): %v", line)
+	}
+
+	// Some post fixups for default module options that will show up
+	// in iptables-save output, which which may not be added when constructing
+	// rules manually
+	for _, module := range rule.Modules {
+		switch module {
+		case "recent":
+			if _, ok := rule.Options["--rsource"]; !ok {
+				rule.Options["--rsource"] = RuleOption{}
+			}
+			if _, ok := rule.Options["--mask"]; !ok {
+				rule.Options["--mask"] = RuleOption{Arg: "255.255.255.255"}
+			}
+		}
+	}
+
+	sort.StringSlice(rule.Modules).Sort()
+	return &rule, chain, nil
+}
+
+func isChainAllowed(chain Chain, allowChains []Chain, allowChainPrefixes []string) bool {
+	if len(allowChains) == 0 && len(allowChainPrefixes) == 0 {
+		// All chains allowed if no allowed chains are given
+		return true
+	}
+
+	if allowChains != nil {
+		for _, ac := range allowChains {
+			if chain == ac {
+				return true
+			}
+		}
+	}
+
+	if allowChainPrefixes != nil {
+		for _, ap := range allowChainPrefixes {
+			if strings.HasPrefix(string(chain), ap) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func ParseTableAddRules(table Table, allowChains []Chain, allowChainPrefixes []string, bytes []byte) (map[Chain][]Rule, error) {
+	chainsMap := make(map[Chain][]Rule)
+	if bytes == nil {
+		return chainsMap, nil
+	}
+
+	tablePrefix := "*" + string(table)
+	readIndex := 0
+	line := ""
+	// find beginning of table
+	for readIndex < len(bytes) {
+		line, readIndex = ReadLine(readIndex, bytes)
+		if strings.HasPrefix(line, tablePrefix) {
+			break
+		}
+	}
+	// parse table lines
+	for readIndex < len(bytes) {
+		line, readIndex = ReadLine(readIndex, bytes)
+		if len(line) == 0 {
+			continue
+		}
+		if strings.HasPrefix(line, "COMMIT") || strings.HasPrefix(line, "*") {
+			break
+		} else if strings.HasPrefix(line, "#") {
+			continue
+		} else if strings.HasPrefix(line, ":") && len(line) > 1 {
+			chain := Chain(strings.SplitN(line[1:], " ", 2)[0])
+			if isChainAllowed(chain, allowChains, allowChainPrefixes) {
+				chainsMap[chain] = make([]Rule, 0)
+			}
+		} else if strings.HasPrefix(line, "-A ") {
+			rule, chain, err := parseRule(line, allowChains, allowChainPrefixes)
+			if err != nil {
+				return nil, err
+			} else if rule != nil {
+				if _, ok := chainsMap[chain]; !ok {
+					return nil, fmt.Errorf("Chain %v unknown", chain)
+				}
+				chainsMap[chain] = append(chainsMap[chain], *rule)
+			}
+		}
+	}
+	return chainsMap, nil
 }
