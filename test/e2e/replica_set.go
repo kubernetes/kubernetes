@@ -183,7 +183,9 @@ func rsConditionCheck(f *framework.Framework) {
 		if err != nil {
 			return false, err
 		}
-		return quota.Status.Hard[api.ResourcePods] == resource.MustParse("2"), nil
+		quantity := resource.MustParse("2")
+		podQuota := quota.Status.Hard[api.ResourcePods]
+		return (&podQuota).Cmp(quantity) == 0, nil
 	})
 	if err == wait.ErrWaitTimeout {
 		err = fmt.Errorf("resource quota %q never synced", name)
