@@ -1082,7 +1082,7 @@ func (r *Runtime) preparePodArgs(manifest *appcschema.PodManifest, manifestFileN
 }
 
 func (r *Runtime) getSelinuxContext(opt *api.SELinuxOptions) (string, error) {
-	selinuxRunner := selinux.NewSelinuxContextRunner()
+	selinuxRunner := selinux.NewSELinuxRunner()
 	str, err := selinuxRunner.Getfilecon(r.config.Dir)
 	if err != nil {
 		return "", err

@@ -65,6 +65,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/selinux"
 	"k8s.io/kubernetes/pkg/util/sets"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/util/term"
@@ -507,20 +508,14 @@ func makeEnvList(envs []kubecontainer.EnvVar) (result []string) {
 // '<HostPath>:<ContainerPath>', or
 // '<HostPath>:<ContainerPath>:ro', if the path is read only, or
 // '<HostPath>:<ContainerPath>:Z', if the volume requires SELinux
-// relabeling and the pod provides an SELinux label
-func makeMountBindings(mounts []kubecontainer.Mount, podHasSELinuxLabel bool) (result []string) {
+// relabeling
+func makeMountBindings(mounts []kubecontainer.Mount) (result []string) {
 	for _, m := range mounts {
 		bind := fmt.Sprintf("%s:%s", m.HostPath, m.ContainerPath)
 		if m.ReadOnly {
 			bind += ":ro"
 		}
-		// Only request relabeling if the pod provides an
-		// SELinux context. If the pod does not provide an
-		// SELinux context relabeling will label the volume
-		// with the container's randomly allocated MCS label.
-		// This would restrict access to the volume to the
-		// container which mounts it first.
-		if m.SELinuxRelabel && podHasSELinuxLabel {
+		if m.SELinuxRelabel && selinux.SELinuxEnabled() {
 			if m.ReadOnly {
 				bind += ",Z"
 			} else {
@@ -646,8 +641,7 @@ func (dm *DockerManager) runContainer(
 			{PathOnHost: "/dev/nvidia-uvm", PathInContainer: "/dev/nvidia-uvm", CgroupPermissions: "mrw"},
 		}
 	}
-	podHasSELinuxLabel := pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SELinuxOptions != nil
-	binds := makeMountBindings(opts.Mounts, podHasSELinuxLabel)
+	binds := makeMountBindings(opts.Mounts)
 	// The reason we create and mount the log file in here (not in kubelet) is because
 	// the file's location depends on the ID of the container, and we need to create and
 	// mount the file before actually starting the container.
@@ -666,6 +660,13 @@ func (dm *DockerManager) runContainer(
 		} else {
 			fs.Close() // Close immediately; we're just doing a `touch` here
 			b := fmt.Sprintf("%s:%s", containerLogPath, container.TerminationMessagePath)
+
+			// Have docker relabel the termination log path if SELinux is
+			// enabled.
+			if selinux.SELinuxEnabled() {
+				b += ":Z"
+			}
+
 			binds = append(binds, b)
 		}
 	}
