@@ -24,11 +24,14 @@ import (
 
 // no-op implementation of iptables Interface
 type FakeIPTables struct {
-	Lines []byte
+	RestoreLines []byte
+	SaveLines    []byte
 }
 
 func NewFake() *FakeIPTables {
-	return &FakeIPTables{}
+	return &FakeIPTables{
+		SaveLines: make([]byte, 0),
+	}
 }
 
 func (*FakeIPTables) GetVersion() (string, error) {
@@ -59,12 +62,12 @@ func (*FakeIPTables) IsIpv6() bool {
 	return false
 }
 
-func (*FakeIPTables) Save(table iptables.Table) ([]byte, error) {
-	return make([]byte, 0), nil
+func (f *FakeIPTables) Save(table iptables.Table) ([]byte, error) {
+	return f.SaveLines, nil
 }
 
-func (*FakeIPTables) SaveAll() ([]byte, error) {
-	return make([]byte, 0), nil
+func (f *FakeIPTables) SaveAll() ([]byte, error) {
+	return f.SaveLines, nil
 }
 
 func (*FakeIPTables) Restore(table iptables.Table, data []byte, flush iptables.FlushFlag, counters iptables.RestoreCountersFlag) error {
@@ -72,7 +75,7 @@ func (*FakeIPTables) Restore(table iptables.Table, data []byte, flush iptables.F
 }
 
 func (f *FakeIPTables) RestoreAll(data []byte, flush iptables.FlushFlag, counters iptables.RestoreCountersFlag) error {
-	f.Lines = data
+	f.RestoreLines = data
 	return nil
 }
 func (*FakeIPTables) AddReloadFunc(reloadFunc func()) {}
@@ -82,7 +85,7 @@ func (*FakeIPTables) Destroy() {}
 // GetChain returns a list of rules for the given chain.
 // The chain name must match exactly.
 func (f *FakeIPTables) GetRules(table iptables.Table, chainName iptables.Chain) ([]iptables.Rule, error) {
-	chains, err := iptables.ParseTableAddRules(table, nil, nil, f.Lines)
+	chains, err := iptables.ParseTableAddRules(table, nil, nil, f.RestoreLines)
 	if err != nil {
 		return nil, err
 	}
