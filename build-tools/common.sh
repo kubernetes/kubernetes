@@ -672,9 +672,6 @@ function kube::release::package_kube_manifests_tarball() {
   objects=$(cd "${KUBE_ROOT}/cluster/addons" && find . \( -name \*.yaml -or -name \*.yaml.in -or -name \*.json \) | grep -v demo)
   tar c -C "${KUBE_ROOT}/cluster/addons" ${objects} | tar x -C "${dst_dir}"
 
-  # This is for coreos only. ContainerVM, GCI, or Trusty does not use it.
-  cp -r "${KUBE_ROOT}/cluster/gce/coreos/kube-manifests"/* "${release_stage}/"
-
   kube::release::clean_cruft
 
   local package_name="${RELEASE_DIR}/kubernetes-manifests.tar.gz"

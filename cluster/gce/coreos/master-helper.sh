@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# A library of helper functions and constant for GCI distro
-source "${KUBE_ROOT}/cluster/gce/gci/helper.sh"
+# A library of helper functions and constant for coreos os distro
+source "${KUBE_ROOT}/cluster/gce/coreos/helper.sh"
 
 # create-master-instance creates the master instance. If called with
 # an argument, the argument is used as the name to a reserved IP
@@ -35,7 +35,6 @@ function create-master-instance {
   [[ -n ${1:-} ]] && address_opt="--address ${1}"
 
   write-master-env
-  ensure-gci-metadata-files
   create-master-instance-internal "${MASTER_NAME}" "${address_opt}"
 }
 
@@ -60,9 +59,6 @@ function replicate-master-instance() {
 
   echo "${kube_env}" > ${KUBE_TEMP}/master-kube-env.yaml
   get-metadata "${existing_master_zone}" "${existing_master_name}" cluster-name > "${KUBE_TEMP}/cluster-name.txt"
-  get-metadata "${existing_master_zone}" "${existing_master_name}" gci-update-strategy > "${KUBE_TEMP}/gci-update.txt"
-  get-metadata "${existing_master_zone}" "${existing_master_name}" gci-ensure-gke-docker > "${KUBE_TEMP}/gci-ensure-gke-docker.txt"
-  get-metadata "${existing_master_zone}" "${existing_master_name}" gci-docker-version > "${KUBE_TEMP}/gci-docker-version.txt"
 
   create-master-instance-internal "${REPLICA_NAME}"
 }
@@ -89,9 +85,9 @@ function create-master-instance-internal() {
     --scopes "storage-ro,compute-rw,monitoring,logging-write" \
     --can-ip-forward \
     --metadata-from-file \
-      "kube-env=${KUBE_TEMP}/master-kube-env.yaml,user-data=${KUBE_ROOT}/cluster/gce/gci/master.yaml,configure-sh=${KUBE_ROOT}/cluster/gce/gci/configure.sh,cluster-name=${KUBE_TEMP}/cluster-name.txt,gci-update-strategy=${KUBE_TEMP}/gci-update.txt,gci-ensure-gke-docker=${KUBE_TEMP}/gci-ensure-gke-docker.txt,gci-docker-version=${KUBE_TEMP}/gci-docker-version.txt" \
+      "kube-env=${KUBE_TEMP}/master-kube-env.yaml,user-data=${KUBE_ROOT}/cluster/gce/coreos/master.yaml,configure-sh=${KUBE_ROOT}/cluster/gce/coreos/configure.sh,cluster-name=${KUBE_TEMP}/cluster-name.txt" \
     --disk "name=${master_name}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no" \
-    --boot-disk-size "${MASTER_ROOT_DISK_SIZE:-10}" \
+    --boot-disk-size "${MASTER_ROOT_DISK_SIZE:-30}" \
     ${preemptible_master}
 }
 

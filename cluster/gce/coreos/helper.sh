@@ -14,25 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# A library of helper functions and constant for GCI distro
+# A library of helper functions and constants for the CoreOS distro
 
-# Creates the GCI specific metadata files if they do not exit.
-# Assumed var
-#   KUBE_TEMP
-function ensure-gci-metadata-files {
-  if [[ ! -f "${KUBE_TEMP}/gci-update.txt" ]]; then
-    cat >"${KUBE_TEMP}/gci-update.txt" << EOF
-update_disabled
-EOF
-  fi
-  if [[ ! -f "${KUBE_TEMP}/gci-ensure-gke-docker.txt" ]]; then
-    cat >"${KUBE_TEMP}/gci-ensure-gke-docker.txt" << EOF
-true
-EOF
-  fi
-  if [[ ! -f "${KUBE_TEMP}/gci-docker-version.txt" ]]; then
-    cat >"${KUBE_TEMP}/gci-docker-version.txt" << EOF
-${GCI_DOCKER_VERSION:-}
-EOF
-  fi
-}
+# This file intentionally left blank
