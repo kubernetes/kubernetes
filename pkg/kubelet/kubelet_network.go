@@ -199,7 +199,10 @@ func (kl *Kubelet) syncNetworkStatus() {
 	// on the filesystem.
 	if kl.networkPlugin != nil {
 		kl.runtimeState.setNetworkState(kl.networkPlugin.Status())
-	} else {
+	} else if kl.runtimeState.podCIDR() != "" {
+		// Don't mark the node ready till we've successfully executed
+		// the first UpdatePodCIDR call through cri. See comment above
+		// setPodCIDR call.
 		kl.runtimeState.setNetworkState(nil)
 	}
 }
@@ -213,10 +216,8 @@ func (kl *Kubelet) updatePodCIDR(cidr string) {
 		return
 	}
 
-	glog.Infof("Setting Pod CIDR: %v -> %v", podCIDR, cidr)
-	kl.runtimeState.setPodCIDR(cidr)
-
 	// kubelet -> network plugin
+	// cri runtime shims are responsible for their own network plugins
 	if kl.networkPlugin != nil {
 		details := make(map[string]interface{})
 		details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = cidr
@@ -224,9 +225,17 @@ func (kl *Kubelet) updatePodCIDR(cidr string) {
 	}
 
 	// kubelet -> generic runtime -> runtime shim -> network plugin
+	// docker/rkt non-cri implementations have a passthrough UpdatePodCIDR
 	if err := kl.GetRuntime().UpdatePodCIDR(cidr); err != nil {
 		glog.Errorf("Failed to update pod CIDR: %v", err)
+		return
 	}
+
+	// We need to be careful about setting podCIDR. Till #35839 lands we're
+	// using it to indicate network plugin status for cri shims. See comment
+	// in syncNetworkStatus.
+	glog.Infof("Setting Pod CIDR: %v -> %v", podCIDR, cidr)
+	kl.runtimeState.setPodCIDR(cidr)
 }
 
 // shapingEnabled returns whether traffic shaping is enabled.
