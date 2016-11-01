@@ -28,3 +28,20 @@ const (
 	LabelOS   = "beta.kubernetes.io/os"
 	LabelArch = "beta.kubernetes.io/arch"
 )
+
+// Role labels are applied to Nodes to mark their purpose.
+const (
+	// LabelRole is a label applied to a Node as a hint that it has a particular purpose (defined by the value).
+	LabelRole = "kubernetes.io/role"
+
+	// LabelKubeadmAlphaRole is a label that kubeadm applies to a Node as a hint that it has a particular purpose.
+	LabelKubeadmAlphaRole = "kubeadm.alpha.kubernetes.io/role"
+
+	// RoleMaster is the value of a LabelRole or LabelKubeadmAlphaRole label, indicating a master node.
+	// A master node typically runs kubernetes system components and will not typically run user workloads.
+	RoleMaster = "master"
+
+	// RoleNode is the value of a LabelRole or LabelKubeadmAlphaRole label, indicating a "normal" node,
+	// as opposed to a RoleMaster node.
+	RoleNode = "node"
+)
