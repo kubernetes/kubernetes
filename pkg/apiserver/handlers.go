@@ -396,7 +396,7 @@ func CORS(handler http.Handler, allowedOriginPatterns []*regexp.Regexp, allowedM
 				w.Header().Set("Access-Control-Allow-Origin", origin)
 				// Set defaults for methods and headers if nothing was passed
 				if allowedMethods == nil {
-					allowedMethods = []string{"POST", "GET", "OPTIONS", "PUT", "DELETE"}
+					allowedMethods = []string{"POST", "GET", "OPTIONS", "PUT", "DELETE", "PATCH"}
 				}
 				if allowedHeaders == nil {
 					allowedHeaders = []string{"Content-Type", "Content-Length", "Accept-Encoding", "X-CSRF-Token", "Authorization", "X-Requested-With", "If-Modified-Since"}
