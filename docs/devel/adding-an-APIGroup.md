@@ -56,7 +56,8 @@ cmd/libs/go2idl/ tool.
 
 2. Generate files for Ugorji codec:
 
-    1. Touch types.generated.go in pkg/apis/`<group>`{/, `<version>`};
+    1. Create the the file types.generated.go in pkg/apis/`<group>`{/, `<version>`}
+       You'll need to include the package name to satisfy the compiler
     2. Run hack/update-codecgen.sh.
 
 3. Generate protobuf objects:
@@ -67,20 +68,11 @@ cmd/libs/go2idl/ tool.
 
 ### Client (optional):
 
-We are overhauling pkg/client, so this section might be outdated; see
-[#15730](https://github.com/kubernetes/kubernetes/pull/15730) for how the client
-package might evolve. Currently, to add your group to the client package, you
-need to:
+This was overhauled; see [#15730](https://github.com/kubernetes/kubernetes/pull/15730).
 
-1. Create pkg/client/unversioned/`<group>`.go, define a group client interface
-and implement the client. You can take pkg/client/unversioned/extensions.go as a
-reference.
+Follow the instructions to [generate a clientset](generating-clientset.md).
 
-2. Add the group client interface to the `Interface` in
-pkg/client/unversioned/client.go and add method to fetch the interface. Again,
-you can take how we add the Extensions group there as an example.
-
-3. If you need to support the group in kubectl, you'll also need to modify
+If you need to support the group in kubectl, you'll also need to modify
 pkg/kubectl/cmd/util/factory.go.
 
 ### Make the group/version selectable in unit tests (optional):

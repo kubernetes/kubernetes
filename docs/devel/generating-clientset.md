@@ -14,7 +14,8 @@ the types (e.g., Pods) that you want to generate clients for with the
 namespace scoped (e.g., PersistentVolume), you need to append the
 `nonNamespaced=true` tag as well.
 
-- Running the client-gen tool: you need to use the command line argument
+- Running the client-gen tool: this is done [in a script](../../hack/update-codegen.sh).
+You need to use the command line argument
 `--input` to specify the groups and versions of the APIs you want to generate
 clients for, client-gen will then look into
 `pkg/apis/${GROUP}/${VERSION}/types.go` and generate clients for the types you
