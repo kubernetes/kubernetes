@@ -597,7 +597,7 @@ func splitLine(line string) ([]string, error) {
 	for i := 0; i < len(line); i++ {
 		if quoted {
 			if line[i] == '\\' {
-				if i == len(line) - 1 {
+				if i == len(line)-1 {
 					return nil, fmt.Errorf("invalid iptables rule (not enough characters to unescape): %v", line)
 				}
 				i++
