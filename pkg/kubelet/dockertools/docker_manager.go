@@ -766,7 +766,6 @@ func (dm *DockerManager) runContainer(
 	if len(securityOpts) > 0 {
 		var msgs []string
 		for _, opt := range securityOpts {
-			glog.Errorf("Logging security options: %+v", opt)
 			msg := opt.msg
 			if msg == "" {
 				msg = opt.value
