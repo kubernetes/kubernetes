@@ -27,6 +27,9 @@ import (
 	clientauth "k8s.io/kubernetes/pkg/client/unversioned/auth"
 )
 
+// promptAuthCache is used to stone prompt auth information
+var promptAuthCache = make(map[string]string)
+
 // AuthLoaders are used to build clientauth.Info objects.
 type AuthLoader interface {
 	// LoadAuth takes a path to a config file and can then do anything it needs in order to return a valid clientauth.Info
@@ -84,6 +87,9 @@ func (a *PromptingAuthLoader) Prompt() (*clientauth.Info, error) {
 }
 
 func promptForString(field string, r io.Reader, show bool) (result string, err error) {
+	if v, ok := promptAuthCache[field]; ok {
+		return v, err
+	}
 	fmt.Printf("Please enter %s: ", field)
 	if show {
 		_, err = fmt.Fscan(r, &result)
@@ -92,6 +98,7 @@ func promptForString(field string, r io.Reader, show bool) (result string, err e
 		data, err = gopass.GetPasswdMasked()
 		result = string(data)
 	}
+	promptAuthCache[field] = result
 	return result, err
 }
 
