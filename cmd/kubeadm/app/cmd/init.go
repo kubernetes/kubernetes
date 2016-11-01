@@ -168,16 +168,6 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 		}
 	}
 
-	if !skipPreFlight {
-		fmt.Println("Running pre-flight checks")
-		err := preflight.RunInitMasterChecks(cfg)
-		if err != nil {
-			return nil, &preflight.PreFlightError{Msg: err.Error()}
-		}
-	} else {
-		fmt.Println("Skipping pre-flight checks")
-	}
-
 	// Auto-detect the IP
 	if len(cfg.API.AdvertiseAddresses) == 0 {
 		// TODO(phase1+) perhaps we could actually grab eth0 and eth1
@@ -186,6 +176,16 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight 
 			return nil, err
 		}
 		cfg.API.AdvertiseAddresses = []string{ip.String()}
+	}
+
+	if !skipPreFlight {
+		fmt.Println("Running pre-flight checks")
+		err := preflight.RunInitMasterChecks(cfg)
+		if err != nil {
+			return nil, &preflight.PreFlightError{Msg: err.Error()}
+		}
+	} else {
+		fmt.Println("Skipping pre-flight checks")
 	}
 
 	// TODO(phase1+) create a custom flag
