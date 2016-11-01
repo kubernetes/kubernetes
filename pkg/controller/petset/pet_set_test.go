@@ -37,9 +37,11 @@ func newFakeStatefulSetController() (*StatefulSetController, *fakePetClient) {
 	return &StatefulSetController{
 		kubeClient:       nil,
 		blockingPetStore: newUnHealthyPetTracker(fpc),
-		podStoreSynced:   func() bool { return true },
-		psStore:          cache.StoreToStatefulSetLister{Store: cache.NewStore(controller.KeyFunc)},
-		podStore:         cache.StoreToPodLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{})},
+		podStoreSynced: func() bool {
+			return true
+		},
+		psStore:  cache.StoreToStatefulSetLister{Store: cache.NewStore(controller.KeyFunc)},
+		podStore: cache.StoreToPodLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{})},
 		newSyncer: func(blockingPet *pcb) *petSyncer {
 			return &petSyncer{fpc, blockingPet}
 		},

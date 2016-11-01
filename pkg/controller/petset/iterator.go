@@ -153,8 +153,12 @@ func NewStatefulSetIterator(ps *apps.StatefulSet, podList []*api.Pod) *statefulS
 // PodsByCreationTimestamp sorts a list of Pods by creation timestamp, using their names as a tie breaker.
 type PodsByCreationTimestamp []*api.Pod
 
-func (o PodsByCreationTimestamp) Len() int      { return len(o) }
-func (o PodsByCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+func (o PodsByCreationTimestamp) Len() int {
+	return len(o)
+}
+func (o PodsByCreationTimestamp) Swap(i, j int) {
+	o[i], o[j] = o[j], o[i]
+}
 
 func (o PodsByCreationTimestamp) Less(i, j int) bool {
 	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
