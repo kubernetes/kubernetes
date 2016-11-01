@@ -28,3 +28,40 @@ const (
 	LabelOS   = "beta.kubernetes.io/os"
 	LabelArch = "beta.kubernetes.io/arch"
 )
+
+// Role labels are applied to Nodes to mark their purpose.  In particular, we
+// usually want to distinguish the master, so that we can isolate privileged
+// pods and operations.
+//
+// Originally we relied on not registering the master, on the fact that the
+// master was Unschedulable, and on static manifests for master components.
+// But we now do register masters in many environments, are generally moving
+// away from static manifests (for better manageability), and working towards
+// deprecating the unschedulable field (replacing it with taints & tolerations
+// instead).
+//
+// Even with tainting, a label remains the easiest way of making a positive
+// selection, so that pods can schedule only to master nodes for example, and
+// thus installations will likely define a label for their master nodes.
+//
+// So that we can recognize master nodes in consequent places though (such as
+// kubectl get nodes), we encourage installations to use the well-known labels.
+// We define LabelRole, which is the preferred form, but we will also recognize
+// other forms that are known to be in widespread use (LabelKubeadmAlphaRole).
+
+const (
+	// LabelRole is the preferred label applied to a Node as a hint that it has a particular purpose (defined by the value).
+	LabelRole = "kubernetes.io/role"
+
+	// LabelKubeadmAlphaRole is a label that kubeadm applies to a Node as a hint that it has a particular purpose.
+	// Use of LabelRole is preferred.
+	LabelKubeadmAlphaRole = "kubeadm.alpha.kubernetes.io/role"
+
+	// RoleMaster is the value of a LabelRole or LabelKubeadmAlphaRole label, indicating a master node.
+	// A master node typically runs kubernetes system components and will not typically run user workloads.
+	RoleMaster = "master"
+
+	// RoleNode is the value of a LabelRole or LabelKubeadmAlphaRole label, indicating a "normal" node,
+	// as opposed to a RoleMaster node.
+	RoleNode = "node"
+)
