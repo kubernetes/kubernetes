@@ -29,7 +29,7 @@ import (
 // newPCB generates a new PCB using the id string as a unique qualifier
 func newPCB(id string, ps *apps.StatefulSet) (*pcb, error) {
 	petPod, err := controller.GetPodFromTemplate(&ps.Spec.Template, ps, nil)
-	setReplicas(petPod,ps.Spec.Replicas)
+	setReplicas(petPod, ps.Spec.Replicas)
 	if err != nil {
 		return nil, err
 	}

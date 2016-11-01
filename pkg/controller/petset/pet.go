@@ -27,8 +27,8 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/runtime"
 
-	"github.com/golang/glog"
 	"errors"
+	"github.com/golang/glog"
 )
 
 // petLifeCycleEvent is used to communicate high level actions the controller
@@ -73,12 +73,12 @@ type pcb struct {
 func getReplicas(pod *api.Pod) int32 {
 	if pod == nil {
 		return -1
-	} else if replicaStr,exists := pod.Annotations[StatefulSetReplicasAnnotation]; !exists{
-		glog.Errorf("Pod %s has no annotation for %s",pod.Name,StatefulSetReplicasAnnotation)
+	} else if replicaStr, exists := pod.Annotations[StatefulSetReplicasAnnotation]; !exists {
+		glog.Errorf("Pod %s has no annotation for %s", pod.Name, StatefulSetReplicasAnnotation)
 		return -1
-	} else if replicas64, err := strconv.ParseInt(replicaStr,10,32); err != nil {
+	} else if replicas64, err := strconv.ParseInt(replicaStr, 10, 32); err != nil {
 		glog.Errorf("Pod %s has invalid value %s for annotation %s",
-			pod.Name,replicaStr,StatefulSetReplicasAnnotation)
+			pod.Name, replicaStr, StatefulSetReplicasAnnotation)
 		return -1
 	} else {
 		return int32(replicas64)
@@ -87,29 +87,29 @@ func getReplicas(pod *api.Pod) int32 {
 
 //Sets pod's StatefulSetReplicasAnnotation to the base 10 string value of replicas.
 func setReplicas(p *api.Pod, replicas int32) {
-	p.Annotations[StatefulSetReplicasAnnotation] = strconv.FormatInt(int64(replicas),10)
+	p.Annotations[StatefulSetReplicasAnnotation] = strconv.FormatInt(int64(replicas), 10)
 }
 
 //Updates pod to be equivalent to desired, and to contain the number same number of replicas as set.
 //By equivalent, we mean that all of the IdentityMappers for StatefulSet produce equivalent values
 //for both pod and desired. The returned bool is true if pod has been mutated or false if no
 //mutation occurs. If the returned error is not nil, the returned bool is false.
-func update (set *apps.StatefulSet, id string, pod *api.Pod, desired *api.Pod) (bool,error) {
+func update(set *apps.StatefulSet, id string, pod *api.Pod, desired *api.Pod) (bool, error) {
 	//preconditions
 	if set == nil {
-		return false,errors.New("nil StatefulSet parameter")
-	} else if (pod == nil){
-		return false,errors.New("nil source supplied")
-	} else if (desired == nil ) {
-		return false,errors.New("nil target supplied")
+		return false, errors.New("nil StatefulSet parameter")
+	} else if pod == nil {
+		return false, errors.New("nil source supplied")
+	} else if desired == nil {
+		return false, errors.New("nil target supplied")
 	}
 
 	//collect mappers that violate the equality condition
 	mappers := newIdentityMappers(set)
-	violated := make([]identityMapper,0,len(mappers))
-	for _,mapper := range(mappers){
+	violated := make([]identityMapper, 0, len(mappers))
+	for _, mapper := range mappers {
 		if mapper.Identity(pod) != mapper.Identity(desired) {
-			violated = append(violated,mapper)
+			violated = append(violated, mapper)
 		}
 	}
 
@@ -118,10 +118,10 @@ func update (set *apps.StatefulSet, id string, pod *api.Pod, desired *api.Pod) (
 		return false, nil
 	}
 
-	for _, mapper := range (violated) {
+	for _, mapper := range violated {
 		mapper.SetIdentity(id, pod)
 	}
-	setReplicas(pod,set.Spec.Replicas)
+	setReplicas(pod, set.Spec.Replicas)
 	return true, nil
 
 }
@@ -282,7 +282,7 @@ func (p *apiServerPetClient) Update(pet *pcb, expectedPet *pcb) error {
 	pc := p.c.Core().Pods(pet.parent.Namespace)
 
 	for i := 0; ; i++ {
-		mutated, err := update(pet.parent,pet.id,pet.pod,expectedPet.pod)
+		mutated, err := update(pet.parent, pet.id, pet.pod, expectedPet.pod)
 
 		if err != nil || !mutated {
 			return err

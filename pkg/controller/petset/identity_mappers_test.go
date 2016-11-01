@@ -157,7 +157,7 @@ func TestPetIDReset(t *testing.T) {
 		},
 	}
 	firstPCB.pod.Spec.Volumes = append(firstPCB.pod.Spec.Volumes, userAdded)
-	mutated, err := update(ps,"2",firstPCB.pod,secondPCB.pod)
+	mutated, err := update(ps, "2", firstPCB.pod, secondPCB.pod)
 
 	if err != nil {
 		t.Errorf("%v", err)

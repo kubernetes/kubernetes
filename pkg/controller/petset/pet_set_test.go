@@ -109,9 +109,9 @@ func TestStatefulSetControllerCreates(t *testing.T) {
 		t.Errorf("Error syncing StatefulSet: %v", err)
 	}
 	checkPets(ps, replicas+1, 0, fc, t)
-	for _,pet := range(fc.pets) {
+	for _, pet := range fc.pets {
 		if r := getReplicas(pet.pod); r != ps.Spec.Replicas {
-			t.Errorf("Expected %d replicas found %d",ps.Spec.Replicas,r)
+			t.Errorf("Expected %d replicas found %d", ps.Spec.Replicas, r)
 		}
 	}
 
@@ -140,9 +140,9 @@ func TestStatefulSetControllerDeletes(t *testing.T) {
 		t.Errorf("Error syncing StatefulSet: %v", errors.NewAggregate(errs))
 	}
 	checkPets(ps, replicas, replicas, fc, t)
-	for _,pet := range(fc.pets) {
+	for _, pet := range fc.pets {
 		if r := getReplicas(pet.pod); r != ps.Spec.Replicas {
-			t.Errorf("Expected %d replicas found %d",ps.Spec.Replicas,r)
+			t.Errorf("Expected %d replicas found %d", ps.Spec.Replicas, r)
 		}
 	}
 }
