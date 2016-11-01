@@ -75,6 +75,7 @@ func DeepCopy_componentconfig_KubeControllerManagerConfiguration(in interface{},
 		out.TypeMeta = in.TypeMeta
 		out.Port = in.Port
 		out.Address = in.Address
+		out.UseServiceAccountCredentials = in.UseServiceAccountCredentials
 		out.CloudProvider = in.CloudProvider
 		out.CloudConfigFile = in.CloudConfigFile
 		out.ConcurrentEndpointSyncs = in.ConcurrentEndpointSyncs

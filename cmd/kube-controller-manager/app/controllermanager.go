@@ -167,7 +167,7 @@ func Run(s *options.CMServer) error {
 			ClientConfig: kubeconfig,
 		}
 		var clientBuilder controller.ControllerClientBuilder
-		if len(s.ServiceAccountKeyFile) > 0 {
+		if len(s.ServiceAccountKeyFile) > 0 && s.UseServiceAccountCredentials {
 			clientBuilder = controller.SAControllerClientBuilder{
 				ClientConfig: restclient.AnonymousClientConfig(kubeconfig),
 				CoreClient:   kubeClient.Core(),

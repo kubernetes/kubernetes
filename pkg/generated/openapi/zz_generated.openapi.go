@@ -1471,6 +1471,13 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "",
 						},
 					},
+					"useServiceAccountCredentials": {
+						SchemaProps: spec.SchemaProps{
+							Description: "useServiceAccountCredentials indicates whether controllers should be run with individual service account credentials.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 					"cloudProvider": {
 						SchemaProps: spec.SchemaProps{
 							Description: "cloudProvider is the provider for cloud services.",
@@ -1848,7 +1855,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 						},
 					},
 				},
-				Required: []string{"TypeMeta", "port", "address", "cloudProvider", "cloudConfigFile", "concurrentEndpointSyncs", "concurrentRSSyncs", "concurrentRCSyncs", "concurrentServiceSyncs", "concurrentResourceQuotaSyncs", "concurrentDeploymentSyncs", "concurrentDaemonSetSyncs", "concurrentJobSyncs", "concurrentNamespaceSyncs", "concurrentSATokenSyncs", "lookupCacheSizeForRC", "lookupCacheSizeForRS", "lookupCacheSizeForDaemonSet", "serviceSyncPeriod", "nodeSyncPeriod", "routeReconciliationPeriod", "resourceQuotaSyncPeriod", "namespaceSyncPeriod", "pvClaimBinderSyncPeriod", "minResyncPeriod", "terminatedPodGCThreshold", "horizontalPodAutoscalerSyncPeriod", "deploymentControllerSyncPeriod", "podEvictionTimeout", "deletingPodsQps", "deletingPodsBurst", "nodeMonitorGracePeriod", "registerRetryCount", "nodeStartupGracePeriod", "nodeMonitorPeriod", "serviceAccountKeyFile", "clusterSigningCertFile", "clusterSigningKeyFile", "approveAllKubeletCSRsForGroup", "enableProfiling", "clusterName", "clusterCIDR", "serviceCIDR", "nodeCIDRMaskSize", "allocateNodeCIDRs", "configureCloudRoutes", "rootCAFile", "contentType", "kubeAPIQPS", "kubeAPIBurst", "leaderElection", "volumeConfiguration", "controllerStartInterval", "enableGarbageCollector", "concurrentGCSyncs", "nodeEvictionRate", "secondaryNodeEvictionRate", "largeClusterSizeThreshold", "unhealthyZoneThreshold"},
+				Required: []string{"TypeMeta", "port", "address", "useServiceAccountCredentials", "cloudProvider", "cloudConfigFile", "concurrentEndpointSyncs", "concurrentRSSyncs", "concurrentRCSyncs", "concurrentServiceSyncs", "concurrentResourceQuotaSyncs", "concurrentDeploymentSyncs", "concurrentDaemonSetSyncs", "concurrentJobSyncs", "concurrentNamespaceSyncs", "concurrentSATokenSyncs", "lookupCacheSizeForRC", "lookupCacheSizeForRS", "lookupCacheSizeForDaemonSet", "serviceSyncPeriod", "nodeSyncPeriod", "routeReconciliationPeriod", "resourceQuotaSyncPeriod", "namespaceSyncPeriod", "pvClaimBinderSyncPeriod", "minResyncPeriod", "terminatedPodGCThreshold", "horizontalPodAutoscalerSyncPeriod", "deploymentControllerSyncPeriod", "podEvictionTimeout", "deletingPodsQps", "deletingPodsBurst", "nodeMonitorGracePeriod", "registerRetryCount", "nodeStartupGracePeriod", "nodeMonitorPeriod", "serviceAccountKeyFile", "clusterSigningCertFile", "clusterSigningKeyFile", "approveAllKubeletCSRsForGroup", "enableProfiling", "clusterName", "clusterCIDR", "serviceCIDR", "nodeCIDRMaskSize", "allocateNodeCIDRs", "configureCloudRoutes", "rootCAFile", "contentType", "kubeAPIQPS", "kubeAPIBurst", "leaderElection", "volumeConfiguration", "controllerStartInterval", "enableGarbageCollector", "concurrentGCSyncs", "nodeEvictionRate", "secondaryNodeEvictionRate", "largeClusterSizeThreshold", "unhealthyZoneThreshold"},
 			},
 		},
 		Dependencies: []string{
