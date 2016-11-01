@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	fake "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/dns/treecache"
 	"k8s.io/kubernetes/pkg/dns/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -51,7 +52,7 @@ func newKubeDNS() *KubeDNS {
 		domain:              testDomain,
 		endpointsStore:      cache.NewStore(cache.MetaNamespaceKeyFunc),
 		servicesStore:       cache.NewStore(cache.MetaNamespaceKeyFunc),
-		cache:               NewTreeCache(),
+		cache:               treecache.NewTreeCache(),
 		reverseRecordMap:    make(map[string]*skymsg.Service),
 		clusterIPServiceMap: make(map[string]*kapi.Service),
 		cacheLock:           sync.RWMutex{},
