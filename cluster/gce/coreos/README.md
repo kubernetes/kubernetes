@@ -1,11 +1,8 @@
-# Container-VM Image
+# CoreOS image
 
-[Container-VM Image](https://cloud.google.com/compute/docs/containers/vm-image/)
-is a container-optimized OS image for the Google Cloud Platform (GCP). It is
-primarily for running Google services on GCP. Unlike the open preview version
-of container-vm, the new Container-VM Image is based on the open source
-ChromiumOS project, allowing us greater control over the build management,
-security compliance, and customizations for GCP.
+The [CoreOS operating system](https://coreos.com/why/) is a Linux distribution optimized for running containers securely at scale.
+CoreOS provides [an image](https://coreos.com/os/docs/latest/booting-on-google-compute-engine.html) for Google Cloud Platform (GCP).
 
+This folder contains configuration and tooling to allow kube-up to create a Kubernetes cluster on Google Cloud Platform running on the official CoreOS image.
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/gce/gci/README.md?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/gce/coreos/README.md?pixel)]()

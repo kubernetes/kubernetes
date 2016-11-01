@@ -19,36 +19,11 @@
 
 # TODO: this script duplicates templating logic from cluster/saltbase/salt
 # using sed. It should use an actual template parser on the manifest
-# files.
+# files, or the manifest files should not be templated salt
 
 set -o errexit
 set -o nounset
 set -o pipefail
-
-function setup-os-params {
-  # Reset core_pattern. On GCI, the default core_pattern pipes the core dumps to
-  # /sbin/crash_reporter which is more restrictive in saving crash dumps. So for
-  # now, set a generic core_pattern that users can work with.
-  echo "core.%e.%p.%t" > /proc/sys/kernel/core_pattern
-}
-
-function config-ip-firewall {
-  echo "Configuring IP firewall rules"
-  # The GCI image has host firewall which drop most inbound/forwarded packets.
-  # We need to add rules to accept all TCP/UDP/ICMP packets.
-  if iptables -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
-    echo "Add rules to accept all inbound TCP/UDP/ICMP packets"
-    iptables -A INPUT -w -p TCP -j ACCEPT
-    iptables -A INPUT -w -p UDP -j ACCEPT
-    iptables -A INPUT -w -p ICMP -j ACCEPT
-  fi
-  if iptables -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then
-    echo "Add rules to accept all forwarded TCP/UDP/ICMP packets"
-    iptables -A FORWARD -w -p TCP -j ACCEPT
-    iptables -A FORWARD -w -p UDP -j ACCEPT
-    iptables -A FORWARD -w -p ICMP -j ACCEPT
-  fi
-}
 
 function create-dirs {
   echo "Creating required directories"
@@ -57,6 +32,13 @@ function create-dirs {
   if [[ "${KUBERNETES_MASTER:-}" == "false" ]]; then
     mkdir -p /var/lib/kube-proxy
   fi
+}
+
+# Create directories referenced in the kube-controller-manager manifest for
+# bindmounts. This is used under the rkt runtime to work around
+# https://github.com/kubernetes/kubernetes/issues/26816
+function create-kube-controller-manager-dirs {
+  mkdir -p /etc/srv/kubernetes /var/ssl /etc/{ssl,openssl,pki}
 }
 
 # Formats the given device ($1) if needed and mounts it at given mount point
@@ -90,51 +72,6 @@ function ensure-local-ssds() {
       echo "No local SSD disks found."
     fi
   done
-}
-
-# Installs logrotate configuration files
-function setup-logrotate() {
-  mkdir -p /etc/logrotate.d/
-  cat >/etc/logrotate.d/docker-containers <<EOF
-/var/lib/docker/containers/*/*-json.log {
-    rotate 5
-    copytruncate
-    missingok
-    notifempty
-    compress
-    maxsize 10M
-    daily
-    dateext
-    dateformat -%Y%m%d-%s
-    create 0644 root root
-}
-EOF
-
-  # Configure log rotation for all logs in /var/log, which is where k8s services
-  # are configured to write their log files. Whenever logrotate is ran, this
-  # config will:
-  # * rotate the log file if its size is > 100Mb OR if one day has elapsed
-  # * save rotated logs into a gzipped timestamped backup
-  # * log file timestamp (controlled by 'dateformat') includes seconds too. This
-  #   ensures that logrotate can generate unique logfiles during each rotation
-  #   (otherwise it skips rotation if 'maxsize' is reached multiple times in a
-  #   day).
-  # * keep only 5 old (rotated) logs, and will discard older logs.
-  cat > /etc/logrotate.d/allvarlogs <<EOF
-/var/log/*.log {
-    rotate 5
-    copytruncate
-    missingok
-    notifempty
-    compress
-    maxsize 100M
-    daily
-    dateext
-    dateformat -%Y%m%d-%s
-    create 0644 root root
-}
-EOF
-
 }
 
 # Finds the master PD device; returns it in MASTER_PD_DEVICE
@@ -387,8 +324,8 @@ function create-master-etcd-auth {
   fi
 }
 
-function assemble-docker-flags {
-  echo "Assemble docker command line flags"
+function configure-docker-daemon {
+  echo "Configuring the Docker daemon"
   local docker_opts="-p /var/run/docker.pid --iptables=false --ip-masq=false"
   if [[ "${TEST_CLUSTER:-}" == "true" ]]; then
     docker_opts+=" --log-level=debug"
@@ -411,28 +348,17 @@ function assemble-docker-flags {
     docker_opts+=" --registry-mirror=${DOCKER_REGISTRY_MIRROR_URL}"
   fi
 
-  echo "DOCKER_OPTS=\"${docker_opts} ${EXTRA_DOCKER_OPTS:-}\"" > /etc/default/docker
-
-  if [[ "${use_net_plugin}" == "true" ]]; then
-    # If using a network plugin, extend the docker configuration to always remove
-    # the network checkpoint to avoid corrupt checkpoints.
-    # (https://github.com/docker/docker/issues/18283).
-    echo "Extend the default docker.service configuration"
-    mkdir -p /etc/systemd/system/docker.service.d
-    cat <<EOF >/etc/systemd/system/docker.service.d/01network.conf
+  mkdir -p /etc/systemd/system/docker.service.d/
+  local kubernetes_conf_dropin="/etc/systemd/system/docker.service.d/00_kubelet.conf"
+  cat > "${kubernetes_conf_dropin}" <<EOF
 [Service]
-ExecStartPre=/bin/sh -x -c "rm -rf /var/lib/docker/network"
+Environment="DOCKER_OPTS=${docker_opts} ${EXTRA_DOCKER_OPTS:-}"
 EOF
-
-    systemctl daemon-reload
-
-    # If using a network plugin, we need to explicitly restart docker daemon, because
-    # kubelet will not do it.
-    echo "Docker command line is updated. Restart docker to pick it up"
-    systemctl restart docker
-  fi
+  # Always restart to get the cbr0 change
+  echo "Docker daemon options updated. Restarting docker..."
+  systemctl daemon-reload
+  systemctl restart docker
 }
-
 # A helper function for loading a docker image. It keeps trying up to 5 times.
 #
 # $1: Full path of the docker image
@@ -443,15 +369,37 @@ function try-load-docker-image {
   set +e
   local -r max_attempts=5
   local -i attempt_num=1
-  until timeout 30 docker load -i "${img}"; do
-    if [[ "${attempt_num}" == "${max_attempts}" ]]; then
-      echo "Fail to load docker image file ${img} after ${max_attempts} retries. Exit!!"
-      exit 1
-    else
-      attempt_num=$((attempt_num+1))
+
+  if [[ "${CONTAINER_RUNTIME:-}" == "rkt" ]]; then
+    for attempt_num in $(seq 1 "${max_attempts}"); do
+      local aci_tmpdir="$(mktemp -t -d docker2aci.XXXXX)"
+      (cd "${aci_tmpdir}"; timeout 40 "${DOCKER2ACI_BIN}" "$1")
+      local aci_success=$?
+      timeout 40 "${RKT_BIN}" fetch --insecure-options=image "${aci_tmpdir}"/*.aci
+      local fetch_success=$?
+      rm -f "${aci_tmpdir}"/*.aci
+      rmdir "${aci_tmpdir}"
+      if [[ ${fetch_success} && ${aci_success} ]]; then
+        echo "rkt: Loaded ${img}"
+        break
+      fi
+      if [[ "${attempt}" == "${max_attempts}" ]]; then
+        echo "rkt: Failed to load image file ${img} after ${max_attempts} retries."
+        exit 1
+      fi
       sleep 5
-    fi
-  done
+    done
+  else
+    until timeout 30 docker load -i "${img}"; do
+      if [[ "${attempt_num}" == "${max_attempts}" ]]; then
+        echo "Fail to load docker image file ${img} after ${max_attempts} retries."
+        exit 1
+      else
+        attempt_num=$((attempt_num+1))
+        sleep 5
+      fi
+    done
+  fi
   # Re-enable errexit.
   set -e
 }
@@ -476,19 +424,6 @@ function start-kubelet {
   echo "Start kubelet"
   local kubelet_bin="${KUBE_HOME}/bin/kubelet"
   local -r version="$("${kubelet_bin}" --version=true | cut -f2 -d " ")"
-  local -r builtin_kubelet="/usr/bin/kubelet"
-  if [[ "${TEST_CLUSTER:-}" == "true" ]]; then
-    # Determine which binary to use on test clusters. We use the built-in
-    # version only if the downloaded version is the same as the built-in
-    # version. This allows GCI to run some of the e2e tests to qualify the
-    # built-in kubelet.
-    if [[ -x "${builtin_kubelet}" ]]; then
-      local -r builtin_version="$("${builtin_kubelet}"  --version=true | cut -f2 -d " ")"
-      if [[ "${builtin_version}" == "${version}" ]]; then
-        kubelet_bin="${builtin_kubelet}"
-      fi
-    fi
-  fi
   echo "Using kubelet binary at ${kubelet_bin}"
   local flags="${KUBELET_TEST_LOG_LEVEL:-"--v=2"} ${KUBELET_TEST_ARGS:-}"
   flags+=" --allow-privileged=true"
@@ -498,7 +433,6 @@ function start-kubelet {
   flags+=" --cluster-dns=${DNS_SERVER_IP}"
   flags+=" --cluster-domain=${DNS_DOMAIN}"
   flags+=" --config=/etc/kubernetes/manifests"
-  flags+=" --experimental-mounter-path=${KUBE_HOME}/bin/mounter"
   flags+=" --experimental-check-node-capabilities-before-mount=true"
 
   if [[ -n "${KUBELET_PORT:-}" ]]; then
@@ -527,9 +461,9 @@ function start-kubelet {
   # Network plugin
   if [[ -n "${NETWORK_PROVIDER:-}" ]]; then
     if [[ "${NETWORK_PROVIDER:-}" == "cni" ]]; then
-      flags+=" --cni-bin-dir=/home/kubernetes/bin"
+      flags+=" --cni-bin-dir=/opt/kubernetes/bin"
     else
-      flags+=" --network-plugin-dir=/home/kubernetes/bin"
+      flags+=" --network-plugin-dir=/opt/kubernetes/bin"
     fi
     flags+=" --network-plugin=${NETWORK_PROVIDER}"
   fi
@@ -552,8 +486,13 @@ function start-kubelet {
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     flags+=" --feature-gates=${FEATURE_GATES}"
   fi
+  if [[ -n "${CONTAINER_RUNTIME:-}" ]]; then
+    flags+=" --container-runtime=${CONTAINER_RUNTIME}"
+    flags+=" --rkt-path=${KUBE_HOME}/bin/rkt"
+    flags+=" --rkt-stage1-image=${RKT_STAGE1_IMAGE}"
+  fi
 
-  local -r kubelet_env_file="/etc/default/kubelet"
+  local -r kubelet_env_file="/etc/kubelet-env"
   echo "KUBELET_OPTS=\"${flags}\"" > "${kubelet_env_file}"
 
   # Write the systemd service file for kubelet.
@@ -600,7 +539,7 @@ function start-kube-proxy {
   if [[ -n "${KUBE_DOCKER_REGISTRY:-}" ]]; then
     kube_docker_registry=${KUBE_DOCKER_REGISTRY}
   fi
-  local -r kube_proxy_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-proxy.docker_tag)
+  local -r kube_proxy_docker_tag=$(cat /opt/kubernetes/kube-docker-files/kube-proxy.docker_tag)
   local api_servers="--master=https://${KUBERNETES_MASTER_NAME}"
   local params="${KUBEPROXY_TEST_LOG_LEVEL:-"--v=2"}"
   if [[ -n "${FEATURE_GATES:-}" ]]; then
@@ -618,6 +557,18 @@ function start-kube-proxy {
   if [[ -n "${CLUSTER_IP_RANGE:-}" ]]; then
     sed -i -e "s@{{cluster_cidr}}@--cluster-cidr=${CLUSTER_IP_RANGE}@g" ${src_file}
   fi
+  if [[ "${CONTAINER_RUNTIME:-}" == "rkt" ]]; then
+    # Work arounds for https://github.com/coreos/rkt/issues/3245 and https://github.com/coreos/rkt/issues/3264
+    # This is an incredibly hacky workaround. It's fragile too. If the kube-proxy command changes too much, this breaks
+    # TODO, this could be done much better in many other places, such as an
+    # init script within the container, or even within kube-proxy's code.
+    local extra_workaround_cmd="ln -sf /proc/self/mounts /etc/mtab; \
+      mount -o remount,rw /proc; \
+      mount -o remount,rw /proc/sys; \
+      mount -o remount,rw /sys; "
+    sed -i -e "s@-\\s\\+kube-proxy@- ${extra_workaround_cmd} kube-proxy@g" "${src_file}"
+  fi
+
   cp "${src_file}" /etc/kubernetes/manifests
 }
 
@@ -629,7 +580,7 @@ function start-kube-proxy {
 # $4: value for variable 'cpulimit'
 # $5: pod name, which should be either etcd or etcd-events
 function prepare-etcd-manifest {
-  local host_name=$(hostname)
+  local host_name=$(hostname -s)
   local etcd_cluster=""
   local cluster_state="new"
   local etcd_protocol="http"
@@ -671,6 +622,7 @@ function prepare-etcd-manifest {
   else
     sed -i -e "s@{{ *pillar\.get('etcd_docker_tag', '\(.*\)') *}}@\1@g" "${temp_file}"
   fi
+
   sed -i -e "s@{{ *etcd_protocol *}}@$etcd_protocol@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_creds *}}@$etcd_creds@g" "${temp_file}"
   if [[ -n "${ETCD_VERSION:-}" ]]; then
@@ -862,7 +814,7 @@ function start-kube-apiserver {
   src_file="${src_dir}/kube-apiserver.manifest"
   remove-salt-config-comments "${src_file}"
   # Evaluate variables.
-  local -r kube_apiserver_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-apiserver.docker_tag)
+  local -r kube_apiserver_docker_tag=$(cat /opt/kubernetes/kube-docker-files/kube-apiserver.docker_tag)
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
   sed -i -e "s@{{srv_kube_path}}@/etc/srv/kubernetes@g" "${src_file}"
   sed -i -e "s@{{srv_sshproxy_path}}@/etc/srv/sshproxy@g" "${src_file}"
@@ -927,7 +879,7 @@ function start-kube-controller-manager {
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     params+=" --feature-gates=${FEATURE_GATES}"
   fi
-  local -r kube_rc_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-controller-manager.docker_tag)
+  local -r kube_rc_docker_tag=$(cat /opt/kubernetes/kube-docker-files/kube-controller-manager.docker_tag)
 
   local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/kube-controller-manager.manifest"
   remove-salt-config-comments "${src_file}"
@@ -1182,63 +1134,74 @@ function start-rescheduler {
   fi
 }
 
-# Setup working directory for kubelet.
-function setup-kubelet-dir {
-    echo "Making /var/lib/kubelet executable for kubelet"
-    mount -B /var/lib/kubelet /var/lib/kubelet/
-    mount -B -o remount,exec,suid,dev /var/lib/kubelet
-}
+# Install and setup rkt
+# TODO(euank): There should be a toggle to use the distro-provided rkt binary
+# Sets the following variables:
+#   RKT_BIN: the path to the rkt binary
+function setup-rkt {
+    local rkt_bin="${KUBE_HOME}/bin/rkt"
+    if [[ -x "${rkt_bin}" ]]; then
+      # idempotency, skip downloading this time
+      # TODO(euank): this might get in the way of updates, but 'file busy'
+      # because of rkt-api would too
+      RKT_BIN="${rkt_bin}"
+      return
+    fi
+    mkdir -p /etc/rkt "${KUBE_HOME}/download/"
+    local rkt_tar="${KUBE_HOME}/download/rkt.tar.gz"
+    local rkt_tmpdir=$(mktemp -d "${KUBE_HOME}/rkt_download.XXXXX")
+    curl --retry 5 --retry-delay 3 --fail --silent --show-error \
+      --location --create-dirs --output "${rkt_tar}" \
+      https://github.com/coreos/rkt/releases/download/v${RKT_VERSION}/rkt-v${RKT_VERSION}.tar.gz
+    tar --strip-components=1 -xf "${rkt_tar}" -C "${rkt_tmpdir}" --overwrite
+    mv "${rkt_tmpdir}/rkt" "${rkt_bin}"
+    if [[ ! -x "${rkt_bin}" ]]; then
+      echo "Could not download requested rkt binary"
+      exit 1
+    fi
+    RKT_BIN="${rkt_bin}"
+    # Cache rkt stage1 images for speed
+    "${RKT_BIN}" fetch --insecure-options=image "${rkt_tmpdir}"/*.aci
+    rm -rf "${rkt_tmpdir}"
 
-function reset-motd {
-  # kubelet is installed both on the master and nodes, and the version is easy to parse (unlike kubectl)
-  local -r version="$("${KUBE_HOME}"/bin/kubelet --version=true | cut -f2 -d " ")"
-  # This logic grabs either a release tag (v1.2.1 or v1.2.1-alpha.1),
-  # or the git hash that's in the build info.
-  local gitref="$(echo "${version}" | sed -r "s/(v[0-9]+\.[0-9]+\.[0-9]+)(-[a-z]+\.[0-9]+)?.*/\1\2/g")"
-  local devel=""
-  if [[ "${gitref}" != "${version}" ]]; then
-    devel="
-Note: This looks like a development version, which might not be present on GitHub.
-If it isn't, the closest tag is at:
-  https://github.com/kubernetes/kubernetes/tree/${gitref}
-"
-    gitref="${version//*+/}"
-  fi
-  cat > /etc/motd <<EOF
+    cat > /etc/systemd/system/rkt-api.service <<EOF
+[Unit]
+Description=rkt api service
+Documentation=http://github.com/coreos/rkt
+After=network.target
 
-Welcome to Kubernetes ${version}!
+[Service]
+ExecStart=${RKT_BIN} api-service --listen=127.0.0.1:15441
 
-You can find documentation for Kubernetes at:
-  http://docs.kubernetes.io/
-
-The source for this release can be found at:
-  /home/kubernetes/kubernetes-src.tar.gz
-Or you can download it at:
-  https://storage.googleapis.com/kubernetes-release/release/${version}/kubernetes-src.tar.gz
-
-It is based on the Kubernetes source at:
-  https://github.com/kubernetes/kubernetes/tree/${gitref}
-${devel}
-For Kubernetes copyright and licensing information, see:
-  /home/kubernetes/LICENSES
-
+[Install]
+WantedBy=multi-user.target
 EOF
+    systemctl enable rkt-api.service
+    systemctl start rkt-api.service
 }
 
-function override-kubectl {
-    echo "overriding kubectl"
-    echo "export PATH=${KUBE_HOME}/bin:\$PATH" > /etc/profile.d/kube_env.sh
-}
-
-function pre-warm-mounter {
-    echo "prewarming mounter"
-    ${KUBE_HOME}/bin/mounter &> /dev/null
+# Install docker2aci, needed to load server images if using rkt runtime
+# This should be removed once rkt can fetch on-disk docker tarballs directly
+# Sets the following variables:
+#   DOCKER2ACI_BIN: the path to the docker2aci binary
+function install-docker2aci {
+  local tar_path="${KUBE_HOME}/download/docker2aci.tar.gz"
+  local tmp_path="${KUBE_HOME}/docker2aci"
+  mkdir -p "${KUBE_HOME}/download/" "${tmp_path}"
+  curl --retry 5 --retry-delay 3 --fail --silent --show-error \
+    --location --create-dirs --output "${tar_path}" \
+    https://github.com/appc/docker2aci/releases/download/v0.14.0/docker2aci-v0.14.0.tar.gz
+  tar --strip-components=1 -xf "${tar_path}" -C "${tmp_path}" --overwrite
+  DOCKER2ACI_BIN="${KUBE_HOME}/bin/docker2aci"
+  mv "${tmp_path}/docker2aci" "${DOCKER2ACI_BIN}"
 }
 
 ########### Main Function ###########
 echo "Start to configure instance for kubernetes"
 
-KUBE_HOME="/home/kubernetes"
+# Note: this name doesn't make as much sense here as in gci where it's actually
+# /home/kubernetes, but for ease of diff-ing, retain the same variable name
+KUBE_HOME="/opt/kubernetes"
 if [[ ! -e "${KUBE_HOME}/kube-env" ]]; then
   echo "The ${KUBE_HOME}/kube-env file does not exist!! Terminate cluster initialization."
   exit 1
@@ -1253,12 +1216,13 @@ if [[ -n "${KUBE_USER:-}" ]]; then
   fi
 fi
 
-setup-os-params
-config-ip-firewall
+# KUBERNETES_CONTAINER_RUNTIME is set by the `kube-env` file, but it's a bit of a mouthful
+if [[ "${CONTAINER_RUNTIME:-}" == "" ]]; then
+  CONTAINER_RUNTIME="${KUBERNETES_CONTAINER_RUNTIME:-docker}"
+fi
+
 create-dirs
-setup-kubelet-dir
 ensure-local-ssds
-setup-logrotate
 if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   mount-master-pd
   create-master-auth
@@ -1269,10 +1233,16 @@ else
   create-kubeproxy-kubeconfig
 fi
 
-override-kubectl
-# Run the containerized mounter once to pre-cache the container image.
-pre-warm-mounter
-assemble-docker-flags
+if [[ "${CONTAINER_RUNTIME:-}" == "rkt" ]]; then
+  systemctl stop docker
+  systemctl disable docker
+  setup-rkt
+  install-docker2aci
+  create-kube-controller-manager-dirs
+else
+  configure-docker-daemon
+fi
+
 load-docker-images
 start-kubelet
 
@@ -1298,5 +1268,5 @@ else
     start-image-puller
   fi
 fi
-reset-motd
+start-fluentd
 echo "Done for the configuration for kubernetes"
