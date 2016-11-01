@@ -75,6 +75,11 @@ function push-node {
 	echo "Skeleton Provider: push-node not implemented" 1>&2
 }
 
+# Sets the kubeconfig context value of the cluster.
+function kubeconfig-context {
+	echo "Skeleton Provider: kubeconfig-context not implemented" 1>&2
+}
+
 # Execute prior to running tests to build a release if required for env
 function test-build-release {
 	echo "Skeleton Provider: test-build-release not implemented" 1>&2

@@ -1658,6 +1658,15 @@ function kube-push() {
   echo
 }
 
+# Sets the kubeconfig context value of the cluster.
+#
+# Vars set:
+#   CONFIG_CONTEXT
+function kubeconfig-context {
+  CONFIG_CONTEXT="${PROJECT}_${INSTANCE_PREFIX}"
+}
+
+
 # -----------------------------------------------------------------------------
 # Cluster specific test helpers used from hack/e2e.go
 
