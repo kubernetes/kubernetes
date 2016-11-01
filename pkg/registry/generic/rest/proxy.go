@@ -32,7 +32,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	utilconfig "k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/pkg/util/httpstream"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/proxy"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 
 	"github.com/golang/glog"
 	"github.com/mxk/go-flowrate/flowrate"
@@ -149,7 +151,7 @@ func (h *UpgradeAwareProxyHandler) tryUpgrade(w http.ResponseWriter, req *http.R
 		backendConn, err = h.connectBackend(req, h.Location)
 	}
 	if err != nil {
-		h.Responder.Error(fmt.Errorf("error dialing backend: %v", err))
+		h.Responder.Error(err)
 		return true
 	}
 	defer backendConn.Close()
@@ -170,7 +172,7 @@ func (h *UpgradeAwareProxyHandler) tryUpgrade(w http.ResponseWriter, req *http.R
 
 	// Forward raw response bytes back to client.
 	if _, err = requestHijackedConn.Write(rawResponse); err != nil {
-		glog.Errorf("Error proxying response from backend to client: %v", err)
+		utilruntime.HandleError(fmt.Errorf("Error proxying response from backend to client: %v", err))
 	}
 
 	// Proxy the connection.
@@ -332,6 +334,8 @@ func (h *UpgradeAwareProxyHandler) defaultProxyTransport(url *url.URL, internalT
 type corsRemovingTransport struct {
 	http.RoundTripper
 }
+
+var _ = utilnet.RoundTripperWrapper(&corsRemovingTransport{})
 
 func (rt *corsRemovingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	resp, err := rt.RoundTripper.RoundTrip(req)
