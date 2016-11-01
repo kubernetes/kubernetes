@@ -35,6 +35,7 @@ import (
 	policyapiv1beta1 "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	storageapiv1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
+	"k8s.io/kubernetes/pkg/apiserver/openapi"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/healthz"
@@ -104,6 +105,12 @@ type completedConfig struct {
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
 func (c *Config) Complete() completedConfig {
+	if c.GenericConfig.OpenAPIConfig != nil && c.GenericConfig.OpenAPIConfig.GetOperationIDAndTags == nil {
+		// Avoid duplicate OpenAPI operation IDs and add GroupVersion tags to all operation definitions.
+		c.GenericConfig.OpenAPIConfig.GetOperationIDAndTags = openapi.GetOperationIDAndTagsFunc(
+			[]string{"extensions_v1beta1", "batch_v2alpha1"},
+			[]string{"getAPIResources", "getAPIGroup", "getAPIVersions"})
+	}
 	c.GenericConfig.Complete()
 
 	// enable swagger UI only if general UI support is on
