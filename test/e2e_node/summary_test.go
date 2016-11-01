@@ -138,10 +138,9 @@ var _ = framework.KubeDescribe("Summary API", func() {
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,
 							"UsedBytes":      bounded(kb, 1*mb),
-							// Inodes are not reported for Volumes.
-							"InodesFree": BeNil(),
-							"Inodes":     BeNil(),
-							"InodesUsed": BeNil(),
+							"InodesFree":     bounded(1E4, 1E8),
+							"Inodes":         bounded(1E4, 1E8),
+							"InodesUsed":     bounded(0, 1E8),
 						}),
 					}),
 				}),
