@@ -46,15 +46,15 @@ type CachedDiscoveryClient struct {
 	// ttl is how long the cache should be considered valid
 	ttl time.Duration
 
-	// startedAt is the time this client was created
-	startedAt time.Time
+	// mutex protects the variables below
+	mutex sync.Mutex
 
-	// invalidationLock protects maxAge and lastInvalidation
-	invalidationLock sync.Mutex
-	// maxAge is the time of the oldest used cache file, zero if no cache was used
-	maxAge time.Time
-	// every cache file before this timestamp will be ignored
-	lastInvalidation time.Time
+	// ourFiles are all filenames of cache files created by this process
+	ourFiles map[string]struct{}
+	// invalidated is true if all cache files should be ignored that are not ours (e.g. after Invalidate() was called)
+	invalidated bool
+	// fresh is true if all used cache files were ours
+	fresh bool
 }
 
 var _ discovery.CachedDiscoveryInterface = &CachedDiscoveryClient{}
@@ -127,6 +127,15 @@ func (d *CachedDiscoveryClient) ServerGroups() (*unversioned.APIGroupList, error
 }
 
 func (d *CachedDiscoveryClient) getCachedFile(filename string) ([]byte, error) {
+	// after invalidation ignore cache files not created by this process
+	d.mutex.Lock()
+	_, ourFile := d.ourFiles[filename]
+	if d.invalidated && !ourFile {
+		d.mutex.Unlock()
+		return nil, errors.New("cache invalidated")
+	}
+	d.mutex.Unlock()
+
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil, err
@@ -141,21 +150,15 @@ func (d *CachedDiscoveryClient) getCachedFile(filename string) ([]byte, error) {
 		return nil, errors.New("cache expired")
 	}
 
-	d.invalidationLock.Lock()
-	if fileInfo.ModTime().Before(d.lastInvalidation) {
-		d.invalidationLock.Unlock()
-		return nil, errors.New("cache invalidated")
-	}
-	if d.maxAge.IsZero() || d.maxAge.After(fileInfo.ModTime()) {
-		d.maxAge = fileInfo.ModTime()
-	}
-	d.invalidationLock.Unlock()
-
 	// the cache is present and its valid.  Try to read and use it.
 	cachedBytes, err := ioutil.ReadAll(file)
 	if err != nil {
 		return nil, err
 	}
+
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+	d.fresh = d.fresh && ourFile
 
 	return cachedBytes, nil
 }
@@ -192,7 +195,13 @@ func (d *CachedDiscoveryClient) writeCachedFile(filename string, obj runtime.Obj
 	}
 
 	// atomic rename
-	return os.Rename(name, filename)
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+	err = os.Rename(name, filename)
+	if err == nil {
+		d.ourFiles[filename] = struct{}{}
+	}
+	return err
 }
 
 func (d *CachedDiscoveryClient) RESTClient() restclient.Interface {
@@ -216,19 +225,19 @@ func (d *CachedDiscoveryClient) SwaggerSchema(version unversioned.GroupVersion) 
 }
 
 func (d *CachedDiscoveryClient) Fresh() bool {
-	d.invalidationLock.Lock()
-	defer d.invalidationLock.Unlock()
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
 
-	return d.maxAge.IsZero() || !d.startedAt.After(d.maxAge)
+	return d.fresh
 }
 
 func (d *CachedDiscoveryClient) Invalidate() {
-	d.invalidationLock.Lock()
-	defer d.invalidationLock.Unlock()
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
 
-	// round down to cope with second precision of a number of file systems
-	d.lastInvalidation = time.Now().Truncate(time.Second)
-	d.maxAge = time.Time{}
+	d.ourFiles = map[string]struct{}{}
+	d.fresh = true
+	d.invalidated = true
 }
 
 // NewCachedDiscoveryClient creates a new DiscoveryClient.  cacheDirectory is the directory where discovery docs are held.  It must be unique per host:port combination to work well.
@@ -237,7 +246,7 @@ func NewCachedDiscoveryClient(delegate discovery.DiscoveryInterface, cacheDirect
 		delegate:       delegate,
 		cacheDirectory: cacheDirectory,
 		ttl:            ttl,
-		// round down to cope with second precision of a number of file systems
-		startedAt: time.Now().Truncate(time.Second),
+		ourFiles:       map[string]struct{}{},
+		fresh:          true,
 	}
 }

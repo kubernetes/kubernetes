@@ -60,9 +60,6 @@ func TestCachedDiscoveryClient_Fresh(t *testing.T) {
 	assert.True(cdc.Fresh(), "should be fresh after another resources call")
 	assert.Equal(c.resourceCalls, 1)
 
-	// wait for another second to cope with second precision of a number of file systems
-	waitForNextSecond()
-
 	cdc = NewCachedDiscoveryClient(&c, d, 60*time.Second)
 	cdc.ServerGroups()
 	assert.False(cdc.Fresh(), "should NOT be fresh after recreation with existing groups cache")
@@ -78,16 +75,6 @@ func TestCachedDiscoveryClient_Fresh(t *testing.T) {
 	cdc.ServerResources()
 	assert.True(cdc.Fresh(), "should ignore existing resources cache after invalidation")
 	assert.Equal(c.resourceCalls, 2)
-}
-
-func waitForNextSecond() {
-	start := time.Now()
-	for {
-		if time.Now().Truncate(time.Second).After(start) {
-			break
-		}
-		time.Sleep(time.Millisecond * 100)
-	}
 }
 
 func TestNewCachedDiscoveryClient_TTL(t *testing.T) {
