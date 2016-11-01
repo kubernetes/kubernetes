@@ -18,30 +18,27 @@ package streaming
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 )
 
-type ResponseError struct {
-	Err  string
-	Code codes.Code
-}
-
-func (e *ResponseError) Error() string {
-	return e.Err
-}
-
 func ErrorStreamingDisabled(method string) error {
-	return &ResponseError{
-		Err:  fmt.Sprintf("streaming method %s disabled", method),
-		Code: codes.NotFound,
-	}
+	return grpc.Errorf(codes.NotFound, fmt.Sprintf("streaming method %s disabled", method))
 }
 
 func ErrorTimeout(op string, timeout time.Duration) error {
-	return &ResponseError{
-		Err:  fmt.Sprintf("%s timed out after %s", op, timeout.String()),
-		Code: codes.DeadlineExceeded,
+	return grpc.Errorf(codes.DeadlineExceeded, fmt.Sprintf("%s timed out after %s", op, timeout.String()))
+}
+
+// Translates a CRI streaming error into an HTTP status code.
+func HTTPStatus(err error) int {
+	switch grpc.Code(err) {
+	case codes.NotFound:
+		return http.StatusNotFound
+	default:
+		return http.StatusInternalServerError
 	}
 }

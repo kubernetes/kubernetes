@@ -265,7 +265,8 @@ func NewDockerManager(
 		imageStatsProvider:     newImageStatsProvider(client),
 		seccompProfileRoot:     seccompProfileRoot,
 	}
-	dm.runner = lifecycle.NewHandlerRunner(httpClient, dm, dm)
+	cmdRunner := &kubecontainer.ContainerCommandRunnerWrapper{dm}
+	dm.runner = lifecycle.NewHandlerRunner(httpClient, cmdRunner, dm)
 	dm.imagePuller = images.NewImageManager(kubecontainer.FilterEventRecorder(recorder), dm, imageBackOff, serializeImagePulls, qps, burst)
 	dm.containerGC = NewContainerGC(client, podGetter, containerLogsDir)
 

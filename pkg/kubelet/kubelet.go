@@ -537,14 +537,13 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 					return nil, err
 				}
 			}
-
 			// kubelet defers to the runtime shim to setup networking. Setting
 			// this to nil will prevent it from trying to invoke the plugin.
 			// It's easier to always probe and initialize plugins till cri
 			// becomes the default.
 			klet.networkPlugin = nil
 
-			klet.containerRuntime, err = kuberuntime.NewKubeGenericRuntimeManager(
+			runtime, err := kuberuntime.NewKubeGenericRuntimeManager(
 				kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
 				klet.livenessManager,
 				containerRefManager,
@@ -575,9 +574,11 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			if err != nil {
 				return nil, err
 			}
+			klet.containerRuntime = runtime
+			klet.runner = runtime
 		default:
 			// Only supported one for now, continue.
-			klet.containerRuntime = dockertools.NewDockerManager(
+			runtime := dockertools.NewDockerManager(
 				kubeDeps.DockerClient,
 				kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
 				klet.livenessManager,
@@ -609,6 +610,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 				kubeCfg.SeccompProfileRoot,
 				kubeDeps.ContainerRuntimeOptions...,
 			)
+			klet.containerRuntime = runtime
+			klet.runner = &kubecontainer.ContainerCommandRunnerWrapper{runtime}
 		}
 	case "rkt":
 		// TODO: Include hairpin mode settings in rkt?
@@ -640,6 +643,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			return nil, err
 		}
 		klet.containerRuntime = rktRuntime
+		klet.runner = &kubecontainer.ContainerCommandRunnerWrapper{rktRuntime}
 	case "remote":
 		remoteRuntimeService, err := remote.NewRemoteRuntimeService(kubeCfg.RemoteRuntimeEndpoint, kubeCfg.RuntimeRequestTimeout.Duration)
 		if err != nil {
@@ -649,7 +653,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		if err != nil {
 			return nil, err
 		}
-		klet.containerRuntime, err = kuberuntime.NewKubeGenericRuntimeManager(
+		runtime, err := kuberuntime.NewKubeGenericRuntimeManager(
 			kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
 			klet.livenessManager,
 			containerRefManager,
@@ -670,6 +674,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		if err != nil {
 			return nil, err
 		}
+		klet.containerRuntime = runtime
+		klet.runner = runtime
 	default:
 		return nil, fmt.Errorf("unsupported container runtime %q specified", kubeCfg.ContainerRuntime)
 	}
@@ -696,7 +702,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	}
 	klet.imageManager = imageManager
 
-	klet.runner = klet.containerRuntime
 	klet.statusManager = status.NewManager(kubeClient, klet.podManager)
 
 	klet.probeManager = prober.NewManager(
