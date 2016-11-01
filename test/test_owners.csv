@@ -859,6 +859,7 @@ k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/webhook,ghodss,1
 k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac,hurf,1
 k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy,mml,1
 k8s.io/kubernetes/plugin/pkg/auth/authorizer/webhook,hurf,1
+k8s.io/kubernetes/plugin/pkg/client/auth/gcp,jlowdermilk,0
 k8s.io/kubernetes/plugin/pkg/client/auth/oidc,cjcullen,1
 k8s.io/kubernetes/plugin/pkg/scheduler,fgrzadkowski,0
 k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates,fgrzadkowski,0
