@@ -24,5 +24,6 @@ import (
 type RESTOptionsGetter func(resource unversioned.GroupResource) generic.RESTOptions
 
 type RESTStorageProvider interface {
+	GroupName() string
 	NewRESTStorage(apiResourceConfigSource APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (APIGroupInfo, bool)
 }

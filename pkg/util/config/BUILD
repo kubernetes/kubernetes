@@ -17,6 +17,7 @@ go_library(
         "configuration_map.go",
         "doc.go",
         "feature_gate.go",
+        "namedcertkey_flag.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -31,6 +32,7 @@ go_test(
     srcs = [
         "config_test.go",
         "feature_gate_test.go",
+        "namedcertkey_flag_test.go",
     ],
     library = "go_default_library",
     tags = ["automanaged"],

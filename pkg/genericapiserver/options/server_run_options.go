@@ -118,6 +118,7 @@ type ServerRunOptions struct {
 	TLSCAFile              string
 	TLSCertFile            string
 	TLSPrivateKeyFile      string
+	SNICertKeys            []config.NamedCertKey
 	TokenAuthFile          string
 	EnableAnyToken         bool
 	WatchCacheSizes        []string
@@ -488,13 +489,22 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"Controllers. This must be a valid PEM-encoded CA bundle.")
 
 	fs.StringVar(&s.TLSCertFile, "tls-cert-file", s.TLSCertFile, ""+
-		"File containing x509 Certificate for HTTPS. (CA cert, if any, concatenated "+
+		"File containing the default x509 Certificate for HTTPS. (CA cert, if any, concatenated "+
 		"after server cert). If HTTPS serving is enabled, and --tls-cert-file and "+
 		"--tls-private-key-file are not provided, a self-signed certificate and key "+
 		"are generated for the public address and saved to /var/run/kubernetes.")
 
 	fs.StringVar(&s.TLSPrivateKeyFile, "tls-private-key-file", s.TLSPrivateKeyFile,
-		"File containing x509 private key matching --tls-cert-file.")
+		"File containing the default x509 private key matching --tls-cert-file.")
+
+	fs.Var(config.NewNamedCertKeyArray(&s.SNICertKeys), "tls-sni-cert-key", ""+
+		"A pair of x509 certificate and private key file paths, optionally suffixed with a list of "+
+		"domain patterns which are fully qualified domain names, possibly with prefixed wildcard "+
+		"segments. If no domain patterns are provided, the names of the certificate are "+
+		"extracted. Non-wildcard matches trump over wildcard matches, explicit domain patterns "+
+		"trump over extracted names. For multiple key/certificate pairs, use the "+
+		"--tls-sni-cert-key multiple times. "+
+		"Examples: \"example.key,example.crt\" or \"*.foo.com,foo.com:foo.key,foo.crt\".")
 
 	fs.StringVar(&s.TokenAuthFile, "token-auth-file", s.TokenAuthFile, ""+
 		"If set, the file that will be used to secure the secure port of the API server "+

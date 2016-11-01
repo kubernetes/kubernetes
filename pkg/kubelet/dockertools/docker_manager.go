@@ -65,6 +65,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/selinux"
 	"k8s.io/kubernetes/pkg/util/sets"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/util/term"
@@ -507,20 +508,14 @@ func makeEnvList(envs []kubecontainer.EnvVar) (result []string) {
 // '<HostPath>:<ContainerPath>', or
 // '<HostPath>:<ContainerPath>:ro', if the path is read only, or
 // '<HostPath>:<ContainerPath>:Z', if the volume requires SELinux
-// relabeling and the pod provides an SELinux label
-func makeMountBindings(mounts []kubecontainer.Mount, podHasSELinuxLabel bool) (result []string) {
+// relabeling
+func makeMountBindings(mounts []kubecontainer.Mount) (result []string) {
 	for _, m := range mounts {
 		bind := fmt.Sprintf("%s:%s", m.HostPath, m.ContainerPath)
 		if m.ReadOnly {
 			bind += ":ro"
 		}
-		// Only request relabeling if the pod provides an
-		// SELinux context. If the pod does not provide an
-		// SELinux context relabeling will label the volume
-		// with the container's randomly allocated MCS label.
-		// This would restrict access to the volume to the
-		// container which mounts it first.
-		if m.SELinuxRelabel && podHasSELinuxLabel {
+		if m.SELinuxRelabel && selinux.SELinuxEnabled() {
 			if m.ReadOnly {
 				bind += ",Z"
 			} else {
@@ -646,8 +641,7 @@ func (dm *DockerManager) runContainer(
 			{PathOnHost: "/dev/nvidia-uvm", PathInContainer: "/dev/nvidia-uvm", CgroupPermissions: "mrw"},
 		}
 	}
-	podHasSELinuxLabel := pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SELinuxOptions != nil
-	binds := makeMountBindings(opts.Mounts, podHasSELinuxLabel)
+	binds := makeMountBindings(opts.Mounts)
 	// The reason we create and mount the log file in here (not in kubelet) is because
 	// the file's location depends on the ID of the container, and we need to create and
 	// mount the file before actually starting the container.
@@ -666,6 +660,13 @@ func (dm *DockerManager) runContainer(
 		} else {
 			fs.Close() // Close immediately; we're just doing a `touch` here
 			b := fmt.Sprintf("%s:%s", containerLogPath, container.TerminationMessagePath)
+
+			// Have docker relabel the termination log path if SELinux is
+			// enabled.
+			if selinux.SELinuxEnabled() {
+				b += ":Z"
+			}
+
 			binds = append(binds, b)
 		}
 	}
@@ -687,18 +688,20 @@ func (dm *DockerManager) runContainer(
 	}
 
 	// Set sysctls if requested
-	sysctls, unsafeSysctls, err := api.SysctlsFromPodAnnotations(pod.Annotations)
-	if err != nil {
-		dm.recorder.Eventf(ref, api.EventTypeWarning, events.FailedToCreateContainer, "Failed to create docker container %q of pod %q with error: %v", container.Name, format.Pod(pod), err)
-		return kubecontainer.ContainerID{}, err
-	}
-	if len(sysctls)+len(unsafeSysctls) > 0 {
-		hc.Sysctls = make(map[string]string, len(sysctls)+len(unsafeSysctls))
-		for _, c := range sysctls {
-			hc.Sysctls[c.Name] = c.Value
+	if container.Name == PodInfraContainerName {
+		sysctls, unsafeSysctls, err := api.SysctlsFromPodAnnotations(pod.Annotations)
+		if err != nil {
+			dm.recorder.Eventf(ref, api.EventTypeWarning, events.FailedToCreateContainer, "Failed to create docker container %q of pod %q with error: %v", container.Name, format.Pod(pod), err)
+			return kubecontainer.ContainerID{}, err
 		}
-		for _, c := range unsafeSysctls {
-			hc.Sysctls[c.Name] = c.Value
+		if len(sysctls)+len(unsafeSysctls) > 0 {
+			hc.Sysctls = make(map[string]string, len(sysctls)+len(unsafeSysctls))
+			for _, c := range sysctls {
+				hc.Sysctls[c.Name] = c.Value
+			}
+			for _, c := range unsafeSysctls {
+				hc.Sysctls[c.Name] = c.Value
+			}
 		}
 	}
 
@@ -1316,6 +1319,12 @@ func (dm *DockerManager) PortForward(pod *kubecontainer.Pod, port uint16, stream
 	}
 
 	return PortForward(dm.client, podInfraContainer.ID.ID, port, stream)
+}
+
+// UpdatePodCIDR updates the podCIDR for the runtime.
+// Currently no-ops, just implemented to satisfy the cri.
+func (dm *DockerManager) UpdatePodCIDR(podCIDR string) error {
+	return nil
 }
 
 // Temporarily export this function to share with dockershim.

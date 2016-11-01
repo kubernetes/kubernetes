@@ -225,7 +225,7 @@ func Run(s *options.ServerRunOptions) error {
 	installExtensionsAPIs(m, restOptionsFactory)
 
 	sharedInformers.Start(wait.NeverStop)
-	m.PrepareRun().Run()
+	m.PrepareRun().Run(wait.NeverStop)
 	return nil
 }
 

@@ -38,7 +38,7 @@ func SetEnvParams() *EnvParams {
 		"hyperkube_image":    "",
 		"discovery_image":    fmt.Sprintf("gcr.io/google_containers/kube-discovery-%s:%s", runtime.GOARCH, "1.0"),
 		"etcd_image":         "",
-		"component_loglevel": "--v=4",
+		"component_loglevel": "--v=2",
 	}
 
 	for k := range envParams {

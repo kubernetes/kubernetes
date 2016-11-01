@@ -418,8 +418,17 @@ func TestOrderedByQoS(t *testing.T) {
 	}
 }
 
-// TestOrderedByDisk ensures we order pods by greediest disk consumer
-func TestOrderedByDisk(t *testing.T) {
+func TestOrderedbyDisk(t *testing.T) {
+	testOrderedByResource(t, resourceDisk, newPodDiskStats)
+}
+
+func TestOrderedbyInodes(t *testing.T) {
+	testOrderedByResource(t, resourceInodes, newPodInodeStats)
+}
+
+// testOrderedByDisk ensures we order pods by greediest resource consumer
+func testOrderedByResource(t *testing.T, orderedByResource api.ResourceName,
+	newPodStatsFunc func(pod *api.Pod, rootFsUsed, logsUsed, perLocalVolumeUsed resource.Quantity) statsapi.PodStats) {
 	pod1 := newPod("best-effort-high", []api.Container{
 		newContainer("best-effort-high", newResourceList("", ""), newResourceList("", "")),
 	}, []api.Volume{
@@ -463,19 +472,19 @@ func TestOrderedByDisk(t *testing.T) {
 		}),
 	})
 	stats := map[*api.Pod]statsapi.PodStats{
-		pod1: newPodDiskStats(pod1, resource.MustParse("50Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")),  // 200Mi
-		pod2: newPodDiskStats(pod2, resource.MustParse("100Mi"), resource.MustParse("150Mi"), resource.MustParse("50Mi")), // 300Mi
-		pod3: newPodDiskStats(pod3, resource.MustParse("200Mi"), resource.MustParse("150Mi"), resource.MustParse("50Mi")), // 400Mi
-		pod4: newPodDiskStats(pod4, resource.MustParse("300Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")), // 450Mi
-		pod5: newPodDiskStats(pod5, resource.MustParse("400Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")), // 550Mi
-		pod6: newPodDiskStats(pod6, resource.MustParse("500Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")), // 650Mi
+		pod1: newPodStatsFunc(pod1, resource.MustParse("50Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")),  // 200Mi
+		pod2: newPodStatsFunc(pod2, resource.MustParse("100Mi"), resource.MustParse("150Mi"), resource.MustParse("50Mi")), // 300Mi
+		pod3: newPodStatsFunc(pod3, resource.MustParse("200Mi"), resource.MustParse("150Mi"), resource.MustParse("50Mi")), // 400Mi
+		pod4: newPodStatsFunc(pod4, resource.MustParse("300Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")), // 450Mi
+		pod5: newPodStatsFunc(pod5, resource.MustParse("400Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")), // 550Mi
+		pod6: newPodStatsFunc(pod6, resource.MustParse("500Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")), // 650Mi
 	}
 	statsFn := func(pod *api.Pod) (statsapi.PodStats, bool) {
 		result, found := stats[pod]
 		return result, found
 	}
 	pods := []*api.Pod{pod1, pod2, pod3, pod4, pod5, pod6}
-	orderedBy(disk(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, resourceDisk)).Sort(pods)
+	orderedBy(disk(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, orderedByResource)).Sort(pods)
 	expected := []*api.Pod{pod6, pod5, pod4, pod3, pod2, pod1}
 	for i := range expected {
 		if pods[i] != expected[i] {
@@ -484,8 +493,17 @@ func TestOrderedByDisk(t *testing.T) {
 	}
 }
 
-// TestOrderedByQoSDisk ensures we order pods by qos and then greediest disk consumer
-func TestOrderedByQoSDisk(t *testing.T) {
+func TestOrderedbyQoSDisk(t *testing.T) {
+	testOrderedByQoSResource(t, resourceDisk, newPodDiskStats)
+}
+
+func TestOrderedbyQoSInodes(t *testing.T) {
+	testOrderedByQoSResource(t, resourceInodes, newPodInodeStats)
+}
+
+// testOrderedByQoSDisk ensures we order pods by qos and then greediest resource consumer
+func testOrderedByQoSResource(t *testing.T, orderedByResource api.ResourceName,
+	newPodStatsFunc func(pod *api.Pod, rootFsUsed, logsUsed, perLocalVolumeUsed resource.Quantity) statsapi.PodStats) {
 	pod1 := newPod("best-effort-high", []api.Container{
 		newContainer("best-effort-high", newResourceList("", ""), newResourceList("", "")),
 	}, []api.Volume{
@@ -529,19 +547,19 @@ func TestOrderedByQoSDisk(t *testing.T) {
 		}),
 	})
 	stats := map[*api.Pod]statsapi.PodStats{
-		pod1: newPodDiskStats(pod1, resource.MustParse("50Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")),  // 200Mi
-		pod2: newPodDiskStats(pod2, resource.MustParse("100Mi"), resource.MustParse("150Mi"), resource.MustParse("50Mi")), // 300Mi
-		pod3: newPodDiskStats(pod3, resource.MustParse("200Mi"), resource.MustParse("150Mi"), resource.MustParse("50Mi")), // 400Mi
-		pod4: newPodDiskStats(pod4, resource.MustParse("300Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")), // 450Mi
-		pod5: newPodDiskStats(pod5, resource.MustParse("400Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")), // 550Mi
-		pod6: newPodDiskStats(pod6, resource.MustParse("500Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")), // 650Mi
+		pod1: newPodStatsFunc(pod1, resource.MustParse("50Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")),  // 200Mi
+		pod2: newPodStatsFunc(pod2, resource.MustParse("100Mi"), resource.MustParse("150Mi"), resource.MustParse("50Mi")), // 300Mi
+		pod3: newPodStatsFunc(pod3, resource.MustParse("200Mi"), resource.MustParse("150Mi"), resource.MustParse("50Mi")), // 400Mi
+		pod4: newPodStatsFunc(pod4, resource.MustParse("300Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")), // 450Mi
+		pod5: newPodStatsFunc(pod5, resource.MustParse("400Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")), // 550Mi
+		pod6: newPodStatsFunc(pod6, resource.MustParse("500Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")), // 650Mi
 	}
 	statsFn := func(pod *api.Pod) (statsapi.PodStats, bool) {
 		result, found := stats[pod]
 		return result, found
 	}
 	pods := []*api.Pod{pod1, pod2, pod3, pod4, pod5, pod6}
-	orderedBy(qosComparator, disk(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, resourceDisk)).Sort(pods)
+	orderedBy(qosComparator, disk(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, orderedByResource)).Sort(pods)
 	expected := []*api.Pod{pod2, pod1, pod4, pod3, pod6, pod5}
 	for i := range expected {
 		if pods[i] != expected[i] {
@@ -1430,16 +1448,32 @@ func testCompareThresholdValue(t *testing.T) {
 }
 
 // newPodInodeStats returns stats with specified usage amounts.
-// TODO: in future, this should take a value for inodesUsed per container.
-func newPodInodeStats(pod *api.Pod) statsapi.PodStats {
+func newPodInodeStats(pod *api.Pod, rootFsInodesUsed, logsInodesUsed, perLocalVolumeInodesUsed resource.Quantity) statsapi.PodStats {
 	result := statsapi.PodStats{
 		PodRef: statsapi.PodReference{
 			Name: pod.Name, Namespace: pod.Namespace, UID: string(pod.UID),
 		},
 	}
+	rootFsUsed := uint64(rootFsInodesUsed.Value())
+	logsUsed := uint64(logsInodesUsed.Value())
 	for range pod.Spec.Containers {
 		result.Containers = append(result.Containers, statsapi.ContainerStats{
-			Rootfs: &statsapi.FsStats{},
+			Rootfs: &statsapi.FsStats{
+				InodesUsed: &rootFsUsed,
+			},
+			Logs: &statsapi.FsStats{
+				InodesUsed: &logsUsed,
+			},
+		})
+	}
+
+	perLocalVolumeUsed := uint64(perLocalVolumeInodesUsed.Value())
+	for _, volumeName := range localVolumeNames(pod) {
+		result.VolumeStats = append(result.VolumeStats, statsapi.VolumeStats{
+			Name: volumeName,
+			FsStats: statsapi.FsStats{
+				InodesUsed: &perLocalVolumeUsed,
+			},
 		})
 	}
 	return result
@@ -1528,10 +1562,12 @@ func newVolume(name string, volumeSource api.VolumeSource) api.Volume {
 	}
 }
 
+// newPod uses the name as the uid.  Make names unique for testing.
 func newPod(name string, containers []api.Container, volumes []api.Volume) *api.Pod {
 	return &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
+			UID:  types.UID(name),
 		},
 		Spec: api.PodSpec{
 			Containers: containers,

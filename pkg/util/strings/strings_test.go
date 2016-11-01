@@ -71,3 +71,73 @@ func TestShortenString(t *testing.T) {
 		}
 	}
 }
+
+func TestIsVowel(t *testing.T) {
+	tests := []struct {
+		name string
+		arg  rune
+		want bool
+	}{
+		{
+			name: "yes",
+			arg:  'E',
+			want: true,
+		},
+		{
+			name: "no",
+			arg:  'n',
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		if got := isVowel(tt.arg); got != tt.want {
+			t.Errorf("%q. IsVowel() = %v, want %v", tt.name, got, tt.want)
+		}
+	}
+}
+
+func TestGetArticleForNoun(t *testing.T) {
+	type args struct {
+	}
+	tests := []struct {
+		noun    string
+		padding string
+		want    string
+	}{
+		{
+			noun:    "Frog",
+			padding: " ",
+			want:    " a ",
+		},
+		{
+			noun:    "frogs",
+			padding: " ",
+			want:    " ",
+		},
+		{
+			noun:    "apple",
+			padding: "",
+			want:    "an",
+		},
+		{
+			noun:    "Apples",
+			padding: " ",
+			want:    " ",
+		},
+		{
+			noun:    "Ingress",
+			padding: " ",
+			want:    " an ",
+		},
+		{
+			noun:    "Class",
+			padding: " ",
+			want:    " a ",
+		},
+	}
+	for _, tt := range tests {
+		if got := GetArticleForNoun(tt.noun, tt.padding); got != tt.want {
+			t.Errorf("%q. GetArticleForNoun() = %v, want %v", tt.noun, got, tt.want)
+		}
+	}
+}

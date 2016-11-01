@@ -43,8 +43,16 @@ func NewPersistentVolumeClaimEvaluator(kubeClient clientset.Interface) quota.Eva
 		MatchesScopeFunc:     generic.MatchesNoScopeFunc,
 		ConstraintsFunc:      PersistentVolumeClaimConstraintsFunc,
 		UsageFunc:            PersistentVolumeClaimUsageFunc,
-		ListFuncByNamespace: func(namespace string, options api.ListOptions) (runtime.Object, error) {
-			return kubeClient.Core().PersistentVolumeClaims(namespace).List(options)
+		ListFuncByNamespace: func(namespace string, options api.ListOptions) ([]runtime.Object, error) {
+			itemList, err := kubeClient.Core().PersistentVolumeClaims(namespace).List(options)
+			if err != nil {
+				return nil, err
+			}
+			results := make([]runtime.Object, 0, len(itemList.Items))
+			for i := range itemList.Items {
+				results = append(results, &itemList.Items[i])
+			}
+			return results, nil
 		},
 	}
 }

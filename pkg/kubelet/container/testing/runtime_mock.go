@@ -153,3 +153,8 @@ func (r *Mock) ImageStats() (*ImageStats, error) {
 	args := r.Called()
 	return args.Get(0).(*ImageStats), args.Error(1)
 }
+
+// UpdatePodCIDR fulfills the cri interface.
+func (r *Mock) UpdatePodCIDR(c string) error {
+	return nil
+}

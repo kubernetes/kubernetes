@@ -102,9 +102,6 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 		t.Fatal(err)
 	}
 
-	fakeNodeClient := fake.NewSimpleClientset(registrytest.MakeNodeList([]string{"node1", "node2"}, api.NodeResources{}))
-	master.nodeClient = fakeNodeClient.Core().Nodes()
-
 	return master, server, *config, assert.New(t)
 }
 
@@ -181,23 +178,6 @@ func TestVersion(t *testing.T) {
 	}
 }
 
-// TestGetServersToValidate verifies the unexported getServersToValidate function
-func TestGetServersToValidate(t *testing.T) {
-	_, etcdserver, config, assert := setUp(t)
-	defer etcdserver.Terminate(t)
-
-	servers := getServersToValidate(config.StorageFactory)
-
-	// Expected servers to validate: scheduler, controller-manager and etcd.
-	assert.Equal(3, len(servers), "unexpected server list: %#v", servers)
-
-	for _, server := range []string{"scheduler", "controller-manager", "etcd-0"} {
-		if _, ok := servers[server]; !ok {
-			t.Errorf("server list missing: %s", server)
-		}
-	}
-}
-
 // TestFindExternalAddress verifies both pass and fail cases for the unexported
 // findExternalAddress function
 func TestFindExternalAddress(t *testing.T) {
@@ -230,34 +210,36 @@ func (*fakeEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP,
 // TestGetNodeAddresses verifies that proper results are returned
 // when requesting node addresses.
 func TestGetNodeAddresses(t *testing.T) {
-	master, etcdserver, _, assert := setUp(t)
-	defer etcdserver.Terminate(t)
+	assert := assert.New(t)
+
+	fakeNodeClient := fake.NewSimpleClientset(registrytest.MakeNodeList([]string{"node1", "node2"}, api.NodeResources{})).Core().Nodes()
+	addressProvider := nodeAddressProvider{fakeNodeClient}
 
 	// Fail case (no addresses associated with nodes)
-	nodes, _ := master.nodeClient.List(api.ListOptions{})
-	addrs, err := master.getNodeAddresses()
+	nodes, _ := fakeNodeClient.List(api.ListOptions{})
+	addrs, err := addressProvider.externalAddresses()
 
-	assert.Error(err, "getNodeAddresses should have caused an error as there are no addresses.")
+	assert.Error(err, "addresses should have caused an error as there are no addresses.")
 	assert.Equal([]string(nil), addrs)
 
 	// Pass case with External type IP
-	nodes, _ = master.nodeClient.List(api.ListOptions{})
+	nodes, _ = fakeNodeClient.List(api.ListOptions{})
 	for index := range nodes.Items {
 		nodes.Items[index].Status.Addresses = []api.NodeAddress{{Type: api.NodeExternalIP, Address: "127.0.0.1"}}
-		master.nodeClient.Update(&nodes.Items[index])
+		fakeNodeClient.Update(&nodes.Items[index])
 	}
-	addrs, err = master.getNodeAddresses()
-	assert.NoError(err, "getNodeAddresses should not have returned an error.")
+	addrs, err = addressProvider.externalAddresses()
+	assert.NoError(err, "addresses should not have returned an error.")
 	assert.Equal([]string{"127.0.0.1", "127.0.0.1"}, addrs)
 
 	// Pass case with LegacyHost type IP
-	nodes, _ = master.nodeClient.List(api.ListOptions{})
+	nodes, _ = fakeNodeClient.List(api.ListOptions{})
 	for index := range nodes.Items {
 		nodes.Items[index].Status.Addresses = []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: "127.0.0.2"}}
-		master.nodeClient.Update(&nodes.Items[index])
+		fakeNodeClient.Update(&nodes.Items[index])
 	}
-	addrs, err = master.getNodeAddresses()
-	assert.NoError(err, "getNodeAddresses failback should not have returned an error.")
+	addrs, err = addressProvider.externalAddresses()
+	assert.NoError(err, "addresses failback should not have returned an error.")
 	assert.Equal([]string{"127.0.0.2", "127.0.0.2"}, addrs)
 }
 
@@ -348,126 +330,6 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	assert.NoError(decodeResponse(resp, &resourceList))
 	assert.Equal(resourceList.APIVersion, "v1")
 
-}
-
-func TestDiscoveryAtAPIS(t *testing.T) {
-	master, etcdserver, _, assert := newLimitedMaster(t)
-	defer etcdserver.Terminate(t)
-
-	server := httptest.NewServer(master.GenericAPIServer.HandlerContainer.ServeMux)
-	resp, err := http.Get(server.URL + "/apis")
-	if !assert.NoError(err) {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	assert.Equal(http.StatusOK, resp.StatusCode)
-
-	groupList := unversioned.APIGroupList{}
-	assert.NoError(decodeResponse(resp, &groupList))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	expectGroupNames := sets.NewString(autoscaling.GroupName, batch.GroupName, apps.GroupName, extensions.GroupName)
-	expectVersions := map[string][]unversioned.GroupVersionForDiscovery{
-		autoscaling.GroupName: {
-			{
-				GroupVersion: testapi.Autoscaling.GroupVersion().String(),
-				Version:      testapi.Autoscaling.GroupVersion().Version,
-			},
-		},
-		// batch is using its pkg/apis/batch/ types here since during installation
-		// both versions get installed and testapi.go currently does not support
-		// multi-versioned clients
-		batch.GroupName: {
-			{
-				GroupVersion: batchapiv1.SchemeGroupVersion.String(),
-				Version:      batchapiv1.SchemeGroupVersion.Version,
-			},
-			{
-				GroupVersion: batchapiv2alpha1.SchemeGroupVersion.String(),
-				Version:      batchapiv2alpha1.SchemeGroupVersion.Version,
-			},
-		},
-		apps.GroupName: {
-			{
-				GroupVersion: testapi.Apps.GroupVersion().String(),
-				Version:      testapi.Apps.GroupVersion().Version,
-			},
-		},
-		extensions.GroupName: {
-			{
-				GroupVersion: testapi.Extensions.GroupVersion().String(),
-				Version:      testapi.Extensions.GroupVersion().Version,
-			},
-		},
-	}
-	expectPreferredVersion := map[string]unversioned.GroupVersionForDiscovery{
-		autoscaling.GroupName: {
-			GroupVersion: registered.GroupOrDie(autoscaling.GroupName).GroupVersion.String(),
-			Version:      registered.GroupOrDie(autoscaling.GroupName).GroupVersion.Version,
-		},
-		batch.GroupName: {
-			GroupVersion: registered.GroupOrDie(batch.GroupName).GroupVersion.String(),
-			Version:      registered.GroupOrDie(batch.GroupName).GroupVersion.Version,
-		},
-		apps.GroupName: {
-			GroupVersion: registered.GroupOrDie(apps.GroupName).GroupVersion.String(),
-			Version:      registered.GroupOrDie(apps.GroupName).GroupVersion.Version,
-		},
-		extensions.GroupName: {
-			GroupVersion: registered.GroupOrDie(extensions.GroupName).GroupVersion.String(),
-			Version:      registered.GroupOrDie(extensions.GroupName).GroupVersion.Version,
-		},
-	}
-
-	assert.Equal(4, len(groupList.Groups))
-	for _, group := range groupList.Groups {
-		if !expectGroupNames.Has(group.Name) {
-			t.Errorf("got unexpected group %s", group.Name)
-		}
-		assert.Equal(expectVersions[group.Name], group.Versions)
-		assert.Equal(expectPreferredVersion[group.Name], group.PreferredVersion)
-	}
-
-	thirdPartyGV := unversioned.GroupVersionForDiscovery{GroupVersion: "company.com/v1", Version: "v1"}
-	master.thirdPartyResourceServer.InstallThirdPartyResource(&extensions.ThirdPartyResource{
-		ObjectMeta: api.ObjectMeta{Name: "foo.company.com"},
-		Versions:   []extensions.APIVersion{{Name: "v1"}},
-	})
-
-	resp, err = http.Get(server.URL + "/apis")
-	if !assert.NoError(err) {
-		t.Errorf("unexpected error: %v", err)
-	}
-	assert.Equal(http.StatusOK, resp.StatusCode)
-	assert.NoError(decodeResponse(resp, &groupList))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	assert.Equal(5, len(groupList.Groups))
-
-	expectGroupNames.Insert("company.com")
-	expectVersions["company.com"] = []unversioned.GroupVersionForDiscovery{thirdPartyGV}
-	expectPreferredVersion["company.com"] = thirdPartyGV
-	for _, group := range groupList.Groups {
-		if !expectGroupNames.Has(group.Name) {
-			t.Errorf("got unexpected group %s", group.Name)
-		}
-		assert.Equal(expectVersions[group.Name], group.Versions)
-		assert.Equal(expectPreferredVersion[group.Name], group.PreferredVersion)
-	}
-}
-
-func writeResponseToFile(resp *http.Response, filename string) error {
-	defer resp.Body.Close()
-
-	data, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	return ioutil.WriteFile(filename, data, 0755)
 }
 
 // TestValidOpenAPISpec verifies that the open api is added
