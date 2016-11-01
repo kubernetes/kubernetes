@@ -60,6 +60,7 @@ var (
 	kopsKubeVersion = flag.String("kops-kubernetes-version", "", "(kops only) If set, the version of Kubernetes to deploy (can be a URL to a GCS path where the release is stored) (Defaults to kops default, latest stable release.).")
 	kopsZones       = flag.String("kops-zones", "us-west-2a", "(kops AWS only) AWS zones for kops deployment, comma delimited.")
 	kopsNodes       = flag.Int("kops-nodes", 2, "(kops only) Number of nodes to create.")
+	kopsUpTimeout   = flag.Duration("kops-up-timeout", 20*time.Minute, "(kops only) Time limit between 'kops config / kops update' and a response from the Kubernetes API.")
 
 	// Deprecated flags.
 	deprecatedPush   = flag.Bool("push", false, "Deprecated. Does nothing.")
@@ -524,7 +525,7 @@ func (k kops) Up() error {
 	// TODO(zmerlynn): More cluster validation. This should perhaps be
 	// added to kops and not here, but this is a fine place to loop
 	// for now.
-	for stop := time.Now().Add(10 * time.Minute); time.Now().Before(stop); time.Sleep(30 * time.Second) {
+	for stop := time.Now().Add(*kopsUpTimeout); time.Now().Before(stop); time.Sleep(30 * time.Second) {
 		n, err := clusterSize(k)
 		if err != nil {
 			log.Printf("Can't get cluster size, sleeping: %v", err)
