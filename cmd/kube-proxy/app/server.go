@@ -26,6 +26,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"runtime"
+	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -204,10 +205,11 @@ func (o Options) applyDeprecatedHealthzPortToConfig() {
 		return
 	}
 
-	// o.config.HealthzBindAddress is bound as a flag to a componentconfig.IPVar,
-	// which requires that the value parse as a valid IP address. Therefore, it's
-	// impossible for o.config.HealthzBindAddress to be "", and it will never
-	// contain a port.
+	index := strings.Index(o.config.HealthzBindAddress, ":")
+	if index != -1 {
+		o.config.HealthzBindAddress = o.config.HealthzBindAddress[0:index]
+	}
+
 	o.config.HealthzBindAddress = fmt.Sprintf("%s:%d", o.config.HealthzBindAddress, o.healthzPort)
 }
 
