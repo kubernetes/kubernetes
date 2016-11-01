@@ -40,6 +40,7 @@ go_library(
         "//pkg/cloudprovider/providers/vsphere:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/certificates:go_default_library",
+        "//pkg/controller/client:go_default_library",
         "//pkg/controller/daemon:go_default_library",
         "//pkg/controller/deployment:go_default_library",
         "//pkg/controller/disruption:go_default_library",

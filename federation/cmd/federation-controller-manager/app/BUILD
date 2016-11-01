@@ -18,6 +18,7 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
+        "//federation/client/clientset_generated/federation_internalclientset:go_default_library",
         "//federation/client/clientset_generated/federation_release_1_5:go_default_library",
         "//federation/cmd/federation-controller-manager/app/options:go_default_library",
         "//federation/pkg/dnsprovider:go_default_library",
@@ -34,6 +35,7 @@ go_library(
         "//federation/pkg/federation-controller/util:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
+        "//pkg/controller/client:go_default_library",
         "//pkg/healthz:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//pkg/util/wait:go_default_library",
