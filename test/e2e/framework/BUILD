@@ -80,6 +80,8 @@ go_library(
         "//pkg/util/yaml:go_default_library",
         "//pkg/version:go_default_library",
         "//pkg/watch:go_default_library",
+        "//plugin/pkg/scheduler/algorithm/predicates:go_default_library",
+        "//plugin/pkg/scheduler/schedulercache:go_default_library",
         "//test/e2e/generated:go_default_library",
         "//test/e2e/perftype:go_default_library",
         "//test/utils:go_default_library",

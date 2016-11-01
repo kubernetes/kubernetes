@@ -47,6 +47,7 @@ import (
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -76,6 +77,8 @@ import (
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/blang/semver"
@@ -2355,6 +2358,36 @@ func isNodeSchedulable(node *api.Node) bool {
 	return !node.Spec.Unschedulable && nodeReady && networkReady
 }
 
+// Test whether a fake pod can be scheduled on "node", given its current taints.
+func isNodeUntainted(node *api.Node) bool {
+	fakePod := &api.Pod{
+		TypeMeta: unversioned.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
+		},
+		ObjectMeta: api.ObjectMeta{
+			Name:      "fake-not-scheduled",
+			Namespace: "fake-not-scheduled",
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:  "fake-not-scheduled",
+					Image: "fake-not-scheduled",
+				},
+			},
+		},
+	}
+	nodeInfo := schedulercache.NewNodeInfo()
+	nodeInfo.SetNode(node)
+	fit, _, err := predicates.PodToleratesNodeTaints(fakePod, nil, nodeInfo)
+	if err != nil {
+		Failf("Can't test predicates for node %s: %v", node.Name, err)
+		return false
+	}
+	return fit
+}
+
 // GetReadySchedulableNodesOrDie addresses the common use case of getting nodes you can do work on.
 // 1) Needs to be schedulable.
 // 2) Needs to be ready.
@@ -2364,7 +2397,7 @@ func GetReadySchedulableNodesOrDie(c clientset.Interface) (nodes *api.NodeList) 
 	// previous tests may have cause failures of some nodes. Let's skip
 	// 'Not Ready' nodes, just in case (there is no need to fail the test).
 	FilterNodes(nodes, func(node api.Node) bool {
-		return isNodeSchedulable(&node)
+		return isNodeSchedulable(&node) && isNodeUntainted(&node)
 	})
 	return nodes
 }
@@ -4447,7 +4480,7 @@ func GetMasterAndWorkerNodesOrDie(c clientset.Interface) (sets.String, *api.Node
 	for _, n := range all.Items {
 		if system.IsMasterNode(&n) {
 			masters.Insert(n.Name)
-		} else if isNodeSchedulable(&n) {
+		} else if isNodeSchedulable(&n) && isNodeUntainted(&n) {
 			nodes.Items = append(nodes.Items, n)
 		}
 	}
