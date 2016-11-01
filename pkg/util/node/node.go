@@ -31,6 +31,13 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 )
 
+const (
+	// The reason and message set on a pod when its state cannot be confirmed as kubelet is unresponsive
+	// on the node it is (was) running.
+	NodeUnreachablePodReason  = "NodeLost"
+	NodeUnreachablePodMessage = "Node %v which was running pod %v is unresponsive"
+)
+
 func GetHostname(hostnameOverride string) string {
 	var hostname string = hostnameOverride
 	if hostname == "" {
