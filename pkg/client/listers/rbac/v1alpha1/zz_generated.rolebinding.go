@@ -20,6 +20,7 @@ package v1alpha1
 
 import (
 	"k8s.io/kubernetes/pkg/api/errors"
+	rbac "k8s.io/kubernetes/pkg/apis/rbac"
 	v1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/labels"
