@@ -29,7 +29,7 @@ import (
 func NewKubeadmCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
 	cmds := &cobra.Command{
 		Use:   "kubeadm",
-		Short: "kubeadm: easily bootstrap a secure Kubernetes cluster.",
+		Short: "kubeadm: easily bootstrap a secure Kubernetes cluster",
 		Long: dedent.Dedent(`
 			kubeadm: easily bootstrap a secure Kubernetes cluster.
 
