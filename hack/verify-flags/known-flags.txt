@@ -312,6 +312,7 @@ kubelet-kubeconfig
 kubelet-network-plugin
 kubelet-pod-infra-container-image
 kubelet-port
+kubelet-preferred-address-types
 kubelet-read-only-port
 kubelet-root-dir
 kubelet-sync-frequency
