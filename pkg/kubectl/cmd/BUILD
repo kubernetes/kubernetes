@@ -174,6 +174,7 @@ go_test(
         "//pkg/apimachinery/registered:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/extensions:go_default_library",
+        "//pkg/apis/policy:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/restclient/fake:go_default_library",
         "//pkg/client/typed/dynamic:go_default_library",
