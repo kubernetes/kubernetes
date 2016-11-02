@@ -127,7 +127,7 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 		return err
 	}
 
-	mapper, resourceMapper, r, cmdNamespace, err := getMapperAndResult(f, args, options, editMode)
+	mapper, resourceMapper, typer, r, cmdNamespace, err := getMapperAndResult(f, args, options, editMode)
 	if err != nil {
 		return err
 	}
@@ -162,7 +162,7 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 
 	containsError := false
 	for {
-		originalObj, err := resource.AsVersionedObject(infos, false, defaultVersion, encoder)
+		originalObj, err := resource.AsVersionedObject(infos, false, defaultVersion, typer, encoder)
 		if err != nil {
 			return err
 		}
@@ -340,10 +340,10 @@ func getPrinter(cmd *cobra.Command) (*editPrinterOptions, error) {
 	}
 }
 
-func getMapperAndResult(f cmdutil.Factory, args []string, options *resource.FilenameOptions, editMode EditMode) (meta.RESTMapper, *resource.Mapper, *resource.Result, string, error) {
+func getMapperAndResult(f cmdutil.Factory, args []string, options *resource.FilenameOptions, editMode EditMode) (meta.RESTMapper, *resource.Mapper, runtime.ObjectTyper, *resource.Result, string, error) {
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
-		return nil, nil, nil, "", err
+		return nil, nil, nil, nil, "", err
 	}
 	var mapper meta.RESTMapper
 	var typer runtime.ObjectTyper
@@ -353,10 +353,10 @@ func getMapperAndResult(f cmdutil.Factory, args []string, options *resource.File
 	case EditBeforeCreateMode:
 		mapper, typer, err = f.UnstructuredObject()
 	default:
-		return nil, nil, nil, "", fmt.Errorf("Not supported edit mode %q", editMode)
+		return nil, nil, nil, nil, "", fmt.Errorf("Not supported edit mode %q", editMode)
 	}
 	if err != nil {
-		return nil, nil, nil, "", err
+		return nil, nil, nil, nil, "", err
 	}
 	resourceMapper := &resource.Mapper{
 		ObjectTyper:  typer,
@@ -379,7 +379,7 @@ func getMapperAndResult(f cmdutil.Factory, args []string, options *resource.File
 	case EditBeforeCreateMode:
 		b = resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), runtime.UnstructuredJSONScheme)
 	default:
-		return nil, nil, nil, "", fmt.Errorf("Not supported edit mode %q", editMode)
+		return nil, nil, nil, nil, "", fmt.Errorf("Not supported edit mode %q", editMode)
 	}
 	r := b.NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options).
@@ -388,9 +388,9 @@ func getMapperAndResult(f cmdutil.Factory, args []string, options *resource.File
 		Do()
 	err = r.Err()
 	if err != nil {
-		return nil, nil, nil, "", err
+		return nil, nil, nil, nil, "", err
 	}
-	return mapper, resourceMapper, r, cmdNamespace, err
+	return mapper, resourceMapper, typer, r, cmdNamespace, err
 }
 
 func visitToPatch(originalObj runtime.Object, updates *resource.Info, mapper meta.RESTMapper, resourceMapper *resource.Mapper, encoder runtime.Encoder, out, errOut io.Writer, defaultVersion unversioned.GroupVersion, results *editResults, file string) error {

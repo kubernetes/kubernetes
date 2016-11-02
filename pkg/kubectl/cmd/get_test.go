@@ -210,7 +210,7 @@ func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 		cmd.Flags().Set("output", "json")
 
 		cmd.Flags().Set("output-version", test.outputVersion)
-		err := RunGet(f, buf, errBuf, cmd, []string{"type/foo", "replicationcontrollers/foo"}, &GetOptions{})
+		err := RunGet(f, buf, errBuf, cmd, []string{"type/foo", "replicationcontrollers/foo"}, &GetOptions{Typer: api.Scheme})
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", k, err)
 			continue
@@ -225,10 +225,10 @@ func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 		}
 		arr := out["items"].([]interface{})
 		if arr[0].(map[string]interface{})["apiVersion"] != test.testtypeVersion {
-			t.Errorf("%s: unexpected list: %#v", k, out)
+			t.Errorf("%s: unexpected list: %#v (expected: %#v)", k, arr[0].(map[string]interface{})["apiVersion"], test.testtypeVersion)
 		}
 		if arr[1].(map[string]interface{})["apiVersion"] != test.rcVersion {
-			t.Errorf("%s: unexpected list: %#v", k, out)
+			t.Errorf("%s: unexpected list: %#v (expected: %#v)", k, arr[1].(map[string]interface{})["apiVersion"], test.rcVersion)
 		}
 	}
 }

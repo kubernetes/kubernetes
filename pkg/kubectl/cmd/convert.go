@@ -93,6 +93,7 @@ type ConvertOptions struct {
 	local   bool
 
 	encoder runtime.Encoder
+	typer   runtime.ObjectTyper
 	out     io.Writer
 	printer kubectl.ResourcePrinter
 
@@ -111,13 +112,14 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.C
 
 	// build the builder
 	mapper, typer := f.Object()
+	o.typer = typer
 	clientMapper := resource.ClientMapperFunc(f.ClientForMapping)
 
 	if o.local {
 		fmt.Fprintln(os.Stderr, "running in local mode...")
-		o.builder = resource.NewBuilder(mapper, typer, resource.DisabledClientForMapping{ClientMapper: clientMapper}, f.Decoder(true))
+		o.builder = resource.NewBuilder(mapper, o.typer, resource.DisabledClientForMapping{ClientMapper: clientMapper}, f.Decoder(true))
 	} else {
-		o.builder = resource.NewBuilder(mapper, typer, clientMapper, f.Decoder(true))
+		o.builder = resource.NewBuilder(mapper, o.typer, clientMapper, f.Decoder(true))
 		schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
 		if err != nil {
 			return err
@@ -168,7 +170,7 @@ func (o *ConvertOptions) RunConvert() error {
 		}
 
 		infos := []*resource.Info{info}
-		objects, err := resource.AsVersionedObject(infos, false, o.outputVersion, o.encoder)
+		objects, err := resource.AsVersionedObject(infos, false, o.outputVersion, o.typer, o.encoder)
 		if err != nil {
 			return err
 		}
