@@ -269,13 +269,23 @@ func (m *kubeGenericRuntimeManager) APIVersion() (kubecontainer.Version, error) 
 }
 
 // Status returns error if the runtime is unhealthy; nil otherwise.
+// TODO(random-liu): Change the Status in runtime interface to return runtime status.
+// TODO(random-liu): Add unit test for this function after addressing the TODO above.
 func (m *kubeGenericRuntimeManager) Status() error {
-	_, err := m.runtimeService.Version(kubeRuntimeAPIVersion)
+	status, err := m.runtimeService.Status()
 	if err != nil {
-		glog.Errorf("Checkout remote runtime status failed: %v", err)
-		return err
+		return fmt.Errorf("failed to checkout runtime status: %v", err)
 	}
-
+	networkReady := getRuntimeCondition(status, runtimeApi.NetworkReady)
+	if networkReady == nil || !networkReady.GetStatus() {
+		return fmt.Errorf("runtime network not ready: reason: %q, message: %q",
+			networkReady.GetReason(), networkReady.GetMessage())
+	}
+	runtimeReady := getRuntimeCondition(status, runtimeApi.RuntimeReady)
+	if runtimeReady == nil || !runtimeReady.GetStatus() {
+		return fmt.Errorf("runtime not ready: reason: %q, message: %q",
+			runtimeReady.GetReason(), runtimeReady.GetMessage())
+	}
 	return nil
 }
 

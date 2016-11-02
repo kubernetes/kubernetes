@@ -216,3 +216,14 @@ func buildFullContainerLogsPath(podUID types.UID, containerName string, restartC
 func buildPodLogsDirectory(podUID types.UID) string {
 	return filepath.Join(podLogsRootDirectory, string(podUID))
 }
+
+// getRuntimeCondition gets specified runtime condition from the runtime status.
+func getRuntimeCondition(status *runtimeApi.RuntimeStatus, t string) *runtimeApi.RuntimeCondition {
+	conditions := status.GetConditions()
+	for _, condition := range conditions {
+		if condition.GetType() == t {
+			return condition
+		}
+	}
+	return nil
+}
