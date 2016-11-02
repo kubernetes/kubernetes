@@ -715,6 +715,14 @@ func NewServiceAffinityPredicate(podLister algorithm.PodLister, serviceLister al
 // the same service are running on nodes with
 // the exact same ServiceAffinity.label values).
 //
+// For example:
+//
+// If the first pod of a service was scheduled to a node with label "region=foo", all the other subsequent pods
+// belong to the same service will be schedule on nodes with the same "region=foo" label.
+
+// Multiple level labels are also supported, e.g. users can also specify that they would like all pods for a service to
+// be scheduled on nodes within the same region and within the same zone (under the region).
+//
 // Details:
 //
 // If (the svc affinity labels are not a subset of pod's label selectors )
