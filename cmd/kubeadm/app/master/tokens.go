@@ -33,6 +33,7 @@ func CreateTokenAuthFile(s *kubeadmapi.Secrets) error {
 	if err := kubeadmutil.GenerateTokenIfNeeded(s); err != nil {
 		return fmt.Errorf("<master/tokens> failed to generate token(s) [%v]", err)
 	}
+	fmt.Printf("<master/tokens> using token: %q\n", s.GivenToken)
 	if err := os.MkdirAll(kubeadmapi.GlobalEnvParams.HostPKIPath, 0700); err != nil {
 		return fmt.Errorf("<master/tokens> failed to create directory %q [%v]", kubeadmapi.GlobalEnvParams.HostPKIPath, err)
 	}

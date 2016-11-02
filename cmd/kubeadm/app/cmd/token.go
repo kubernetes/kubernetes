@@ -109,7 +109,7 @@ func RunCreateToken(out io.Writer, cmd *cobra.Command, tokenDuration time.Durati
 	if _, err := client.Secrets(api.NamespaceSystem).Create(secret); err != nil {
 		return fmt.Errorf("<cmd/token> failed to bootstrap token [%v]", err)
 	}
-	fmt.Printf("<cmd/token> Token secret created: %s\n", tokenSecret.GivenToken)
+	fmt.Println(tokenSecret.GivenToken)
 
 	return nil
 }
@@ -130,8 +130,7 @@ func encodeTokenSecretData(tokenSecret *kubeadmapi.Secrets, duration time.Durati
 }
 
 func createAPIClient() (*clientset.Clientset, error) {
-	envParams := kubeadmapi.GetEnvParams()
-	adminKubeconfig, err := clientcmd.LoadFromFile(path.Join(envParams["kubernetes_dir"], "admin.conf"))
+	adminKubeconfig, err := clientcmd.LoadFromFile(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "admin.conf"))
 	if err != nil {
 		return nil, fmt.Errorf("<cmd/token> failed to load admin kubeconfig [%v]", err)
 	}

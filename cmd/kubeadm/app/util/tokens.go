@@ -71,9 +71,6 @@ func GenerateTokenIfNeeded(s *kubeadmapi.Secrets) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("<util/tokens> generated token: %q\n", s.GivenToken)
-	} else {
-		fmt.Println("<util/tokens> accepted provided token")
 	}
 
 	return nil
