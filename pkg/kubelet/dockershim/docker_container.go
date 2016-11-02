@@ -45,13 +45,9 @@ func (ds *dockerService) ListContainers(filter *runtimeApi.ContainerFilter) ([]*
 		if filter.Id != nil {
 			f.Add("id", filter.GetId())
 		}
-		if filter.State != nil {
-			f.Add("status", toDockerContainerStatus(filter.GetState()))
-		}
 		if filter.PodSandboxId != nil {
 			f.AddLabel(sandboxIDLabelKey, *filter.PodSandboxId)
 		}
-
 		if filter.LabelSelector != nil {
 			for k, v := range filter.LabelSelector {
 				f.AddLabel(k, v)
@@ -62,6 +58,7 @@ func (ds *dockerService) ListContainers(filter *runtimeApi.ContainerFilter) ([]*
 	if err != nil {
 		return nil, err
 	}
+
 	// Convert docker to runtime api containers.
 	result := []*runtimeApi.Container{}
 	for i := range containers {
@@ -70,6 +67,25 @@ func (ds *dockerService) ListContainers(filter *runtimeApi.ContainerFilter) ([]*
 		converted, err := toRuntimeAPIContainer(&c)
 		if err != nil {
 			glog.V(5).Infof("Unable to convert docker to runtime API container: %v", err)
+			continue
+		}
+
+		if converted.GetState() == runtimeApi.ContainerState_CREATED {
+			// If docker failed to start a container, if remains in the "Created"
+			// state. We need to check the exit code to know whether the container
+			// should be in "Exited" state instead.
+			r, err := ds.client.InspectContainer(c.ID)
+			if err != nil {
+				glog.V(5).Infof("Unable to inspect container %q: %v", c.ID, err)
+				continue
+			}
+			if r.State.ExitCode != 0 {
+				state := runtimeApi.ContainerState_EXITED
+				converted.State = &state
+			}
+		}
+
+		if filter.State != nil && converted.GetState() != filter.GetState() {
 			continue
 		}
 

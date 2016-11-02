@@ -29,13 +29,6 @@ import (
 // This file contains helper functions to convert docker API types to runtime
 // API types, or vice versa.
 
-const (
-	// Status of a container returned by docker ListContainers
-	statusRunningPrefix = "Up"
-	statusCreatedPrefix = "Created"
-	statusExitedPrefix  = "Exited"
-)
-
 func imageToRuntimeAPIImage(image *dockertypes.Image) (*runtimeApi.Image, error) {
 	if image == nil {
 		return nil, fmt.Errorf("unable to convert a nil pointer to a runtime API image")
@@ -76,7 +69,7 @@ func toPullableImageID(id string, image *dockertypes.ImageInspect) string {
 }
 
 func toRuntimeAPIContainer(c *dockertypes.Container) (*runtimeApi.Container, error) {
-	state := toRuntimeAPIContainerState(c.Status)
+	state := toRuntimeAPIContainerState(c)
 	metadata, err := parseContainerName(c.Names[0])
 	if err != nil {
 		return nil, err
@@ -98,41 +91,51 @@ func toRuntimeAPIContainer(c *dockertypes.Container) (*runtimeApi.Container, err
 	}, nil
 }
 
-func toDockerContainerStatus(state runtimeApi.ContainerState) string {
-	switch state {
-	case runtimeApi.ContainerState_CREATED:
-		return "created"
-	case runtimeApi.ContainerState_RUNNING:
-		return "running"
-	case runtimeApi.ContainerState_EXITED:
-		return "exited"
-	case runtimeApi.ContainerState_UNKNOWN:
-		fallthrough
-	default:
-		return "unknown"
+func toRuntimeAPIContainerState(c *dockertypes.Container) runtimeApi.ContainerState {
+	if len(c.State) == 0 {
+		// Docker <= 1.10 (remote API <= 1.22) does not include "State" in the
+		// response when listing the containers. We have to rely on translating
+		// the "Status" string into a state.
+		// TODO: Remove this once we determine not to support Docker 1.10.
+		switch {
+		case strings.HasPrefix(c.Status, "Up"):
+			return runtimeApi.ContainerState_RUNNING
+		case strings.HasPrefix(c.Status, "Exited"):
+			return runtimeApi.ContainerState_EXITED
+		case strings.HasPrefix(c.Status, "Created"):
+			return runtimeApi.ContainerState_CREATED
+		default:
+			return runtimeApi.ContainerState_UNKNOWN
+		}
 	}
-}
 
-func toRuntimeAPIContainerState(state string) runtimeApi.ContainerState {
-	// Parse the state string in dockertypes.Container. This could break when
-	// we upgrade docker.
-	switch {
-	case strings.HasPrefix(state, statusRunningPrefix):
+	switch c.State {
+	case "running":
 		return runtimeApi.ContainerState_RUNNING
-	case strings.HasPrefix(state, statusExitedPrefix):
+	case "exited":
 		return runtimeApi.ContainerState_EXITED
-	case strings.HasPrefix(state, statusCreatedPrefix):
+	case "created":
 		return runtimeApi.ContainerState_CREATED
 	default:
 		return runtimeApi.ContainerState_UNKNOWN
 	}
 }
 
-func toRuntimeAPISandboxState(state string) runtimeApi.PodSandBoxState {
-	// Parse the state string in dockertypes.Container. This could break when
-	// we upgrade docker.
-	switch {
-	case strings.HasPrefix(state, statusRunningPrefix):
+func toRuntimeAPISandboxState(c *dockertypes.Container) runtimeApi.PodSandBoxState {
+	if len(c.State) == 0 {
+		// Docker <= 1.10 (remote API <= 1.22) does not include "State" in the
+		// response when listing the containers. We have to rely on translating
+		// the "Status" string into a state.
+		// TODO: Remove this once we determine not to support Docker 1.10.
+		switch {
+		case strings.HasPrefix(c.Status, "Up"):
+			return runtimeApi.PodSandBoxState_READY
+		default:
+			return runtimeApi.PodSandBoxState_NOTREADY
+		}
+	}
+	switch c.State {
+	case "running":
 		return runtimeApi.PodSandBoxState_READY
 	default:
 		return runtimeApi.PodSandBoxState_NOTREADY
@@ -140,7 +143,7 @@ func toRuntimeAPISandboxState(state string) runtimeApi.PodSandBoxState {
 }
 
 func toRuntimeAPISandbox(c *dockertypes.Container) (*runtimeApi.PodSandbox, error) {
-	state := toRuntimeAPISandboxState(c.Status)
+	state := toRuntimeAPISandboxState(c)
 	metadata, err := parseSandboxName(c.Names[0])
 	if err != nil {
 		return nil, err
