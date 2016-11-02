@@ -31,6 +31,7 @@ go_library(
         "//pkg/kubelet/api:go_default_library",
         "//pkg/kubelet/api/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/container:go_default_library",
+        "//pkg/kubelet/dockershim/cm:go_default_library",
         "//pkg/kubelet/dockertools:go_default_library",
         "//pkg/kubelet/leaky:go_default_library",
         "//pkg/kubelet/network:go_default_library",
