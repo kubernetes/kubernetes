@@ -1,0 +1,7 @@
+# Diff files
+*.orig
+
+.idea
+src
+pkg
+bin
