@@ -48,6 +48,7 @@ import (
 	triple "k8s.io/kubernetes/pkg/util/cert/triple"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/spf13/cobra"
 )
@@ -92,7 +93,7 @@ var (
 		"module": "federation-controller-manager",
 	}
 
-	hyperkubeImage = "gcr.io/google_containers/hyperkube-amd64:v1.5.0"
+	hyperkubeImageName = "gcr.io/google_containers/hyperkube-amd64"
 )
 
 // NewCmdInit defines the `init` command that bootstraps a federation
@@ -109,8 +110,11 @@ func NewCmdInit(cmdOut io.Writer, config util.AdminConfig) *cobra.Command {
 		},
 	}
 
+	defaultImage := fmt.Sprintf("%s:%s", hyperkubeImageName, version.Get())
+
 	util.AddSubcommandFlags(cmd)
 	cmd.Flags().String("dns-zone-name", "", "DNS suffix for this federation. Federated Service DNS names are published with this suffix.")
+	cmd.Flags().String("image", defaultImage, "Image to use for federation API server and controller manager binaries.")
 	return cmd
 }
 
@@ -129,6 +133,7 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 		return err
 	}
 	dnsZoneName := cmdutil.GetFlagString(cmd, "dns-zone-name")
+	image := cmdutil.GetFlagString(cmd, "image")
 
 	hostFactory := config.HostFactory(initFlags.Host, initFlags.Kubeconfig)
 	hostClientset, err := hostFactory.ClientSet()
@@ -190,13 +195,13 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	}
 
 	// 6. Create federation API server
-	_, err = createAPIServer(hostClientset, initFlags.FederationSystemNamespace, serverName, serverCredName, pvc.Name, advertiseAddress)
+	_, err = createAPIServer(hostClientset, initFlags.FederationSystemNamespace, serverName, image, serverCredName, pvc.Name, advertiseAddress)
 	if err != nil {
 		return err
 	}
 
 	// 7. Create federation controller manager
-	_, err = createControllerManager(hostClientset, initFlags.FederationSystemNamespace, initFlags.Name, cmName, cmKubeconfigName, dnsZoneName)
+	_, err = createControllerManager(hostClientset, initFlags.FederationSystemNamespace, initFlags.Name, cmName, image, cmKubeconfigName, dnsZoneName)
 	if err != nil {
 		return err
 	}
@@ -356,7 +361,7 @@ func createPVC(clientset *client.Clientset, namespace, svcName string) (*api.Per
 	return clientset.Core().PersistentVolumeClaims(namespace).Create(pvc)
 }
 
-func createAPIServer(clientset *client.Clientset, namespace, name, credentialsName, pvcName, advertiseAddress string) (*extensions.Deployment, error) {
+func createAPIServer(clientset *client.Clientset, namespace, name, image, credentialsName, pvcName, advertiseAddress string) (*extensions.Deployment, error) {
 	command := []string{
 		"/hyperkube",
 		"federation-apiserver",
@@ -394,7 +399,7 @@ func createAPIServer(clientset *client.Clientset, namespace, name, credentialsNa
 					Containers: []api.Container{
 						{
 							Name:    "apiserver",
-							Image:   hyperkubeImage,
+							Image:   image,
 							Command: command,
 							Ports: []api.ContainerPort{
 								{
@@ -456,7 +461,7 @@ func createAPIServer(clientset *client.Clientset, namespace, name, credentialsNa
 	return clientset.Extensions().Deployments(namespace).Create(dep)
 }
 
-func createControllerManager(clientset *client.Clientset, namespace, name, cmName, kubeconfigName, dnsZoneName string) (*extensions.Deployment, error) {
+func createControllerManager(clientset *client.Clientset, namespace, name, cmName, image, kubeconfigName, dnsZoneName string) (*extensions.Deployment, error) {
 	dep := &extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name:      cmName,
@@ -474,7 +479,7 @@ func createControllerManager(clientset *client.Clientset, namespace, name, cmNam
 					Containers: []api.Container{
 						{
 							Name:  "controller-manager",
-							Image: hyperkubeImage,
+							Image: image,
 							Command: []string{
 								"/hyperkube",
 								"federation-controller-manager",
