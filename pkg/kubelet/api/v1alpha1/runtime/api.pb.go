@@ -2697,26 +2697,41 @@ type RuntimeServiceClient interface {
 	// RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
 	// the sandbox is in ready state.
 	RunPodSandbox(ctx context.Context, in *RunPodSandboxRequest, opts ...grpc.CallOption) (*RunPodSandboxResponse, error)
-	// StopPodSandbox stops the running sandbox. If there are any running
-	// containers in the sandbox, they should be forcibly terminated.
+	// StopPodSandbox stops any running process that is part of the sandbox and
+	// reclaims network resources (e.g., IP addresses) allocated to the sandbox.
+	// It is recommended to stop all containers in the sandbox before stopping
+	// the sandbox itself. If there are any running containers in the sandbox,
+	// they should be forcibly terminated.
+	// This call is idempotent, and should return no error if all relevant
+	// resources have already been reclaimed. Kubelet will call StopPodSandbox
+	// as soon as possible to reclaim the resources once it notices that the
+	// sandbox is no longer needed. In some rare cases (which can be
+	// runtime-dependent),  kubelet may neglect to do so. To ensure that
+	// resources are reclaimed properly, kubelet will call StopPodSandbox
+	// before calling RemovePodSandbox. Hence, multiple StopPodSandbox calls
+	// are expected before the sandbox removal.
 	StopPodSandbox(ctx context.Context, in *StopPodSandboxRequest, opts ...grpc.CallOption) (*StopPodSandboxResponse, error)
-	// RemovePodSandbox removes the sandbox. If there are any running containers in the
-	// sandbox, they should be forcibly removed.
-	// It should return success if the sandbox has already been removed.
+	// RemovePodSandbox removes the sandbox. If there are any running containers
+	// in the sandbox, they should be forcibly terminated and removed.
+	// This call is idempotent, and should return no error if the sandbox has
+	// already been removed.
 	RemovePodSandbox(ctx context.Context, in *RemovePodSandboxRequest, opts ...grpc.CallOption) (*RemovePodSandboxResponse, error)
 	// PodSandboxStatus returns the status of the PodSandbox.
 	PodSandboxStatus(ctx context.Context, in *PodSandboxStatusRequest, opts ...grpc.CallOption) (*PodSandboxStatusResponse, error)
-	// ListPodSandbox returns a list of Sandbox.
+	// ListPodSandbox returns a list of PodSandboxes.
 	ListPodSandbox(ctx context.Context, in *ListPodSandboxRequest, opts ...grpc.CallOption) (*ListPodSandboxResponse, error)
 	// CreateContainer creates a new container in specified PodSandbox
 	CreateContainer(ctx context.Context, in *CreateContainerRequest, opts ...grpc.CallOption) (*CreateContainerResponse, error)
 	// StartContainer starts the container.
 	StartContainer(ctx context.Context, in *StartContainerRequest, opts ...grpc.CallOption) (*StartContainerResponse, error)
 	// StopContainer stops a running container with a grace period (i.e., timeout).
+	// This call is idempotent, and should return no error if the container has
+	// already been stopped.
 	StopContainer(ctx context.Context, in *StopContainerRequest, opts ...grpc.CallOption) (*StopContainerResponse, error)
 	// RemoveContainer removes the container. If the container is running, the
 	// container should be forcibly removed.
-	// It should return success if the container has already been removed.
+	// This call is idempotent, and should return no error if the container has
+	// already been removed.
 	RemoveContainer(ctx context.Context, in *RemoveContainerRequest, opts ...grpc.CallOption) (*RemoveContainerResponse, error)
 	// ListContainers lists all containers by filters.
 	ListContainers(ctx context.Context, in *ListContainersRequest, opts ...grpc.CallOption) (*ListContainersResponse, error)
@@ -2903,26 +2918,41 @@ type RuntimeServiceServer interface {
 	// RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
 	// the sandbox is in ready state.
 	RunPodSandbox(context.Context, *RunPodSandboxRequest) (*RunPodSandboxResponse, error)
-	// StopPodSandbox stops the running sandbox. If there are any running
-	// containers in the sandbox, they should be forcibly terminated.
+	// StopPodSandbox stops any running process that is part of the sandbox and
+	// reclaims network resources (e.g., IP addresses) allocated to the sandbox.
+	// It is recommended to stop all containers in the sandbox before stopping
+	// the sandbox itself. If there are any running containers in the sandbox,
+	// they should be forcibly terminated.
+	// This call is idempotent, and should return no error if all relevant
+	// resources have already been reclaimed. Kubelet will call StopPodSandbox
+	// as soon as possible to reclaim the resources once it notices that the
+	// sandbox is no longer needed. In some rare cases (which can be
+	// runtime-dependent),  kubelet may neglect to do so. To ensure that
+	// resources are reclaimed properly, kubelet will call StopPodSandbox
+	// before calling RemovePodSandbox. Hence, multiple StopPodSandbox calls
+	// are expected before the sandbox removal.
 	StopPodSandbox(context.Context, *StopPodSandboxRequest) (*StopPodSandboxResponse, error)
-	// RemovePodSandbox removes the sandbox. If there are any running containers in the
-	// sandbox, they should be forcibly removed.
-	// It should return success if the sandbox has already been removed.
+	// RemovePodSandbox removes the sandbox. If there are any running containers
+	// in the sandbox, they should be forcibly terminated and removed.
+	// This call is idempotent, and should return no error if the sandbox has
+	// already been removed.
 	RemovePodSandbox(context.Context, *RemovePodSandboxRequest) (*RemovePodSandboxResponse, error)
 	// PodSandboxStatus returns the status of the PodSandbox.
 	PodSandboxStatus(context.Context, *PodSandboxStatusRequest) (*PodSandboxStatusResponse, error)
-	// ListPodSandbox returns a list of Sandbox.
+	// ListPodSandbox returns a list of PodSandboxes.
 	ListPodSandbox(context.Context, *ListPodSandboxRequest) (*ListPodSandboxResponse, error)
 	// CreateContainer creates a new container in specified PodSandbox
 	CreateContainer(context.Context, *CreateContainerRequest) (*CreateContainerResponse, error)
 	// StartContainer starts the container.
 	StartContainer(context.Context, *StartContainerRequest) (*StartContainerResponse, error)
 	// StopContainer stops a running container with a grace period (i.e., timeout).
+	// This call is idempotent, and should return no error if the container has
+	// already been stopped.
 	StopContainer(context.Context, *StopContainerRequest) (*StopContainerResponse, error)
 	// RemoveContainer removes the container. If the container is running, the
 	// container should be forcibly removed.
-	// It should return success if the container has already been removed.
+	// This call is idempotent, and should return no error if the container has
+	// already been removed.
 	RemoveContainer(context.Context, *RemoveContainerRequest) (*RemoveContainerResponse, error)
 	// ListContainers lists all containers by filters.
 	ListContainers(context.Context, *ListContainersRequest) (*ListContainersResponse, error)
