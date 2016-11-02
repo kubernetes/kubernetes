@@ -410,26 +410,19 @@ function kube::build::clean() {
   rm -rf "${LOCAL_OUTPUT_ROOT}"
 }
 
-function kube::build::build_image_built() {
-  kube::build::docker_image_exists "${KUBE_BUILD_IMAGE_REPO}" "${KUBE_BUILD_IMAGE_TAG}"
-}
-
 # Set up the context directory for the kube-build image and build it.
 function kube::build::build_image() {
-  if ! kube::build::build_image_built; then
-    mkdir -p "${LOCAL_OUTPUT_BUILD_CONTEXT}"
+  mkdir -p "${LOCAL_OUTPUT_BUILD_CONTEXT}"
 
-    cp /etc/localtime "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
+  cp /etc/localtime "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
 
-    cp build-tools/build-image/Dockerfile "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
-    cp build-tools/build-image/rsyncd.sh "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
-    dd if=/dev/urandom bs=512 count=1 2>/dev/null | LC_ALL=C tr -dc 'A-Za-z0-9' | dd bs=32 count=1 2>/dev/null > "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
-    chmod go= "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
+  cp build-tools/build-image/Dockerfile "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
+  cp build-tools/build-image/rsyncd.sh "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
+  dd if=/dev/urandom bs=512 count=1 2>/dev/null | LC_ALL=C tr -dc 'A-Za-z0-9' | dd bs=32 count=1 2>/dev/null > "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
+  chmod go= "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
 
-    kube::build::update_dockerfile
-
-    kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${LOCAL_OUTPUT_BUILD_CONTEXT}" 'false'
-  fi
+  kube::build::update_dockerfile
+  kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${LOCAL_OUTPUT_BUILD_CONTEXT}" 'false'
 
   # Clean up old versions of everything
   kube::build::docker_delete_old_containers "${KUBE_BUILD_CONTAINER_NAME_BASE}" "${KUBE_BUILD_CONTAINER_NAME}"
