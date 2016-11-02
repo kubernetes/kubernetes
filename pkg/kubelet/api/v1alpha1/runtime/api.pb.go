@@ -480,7 +480,7 @@ type SandboxSecurityContext struct {
 	// If set, the root filesystem of the container is read-only.
 	ReadonlyRootfs *bool `protobuf:"varint,5,opt,name=readonly_rootfs,json=readonlyRootfs" json:"readonly_rootfs,omitempty"`
 	// A list of groups applied to the first process run in the sandbox, in addition
-	// to the container's primary GID.  If unspecified, no groups will be added.
+	// to the sandbox's primary GID.  If unspecified, no groups will be added.
 	SupplementalGroups []int64 `protobuf:"varint,6,rep,name=supplemental_groups,json=supplementalGroups" json:"supplemental_groups,omitempty"`
 	// A special supplemental group that applies to the sandbox.
 	// Some volume types allow the Kubelet to change the ownership of that volume
