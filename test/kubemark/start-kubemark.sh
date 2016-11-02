@@ -168,11 +168,12 @@ gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
   "${RESOURCE_DIRECTORY}/apiserver_flags" \
   "${RESOURCE_DIRECTORY}/scheduler_flags" \
   "${RESOURCE_DIRECTORY}/controllers_flags" \
-  "${MASTER_NAME}":~
+  "root@${MASTER_NAME}":/
+
 
 gcloud compute ssh "${MASTER_NAME}" --zone="${ZONE}" --project="${PROJECT}" \
-  --command="chmod a+x configure-kubectl.sh && chmod a+x start-kubemark-master.sh && \
-             sudo ./start-kubemark-master.sh ${EVENT_STORE_IP:-127.0.0.1} ${NUM_NODES:-0} ${EVENT_PD:-false} ${ETCD_IMAGE:-}"
+  --command="sudo chmod a+x /configure-kubectl.sh && sudo chmod a+x /start-kubemark-master.sh && \
+             sudo /start-kubemark-master.sh ${EVENT_STORE_IP:-127.0.0.1} ${NUM_NODES:-0} ${EVENT_PD:-false} ${ETCD_IMAGE:-}"
 
 # create kubeconfig for Kubelet:
 KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
@@ -301,5 +302,6 @@ until [[ "${ready}" -ge "${NUM_NODES}" ]]; do
 done
 echo ""
 
+echo "Master IP: ${MASTER_IP}"
 echo "Password to kubemark master: ${password}"
 echo "Kubeconfig for kubemark master is written in ${LOCAL_KUBECONFIG}"
