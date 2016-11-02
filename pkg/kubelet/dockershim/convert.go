@@ -100,13 +100,13 @@ func toRuntimeAPIContainer(c *dockertypes.Container) (*runtimeApi.Container, err
 
 func toDockerContainerStatus(state runtimeApi.ContainerState) string {
 	switch state {
-	case runtimeApi.ContainerState_CREATED:
+	case runtimeApi.ContainerState_CONTAINER_CREATED:
 		return "created"
-	case runtimeApi.ContainerState_RUNNING:
+	case runtimeApi.ContainerState_CONTAINER_RUNNING:
 		return "running"
-	case runtimeApi.ContainerState_EXITED:
+	case runtimeApi.ContainerState_CONTAINER_EXITED:
 		return "exited"
-	case runtimeApi.ContainerState_UNKNOWN:
+	case runtimeApi.ContainerState_CONTAINER_UNKNOWN:
 		fallthrough
 	default:
 		return "unknown"
@@ -118,24 +118,24 @@ func toRuntimeAPIContainerState(state string) runtimeApi.ContainerState {
 	// we upgrade docker.
 	switch {
 	case strings.HasPrefix(state, statusRunningPrefix):
-		return runtimeApi.ContainerState_RUNNING
+		return runtimeApi.ContainerState_CONTAINER_RUNNING
 	case strings.HasPrefix(state, statusExitedPrefix):
-		return runtimeApi.ContainerState_EXITED
+		return runtimeApi.ContainerState_CONTAINER_EXITED
 	case strings.HasPrefix(state, statusCreatedPrefix):
-		return runtimeApi.ContainerState_CREATED
+		return runtimeApi.ContainerState_CONTAINER_CREATED
 	default:
-		return runtimeApi.ContainerState_UNKNOWN
+		return runtimeApi.ContainerState_CONTAINER_UNKNOWN
 	}
 }
 
-func toRuntimeAPISandboxState(state string) runtimeApi.PodSandBoxState {
+func toRuntimeAPISandboxState(state string) runtimeApi.PodSandboxState {
 	// Parse the state string in dockertypes.Container. This could break when
 	// we upgrade docker.
 	switch {
 	case strings.HasPrefix(state, statusRunningPrefix):
-		return runtimeApi.PodSandBoxState_READY
+		return runtimeApi.PodSandboxState_SANDBOX_READY
 	default:
-		return runtimeApi.PodSandBoxState_NOTREADY
+		return runtimeApi.PodSandboxState_SANDBOX_NOTREADY
 	}
 }
 
