@@ -16,19 +16,6 @@
 
 # TODO: figure out how to get etcd tag from some real configuration and put it here.
 
-function write_supervisor_conf() {
-	local name=$1
-	local exec_command=$2
-	cat >>"/etc/supervisor/conf.d/${name}.conf" <<EOF
-[program:${name}]
-command=${exec_command}
-stderr_logfile=/var/log/${name}.log
-stdout_logfile=/var/log/${name}.log
-autorestart=true
-startretries=1000000
-EOF
-}
-
 EVENT_STORE_IP=$1
 EVENT_STORE_URL="http://${EVENT_STORE_IP}:4002"
 NUM_NODES=$2
@@ -120,11 +107,12 @@ retry sudo docker run --net=host \
 # Increase the allowed number of open file descriptors
 ulimit -n 65536
 
-cd /
 tar xzf kubernetes-server-linux-amd64.tar.gz
 
-write_supervisor_conf "kube-scheduler" "/kubernetes/server/bin/kube-scheduler --master=127.0.0.1:8080 $(cat /scheduler_flags | tr '\n' ' ')"
-write_supervisor_conf "kube-apiserver" "/kubernetes/server/bin/kube-apiserver --insecure-bind-address=0.0.0.0 \
+kubernetes/server/bin/kube-scheduler --master=127.0.0.1:8080 $(cat scheduler_flags) &> /var/log/kube-scheduler.log &
+
+kubernetes/server/bin/kube-apiserver \
+	--insecure-bind-address=0.0.0.0 \
 	--etcd-servers=http://127.0.0.1:2379 \
 	--etcd-servers-overrides=/events#${EVENT_STORE_URL} \
 	--tls-cert-file=/srv/kubernetes/server.cert \
@@ -134,17 +122,14 @@ write_supervisor_conf "kube-apiserver" "/kubernetes/server/bin/kube-apiserver --
 	--secure-port=443 \
 	--basic-auth-file=/srv/kubernetes/basic_auth.csv \
 	--target-ram-mb=$((${NUM_NODES} * 60)) \
-	$(cat /apiserver_flags | tr '\n' ' ')"
-write_supervisor_conf "kube-contoller-manager" "/kubernetes/server/bin/kube-controller-manager \
-  --master=127.0.0.1:8080 \
-  --service-account-private-key-file=/srv/kubernetes/server.key \
-  --root-ca-file=/srv/kubernetes/ca.crt \
-  $(cat /controllers_flags | tr '\n' ' ')"
+	$(cat apiserver_flags) &> /var/log/kube-apiserver.log &
 
-supervisorctl reread
-supervisorctl update
-
+# kube-contoller-manager now needs running kube-api server to actually start
 until [ "$(curl 127.0.0.1:8080/healthz 2> /dev/null)" == "ok" ]; do
 	sleep 1
 done
-
+kubernetes/server/bin/kube-controller-manager \
+  --master=127.0.0.1:8080 \
+  --service-account-private-key-file=/srv/kubernetes/server.key \
+  --root-ca-file=/srv/kubernetes/ca.crt \
+  $(cat controllers_flags) &> /var/log/kube-controller-manager.log &
