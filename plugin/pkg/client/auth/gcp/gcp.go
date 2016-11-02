@@ -34,8 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/yaml"
 )
 
-type tokenSourceFactory func() (oauth2.TokenSource, error)
-
 func init() {
 	if err := restclient.RegisterAuthProviderPlugin("gcp", newGCPAuthProvider); err != nil {
 		glog.Fatalf("Failed to register gcp auth plugin: %v", err)
@@ -49,21 +47,21 @@ type gcpAuthProvider struct {
 
 func newGCPAuthProvider(_ string, gcpConfig map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
 	cmd, useCmd := gcpConfig["cmd-path"]
-	var tokenSourceFactory tokenSourceFactory
+	var ts oauth2.TokenSource
+	var err error
 	if useCmd {
-		tokenSourceFactory = func() (oauth2.TokenSource, error) {
-			return newCmdTokenSource(cmd, gcpConfig["token-key"], gcpConfig["expiry-key"], gcpConfig["time-fmt"])
-		}
+		ts, err = newCmdTokenSource(cmd, gcpConfig["token-key"], gcpConfig["expiry-key"], gcpConfig["time-fmt"])
 	} else {
-		tokenSourceFactory = func() (oauth2.TokenSource, error) {
-			return google.DefaultTokenSource(context.Background(), "https://www.googleapis.com/auth/cloud-platform")
-		}
+		ts, err = google.DefaultTokenSource(context.Background(), "https://www.googleapis.com/auth/cloud-platform")
 	}
-	ts, err := newCachedTokenSource(gcpConfig["access-token"], gcpConfig["expiry"], persister, tokenSourceFactory, gcpConfig)
 	if err != nil {
 		return nil, err
 	}
-	return &gcpAuthProvider{ts, persister}, nil
+	cts, err := newCachedTokenSource(gcpConfig["access-token"], gcpConfig["expiry"], persister, ts, gcpConfig)
+	if err != nil {
+		return nil, err
+	}
+	return &gcpAuthProvider{cts, persister}, nil
 }
 
 func (g *gcpAuthProvider) WrapTransport(rt http.RoundTripper) http.RoundTripper {
@@ -83,14 +81,10 @@ type cachedTokenSource struct {
 	cache       map[string]string
 }
 
-func newCachedTokenSource(accessToken, expiry string, persister restclient.AuthProviderConfigPersister, tsFactory tokenSourceFactory, cache map[string]string) (*cachedTokenSource, error) {
+func newCachedTokenSource(accessToken, expiry string, persister restclient.AuthProviderConfigPersister, ts oauth2.TokenSource, cache map[string]string) (*cachedTokenSource, error) {
 	var expiryTime time.Time
 	if parsedTime, err := time.Parse(time.RFC3339Nano, expiry); err == nil {
 		expiryTime = parsedTime
-	}
-	ts, err := tsFactory()
-	if err != nil {
-		return nil, err
 	}
 	if cache == nil {
 		cache = make(map[string]string)
@@ -178,8 +172,7 @@ func (c *commandTokenSource) parseTokenCmdOutput(output []byte) (*oauth2.Token, 
 		return nil, err
 	}
 	var data interface{}
-	err = json.Unmarshal(output, &data)
-	if err != nil {
+	if err := json.Unmarshal(output, &data); err != nil {
 		return nil, err
 	}
 

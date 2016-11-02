@@ -40,9 +40,9 @@ func TestCmdTokenSource(t *testing.T) {
 		{
 			"defaults",
 			[]byte(`{
-				"access_token": "faketoken",
-				"token_expiry": "2016-10-31T22:31:09.123000000Z"
-			}`),
+  "access_token": "faketoken",
+  "token_expiry": "2016-10-31T22:31:09.123000000Z"
+}`),
 			"/fake/cmd/path", "", "", "",
 			&oauth2.Token{
 				AccessToken: "faketoken",
@@ -54,11 +54,11 @@ func TestCmdTokenSource(t *testing.T) {
 		{
 			"custom keys",
 			[]byte(`{
-				"token": "faketoken",
-				"token_expiry": {
-				  "datetime": "2016-10-31 22:31:09.123"
-				}
-			}`),
+  "token": "faketoken",
+  "token_expiry": {
+    "datetime": "2016-10-31 22:31:09.123"
+  }
+}`),
 			"/fake/cmd/path", "{.token}", "{.token_expiry.datetime}", customFmt,
 			&oauth2.Token{
 				AccessToken: "faketoken",
@@ -77,11 +77,11 @@ func TestCmdTokenSource(t *testing.T) {
 		{
 			"missing token-key",
 			[]byte(`{
-				"broken": "faketoken",
-				"token_expiry": {
-				  "datetime": "2016-10-31 22:31:09.123000000Z"
-				}
-			}`),
+  "broken": "faketoken",
+  "token_expiry": {
+    "datetime": "2016-10-31 22:31:09.123000000Z"
+  }
+}`),
 			"/fake/cmd/path", "{.token}", "", "",
 			nil,
 			fmt.Errorf("error parsing token-key %q", "{.token}"),
@@ -89,9 +89,9 @@ func TestCmdTokenSource(t *testing.T) {
 		{
 			"missing expiry-key",
 			[]byte(`{
-				"access_token": "faketoken",
-				"expires": "2016-10-31T22:31:09.123000000Z"
-			}`),
+  "access_token": "faketoken",
+  "expires": "2016-10-31T22:31:09.123000000Z"
+}`),
 			"/fake/cmd/path", "", "{.expiry}", "",
 			nil,
 			fmt.Errorf("error parsing expiry-key %q", "{.expiry}"),
@@ -99,9 +99,9 @@ func TestCmdTokenSource(t *testing.T) {
 		{
 			"invalid expiry timestamp",
 			[]byte(`{
-				"access_token": "faketoken",
-				"token_expiry": "sometime soon, idk"
-			}`),
+  "access_token": "faketoken",
+  "token_expiry": "sometime soon, idk"
+}`),
 			"/fake/cmd/path", "", "", "",
 			&oauth2.Token{
 				AccessToken: "faketoken",
@@ -113,10 +113,10 @@ func TestCmdTokenSource(t *testing.T) {
 		{
 			"bad JSON",
 			[]byte(`{
-				"access_token": "faketoken",
-				"token_expiry": "sometime soon, idk"
-				------
-			`),
+  "access_token": "faketoken",
+  "token_expiry": "sometime soon, idk"
+  ------
+`),
 			"/fake/cmd", "", "", "",
 			nil,
 			fmt.Errorf("invalid character '-' after object key:value pair"),
