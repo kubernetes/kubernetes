@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 var (
@@ -115,8 +116,11 @@ func RunDelete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		return err
 	}
 	deleteAll := cmdutil.GetFlagBool(cmd, "all")
-	mapper, typer := f.Object()
-	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	mapper, typer, err := f.UnstructuredObject()
+	if err != nil {
+		return err
+	}
+	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), runtime.UnstructuredJSONScheme).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options).
