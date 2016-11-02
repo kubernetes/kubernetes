@@ -889,6 +889,9 @@ func newStatefulSet(name, ns, governingSvcName string, replicas int32, petMounts
 		ObjectMeta: api.ObjectMeta{
 			Name:      name,
 			Namespace: ns,
+			Annotations: map[string]string{
+				"pod.alpha.kubernetes.io/initialized": "false",
+			},
 		},
 		Spec: apps.StatefulSetSpec{
 			Selector: &unversioned.LabelSelector{
