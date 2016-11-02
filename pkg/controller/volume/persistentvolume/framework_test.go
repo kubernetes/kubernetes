@@ -750,6 +750,8 @@ func newClaim(name, claimUID, capacity, boundToVolume string, phase api.Persiste
 			switch a {
 			case storageutil.StorageClassAnnotation:
 				claim.Annotations[a] = "gold"
+			case annStorageProvisioner:
+				claim.Annotations[a] = mockPluginName
 			default:
 				claim.Annotations[a] = "yes"
 			}
@@ -782,6 +784,17 @@ func claimWithClass(className string, claims []*api.PersistentVolumeClaim) []*ap
 		claims[0].Annotations = map[string]string{storageutil.StorageClassAnnotation: className}
 	} else {
 		claims[0].Annotations[storageutil.StorageClassAnnotation] = className
+	}
+	return claims
+}
+
+// claimWithAnnotation saves given annotation into given claims.
+// Meant to be used to compose claims specified inline in a test.
+func claimWithAnnotation(name, value string, claims []*api.PersistentVolumeClaim) []*api.PersistentVolumeClaim {
+	if claims[0].Annotations == nil {
+		claims[0].Annotations = map[string]string{name: value}
+	} else {
+		claims[0].Annotations[name] = value
 	}
 	return claims
 }
