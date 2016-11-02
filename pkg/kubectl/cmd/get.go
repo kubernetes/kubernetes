@@ -332,7 +332,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			res = infos[0].ResourceMapping().Resource
 		}
 
-		obj, err := resource.AsVersionedObject(infos, !singular, version, f.JSONEncoder())
+		obj, err := resource.AsVersionedObject(infos, !singular, version, typer, f.JSONEncoder())
 		if err != nil {
 			return err
 		}
