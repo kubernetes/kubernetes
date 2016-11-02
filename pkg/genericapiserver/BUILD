@@ -65,6 +65,7 @@ go_library(
         "//pkg/util/net:go_default_library",
         "//pkg/util/runtime:go_default_library",
         "//pkg/util/sets:go_default_library",
+        "//pkg/util/validation:go_default_library",
         "//pkg/util/wait:go_default_library",
         "//pkg/version:go_default_library",
         "//vendor:github.com/coreos/go-systemd/daemon",
