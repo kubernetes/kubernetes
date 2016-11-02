@@ -50,8 +50,19 @@ type FakeRuntimeService struct {
 
 	Called []string
 
+	Errors     map[string]error
+	FakeStatus *runtimeApi.RuntimeStatus
 	Containers map[string]*FakeContainer
 	Sandboxes  map[string]*FakePodSandbox
+}
+
+// SetFakeRuntime is a simple function to set arbitrary field in the fake runtime
+// with lock.
+func (r *FakeRuntimeService) SetFakeRuntime(set func(*FakeRuntimeService)) {
+	r.Lock()
+	defer r.Unlock()
+
+	set(r)
 }
 
 func (r *FakeRuntimeService) SetFakeSandboxes(sandboxes []*FakePodSandbox) {
@@ -90,6 +101,7 @@ func (r *FakeRuntimeService) AssertCalls(calls []string) error {
 func NewFakeRuntimeService() *FakeRuntimeService {
 	return &FakeRuntimeService{
 		Called:     make([]string, 0),
+		Errors:     make(map[string]error),
 		Containers: make(map[string]*FakeContainer),
 		Sandboxes:  make(map[string]*FakePodSandbox),
 	}
@@ -107,6 +119,15 @@ func (r *FakeRuntimeService) Version(apiVersion string) (*runtimeApi.VersionResp
 		RuntimeVersion:    &version,
 		RuntimeApiVersion: &version,
 	}, nil
+}
+
+func (r *FakeRuntimeService) Status() (*runtimeApi.RuntimeStatus, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "Status")
+
+	return r.FakeStatus, r.Errors["Status"]
 }
 
 func (r *FakeRuntimeService) RunPodSandbox(config *runtimeApi.PodSandboxConfig) (string, error) {

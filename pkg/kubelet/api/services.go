@@ -22,6 +22,16 @@ import (
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
+// RuntimeConditionType is the condition type for the runtime.
+type RuntimeConditionType string
+
+const (
+	// RuntimeReady means the runtime is up and ready to accept basic containers.
+	RuntimeReady RuntimeConditionType = "RuntimeReady"
+	// NetworkReady means the runtime network is up and ready to accept containers which require network.
+	NetworkReady RuntimeConditionType = "NetworkReady"
+)
+
 // RuntimeVersioner contains methods for runtime name, version and API version.
 type RuntimeVersioner interface {
 	// Version returns the runtime name, runtime version and runtime API version
@@ -81,6 +91,8 @@ type RuntimeService interface {
 
 	// UpdateRuntimeConfig updates runtime configuration if specified
 	UpdateRuntimeConfig(runtimeConfig *runtimeApi.RuntimeConfig) error
+	// Status returns the status of the runtime.
+	Status() (*runtimeApi.RuntimeStatus, error)
 }
 
 // ImageManagerService interface should be implemented by a container image
