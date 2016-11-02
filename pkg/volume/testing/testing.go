@@ -442,11 +442,11 @@ func (fv *FakeVolume) WaitForDetach(devicePath string, timeout time.Duration) er
 	return nil
 }
 
-func (fv *FakeVolume) UnmountDevice(globalMountPath string) error {
+func (fv *FakeVolume) UnmountDevice(globalMountPath string) (string, error) {
 	fv.Lock()
 	defer fv.Unlock()
 	fv.UnmountDeviceCallCount++
-	return nil
+	return "", nil
 }
 
 type fakeRecycler struct {

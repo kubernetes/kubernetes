@@ -177,10 +177,10 @@ type Detacher interface {
 	// period an error is returned.
 	WaitForDetach(devicePath string, timeout time.Duration) error
 
-	// UnmountDevice unmounts the global mount of the disk. This
+	// UnmountDevice retrieves the device path that is mounted on, unmounts the global mount of the disk. This
 	// should only be called once all bind mounts have been
-	// unmounted.
-	UnmountDevice(deviceMountPath string) error
+	// unmounted. The device path, if existed, is returned for further processing.
+	UnmountDevice(deviceMountPath string) (string, error)
 }
 
 // NewDeletedVolumeInUseError returns a new instance of DeletedVolumeInUseError

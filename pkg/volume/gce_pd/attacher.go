@@ -291,6 +291,6 @@ func (detacher *gcePersistentDiskDetacher) WaitForDetach(devicePath string, time
 	}
 }
 
-func (detacher *gcePersistentDiskDetacher) UnmountDevice(deviceMountPath string) error {
+func (detacher *gcePersistentDiskDetacher) UnmountDevice(deviceMountPath string) (string, error) {
 	return volumeutil.UnmountPath(deviceMountPath, detacher.host.GetMounter())
 }

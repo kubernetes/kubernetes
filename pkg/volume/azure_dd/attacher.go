@@ -19,7 +19,6 @@ package azure_dd
 import (
 	"fmt"
 	"os"
-	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -285,12 +284,6 @@ func (detacher *azureDiskDetacher) WaitForDetach(devicePath string, timeout time
 }
 
 // UnmountDevice unmounts the volume on the node
-func (detacher *azureDiskDetacher) UnmountDevice(deviceMountPath string) error {
-	volume := path.Base(deviceMountPath)
-	if err := util.UnmountPath(deviceMountPath, detacher.mounter); err != nil {
-		glog.Errorf("Error unmounting %q: %v", volume, err)
-		return err
-	} else {
-		return nil
-	}
+func (detacher *azureDiskDetacher) UnmountDevice(deviceMountPath string) (string, error) {
+	return util.UnmountPath(deviceMountPath, detacher.mounter)
 }

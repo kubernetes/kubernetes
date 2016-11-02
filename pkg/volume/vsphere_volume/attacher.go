@@ -272,6 +272,6 @@ func (detacher *vsphereVMDKDetacher) WaitForDetach(devicePath string, timeout ti
 	}
 }
 
-func (detacher *vsphereVMDKDetacher) UnmountDevice(deviceMountPath string) error {
+func (detacher *vsphereVMDKDetacher) UnmountDevice(deviceMountPath string) (string, error) {
 	return volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
 }
