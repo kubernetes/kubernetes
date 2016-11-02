@@ -114,6 +114,8 @@ type KubeGenericRuntime interface {
 	kubecontainer.Runtime
 	kubecontainer.IndirectStreamingRuntime
 	kubecontainer.ContainerCommandRunner
+	// TODO(timstclair): Remove this once the indirect path is fully functional.
+	kubecontainer.DirectStreamingRuntime
 }
 
 // NewKubeGenericRuntimeManager creates a new kubeGenericRuntimeManager

@@ -121,6 +121,8 @@ type Runtime interface {
 	UpdatePodCIDR(podCIDR string) error
 }
 
+// DirectStreamingRuntime is the interface implemented by runtimes for which the streaming calls
+// (exec/attach/port-forward) should be served directly by the Kubelet.
 type DirectStreamingRuntime interface {
 	// Runs the command in the container of the specified pod using nsenter.
 	// Attaches the processes stdin, stdout, and stderr. Optionally uses a
@@ -132,10 +134,13 @@ type DirectStreamingRuntime interface {
 	ContainerAttacher
 }
 
+// IndirectStreamingRuntime is the interface implemented by runtimes that handle the serving of the
+// streaming calls (exec/attach/port-forward) themselves. In this case, Kubelet should redirect to
+// the runtime server.
 type IndirectStreamingRuntime interface {
 	GetExec(id ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error)
 	GetAttach(id ContainerID, stdin, stdout, stderr bool) (*url.URL, error)
-	GetPortForward(podFullName string, podUID types.UID) (*url.URL, error)
+	GetPortForward(podName, podNamespace string, podUID types.UID) (*url.URL, error)
 }
 
 type ImageService interface {

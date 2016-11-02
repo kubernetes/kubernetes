@@ -182,7 +182,7 @@ type HostInterface interface {
 	PLEGHealthCheck() (bool, error)
 	GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommand.Options) (*url.URL, error)
 	GetAttach(podFullName string, podUID types.UID, containerName string, streamOpts remotecommand.Options) (*url.URL, error)
-	GetPortForward(podFullName string, podUID types.UID) (*url.URL, error)
+	GetPortForward(podName, podNamespace string, podUID types.UID) (*url.URL, error)
 }
 
 // NewServer initializes and configures a kubelet.Server object to handle HTTP requests.
@@ -699,8 +699,7 @@ func (s *Server) getPortForward(request *restful.Request, response *restful.Resp
 		return
 	}
 
-	podFullName := kubecontainer.GetPodFullName(pod)
-	redirect, err := s.host.GetPortForward(podFullName, params.podUID)
+	redirect, err := s.host.GetPortForward(params.podName, params.podNamespace, params.podUID)
 	if err != nil {
 		response.WriteError(streaming.HTTPStatus(err), err)
 		return
@@ -713,7 +712,7 @@ func (s *Server) getPortForward(request *restful.Request, response *restful.Resp
 	portforward.ServePortForward(response.ResponseWriter,
 		request.Request,
 		s.host,
-		podFullName,
+		kubecontainer.GetPodFullName(pod),
 		params.podUID,
 		s.host.StreamingConnectionIdleTimeout(),
 		remotecommand.DefaultStreamCreationTimeout)

@@ -465,7 +465,7 @@ func (f *FakeIndirectStreamingRuntime) GetAttach(id ContainerID, stdin, stdout, 
 	return &url.URL{Host: FakeHost}, f.Err
 }
 
-func (f *FakeIndirectStreamingRuntime) GetPortForward(podFullName string, podUID types.UID) (*url.URL, error) {
+func (f *FakeIndirectStreamingRuntime) GetPortForward(podName, podNamespace string, podUID types.UID) (*url.URL, error) {
 	f.Lock()
 	defer f.Unlock()
 

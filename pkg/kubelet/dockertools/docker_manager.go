@@ -106,8 +106,9 @@ const (
 )
 
 var (
-	// DockerManager implements the Runtime interface.
-	_ kubecontainer.Runtime = &DockerManager{}
+	// DockerManager implements the Runtime and DirectStreamingRuntime interfaces.
+	_ kubecontainer.Runtime                = &DockerManager{}
+	_ kubecontainer.DirectStreamingRuntime = &DockerManager{}
 
 	// TODO: make this a TTL based pull (if image older than X policy, pull)
 	podInfraContainerImagePullPolicy = api.PullIfNotPresent

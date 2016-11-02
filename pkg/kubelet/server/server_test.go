@@ -145,7 +145,7 @@ func (fk *fakeKubelet) GetAttach(podFullName string, podUID types.UID, container
 	return fk.redirectURL, nil
 }
 
-func (fk *fakeKubelet) GetPortForward(podFullName string, podUID types.UID) (*url.URL, error) {
+func (fk *fakeKubelet) GetPortForward(podName, podNamespace string, podUID types.UID) (*url.URL, error) {
 	return fk.redirectURL, nil
 }
 

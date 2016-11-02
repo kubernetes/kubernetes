@@ -1246,7 +1246,7 @@ func (kl *Kubelet) GetAttach(podFullName string, podUID types.UID, containerName
 }
 
 // GetPortForward gets the URL the port-forward will be served from, or nil if the Kubelet will serve it.
-func (kl *Kubelet) GetPortForward(podFullName string, podUID types.UID) (*url.URL, error) {
+func (kl *Kubelet) GetPortForward(podName, podNamespace string, podUID types.UID) (*url.URL, error) {
 	switch streamingRuntime := kl.containerRuntime.(type) {
 	case kubecontainer.DirectStreamingRuntime:
 		// Kubelet will serve the attach directly.
@@ -1257,12 +1257,13 @@ func (kl *Kubelet) GetPortForward(podFullName string, podUID types.UID) (*url.UR
 			return nil, err
 		}
 		podUID = kl.podManager.TranslatePodUID(podUID)
+		podFullName := kubecontainer.BuildPodFullName(podName, podNamespace)
 		pod := kubecontainer.Pods(pods).FindPod(podFullName, podUID)
 		if pod.IsEmpty() {
 			return nil, fmt.Errorf("pod not found (%q)", podFullName)
 		}
 
-		return streamingRuntime.GetPortForward(podFullName, podUID)
+		return streamingRuntime.GetPortForward(podName, podNamespace, podUID)
 	default:
 		return nil, fmt.Errorf("container runtime does not support port-forward")
 	}

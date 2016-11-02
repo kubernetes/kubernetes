@@ -223,13 +223,13 @@ func (m *kubeGenericRuntimeManager) getSandboxIDByPodUID(podUID kubetypes.UID, s
 }
 
 // GetPortForward gets the endpoint the runtime will serve the port-forward request from.
-func (m *kubeGenericRuntimeManager) GetPortForward(podFullName string, podUID kubetypes.UID) (*url.URL, error) {
+func (m *kubeGenericRuntimeManager) GetPortForward(podName, podNamespace string, podUID kubetypes.UID) (*url.URL, error) {
 	sandboxIDs, err := m.getSandboxIDByPodUID(podUID, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find sandboxID for pod %s (%s): %v", podFullName, podUID, err)
+		return nil, fmt.Errorf("failed to find sandboxID for pod %s: %v", format.PodDesc(podName, podNamespace, podUID), err)
 	}
 	if len(sandboxIDs) == 0 {
-		return nil, fmt.Errorf("failed to find sandboxID for pod %s (%s)", podFullName, podUID)
+		return nil, fmt.Errorf("failed to find sandboxID for pod %s", format.PodDesc(podName, podNamespace, podUID))
 	}
 	// TODO: Port is unused for now, but we may need it in the future.
 	req := &runtimeApi.PortForwardRequest{

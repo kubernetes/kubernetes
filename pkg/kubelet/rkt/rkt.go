@@ -181,6 +181,7 @@ type Runtime struct {
 }
 
 var _ kubecontainer.Runtime = &Runtime{}
+var _ kubecontainer.DirectStreamingRuntime = &Runtime{}
 
 // TODO(yifan): This duplicates the podGetter in dockertools.
 type podGetter interface {
