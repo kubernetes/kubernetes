@@ -36,6 +36,7 @@ go_library(
         "//pkg/util/iptables:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/net:go_default_library",
+        "//pkg/util/netsh:go_default_library",
         "//pkg/util/node:go_default_library",
         "//pkg/util/oom:go_default_library",
         "//pkg/util/resourcecontainer:go_default_library",
