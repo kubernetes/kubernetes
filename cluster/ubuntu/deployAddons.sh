@@ -41,29 +41,29 @@ function init {
 
 function deploy_dns {
   echo "Deploying DNS on Kubernetes"
-  sed -e "s/\\\$DNS_REPLICAS/${DNS_REPLICAS}/g;s/\\\$DNS_DOMAIN/${DNS_DOMAIN}/g;" "${KUBE_ROOT}/cluster/addons/dns/skydns-rc.yaml.sed" > skydns-rc.yaml
+  sed -e "s/\\\$DNS_DOMAIN/${DNS_DOMAIN}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-rc.yaml.sed" > skydns-rc.yaml
   sed -e "s/\\\$DNS_SERVER_IP/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-svc.yaml.sed" > skydns-svc.yaml
 
   KUBEDNS=`eval "${KUBECTL} get services --namespace=kube-system | grep kube-dns | cat"`
-      
+
   if [ ! "$KUBEDNS" ]; then
     # use kubectl to create skydns rc and service
     ${KUBECTL} --namespace=kube-system create -f skydns-rc.yaml 
     ${KUBECTL} --namespace=kube-system create -f skydns-svc.yaml
 
-    echo "Kube-dns rc and service is successfully deployed."
+    echo "Kube-dns controller and service are successfully deployed."
   else
-    echo "Kube-dns rc and service is already deployed. Skipping."
+    echo "Kube-dns controller and service are already deployed. Skipping."
   fi
 
   echo
 }
 
 function deploy_dashboard {
-    if ${KUBECTL} get rc -l k8s-app=kubernetes-dashboard --namespace=kube-system | grep kubernetes-dashboard-v &> /dev/null; then
-        echo "Kubernetes Dashboard replicationController already exists"
+    if ${KUBECTL} get deployment -l k8s-app=kubernetes-dashboard --namespace=kube-system | grep kubernetes-dashboard-v &> /dev/null; then
+        echo "Kubernetes Dashboard controller already exists"
     else
-        echo "Creating Kubernetes Dashboard replicationController"
+        echo "Creating Kubernetes Dashboard controller"
         ${KUBECTL} create -f ${KUBE_ROOT}/cluster/addons/dashboard/dashboard-controller.yaml
     fi
 
