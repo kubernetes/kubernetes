@@ -513,7 +513,7 @@ func (proxier *Proxier) openPortal(service proxy.ServicePortName, info *serviceI
 
 func (proxier *Proxier) openOnePortal(portal portal, protocol api.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) error {
 	if local, err := isLocalIP(portal.ip); err != nil {
-		return fmt.Errorf("can't determine if IP is local, assuming not: %v", err)
+		return fmt.Errorf("can't determine if IP %s is local, assuming not: %v", portal.ip, err)
 	} else if local {
 		err := proxier.claimNodePort(portal.ip, portal.port, protocol, name)
 		if err != nil {
@@ -691,7 +691,7 @@ func (proxier *Proxier) closeOnePortal(portal portal, protocol api.Protocol, pro
 	el := []error{}
 
 	if local, err := isLocalIP(portal.ip); err != nil {
-		el = append(el, fmt.Errorf("can't determine if IP is local, assuming not: %v", err))
+		el = append(el, fmt.Errorf("can't determine if IP %s is local, assuming not: %v", portal.ip, err))
 	} else if local {
 		if err := proxier.releaseNodePort(portal.ip, portal.port, protocol, name); err != nil {
 			el = append(el, err)
