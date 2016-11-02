@@ -55,16 +55,17 @@ var _ = framework.KubeDescribe("Rescheduler [Serial]", func() {
 		By("creating a new instance of Dashboard and waiting for Dashboard to be scheduled")
 		label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": "kubernetes-dashboard"}))
 		listOpts := api.ListOptions{LabelSelector: label}
-		rcs, err := f.ClientSet.Core().ReplicationControllers(api.NamespaceSystem).List(listOpts)
+		deployments, err := f.ClientSet.Extensions().Deployments(api.NamespaceSystem).List(listOpts)
 		framework.ExpectNoError(err)
-		Expect(len(rcs.Items)).Should(Equal(1))
+		Expect(len(deployments.Items)).Should(Equal(1))
 
-		rc := rcs.Items[0]
-		replicas := uint(rc.Spec.Replicas)
+		deployment := deployments.Items[0]
+		replicas := uint(deployment.Spec.Replicas)
 
-		err = framework.ScaleRC(f.ClientSet, api.NamespaceSystem, rc.Name, replicas+1, true)
-		defer framework.ExpectNoError(framework.ScaleRC(f.ClientSet, api.NamespaceSystem, rc.Name, replicas, true))
+		err = framework.ScaleDeployment(f.ClientSet, api.NamespaceSystem, deployment.Name, replicas+1, true)
+		defer framework.ExpectNoError(framework.ScaleDeployment(f.ClientSet, api.NamespaceSystem, deployment.Name, replicas, true))
 		framework.ExpectNoError(err)
+
 	})
 })
 
