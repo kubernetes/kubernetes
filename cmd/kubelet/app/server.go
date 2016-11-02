@@ -309,7 +309,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 
 	done := make(chan struct{})
 	if s.LockFilePath != "" {
-		glog.Infof("acquiring lock on %q", s.LockFilePath)
+		glog.Infof("acquiring file lock on %q", s.LockFilePath)
 		if err := flock.Acquire(s.LockFilePath); err != nil {
 			return fmt.Errorf("unable to acquire file lock on %q: %v", s.LockFilePath, err)
 		}
@@ -499,7 +499,7 @@ func getNodeName(cloud cloudprovider.Interface, hostname string) (types.NodeName
 
 	nodeName, err := instances.CurrentNodeName(hostname)
 	if err != nil {
-		return "", fmt.Errorf("error fetching current instance name from cloud provider: %v", err)
+		return "", fmt.Errorf("error fetching current node name from cloud provider: %v", err)
 	}
 
 	glog.V(2).Infof("cloud provider determined current node name to be %s", nodeName)
