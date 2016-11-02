@@ -238,7 +238,21 @@ func (a *OIDCAuthenticator) AuthenticateToken(value string) (user.Info, bool, er
 	var username string
 	switch a.usernameClaim {
 	case "email":
-		// TODO(yifan): Check 'email_verified' to make sure the email is valid.
+		// Only act on the "email_verified" claim if it's present. The lack of "email_verified"
+		// implies that the email is verified.
+		if verified, ok := claims["email_verified"]; ok {
+			emailVerified, ok := verified.(bool)
+			if !ok {
+				// OpenID Connect spec defines 'email_verified' as a boolean. For now, be a pain and error if
+				// it's a different type. If there are enough misbehaving providers we can relax this latter.
+				//
+				// See: https://openid.net/specs/openid-connect-core-1_0.html#StandardClaims
+				return nil, false, fmt.Errorf("malformed claim 'email_verified', expected boolean got %T", verified)
+			}
+			if !emailVerified {
+				return nil, false, errors.New("email not verified")
+			}
+		}
 		username = claim
 	default:
 		// For all other cases, use issuerURL + claim as the user name.

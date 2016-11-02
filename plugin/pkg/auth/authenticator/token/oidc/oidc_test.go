@@ -33,14 +33,17 @@ import (
 	oidctesting "k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/oidc/testing"
 )
 
-func generateToken(t *testing.T, op *oidctesting.OIDCProvider, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups interface{}, iat, exp time.Time) string {
-	signer := op.PrivKey.Signer()
+func generateToken(t *testing.T, op *oidctesting.OIDCProvider, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups interface{}, iat, exp time.Time, setCustomClaims func(c jose.Claims)) string {
 	claims := oidc.NewClaims(iss, sub, aud, iat, exp)
 	claims.Add(usernameClaim, value)
 	if groups != nil && groupsClaim != "" {
 		claims.Add(groupsClaim, groups)
 	}
+	if setCustomClaims != nil {
+		setCustomClaims(claims)
+	}
 
+	signer := op.PrivKey.Signer()
 	jwt, err := jose.NewSignedJWT(claims, signer)
 	if err != nil {
 		t.Fatalf("Cannot generate token: %v", err)
@@ -49,16 +52,23 @@ func generateToken(t *testing.T, op *oidctesting.OIDCProvider, iss, sub, aud str
 	return jwt.Encode()
 }
 
+func generateTokenWithUnverifiedEmail(t *testing.T, op *oidctesting.OIDCProvider, iss, sub, aud string, email string) string {
+	setCustomClaims := func(c jose.Claims) {
+		c.Add("email_verified", false)
+	}
+	return generateToken(t, op, iss, sub, aud, "email", email, "", nil, time.Now(), time.Now().Add(time.Hour), setCustomClaims)
+}
+
 func generateGoodToken(t *testing.T, op *oidctesting.OIDCProvider, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups interface{}) string {
-	return generateToken(t, op, iss, sub, aud, usernameClaim, value, groupsClaim, groups, time.Now(), time.Now().Add(time.Hour))
+	return generateToken(t, op, iss, sub, aud, usernameClaim, value, groupsClaim, groups, time.Now(), time.Now().Add(time.Hour), nil)
 }
 
 func generateMalformedToken(t *testing.T, op *oidctesting.OIDCProvider, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups interface{}) string {
-	return generateToken(t, op, iss, sub, aud, usernameClaim, value, groupsClaim, groups, time.Now(), time.Now().Add(time.Hour)) + "randombits"
+	return generateToken(t, op, iss, sub, aud, usernameClaim, value, groupsClaim, groups, time.Now(), time.Now().Add(time.Hour), nil) + "randombits"
 }
 
 func generateExpiredToken(t *testing.T, op *oidctesting.OIDCProvider, iss, sub, aud string, usernameClaim, value, groupsClaim string, groups interface{}) string {
-	return generateToken(t, op, iss, sub, aud, usernameClaim, value, groupsClaim, groups, time.Now().Add(-2*time.Hour), time.Now().Add(-1*time.Hour))
+	return generateToken(t, op, iss, sub, aud, usernameClaim, value, groupsClaim, groups, time.Now().Add(-2*time.Hour), time.Now().Add(-1*time.Hour), nil)
 }
 
 func TestTLSConfig(t *testing.T) {
@@ -256,6 +266,15 @@ func TestOIDCAuthentication(t *testing.T) {
 				nil,
 				false,
 				"custom group claim contains invalid type: float64",
+			},
+			{
+				// Email not verified
+				"email",
+				"",
+				generateTokenWithUnverifiedEmail(t, op, srv.URL, "client-foo", "client-foo", "foo@example.com"),
+				nil,
+				false,
+				"email not verified",
 			},
 			{
 				"sub",
