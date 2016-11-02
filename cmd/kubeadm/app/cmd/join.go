@@ -50,7 +50,7 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 	var cfgPath string
 	cmd := &cobra.Command{
 		Use:   "join",
-		Short: "Run this on any machine you wish to join an existing cluster.",
+		Short: "Run this on any machine you wish to join an existing cluster",
 		Run: func(cmd *cobra.Command, args []string) {
 			j, err := NewJoin(cfgPath, args, cfg, skipPreFlight)
 			kubeadmutil.CheckErr(err)
