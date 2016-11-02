@@ -17,34 +17,86 @@ limitations under the License.
 package filters
 
 import (
+	"fmt"
 	"net/http"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/apiserver/request"
 	"k8s.io/kubernetes/pkg/httplog"
+	"k8s.io/kubernetes/pkg/util/sets"
+
+	"github.com/golang/glog"
 )
 
 // Constant for the retry-after interval on rate limiting.
 // TODO: maybe make this dynamic? or user-adjustable?
 const retryAfter = "1"
 
+var nonMutatingRequestVerbs = sets.NewString("get", "list", "watch")
+
+func handleError(w http.ResponseWriter, r *http.Request, err error) {
+	w.WriteHeader(http.StatusInternalServerError)
+	fmt.Fprintf(w, "Internal Server Error: %#v", r.RequestURI)
+	glog.Errorf(err.Error())
+}
+
 // WithMaxInFlightLimit limits the number of in-flight requests to buffer size of the passed in channel.
-func WithMaxInFlightLimit(handler http.Handler, limit int, longRunningRequestCheck LongRunningRequestCheck) http.Handler {
-	if limit == 0 {
+func WithMaxInFlightLimit(
+	handler http.Handler,
+	nonMutatingLimit int,
+	mutatingLimit int,
+	requestContextMapper api.RequestContextMapper,
+	longRunningRequestCheck LongRunningRequestCheck,
+) http.Handler {
+	if nonMutatingLimit == 0 && mutatingLimit == 0 {
 		return handler
 	}
-	c := make(chan bool, limit)
+	var nonMutatingChan chan bool
+	var mutatingChan chan bool
+	if nonMutatingLimit != 0 {
+		nonMutatingChan = make(chan bool, nonMutatingLimit)
+	}
+	if mutatingLimit != 0 {
+		mutatingChan = make(chan bool, mutatingLimit)
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// TODO: migrate to use requestInfo instead of having custom request parser.
 		if longRunningRequestCheck(r) {
 			// Skip tracking long running events.
 			handler.ServeHTTP(w, r)
 			return
 		}
-		select {
-		case c <- true:
-			defer func() { <-c }()
+
+		ctx, ok := requestContextMapper.Get(r)
+		if !ok {
+			handleError(w, r, fmt.Errorf("no context found for request, handler chain must be wrong"))
+			return
+		}
+		requestInfo, ok := request.RequestInfoFrom(ctx)
+		if !ok {
+			handleError(w, r, fmt.Errorf("no RequestInfo found in context, handler chain must be wrong"))
+			return
+		}
+
+		var c chan bool
+		if !nonMutatingRequestVerbs.Has(requestInfo.Verb) {
+			c = mutatingChan
+		} else {
+			c = nonMutatingChan
+		}
+
+		if c == nil {
 			handler.ServeHTTP(w, r)
-		default:
-			tooManyRequests(r, w)
+		} else {
+			select {
+			case c <- true:
+				defer func() { <-c }()
+				handler.ServeHTTP(w, r)
+			default:
+				tooManyRequests(r, w)
+			}
 		}
 	})
 }
