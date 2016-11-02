@@ -49,7 +49,7 @@ func GetCoreImage(image string, cfg *kubeadmapi.MasterConfiguration, overrideIma
 	if overrideImage != "" {
 		return overrideImage
 	}
-	repoPrefix := getRepoPrefix()
+	repoPrefix := kubeadmapi.GetEnvParams()["repo_prefix"]
 	return map[string]string{
 		KubeEtcdImage:              fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "etcd", runtime.GOARCH, etcdVersion),
 		KubeAPIServerImage:         fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kube-apiserver", runtime.GOARCH, cfg.KubernetesVersion),
@@ -60,7 +60,7 @@ func GetCoreImage(image string, cfg *kubeadmapi.MasterConfiguration, overrideIma
 }
 
 func GetAddonImage(image string) string {
-	repoPrefix := getRepoPrefix()
+	repoPrefix := kubeadmapi.GetEnvParams()["repo_prefix"]
 	return map[string]string{
 		KubeDNSImage:         fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kubedns", runtime.GOARCH, kubeDNSVersion),
 		KubeDNSmasqImage:     fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kube-dnsmasq", runtime.GOARCH, dnsmasqVersion),
@@ -69,10 +69,3 @@ func GetAddonImage(image string) string {
 	}[image]
 }
 
-func getRepoPrefix()string{
-	repoPrefix := kubeadmapi.GetEnvParams()["repo_prefix"]
-	if repoPrefix == ""{
-		repoPrefix = gcrPrefix
-	}
-	return repoPrefix
-}
