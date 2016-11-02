@@ -54,9 +54,9 @@ func (r *Mock) APIVersion() (Version, error) {
 	return args.Get(0).(Version), args.Error(1)
 }
 
-func (r *Mock) Status() error {
+func (r *Mock) Status() (*RuntimeStatus, error) {
 	args := r.Called()
-	return args.Error(0)
+	return args.Get(0).(*RuntimeStatus), args.Error(0)
 }
 
 func (r *Mock) GetPods(all bool) ([]*Pod, error) {

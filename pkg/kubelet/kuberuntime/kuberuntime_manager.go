@@ -268,25 +268,14 @@ func (m *kubeGenericRuntimeManager) APIVersion() (kubecontainer.Version, error) 
 	return newRuntimeVersion(typedVersion.GetRuntimeApiVersion())
 }
 
-// Status returns error if the runtime is unhealthy; nil otherwise.
-// TODO(random-liu): Change the Status in runtime interface to return runtime status.
-// TODO(random-liu): Add unit test for this function after addressing the TODO above.
-func (m *kubeGenericRuntimeManager) Status() error {
+// Status returns the status of the runtime. An error is returned if the Status
+// function itself fails, nil otherwise.
+func (m *kubeGenericRuntimeManager) Status() (*kubecontainer.RuntimeStatus, error) {
 	status, err := m.runtimeService.Status()
 	if err != nil {
-		return fmt.Errorf("failed to checkout runtime status: %v", err)
+		return nil, err
 	}
-	networkReady := getRuntimeCondition(status, runtimeApi.NetworkReady)
-	if networkReady == nil || !networkReady.GetStatus() {
-		return fmt.Errorf("runtime network not ready: reason: %q, message: %q",
-			networkReady.GetReason(), networkReady.GetMessage())
-	}
-	runtimeReady := getRuntimeCondition(status, runtimeApi.RuntimeReady)
-	if runtimeReady == nil || !runtimeReady.GetStatus() {
-		return fmt.Errorf("runtime not ready: reason: %q, message: %q",
-			runtimeReady.GetReason(), runtimeReady.GetMessage())
-	}
-	return nil
+	return toKubeRuntimeStatus(status), nil
 }
 
 // GetPods returns a list of containers grouped by pods. The boolean parameter

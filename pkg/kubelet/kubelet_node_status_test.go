@@ -865,6 +865,38 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 	clock.SetTime(time.Now())
 	kubelet.updateRuntimeUp()
 	checkNodeStatus(api.ConditionFalse, "KubeletNotReady", downMessage)
+
+	// Test cri integration.
+	kubelet.kubeletConfiguration.ExperimentalRuntimeIntegrationType = "cri"
+	fakeRuntime.StatusErr = nil
+
+	// Should report node not ready if runtime status is nil.
+	fakeRuntime.RuntimeStatus = nil
+	kubelet.updateRuntimeUp()
+	checkNodeStatus(api.ConditionFalse, "KubeletNotReady", downMessage)
+
+	// Should report node not ready if runtime status is empty.
+	fakeRuntime.RuntimeStatus = &kubecontainer.RuntimeStatus{}
+	kubelet.updateRuntimeUp()
+	checkNodeStatus(api.ConditionFalse, "KubeletNotReady", downMessage)
+
+	// Should report node not ready if RuntimeReady is false.
+	fakeRuntime.RuntimeStatus = &kubecontainer.RuntimeStatus{
+		Conditions: []kubecontainer.RuntimeCondition{
+			{Type: kubecontainer.RuntimeReady, Status: false},
+		},
+	}
+	kubelet.updateRuntimeUp()
+	checkNodeStatus(api.ConditionFalse, "KubeletNotReady", downMessage)
+
+	// Should report node ready if RuntimeReady is true.
+	fakeRuntime.RuntimeStatus = &kubecontainer.RuntimeStatus{
+		Conditions: []kubecontainer.RuntimeCondition{
+			{Type: kubecontainer.RuntimeReady, Status: true},
+		},
+	}
+	kubelet.updateRuntimeUp()
+	checkNodeStatus(api.ConditionTrue, "KubeletReady", readyMessage)
 }
 
 func TestUpdateNodeStatusError(t *testing.T) {

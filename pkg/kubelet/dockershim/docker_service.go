@@ -60,7 +60,7 @@ const (
 	sandboxIDLabelKey           = "io.kubernetes.sandbox.id"
 )
 
-// NetworkPluginArgs is the subset of kubelet runtime args we pass
+// NetworkPluginSettings is the subset of kubelet runtime args we pass
 // to the container runtime shim so it can probe for network plugins.
 // In the future we will feed these directly to a standalone container
 // runtime process.
