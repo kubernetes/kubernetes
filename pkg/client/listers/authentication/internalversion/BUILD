@@ -12,7 +12,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["zz_generated.tokenreview.go"],
+    srcs = [
+        "expansion_generated.go",
+        "tokenreview.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",

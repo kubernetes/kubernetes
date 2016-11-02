@@ -13,10 +13,11 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "zz_generated.clusterrole.go",
-        "zz_generated.clusterrolebinding.go",
-        "zz_generated.role.go",
-        "zz_generated.rolebinding.go",
+        "clusterrole.go",
+        "clusterrolebinding.go",
+        "expansion_generated.go",
+        "role.go",
+        "rolebinding.go",
     ],
     tags = ["automanaged"],
     deps = [
