@@ -382,17 +382,17 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 // the newer overlapping ones (only sync the oldest one). New/old is determined by when the
 // deployment's selector is last updated.
 func (dc *DeploymentController) handleOverlap(d *extensions.Deployment) error {
-	selector, err := unversioned.LabelSelectorAsSelector(d.Spec.Selector)
-	if err != nil {
-		return fmt.Errorf("deployment %s/%s has invalid label selector: %v", d.Namespace, d.Name, err)
-	}
 	deployments, err := dc.dLister.Deployments(d.Namespace).List(labels.Everything())
 	if err != nil {
 		return fmt.Errorf("error listing deployments in namespace %s: %v", d.Namespace, err)
 	}
 	overlapping := false
 	for _, other := range deployments {
-		if !selector.Empty() && selector.Matches(labels.Set(other.Spec.Template.Labels)) && d.UID != other.UID {
+		foundOverlaps, err := overlapsWith(d, other)
+		if err != nil {
+			return err
+		}
+		if foundOverlaps {
 			deploymentCopy, err := util.DeploymentDeepCopy(other)
 			if err != nil {
 				return err
@@ -414,6 +414,23 @@ func (dc *DeploymentController) handleOverlap(d *extensions.Deployment) error {
 		d, _ = dc.clearDeploymentOverlap(d)
 	}
 	return nil
+}
+
+// overlapsWith returns true when two given deployments are different and overlap with each other
+func overlapsWith(current, other *extensions.Deployment) (bool, error) {
+	if current.UID == other.UID {
+		return false, nil
+	}
+	currentSelector, err := unversioned.LabelSelectorAsSelector(current.Spec.Selector)
+	if err != nil {
+		return false, fmt.Errorf("deployment %s/%s has invalid label selector: %v", current.Namespace, current.Name, err)
+	}
+	otherSelector, err := unversioned.LabelSelectorAsSelector(other.Spec.Selector)
+	if err != nil {
+		return false, fmt.Errorf("deployment %s/%s has invalid label selector: %v", other.Namespace, other.Name, err)
+	}
+	return (!currentSelector.Empty() && currentSelector.Matches(labels.Set(other.Spec.Template.Labels))) ||
+		(!otherSelector.Empty() && otherSelector.Matches(labels.Set(current.Spec.Template.Labels))), nil
 }
 
 func (dc *DeploymentController) markDeploymentOverlap(deployment *extensions.Deployment, withDeployment string) (*extensions.Deployment, error) {
