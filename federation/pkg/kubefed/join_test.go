@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
+	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -110,12 +111,12 @@ func TestJoinFederation(t *testing.T) {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
 
-		joinConfig, err := newFakeJoinFederationConfig(hostFactory, tc.kubeconfigGlobal)
+		adminConfig, err := newFakeAdminConfig(hostFactory, tc.kubeconfigGlobal)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
 
-		cmd := NewCmdJoin(f, buf, joinConfig)
+		cmd := NewCmdJoin(f, buf, adminConfig)
 
 		cmd.Flags().Set("kubeconfig", tc.kubeconfigExplicit)
 		cmd.Flags().Set("host", "substrate")
@@ -171,28 +172,28 @@ func testJoinFederationFactory(name, server string) cmdutil.Factory {
 	return f
 }
 
-type fakeJoinFederationConfig struct {
+type fakeAdminConfig struct {
 	pathOptions *clientcmd.PathOptions
 	hostFactory cmdutil.Factory
 }
 
-func newFakeJoinFederationConfig(f cmdutil.Factory, kubeconfigGlobal string) (JoinFederationConfig, error) {
+func newFakeAdminConfig(f cmdutil.Factory, kubeconfigGlobal string) (util.AdminConfig, error) {
 	pathOptions := clientcmd.NewDefaultPathOptions()
 	pathOptions.GlobalFile = kubeconfigGlobal
 	pathOptions.EnvVar = ""
 
-	return &fakeJoinFederationConfig{
+	return &fakeAdminConfig{
 		pathOptions: pathOptions,
 		hostFactory: f,
 	}, nil
 }
 
-func (r *fakeJoinFederationConfig) PathOptions() *clientcmd.PathOptions {
-	return r.pathOptions
+func (f *fakeAdminConfig) PathOptions() *clientcmd.PathOptions {
+	return f.pathOptions
 }
 
-func (r *fakeJoinFederationConfig) HostFactory(host, kubeconfigPath string) cmdutil.Factory {
-	return r.hostFactory
+func (f *fakeAdminConfig) HostFactory(host, kubeconfigPath string) cmdutil.Factory {
+	return f.hostFactory
 }
 
 func fakeJoinHostFactory(name, server, token string) (cmdutil.Factory, error) {
