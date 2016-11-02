@@ -13,7 +13,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "defaults.go",
         "doc.go",
         "env.go",
         "register.go",
