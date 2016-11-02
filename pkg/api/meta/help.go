@@ -39,6 +39,14 @@ func GetItemsPtr(list runtime.Object) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// if we're a runtime.Unstructured, check to see if we have an `items` key
+	if unstructured, ok := list.(*runtime.Unstructured); ok {
+		if items, ok := unstructured.Object["items"]; ok {
+			return items, nil
+		}
+	}
+
 	items := v.FieldByName("Items")
 	if !items.IsValid() {
 		return nil, fmt.Errorf("no Items field in %#v", list)
@@ -117,6 +125,13 @@ func SetList(list runtime.Object, objects []runtime.Object) error {
 	slice := reflect.MakeSlice(items.Type(), len(objects), len(objects))
 	for i := range objects {
 		dest := slice.Index(i)
+
+		// check to see if you're directly assignable
+		if reflect.TypeOf(objects[i]).AssignableTo(dest.Type()) {
+			dest.Set(reflect.ValueOf(objects[i]))
+			continue
+		}
+
 		src, err := conversion.EnforcePtr(objects[i])
 		if err != nil {
 			return err
