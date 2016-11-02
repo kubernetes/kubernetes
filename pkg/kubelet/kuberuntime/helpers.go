@@ -23,6 +23,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	internalApi "k8s.io/kubernetes/pkg/kubelet/api"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
@@ -210,4 +211,18 @@ func buildContainerLogsPath(containerName string, restartCount int) string {
 // buildPodLogsDirectory builds absolute log directory path for a pod sandbox.
 func buildPodLogsDirectory(podUID types.UID) string {
 	return filepath.Join(podLogsRootDirectory, string(podUID))
+}
+
+// getRuntimeCondition gets specified runtime condition from the runtime status.
+func getRuntimeCondition(status *runtimeApi.RuntimeStatus, t internalApi.RuntimeCondition) *runtimeApi.RuntimeCondition {
+	if status == nil || status.GetConditions() == nil {
+		return nil
+	}
+	conditions := status.GetConditions()
+	for _, condition := range conditions {
+		if condition.GetType() == string(t) {
+			return condition
+		}
+	}
+	return nil
 }

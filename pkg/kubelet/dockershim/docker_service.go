@@ -214,3 +214,32 @@ type dockerNetworkHost struct {
 	network.LegacyHost
 	*namespaceGetter
 }
+
+// Status returns the status of the runtime.
+// TODO(random-liu): Set network condition accordingly here.
+func (ds *dockerService) Status() (*runtimeApi.RuntimeStatus, error) {
+	var (
+		conditionTrue    = true
+		conditionFalse   = false
+		runtimeReadyType = string(internalApi.RuntimeReady)
+		networkReadyType = string(internalApi.NetworkReady)
+	)
+	runtimeReady := &runtimeApi.RuntimeCondition{
+		Type:   &runtimeReadyType,
+		Status: &conditionTrue,
+	}
+	networkReady := &runtimeApi.RuntimeCondition{
+		Type:   &networkReadyType,
+		Status: &conditionTrue,
+	}
+	conditions := []*runtimeApi.RuntimeCondition{runtimeReady, networkReady}
+	_, err := ds.client.Version()
+	if err != nil {
+		runtimeReady.Status = &conditionFalse
+		reason := "DockerDaemonNotReady"
+		message := fmt.Sprintf("docker: failed to get docker version: %v", err)
+		runtimeReady.Reason = &reason
+		runtimeReady.Message = &message
+	}
+	return &runtimeApi.RuntimeStatus{Conditions: conditions}, nil
+}
