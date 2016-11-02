@@ -835,3 +835,22 @@ func (o BySelectorLastUpdateTime) Less(i, j int) bool {
 	}
 	return ti.Before(tj)
 }
+
+// OverlapsWith returns true when two given deployments are different and overlap with each other
+func OverlapsWith(current, other *extensions.Deployment) bool {
+	if current.UID == other.UID {
+		return false
+	}
+	currentSelector, err := unversioned.LabelSelectorAsSelector(current.Spec.Selector)
+	if err != nil {
+		glog.Errorf("Skip overlapping check: deployment %s/%s has invalid label selector: %v", current.Namespace, current.Name, err)
+		return false
+	}
+	otherSelector, err := unversioned.LabelSelectorAsSelector(other.Spec.Selector)
+	if err != nil {
+		glog.Errorf("Skip overlapping check: deployment %s/%s has invalid label selector: %v", other.Namespace, other.Name, err)
+		return false
+	}
+	return (!currentSelector.Empty() && currentSelector.Matches(labels.Set(other.Spec.Template.Labels))) ||
+		(!otherSelector.Empty() && otherSelector.Matches(labels.Set(current.Spec.Template.Labels)))
+}
