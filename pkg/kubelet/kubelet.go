@@ -509,7 +509,10 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		case "cri":
 			// Use the new CRI shim for docker. This is needed for testing the
 			// docker integration through CRI, and may be removed in the future.
-			dockerService, err := dockershim.NewDockerService(klet.dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage, nil, &pluginSettings)
+			dockerService, err := dockershim.NewDockerService(klet.dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage, nil, &pluginSettings, kubeCfg.RuntimeCgroups)
+			if err != nil {
+				return nil, err
+			}
 			runtimeService := dockerService.(internalApi.RuntimeService)
 			imageService := dockerService.(internalApi.ImageManagerService)
 
@@ -536,6 +539,10 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 				if err != nil {
 					return nil, err
 				}
+			}
+			// TODO: Find a better place to start the service.
+			if err := dockerService.Start(); err != nil {
+				return nil, err
 			}
 
 			// kubelet defers to the runtime shim to setup networking. Setting
