@@ -21,6 +21,8 @@ import (
 	"io"
 
 	"github.com/golang/glog"
+	"github.com/golang/protobuf/proto"
+
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	internalApi "k8s.io/kubernetes/pkg/kubelet/api"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
@@ -221,4 +223,25 @@ type dockerNetworkHost struct {
 // Start initializes and starts components in dockerService.
 func (ds *dockerService) Start() error {
 	return ds.containerManager.Start()
+}
+
+// Status returns the status of the runtime.
+// TODO(random-liu): Set network condition accordingly here.
+func (ds *dockerService) Status() (*runtimeApi.RuntimeStatus, error) {
+	runtimeReady := &runtimeApi.RuntimeCondition{
+		Type:   proto.String(runtimeApi.RuntimeReady),
+		Status: proto.Bool(true),
+	}
+	networkReady := &runtimeApi.RuntimeCondition{
+		Type:   proto.String(runtimeApi.NetworkReady),
+		Status: proto.Bool(true),
+	}
+	conditions := []*runtimeApi.RuntimeCondition{runtimeReady, networkReady}
+	_, err := ds.client.Version()
+	if err != nil {
+		runtimeReady.Status = proto.Bool(false)
+		runtimeReady.Reason = proto.String("DockerDaemonNotReady")
+		runtimeReady.Message = proto.String(fmt.Sprintf("docker: failed to get docker version: %v", err))
+	}
+	return &runtimeApi.RuntimeStatus{Conditions: conditions}, nil
 }
