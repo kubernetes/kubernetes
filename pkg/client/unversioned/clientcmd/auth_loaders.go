@@ -22,6 +22,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"sync"
 
 	"github.com/howeyc/gopass"
 	clientauth "k8s.io/kubernetes/pkg/client/unversioned/auth"
@@ -41,8 +42,14 @@ func (*defaultAuthLoader) LoadAuth(path string) (*clientauth.Info, error) {
 	return clientauth.LoadFromFile(path)
 }
 
+var (
+	prompter *PromptingAuthLoader
+	once     sync.Once
+)
+
 type PromptingAuthLoader struct {
-	reader io.Reader
+	reader          io.Reader
+	promptAuthCache map[string]string
 }
 
 // LoadAuth parses an AuthInfo object from a file path. It prompts user and creates file if it doesn't exist.
@@ -72,18 +79,21 @@ func (a *PromptingAuthLoader) LoadAuth(path string) (*clientauth.Info, error) {
 func (a *PromptingAuthLoader) Prompt() (*clientauth.Info, error) {
 	var err error
 	auth := &clientauth.Info{}
-	auth.User, err = promptForString("Username", a.reader, true)
+	auth.User, err = a.promptForString("Username", a.reader, true)
 	if err != nil {
 		return nil, err
 	}
-	auth.Password, err = promptForString("Password", nil, false)
+	auth.Password, err = a.promptForString("Password", nil, false)
 	if err != nil {
 		return nil, err
 	}
 	return auth, nil
 }
 
-func promptForString(field string, r io.Reader, show bool) (result string, err error) {
+func (a *PromptingAuthLoader) promptForString(field string, r io.Reader, show bool) (result string, err error) {
+	if v, ok := a.promptAuthCache[field]; ok {
+		return v, err
+	}
 	fmt.Printf("Please enter %s: ", field)
 	if show {
 		_, err = fmt.Fscan(r, &result)
@@ -92,12 +102,19 @@ func promptForString(field string, r io.Reader, show bool) (result string, err e
 		data, err = gopass.GetPasswdMasked()
 		result = string(data)
 	}
+	a.promptAuthCache[field] = result
 	return result, err
 }
 
 // NewPromptingAuthLoader is an AuthLoader that parses an AuthInfo object from a file path. It prompts user and creates file if it doesn't exist.
 func NewPromptingAuthLoader(reader io.Reader) *PromptingAuthLoader {
-	return &PromptingAuthLoader{reader}
+	once.Do(func() {
+		prompter = &PromptingAuthLoader{
+			reader:          reader,
+			promptAuthCache: make(map[string]string),
+		}
+	})
+	return prompter
 }
 
 // NewDefaultAuthLoader returns a default implementation of an AuthLoader that only reads from a config file
