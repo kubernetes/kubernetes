@@ -49,7 +49,6 @@ go_library(
         "//pkg/util/rand:go_default_library",
         "//pkg/util/sets:go_default_library",
         "//pkg/util/uuid:go_default_library",
-        "//pkg/util/validation/field:go_default_library",
         "//vendor:github.com/davecgh/go-spew/spew",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/ugorji/go/codec",
