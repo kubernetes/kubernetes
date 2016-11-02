@@ -21,13 +21,18 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+	"time"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/pkg/api"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
 
 const (
-	TokenIDLen = 6
-	TokenBytes = 8
+	TokenIDLen                 = 6
+	TokenBytes                 = 8
+	BootstrapTokenSecretPrefix = "bootstrap-token-"
+	DefaultTokenDuration       = time.Duration(8) * time.Hour
 )
 
 func RandBytes(length int) ([]byte, string, error) {
@@ -96,4 +101,33 @@ func UseGivenTokenIfValid(s *kubeadmapi.Secrets) (bool, error) {
 	s.BearerToken = givenToken[1]
 	s.Token = tokenBytes
 	return true, nil // given and valid
+}
+
+func CreateToken(client *clientset.Clientset, tokenSecret *kubeadmapi.Secrets, tokenDuration time.Duration) error {
+	secret := &api.Secret{
+		ObjectMeta: api.ObjectMeta{
+			Name: fmt.Sprintf("%s%s", BootstrapTokenSecretPrefix, tokenSecret.TokenID),
+		},
+		Type: api.SecretTypeBootstrapToken,
+		Data: encodeTokenSecretData(tokenSecret, tokenDuration),
+	}
+	if _, err := client.Secrets(api.NamespaceSystem).Create(secret); err != nil {
+		return fmt.Errorf("<util/tokens> failed to create bootstrap token [%v]", err)
+	}
+	return nil
+}
+
+func encodeTokenSecretData(tokenSecret *kubeadmapi.Secrets, duration time.Duration) map[string][]byte {
+	var (
+		data = map[string][]byte{}
+	)
+
+	data["token-id"] = []byte(tokenSecret.TokenID)
+	data["token-secret"] = []byte(tokenSecret.BearerToken)
+
+	t := time.Now()
+	t = t.Add(duration)
+	data["expiration"] = []byte(t.Format(time.RFC3339))
+
+	return data
 }

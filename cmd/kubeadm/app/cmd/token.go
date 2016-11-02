@@ -34,11 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 )
 
-const (
-	bootstrapTokenSecretPrefix = "bootstrap-token-"
-	defaultTokenDuration       = time.Duration(8) * time.Hour
-)
-
 func NewCmdToken(out io.Writer) *cobra.Command {
 	tokenCmd := &cobra.Command{
 		Use:   "token",
@@ -56,7 +51,7 @@ func NewCmdToken(out io.Writer) *cobra.Command {
 		},
 	}
 	createCmd.PersistentFlags().DurationVar(&tokenDuration,
-		"duration", defaultTokenDuration, "Duration the token should be valid")
+		"duration", kubeadmutil.DefaultTokenDuration, "Duration the token should be valid")
 	createCmd.PersistentFlags().StringVar(
 		&tokenSecret.GivenToken, "token", "",
 		"Shared secret used to secure cluster bootstrap; if none is provided, one will be generated for you",
@@ -98,34 +93,13 @@ func RunCreateToken(out io.Writer, cmd *cobra.Command, tokenDuration time.Durati
 		return err
 	}
 
-	secret := &api.Secret{
-		ObjectMeta: api.ObjectMeta{
-			Name: fmt.Sprintf("%s%s", bootstrapTokenSecretPrefix, tokenSecret.TokenID),
-		},
-		Type: api.SecretTypeBootstrapToken,
-		Data: encodeTokenSecretData(tokenSecret, tokenDuration),
-	}
-	if _, err := client.Secrets(api.NamespaceSystem).Create(secret); err != nil {
-		return fmt.Errorf("<cmd/token> failed to bootstrap token [%v]", err)
+	err = kubeadmutil.CreateToken(client, tokenSecret, tokenDuration)
+	if err != nil {
+		return err
 	}
 	fmt.Println(tokenSecret.GivenToken)
 
 	return nil
-}
-
-func encodeTokenSecretData(tokenSecret *kubeadmapi.Secrets, duration time.Duration) map[string][]byte {
-	var (
-		data = map[string][]byte{}
-	)
-
-	data["token-id"] = []byte(tokenSecret.TokenID)
-	data["token-secret"] = []byte(tokenSecret.BearerToken)
-
-	t := time.Now()
-	t = t.Add(duration)
-	data["expiration"] = []byte(t.Format(time.RFC3339))
-
-	return data
 }
 
 // RunListTokens lists details on all existing bootstrap tokens on the server.
@@ -173,7 +147,7 @@ func RunDeleteToken(out io.Writer, cmd *cobra.Command, tokenId string) error {
 		return err
 	}
 
-	tokenSecretName := fmt.Sprintf("%s%s", bootstrapTokenSecretPrefix, tokenId)
+	tokenSecretName := fmt.Sprintf("%s%s", kubeadmutil.BootstrapTokenSecretPrefix, tokenId)
 	if err := client.Secrets(api.NamespaceSystem).Delete(tokenSecretName, nil); err != nil {
 		return fmt.Errorf("<cmd/token> failed to delete bootstrap token [%v]", err)
 	}
