@@ -33,9 +33,11 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	pathvalidation "k8s.io/kubernetes/pkg/api/validation/path"
+	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/client/metrics"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -551,13 +553,32 @@ func (r *Request) Body(obj interface{}) *Request {
 		if reflect.ValueOf(t).IsNil() {
 			return r
 		}
-		data, err := runtime.Encode(r.serializers.Encoder, t)
-		if err != nil {
-			r.err = err
-			return r
+		fmt.Println("reflect.TypeOf(t)", reflect.TypeOf(t))
+		switch typedObj := t.(type) {
+		// hack for eviction
+		case *policy.Eviction:
+			codec, err := testapi.GetCodecForObject(typedObj)
+			if err != nil {
+				r.err = err
+				return r
+			}
+			var buffer bytes.Buffer
+			err = codec.Encode(typedObj, &buffer)
+			if err != nil {
+				r.err = err
+				return r
+			}
+			glog.V(8).Infof("Request Body: %#v", buffer.String())
+			r.body = &buffer
+		default:
+			data, err := runtime.Encode(r.serializers.Encoder, typedObj)
+			if err != nil {
+				r.err = err
+				return r
+			}
+			glog.V(8).Infof("Request Body: %#v", string(data))
+			r.body = bytes.NewReader(data)
 		}
-		glog.V(8).Infof("Request Body: %#v", string(data))
-		r.body = bytes.NewReader(data)
 		r.SetHeader("Content-Type", r.content.ContentType)
 	default:
 		r.err = fmt.Errorf("unknown type used for body: %+v", obj)

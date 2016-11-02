@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	"k8s.io/kubernetes/pkg/conversion"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
@@ -484,7 +485,7 @@ func TestDrain(t *testing.T) {
 				case m.isFor("GET", "/namespaces/default/replicasets/rs"):
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(testapi.Extensions.Codec(), &test.replicaSets[0])}, nil
 				case m.isFor("GET", "/namespaces/default/pods/bar"):
-					return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, &test.pods[0])}, nil
+					return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, &api.Pod{})}, nil
 				case m.isFor("GET", "/pods"):
 					values, err := url.ParseQuery(req.URL.RawQuery)
 					if err != nil {
@@ -514,6 +515,9 @@ func TestDrain(t *testing.T) {
 				case m.isFor("DELETE", "/namespaces/default/pods/bar"):
 					deleted = true
 					return &http.Response{StatusCode: 204, Header: defaultHeader(), Body: objBody(codec, &test.pods[0])}, nil
+				case m.isFor("POST", "/namespaces/default/pods/bar/eviction"):
+					deleted = true
+					return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: policyObjBody(&policy.Eviction{})}, nil
 				default:
 					t.Fatalf("%s: unexpected request: %v %#v\n%#v", test.description, req.Method, req.URL, req)
 					return nil, nil
