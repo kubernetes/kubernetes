@@ -47,6 +47,7 @@ import (
 const (
 	MinSaturationThreshold     = 2 * time.Minute
 	MinPodsPerSecondThroughput = 8
+	DensityPollInterval        = 10 * time.Second
 )
 
 // Maximum container failures this test tolerates before failing.
@@ -356,11 +357,11 @@ var _ = framework.KubeDescribe("Density", func() {
 
 	densityTests := []Density{
 		// TODO: Expose runLatencyTest as ginkgo flag.
-		{podsPerNode: 3, runLatencyTest: false, interval: 10 * time.Second},
-		{podsPerNode: 30, runLatencyTest: true, interval: 10 * time.Second},
-		{podsPerNode: 50, runLatencyTest: false, interval: 10 * time.Second},
-		{podsPerNode: 95, runLatencyTest: true, interval: 10 * time.Second},
-		{podsPerNode: 100, runLatencyTest: false, interval: 10 * time.Second},
+		{podsPerNode: 3, runLatencyTest: false},
+		{podsPerNode: 30, runLatencyTest: true},
+		{podsPerNode: 50, runLatencyTest: false},
+		{podsPerNode: 95, runLatencyTest: true},
+		{podsPerNode: 100, runLatencyTest: false},
 	}
 
 	for _, testArg := range densityTests {
@@ -401,15 +402,18 @@ var _ = framework.KubeDescribe("Density", func() {
 			// has to assume that it will be run at the very end.
 			podThroughput := 20
 			timeout := time.Duration(totalPods/podThroughput)*time.Second + 3*time.Minute
+			// createClients is defined in load.go
+			clients, err := createClients(numberOfRCs)
 			for i := 0; i < numberOfRCs; i++ {
 				RCName := fmt.Sprintf("density%v-%v-%v", totalPods, i, uuid)
 				nsName := namespaces[i].Name
-				RCConfigs[i] = testutils.RCConfig{Client: c,
+				RCConfigs[i] = testutils.RCConfig{
+					Client:               clients[i],
 					Image:                framework.GetPauseImageName(f.ClientSet),
 					Name:                 RCName,
 					Namespace:            nsName,
 					Labels:               map[string]string{"type": "densityPod"},
-					PollInterval:         itArg.interval,
+					PollInterval:         DensityPollInterval,
 					Timeout:              timeout,
 					PodStatusFile:        fileHndl,
 					Replicas:             (totalPods + numberOfRCs - 1) / numberOfRCs,
@@ -424,7 +428,7 @@ var _ = framework.KubeDescribe("Density", func() {
 				ClientSet:    f.ClientSet,
 				Configs:      RCConfigs,
 				PodCount:     totalPods,
-				PollInterval: itArg.interval,
+				PollInterval: DensityPollInterval,
 			}
 			e2eStartupTime = runDensityTest(dConfig)
 			if itArg.runLatencyTest {
@@ -665,7 +669,7 @@ var _ = framework.KubeDescribe("Density", func() {
 				Name:                 RCName,
 				Namespace:            ns,
 				Labels:               map[string]string{"type": "densityPod"},
-				PollInterval:         10 * time.Second,
+				PollInterval:         DensityPollInterval,
 				PodStatusFile:        fileHndl,
 				Replicas:             podsPerRC,
 				MaxContainerFailures: &MaxContainerFailures,
@@ -676,7 +680,7 @@ var _ = framework.KubeDescribe("Density", func() {
 			ClientSet:    f.ClientSet,
 			Configs:      RCConfigs,
 			PodCount:     totalPods,
-			PollInterval: 10 * time.Second,
+			PollInterval: DensityPollInterval,
 		}
 		e2eStartupTime = runDensityTest(dConfig)
 		cleanupDensityTest(dConfig)
