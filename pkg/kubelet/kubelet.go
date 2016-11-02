@@ -1944,9 +1944,33 @@ func (kl *Kubelet) PLEGHealthCheck() (bool, error) {
 // and returns an error if the status check fails.  If the status check is OK,
 // update the container runtime uptime in the kubelet runtimeState.
 func (kl *Kubelet) updateRuntimeUp() {
-	if err := kl.containerRuntime.Status(); err != nil {
+	s, err := kl.containerRuntime.Status()
+	if err != nil {
 		glog.Errorf("Container runtime sanity check failed: %v", err)
 		return
+	}
+	// Only check specific conditions when runtime integration type is cri,
+	// because the old integration doesn't populate any runtime condition.
+	// TODO(random-liu): Add runtime error in runtimeState, and update it
+	// when when runtime is not ready, so that the information in RuntimeReady
+	// condition will be propagated to NodeReady condition.
+	// TODO(random-liu): Update network state according to NetworkReady runtime
+	// condition once it is implemented in dockershim.
+	if kl.kubeletConfiguration.ExperimentalRuntimeIntegrationType == "cri" {
+		if s == nil {
+			glog.Errorf("Container runtime status is nil")
+			return
+		}
+		runtimeReady := s.GetRuntimeCondition(kubecontainer.RuntimeReady)
+		// Periodically log the whole runtime status for debugging.
+		// TODO(random-liu): Consider to send node event when optional
+		// condition is unmet.
+		glog.V(4).Infof("Container runtime status: %v", s)
+		// If RuntimeReady is not set or is false, report an error.
+		if runtimeReady == nil || !runtimeReady.Status {
+			glog.Errorf("Container runtime not ready: %v", runtimeReady)
+			return
+		}
 	}
 	kl.oneTimeInitializer.Do(kl.initializeRuntimeDependentModules)
 	kl.runtimeState.setRuntimeSync(kl.clock.Now())
