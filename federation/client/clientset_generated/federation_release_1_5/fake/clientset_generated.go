@@ -18,6 +18,8 @@ package fake
 
 import (
 	clientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
+	v1batch "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/typed/batch/v1"
+	fakev1batch "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/typed/batch/v1/fake"
 	v1core "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/typed/core/v1"
 	fakev1core "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/typed/core/v1/fake"
 	v1beta1extensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/typed/extensions/v1beta1"
@@ -74,6 +76,16 @@ func (c *Clientset) CoreV1() v1core.CoreV1Interface {
 // Core retrieves the CoreV1Client
 func (c *Clientset) Core() v1core.CoreV1Interface {
 	return &fakev1core.FakeCoreV1{Fake: &c.Fake}
+}
+
+// BatchV1 retrieves the BatchV1Client
+func (c *Clientset) BatchV1() v1batch.BatchV1Interface {
+	return &fakev1batch.FakeBatchV1{Fake: &c.Fake}
+}
+
+// Batch retrieves the BatchV1Client
+func (c *Clientset) Batch() v1batch.BatchV1Interface {
+	return &fakev1batch.FakeBatchV1{Fake: &c.Fake}
 }
 
 // ExtensionsV1beta1 retrieves the ExtensionsV1beta1Client
