@@ -102,6 +102,13 @@ start_etcd() {
   # Use random ports, so that apiserver cannot connect to etcd.
   ETCD_PORT=18629
   ETCD_PEER_PORT=18630
+  # Avoid collisions between etcd and event-etcd.
+  case "${DATA_DIRECTORY}" in
+    *event*)
+      ETCD_PORT=18631
+      ETCD_PEER_PORT=18632
+      ;;
+  esac
   local ETCD_CMD="${ETCD:-/usr/local/bin/etcd-${START_VERSION}}"
   local ETCDCTL_CMD="${ETCDCTL:-/usr/local/bin/etcdctl-${START_VERSION}}"
   local API_VERSION="$(echo ${START_STORAGE} | cut -c5-5)"
