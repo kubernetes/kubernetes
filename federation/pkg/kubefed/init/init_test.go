@@ -73,6 +73,7 @@ func TestInitFederation(t *testing.T) {
 		kubeconfigExplicit string
 		dnsZoneName        string
 		lbIP               string
+		image              string
 		expectedErr        string
 	}{
 		{
@@ -81,6 +82,7 @@ func TestInitFederation(t *testing.T) {
 			kubeconfigExplicit: "",
 			dnsZoneName:        "example.test.",
 			lbIP:               "10.20.30.40",
+			image:              "example.test/foo:bar",
 			expectedErr:        "",
 		},
 	}
@@ -89,7 +91,7 @@ func TestInitFederation(t *testing.T) {
 		cmdErrMsg = ""
 		buf := bytes.NewBuffer([]byte{})
 
-		hostFactory, err := fakeInitHostFactory(tc.federation, util.DefaultFederationSystemNamespace, tc.lbIP, tc.dnsZoneName)
+		hostFactory, err := fakeInitHostFactory(tc.federation, util.DefaultFederationSystemNamespace, tc.lbIP, tc.dnsZoneName, tc.image)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -104,6 +106,7 @@ func TestInitFederation(t *testing.T) {
 		cmd.Flags().Set("kubeconfig", tc.kubeconfigExplicit)
 		cmd.Flags().Set("host-cluster-context", "substrate")
 		cmd.Flags().Set("dns-zone-name", tc.dnsZoneName)
+		cmd.Flags().Set("image", tc.image)
 		cmd.Run(cmd, []string{tc.federation})
 
 		if tc.expectedErr == "" {
@@ -364,7 +367,7 @@ func TestCertsHTTPS(t *testing.T) {
 	}
 }
 
-func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName string) (cmdutil.Factory, error) {
+func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image string) (cmdutil.Factory, error) {
 	svcName := federationName + "-apiserver"
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
@@ -492,7 +495,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName string) 
 					Containers: []v1.Container{
 						{
 							Name:  "apiserver",
-							Image: hyperkubeImage,
+							Image: image,
 							Command: []string{
 								"/hyperkube",
 								"federation-apiserver",
@@ -587,7 +590,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName string) 
 					Containers: []v1.Container{
 						{
 							Name:  "controller-manager",
-							Image: hyperkubeImage,
+							Image: image,
 							Command: []string{
 								"/hyperkube",
 								"federation-controller-manager",

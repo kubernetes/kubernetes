@@ -27,6 +27,7 @@ go_library(
         "//pkg/util/cert/triple:go_default_library",
         "//pkg/util/intstr:go_default_library",
         "//pkg/util/wait:go_default_library",
+        "//pkg/version:go_default_library",
         "//vendor:github.com/spf13/cobra",
     ],
 )
