@@ -2,7 +2,6 @@ package node
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -49,7 +48,7 @@ func TestPerformTLSBootstrap(t *testing.T) {
 		r := &restclient.Config{Host: rt.h}
 		tmpConfig, err := certclient.NewForConfig(r)
 		if err != nil {
-			log.Fatal(err)
+			t.Fatalf("encountered an error while trying to get New Cert Client: %v", err)
 		}
 		cd.CertClient = tmpConfig
 		_, actual := PerformTLSBootstrap(cd)
