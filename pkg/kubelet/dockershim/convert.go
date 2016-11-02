@@ -77,6 +77,9 @@ func toPullableImageID(id string, image *dockertypes.ImageInspect) string {
 
 func toRuntimeAPIContainer(c *dockertypes.Container) (*runtimeApi.Container, error) {
 	state := toRuntimeAPIContainerState(c.Status)
+	if len(c.Names) == 0 {
+		return nil, fmt.Errorf("unexpected empty container name: %+v", c)
+	}
 	metadata, err := parseContainerName(c.Names[0])
 	if err != nil {
 		return nil, err
@@ -141,6 +144,9 @@ func toRuntimeAPISandboxState(state string) runtimeApi.PodSandboxState {
 
 func toRuntimeAPISandbox(c *dockertypes.Container) (*runtimeApi.PodSandbox, error) {
 	state := toRuntimeAPISandboxState(c.Status)
+	if len(c.Names) == 0 {
+		return nil, fmt.Errorf("unexpected empty sandbox name: %+v", c)
+	}
 	metadata, err := parseSandboxName(c.Names[0])
 	if err != nil {
 		return nil, err
