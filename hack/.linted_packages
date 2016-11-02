@@ -88,6 +88,7 @@ pkg/auth/authenticator
 pkg/auth/authorizer/union
 pkg/client/listers/apps/internalversion
 pkg/client/listers/apps/v1alpha1
+pkg/client/listers/apps/v1beta1
 pkg/client/listers/authentication/internalversion
 pkg/client/listers/authentication/v1beta1
 pkg/client/listers/authorization/internalversion

@@ -179,7 +179,7 @@ of three pods.
 <!-- BEGIN MUNGE: EXAMPLE cassandra-petset.yaml -->
 
 ```yaml
-apiVersion: "apps/v1alpha1"
+apiVersion: "apps/v1beta1"
 kind: StatefulSet
 metadata:
   name: cassandra
