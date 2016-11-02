@@ -96,6 +96,7 @@ go_library(
         "service_latency.go",
         "serviceloadbalancers.go",
         "ssh.go",
+        "taint_based_eviction.go",
         "third-party.go",
         "ubernetes_lite.go",
         "util_iperf.go",
