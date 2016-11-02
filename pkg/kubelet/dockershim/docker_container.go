@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	dockertypes "github.com/docker/engine-api/types"
@@ -104,7 +105,6 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 	createConfig := dockertypes.ContainerCreateConfig{
 		Name: makeContainerName(sandboxConfig, config),
 		Config: &dockercontainer.Config{
-			// TODO: set User.
 			Entrypoint: dockerstrslice.StrSlice(config.GetCommand()),
 			Cmd:        dockerstrslice.StrSlice(config.GetArgs()),
 			Env:        generateEnvList(config.GetEnvs()),
@@ -116,6 +116,11 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 			StdinOnce: config.GetStdinOnce(),
 			Tty:       config.GetTty(),
 		},
+	}
+
+	// Set user.
+	if config.RunAsUser != nil {
+		createConfig.Config.User = strconv.FormatInt(*config.RunAsUser, 10)
 	}
 
 	// Fill the HostConfig.

@@ -52,6 +52,7 @@ func (DeploymentV1Beta1) ParamNames() []GeneratorParam {
 		{"env", false},
 		{"requests", false},
 		{"limits", false},
+		{"uid", false},
 	}
 }
 
@@ -231,6 +232,7 @@ func (JobV1Beta1) ParamNames() []GeneratorParam {
 		{"requests", false},
 		{"limits", false},
 		{"restart", false},
+		{"uid", false},
 	}
 }
 
@@ -328,6 +330,7 @@ func (JobV1) ParamNames() []GeneratorParam {
 		{"requests", false},
 		{"limits", false},
 		{"restart", false},
+		{"uid", false},
 	}
 }
 
@@ -422,6 +425,7 @@ func (ScheduledJobV2Alpha1) ParamNames() []GeneratorParam {
 		{"limits", false},
 		{"restart", false},
 		{"schedule", true},
+		{"uid", false},
 	}
 }
 
@@ -520,6 +524,7 @@ func (BasicReplicationController) ParamNames() []GeneratorParam {
 		{"env", false},
 		{"requests", false},
 		{"limits", false},
+		{"uid", false},
 	}
 }
 
@@ -603,6 +608,42 @@ func handleV1ResourceRequirements(params map[string]string) (v1.ResourceRequirem
 	return result, nil
 }
 
+// HandleSecurityContext parses the uid parameter if specified
+func HandleSecurityContext(params map[string]string) (*api.SecurityContext, error) {
+	val, found := params["uid"]
+	if !found {
+		return nil, nil
+	}
+	uid, err := strconv.ParseInt(val, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	if uid >= 0 {
+		return &api.SecurityContext{
+			RunAsUser: &uid,
+		}, nil
+	}
+	return nil, nil
+}
+
+// handleV1SecurityContext parses the uid parameter if specified
+func handleV1SecurityContext(params map[string]string) (*v1.SecurityContext, error) {
+	val, found := params["uid"]
+	if !found {
+		return nil, nil
+	}
+	uid, err := strconv.ParseInt(val, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	if uid >= 0 {
+		return &v1.SecurityContext{
+			RunAsUser: &uid,
+		}, nil
+	}
+	return nil, nil
+}
+
 func makePodSpec(params map[string]string, name string) (*api.PodSpec, error) {
 	stdin, err := GetBool(params, "stdin", false)
 	if err != nil {
@@ -619,14 +660,20 @@ func makePodSpec(params map[string]string, name string) (*api.PodSpec, error) {
 		return nil, err
 	}
 
+	securityContext, err := HandleSecurityContext(params)
+	if err != nil {
+		return nil, err
+	}
+
 	spec := api.PodSpec{
 		Containers: []api.Container{
 			{
-				Name:      name,
-				Image:     params["image"],
-				Stdin:     stdin,
-				TTY:       tty,
-				Resources: resourceRequirements,
+				Name:            name,
+				Image:           params["image"],
+				Stdin:           stdin,
+				TTY:             tty,
+				Resources:       resourceRequirements,
+				SecurityContext: securityContext,
 			},
 		},
 	}
@@ -649,14 +696,20 @@ func makeV1PodSpec(params map[string]string, name string) (*v1.PodSpec, error) {
 		return nil, err
 	}
 
+	securityContext, err := handleV1SecurityContext(params)
+	if err != nil {
+		return nil, err
+	}
+
 	spec := v1.PodSpec{
 		Containers: []v1.Container{
 			{
-				Name:      name,
-				Image:     params["image"],
-				Stdin:     stdin,
-				TTY:       tty,
-				Resources: resourceRequirements,
+				Name:            name,
+				Image:           params["image"],
+				Stdin:           stdin,
+				TTY:             tty,
+				Resources:       resourceRequirements,
+				SecurityContext: securityContext,
 			},
 		},
 	}
@@ -863,6 +916,7 @@ func (BasicPod) ParamNames() []GeneratorParam {
 		{"env", false},
 		{"requests", false},
 		{"limits", false},
+		{"uid", false},
 	}
 }
 
@@ -911,6 +965,11 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 		return nil, err
 	}
 
+	securityContext, err := HandleSecurityContext(params)
+	if err != nil {
+		return nil, err
+	}
+
 	restartPolicy := api.RestartPolicy(params["restart"])
 	if len(restartPolicy) == 0 {
 		restartPolicy = api.RestartPolicyAlways
@@ -932,6 +991,7 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 					StdinOnce:       !leaveStdinOpen && stdin,
 					TTY:             tty,
 					Resources:       resourceRequirements,
+					SecurityContext: securityContext,
 				},
 			},
 			DNSPolicy:     api.DNSClusterFirst,

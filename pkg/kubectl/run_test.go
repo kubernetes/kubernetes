@@ -382,6 +382,40 @@ func TestGenerate(t *testing.T) {
 				},
 			},
 		},
+		{
+			params: map[string]interface{}{
+				"name":     "foo",
+				"image":    "someimage",
+				"replicas": "1",
+				"uid":      "1000",
+			},
+			expected: &api.ReplicationController{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"run": "foo"},
+				},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 1,
+					Selector: map[string]string{"run": "foo"},
+					Template: &api.PodTemplateSpec{
+						ObjectMeta: api.ObjectMeta{
+							Labels: map[string]string{"run": "foo"},
+						},
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Name:  "foo",
+									Image: "someimage",
+									SecurityContext: &api.SecurityContext{
+										RunAsUser: func(i int64) *int64 { return &i }(1000),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 	generator := BasicReplicationController{}
 	for i, test := range tests {
@@ -622,6 +656,32 @@ func TestGeneratePod(t *testing.T) {
 				},
 			},
 		},
+		{
+			params: map[string]interface{}{
+				"name":  "foo",
+				"image": "someimage",
+				"uid":   "1000",
+			},
+			expected: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:            "foo",
+							Image:           "someimage",
+							ImagePullPolicy: api.PullIfNotPresent,
+							SecurityContext: &api.SecurityContext{
+								RunAsUser: func(i int64) *int64 { return &i }(1000),
+							},
+						},
+					},
+					DNSPolicy:     api.DNSClusterFirst,
+					RestartPolicy: api.RestartPolicyAlways,
+				},
+			},
+		},
 	}
 	generator := BasicPod{}
 	for _, test := range tests {
@@ -659,6 +719,7 @@ func TestGenerateDeployment(t *testing.T) {
 				"env":               []string{"a=b", "c=d"},
 				"requests":          "cpu=100m,memory=100Mi",
 				"limits":            "cpu=400m,memory=200Mi",
+				"uid":               "1000",
 			},
 			expected: &extensions.Deployment{
 				ObjectMeta: api.ObjectMeta{
@@ -706,6 +767,9 @@ func TestGenerateDeployment(t *testing.T) {
 											api.ResourceMemory: resource.MustParse("200Mi"),
 										},
 									},
+									SecurityContext: &api.SecurityContext{
+										RunAsUser: func(i int64) *int64 { return &i }(1000),
+									},
 								},
 							},
 						},
@@ -751,6 +815,7 @@ func TestGenerateJob(t *testing.T) {
 				"requests":         "cpu=100m,memory=100Mi",
 				"limits":           "cpu=400m,memory=200Mi",
 				"restart":          "OnFailure",
+				"uid":              "1000",
 			},
 			expected: &batch.Job{
 				ObjectMeta: api.ObjectMeta{
@@ -800,6 +865,9 @@ func TestGenerateJob(t *testing.T) {
 											api.ResourceCPU:    resource.MustParse("400m"),
 											api.ResourceMemory: resource.MustParse("200Mi"),
 										},
+									},
+									SecurityContext: &api.SecurityContext{
+										RunAsUser: func(i int64) *int64 { return &i }(1000),
 									},
 								},
 							},
