@@ -29,12 +29,12 @@ kube::test::clear_all() {
 # Force exact match of a returned result for a object query.  Wrap this with || to support multiple
 # valid return types.
 kube::test::get_object_assert() {
-  local object=$1
-  local request=$2
-  local expected=$3
-  local args=${4:-}
+  local object="${1}"
+  local request="${2}"
+  local expected="${3}"
+  local args="${4:-}"
 
-  res=$(eval kubectl ${args} get "${kube_flags[@]}" $object -o go-template=\"$request\")
+  res=$(kubectl ${args} get "${kube_flags[@]}" $object -o "go-template=${request}")
 
   if [[ "$res" =~ ^$expected$ ]]; then
       echo -n ${green}
@@ -55,11 +55,11 @@ kube::test::get_object_assert() {
 }
 
 kube::test::get_object_jsonpath_assert() {
-  local object=$1
-  local request=$2
-  local expected=$3
+  local object="${1}"
+  local request="${2}"
+  local expected="${3}"
 
-  res=$(eval kubectl get "${kube_flags[@]}" $object -o jsonpath=\"$request\")
+  res=$(kubectl get "${kube_flags[@]}" "${object}" -o "jsonpath=${request}")
 
   if [[ "$res" =~ ^$expected$ ]]; then
       echo -n ${green}
@@ -84,7 +84,7 @@ kube::test::describe_object_assert() {
   local object=$2
   local matches=${@:3}
 
-  result=$(eval kubectl describe "${kube_flags[@]}" $resource $object)
+  result=$(kubectl describe "${kube_flags[@]}" "${resource}" "${object}")
 
   for match in ${matches}; do
     if [[ ! $(echo "$result" | grep ${match}) ]]; then
@@ -109,14 +109,14 @@ kube::test::describe_object_assert() {
 }
 
 kube::test::describe_object_events_assert() {
-    local resource=$1
-    local object=$2
-    local showevents=${3:-"true"}
+    local resource="${1}"
+    local object="${2}"
+    local showevents="${3:-true}"
 
     if [[ -z "${3:-}" ]]; then
-        result=$(eval kubectl describe "${kube_flags[@]}" $resource $object)
+        result=$(kubectl describe "${kube_flags[@]}" "${resource}" "${object}")
     else
-        result=$(eval kubectl describe "${kube_flags[@]}" "--show-events=$showevents" $resource $object)
+        result=$(kubectl describe "${kube_flags[@]}" "--show-events=${showevents}" "${resource}" "${object}")
     fi
 
     if [[ -n $(echo "$result" | grep "No events.\|Events:") ]]; then
@@ -150,7 +150,7 @@ kube::test::describe_resource_assert() {
   local resource=$1
   local matches=${@:2}
 
-  result=$(eval kubectl describe "${kube_flags[@]}" $resource)
+  result=$(kubectl describe "${kube_flags[@]}" "${resource}")
 
   for match in ${matches}; do
     if [[ ! $(echo "$result" | grep ${match}) ]]; then
@@ -175,10 +175,10 @@ kube::test::describe_resource_assert() {
 }
 
 kube::test::describe_resource_events_assert() {
-    local resource=$1
-    local showevents=${2:-"true"}
+    local resource="${1}"
+    local showevents="${2:-true}"
 
-    result=$(eval kubectl describe "${kube_flags[@]}" "--show-events=$showevents" $resource)
+    result=$(kubectl describe "${kube_flags[@]}" "--show-events=${showevents}" "${resource}")
 
     if [[ $(echo "$result" | grep "No events.\|Events:") ]]; then
         local has_events="true"
@@ -207,8 +207,8 @@ kube::test::describe_resource_events_assert() {
 }
 
 kube::test::if_has_string() {
-  local message=$1
-  local match=$2
+  local message="${1}"
+  local match="${2}"
 
   if [[ $(echo "$message" | grep "$match") ]]; then
     echo "Successful"
