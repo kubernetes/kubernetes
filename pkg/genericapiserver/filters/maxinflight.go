@@ -18,33 +18,84 @@ package filters
 
 import (
 	"net/http"
+	"strings"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/apiserver/request"
 	"k8s.io/kubernetes/pkg/httplog"
+	"k8s.io/kubernetes/pkg/util/sets"
+
+	"github.com/golang/glog"
 )
 
 // Constant for the retry-after interval on rate limiting.
 // TODO: maybe make this dynamic? or user-adjustable?
 const retryAfter = "1"
 
+var mutatingRequestVerbs = sets.NewString("PUT", "POST", "PATCH", "DELETE")
+
 // WithMaxInFlightLimit limits the number of in-flight requests to buffer size of the passed in channel.
-func WithMaxInFlightLimit(handler http.Handler, limit int, longRunningRequestCheck LongRunningRequestCheck) http.Handler {
-	if limit == 0 {
+func WithMaxInFlightLimit(
+	handler http.Handler,
+	nonMutatingLimit int,
+	mutatingLimit int,
+	requestContextMapper api.RequestContextMapper,
+	longRunningRequestCheck LongRunningRequestCheck,
+) http.Handler {
+	if nonMutatingLimit == 0 && mutatingLimit == 0 {
 		return handler
 	}
-	c := make(chan bool, limit)
+	var nonMutatingChan chan bool
+	var mutatingChan chan bool
+	if nonMutatingLimit != 0 {
+		nonMutatingChan = make(chan bool, nonMutatingLimit)
+	}
+	if mutatingLimit != 0 {
+		mutatingChan = make(chan bool, mutatingLimit)
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if longRunningRequestCheck(r) {
 			// Skip tracking long running events.
 			handler.ServeHTTP(w, r)
 			return
 		}
-		select {
-		case c <- true:
-			defer func() { <-c }()
+
+		isMutating := false
+		var requestInfo *request.RequestInfo
+		ctx, ok := requestContextMapper.Get(r)
+		if !ok {
+			glog.Errorf("no context found for request, handler chain must be wrong. Falling back to computing from request...")
+			isMutating = mutatingRequestVerbs.Has(strings.ToUpper(r.Method))
+
+		} else {
+			requestInfo, ok = request.RequestInfoFrom(ctx)
+			if !ok {
+				glog.Errorf("no RequestInfo found in context, handler chain must be wrong")
+				isMutating = mutatingRequestVerbs.Has(strings.ToUpper(r.Method))
+			}
+		}
+
+		isMutating = mutatingRequestVerbs.Has(strings.ToUpper(requestInfo.Verb))
+
+		var c chan bool
+		if isMutating {
+			c = mutatingChan
+		} else {
+			c = nonMutatingChan
+		}
+
+		if c == nil {
 			handler.ServeHTTP(w, r)
-		default:
-			tooManyRequests(r, w)
+		} else {
+			select {
+			case c <- true:
+				defer func() { <-c }()
+				handler.ServeHTTP(w, r)
+			default:
+				tooManyRequests(r, w)
+			}
 		}
 	})
 }

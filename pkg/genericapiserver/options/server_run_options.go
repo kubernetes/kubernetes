@@ -98,6 +98,7 @@ type ServerRunOptions struct {
 	MasterCount                  int
 	MasterServiceNamespace       string
 	MaxRequestsInFlight          int
+	MaxMutatingRequestsInFlight  int
 	MinRequestTimeout            int
 	OIDCCAFile                   string
 	OIDCClientID                 string
@@ -148,6 +149,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		MasterCount:                              1,
 		MasterServiceNamespace:                   api.NamespaceDefault,
 		MaxRequestsInFlight:                      400,
+		MaxMutatingRequestsInFlight:              200,
 		MinRequestTimeout:                        1800,
 		RuntimeConfig:                            make(config.ConfigurationMap),
 		SecurePort:                               6443,
@@ -406,7 +408,11 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"DEPRECATED: the namespace from which the kubernetes master services should be injected into pods.")
 
 	fs.IntVar(&s.MaxRequestsInFlight, "max-requests-inflight", s.MaxRequestsInFlight, ""+
-		"The maximum number of requests in flight at a given time. When the server exceeds this, "+
+		"The maximum number of non-mutating requests in flight at a given time. When the server exceeds this, "+
+		"it rejects requests. Zero for no limit.")
+
+	fs.IntVar(&s.MaxMutatingRequestsInFlight, "max-mutating-requests-inflight", s.MaxMutatingRequestsInFlight, ""+
+		"The maximum number of mutating requests in flight at a given time. When the server exceeds this, "+
 		"it rejects requests. Zero for no limit.")
 
 	fs.IntVar(&s.MinRequestTimeout, "min-request-timeout", s.MinRequestTimeout, ""+
