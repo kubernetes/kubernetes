@@ -35,7 +35,12 @@ type RoutesClient struct {
 
 // NewRoutesClient creates an instance of the RoutesClient client.
 func NewRoutesClient(subscriptionID string) RoutesClient {
-	return RoutesClient{New(subscriptionID)}
+	return NewRoutesClientWithBaseURI(DefaultBaseURI, subscriptionID)
+}
+
+// NewRoutesClientWithBaseURI creates an instance of the RoutesClient client.
+func NewRoutesClientWithBaseURI(baseURI string, subscriptionID string) RoutesClient {
+	return RoutesClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
 // CreateOrUpdate the Put route operation creates/updates a route in the
@@ -242,7 +247,7 @@ func (client RoutesClient) GetResponder(resp *http.Response) (result Route, err 
 	return
 }
 
-// List the List network security rule opertion retrieves all the routes in a
+// List the List network security rule operation retrieves all the routes in a
 // route table.
 //
 // resourceGroupName is the name of the resource group. routeTableName is the

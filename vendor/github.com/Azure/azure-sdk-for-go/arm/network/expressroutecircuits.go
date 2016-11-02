@@ -36,7 +36,13 @@ type ExpressRouteCircuitsClient struct {
 // NewExpressRouteCircuitsClient creates an instance of the
 // ExpressRouteCircuitsClient client.
 func NewExpressRouteCircuitsClient(subscriptionID string) ExpressRouteCircuitsClient {
-	return ExpressRouteCircuitsClient{New(subscriptionID)}
+	return NewExpressRouteCircuitsClientWithBaseURI(DefaultBaseURI, subscriptionID)
+}
+
+// NewExpressRouteCircuitsClientWithBaseURI creates an instance of the
+// ExpressRouteCircuitsClient client.
+func NewExpressRouteCircuitsClientWithBaseURI(baseURI string, subscriptionID string) ExpressRouteCircuitsClient {
+	return ExpressRouteCircuitsClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
 // CreateOrUpdate the Put ExpressRouteCircuit operation creates/updates a
@@ -240,7 +246,7 @@ func (client ExpressRouteCircuitsClient) GetResponder(resp *http.Response) (resu
 	return
 }
 
-// GetPeeringStats the Liststats ExpressRouteCircuit opertion retrieves all
+// GetPeeringStats the Liststats ExpressRouteCircuit operation retrieves all
 // the stats from a ExpressRouteCircuits in a resource group.
 //
 // resourceGroupName is the name of the resource group. circuitName is the
@@ -305,8 +311,8 @@ func (client ExpressRouteCircuitsClient) GetPeeringStatsResponder(resp *http.Res
 	return
 }
 
-// GetStats the Liststats ExpressRouteCircuit opertion retrieves all the stats
-// from a ExpressRouteCircuits in a resource group.
+// GetStats the Liststats ExpressRouteCircuit operation retrieves all the
+// stats from a ExpressRouteCircuits in a resource group.
 //
 // resourceGroupName is the name of the resource group. circuitName is the
 // name of the circuit.
@@ -369,7 +375,7 @@ func (client ExpressRouteCircuitsClient) GetStatsResponder(resp *http.Response) 
 	return
 }
 
-// List the List ExpressRouteCircuit opertion retrieves all the
+// List the List ExpressRouteCircuit operation retrieves all the
 // ExpressRouteCircuits in a resource group.
 //
 // resourceGroupName is the name of the resource group.
@@ -455,7 +461,7 @@ func (client ExpressRouteCircuitsClient) ListNextResults(lastResults ExpressRout
 	return
 }
 
-// ListAll the List ExpressRouteCircuit opertion retrieves all the
+// ListAll the List ExpressRouteCircuit operation retrieves all the
 // ExpressRouteCircuits in a subscription.
 func (client ExpressRouteCircuitsClient) ListAll() (result ExpressRouteCircuitListResult, err error) {
 	req, err := client.ListAllPreparer()
@@ -538,7 +544,7 @@ func (client ExpressRouteCircuitsClient) ListAllNextResults(lastResults ExpressR
 	return
 }
 
-// ListArpTable the ListArpTable from ExpressRouteCircuit opertion retrieves
+// ListArpTable the ListArpTable from ExpressRouteCircuit operation retrieves
 // the currently advertised arp table associated with the
 // ExpressRouteCircuits in a resource group. This method may poll for
 // completion. Polling can be canceled by passing the cancel channel
@@ -610,7 +616,7 @@ func (client ExpressRouteCircuitsClient) ListArpTableResponder(resp *http.Respon
 	return
 }
 
-// ListRoutesTable the ListRoutesTable from ExpressRouteCircuit opertion
+// ListRoutesTable the ListRoutesTable from ExpressRouteCircuit operation
 // retrieves the currently advertised routes table associated with the
 // ExpressRouteCircuits in a resource group. This method may poll for
 // completion. Polling can be canceled by passing the cancel channel
@@ -683,7 +689,7 @@ func (client ExpressRouteCircuitsClient) ListRoutesTableResponder(resp *http.Res
 }
 
 // ListRoutesTableSummary the ListRoutesTable from ExpressRouteCircuit
-// opertion retrieves the currently advertised routes table associated with
+// operation retrieves the currently advertised routes table associated with
 // the ExpressRouteCircuits in a resource group. This method may poll for
 // completion. Polling can be canceled by passing the cancel channel
 // argument. The channel will be used to cancel polling and any outstanding

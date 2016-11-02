@@ -36,7 +36,13 @@ type LocalNetworkGatewaysClient struct {
 // NewLocalNetworkGatewaysClient creates an instance of the
 // LocalNetworkGatewaysClient client.
 func NewLocalNetworkGatewaysClient(subscriptionID string) LocalNetworkGatewaysClient {
-	return LocalNetworkGatewaysClient{New(subscriptionID)}
+	return NewLocalNetworkGatewaysClientWithBaseURI(DefaultBaseURI, subscriptionID)
+}
+
+// NewLocalNetworkGatewaysClientWithBaseURI creates an instance of the
+// LocalNetworkGatewaysClient client.
+func NewLocalNetworkGatewaysClientWithBaseURI(baseURI string, subscriptionID string) LocalNetworkGatewaysClient {
+	return LocalNetworkGatewaysClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
 // CreateOrUpdate the Put LocalNetworkGateway operation creates/updates a
@@ -243,8 +249,8 @@ func (client LocalNetworkGatewaysClient) GetResponder(resp *http.Response) (resu
 	return
 }
 
-// List the List LocalNetworkGateways opertion retrieves all the local network
-// gateways stored.
+// List the List LocalNetworkGateways operation retrieves all the local
+// network gateways stored.
 //
 // resourceGroupName is the name of the resource group.
 func (client LocalNetworkGatewaysClient) List(resourceGroupName string) (result LocalNetworkGatewayListResult, err error) {

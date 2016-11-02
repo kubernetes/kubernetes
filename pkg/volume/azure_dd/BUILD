@@ -15,11 +15,13 @@ go_library(
     srcs = [
         "attacher.go",
         "azure_dd.go",
+        "azure_provision.go",
         "vhd_util.go",
     ],
     tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/api/resource:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/azure:go_default_library",
         "//pkg/types:go_default_library",

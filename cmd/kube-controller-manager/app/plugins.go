@@ -31,6 +31,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
@@ -121,6 +122,8 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config componen
 			allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
 		case vsphere.ProviderName == cloud.ProviderName():
 			allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
+		case azure.CloudProviderName == cloud.ProviderName():
+			allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
 		}
 	}
 
@@ -149,6 +152,8 @@ func NewAlphaVolumeProvisioner(cloud cloudprovider.Interface, config componentco
 		return getProvisionablePluginFromVolumePlugins(cinder.ProbeVolumePlugins())
 	case cloud != nil && vsphere.ProviderName == cloud.ProviderName():
 		return getProvisionablePluginFromVolumePlugins(vsphere_volume.ProbeVolumePlugins())
+	case cloud != nil && azure.CloudProviderName == cloud.ProviderName():
+		return getProvisionablePluginFromVolumePlugins(azure_dd.ProbeVolumePlugins())
 	}
 	return nil, nil
 }

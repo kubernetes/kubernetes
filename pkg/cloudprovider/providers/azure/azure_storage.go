@@ -182,3 +182,62 @@ func (az *Cloud) GetNextDiskLun(nodeName types.NodeName) (int32, error) {
 	}
 	return -1, fmt.Errorf("All Luns are used")
 }
+
+// CreateVolume creates a VHD blob in a storage account that has storageType and location using the given storage account.
+// If no storage account is given, search all the storage accounts associated with the resource group and pick one that
+// fits storage type and location.
+func (az *Cloud) CreateVolume(name, storageAccount, storageType, location string, requestGB int) (string, string, int, error) {
+	var err error
+	accounts := []accountWithLocation{}
+	if len(storageAccount) > 0 {
+		accounts = append(accounts, accountWithLocation{Name: storageAccount})
+	} else {
+		// find a storage account
+		accounts, err = az.getStorageAccounts()
+		if err != nil {
+			// TODO: create a storage account and container
+			return "", "", 0, err
+		}
+	}
+	for _, account := range accounts {
+		glog.V(4).Infof("account %s type %s location %s", account.Name, account.StorageType, account.Location)
+		if ((storageType == "" || account.StorageType == storageType) && (location == "" || account.Location == location)) || len(storageAccount) > 0 {
+			// find the access key with this account
+			key, err := az.getStorageAccesskey(account.Name)
+			if err != nil {
+				glog.V(2).Infof("no key found for storage account %s", account.Name)
+				continue
+			}
+
+			// create a page blob in this account's vhd container
+			name, uri, err := az.createVhdBlob(account.Name, key, name, int64(requestGB), nil)
+			if err != nil {
+				glog.V(2).Infof("failed to create vhd in account %s: %v", account.Name, err)
+				continue
+			}
+			glog.V(4).Infof("created vhd blob uri: %s", uri)
+			return name, uri, requestGB, err
+		}
+	}
+	return "", "", 0, fmt.Errorf("failed to find a matching storage account")
+}
+
+// DeleteVolume deletes a VHD blob
+func (az *Cloud) DeleteVolume(name, uri string) error {
+	accountName, blob, err := az.getBlobNameAndAccountFromURI(uri)
+	if err != nil {
+		return fmt.Errorf("failed to parse vhd URI %v", err)
+	}
+	key, err := az.getStorageAccesskey(accountName)
+	if err != nil {
+		return fmt.Errorf("no key for storage account %s, err %v", accountName, err)
+	}
+	err = az.deleteVhdBlob(accountName, key, blob)
+	if err != nil {
+		glog.Warningf("failed to delete blob %s err: %v", uri, err)
+		return fmt.Errorf("failed to delete vhd %v, account %s, blob %s, err: %v", uri, accountName, blob, err)
+	}
+	glog.V(4).Infof("blob %s deleted", uri)
+	return nil
+
+}
