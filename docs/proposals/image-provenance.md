@@ -52,7 +52,7 @@ The admission controller code will go in `plugin/pkg/admission/imagepolicy`.
 There will be a cache of decisions in the admission controller.
 
 If the apiserver cannot reach the webhook backend, it will log a warning and either admit or deny the pod.
-A flag will control whether it admits or denys on failure.
+A flag will control whether it admits or denies on failure.
 The rationale for deny is that an attacker could DoS the backend or wait for it to be down, and then sneak a
 bad pod into the system.  The rationale for allow here is that, if the cluster admin also does
 after-the-fact auditing of what images were run (which we think will be common), this will catch

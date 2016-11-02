@@ -45,20 +45,20 @@ All Docker names are suffixed with a hash derived from the file path (to allow c
 
 ## Proxy Settings
 
-If you are behind a proxy and you are letting these scripts use `docker-machine` to set up your local VM for you on macOS, you need to export proxy settings for kubernetes build, the following environment variables should be defined.
+If you are behind a proxy and you are letting these scripts use `docker-machine` to set up your local VM for you on macOS, you need to export proxy settings for Kubernetes build, the following environment variables should be defined.
 
 ```
 export KUBERNETES_HTTP_PROXY=http://username:password@proxyaddr:proxyport
 export KUBERNETES_HTTPS_PROXY=https://username:password@proxyaddr:proxyport
 ```
 
-Optionally, you can specify addresses of no proxy for kubernetes build, for example
+Optionally, you can specify addresses of no proxy for Kubernetes build, for example
 
 ```
 export KUBERNETES_NO_PROXY=127.0.0.1
 ```
 
-If you are using sudo to make kubernetes build for example make quick-release, you need run `sudo -E make quick-release` to pass the environment variables.
+If you are using sudo to make Kubernetes build for example make quick-release, you need run `sudo -E make quick-release` to pass the environment variables.
 
 ## Really Remote Docker Engine
 

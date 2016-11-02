@@ -98,7 +98,7 @@ $ kubectl delete -f examples/guestbook/
 
 ### Step One: Start up the redis master
 
-Before continuing to the gory details, we also recommend you to read [Quick walkthrough](../../docs/user-guide/#quick-walkthrough), [Thorough walkthough](../../docs/user-guide/#thorough-walkthrough) and [Concept guide](../../docs/user-guide/#concept-guide).
+Before continuing to the gory details, we also recommend you to read [Quick walkthrough](../../docs/user-guide/#quick-walkthrough), [Thorough walkthrough](../../docs/user-guide/#thorough-walkthrough) and [Concept guide](../../docs/user-guide/#concept-guide).
 **Note**: The redis master in this example is *not* highly available.  Making it highly available would be an interesting, but intricate exercise — redis doesn't actually support multi-master Deployments at this point in time, so high availability would be a somewhat tricky thing to implement, and might involve periodic serialization to disk, and so on.
 
 #### Define a Deployment
