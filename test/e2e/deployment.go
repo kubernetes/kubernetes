@@ -1232,6 +1232,7 @@ func testOverlappingDeployment(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 	deploymentName = "second-deployment"
 	By(fmt.Sprintf("Creating deployment %q with overlapping selector", deploymentName))
+	podLabels["other-label"] = "random-label"
 	d = newDeployment(deploymentName, replicas, podLabels, nginxImageName, nginxImage, extensions.RollingUpdateDeploymentStrategyType, nil)
 	deployOverlapping, err := c.Extensions().Deployments(ns).Create(d)
 	Expect(err).NotTo(HaveOccurred(), "Failed creating the second deployment")
