@@ -383,14 +383,12 @@ func createPVC(clientset *client.Clientset, namespace, svcName string) (*api.Per
 
 func createAPIServer(clientset *client.Clientset, namespace, name, image, credentialsName, pvcName, advertiseAddress string) (*extensions.Deployment, error) {
 	command := []string{
-		"/hyperkube",
+		"/usr/local/bin/hyperkube",
 		"federation-apiserver",
 		"--bind-address=0.0.0.0",
 		"--etcd-servers=http://localhost:2379",
 		"--service-cluster-ip-range=10.0.0.0/16",
 		"--secure-port=443",
-		"--token-auth-file=/etc/federation/apiserver/known_tokens.csv",
-		"--basic-auth-file=/etc/federation/apiserver/basic_auth.csv",
 		"--client-ca-file=/etc/federation/apiserver/ca.crt",
 		"--tls-cert-file=/etc/federation/apiserver/server.crt",
 		"--tls-private-key-file=/etc/federation/apiserver/server.key",
@@ -501,7 +499,7 @@ func createControllerManager(clientset *client.Clientset, namespace, name, cmNam
 							Name:  "controller-manager",
 							Image: image,
 							Command: []string{
-								"/hyperkube",
+								"/usr/local/bin/hyperkube",
 								"federation-controller-manager",
 								"--master=https://federation-apiserver",
 								"--kubeconfig=/etc/federation/controller-manager/kubeconfig",
