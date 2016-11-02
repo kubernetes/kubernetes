@@ -1062,7 +1062,7 @@ var _ = framework.KubeDescribe("Services", func() {
 					},
 				},
 			},
-		})
+		}, nil)
 
 		By(fmt.Sprintf("createing RC %v with selectors %v", rcSpec.Name, rcSpec.Spec.Selector))
 		_, err := t.createRC(rcSpec)
@@ -2585,7 +2585,7 @@ func (t *ServiceTestFixture) BuildServiceSpec() *api.Service {
 // CreateWebserverRC creates rc-backed pods with the well-known webserver
 // configuration and records it for cleanup.
 func (t *ServiceTestFixture) CreateWebserverRC(replicas int32) *api.ReplicationController {
-	rcSpec := rcByNamePort(t.name, replicas, t.image, 80, api.ProtocolTCP, t.Labels)
+	rcSpec := rcByNamePort(t.name, replicas, t.image, 80, api.ProtocolTCP, t.Labels, nil)
 	rcAct, err := t.createRC(rcSpec)
 	if err != nil {
 		framework.Failf("Failed to create rc %s: %v", rcSpec.Name, err)
