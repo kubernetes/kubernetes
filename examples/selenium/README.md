@@ -168,7 +168,7 @@ You now have 10 Firefox and 10 Chrome nodes, happy Seleniuming!
 
 ### Debugging
 
-Sometimes it is neccessary to check on a hung test. Each pod is running VNC. To check on one of the browser nodes via VNC, it's recommended that you proxy, since we don't want to expose a service for every pod, and the containers have a weak VNC password. Replace POD_NAME with the name of the pod you want to connect to.
+Sometimes it is necessary to check on a hung test. Each pod is running VNC. To check on one of the browser nodes via VNC, it's recommended that you proxy, since we don't want to expose a service for every pod, and the containers have a weak VNC password. Replace POD_NAME with the name of the pod you want to connect to.
 
 ```console
 kubectl port-forward --pod=POD_NAME 5900:5900

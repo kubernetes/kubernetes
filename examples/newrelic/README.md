@@ -6,7 +6,7 @@ This example will create a DaemonSet which places the New Relic monitoring agent
 
 ### Step 0: Prerequisites
 
-This process will create priviliged containers which have full access to the host system for logging. Beware of the security implications of this.
+This process will create privileged containers which have full access to the host system for logging. Beware of the security implications of this.
 
 If you are using a Salt based KUBERNETES\_PROVIDER (**gce**, **vagrant**, **aws**), you should make sure the creation of privileged containers via the API is enabled. Check `cluster/saltbase/pillar/privilege.sls`.
 

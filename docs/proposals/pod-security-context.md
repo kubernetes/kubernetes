@@ -56,7 +56,7 @@ attributes.
 Some use cases require the containers in a pod to run with different security settings.  As an
 example, a user may want to have a pod with two containers, one of which runs as root with the
 privileged setting, and one that runs as a non-root UID.  To support use cases like this, it should
-be possible to override appropriate (ie, not intrinsically pod-level) security settings for
+be possible to override appropriate (i.e., not intrinsically pod-level) security settings for
 individual containers.
 
 ## Proposed Design

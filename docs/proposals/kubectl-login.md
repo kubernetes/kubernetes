@@ -63,10 +63,10 @@ by the latter command.
 When clusters utilize authorization plugins access decisions are based on the
 correct configuration of an auth-N plugin, an auth-Z plugin, and client side
 credentials. Being rejected then begs several questions. Is the user's
-kubeconfig mis-configured? Is the authorization plugin setup wrong? Is the user
+kubeconfig misconfigured? Is the authorization plugin setup wrong? Is the user
 authenticating as a different user than the one they assume?
 
-To help `kubectl login` diagnose mis-configured credentials, responses from the
+To help `kubectl login` diagnose misconfigured credentials, responses from the
 API server to authenticated requests SHOULD include the `Authentication-Info`
 header as defined in [RFC 7615](https://tools.ietf.org/html/rfc7615). The value
 will hold name value pairs for `username` and `uid`. Since usernames and IDs

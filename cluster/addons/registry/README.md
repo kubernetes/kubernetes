@@ -91,7 +91,7 @@ spec:
 This tells Kubernetes that you want to use storage, and the `PersistentVolume`
 you created before will be bound to this claim (unless you have other
 `PersistentVolumes` in which case those might get bound instead).  This claim
-gives you the rigth to use this storage until you release the claim.
+gives you the right to use this storage until you release the claim.
 
 ## Run the registry
 

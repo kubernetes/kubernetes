@@ -2,7 +2,7 @@
 
 This example shows how to use experimental persistent volume provisioning.
 
-### Pre-requisites
+### Prerequisites
 
 This example assumes that you have an understanding of Kubernetes administration and can modify the
 scripts that launch kube-controller-manager.

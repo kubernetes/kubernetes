@@ -18,7 +18,7 @@ chosen networking solution.
 
 ## Implementation
 
-The implmentation in Kubernetes consists of:
+The implementation in Kubernetes consists of:
 - A v1beta1 NetworkPolicy API object
 - A structure on the `Namespace` object to control policy, to be developed as an annotation for now.
 
