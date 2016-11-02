@@ -29,12 +29,14 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	testcore "k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/diff"
+	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -536,6 +538,145 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 				podEvicted, item.description)
 		}
 	}
+}
+
+func TestPodStatusChange(t *testing.T) {
+	fakeNow := unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
+	evictionTimeout := 10 * time.Minute
+
+	// Because of the logic that prevents NC from evicting anything when all Nodes are NotReady
+	// we need second healthy node in tests. Because of how the tests are written we need to update
+	// the status of this Node.
+	healthyNodeNewStatus := api.NodeStatus{
+		Conditions: []api.NodeCondition{
+			{
+				Type:   api.NodeReady,
+				Status: api.ConditionTrue,
+				// Node status has just been updated, and is NotReady for 10min.
+				LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 9, 0, 0, time.UTC),
+				LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+			},
+		},
+	}
+
+	// Node created long time ago, node controller posted Unknown for a long period of time.
+	table := []struct {
+		fakeNodeHandler     *FakeNodeHandler
+		daemonSets          []extensions.DaemonSet
+		timeToPass          time.Duration
+		newNodeStatus       api.NodeStatus
+		secondNodeNewStatus api.NodeStatus
+		expectedPodUpdate   bool
+		expectedReason      string
+		description         string
+	}{
+		{
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							Labels: map[string]string{
+								unversioned.LabelZoneRegion:        "region1",
+								unversioned.LabelZoneFailureDomain: "zone1",
+							},
+						},
+						Status: api.NodeStatus{
+							Conditions: []api.NodeCondition{
+								{
+									Type:               api.NodeReady,
+									Status:             api.ConditionUnknown,
+									LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name:              "node1",
+							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							Labels: map[string]string{
+								unversioned.LabelZoneRegion:        "region1",
+								unversioned.LabelZoneFailureDomain: "zone1",
+							},
+						},
+						Status: api.NodeStatus{
+							Conditions: []api.NodeCondition{
+								{
+									Type:               api.NodeReady,
+									Status:             api.ConditionTrue,
+									LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
+			},
+			timeToPass: 60 * time.Minute,
+			newNodeStatus: api.NodeStatus{
+				Conditions: []api.NodeCondition{
+					{
+						Type:   api.NodeReady,
+						Status: api.ConditionUnknown,
+						// Node status was updated by nodecontroller 1hr ago
+						LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+					},
+				},
+			},
+			secondNodeNewStatus: healthyNodeNewStatus,
+			expectedPodUpdate:   true,
+			expectedReason:      node.NodeUnreachablePodReason,
+			description: "Node created long time ago, node controller posted Unknown for a " +
+				"long period of time, the pod status must include reason for termination.",
+		},
+	}
+
+	for _, item := range table {
+		nodeController, _ := NewNodeControllerFromClient(nil, item.fakeNodeHandler,
+			evictionTimeout, testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealtyThreshold, testNodeMonitorGracePeriod,
+			testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false)
+		nodeController.now = func() unversioned.Time { return fakeNow }
+		if err := nodeController.monitorNodeStatus(); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if item.timeToPass > 0 {
+			nodeController.now = func() unversioned.Time { return unversioned.Time{Time: fakeNow.Add(item.timeToPass)} }
+			item.fakeNodeHandler.Existing[0].Status = item.newNodeStatus
+			item.fakeNodeHandler.Existing[1].Status = item.secondNodeNewStatus
+		}
+		if err := nodeController.monitorNodeStatus(); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		zones := getZones(item.fakeNodeHandler)
+		for _, zone := range zones {
+			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
+				nodeUid, _ := value.UID.(string)
+				deletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUid, nodeController.daemonSetStore)
+				return true, 0
+			})
+		}
+
+		podReasonUpdate := false
+		for _, action := range item.fakeNodeHandler.Actions() {
+			if action.GetVerb() == "update" && action.GetResource().Resource == "pods" {
+				updateReason := action.(testcore.UpdateActionImpl).GetObject().(*api.Pod).Status.Reason
+				podReasonUpdate = true
+				if updateReason != item.expectedReason {
+					t.Errorf("expected pod status reason: %+v, got %+v for %+v", item.expectedReason, updateReason, item.description)
+				}
+			}
+		}
+
+		if podReasonUpdate != item.expectedPodUpdate {
+			t.Errorf("expected pod update: %+v, got %+v for %+v", podReasonUpdate, item.expectedPodUpdate, item.description)
+		}
+	}
+
 }
 
 func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
