@@ -625,6 +625,17 @@ func TestConvertToVersion(t *testing.T) {
 				A: "test",
 			},
 		},
+		// unversioned type returned when not included in the target types
+		{
+			scheme: GetTestScheme(),
+			in:     &UnversionedType{A: "test"},
+			gv:     unversioned.GroupVersions{{Group: "other", Version: "v2"}},
+			same:   true,
+			out: &UnversionedType{
+				MyWeirdCustomEmbeddedVersionKindField: MyWeirdCustomEmbeddedVersionKindField{APIVersion: "v1", ObjectKind: "UnversionedType"},
+				A: "test",
+			},
+		},
 		// detected as already being in the target version
 		{
 			scheme: GetTestScheme(),
