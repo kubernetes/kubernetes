@@ -131,13 +131,13 @@ func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
+		SelectorParam(o.Selector).
+		ResourceTypeOrNameArgs(o.All, o.Resources...).
 		Flatten()
 	if !o.Local {
-		builder = builder.
-			SelectorParam(o.Selector).
-			ResourceTypeOrNameArgs(o.All, o.Resources...).
-			Latest()
+		builder = builder.Latest()
 	}
+
 	o.Infos, err = builder.Do().Infos()
 	if err != nil {
 		return err
