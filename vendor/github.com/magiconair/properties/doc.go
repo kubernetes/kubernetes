@@ -102,7 +102,7 @@
 //   v = p.GetString("key", "def")
 //   v = p.GetDuration("key", 999)
 //
-// As an alterantive properties may be applied with the standard
+// As an alternative properties may be applied with the standard
 // library's flag implementation at any time.
 //
 //   # Standard configuration
