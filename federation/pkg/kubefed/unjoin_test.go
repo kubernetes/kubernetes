@@ -125,12 +125,12 @@ func TestUnjoinFederation(t *testing.T) {
 		errBuf := bytes.NewBuffer([]byte{})
 
 		hostFactory := fakeUnjoinHostFactory(tc.cluster)
-		joinConfig, err := newFakeJoinFederationConfig(hostFactory, tc.kubeconfigGlobal)
+		adminConfig, err := newFakeAdminConfig(hostFactory, tc.kubeconfigGlobal)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
 
-		cmd := NewCmdUnjoin(f, buf, errBuf, joinConfig)
+		cmd := NewCmdUnjoin(f, buf, errBuf, adminConfig)
 
 		cmd.Flags().Set("kubeconfig", tc.kubeconfigExplicit)
 		cmd.Flags().Set("host", "substrate")
