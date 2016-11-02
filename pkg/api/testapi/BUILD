@@ -27,6 +27,7 @@ go_library(
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/apps/install:go_default_library",
         "//pkg/apis/authentication/install:go_default_library",
+        "//pkg/apis/authorization:go_default_library",
         "//pkg/apis/authorization/install:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/autoscaling/install:go_default_library",
