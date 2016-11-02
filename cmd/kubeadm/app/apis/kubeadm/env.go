@@ -34,7 +34,7 @@ func GetEnvParams() map[string]string {
 		"host_pki_path":      "/etc/kubernetes/pki",
 		"host_etcd_path":     "/var/lib/etcd",
 		"hyperkube_image":    "",
-		"repo_prefix":	      "",
+		"repo_prefix":	      "gcr.io/google_containers",
 		"discovery_image":    fmt.Sprintf("gcr.io/google_containers/kube-discovery-%s:%s", runtime.GOARCH, "1.0"),
 		"etcd_image":         "",
 		"component_loglevel": "--v=4",
