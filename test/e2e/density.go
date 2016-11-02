@@ -630,6 +630,7 @@ var _ = framework.KubeDescribe("Density", func() {
 
 				By("Removing additional replication controllers")
 				deleteRC := func(i int) {
+					defer GinkgoRecover()
 					name := additionalPodsPrefix + "-" + strconv.Itoa(i+1)
 					framework.ExpectNoError(framework.DeleteRCAndWaitForGC(c, rcNameToNsMap[name], name))
 				}
