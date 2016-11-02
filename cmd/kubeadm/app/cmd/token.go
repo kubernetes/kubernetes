@@ -27,10 +27,9 @@ import (
 	"github.com/spf13/cobra"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
 )
@@ -89,7 +88,7 @@ func NewCmdToken(out io.Writer) *cobra.Command {
 
 // RunCreateToken generates a new bootstrap token and stores it as a secret on the server.
 func RunCreateToken(out io.Writer, cmd *cobra.Command, tokenDuration time.Duration, tokenSecret *kubeadmapi.Secrets) error {
-	client, err := createAPIClient()
+	client, err := kubemaster.CreateClientFromFile(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "admin.conf"))
 	if err != nil {
 		return err
 	}
@@ -129,29 +128,9 @@ func encodeTokenSecretData(tokenSecret *kubeadmapi.Secrets, duration time.Durati
 	return data
 }
 
-func createAPIClient() (*clientset.Clientset, error) {
-	adminKubeconfig, err := clientcmd.LoadFromFile(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "admin.conf"))
-	if err != nil {
-		return nil, fmt.Errorf("<cmd/token> failed to load admin kubeconfig [%v]", err)
-	}
-	adminClientConfig, err := clientcmd.NewDefaultClientConfig(
-		*adminKubeconfig,
-		&clientcmd.ConfigOverrides{},
-	).ClientConfig()
-	if err != nil {
-		return nil, fmt.Errorf("<cmd/token> failed to create API client configuration [%v]", err)
-	}
-
-	client, err := clientset.NewForConfig(adminClientConfig)
-	if err != nil {
-		return nil, fmt.Errorf("<cmd/token> failed to create API client [%v]", err)
-	}
-	return client, nil
-}
-
 // RunListTokens lists details on all existing bootstrap tokens on the server.
 func RunListTokens(out io.Writer, cmd *cobra.Command) error {
-	client, err := createAPIClient()
+	client, err := kubemaster.CreateClientFromFile(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "admin.conf"))
 	if err != nil {
 		return err
 	}
@@ -189,7 +168,7 @@ func RunListTokens(out io.Writer, cmd *cobra.Command) error {
 
 // RunDeleteToken removes a bootstrap token from the server.
 func RunDeleteToken(out io.Writer, cmd *cobra.Command, tokenId string) error {
-	client, err := createAPIClient()
+	client, err := kubemaster.CreateClientFromFile(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "admin.conf"))
 	if err != nil {
 		return err
 	}

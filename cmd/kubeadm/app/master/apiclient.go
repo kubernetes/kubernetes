@@ -35,21 +35,35 @@ import (
 
 const apiCallRetryInterval = 500 * time.Millisecond
 
-func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Clientset, error) {
+func createAPIClient(adminKubeconfig *clientcmdapi.Config) (*clientset.Clientset, error) {
 	adminClientConfig, err := clientcmd.NewDefaultClientConfig(
-		*adminConfig,
+		*adminKubeconfig,
 		&clientcmd.ConfigOverrides{},
 	).ClientConfig()
 	if err != nil {
-		return nil, fmt.Errorf("<master/apiclient> failed to create API client configuration [%v]", err)
+		return nil, fmt.Errorf("<cmd/token> failed to create API client configuration [%v]", err)
 	}
-	fmt.Println("<master/apiclient> created API client configuration")
 
 	client, err := clientset.NewForConfig(adminClientConfig)
 	if err != nil {
-		return nil, fmt.Errorf("<master/apiclient> failed to create API client [%v]", err)
+		return nil, fmt.Errorf("<cmd/token> failed to create API client [%v]", err)
 	}
+	return client, nil
+}
 
+func CreateClientFromFile(path string) (*clientset.Clientset, error) {
+	adminKubeconfig, err := clientcmd.LoadFromFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("<master/apiclient> failed to load admin kubeconfig [%v]", err)
+	}
+	return createAPIClient(adminKubeconfig)
+}
+
+func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Clientset, error) {
+	client, err := createAPIClient(adminConfig)
+	if err != nil {
+		return nil, err
+	}
 	fmt.Println("<master/apiclient> created API client, waiting for the control plane to become ready")
 
 	start := time.Now()
