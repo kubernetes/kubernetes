@@ -50,6 +50,7 @@ type FakeRuntimeService struct {
 
 	Called []string
 
+	FakeStatus *runtimeApi.RuntimeStatus
 	Containers map[string]*FakeContainer
 	Sandboxes  map[string]*FakePodSandbox
 }
@@ -107,6 +108,15 @@ func (r *FakeRuntimeService) Version(apiVersion string) (*runtimeApi.VersionResp
 		RuntimeVersion:    &version,
 		RuntimeApiVersion: &version,
 	}, nil
+}
+
+func (r *FakeRuntimeService) Status() (*runtimeApi.RuntimeStatus, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "Status")
+
+	return r.FakeStatus, nil
 }
 
 func (r *FakeRuntimeService) RunPodSandbox(config *runtimeApi.PodSandboxConfig) (string, error) {

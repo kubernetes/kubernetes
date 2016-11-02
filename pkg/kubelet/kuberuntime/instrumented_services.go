@@ -68,6 +68,15 @@ func (in instrumentedRuntimeService) Version(apiVersion string) (*runtimeApi.Ver
 	return out, err
 }
 
+func (in instrumentedRuntimeService) Status() (*runtimeApi.RuntimeStatus, error) {
+	const operation = "status"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.service.Status()
+	recordError(operation, err)
+	return out, err
+}
+
 func (in instrumentedRuntimeService) CreateContainer(podSandboxID string, config *runtimeApi.ContainerConfig, sandboxConfig *runtimeApi.PodSandboxConfig) (string, error) {
 	const operation = "create_container"
 	defer recordOperation(operation, time.Now())
