@@ -948,6 +948,11 @@ func addObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj in
 			}
 			switch sf.Type.Kind() {
 			case reflect.Interface, reflect.Struct:
+			case reflect.Ptr:
+				if sf.Type.Elem().Kind() == reflect.Interface || sf.Type.Elem().Kind() == reflect.Struct {
+					continue
+				}
+				fallthrough
 			default:
 				jsonTag := sf.Tag.Get("json")
 				if len(jsonTag) == 0 {
