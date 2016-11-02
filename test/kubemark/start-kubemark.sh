@@ -144,12 +144,11 @@ gcloud compute copy-files --zone="${ZONE}" --project="${PROJECT}" \
   "${RESOURCE_DIRECTORY}/apiserver_flags" \
   "${RESOURCE_DIRECTORY}/scheduler_flags" \
   "${RESOURCE_DIRECTORY}/controllers_flags" \
-  "root@${MASTER_NAME}":/
-
+  "${MASTER_NAME}":~
 
 gcloud compute ssh "${MASTER_NAME}" --zone="${ZONE}" --project="${PROJECT}" \
-  --command="sudo chmod a+x /configure-kubectl.sh && sudo chmod a+x /start-kubemark-master.sh && \
-             sudo /start-kubemark-master.sh ${EVENT_STORE_IP:-127.0.0.1} ${NUM_NODES:-0} ${ETCD_VERSION:-}"
+  --command="chmod a+x configure-kubectl.sh && chmod a+x start-kubemark-master.sh && \
+             sudo ./start-kubemark-master.sh ${EVENT_STORE_IP:-127.0.0.1} ${NUM_NODES:-0} ${ETCD_VERSION:-}"
 
 # create kubeconfig for Kubelet:
 KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
