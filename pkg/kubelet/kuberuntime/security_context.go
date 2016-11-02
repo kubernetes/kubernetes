@@ -23,7 +23,7 @@ import (
 
 // determineEffectiveSecurityContext gets container's security context from api.Pod and container.SecurityContext.
 func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *api.Pod, sc *api.SecurityContext) *runtimeapi.SecurityContext {
-	effectiveSc := m.securityContextFromPodSecurityContext(pod)
+	effectiveSc := m.getRuntimeSCFromPod(pod)
 	if effectiveSc == nil && sc == nil {
 		return nil
 	}
@@ -61,28 +61,23 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *api.P
 	return effectiveSc
 }
 
-// securityContextFromPodSecurityContext gets security context from api.Pod.
-func (m *kubeGenericRuntimeManager) securityContextFromPodSecurityContext(pod *api.Pod) *runtimeapi.SecurityContext {
+// getRuntimeSCFromPod gets container security context from api.Pod.
+func (m *kubeGenericRuntimeManager) getRuntimeSCFromPod(pod *api.Pod) *runtimeapi.SecurityContext {
 	if pod.Spec.SecurityContext == nil {
 		return nil
 	}
 
 	podSc := pod.Spec.SecurityContext
 	synthesized := &runtimeapi.SecurityContext{
+		FsGroup:      podSc.FSGroup,
+		RunAsUser:    podSc.RunAsUser,
+		RunAsNonRoot: podSc.RunAsNonRoot,
 		NamespaceOptions: &runtimeapi.NamespaceOption{
 			HostNetwork: &podSc.HostNetwork,
 			HostIpc:     &podSc.HostIPC,
 			HostPid:     &podSc.HostPID,
 		},
-	}
-	if podSc.SELinuxOptions != nil {
-		synthesized.SelinuxOptions = convertToRuntimeSELinuxOption(podSc.SELinuxOptions)
-	}
-	if podSc.RunAsUser != nil {
-		synthesized.RunAsUser = podSc.RunAsUser
-	}
-	if podSc.RunAsNonRoot != nil {
-		synthesized.RunAsNonRoot = podSc.RunAsNonRoot
+		SelinuxOptions: convertToRuntimeSELinuxOption(podSc.SELinuxOptions),
 	}
 
 	if groups := m.runtimeHelper.GetExtraSupplementalGroupsForPod(pod); len(groups) > 0 {
@@ -90,10 +85,6 @@ func (m *kubeGenericRuntimeManager) securityContextFromPodSecurityContext(pod *a
 	}
 	if podSc.SupplementalGroups != nil {
 		synthesized.SupplementalGroups = append(synthesized.SupplementalGroups, podSc.SupplementalGroups...)
-	}
-
-	if podSc.FSGroup != nil {
-		synthesized.FsGroup = podSc.FSGroup
 	}
 
 	return synthesized

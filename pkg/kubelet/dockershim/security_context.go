@@ -22,6 +22,7 @@ import (
 
 	dockercontainer "github.com/docker/engine-api/types/container"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 )
 
 const (
@@ -54,7 +55,7 @@ func applyContainerSecurityContext(lc *runtimeapi.LinuxContainerConfig, sandboxI
 
 // modifySandboxContainerConfig applies sandbox security context config to dockercontainer.Config.
 func modifySandboxContainerConfig(podSc *runtimeapi.SandboxSecurityContext, config *dockercontainer.Config) {
-	if podSc != nil && podSc.RunAsUser != nil {
+	if podSc != nil {
 		modifyContainerConfig(&runtimeapi.SecurityContext{
 			RunAsUser: podSc.RunAsUser,
 		}, config)
@@ -64,7 +65,7 @@ func modifySandboxContainerConfig(podSc *runtimeapi.SandboxSecurityContext, conf
 // modifyContainerConfig applies container security context config to dockercontainer.Config.
 func modifyContainerConfig(sc *runtimeapi.SecurityContext, config *dockercontainer.Config) {
 	if sc != nil && sc.RunAsUser != nil {
-		config.User = strconv.Itoa(int(*sc.RunAsUser))
+		config.User = strconv.Itoa(int(sc.GetRunAsUser()))
 	}
 }
 
@@ -91,7 +92,7 @@ func modifySandboxHostConfig(podSc *runtimeapi.SandboxSecurityContext, hc *docke
 // modifyHostConfig applies security context config to dockercontainer.HostConfig.
 func modifyHostConfig(sc *runtimeapi.SecurityContext, sandboxID string, hostConfig *dockercontainer.HostConfig) {
 	// Apply namespace options.
-	modifyNamespaceOptions(sc, sandboxID, hostConfig)
+	modifyNamespaceOptions(sc.GetNamespaceOptions(), sandboxID, hostConfig)
 
 	if sc == nil {
 		return
@@ -113,23 +114,21 @@ func modifyHostConfig(sc *runtimeapi.SecurityContext, sandboxID string, hostConf
 		hostConfig.ReadonlyRootfs = sc.GetReadonlyRootfs()
 	}
 	if sc.Capabilities != nil {
-		add, drop := MakeCapabilities(sc.Capabilities.AddCapabilities, sc.Capabilities.DropCapabilities)
-		hostConfig.CapAdd = add
-		hostConfig.CapDrop = drop
+		hostConfig.CapAdd = sc.GetCapabilities().GetAddCapabilities()
+		hostConfig.CapDrop = sc.GetCapabilities().GetDropCapabilities()
 	}
 	if sc.SelinuxOptions != nil {
-		hostConfig.SecurityOpt = modifySecurityOption(hostConfig.SecurityOpt, dockerLabelUser, sc.SelinuxOptions.GetUser())
-		hostConfig.SecurityOpt = modifySecurityOption(hostConfig.SecurityOpt, dockerLabelRole, sc.SelinuxOptions.GetRole())
-		hostConfig.SecurityOpt = modifySecurityOption(hostConfig.SecurityOpt, dockerLabelType, sc.SelinuxOptions.GetType())
-		hostConfig.SecurityOpt = modifySecurityOption(hostConfig.SecurityOpt, dockerLabelLevel, sc.SelinuxOptions.GetLevel())
+		hostConfig.SecurityOpt = modifySELinuxOption(hostConfig.SecurityOpt, dockerLabelUser, sc.SelinuxOptions.GetUser())
+		hostConfig.SecurityOpt = modifySELinuxOption(hostConfig.SecurityOpt, dockerLabelRole, sc.SelinuxOptions.GetRole())
+		hostConfig.SecurityOpt = modifySELinuxOption(hostConfig.SecurityOpt, dockerLabelType, sc.SelinuxOptions.GetType())
+		hostConfig.SecurityOpt = modifySELinuxOption(hostConfig.SecurityOpt, dockerLabelLevel, sc.SelinuxOptions.GetLevel())
 	}
 }
 
 // modifyNamespaceOptions applies namespaceoptions to dockercontainer.HostConfig.
-func modifyNamespaceOptions(sc *runtimeapi.SecurityContext, sandboxID string, hostConfig *dockercontainer.HostConfig) {
+func modifyNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, sandboxID string, hostConfig *dockercontainer.HostConfig) {
 	hostNetwork := false
-	if sc != nil && sc.NamespaceOptions != nil {
-		nsOpts := sc.GetNamespaceOptions()
+	if nsOpts != nil {
 		if nsOpts.HostNetwork != nil {
 			hostNetwork = nsOpts.GetHostNetwork()
 		}
@@ -174,26 +173,28 @@ func modifyHostNetworkOptionForContainer(hostNetwork bool, sandboxID string, hc 
 	}
 }
 
-// modifySecurityOption adds the security option of name to the config array with value in the form
+// modifySELinuxOption adds the SELinux option of name to the config array with value in the form
 // of name:value
-func modifySecurityOption(config []string, name, value string) []string {
+func modifySELinuxOption(config []string, name, value string) []string {
 	if len(value) > 0 {
 		config = append(config, fmt.Sprintf("%s:%s", name, value))
 	}
 	return config
 }
 
-// MakeCapabilities creates string slices from Capability slices
-func MakeCapabilities(capAdd []string, capDrop []string) ([]string, []string) {
-	var (
-		addCaps  []string
-		dropCaps []string
-	)
-	for _, cap := range capAdd {
-		addCaps = append(addCaps, cap)
+// verifyRunAsNonRoot verifies RunAsNonRoot of security context.
+func (ds *dockerService) verifyRunAsNonRoot(runAsUser int64, image string) error {
+	if runAsUser == 0 {
+		return fmt.Errorf("container's runAsUser breaks non-root policy")
 	}
-	for _, cap := range capDrop {
-		dropCaps = append(dropCaps, cap)
+
+	imgRoot, err := dockertools.IsImageRoot(ds.client, image)
+	if err != nil {
+		return fmt.Errorf("can't tell if image runs as root: %v", err)
 	}
-	return addCaps, dropCaps
+	if imgRoot {
+		return fmt.Errorf("container has runAsNonRoot and image will run as root")
+	}
+
+	return nil
 }

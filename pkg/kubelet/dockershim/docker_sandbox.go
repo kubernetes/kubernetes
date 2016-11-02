@@ -79,7 +79,7 @@ func (ds *dockerService) RunPodSandbox(config *runtimeApi.PodSandboxConfig) (str
 	if err != nil {
 		return createResp.ID, fmt.Errorf("failed to start sandbox container for pod %q: %v", config.Metadata.GetName(), err)
 	}
-	if config.GetLinux().GetNamespaceOptions().GetHostNetwork() {
+	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetHostNetwork() {
 		return createResp.ID, nil
 	}
 
@@ -286,24 +286,16 @@ func (ds *dockerService) ListPodSandbox(filter *runtimeApi.PodSandboxFilter) ([]
 	return result, nil
 }
 
-// applyLinuxSpecificOptions applies LinuxPodSandboxConfig to dockercontainer.HostConfig and dockercontainer.ContainerCreateConfig.
-func (ds *dockerService) applyLinuxSpecificOptions(hc *dockercontainer.HostConfig, lc *runtimeApi.LinuxPodSandboxConfig, createConfig *dockertypes.ContainerCreateConfig, image string) error {
+// applySandboxLinuxOptions applies LinuxPodSandboxConfig to dockercontainer.HostConfig and dockercontainer.ContainerCreateConfig.
+func (ds *dockerService) applySandboxLinuxOptions(hc *dockercontainer.HostConfig, lc *runtimeApi.LinuxPodSandboxConfig, createConfig *dockertypes.ContainerCreateConfig, image string) error {
 	// Apply Cgroup options.
 	// TODO: Check if this works with per-pod cgroups.
 	hc.CgroupParent = lc.GetCgroupParent()
 
 	// Verify RunAsNonRoot of security context.
-	if podSc := lc.GetSecurityContext(); podSc != nil && podSc.RunAsNonRoot != nil {
-		if podSc.RunAsUser != nil {
-			return fmt.Errorf("container's runAsUser breaks non-root policy")
-		}
-
-		imgRoot, err := ds.isImageRoot(image)
-		if err != nil {
-			return fmt.Errorf("can't tell if image runs as root: %v", err)
-		}
-		if imgRoot {
-			return fmt.Errorf("container has runAsNonRoot and image will run as root")
+	if lc.GetSecurityContext().GetRunAsNonRoot() {
+		if err := ds.verifyRunAsNonRoot(lc.GetSecurityContext().GetRunAsUser(), image); err != nil {
+			return err
 		}
 	}
 
@@ -343,7 +335,7 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig,
 
 	// Apply linux-specific options.
 	if lc := c.GetLinux(); lc != nil {
-		if err := ds.applyLinuxSpecificOptions(hc, lc, createConfig, image); err != nil {
+		if err := ds.applySandboxLinuxOptions(hc, lc, createConfig, image); err != nil {
 			return nil, err
 		}
 	}
