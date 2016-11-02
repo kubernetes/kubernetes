@@ -125,9 +125,8 @@ type NodeController struct {
 	// Lock to access evictor workers
 	evictorLock sync.Mutex
 	// workers that evicts pods from unresponsive nodes.
-	zonePodEvictor         map[string]*RateLimitedTimedQueue
-	zoneTerminationEvictor map[string]*RateLimitedTimedQueue
-	podEvictionTimeout     time.Duration
+	zonePodEvictor     map[string]*RateLimitedTimedQueue
+	podEvictionTimeout time.Duration
 	// The maximum duration before a pod evicted from a node can be forcefully terminated.
 	maximumGracePeriod time.Duration
 	recorder           record.EventRecorder
@@ -215,7 +214,6 @@ func NewNodeController(
 		podEvictionTimeout:          podEvictionTimeout,
 		maximumGracePeriod:          5 * time.Minute,
 		zonePodEvictor:              make(map[string]*RateLimitedTimedQueue),
-		zoneTerminationEvictor:      make(map[string]*RateLimitedTimedQueue),
 		nodeStatusMap:               make(map[string]nodeStatusData),
 		nodeMonitorGracePeriod:      nodeMonitorGracePeriod,
 		nodeMonitorPeriod:           nodeMonitorPeriod,
@@ -370,17 +368,8 @@ func (nc *NodeController) Run() {
 		}, nc.nodeMonitorPeriod, wait.NeverStop)
 
 		// Managing eviction of nodes:
-		// 1. when we delete pods off a node, if the node was not empty at the time we then
-		//    queue a termination watcher
-		//    a. If we hit an error, retry deletion
-		// 2. The terminator loop ensures that pods are eventually cleaned and we never
-		//    terminate a pod in a time period less than nc.maximumGracePeriod. AddedAt
-		//    is the time from which we measure "has this pod been terminating too long",
-		//    after which we will delete the pod with grace period 0 (force delete).
-		//    a. If we hit errors, retry instantly
-		//    b. If there are no pods left terminating, exit
-		//    c. If there are pods still terminating, wait for their estimated completion
-		//       before retrying
+		// When we delete pods off a node, if the node was not empty at the time we then
+		// queue an eviction watcher. If we hit an error, retry deletion.
 		go wait.Until(func() {
 			nc.evictorLock.Lock()
 			defer nc.evictorLock.Unlock()
@@ -405,39 +394,9 @@ func (nc *NodeController) Run() {
 					}
 
 					if remaining {
-						nc.zoneTerminationEvictor[k].Add(value.Value, value.UID)
+						glog.Infof("Pods awaiting deletion due to NodeController eviction")
 					}
 					return true, 0
-				})
-			}
-		}, nodeEvictionPeriod, wait.NeverStop)
-
-		// TODO: replace with a controller that ensures pods that are terminating complete
-		// in a particular time period
-		go wait.Until(func() {
-			nc.evictorLock.Lock()
-			defer nc.evictorLock.Unlock()
-			for k := range nc.zoneTerminationEvictor {
-				nc.zoneTerminationEvictor[k].Try(func(value TimedValue) (bool, time.Duration) {
-					nodeUid, _ := value.UID.(string)
-					completed, remaining, err := terminatePods(nc.kubeClient, nc.recorder, value.Value, nodeUid, value.AddedAt, nc.maximumGracePeriod)
-					if err != nil {
-						utilruntime.HandleError(fmt.Errorf("unable to terminate pods on node %q: %v", value.Value, err))
-						return false, 0
-					}
-
-					if completed {
-						glog.V(2).Infof("All pods terminated on %s", value.Value)
-						recordNodeEvent(nc.recorder, value.Value, nodeUid, api.EventTypeNormal, "TerminatedAllPods", fmt.Sprintf("Terminated all Pods on Node %s.", value.Value))
-						return true, 0
-					}
-
-					glog.V(2).Infof("Pods terminating since %s on %q, estimated completion %s", value.AddedAt, value.Value, remaining)
-					// clamp very short intervals
-					if remaining < nodeEvictionPeriod {
-						remaining = nodeEvictionPeriod
-					}
-					return false, remaining
 				})
 			}
 		}, nodeEvictionPeriod, wait.NeverStop)
@@ -469,10 +428,6 @@ func (nc *NodeController) monitorNodeStatus() error {
 			// Init the metric for the new zone.
 			glog.Infof("Initializing eviction metric for zone: %v", zone)
 			EvictionsNumber.WithLabelValues(zone).Add(0)
-		}
-		if _, found := nc.zoneTerminationEvictor[zone]; !found {
-			nc.zoneTerminationEvictor[zone] = NewRateLimitedTimedQueue(
-				flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, evictionRateLimiterBurst))
 		}
 		nc.cancelPodEviction(added[i])
 	}
@@ -557,7 +512,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 						// Kubelet is not reporting and Cloud Provider says node
 						// is gone. Delete it without worrying about grace
 						// periods.
-						if err := forcefullyDeleteNode(nc.kubeClient, nodeName, nc.forcefullyDeletePod); err != nil {
+						if err := forcefullyDeleteNode(nc.kubeClient, nodeName); err != nil {
 							glog.Errorf("Unable to forcefully delete node %q: %v", nodeName, err)
 						}
 					}(node.Name)
@@ -618,7 +573,6 @@ func (nc *NodeController) handleDisruption(zoneToNodeConditions map[string][]*ap
 			// We stop all evictions.
 			for k := range nc.zonePodEvictor {
 				nc.zonePodEvictor[k].SwapLimiter(0)
-				nc.zoneTerminationEvictor[k].SwapLimiter(0)
 			}
 			for k := range nc.zoneStates {
 				nc.zoneStates[k] = stateFullDisruption
@@ -662,16 +616,11 @@ func (nc *NodeController) setLimiterInZone(zone string, zoneSize int, state zone
 	switch state {
 	case stateNormal:
 		nc.zonePodEvictor[zone].SwapLimiter(nc.evictionLimiterQPS)
-		nc.zoneTerminationEvictor[zone].SwapLimiter(nc.evictionLimiterQPS)
 	case statePartialDisruption:
 		nc.zonePodEvictor[zone].SwapLimiter(
 			nc.enterPartialDisruptionFunc(zoneSize))
-		nc.zoneTerminationEvictor[zone].SwapLimiter(
-			nc.enterPartialDisruptionFunc(zoneSize))
 	case stateFullDisruption:
 		nc.zonePodEvictor[zone].SwapLimiter(
-			nc.enterFullDisruptionFunc(zoneSize))
-		nc.zoneTerminationEvictor[zone].SwapLimiter(
 			nc.enterFullDisruptionFunc(zoneSize))
 	}
 }
@@ -871,8 +820,7 @@ func (nc *NodeController) cancelPodEviction(node *api.Node) bool {
 	nc.evictorLock.Lock()
 	defer nc.evictorLock.Unlock()
 	wasDeleting := nc.zonePodEvictor[zone].Remove(node.Name)
-	wasTerminating := nc.zoneTerminationEvictor[zone].Remove(node.Name)
-	if wasDeleting || wasTerminating {
+	if wasDeleting {
 		glog.V(2).Infof("Cancelling pod Eviction on Node: %v", node.Name)
 		return true
 	}

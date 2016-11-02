@@ -255,6 +255,12 @@ Namespaces should always delete fast (ALL of 100 namespaces in 150 seconds),rmmh
 Namespaces should delete fast enough (90 percent of 100 namespaces in 150 seconds),kevin-wangzefeng,1
 Namespaces should ensure that all pods are removed when a namespace is deleted.,xiang90,1
 Namespaces should ensure that all services are removed when a namespace is deleted.,pmorie,1
+Network Partition *,foxish,0
+Network Partition Pods should return to running and ready state after network partition is healed *,foxish,0
+Network Partition should come back up if node goes down,foxish,0
+Network Partition should create new pods when node is partitioned,foxish,0
+Network Partition should eagerly create replacement pod during network partition when termination grace is non-zero,foxish,0
+Network Partition should not reschedule pets if there is a network partition,foxish,0
 Networking Granular Checks: Pods should function for intra-pod communication: http,stts,0
 Networking Granular Checks: Pods should function for intra-pod communication: udp,freehan,0
 Networking Granular Checks: Pods should function for node-pod communication: http,spxtr,1
@@ -275,7 +281,6 @@ Networking should provide Internet connection for containers,sttts,0
 "Networking should provide unchanging, static URL paths for kubernetes api services",freehan,0
 NodeOutOfDisk runs out of disk space,vishh,0
 NodeProblemDetector KernelMonitor should generate node condition and events for corresponding errors,Random-Liu,0
-Nodes Network when a node becomes unreachable *,alex-mohr,1
 Nodes Resize should be able to add nodes,piosz,1
 Nodes Resize should be able to delete nodes,zmerlynn,1
 Opaque resources should account opaque integer resources in pods with multiple containers.,ConnorDoyle,0
