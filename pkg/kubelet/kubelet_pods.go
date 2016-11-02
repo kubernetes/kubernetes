@@ -783,6 +783,10 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName string, lo
 		podStatus = pod.Status
 	}
 
+	// TODO: Consolidate the logic here with kuberuntime.GetContainerLogs, here we convert container name to containerID,
+	// but inside kuberuntime we convert container id back to container name and restart count.
+	// TODO: After separate container log lifecycle management, we should get log based on the existing log files
+	// instead of container status.
 	containerID, err := kl.validateContainerLogStatus(pod.Name, &podStatus, containerName, logOptions.Previous)
 	if err != nil {
 		return err
