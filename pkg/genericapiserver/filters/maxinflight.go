@@ -28,23 +28,53 @@ import (
 const retryAfter = "1"
 
 // WithMaxInFlightLimit limits the number of in-flight requests to buffer size of the passed in channel.
-func WithMaxInFlightLimit(handler http.Handler, limit int, longRunningRequestCheck LongRunningRequestCheck) http.Handler {
-	if limit == 0 {
+func WithMaxInFlightLimit(
+	handler http.Handler,
+	readLimit int,
+	writeLimit int,
+	longRunningRequestCheck LongRunningRequestCheck,
+	mutatingRequestCheck MutatingRequestCheck,
+) http.Handler {
+	if readLimit == 0 && writeLimit == 0 {
 		return handler
 	}
-	c := make(chan bool, limit)
+	var readChan chan bool
+	var writeChan chan bool
+	if readLimit == 0 {
+		readChan = nil
+	} else {
+		readChan = make(chan bool, readLimit)
+	}
+	if writeLimit == 0 {
+		writeChan = nil
+	} else {
+		writeChan = make(chan bool, writeLimit)
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if longRunningRequestCheck(r) {
 			// Skip tracking long running events.
 			handler.ServeHTTP(w, r)
 			return
 		}
-		select {
-		case c <- true:
-			defer func() { <-c }()
+
+		var c chan bool
+		if mutatingRequestCheck(r) {
+			c = writeChan
+		} else {
+			c = readChan
+		}
+
+		if c == nil {
 			handler.ServeHTTP(w, r)
-		default:
-			tooManyRequests(r, w)
+		} else {
+			select {
+			case c <- true:
+				defer func() { <-c }()
+				handler.ServeHTTP(w, r)
+			default:
+				tooManyRequests(r, w)
+			}
 		}
 	})
 }

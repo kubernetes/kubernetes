@@ -160,11 +160,16 @@ type Config struct {
 	OpenAPIConfig *common.Config
 
 	// MaxRequestsInFlight is the maximum number of parallel non-long-running requests. Every further
-	// request has to wait.
+	// request has to wait. Applies only to read-only requests.
 	MaxRequestsInFlight int
+	// MaxMutatingRequestsInFlight is the maximum number of parallel mutating requests. Every further
+	// request has to wait.
+	MaxMutatingRequestsInFlight int
 
 	// Predicate which is true for paths of long-running http requests
 	LongRunningFunc genericfilters.LongRunningRequestCheck
+	// Predicate which is true when the request is mutating
+	MutatingFunc genericfilters.MutatingRequestCheck
 
 	// Build the handler chains by decorating the apiHandler.
 	BuildHandlerChainsFunc func(apiHandler http.Handler, c *Config) (secure, insecure http.Handler)
@@ -243,6 +248,7 @@ func NewConfig() *Config {
 			GetOperationIDAndTags: apiserveropenapi.GetOperationIDAndTags,
 		},
 		LongRunningFunc: genericfilters.BasicLongRunningRequestCheck(longRunningRE, map[string]string{"watch": "true"}),
+		MutatingFunc:    genericfilters.BasicMutatingRequestCheck(),
 	}
 
 	// this keeps the defaults in sync
@@ -317,6 +323,7 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 	c.KubernetesServiceNodePort = options.KubernetesServiceNodePort
 	c.MasterCount = options.MasterCount
 	c.MaxRequestsInFlight = options.MaxRequestsInFlight
+	c.MaxMutatingRequestsInFlight = options.MaxMutatingRequestsInFlight
 	c.MinRequestTimeout = options.MinRequestTimeout
 	c.PublicAddress = options.AdvertiseAddress
 	c.ServiceClusterIPRange = &options.ServiceClusterIPRange
@@ -495,7 +502,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) (secure, insec
 		handler = apiserverfilters.WithRequestInfo(handler, NewRequestInfoResolver(c), c.RequestContextMapper)
 		handler = api.WithRequestContext(handler, c.RequestContextMapper)
 		handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.LongRunningFunc)
-		handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.LongRunningFunc)
+		handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.LongRunningFunc, c.MutatingFunc)
 		return handler
 	}
 	audit := func(handler http.Handler) http.Handler {

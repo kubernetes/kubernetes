@@ -36,25 +36,26 @@ import (
 // - subsequent "short" requests are rejected instantly with appropriate error,
 // - subsequent "long" requests are handled normally,
 // - we correctly recover after some "short" requests finish, i.e. we can process new ones.
-func TestMaxInFlight(t *testing.T) {
-	const AllowedInflightRequestsNo = 3
+func TestMaxInFlightRead(t *testing.T) {
+	const AllowedReadInflightRequestsNo = 3
 
 	// notAccountedPathsRegexp specifies paths requests to which we don't account into
 	// requests in flight.
 	notAccountedPathsRegexp := regexp.MustCompile(".*\\/watch")
 	longRunningRequestCheck := BasicLongRunningRequestCheck(notAccountedPathsRegexp, map[string]string{"watch": "true"})
+	mutatingRequestCheck := BasicMutatingRequestCheck()
 
 	// Calls is used to wait until all server calls are received. We are sending
-	// AllowedInflightRequestsNo of 'long' not-accounted requests and the same number of
+	// AllowedReadInflightRequestsNo of 'long' not-accounted requests and the same number of
 	// 'short' accounted ones.
 	calls := &sync.WaitGroup{}
-	calls.Add(AllowedInflightRequestsNo * 2)
+	calls.Add(AllowedReadInflightRequestsNo * 2)
 
 	// Responses is used to wait until all responses are
 	// received. This prevents some async requests getting EOF
 	// errors from prematurely closing the server
 	responses := sync.WaitGroup{}
-	responses.Add(AllowedInflightRequestsNo * 2)
+	responses.Add(AllowedReadInflightRequestsNo * 2)
 
 	// Block is used to keep requests in flight for as long as we need to. All requests will
 	// be unblocked at the same time.
@@ -73,32 +74,35 @@ func TestMaxInFlight(t *testing.T) {
 				}
 				block.Wait()
 			}),
-			AllowedInflightRequestsNo,
+			AllowedReadInflightRequestsNo,
+			1,
 			longRunningRequestCheck,
+			mutatingRequestCheck,
 		),
 	)
 	defer server.Close()
 
 	// These should hang, but not affect accounting.  use a query param match
-	for i := 0; i < AllowedInflightRequestsNo; i++ {
+	for i := 0; i < AllowedReadInflightRequestsNo; i++ {
 		// These should hang waiting on block...
 		go func() {
-			if err := expectHTTP(server.URL+"/foo/bar?watch=true", http.StatusOK); err != nil {
+			if err := expectHTTPGet(server.URL+"/foo/bar?watch=true", http.StatusOK); err != nil {
 				t.Error(err)
 			}
 			responses.Done()
 		}()
 	}
+
 	// Check that sever is not saturated by not-accounted calls
-	if err := expectHTTP(server.URL+"/dontwait", http.StatusOK); err != nil {
+	if err := expectHTTPGet(server.URL+"/dontwait", http.StatusOK); err != nil {
 		t.Error(err)
 	}
 
 	// These should hang and be accounted, i.e. saturate the server
-	for i := 0; i < AllowedInflightRequestsNo; i++ {
+	for i := 0; i < AllowedReadInflightRequestsNo; i++ {
 		// These should hang waiting on block...
 		go func() {
-			if err := expectHTTP(server.URL, http.StatusOK); err != nil {
+			if err := expectHTTPGet(server.URL, http.StatusOK); err != nil {
 				t.Error(err)
 			}
 			responses.Done()
@@ -111,12 +115,17 @@ func TestMaxInFlight(t *testing.T) {
 
 	// Do this multiple times to show that it rate limit rejected requests don't block.
 	for i := 0; i < 2; i++ {
-		if err := expectHTTP(server.URL, errors.StatusTooManyRequests); err != nil {
+		if err := expectHTTPGet(server.URL, errors.StatusTooManyRequests); err != nil {
 			t.Error(err)
 		}
 	}
 	// Validate that non-accounted URLs still work.  use a path regex match
-	if err := expectHTTP(server.URL+"/dontwait/watch", http.StatusOK); err != nil {
+	if err := expectHTTPGet(server.URL+"/dontwait/watch", http.StatusOK); err != nil {
+		t.Error(err)
+	}
+
+	// We should allow a single mutating request.
+	if err := expectHTTPPost(server.URL+"/dontwait", http.StatusOK); err != nil {
 		t.Error(err)
 	}
 
@@ -126,13 +135,100 @@ func TestMaxInFlight(t *testing.T) {
 	// Show that we recover from being blocked up.
 	// Too avoid flakyness we need to wait until at least one of the requests really finishes.
 	responses.Wait()
-	if err := expectHTTP(server.URL, http.StatusOK); err != nil {
+	if err := expectHTTPGet(server.URL, http.StatusOK); err != nil {
 		t.Error(err)
 	}
 }
 
-func expectHTTP(url string, code int) error {
+func TestMaxInFlightWrite(t *testing.T) {
+	const AllowedWriteInflightRequestsNo = 3
+
+	// notAccountedPathsRegexp specifies paths requests to which we don't account into
+	// requests in flight.
+	notAccountedPathsRegexp := regexp.MustCompile(".*\\/watch")
+	longRunningRequestCheck := BasicLongRunningRequestCheck(notAccountedPathsRegexp, map[string]string{"watch": "true"})
+	mutatingRequestCheck := BasicMutatingRequestCheck()
+
+	calls := &sync.WaitGroup{}
+	calls.Add(AllowedWriteInflightRequestsNo)
+
+	responses := sync.WaitGroup{}
+	responses.Add(AllowedWriteInflightRequestsNo)
+
+	// Block is used to keep requests in flight for as long as we need to. All requests will
+	// be unblocked at the same time.
+	block := sync.WaitGroup{}
+	block.Add(1)
+
+	server := httptest.NewServer(
+		WithMaxInFlightLimit(
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if strings.Contains(r.URL.Path, "dontwait") {
+					return
+				}
+				if calls != nil {
+					calls.Done()
+				}
+				block.Wait()
+			}),
+			1,
+			AllowedWriteInflightRequestsNo,
+			longRunningRequestCheck,
+			mutatingRequestCheck,
+		),
+	)
+	defer server.Close()
+
+	// These should hang and be accounted, i.e. saturate the server
+	for i := 0; i < AllowedWriteInflightRequestsNo; i++ {
+		// These should hang waiting on block...
+		go func() {
+			if err := expectHTTPPost(server.URL+"/foo/bar", http.StatusOK); err != nil {
+				t.Error(err)
+			}
+			responses.Done()
+		}()
+	}
+	// We wait for all calls to be received by the server
+	calls.Wait()
+	// Disable calls notifications in the server
+	calls = nil
+
+	// Do this multiple times to show that it rate limit rejected requests don't block.
+	for i := 0; i < 2; i++ {
+		if err := expectHTTPPost(server.URL+"/foo/bar/", errors.StatusTooManyRequests); err != nil {
+			t.Error(err)
+		}
+	}
+	// Validate that Read URLs still work.  use a path regex match
+	if err := expectHTTPGet(server.URL+"/dontwait", http.StatusOK); err != nil {
+		t.Error(err)
+	}
+
+	// Let all hanging requests finish
+	block.Done()
+
+	// Show that we recover from being blocked up.
+	// Too avoid flakyness we need to wait until at least one of the requests really finishes.
+	responses.Wait()
+	if err := expectHTTPPost(server.URL+"/foo/bar", http.StatusOK); err != nil {
+		t.Error(err)
+	}
+}
+
+func expectHTTPGet(url string, code int) error {
 	r, err := http.Get(url)
+	if err != nil {
+		return fmt.Errorf("unexpected error: %v", err)
+	}
+	if r.StatusCode != code {
+		return fmt.Errorf("unexpected response: %v", r.StatusCode)
+	}
+	return nil
+}
+
+func expectHTTPPost(url string, code int) error {
+	r, err := http.Post(url, "text/html", strings.NewReader("foo bar"))
 	if err != nil {
 		return fmt.Errorf("unexpected error: %v", err)
 	}
