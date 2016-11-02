@@ -389,8 +389,6 @@ func createAPIServer(clientset *client.Clientset, namespace, name, image, creden
 		"--etcd-servers=http://localhost:2379",
 		"--service-cluster-ip-range=10.0.0.0/16",
 		"--secure-port=443",
-		"--token-auth-file=/etc/federation/apiserver/known_tokens.csv",
-		"--basic-auth-file=/etc/federation/apiserver/basic_auth.csv",
 		"--client-ca-file=/etc/federation/apiserver/ca.crt",
 		"--tls-cert-file=/etc/federation/apiserver/server.crt",
 		"--tls-private-key-file=/etc/federation/apiserver/server.key",
