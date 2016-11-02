@@ -36,7 +36,13 @@ type SecurityGroupsClient struct {
 // NewSecurityGroupsClient creates an instance of the SecurityGroupsClient
 // client.
 func NewSecurityGroupsClient(subscriptionID string) SecurityGroupsClient {
-	return SecurityGroupsClient{New(subscriptionID)}
+	return NewSecurityGroupsClientWithBaseURI(DefaultBaseURI, subscriptionID)
+}
+
+// NewSecurityGroupsClientWithBaseURI creates an instance of the
+// SecurityGroupsClient client.
+func NewSecurityGroupsClientWithBaseURI(baseURI string, subscriptionID string) SecurityGroupsClient {
+	return SecurityGroupsClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
 // CreateOrUpdate the Put NetworkSecurityGroup operation creates/updates a

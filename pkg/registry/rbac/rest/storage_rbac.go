@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	rbacapiv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
 	rbacvalidation "k8s.io/kubernetes/pkg/apis/rbac/validation"
-	rbacclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/unversioned"
+	rbacclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/registry/rbac/clusterrole"
 	clusterroleetcd "k8s.io/kubernetes/pkg/registry/rbac/clusterrole/etcd"
@@ -49,10 +49,10 @@ type RESTStorageProvider struct {
 	AuthorizerRBACSuperUser string
 }
 
-var _ genericapiserver.RESTStorageProvider = &RESTStorageProvider{}
-var _ genericapiserver.PostStartHookProvider = &RESTStorageProvider{}
+var _ genericapiserver.RESTStorageProvider = RESTStorageProvider{}
+var _ genericapiserver.PostStartHookProvider = RESTStorageProvider{}
 
-func (p *RESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
+func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(rbac.GroupName)
 
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(rbacapiv1alpha1.SchemeGroupVersion) {
@@ -63,7 +63,7 @@ func (p *RESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapis
 	return apiGroupInfo, true
 }
 
-func (p *RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) map[string]rest.Storage {
+func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter genericapiserver.RESTOptionsGetter) map[string]rest.Storage {
 	version := rbacapiv1alpha1.SchemeGroupVersion
 
 	once := new(sync.Once)
@@ -100,7 +100,7 @@ func (p *RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapi
 	return storage
 }
 
-func (p *RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStartHookFunc, error) {
+func (p RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStartHookFunc, error) {
 	return "rbac/bootstrap-roles", PostStartHook, nil
 }
 
@@ -152,4 +152,8 @@ func PostStartHook(hookContext genericapiserver.PostStartHookContext) error {
 	}
 
 	return nil
+}
+
+func (p RESTStorageProvider) GroupName() string {
+	return rbac.GroupName
 }

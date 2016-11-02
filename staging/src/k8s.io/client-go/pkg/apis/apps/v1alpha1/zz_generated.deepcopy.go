@@ -36,42 +36,42 @@ func init() {
 // to allow building arbitrary schemes.
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PetSet, InType: reflect.TypeOf(&PetSet{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PetSetList, InType: reflect.TypeOf(&PetSetList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PetSetSpec, InType: reflect.TypeOf(&PetSetSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PetSetStatus, InType: reflect.TypeOf(&PetSetStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_StatefulSet, InType: reflect.TypeOf(&StatefulSet{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_StatefulSetList, InType: reflect.TypeOf(&StatefulSetList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_StatefulSetSpec, InType: reflect.TypeOf(&StatefulSetSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_StatefulSetStatus, InType: reflect.TypeOf(&StatefulSetStatus{})},
 	)
 }
 
-func DeepCopy_v1alpha1_PetSet(in interface{}, out interface{}, c *conversion.Cloner) error {
+func DeepCopy_v1alpha1_StatefulSet(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
-		in := in.(*PetSet)
-		out := out.(*PetSet)
+		in := in.(*StatefulSet)
+		out := out.(*StatefulSet)
 		out.TypeMeta = in.TypeMeta
 		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 			return err
 		}
-		if err := DeepCopy_v1alpha1_PetSetSpec(&in.Spec, &out.Spec, c); err != nil {
+		if err := DeepCopy_v1alpha1_StatefulSetSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
 		}
-		if err := DeepCopy_v1alpha1_PetSetStatus(&in.Status, &out.Status, c); err != nil {
+		if err := DeepCopy_v1alpha1_StatefulSetStatus(&in.Status, &out.Status, c); err != nil {
 			return err
 		}
 		return nil
 	}
 }
 
-func DeepCopy_v1alpha1_PetSetList(in interface{}, out interface{}, c *conversion.Cloner) error {
+func DeepCopy_v1alpha1_StatefulSetList(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
-		in := in.(*PetSetList)
-		out := out.(*PetSetList)
+		in := in.(*StatefulSetList)
+		out := out.(*StatefulSetList)
 		out.TypeMeta = in.TypeMeta
 		out.ListMeta = in.ListMeta
 		if in.Items != nil {
 			in, out := &in.Items, &out.Items
-			*out = make([]PetSet, len(*in))
+			*out = make([]StatefulSet, len(*in))
 			for i := range *in {
-				if err := DeepCopy_v1alpha1_PetSet(&(*in)[i], &(*out)[i], c); err != nil {
+				if err := DeepCopy_v1alpha1_StatefulSet(&(*in)[i], &(*out)[i], c); err != nil {
 					return err
 				}
 			}
@@ -82,10 +82,10 @@ func DeepCopy_v1alpha1_PetSetList(in interface{}, out interface{}, c *conversion
 	}
 }
 
-func DeepCopy_v1alpha1_PetSetSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
+func DeepCopy_v1alpha1_StatefulSetSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
-		in := in.(*PetSetSpec)
-		out := out.(*PetSetSpec)
+		in := in.(*StatefulSetSpec)
+		out := out.(*StatefulSetSpec)
 		if in.Replicas != nil {
 			in, out := &in.Replicas, &out.Replicas
 			*out = new(int32)
@@ -121,10 +121,10 @@ func DeepCopy_v1alpha1_PetSetSpec(in interface{}, out interface{}, c *conversion
 	}
 }
 
-func DeepCopy_v1alpha1_PetSetStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
+func DeepCopy_v1alpha1_StatefulSetStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
-		in := in.(*PetSetStatus)
-		out := out.(*PetSetStatus)
+		in := in.(*StatefulSetStatus)
+		out := out.(*StatefulSetStatus)
 		if in.ObservedGeneration != nil {
 			in, out := &in.ObservedGeneration, &out.ObservedGeneration
 			*out = new(int64)

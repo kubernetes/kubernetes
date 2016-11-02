@@ -21,6 +21,7 @@ import (
 	v1 "k8s.io/client-go/pkg/api/v1"
 	v1beta1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // DaemonSetsGetter has a method to return a DaemonSetInterface.
@@ -45,14 +46,14 @@ type DaemonSetInterface interface {
 
 // daemonSets implements DaemonSetInterface
 type daemonSets struct {
-	client *ExtensionsClient
+	client rest.Interface
 	ns     string
 }
 
 // newDaemonSets returns a DaemonSets
 func newDaemonSets(c *ExtensionsClient, namespace string) *daemonSets {
 	return &daemonSets{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

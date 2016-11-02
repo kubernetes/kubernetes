@@ -17,14 +17,15 @@ limitations under the License.
 package remote
 
 import (
-	"io"
+	"fmt"
+	"strings"
 	"time"
 
-	"fmt"
 	"github.com/golang/glog"
 	"google.golang.org/grpc"
 	internalApi "k8s.io/kubernetes/pkg/kubelet/api"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	utilexec "k8s.io/kubernetes/pkg/util/exec"
 )
 
 // RemoteRuntimeService is a gRPC implementation of internalApi.RuntimeService.
@@ -35,7 +36,7 @@ type RemoteRuntimeService struct {
 
 // NewRemoteRuntimeService creates a new internalApi.RuntimeService.
 func NewRemoteRuntimeService(addr string, connectionTimout time.Duration) (internalApi.RuntimeService, error) {
-	glog.V(3).Infof("Connecting to runtime service %s", addr)
+	glog.Infof("Connecting to runtime service %s", addr)
 	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithTimeout(connectionTimout), grpc.WithDialer(dial))
 	if err != nil {
 		glog.Errorf("Connect remote runtime %s failed: %v", addr, err)
@@ -247,12 +248,94 @@ func (r *RemoteRuntimeService) ContainerStatus(containerID string) (*runtimeApi.
 	return resp.Status, nil
 }
 
-// Exec executes a command in the container.
-// TODO: support terminal resizing for exec, refer https://github.com/kubernetes/kubernetes/issues/29579.
-func (r *RemoteRuntimeService) Exec(containerID string, cmd []string, tty bool, stdin io.Reader, stdout, stderr io.WriteCloser) error {
-	return fmt.Errorf("Not implemented")
+// ExecSync executes a command in the container, and returns the stdout output.
+// If command exits with a non-zero exit code, an error is returned.
+func (r *RemoteRuntimeService) ExecSync(containerID string, cmd []string, timeout time.Duration) (stdout []byte, stderr []byte, err error) {
+	ctx, cancel := getContextWithTimeout(r.timeout)
+	defer cancel()
+
+	timeoutSeconds := int64(timeout.Seconds())
+	req := &runtimeApi.ExecSyncRequest{
+		ContainerId: &containerID,
+		Cmd:         cmd,
+		Timeout:     &timeoutSeconds,
+	}
+	resp, err := r.runtimeClient.ExecSync(ctx, req)
+	if err != nil {
+		glog.Errorf("ExecSync %s '%s' from runtime service failed: %v", containerID, strings.Join(cmd, " "), err)
+		return nil, nil, err
+	}
+
+	err = nil
+	if resp.GetExitCode() != 0 {
+		err = utilexec.CodeExitError{
+			Err:  fmt.Errorf("command '%s' exited with %d: %s", strings.Join(cmd, " "), resp.GetExitCode(), resp.GetStderr()),
+			Code: int(resp.GetExitCode()),
+		}
+	}
+
+	return resp.GetStdout(), resp.GetStderr(), err
 }
 
+// Exec prepares a streaming endpoint to execute a command in the container, and returns the address.
+func (r *RemoteRuntimeService) Exec(req *runtimeApi.ExecRequest) (*runtimeApi.ExecResponse, error) {
+	ctx, cancel := getContextWithTimeout(r.timeout)
+	defer cancel()
+
+	resp, err := r.runtimeClient.Exec(ctx, req)
+	if err != nil {
+		glog.Errorf("Exec %s '%s' from runtime service failed: %v", req.GetContainerId(), strings.Join(req.GetCmd(), " "), err)
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+// Attach prepares a streaming endpoint to attach to a running container, and returns the address.
+func (r *RemoteRuntimeService) Attach(req *runtimeApi.AttachRequest) (*runtimeApi.AttachResponse, error) {
+	ctx, cancel := getContextWithTimeout(r.timeout)
+	defer cancel()
+
+	resp, err := r.runtimeClient.Attach(ctx, req)
+	if err != nil {
+		glog.Errorf("Attach %s from runtime service failed: %v", req.GetContainerId(), err)
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+// PortForward prepares a streaming endpoint to forward ports from a PodSandbox, and returns the address.
+func (r *RemoteRuntimeService) PortForward(req *runtimeApi.PortForwardRequest) (*runtimeApi.PortForwardResponse, error) {
+	ctx, cancel := getContextWithTimeout(r.timeout)
+	defer cancel()
+
+	resp, err := r.runtimeClient.PortForward(ctx, req)
+	if err != nil {
+		glog.Errorf("PortForward %s from runtime service failed: %v", req.GetPodSandboxId(), err)
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+// UpdateRuntimeConfig updates the config of a runtime service. The only
+// update payload currently supported is the pod CIDR assigned to a node,
+// and the runtime service just proxies it down to the network plugin.
 func (r *RemoteRuntimeService) UpdateRuntimeConfig(runtimeConfig *runtimeApi.RuntimeConfig) error {
+	ctx, cancel := getContextWithTimeout(r.timeout)
+	defer cancel()
+
+	// Response doesn't contain anything of interest. This translates to an
+	// Event notification to the network plugin, which can't fail, so we're
+	// really looking to surface destination unreachable.
+	_, err := r.runtimeClient.UpdateRuntimeConfig(ctx, &runtimeApi.UpdateRuntimeConfigRequest{
+		RuntimeConfig: runtimeConfig,
+	})
+
+	if err != nil {
+		return err
+	}
+
 	return nil
 }

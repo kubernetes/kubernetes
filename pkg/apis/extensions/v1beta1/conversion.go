@@ -153,6 +153,10 @@ func Convert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensions.
 	} else {
 		out.RollbackTo = nil
 	}
+	if in.ProgressDeadlineSeconds != nil {
+		out.ProgressDeadlineSeconds = new(int32)
+		*out.ProgressDeadlineSeconds = *in.ProgressDeadlineSeconds
+	}
 	return nil
 }
 
@@ -175,6 +179,10 @@ func Convert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *DeploymentS
 		out.RollbackTo.Revision = in.RollbackTo.Revision
 	} else {
 		out.RollbackTo = nil
+	}
+	if in.ProgressDeadlineSeconds != nil {
+		out.ProgressDeadlineSeconds = new(int32)
+		*out.ProgressDeadlineSeconds = *in.ProgressDeadlineSeconds
 	}
 	return nil
 }

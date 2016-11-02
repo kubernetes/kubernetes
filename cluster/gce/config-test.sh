@@ -44,7 +44,7 @@ NODE_OS_DISTRIBUTION=${KUBE_NODE_OS_DISTRIBUTION:-${KUBE_OS_DISTRIBUTION:-gci}}
 # containervm. If you are updating the containervm version, update this
 # variable. Also please update corresponding image for node e2e at:
 # https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/jenkins/image-config.yaml
-CVM_VERSION=container-v1-3-v20160604
+CVM_VERSION=container-vm-v20161025
 GCI_VERSION="gci-dev-55-8872-18-0"
 MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
@@ -95,7 +95,7 @@ ENABLE_L7_LOADBALANCING="${KUBE_ENABLE_L7_LOADBALANCING:-glbc}"
 ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
 
 # Set etcd version (e.g. 3.0.4-migration.1) if you need non-default version.
-TEST_ETCD_VERSION="${TEST_ETCD_VERSION:-}"
+ETCD_VERSION="${TEST_ETCD_VERSION:-}"
 
 # Default Log level for all components in test clusters and variables to override it in specific components.
 TEST_CLUSTER_LOG_LEVEL="${TEST_CLUSTER_LOG_LEVEL:---v=4}"
@@ -198,12 +198,7 @@ E2E_STORAGE_TEST_ENVIRONMENT=${KUBE_E2E_STORAGE_TEST_ENVIRONMENT:-false}
 PREPULL_E2E_IMAGES="${PREPULL_E2E_IMAGES:-true}"
 
 # Evict pods whenever compute resource availability on the nodes gets below a threshold.
-# TODO: Get rid of the conditionals once https://github.com/kubernetes/kubernetes/issues/33444 is resolved.
-if [[ "${NODE_OS_DISTRIBUTION}" == "debian" ]]; then
-    EVICTION_HARD="${EVICTION_HARD:-memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5%}"
-else
-    EVICTION_HARD="${EVICTION_HARD:-memory.available<100Mi,imagefs.available<10%,imagefs.inodesFree<5%}"
-fi
+EVICTION_HARD="${EVICTION_HARD:-memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5%}"
 
 # Optional: custom scheduling algorithm
 SCHEDULING_ALGORITHM_PROVIDER="${SCHEDULING_ALGORITHM_PROVIDER:-}"

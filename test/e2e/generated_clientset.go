@@ -22,6 +22,7 @@ import (
 
 	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -85,14 +86,14 @@ func testingPod(name, value string) v1.Pod {
 	}
 }
 
-func observePodCreation(w watch.Interface) {
+func observeCreation(w watch.Interface) {
 	select {
 	case event, _ := <-w.ResultChan():
 		if event.Type != watch.Added {
-			framework.Failf("Failed to observe pod creation: %v", event)
+			framework.Failf("Failed to observe the creation: %v", event)
 		}
-	case <-time.After(framework.PodStartTimeout):
-		framework.Failf("Timeout while waiting for pod creation")
+	case <-time.After(30 * time.Second):
+		framework.Failf("Timeout while waiting for observing the creation")
 	}
 }
 
@@ -161,7 +162,7 @@ var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 		Expect(len(pods.Items)).To(Equal(1))
 
 		By("verifying pod creation was observed")
-		observePodCreation(w)
+		observeCreation(w)
 
 		// We need to wait for the pod to be scheduled, otherwise the deletion
 		// will be carried out immediately rather than gracefully.
@@ -184,6 +185,130 @@ var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 			framework.Failf("Failed to list pods to verify deletion: %v", err)
 		}
 		Expect(len(pods.Items)).To(Equal(0))
+	})
+})
+
+func newTestingScheduledJob(name string, value string) *v2alpha1.ScheduledJob {
+	parallelism := int32(1)
+	completions := int32(1)
+	return &v2alpha1.ScheduledJob{
+		ObjectMeta: v1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"time": value,
+			},
+		},
+		Spec: v2alpha1.ScheduledJobSpec{
+			Schedule:          "*/1 * * * ?",
+			ConcurrencyPolicy: v2alpha1.AllowConcurrent,
+			JobTemplate: v2alpha1.JobTemplateSpec{
+				Spec: v2alpha1.JobSpec{
+					Parallelism: &parallelism,
+					Completions: &completions,
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							RestartPolicy: v1.RestartPolicyOnFailure,
+							Volumes: []v1.Volume{
+								{
+									Name: "data",
+									VolumeSource: v1.VolumeSource{
+										EmptyDir: &v1.EmptyDirVolumeSource{},
+									},
+								},
+							},
+							Containers: []v1.Container{
+								{
+									Name:  "c",
+									Image: "gcr.io/google_containers/busybox:1.24",
+									VolumeMounts: []v1.VolumeMount{
+										{
+											MountPath: "/data",
+											Name:      "data",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
+	f := framework.NewDefaultFramework("clientset")
+	It("should create v2alpha1 scheduleJobs, delete scheduleJobs, watch scheduleJobs", func() {
+		var enabled bool
+		groupList, err := f.ClientSet_1_5.Discovery().ServerGroups()
+		ExpectNoError(err)
+		for _, group := range groupList.Groups {
+			if group.Name == v2alpha1.GroupName {
+				for _, version := range group.Versions {
+					if version.Version == v2alpha1.SchemeGroupVersion.Version {
+						enabled = true
+						break
+					}
+				}
+			}
+		}
+		if !enabled {
+			framework.Logf("%s is not enabled, test skipped", v2alpha1.SchemeGroupVersion)
+			return
+		}
+		scheduleJobClient := f.ClientSet_1_5.BatchV2alpha1().ScheduledJobs(f.Namespace.Name)
+		By("constructing the scheduledJob")
+		name := "scheduledjob" + string(uuid.NewUUID())
+		value := strconv.Itoa(time.Now().Nanosecond())
+		scheduledJob := newTestingScheduledJob(name, value)
+		By("setting up watch")
+		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value})).String()
+		options := v1.ListOptions{LabelSelector: selector}
+		scheduleJobs, err := scheduleJobClient.List(options)
+		if err != nil {
+			framework.Failf("Failed to query for scheduleJobs: %v", err)
+		}
+		Expect(len(scheduleJobs.Items)).To(Equal(0))
+		options = v1.ListOptions{
+			LabelSelector:   selector,
+			ResourceVersion: scheduleJobs.ListMeta.ResourceVersion,
+		}
+		w, err := scheduleJobClient.Watch(options)
+		if err != nil {
+			framework.Failf("Failed to set up watch: %v", err)
+		}
+
+		By("creating the scheduledJob")
+		scheduledJob, err = scheduleJobClient.Create(scheduledJob)
+		if err != nil {
+			framework.Failf("Failed to create scheduledJob: %v", err)
+		}
+
+		By("verifying the scheduledJob is in kubernetes")
+		options = v1.ListOptions{
+			LabelSelector:   selector,
+			ResourceVersion: scheduledJob.ResourceVersion,
+		}
+		scheduleJobs, err = scheduleJobClient.List(options)
+		if err != nil {
+			framework.Failf("Failed to query for scheduleJobs: %v", err)
+		}
+		Expect(len(scheduleJobs.Items)).To(Equal(1))
+
+		By("verifying scheduledJob creation was observed")
+		observeCreation(w)
+
+		By("deleting the scheduledJob")
+		if err := scheduleJobClient.Delete(scheduledJob.Name, nil); err != nil {
+			framework.Failf("Failed to delete scheduledJob: %v", err)
+		}
+
+		options = v1.ListOptions{LabelSelector: selector}
+		scheduleJobs, err = scheduleJobClient.List(options)
+		if err != nil {
+			framework.Failf("Failed to list scheduleJobs to verify deletion: %v", err)
+		}
+		Expect(len(scheduleJobs.Items)).To(Equal(0))
 	})
 })
 

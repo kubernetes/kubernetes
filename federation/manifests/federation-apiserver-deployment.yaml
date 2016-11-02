@@ -32,6 +32,7 @@ spec:
         - --tls-private-key-file=/srv/kubernetes/server.key
         - --admission-control={{.FEDERATION_ADMISSION_CONTROL}}
         - --token-auth-file=/srv/kubernetes/known-tokens.csv
+        - --anonymous-auth=false
         ports:
         - containerPort: 443
           name: https

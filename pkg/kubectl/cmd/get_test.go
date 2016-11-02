@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/unversioned/fake"
+	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer"
@@ -193,9 +193,7 @@ func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 		}
 
 		f, tf, codec := cmdtesting.NewMixedFactory(regularClient)
-		negotiatedSerializer := serializer.NegotiatedSerializerWrapper(
-			runtime.SerializerInfo{Serializer: codec},
-			runtime.StreamSerializerInfo{})
+		negotiatedSerializer := serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})
 		tf.Printer = &testPrinter{}
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: negotiatedSerializer,

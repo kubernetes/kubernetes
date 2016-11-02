@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -62,7 +63,7 @@ func TestListSandboxes(t *testing.T) {
 	}
 
 	expected := []*runtimeApi.PodSandbox{}
-	state := runtimeApi.PodSandBoxState_READY
+	state := runtimeApi.PodSandboxState_SANDBOX_READY
 	var createdAt int64 = 0
 	for i := range configs {
 		id, err := ds.RunPodSandbox(configs[i])
@@ -97,14 +98,15 @@ func TestSandboxStatus(t *testing.T) {
 	fakeIP := "2.3.4.5"
 	fakeNS := fmt.Sprintf("/proc/%d/ns/net", os.Getpid())
 
-	state := runtimeApi.PodSandBoxState_READY
+	state := runtimeApi.PodSandboxState_SANDBOX_READY
 	ct := int64(0)
+	hostNetwork := false
 	expected := &runtimeApi.PodSandboxStatus{
 		State:       &state,
 		CreatedAt:   &ct,
 		Metadata:    config.Metadata,
 		Network:     &runtimeApi.PodSandboxNetworkStatus{Ip: &fakeIP},
-		Linux:       &runtimeApi.LinuxPodSandboxStatus{Namespaces: &runtimeApi.Namespace{Network: &fakeNS}},
+		Linux:       &runtimeApi.LinuxPodSandboxStatus{Namespaces: &runtimeApi.Namespace{Network: &fakeNS, Options: &runtimeApi.NamespaceOption{HostNetwork: &hostNetwork}}},
 		Labels:      labels,
 		Annotations: annotations,
 	}
@@ -126,7 +128,7 @@ func TestSandboxStatus(t *testing.T) {
 	assert.Equal(t, expected, status)
 
 	// Stop the sandbox.
-	*expected.State = runtimeApi.PodSandBoxState_NOTREADY
+	*expected.State = runtimeApi.PodSandboxState_SANDBOX_NOTREADY
 	err = ds.StopPodSandbox(id)
 	assert.NoError(t, err)
 	status, err = ds.PodSandboxStatus(id)
@@ -137,4 +139,58 @@ func TestSandboxStatus(t *testing.T) {
 	assert.NoError(t, err)
 	status, err = ds.PodSandboxStatus(id)
 	assert.Error(t, err, fmt.Sprintf("status of sandbox: %+v", status))
+}
+
+// TestNetworkPluginInvocation checks that the right SetUpPod and TearDownPod
+// calls are made when we run/stop a sandbox.
+func TestNetworkPluginInvocation(t *testing.T) {
+	ds, _, _ := newTestDockerService()
+	mockPlugin := newTestNetworkPlugin(t)
+	ds.networkPlugin = mockPlugin
+	defer mockPlugin.Finish()
+
+	name := "foo0"
+	ns := "bar0"
+	c := makeSandboxConfigWithLabelsAndAnnotations(
+		name, ns, "0", 0,
+		map[string]string{"label": name},
+		map[string]string{"annotation": ns},
+	)
+	cID := kubecontainer.ContainerID{Type: runtimeName, ID: fmt.Sprintf("/%v", makeSandboxName(c))}
+
+	setup := mockPlugin.EXPECT().SetUpPod(ns, name, cID)
+	// StopPodSandbox performs a lookup on status to figure out if the sandbox
+	// is running with hostnetworking, as all its given is the ID.
+	mockPlugin.EXPECT().GetPodNetworkStatus(ns, name, cID)
+	mockPlugin.EXPECT().TearDownPod(ns, name, cID).After(setup)
+
+	_, err := ds.RunPodSandbox(c)
+	assert.NoError(t, err)
+	err = ds.StopPodSandbox(cID.ID)
+	assert.NoError(t, err)
+}
+
+// TestHostNetworkPluginInvocation checks that *no* SetUp/TearDown calls happen
+// for host network sandboxes.
+func TestHostNetworkPluginInvocation(t *testing.T) {
+	ds, _, _ := newTestDockerService()
+	mockPlugin := newTestNetworkPlugin(t)
+	ds.networkPlugin = mockPlugin
+	defer mockPlugin.Finish()
+
+	name := "foo0"
+	ns := "bar0"
+	c := makeSandboxConfigWithLabelsAndAnnotations(
+		name, ns, "0", 0,
+		map[string]string{"label": name},
+		map[string]string{"annotation": ns},
+	)
+	hostNetwork := true
+	c.Linux = &runtimeApi.LinuxPodSandboxConfig{NamespaceOptions: &runtimeApi.NamespaceOption{HostNetwork: &hostNetwork}}
+	cID := kubecontainer.ContainerID{Type: runtimeName, ID: fmt.Sprintf("/%v", makeSandboxName(c))}
+
+	// No calls to network plugin are expected
+	_, err := ds.RunPodSandbox(c)
+	assert.NoError(t, err)
+	assert.NoError(t, ds.StopPodSandbox(cID.ID))
 }

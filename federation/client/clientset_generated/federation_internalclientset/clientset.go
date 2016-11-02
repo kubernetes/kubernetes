@@ -18,9 +18,9 @@ package federation_internalclientset
 
 import (
 	"github.com/golang/glog"
-	unversionedcore "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/core/unversioned"
-	unversionedextensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/extensions/unversioned"
-	unversionedfederation "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/unversioned"
+	internalversioncore "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/core/internalversion"
+	internalversionextensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/extensions/internalversion"
+	internalversionfederation "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/internalversion"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	discovery "k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
@@ -29,30 +29,24 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
-	Federation() unversionedfederation.FederationInterface
-	Core() unversionedcore.CoreInterface
-	Extensions() unversionedextensions.ExtensionsInterface
+	Core() internalversioncore.CoreInterface
+
+	Extensions() internalversionextensions.ExtensionsInterface
+
+	Federation() internalversionfederation.FederationInterface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	*unversionedfederation.FederationClient
-	*unversionedcore.CoreClient
-	*unversionedextensions.ExtensionsClient
-}
-
-// Federation retrieves the FederationClient
-func (c *Clientset) Federation() unversionedfederation.FederationInterface {
-	if c == nil {
-		return nil
-	}
-	return c.FederationClient
+	*internalversioncore.CoreClient
+	*internalversionextensions.ExtensionsClient
+	*internalversionfederation.FederationClient
 }
 
 // Core retrieves the CoreClient
-func (c *Clientset) Core() unversionedcore.CoreInterface {
+func (c *Clientset) Core() internalversioncore.CoreInterface {
 	if c == nil {
 		return nil
 	}
@@ -60,11 +54,19 @@ func (c *Clientset) Core() unversionedcore.CoreInterface {
 }
 
 // Extensions retrieves the ExtensionsClient
-func (c *Clientset) Extensions() unversionedextensions.ExtensionsInterface {
+func (c *Clientset) Extensions() internalversionextensions.ExtensionsInterface {
 	if c == nil {
 		return nil
 	}
 	return c.ExtensionsClient
+}
+
+// Federation retrieves the FederationClient
+func (c *Clientset) Federation() internalversionfederation.FederationInterface {
+	if c == nil {
+		return nil
+	}
+	return c.FederationClient
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -80,15 +82,15 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	}
 	var clientset Clientset
 	var err error
-	clientset.FederationClient, err = unversionedfederation.NewForConfig(&configShallowCopy)
+	clientset.CoreClient, err = internalversioncore.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.CoreClient, err = unversionedcore.NewForConfig(&configShallowCopy)
+	clientset.ExtensionsClient, err = internalversionextensions.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.ExtensionsClient, err = unversionedextensions.NewForConfig(&configShallowCopy)
+	clientset.FederationClient, err = internalversionfederation.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -105,9 +107,9 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *restclient.Config) *Clientset {
 	var clientset Clientset
-	clientset.FederationClient = unversionedfederation.NewForConfigOrDie(c)
-	clientset.CoreClient = unversionedcore.NewForConfigOrDie(c)
-	clientset.ExtensionsClient = unversionedextensions.NewForConfigOrDie(c)
+	clientset.CoreClient = internalversioncore.NewForConfigOrDie(c)
+	clientset.ExtensionsClient = internalversionextensions.NewForConfigOrDie(c)
+	clientset.FederationClient = internalversionfederation.NewForConfigOrDie(c)
 
 	clientset.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &clientset
@@ -116,9 +118,9 @@ func NewForConfigOrDie(c *restclient.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c restclient.Interface) *Clientset {
 	var clientset Clientset
-	clientset.FederationClient = unversionedfederation.New(c)
-	clientset.CoreClient = unversionedcore.New(c)
-	clientset.ExtensionsClient = unversionedextensions.New(c)
+	clientset.CoreClient = internalversioncore.New(c)
+	clientset.ExtensionsClient = internalversionextensions.New(c)
+	clientset.FederationClient = internalversionfederation.New(c)
 
 	clientset.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &clientset

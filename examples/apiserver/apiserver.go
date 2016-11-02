@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"net"
 
-	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup.k8s.io/v1"
+	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup/v1"
 	testgroupetcd "k8s.io/kubernetes/examples/apiserver/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 
 	// Install the testgroup API
-	_ "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup.k8s.io/install"
+	_ "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup/install"
 )
 
 const (
@@ -60,7 +60,7 @@ func NewServerRunOptions() *genericoptions.ServerRunOptions {
 	return serverOptions
 }
 
-func Run(serverOptions *genericoptions.ServerRunOptions) error {
+func Run(serverOptions *genericoptions.ServerRunOptions, stopCh <-chan struct{}) error {
 	// Set ServiceClusterIPRange
 	_, serviceClusterIPRange, _ := net.ParseCIDR("10.0.0.0/24")
 	serverOptions.ServiceClusterIPRange = *serviceClusterIPRange
@@ -105,6 +105,6 @@ func Run(serverOptions *genericoptions.ServerRunOptions) error {
 	if err := s.InstallAPIGroup(&apiGroupInfo); err != nil {
 		return fmt.Errorf("Error in installing API: %v", err)
 	}
-	s.PrepareRun().Run()
+	s.PrepareRun().Run(stopCh)
 	return nil
 }

@@ -17,7 +17,7 @@ limitations under the License.
 package api
 
 import (
-	"io"
+	"time"
 
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
@@ -43,8 +43,13 @@ type ContainerManager interface {
 	ListContainers(filter *runtimeApi.ContainerFilter) ([]*runtimeApi.Container, error)
 	// ContainerStatus returns the status of the container.
 	ContainerStatus(containerID string) (*runtimeApi.ContainerStatus, error)
-	// Exec executes a command in the container.
-	Exec(containerID string, cmd []string, tty bool, stdin io.Reader, stdout, stderr io.WriteCloser) error
+	// ExecSync executes a command in the container, and returns the stdout output.
+	// If command exits with a non-zero exit code, an error is returned.
+	ExecSync(containerID string, cmd []string, timeout time.Duration) (stdout []byte, stderr []byte, err error)
+	// Exec prepares a streaming endpoint to execute a command in the container, and returns the address.
+	Exec(*runtimeApi.ExecRequest) (*runtimeApi.ExecResponse, error)
+	// Attach prepares a streaming endpoint to attach to a running container, and returns the address.
+	Attach(req *runtimeApi.AttachRequest) (*runtimeApi.AttachResponse, error)
 }
 
 // PodSandboxManager contains methods for operating on PodSandboxes. The methods
@@ -63,6 +68,8 @@ type PodSandboxManager interface {
 	PodSandboxStatus(podSandboxID string) (*runtimeApi.PodSandboxStatus, error)
 	// ListPodSandbox returns a list of Sandbox.
 	ListPodSandbox(filter *runtimeApi.PodSandboxFilter) ([]*runtimeApi.PodSandbox, error)
+	// PortForward prepares a streaming endpoint to forward ports from a PodSandbox, and returns the address.
+	PortForward(*runtimeApi.PortForwardRequest) (*runtimeApi.PortForwardResponse, error)
 }
 
 // RuntimeService interface should be implemented by a container runtime.

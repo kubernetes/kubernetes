@@ -19,10 +19,10 @@
 EVENT_STORE_IP=$1
 EVENT_STORE_URL="http://${EVENT_STORE_IP}:4002"
 NUM_NODES=$2
-TEST_ETCD_VERSION=$3
-if [[ -z "${TEST_ETCD_VERSION}" ]]; then
+KUBEMARK_ETCD_VERSION=$3
+if [[ -z "${KUBEMARK_ETCD_VERSION}" ]]; then
   # Default etcd version.
-  TEST_ETCD_VERSION="2.2.1"
+  KUBEMARK_ETCD_VERSION="2.2.1"
 fi
 
 function retry() {
@@ -76,25 +76,33 @@ function mount-master-pd() {
 
 mount-master-pd
 
+ETCD_QUOTA_BYTES=""
+if [ "${KUBEMARK_ETCD_VERSION:0:2}" == "3." ]; then
+  # TODO: Set larger quota to see if that helps with
+  # 'mvcc: database space exceeded' errors. If so, pipe
+  # though our setup scripts.
+  ETCD_QUOTA_BYTES="--quota-backend-bytes=4294967296 "
+fi
+
 if [ "${EVENT_STORE_IP}" == "127.0.0.1" ]; then
 	# Retry starting etcd to avoid pulling image errors.
 	retry sudo docker run --net=host \
 		-v /var/etcd/data-events:/var/etcd/data -v /var/log:/var/log -d \
-		gcr.io/google_containers/etcd:${TEST_ETCD_VERSION} /bin/sh -c "/usr/local/bin/etcd \
+		gcr.io/google_containers/etcd:${KUBEMARK_ETCD_VERSION} /bin/sh -c "/usr/local/bin/etcd \
 		--listen-peer-urls http://127.0.0.1:2381 \
 		--advertise-client-urls=http://127.0.0.1:4002 \
 		--listen-client-urls=http://0.0.0.0:4002 \
-		--data-dir=/var/etcd/data 1>> /var/log/etcd-events.log 2>&1"
+		--data-dir=/var/etcd/data ${ETCD_QUOTA_BYTES} 1>> /var/log/etcd-events.log 2>&1"
 fi
 
 # Retry starting etcd to avoid pulling image errors.
 retry sudo docker run --net=host \
 	-v /var/etcd/data:/var/etcd/data -v /var/log:/var/log -d \
-	gcr.io/google_containers/etcd:${TEST_ETCD_VERSION} /bin/sh -c "/usr/local/bin/etcd \
+	gcr.io/google_containers/etcd:${KUBEMARK_ETCD_VERSION} /bin/sh -c "/usr/local/bin/etcd \
 	--listen-peer-urls http://127.0.0.1:2380 \
 	--advertise-client-urls=http://127.0.0.1:2379 \
 	--listen-client-urls=http://0.0.0.0:2379 \
-	--data-dir=/var/etcd/data 1>> /var/log/etcd.log 2>&1"
+	--data-dir=/var/etcd/data ${ETCD_QUOTA_BYTES} 1>> /var/log/etcd.log 2>&1"
 
 # Increase the allowed number of open file descriptors
 ulimit -n 65536

@@ -18,10 +18,8 @@ package v2alpha1
 
 import (
 	"fmt"
-	"reflect"
 
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/unversioned"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/apis/batch"
 	"k8s.io/client-go/pkg/conversion"
@@ -57,21 +55,10 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 }
 
 func Convert_batch_JobSpec_To_v2alpha1_JobSpec(in *batch.JobSpec, out *JobSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*batch.JobSpec))(in)
-	}
 	out.Parallelism = in.Parallelism
 	out.Completions = in.Completions
 	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
-	// unable to generate simple pointer conversion for unversioned.LabelSelector -> v1.LabelSelector
-	if in.Selector != nil {
-		out.Selector = new(LabelSelector)
-		if err := Convert_unversioned_LabelSelector_To_v2alpha1_LabelSelector(in.Selector, out.Selector, s); err != nil {
-			return err
-		}
-	} else {
-		out.Selector = nil
-	}
+	out.Selector = in.Selector
 	if in.ManualSelector != nil {
 		out.ManualSelector = new(bool)
 		*out.ManualSelector = *in.ManualSelector
@@ -86,21 +73,10 @@ func Convert_batch_JobSpec_To_v2alpha1_JobSpec(in *batch.JobSpec, out *JobSpec, 
 }
 
 func Convert_v2alpha1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpec, s conversion.Scope) error {
-	if defaulting, found := s.DefaultingInterface(reflect.TypeOf(*in)); found {
-		defaulting.(func(*JobSpec))(in)
-	}
 	out.Parallelism = in.Parallelism
 	out.Completions = in.Completions
 	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
-	// unable to generate simple pointer conversion for unversioned.LabelSelector -> v1.LabelSelector
-	if in.Selector != nil {
-		out.Selector = new(unversioned.LabelSelector)
-		if err := Convert_v2alpha1_LabelSelector_To_unversioned_LabelSelector(in.Selector, out.Selector, s); err != nil {
-			return err
-		}
-	} else {
-		out.Selector = nil
-	}
+	out.Selector = in.Selector
 	if in.ManualSelector != nil {
 		out.ManualSelector = new(bool)
 		*out.ManualSelector = *in.ManualSelector

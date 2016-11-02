@@ -14,5 +14,5 @@ go_library(
     name = "go_default_library",
     srcs = ["args.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/api/unversioned:go_default_library"],
+    deps = ["//cmd/libs/go2idl/client-gen/types:go_default_library"],
 )

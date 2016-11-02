@@ -24,13 +24,13 @@ import (
 )
 
 type PolicyInterface interface {
-	GetRESTClient() *rest.RESTClient
+	RESTClient() rest.Interface
 	PodDisruptionBudgetsGetter
 }
 
 // PolicyClient is used to interact with features provided by the Policy group.
 type PolicyClient struct {
-	*rest.RESTClient
+	restClient rest.Interface
 }
 
 func (c *PolicyClient) PodDisruptionBudgets(namespace string) PodDisruptionBudgetInterface {
@@ -61,7 +61,7 @@ func NewForConfigOrDie(c *rest.Config) *PolicyClient {
 }
 
 // New creates a new PolicyClient for the given RESTClient.
-func New(c *rest.RESTClient) *PolicyClient {
+func New(c rest.Interface) *PolicyClient {
 	return &PolicyClient{c}
 }
 
@@ -86,11 +86,11 @@ func setConfigDefaults(config *rest.Config) error {
 	return nil
 }
 
-// GetRESTClient returns a RESTClient that is used to communicate
+// RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *PolicyClient) GetRESTClient() *rest.RESTClient {
+func (c *PolicyClient) RESTClient() rest.Interface {
 	if c == nil {
 		return nil
 	}
-	return c.RESTClient
+	return c.restClient
 }

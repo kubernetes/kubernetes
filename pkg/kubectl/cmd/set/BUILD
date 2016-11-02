@@ -46,7 +46,7 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
         "//pkg/client/restclient:go_default_library",
-        "//pkg/client/unversioned/fake:go_default_library",
+        "//pkg/client/restclient/fake:go_default_library",
         "//pkg/kubectl/cmd/testing:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/resource:go_default_library",

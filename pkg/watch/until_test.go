@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -161,56 +160,5 @@ func TestUntilErrorCondition(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), expected) {
 		t.Fatalf("expected %q in error string, got %q", expected, err.Error())
-	}
-}
-
-type lw struct {
-	list  runtime.Object
-	watch Interface
-}
-
-func (w lw) List(options api.ListOptions) (runtime.Object, error) {
-	return w.list, nil
-}
-
-func (w lw) Watch(options api.ListOptions) (Interface, error) {
-	return w.watch, nil
-}
-
-func TestListWatchUntil(t *testing.T) {
-	fw := NewFake()
-	go func() {
-		var obj *api.Pod
-		fw.Modify(obj)
-	}()
-	listwatch := lw{
-		list:  &api.PodList{Items: []api.Pod{{}}},
-		watch: fw,
-	}
-
-	conditions := []ConditionFunc{
-		func(event Event) (bool, error) {
-			t.Logf("got %#v", event)
-			return event.Type == Added, nil
-		},
-		func(event Event) (bool, error) {
-			t.Logf("got %#v", event)
-			return event.Type == Modified, nil
-		},
-	}
-
-	timeout := 10 * time.Second
-	lastEvent, err := ListWatchUntil(timeout, listwatch, conditions...)
-	if err != nil {
-		t.Fatalf("expected nil error, got %#v", err)
-	}
-	if lastEvent == nil {
-		t.Fatal("expected an event")
-	}
-	if lastEvent.Type != Modified {
-		t.Fatalf("expected MODIFIED event type, got %v", lastEvent.Type)
-	}
-	if got, isPod := lastEvent.Object.(*api.Pod); !isPod {
-		t.Fatalf("expected a pod event, got %#v", got)
 	}
 }

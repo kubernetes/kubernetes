@@ -19,11 +19,8 @@ package dynamic
 import (
 	"sync"
 
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/client-go/pkg/api/meta"
 	"k8s.io/client-go/pkg/api/unversioned"
-	"k8s.io/client-go/pkg/runtime"
-	"k8s.io/client-go/pkg/runtime/serializer"
 	"k8s.io/client-go/rest"
 )
 
@@ -64,6 +61,7 @@ type clientPoolImpl struct {
 // resources or groups.
 func NewClientPool(config *rest.Config, mapper meta.RESTMapper, apiPathResolverFunc APIPathResolverFunc) ClientPool {
 	confCopy := *config
+
 	return &clientPoolImpl{
 		config:              &confCopy,
 		clients:             map[unversioned.GroupVersion]*Client{},
@@ -107,11 +105,6 @@ func (c *clientPoolImpl) ClientForGroupVersionKind(kind unversioned.GroupVersion
 
 	// we need to make a client
 	conf.GroupVersion = &gv
-
-	if conf.NegotiatedSerializer == nil {
-		streamingInfo, _ := api.Codecs.StreamingSerializerForMediaType("application/json;stream=watch", nil)
-		conf.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: dynamicCodec{}}, streamingInfo)
-	}
 
 	dynamicClient, err := NewClient(conf)
 	if err != nil {

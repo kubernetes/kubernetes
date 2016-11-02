@@ -22,17 +22,17 @@ import (
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
-type FakeAutoscaling struct {
+type FakeAutoscalingV1 struct {
 	*core.Fake
 }
 
-func (c *FakeAutoscaling) HorizontalPodAutoscalers(namespace string) v1.HorizontalPodAutoscalerInterface {
+func (c *FakeAutoscalingV1) HorizontalPodAutoscalers(namespace string) v1.HorizontalPodAutoscalerInterface {
 	return &FakeHorizontalPodAutoscalers{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeAutoscaling) RESTClient() restclient.Interface {
+func (c *FakeAutoscalingV1) RESTClient() restclient.Interface {
 	var ret *restclient.RESTClient
 	return ret
 }

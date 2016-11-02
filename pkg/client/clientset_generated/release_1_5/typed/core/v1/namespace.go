@@ -49,7 +49,7 @@ type namespaces struct {
 }
 
 // newNamespaces returns a Namespaces
-func newNamespaces(c *CoreClient) *namespaces {
+func newNamespaces(c *CoreV1Client) *namespaces {
 	return &namespaces{
 		client: c.RESTClient(),
 	}

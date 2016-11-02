@@ -22,17 +22,17 @@ import (
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
-type FakeFederation struct {
+type FakeFederationV1beta1 struct {
 	*core.Fake
 }
 
-func (c *FakeFederation) Clusters() v1beta1.ClusterInterface {
+func (c *FakeFederationV1beta1) Clusters() v1beta1.ClusterInterface {
 	return &FakeClusters{c}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeFederation) RESTClient() restclient.Interface {
+func (c *FakeFederationV1beta1) RESTClient() restclient.Interface {
 	var ret *restclient.RESTClient
 	return ret
 }

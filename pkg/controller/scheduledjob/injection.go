@@ -17,6 +17,7 @@ limitations under the License.
 package scheduledjob
 
 import (
+	"fmt"
 	"sync"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -127,6 +128,7 @@ func (f *fakeJobControl) CreateJob(namespace string, job *batch.Job) (*batch.Job
 	if f.Err != nil {
 		return nil, f.Err
 	}
+	job.SelfLink = fmt.Sprintf("/api/batch/v1/namespaces/%s/jobs/%s", namespace, job.Name)
 	f.Jobs = append(f.Jobs, *job)
 	job.UID = "test-uid"
 	return job, nil

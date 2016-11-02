@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/password/passwordfile"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/anonymous"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/basicauth"
+	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/headerrequest"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/x509"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/anytoken"
@@ -38,6 +39,15 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/tokenfile"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/webhook"
 )
+
+type RequestHeaderConfig struct {
+	// UsernameHeaders are the headers to check (in order, case-insensitively) for an identity. The first header with a value wins.
+	UsernameHeaders []string
+	// ClientCA points to CA bundle file which is used verify the identity of the front proxy
+	ClientCA string
+	// AllowedClientNames is a list of common names that may be presented by the authenticating front proxy.  Empty means: accept any.
+	AllowedClientNames []string
+}
 
 type AuthenticatorConfig struct {
 	Anonymous                   bool
@@ -56,6 +66,8 @@ type AuthenticatorConfig struct {
 	KeystoneURL                 string
 	WebhookTokenAuthnConfigFile string
 	WebhookTokenAuthnCacheTTL   time.Duration
+
+	RequestHeaderConfig *RequestHeaderConfig
 }
 
 // New returns an authenticator.Request or an error that supports the standard
@@ -66,7 +78,20 @@ func New(config AuthenticatorConfig) (authenticator.Request, *spec.SecurityDefin
 	hasBasicAuth := false
 	hasTokenAuth := false
 
-	// BasicAuth methods, local first, then remote
+	// front-proxy, BasicAuth methods, local first, then remote
+	// Add the front proxy authenticator if requested
+	if config.RequestHeaderConfig != nil {
+		requestHeaderAuthenticator, err := headerrequest.NewSecure(
+			config.RequestHeaderConfig.ClientCA,
+			config.RequestHeaderConfig.AllowedClientNames,
+			config.RequestHeaderConfig.UsernameHeaders,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		authenticators = append(authenticators, requestHeaderAuthenticator)
+	}
+
 	if len(config.BasicAuthFile) > 0 {
 		basicAuth, err := newAuthenticatorFromBasicAuthFile(config.BasicAuthFile)
 		if err != nil {

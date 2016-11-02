@@ -37,11 +37,11 @@ type REST struct {
 func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 	prefix := "/" + opts.ResourcePrefix
 
-	newListFunc := func() runtime.Object { return &appsapi.PetSetList{} }
+	newListFunc := func() runtime.Object { return &appsapi.StatefulSetList{} }
 	storageInterface, dFunc := opts.Decorator(
 		opts.StorageConfig,
-		cachesize.GetWatchCacheSizeByResource(cachesize.PetSet),
-		&appsapi.PetSet{},
+		cachesize.GetWatchCacheSizeByResource(cachesize.StatefulSet),
+		&appsapi.StatefulSet{},
 		prefix,
 		petset.Strategy,
 		newListFunc,
@@ -49,27 +49,27 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 	)
 
 	store := &registry.Store{
-		NewFunc: func() runtime.Object { return &appsapi.PetSet{} },
+		NewFunc: func() runtime.Object { return &appsapi.StatefulSet{} },
 
 		// NewListFunc returns an object capable of storing results of an etcd list.
 		NewListFunc: newListFunc,
-		// Produces a petSet that etcd understands, to the root of the resource
+		// Produces a statefulSet that etcd understands, to the root of the resource
 		// by combining the namespace in the context with the given prefix
 		KeyRootFunc: func(ctx api.Context) string {
 			return registry.NamespaceKeyRootFunc(ctx, prefix)
 		},
-		// Produces a petSet that etcd understands, to the resource by combining
+		// Produces a statefulSet that etcd understands, to the resource by combining
 		// the namespace in the context with the given prefix
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
 			return registry.NamespaceKeyFunc(ctx, prefix, name)
 		},
 		// Retrieve the name field of a replication controller
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*appsapi.PetSet).Name, nil
+			return obj.(*appsapi.StatefulSet).Name, nil
 		},
 		// Used to match objects based on labels/fields for list and watch
-		PredicateFunc:           petset.MatchPetSet,
-		QualifiedResource:       appsapi.Resource("petsets"),
+		PredicateFunc:           petset.MatchStatefulSet,
+		QualifiedResource:       appsapi.Resource("statefulsets"),
 		EnableGarbageCollection: opts.EnableGarbageCollection,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
@@ -88,13 +88,13 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 	return &REST{store}, &StatusREST{store: &statusStore}
 }
 
-// StatusREST implements the REST endpoint for changing the status of an petSet
+// StatusREST implements the REST endpoint for changing the status of an statefulSet
 type StatusREST struct {
 	store *registry.Store
 }
 
 func (r *StatusREST) New() runtime.Object {
-	return &appsapi.PetSet{}
+	return &appsapi.StatefulSet{}
 }
 
 // Get retrieves the object from the storage. It is required to support Patch.

@@ -27,7 +27,7 @@ import (
 
 // FakeResourceQuotas implements ResourceQuotaInterface
 type FakeResourceQuotas struct {
-	Fake *FakeCore
+	Fake *FakeCoreV1
 	ns   string
 }
 

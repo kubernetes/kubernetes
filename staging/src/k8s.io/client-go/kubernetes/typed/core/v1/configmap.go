@@ -20,6 +20,7 @@ import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // ConfigMapsGetter has a method to return a ConfigMapInterface.
@@ -43,14 +44,14 @@ type ConfigMapInterface interface {
 
 // configMaps implements ConfigMapInterface
 type configMaps struct {
-	client *CoreClient
+	client rest.Interface
 	ns     string
 }
 
 // newConfigMaps returns a ConfigMaps
 func newConfigMaps(c *CoreClient, namespace string) *configMaps {
 	return &configMaps{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

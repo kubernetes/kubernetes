@@ -29,42 +29,75 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
-	Federation() v1beta1federation.FederationInterface
-	Core() v1core.CoreInterface
-	Extensions() v1beta1extensions.ExtensionsInterface
+	CoreV1() v1core.CoreV1Interface
+	// Deprecated: please explicitly pick a version if possible.
+	Core() v1core.CoreV1Interface
+	ExtensionsV1beta1() v1beta1extensions.ExtensionsV1beta1Interface
+	// Deprecated: please explicitly pick a version if possible.
+	Extensions() v1beta1extensions.ExtensionsV1beta1Interface
+	FederationV1beta1() v1beta1federation.FederationV1beta1Interface
+	// Deprecated: please explicitly pick a version if possible.
+	Federation() v1beta1federation.FederationV1beta1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	*v1beta1federation.FederationClient
-	*v1core.CoreClient
-	*v1beta1extensions.ExtensionsClient
+	*v1core.CoreV1Client
+	*v1beta1extensions.ExtensionsV1beta1Client
+	*v1beta1federation.FederationV1beta1Client
 }
 
-// Federation retrieves the FederationClient
-func (c *Clientset) Federation() v1beta1federation.FederationInterface {
+// CoreV1 retrieves the CoreV1Client
+func (c *Clientset) CoreV1() v1core.CoreV1Interface {
 	if c == nil {
 		return nil
 	}
-	return c.FederationClient
+	return c.CoreV1Client
 }
 
-// Core retrieves the CoreClient
-func (c *Clientset) Core() v1core.CoreInterface {
+// Deprecated: Core retrieves the default version of CoreClient.
+// Please explicitly pick a version.
+func (c *Clientset) Core() v1core.CoreV1Interface {
 	if c == nil {
 		return nil
 	}
-	return c.CoreClient
+	return c.CoreV1Client
 }
 
-// Extensions retrieves the ExtensionsClient
-func (c *Clientset) Extensions() v1beta1extensions.ExtensionsInterface {
+// ExtensionsV1beta1 retrieves the ExtensionsV1beta1Client
+func (c *Clientset) ExtensionsV1beta1() v1beta1extensions.ExtensionsV1beta1Interface {
 	if c == nil {
 		return nil
 	}
-	return c.ExtensionsClient
+	return c.ExtensionsV1beta1Client
+}
+
+// Deprecated: Extensions retrieves the default version of ExtensionsClient.
+// Please explicitly pick a version.
+func (c *Clientset) Extensions() v1beta1extensions.ExtensionsV1beta1Interface {
+	if c == nil {
+		return nil
+	}
+	return c.ExtensionsV1beta1Client
+}
+
+// FederationV1beta1 retrieves the FederationV1beta1Client
+func (c *Clientset) FederationV1beta1() v1beta1federation.FederationV1beta1Interface {
+	if c == nil {
+		return nil
+	}
+	return c.FederationV1beta1Client
+}
+
+// Deprecated: Federation retrieves the default version of FederationClient.
+// Please explicitly pick a version.
+func (c *Clientset) Federation() v1beta1federation.FederationV1beta1Interface {
+	if c == nil {
+		return nil
+	}
+	return c.FederationV1beta1Client
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -80,15 +113,15 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	}
 	var clientset Clientset
 	var err error
-	clientset.FederationClient, err = v1beta1federation.NewForConfig(&configShallowCopy)
+	clientset.CoreV1Client, err = v1core.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.CoreClient, err = v1core.NewForConfig(&configShallowCopy)
+	clientset.ExtensionsV1beta1Client, err = v1beta1extensions.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	clientset.ExtensionsClient, err = v1beta1extensions.NewForConfig(&configShallowCopy)
+	clientset.FederationV1beta1Client, err = v1beta1federation.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -105,9 +138,9 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *restclient.Config) *Clientset {
 	var clientset Clientset
-	clientset.FederationClient = v1beta1federation.NewForConfigOrDie(c)
-	clientset.CoreClient = v1core.NewForConfigOrDie(c)
-	clientset.ExtensionsClient = v1beta1extensions.NewForConfigOrDie(c)
+	clientset.CoreV1Client = v1core.NewForConfigOrDie(c)
+	clientset.ExtensionsV1beta1Client = v1beta1extensions.NewForConfigOrDie(c)
+	clientset.FederationV1beta1Client = v1beta1federation.NewForConfigOrDie(c)
 
 	clientset.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &clientset
@@ -116,9 +149,9 @@ func NewForConfigOrDie(c *restclient.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c restclient.Interface) *Clientset {
 	var clientset Clientset
-	clientset.FederationClient = v1beta1federation.New(c)
-	clientset.CoreClient = v1core.New(c)
-	clientset.ExtensionsClient = v1beta1extensions.New(c)
+	clientset.CoreV1Client = v1core.New(c)
+	clientset.ExtensionsV1beta1Client = v1beta1extensions.New(c)
+	clientset.FederationV1beta1Client = v1beta1federation.New(c)
 
 	clientset.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &clientset

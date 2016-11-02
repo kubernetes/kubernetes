@@ -22,12 +22,13 @@ import (
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
+	RegisterDefaults(scheme)
 	return scheme.AddDefaultingFuncs(
-		SetDefaults_PetSet,
+		SetDefaults_StatefulSet,
 	)
 }
 
-func SetDefaults_PetSet(obj *PetSet) {
+func SetDefaults_StatefulSet(obj *StatefulSet) {
 	labels := obj.Spec.Template.Labels
 	if labels != nil {
 		if obj.Spec.Selector == nil {

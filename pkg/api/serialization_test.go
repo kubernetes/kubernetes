@@ -380,12 +380,15 @@ func TestObjectWatchFraming(t *testing.T) {
 	secret.Data["long"] = bytes.Repeat([]byte{0x01, 0x02, 0x03, 0x00}, 1000)
 	converted, _ := api.Scheme.ConvertToVersion(secret, v1.SchemeGroupVersion)
 	v1secret := converted.(*v1.Secret)
-	for _, streamingMediaType := range api.Codecs.SupportedStreamingMediaTypes() {
-		s, _ := api.Codecs.StreamingSerializerForMediaType(streamingMediaType, nil)
+	for _, info := range api.Codecs.SupportedMediaTypes() {
+		if info.StreamSerializer == nil {
+			continue
+		}
+		s := info.StreamSerializer
 		framer := s.Framer
-		embedded := s.Embedded.Serializer
+		embedded := info.Serializer
 		if embedded == nil {
-			t.Errorf("no embedded serializer for %s", streamingMediaType)
+			t.Errorf("no embedded serializer for %s", info.MediaType)
 			continue
 		}
 		innerDecode := api.Codecs.DecoderToVersion(embedded, api.SchemeGroupVersion)
@@ -442,7 +445,7 @@ func TestObjectWatchFraming(t *testing.T) {
 		}
 
 		if !api.Semantic.DeepEqual(secret, outEvent.Object.Object) {
-			t.Fatalf("%s: did not match after frame decoding: %s", streamingMediaType, diff.ObjectGoPrintDiff(secret, outEvent.Object.Object))
+			t.Fatalf("%s: did not match after frame decoding: %s", info.MediaType, diff.ObjectGoPrintDiff(secret, outEvent.Object.Object))
 		}
 	}
 }

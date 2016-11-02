@@ -33,9 +33,8 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -158,9 +157,7 @@ func NewTestFactory() (cmdutil.Factory, *TestFactory, runtime.Codec, runtime.Neg
 		Mapper:    mapper,
 		Typer:     scheme,
 	}
-	negotiatedSerializer := serializer.NegotiatedSerializerWrapper(
-		runtime.SerializerInfo{Serializer: codec},
-		runtime.StreamSerializerInfo{})
+	negotiatedSerializer := serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})
 	return &FakeFactory{
 		tf:    t,
 		Codec: codec,
@@ -264,11 +261,11 @@ func (f *FakeFactory) LogsForObject(object, options runtime.Object) (*restclient
 	return nil, nil
 }
 
-func (f *FakeFactory) PauseObject(runtime.Object) (bool, error) {
+func (f *FakeFactory) Pauser(info *resource.Info) (bool, error) {
 	return false, nil
 }
 
-func (f *FakeFactory) ResumeObject(runtime.Object) (bool, error) {
+func (f *FakeFactory) Resumer(info *resource.Info) (bool, error) {
 	return false, nil
 }
 
@@ -284,8 +281,15 @@ func (f *FakeFactory) DefaultNamespace() (string, bool, error) {
 	return f.tf.Namespace, false, f.tf.Err
 }
 
-func (f *FakeFactory) Generators(string) map[string]kubectl.Generator {
-	return nil
+func (f *FakeFactory) Generators(cmdName string) map[string]kubectl.Generator {
+	var generator map[string]kubectl.Generator
+	switch cmdName {
+	case "run":
+		generator = map[string]kubectl.Generator{
+			cmdutil.DeploymentV1Beta1GeneratorName: kubectl.DeploymentV1Beta1{},
+		}
+	}
+	return generator
 }
 
 func (f *FakeFactory) CanBeExposed(unversioned.GroupKind) error {
@@ -339,6 +343,10 @@ func (f *FakeFactory) DefaultResourceFilterOptions(cmd *cobra.Command, withNames
 
 func (f *FakeFactory) DefaultResourceFilterFunc() kubectl.Filters {
 	return nil
+}
+
+func (f *FakeFactory) SuggestedPodTemplateResources() []unversioned.GroupResource {
+	return []unversioned.GroupResource{}
 }
 
 type fakeMixedFactory struct {
@@ -447,9 +455,10 @@ func (f *fakeAPIFactory) Printer(mapping *meta.RESTMapping, options kubectl.Prin
 }
 
 func (f *fakeAPIFactory) LogsForObject(object, options runtime.Object) (*restclient.Request, error) {
-	fakeClient := f.tf.Client.(*fake.RESTClient)
-	c := client.NewOrDie(f.tf.ClientConfig)
-	c.Client = fakeClient.Client
+	c, err := f.ClientSet()
+	if err != nil {
+		panic(err)
+	}
 
 	switch t := object.(type) {
 	case *api.Pod:
@@ -457,7 +466,7 @@ func (f *fakeAPIFactory) LogsForObject(object, options runtime.Object) (*restcli
 		if !ok {
 			return nil, errors.New("provided options object is not a PodLogOptions")
 		}
-		return c.Pods(f.tf.Namespace).GetLogs(t.Name, opts), nil
+		return c.Core().Pods(f.tf.Namespace).GetLogs(t.Name, opts), nil
 	default:
 		fqKinds, _, err := api.Scheme.ObjectKinds(object)
 		if err != nil {
@@ -505,6 +514,10 @@ func (f *fakeAPIFactory) NewBuilder() *resource.Builder {
 	mapper, typer := f.Object()
 
 	return resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true))
+}
+
+func (f *fakeAPIFactory) SuggestedPodTemplateResources() []unversioned.GroupResource {
+	return []unversioned.GroupResource{}
 }
 
 func NewAPIFactory() (cmdutil.Factory, *TestFactory, runtime.Codec, runtime.NegotiatedSerializer) {

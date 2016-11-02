@@ -29,13 +29,13 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&PetSet{}, func(obj interface{}) { SetObjectDefaults_PetSet(obj.(*PetSet)) })
-	scheme.AddTypeDefaultingFunc(&PetSetList{}, func(obj interface{}) { SetObjectDefaults_PetSetList(obj.(*PetSetList)) })
+	scheme.AddTypeDefaultingFunc(&StatefulSet{}, func(obj interface{}) { SetObjectDefaults_StatefulSet(obj.(*StatefulSet)) })
+	scheme.AddTypeDefaultingFunc(&StatefulSetList{}, func(obj interface{}) { SetObjectDefaults_StatefulSetList(obj.(*StatefulSetList)) })
 	return nil
 }
 
-func SetObjectDefaults_PetSet(in *PetSet) {
-	SetDefaults_PetSet(in)
+func SetObjectDefaults_StatefulSet(in *StatefulSet) {
+	SetDefaults_StatefulSet(in)
 	v1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
 		a := &in.Spec.Template.Spec.Volumes[i]
@@ -158,9 +158,9 @@ func SetObjectDefaults_PetSet(in *PetSet) {
 	}
 }
 
-func SetObjectDefaults_PetSetList(in *PetSetList) {
+func SetObjectDefaults_StatefulSetList(in *StatefulSetList) {
 	for i := range in.Items {
 		a := &in.Items[i]
-		SetObjectDefaults_PetSet(a)
+		SetObjectDefaults_StatefulSet(a)
 	}
 }

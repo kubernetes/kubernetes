@@ -22,7 +22,7 @@ go_library(
         "//pkg/api/rest:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/v1beta1:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion:go_default_library",
         "//pkg/genericapiserver:go_default_library",
         "//pkg/registry/autoscaling/horizontalpodautoscaler/etcd:go_default_library",
         "//pkg/registry/batch/job/etcd:go_default_library",

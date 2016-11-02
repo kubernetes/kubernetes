@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -18,7 +18,7 @@
 # This script performs etcd upgrade based on the following environmental
 # variables:
 # TARGET_STORAGE - API of etcd to be used (supported: 'etcd2', 'etcd3')
-# TARGET_VERSION - etcd release to be used (supported: '2.2.1', '2.3.7', '3.0.12')
+# TARGET_VERSION - etcd release to be used (supported: '2.2.1', '2.3.7', '3.0.13')
 # DATA_DIRECTORY - directory with etcd data
 #
 # The current etcd version and storage format is detected based on the
@@ -27,8 +27,8 @@
 #
 # The update workflow support the following upgrade steps:
 # - 2.2.1/etcd2 -> 2.3.7/etcd2
-# - 2.3.7/etcd2 -> 3.0.12/etcd2
-# - 3.0.12/etcd2 -> 3.0.12/etcd3
+# - 2.3.7/etcd2 -> 3.0.13/etcd2
+# - 3.0.13/etcd2 -> 3.0.13/etcd3
 #
 # NOTE: The releases supported in this script has to match release binaries
 # present in the etcd image (to make this script work correctly).
@@ -57,9 +57,17 @@ if [ "${TARGET_STORAGE}" != "etcd2" -a "${TARGET_STORAGE}" != "etcd3" ]; then
   exit 1
 fi
 
+# Correctly support upgrade and rollback to non-default version.
+if [ "${DO_NOT_MOVE_BINARIES:-}" != "true" ]; then
+  cp "/usr/local/bin/etcd-${TARGET_VERSION}" "/usr/local/bin/etcd"
+  cp "/usr/local/bin/etcdctl-${TARGET_VERSION}" "/usr/local/bin/etcdctl"
+fi
+
 # NOTE: SUPPORTED_VERSION has to match release binaries present in the
 # etcd image (to make this script work correctly).
-SUPPORTED_VERSIONS=("2.2.1" "2.3.7" "3.0.12")
+# We cannot use array since sh doesn't support it.
+SUPPORTED_VERSIONS_STRING="2.2.1 2.3.7 3.0.13"
+SUPPORTED_VERSIONS=$(echo "${SUPPORTED_VERSIONS_STRING}" | tr " " "\n")
 
 VERSION_FILE="version.txt"
 CURRENT_STORAGE="etcd2"
@@ -82,7 +90,7 @@ fi
 if [ -z "$(ls -A ${DATA_DIRECTORY})" ]; then
   echo "${DATA_DIRECTORY} is empty - skipping migration"
   echo "${TARGET_VERSION}/${TARGET_STORAGE}" > "${DATA_DIRECTORY}/${VERSION_FILE}"
-	exit 0
+  exit 0
 fi
 
 # Starts 'etcd' version ${START_VERSION} and writes to it:
@@ -96,7 +104,8 @@ start_etcd() {
   ETCD_PEER_PORT=18630
   local ETCD_CMD="${ETCD:-/usr/local/bin/etcd-${START_VERSION}}"
   local ETCDCTL_CMD="${ETCDCTL:-/usr/local/bin/etcdctl-${START_VERSION}}"
-  if [ "${START_VERSION:0:2}" == "2." ]; then
+  local API_VERSION="$(echo ${START_STORAGE} | cut -c5-5)"
+  if [ "${API_VERSION}" = "2" ]; then
     ETCDCTL_CMD="${ETCDCTL_CMD} --endpoint=http://127.0.0.1:${ETCD_PORT} set"
   else
     ETCDCTL_CMD="${ETCDCTL_CMD} --endpoints=http://127.0.0.1:${ETCD_PORT} put"
@@ -108,7 +117,6 @@ start_etcd() {
     --initial-advertise-peer-urls http://127.0.0.1:${ETCD_PEER_PORT} \
     1>>/dev/null 2>&1 &
   ETCD_PID=$!
-  local API_VERSION="${START_STORAGE:4:4}"
   # Wait until we can write to etcd.
   for i in $(seq 240); do
     ETCDCTL_API="${API_VERSION}" ${ETCDCTL_CMD} 'etcd_version' ${START_VERSION}
@@ -132,8 +140,18 @@ ATTACHLEASE="${ATTACHLEASE:-/usr/local/bin/attachlease}"
 ROLLBACK="${ROLLBACK:-/usr/local/bin/rollback}"
 
 # Do the roll-forward migration if needed.
-for step in "${SUPPORTED_VERSIONS[@]}"; do
-  if [ "${step}" == "${CURRENT_VERSION}"  -a "${CURRENT_VERSION}" != "${TARGET_VERSION}" ]; then
+# The migration goes as following:
+# 1. for all versions starting one after the current version of etcd
+#    we do "start, wait until healthy and stop etcd". This is the
+#    procedure that etcd documentation suggests for upgrading binaries.
+# 2. For the first 3.0.x version that we encounter, if we are still in
+#    v2 API, we do upgrade to v3 API using the "etcdct migrate" and
+#    attachlease commands.
+SKIP_STEP=true
+for step in ${SUPPORTED_VERSIONS}; do
+  if [ "${step}" = "${CURRENT_VERSION}" ]; then
+    SKIP_STEP=false
+  elif [ "${SKIP_STEP}" != "true" ]; then
     # Do the migration step, by just starting etcd in this version.
     START_VERSION="${step}"
     START_STORAGE="${CURRENT_STORAGE}"
@@ -144,10 +162,10 @@ for step in "${SUPPORTED_VERSIONS[@]}"; do
     fi
     # Kill etcd and wait until this is down.
     stop_etcd
+    CURRENT_VERSION=${step}
+    echo "${CURRENT_VERSION}/${CURRENT_STORAGE}" > "${DATA_DIRECTORY}/${VERSION_FILE}"
   fi
-  CURRENT_VERSION=${step}
-  echo "${CURRENT_VERSION}/${CURRENT_STORAGE}" > "${DATA_DIRECTORY}/${VERSION_FILE}"
-  if [ "${CURRENT_VERSION:0:2}" == "3." -a "${CURRENT_STORAGE}" == "etcd2" -a "${TARGET_STORAGE}" == "etcd3" ]; then
+  if [ "$(echo ${CURRENT_VERSION} | cut -c1-2)" = "3." -a "${CURRENT_STORAGE}" = "etcd2" -a "${TARGET_STORAGE}" = "etcd3" ]; then
     # If it is the first 3.x release in the list and we are migrating
     # also from 'etcd2' to 'etcd3', do the migration now.
     echo "Performing etcd2 -> etcd3 migration"
@@ -173,7 +191,7 @@ for step in "${SUPPORTED_VERSIONS[@]}"; do
     CURRENT_STORAGE="etcd3"
     echo "${CURRENT_VERSION}/${CURRENT_STORAGE}" > "${DATA_DIRECTORY}/${VERSION_FILE}"
   fi
-  if [ "${CURRENT_VERSION}" == "${TARGET_VERSION}" -a "${CURRENT_STORAGE}" == "${TARGET_STORAGE}" ]; then
+  if [ "${CURRENT_VERSION}" = "${TARGET_VERSION}" -a "${CURRENT_STORAGE}" = "${TARGET_STORAGE}" ]; then
     break
   fi
 done
@@ -181,8 +199,8 @@ done
 # Do the rollback of needed.
 # NOTE: Rollback is only supported from "3.0.x" version in 'etcd3' mode to
 # "2.3.7" version in 'etcd2' mode.
-if [ "${CURRENT_STORAGE}" == "etcd3" -a "${TARGET_STORAGE}" == "etcd2" ]; then
-  if [ "${CURRENT_VERSION:0:4}" != "3.0." -o "${TARGET_VERSION}" != "2.3.7" ]; then
+if [ "${CURRENT_STORAGE}" = "etcd3" -a "${TARGET_STORAGE}" = "etcd2" ]; then
+  if [ "$(echo ${CURRENT_VERSION} | cut -c1-4)" != "3.0." -o "${TARGET_VERSION}" != "2.3.7" ]; then
     echo "etcd3 -> etcd2 downgrade is supported only between 3.0.x and 2.3.7"
     return 0
   fi

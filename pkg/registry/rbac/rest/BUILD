@@ -20,7 +20,7 @@ go_library(
         "//pkg/apis/rbac:go_default_library",
         "//pkg/apis/rbac/v1alpha1:go_default_library",
         "//pkg/apis/rbac/validation:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset/typed/rbac/unversioned:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion:go_default_library",
         "//pkg/genericapiserver:go_default_library",
         "//pkg/registry/rbac/clusterrole:go_default_library",
         "//pkg/registry/rbac/clusterrole/etcd:go_default_library",

@@ -50,3 +50,7 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource genericapiserver.
 	}
 	return storage
 }
+
+func (p RESTStorageProvider) GroupName() string {
+	return autoscaling.GroupName
+}

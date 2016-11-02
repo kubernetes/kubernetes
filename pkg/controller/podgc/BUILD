@@ -43,6 +43,7 @@ go_test(
         "//pkg/api/unversioned:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
+        "//pkg/labels:go_default_library",
         "//pkg/util/sets:go_default_library",
     ],
 )

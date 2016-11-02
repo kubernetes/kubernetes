@@ -43,8 +43,6 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_JobStatus, InType: reflect.TypeOf(&JobStatus{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_JobTemplate, InType: reflect.TypeOf(&JobTemplate{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_JobTemplateSpec, InType: reflect.TypeOf(&JobTemplateSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_LabelSelector, InType: reflect.TypeOf(&LabelSelector{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_LabelSelectorRequirement, InType: reflect.TypeOf(&LabelSelectorRequirement{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ScheduledJob, InType: reflect.TypeOf(&ScheduledJob{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ScheduledJobList, InType: reflect.TypeOf(&ScheduledJobList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ScheduledJobSpec, InType: reflect.TypeOf(&ScheduledJobSpec{})},
@@ -132,8 +130,8 @@ func DeepCopy_v2alpha1_JobSpec(in interface{}, out interface{}, c *conversion.Cl
 		}
 		if in.Selector != nil {
 			in, out := &in.Selector, &out.Selector
-			*out = new(LabelSelector)
-			if err := DeepCopy_v2alpha1_LabelSelector(*in, *out, c); err != nil {
+			*out = new(unversioned.LabelSelector)
+			if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
 				return err
 			}
 		} else {
@@ -213,51 +211,6 @@ func DeepCopy_v2alpha1_JobTemplateSpec(in interface{}, out interface{}, c *conve
 		}
 		if err := DeepCopy_v2alpha1_JobSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v2alpha1_LabelSelector(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*LabelSelector)
-		out := out.(*LabelSelector)
-		if in.MatchLabels != nil {
-			in, out := &in.MatchLabels, &out.MatchLabels
-			*out = make(map[string]string)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		} else {
-			out.MatchLabels = nil
-		}
-		if in.MatchExpressions != nil {
-			in, out := &in.MatchExpressions, &out.MatchExpressions
-			*out = make([]LabelSelectorRequirement, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v2alpha1_LabelSelectorRequirement(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.MatchExpressions = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v2alpha1_LabelSelectorRequirement(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*LabelSelectorRequirement)
-		out := out.(*LabelSelectorRequirement)
-		out.Key = in.Key
-		out.Operator = in.Operator
-		if in.Values != nil {
-			in, out := &in.Values, &out.Values
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.Values = nil
 		}
 		return nil
 	}

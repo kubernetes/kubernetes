@@ -175,7 +175,7 @@ func TestKindForGroupVersionKinds(t *testing.T) {
 			ok:     true,
 		},
 		{
-			input:  []GroupVersionKind{{Group: "apps", Version: "v1alpha1", Kind: "PetSet"}},
+			input:  []GroupVersionKind{{Group: "apps", Version: "v1alpha1", Kind: "StatefulSet"}},
 			target: GroupVersionKind{},
 			ok:     false,
 		},

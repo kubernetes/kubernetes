@@ -9,6 +9,795 @@
   },
   "apis": [
    {
+    "path": "/api/v1/namespaces/{namespace}/configmaps",
+    "description": "API at /api/v1",
+    "operations": [
+     {
+      "type": "v1.ConfigMapList",
+      "method": "GET",
+      "summary": "list or watch objects of kind ConfigMap",
+      "nickname": "listNamespacedConfigMap",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.ConfigMapList"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.ConfigMap",
+      "method": "POST",
+      "summary": "create a ConfigMap",
+      "nickname": "createNamespacedConfigMap",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.ConfigMap",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.ConfigMap"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "unversioned.Status",
+      "method": "DELETE",
+      "summary": "delete collection of ConfigMap",
+      "nickname": "deletecollectionNamespacedConfigMap",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "unversioned.Status"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/watch/namespaces/{namespace}/configmaps",
+    "description": "API at /api/v1",
+    "operations": [
+     {
+      "type": "versioned.Event",
+      "method": "GET",
+      "summary": "watch individual changes to a list of ConfigMap",
+      "nickname": "watchNamespacedConfigMapList",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "versioned.Event"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/namespaces/{namespace}/configmaps/{name}",
+    "description": "API at /api/v1",
+    "operations": [
+     {
+      "type": "v1.ConfigMap",
+      "method": "GET",
+      "summary": "read the specified ConfigMap",
+      "nickname": "readNamespacedConfigMap",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "export",
+        "description": "Should this value be exported.  Export strips fields that a user can not specify.`",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "exact",
+        "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ConfigMap",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.ConfigMap"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.ConfigMap",
+      "method": "PUT",
+      "summary": "replace the specified ConfigMap",
+      "nickname": "replaceNamespacedConfigMap",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.ConfigMap",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ConfigMap",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.ConfigMap"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1.ConfigMap",
+      "method": "PATCH",
+      "summary": "partially update the specified ConfigMap",
+      "nickname": "patchNamespacedConfigMap",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "unversioned.Patch",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ConfigMap",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.ConfigMap"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
+      ]
+     },
+     {
+      "type": "unversioned.Status",
+      "method": "DELETE",
+      "summary": "delete a ConfigMap",
+      "nickname": "deleteNamespacedConfigMap",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ConfigMap",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "unversioned.Status"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/watch/namespaces/{namespace}/configmaps/{name}",
+    "description": "API at /api/v1",
+    "operations": [
+     {
+      "type": "versioned.Event",
+      "method": "GET",
+      "summary": "watch changes to an object of kind ConfigMap",
+      "nickname": "watchNamespacedConfigMap",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ConfigMap",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "versioned.Event"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/configmaps",
+    "description": "API at /api/v1",
+    "operations": [
+     {
+      "type": "v1.ConfigMapList",
+      "method": "GET",
+      "summary": "list or watch objects of kind ConfigMap",
+      "nickname": "listConfigMapForAllNamespaces",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1.ConfigMapList"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1/watch/configmaps",
+    "description": "API at /api/v1",
+    "operations": [
+     {
+      "type": "versioned.Event",
+      "method": "GET",
+      "summary": "watch individual changes to a list of ConfigMap",
+      "nickname": "watchConfigMapListForAllNamespaces",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "integer",
+        "paramType": "query",
+        "name": "timeoutSeconds",
+        "description": "Timeout for the list/watch call.",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "versioned.Event"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/api/v1/namespaces/{namespace}/events",
     "description": "API at /api/v1",
     "operations": [
@@ -85,7 +874,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -295,8 +1086,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -625,8 +1417,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -643,7 +1436,7 @@
       "type": "v1.EventList",
       "method": "GET",
       "summary": "list or watch objects of kind Event",
-      "nickname": "listNamespacedEvent",
+      "nickname": "listEventForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -704,7 +1497,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -720,7 +1515,7 @@
       "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Event",
-      "nickname": "watchNamespacedEventList",
+      "nickname": "watchEventListForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -780,8 +1575,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -859,7 +1655,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -1045,8 +1843,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -1335,8 +2134,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -1616,7 +2416,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -1826,8 +2628,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -2156,8 +2959,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -2174,7 +2978,7 @@
       "type": "v1.SecretList",
       "method": "GET",
       "summary": "list or watch objects of kind Secret",
-      "nickname": "listNamespacedSecret",
+      "nickname": "listSecretForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -2235,7 +3039,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -2251,7 +3057,7 @@
       "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Secret",
-      "nickname": "watchNamespacedSecretList",
+      "nickname": "watchSecretListForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -2311,8 +3117,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -2398,7 +3205,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -2608,8 +3417,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -2938,8 +3748,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -2956,7 +3767,7 @@
       "type": "v1.ServiceList",
       "method": "GET",
       "summary": "list or watch objects of kind Service",
-      "nickname": "listNamespacedService",
+      "nickname": "listServiceForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -3017,7 +3828,9 @@
       "produces": [
        "application/json",
        "application/yaml",
-       "application/vnd.kubernetes.protobuf"
+       "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
+       "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
        "*/*"
@@ -3033,7 +3846,7 @@
       "type": "versioned.Event",
       "method": "GET",
       "summary": "watch individual changes to a list of Service",
-      "nickname": "watchNamespacedServiceList",
+      "nickname": "watchServiceListForAllNamespaces",
       "parameters": [
        {
         "type": "string",
@@ -3093,8 +3906,9 @@
       ],
       "produces": [
        "application/json",
-       "application/json;stream=watch",
+       "application/yaml",
        "application/vnd.kubernetes.protobuf",
+       "application/json;stream=watch",
        "application/vnd.kubernetes.protobuf;stream=watch"
       ],
       "consumes": [
@@ -3293,9 +4107,9 @@
    }
   ],
   "models": {
-   "v1.EventList": {
-    "id": "v1.EventList",
-    "description": "EventList is a list of events.",
+   "v1.ConfigMapList": {
+    "id": "v1.ConfigMapList",
+    "description": "ConfigMapList is a resource containing a list of ConfigMap objects.",
     "required": [
      "items"
     ],
@@ -3310,14 +4124,14 @@
      },
      "metadata": {
       "$ref": "unversioned.ListMeta",
-      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+      "description": "More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "items": {
       "type": "array",
       "items": {
-       "$ref": "v1.Event"
+       "$ref": "v1.ConfigMap"
       },
-      "description": "List of events"
+      "description": "Items is the list of ConfigMaps."
      }
     }
    },
@@ -3335,13 +4149,9 @@
      }
     }
    },
-   "v1.Event": {
-    "id": "v1.Event",
-    "description": "Event is a report of an event somewhere in the cluster.",
-    "required": [
-     "metadata",
-     "involvedObject"
-    ],
+   "v1.ConfigMap": {
+    "id": "v1.ConfigMap",
+    "description": "ConfigMap holds configuration data for pods to consume.",
     "properties": {
      "kind": {
       "type": "string",
@@ -3355,40 +4165,9 @@
       "$ref": "v1.ObjectMeta",
       "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
-     "involvedObject": {
-      "$ref": "v1.ObjectReference",
-      "description": "The object that this event is about."
-     },
-     "reason": {
-      "type": "string",
-      "description": "This should be a short, machine understandable string that gives the reason for the transition into the object's current status."
-     },
-     "message": {
-      "type": "string",
-      "description": "A human-readable description of the status of this operation."
-     },
-     "source": {
-      "$ref": "v1.EventSource",
-      "description": "The component reporting this event. Should be a short machine understandable string."
-     },
-     "firstTimestamp": {
-      "type": "string",
-      "format": "date-time",
-      "description": "The time at which the event was first recorded. (Time of server receipt is in TypeMeta.)"
-     },
-     "lastTimestamp": {
-      "type": "string",
-      "format": "date-time",
-      "description": "The time at which the most recent occurrence of this event was recorded."
-     },
-     "count": {
-      "type": "integer",
-      "format": "int32",
-      "description": "The number of times this event has occurred."
-     },
-     "type": {
-      "type": "string",
-      "description": "Type of this event (Normal, Warning), new types could be added in the future"
+     "data": {
+      "type": "object",
+      "description": "Data contains the configuration data. Each key must be a valid DNS_SUBDOMAIN with an optional leading dot."
      }
     }
    },
@@ -3497,54 +4276,6 @@
      "controller": {
       "type": "boolean",
       "description": "If true, this reference points to the managing controller."
-     }
-    }
-   },
-   "v1.ObjectReference": {
-    "id": "v1.ObjectReference",
-    "description": "ObjectReference contains enough information to let you inspect or modify the referred object.",
-    "properties": {
-     "kind": {
-      "type": "string",
-      "description": "Kind of the referent. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
-     },
-     "namespace": {
-      "type": "string",
-      "description": "Namespace of the referent. More info: http://kubernetes.io/docs/user-guide/namespaces"
-     },
-     "name": {
-      "type": "string",
-      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
-     },
-     "uid": {
-      "type": "string",
-      "description": "UID of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#uids"
-     },
-     "apiVersion": {
-      "type": "string",
-      "description": "API version of the referent."
-     },
-     "resourceVersion": {
-      "type": "string",
-      "description": "Specific resourceVersion to which this reference is made, if any. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "fieldPath": {
-      "type": "string",
-      "description": "If referring to a piece of an object instead of an entire object, this string should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2]. For example, if the object reference is to a container within a pod, this would take on a value like: \"spec.containers{name}\" (where \"name\" refers to the name of the container that triggered the event) or if no container name is specified \"spec.containers[2]\" (container with index 2 in this pod). This syntax is chosen only to have some well-defined way of referencing a part of an object."
-     }
-    }
-   },
-   "v1.EventSource": {
-    "id": "v1.EventSource",
-    "description": "EventSource contains information for an event.",
-    "properties": {
-     "component": {
-      "type": "string",
-      "description": "Component from which the event is generated."
-     },
-     "host": {
-      "type": "string",
-      "description": "Host name on which the event is generated."
      }
     }
    },
@@ -3695,6 +4426,139 @@
    "types.UID": {
     "id": "types.UID",
     "properties": {}
+   },
+   "v1.EventList": {
+    "id": "v1.EventList",
+    "description": "EventList is a list of events.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "unversioned.ListMeta",
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.Event"
+      },
+      "description": "List of events"
+     }
+    }
+   },
+   "v1.Event": {
+    "id": "v1.Event",
+    "description": "Event is a report of an event somewhere in the cluster.",
+    "required": [
+     "metadata",
+     "involvedObject"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
+     },
+     "involvedObject": {
+      "$ref": "v1.ObjectReference",
+      "description": "The object that this event is about."
+     },
+     "reason": {
+      "type": "string",
+      "description": "This should be a short, machine understandable string that gives the reason for the transition into the object's current status."
+     },
+     "message": {
+      "type": "string",
+      "description": "A human-readable description of the status of this operation."
+     },
+     "source": {
+      "$ref": "v1.EventSource",
+      "description": "The component reporting this event. Should be a short machine understandable string."
+     },
+     "firstTimestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "The time at which the event was first recorded. (Time of server receipt is in TypeMeta.)"
+     },
+     "lastTimestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "The time at which the most recent occurrence of this event was recorded."
+     },
+     "count": {
+      "type": "integer",
+      "format": "int32",
+      "description": "The number of times this event has occurred."
+     },
+     "type": {
+      "type": "string",
+      "description": "Type of this event (Normal, Warning), new types could be added in the future"
+     }
+    }
+   },
+   "v1.ObjectReference": {
+    "id": "v1.ObjectReference",
+    "description": "ObjectReference contains enough information to let you inspect or modify the referred object.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind of the referent. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "namespace": {
+      "type": "string",
+      "description": "Namespace of the referent. More info: http://kubernetes.io/docs/user-guide/namespaces"
+     },
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#names"
+     },
+     "uid": {
+      "type": "string",
+      "description": "UID of the referent. More info: http://kubernetes.io/docs/user-guide/identifiers#uids"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "API version of the referent."
+     },
+     "resourceVersion": {
+      "type": "string",
+      "description": "Specific resourceVersion to which this reference is made, if any. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency"
+     },
+     "fieldPath": {
+      "type": "string",
+      "description": "If referring to a piece of an object instead of an entire object, this string should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2]. For example, if the object reference is to a container within a pod, this would take on a value like: \"spec.containers{name}\" (where \"name\" refers to the name of the container that triggered the event) or if no container name is specified \"spec.containers[2]\" (container with index 2 in this pod). This syntax is chosen only to have some well-defined way of referencing a part of an object."
+     }
+    }
+   },
+   "v1.EventSource": {
+    "id": "v1.EventSource",
+    "description": "EventSource contains information for an event.",
+    "properties": {
+     "component": {
+      "type": "string",
+      "description": "Component from which the event is generated."
+     },
+     "host": {
+      "type": "string",
+      "description": "Node name on which the event is generated."
+     }
+    }
    },
    "v1.NamespaceList": {
     "id": "v1.NamespaceList",

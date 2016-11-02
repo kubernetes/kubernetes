@@ -82,6 +82,23 @@ func FailedContainers(pod *api.Pod) map[string]ContainerFailures {
 	return states
 }
 
+// TerminatedContainers inspects all containers in a pod and returns a map
+// of "container name: termination reason", for all currently terminated
+// containers.
+func TerminatedContainers(pod *api.Pod) map[string]string {
+	states := make(map[string]string)
+	statuses := pod.Status.ContainerStatuses
+	if len(statuses) == 0 {
+		return states
+	}
+	for _, status := range statuses {
+		if status.State.Terminated != nil {
+			states[status.Name] = status.State.Terminated.Reason
+		}
+	}
+	return states
+}
+
 // PodNotReady checks whether pod p's has a ready condition of status false.
 func PodNotReady(p *api.Pod) (bool, error) {
 	// Check the ready condition is false.

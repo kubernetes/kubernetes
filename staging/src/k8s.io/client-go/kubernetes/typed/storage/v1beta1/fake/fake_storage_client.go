@@ -30,8 +30,9 @@ func (c *FakeStorage) StorageClasses() v1beta1.StorageClassInterface {
 	return &FakeStorageClasses{c}
 }
 
-// GetRESTClient returns a RESTClient that is used to communicate
+// RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeStorage) GetRESTClient() *rest.RESTClient {
-	return nil
+func (c *FakeStorage) RESTClient() rest.Interface {
+	var ret *rest.RESTClient
+	return ret
 }

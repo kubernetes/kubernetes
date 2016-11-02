@@ -21,11 +21,14 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/util/initsystem"
+	"k8s.io/kubernetes/pkg/util/node"
 )
 
 type PreFlightError struct {
@@ -113,28 +116,41 @@ func (irc IsRootCheck) Check() (warnings, errors []error) {
 // DirAvailableCheck checks if the given directory either does not exist, or
 // is empty.
 type DirAvailableCheck struct {
-	path string
+	Path string
 }
 
 func (dac DirAvailableCheck) Check() (warnings, errors []error) {
 	errors = []error{}
 	// If it doesn't exist we are good:
-	if _, err := os.Stat(dac.path); os.IsNotExist(err) {
+	if _, err := os.Stat(dac.Path); os.IsNotExist(err) {
 		return nil, nil
 	}
 
-	f, err := os.Open(dac.path)
+	f, err := os.Open(dac.Path)
 	if err != nil {
-		errors = append(errors, fmt.Errorf("unable to check if %s is empty: %s", dac.path, err))
+		errors = append(errors, fmt.Errorf("unable to check if %s is empty: %s", dac.Path, err))
 		return nil, errors
 	}
 	defer f.Close()
 
 	_, err = f.Readdirnames(1)
 	if err != io.EOF {
-		errors = append(errors, fmt.Errorf("%s is not empty", dac.path))
+		errors = append(errors, fmt.Errorf("%s is not empty", dac.Path))
 	}
 
+	return nil, errors
+}
+
+// FileAvailableCheck checks that the given file does not already exist.
+type FileAvailableCheck struct {
+	Path string
+}
+
+func (fac FileAvailableCheck) Check() (warnings, errors []error) {
+	errors = []error{}
+	if _, err := os.Stat(fac.Path); err == nil {
+		errors = append(errors, fmt.Errorf("%s already exists", fac.Path))
+	}
 	return nil, errors
 }
 
@@ -157,10 +173,51 @@ func (ipc InPathCheck) Check() (warnings, errors []error) {
 	return nil, nil
 }
 
+// HostnameCheck checks if hostname match dns sub domain regex.
+// If hostname doesn't match this regex, kubelet will not launch static pods like kube-apiserver/kube-controller-manager and so on.
+type HostnameCheck struct{}
+
+func (hc HostnameCheck) Check() (warnings, errors []error) {
+	errors = []error{}
+	hostname := node.GetHostname("")
+	for _, msg := range validation.ValidateNodeName(hostname, false) {
+		errors = append(errors, fmt.Errorf("hostname \"%s\" %s", hostname, msg))
+	}
+	return nil, errors
+}
+
+// HttpProxyCheck checks if https connection to specific host is going
+// to be done directly or over proxy. If proxy detected, it will return warning.
+type HttpProxyCheck struct {
+	Proto string
+	Host  string
+	Port  int
+}
+
+func (hst HttpProxyCheck) Check() (warnings, errors []error) {
+
+	url := fmt.Sprintf("%s://%s:%d", hst.Proto, hst.Host, hst.Port)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, []error{err}
+	}
+
+	proxy, err := http.DefaultTransport.(*http.Transport).Proxy(req)
+	if err != nil {
+		return nil, []error{err}
+	}
+	if proxy != nil {
+		return []error{fmt.Errorf("Connection to %q uses proxy %q. If that is not intended, adjust your proxy settings", url, proxy)}, nil
+	}
+	return nil, nil
+}
+
 func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 	// TODO: Some of these ports should come from kubeadm config eventually:
 	checks := []PreFlightCheck{
 		IsRootCheck{root: true},
+		HostnameCheck{},
 		ServiceCheck{Service: "kubelet"},
 		ServiceCheck{Service: "docker"},
 		PortOpenCheck{port: int(cfg.API.BindPort)},
@@ -170,9 +227,13 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		PortOpenCheck{port: 10250},
 		PortOpenCheck{port: 10251},
 		PortOpenCheck{port: 10252},
-		DirAvailableCheck{path: "/etc/kubernetes"},
-		DirAvailableCheck{path: "/var/lib/etcd"},
-		DirAvailableCheck{path: "/var/lib/kubelet"},
+		HttpProxyCheck{Proto: "https", Host: cfg.API.AdvertiseAddresses[0], Port: int(cfg.API.BindPort)},
+		DirAvailableCheck{Path: "/etc/kubernetes/manifests"},
+		DirAvailableCheck{Path: "/etc/kubernetes/pki"},
+		DirAvailableCheck{Path: "/var/lib/etcd"},
+		DirAvailableCheck{Path: "/var/lib/kubelet"},
+		FileAvailableCheck{Path: "/etc/kubernetes/admin.conf"},
+		FileAvailableCheck{Path: "/etc/kubernetes/kubelet.conf"},
 		InPathCheck{executable: "ebtables", mandatory: true},
 		InPathCheck{executable: "ethtool", mandatory: true},
 		InPathCheck{executable: "ip", mandatory: true},
@@ -184,18 +245,21 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		InPathCheck{executable: "touch", mandatory: false},
 	}
 
-	return runChecks(checks)
+	return runChecks(checks, os.Stderr)
 }
 
-func RunJoinNodeChecks() error {
+func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 	// TODO: Some of these ports should come from kubeadm config eventually:
 	checks := []PreFlightCheck{
 		IsRootCheck{root: true},
+		HostnameCheck{},
 		ServiceCheck{Service: "docker"},
 		ServiceCheck{Service: "kubelet"},
 		PortOpenCheck{port: 10250},
-		DirAvailableCheck{path: "/etc/kubernetes"},
-		DirAvailableCheck{path: "/var/lib/kubelet"},
+		HttpProxyCheck{Proto: "https", Host: cfg.MasterAddresses[0], Port: int(cfg.APIPort)},
+		HttpProxyCheck{Proto: "http", Host: cfg.MasterAddresses[0], Port: int(cfg.DiscoveryPort)},
+		DirAvailableCheck{Path: "/etc/kubernetes"},
+		DirAvailableCheck{Path: "/var/lib/kubelet"},
 		InPathCheck{executable: "ebtables", mandatory: true},
 		InPathCheck{executable: "ethtool", mandatory: true},
 		InPathCheck{executable: "ip", mandatory: true},
@@ -207,7 +271,7 @@ func RunJoinNodeChecks() error {
 		InPathCheck{executable: "touch", mandatory: false},
 	}
 
-	return runChecks(checks)
+	return runChecks(checks, os.Stderr)
 }
 
 func RunResetCheck() error {
@@ -215,17 +279,17 @@ func RunResetCheck() error {
 		IsRootCheck{root: true},
 	}
 
-	return runChecks(checks)
+	return runChecks(checks, os.Stderr)
 }
 
 // runChecks runs each check, displays it's warnings/errors, and once all
 // are processed will exit if any errors occurred.
-func runChecks(checks []PreFlightCheck) error {
+func runChecks(checks []PreFlightCheck, ww io.Writer) error {
 	found := []error{}
 	for _, c := range checks {
 		warnings, errs := c.Check()
 		for _, w := range warnings {
-			fmt.Printf("WARNING: %s\n", w)
+			io.WriteString(ww, fmt.Sprintf("WARNING: %s\n", w))
 		}
 		for _, e := range errs {
 			found = append(found, e)

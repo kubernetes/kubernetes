@@ -287,6 +287,7 @@ kops-kubernetes-version
 kops-nodes
 kops-ssh-key
 kops-state
+kops-up-timeout
 kops-zones
 kube-api-burst
 kube-api-content-type
@@ -312,6 +313,7 @@ kubelet-kubeconfig
 kubelet-network-plugin
 kubelet-pod-infra-container-image
 kubelet-port
+kubelet-preferred-address-types
 kubelet-read-only-port
 kubelet-root-dir
 kubelet-sync-frequency
@@ -464,6 +466,9 @@ replication-controller-lookup-cache-size
 repo-root
 report-dir
 report-prefix
+requestheader-allowed-names
+requestheader-client-ca-file
+requestheader-username-headers
 require-kubeconfig
 required-contexts
 resolv-conf
@@ -551,6 +556,7 @@ tls-ca-file
 tls-cert-file
 tls-private-key-file
 to-version
+tls-sni-cert-key
 token-auth-file
 ttl-keys-prefix
 ttl-secs

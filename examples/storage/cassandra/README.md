@@ -101,7 +101,7 @@ kubectl scale rc cassandra --replicas=4
 kubectl delete rc cassandra
 
 #
-# Create a daemonset to place a cassandra node on each kubernetes node
+# Create a DaemonSet to place a cassandra node on each kubernetes node
 #
 
 kubectl create -f examples/storage/cassandra/cassandra-daemonset.yaml --validate=false
@@ -180,7 +180,7 @@ of three pods.
 
 ```yaml
 apiVersion: "apps/v1alpha1"
-kind: PetSet
+kind: StatefulSet
 metadata:
   name: cassandra
 spec:
@@ -659,7 +659,7 @@ cluster can react by re-replicating the data to other running nodes.
 
 `DaemonSet` is designed to place a single pod on each node in the Kubernetes
 cluster.  That will give us data redundancy. Let's create a
-daemonset to start our storage cluster:
+DaemonSet to start our storage cluster:
 
 <!-- BEGIN MUNGE: EXAMPLE cassandra-daemonset.yaml -->
 
@@ -725,16 +725,16 @@ spec:
 [Download example](cassandra-daemonset.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE cassandra-daemonset.yaml -->
 
-Most of this Daemonset definition is identical to the ReplicationController
+Most of this DaemonSet definition is identical to the ReplicationController
 definition above; it simply gives the daemon set a recipe to use when it creates
 new Cassandra pods, and targets all Cassandra nodes in the cluster.
 
 Differentiating aspects are the `nodeSelector` attribute, which allows the
-Daemonset to target a specific subset of nodes (you can label nodes just like
+DaemonSet to target a specific subset of nodes (you can label nodes just like
 other resources), and the lack of a `replicas` attribute due to the 1-to-1 node-
 pod relationship.
 
-Create this daemonset:
+Create this DaemonSet:
 
 ```console
 
@@ -750,7 +750,7 @@ $ kubectl create -f examples/storage/cassandra/cassandra-daemonset.yaml --valida
 
 ```
 
-You can see the daemonset running:
+You can see the DaemonSet running:
 
 ```console
 
@@ -793,8 +793,8 @@ UN  10.244.3.3  51.28 KB   256     100.0%            dafe3154-1d67-42e1-ac1d-78e
 ```
 
 **Note**: This example had you delete the cassandra Replication Controller before
-you created the Daemonset.  This is because – to keep this example simple – the
-RC and the Daemonset are using the same `app=cassandra` label (so that their pods map to the
+you created the DaemonSet.  This is because – to keep this example simple – the
+RC and the DaemonSet are using the same `app=cassandra` label (so that their pods map to the
 service we created, and so that the SeedProvider can identify them).
 
 If we didn't delete the RC first, the two resources would conflict with
@@ -821,7 +821,7 @@ In Cassandra, a `SeedProvider` bootstraps the gossip protocol that Cassandra use
 Cassandra nodes. Seed addresses are hosts deemed as contact points. Cassandra
 instances use the seed list to find each other and learn the topology of the
 ring. The [`KubernetesSeedProvider`](java/src/main/java/io/k8s/cassandra/KubernetesSeedProvider.java)
-discovers Cassandra seeds IP addresses vis the Kubernetes API, those Cassandra
+discovers Cassandra seeds IP addresses via the Kubernetes API, those Cassandra
 instances are defined within the Cassandra Service.
 
 Refer to the custom seed provider [README](java/README.md) for further

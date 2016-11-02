@@ -27,7 +27,7 @@ import (
 
 // FakeConfigMaps implements ConfigMapInterface
 type FakeConfigMaps struct {
-	Fake *FakeCore
+	Fake *FakeCoreV1
 	ns   string
 }
 

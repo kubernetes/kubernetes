@@ -319,14 +319,11 @@ func diskUsage(fsStats *statsapi.FsStats) *resource.Quantity {
 
 // inodeUsage converts inodes consumed into a resource quantity.
 func inodeUsage(fsStats *statsapi.FsStats) *resource.Quantity {
-	// TODO: cadvisor needs to support inodes used per container
-	// right now, cadvisor reports total inodes and inodes free per filesystem.
-	// this is insufficient to know how many inodes are consumed by the container.
-	// for example, with the overlay driver, the rootfs and each container filesystem
-	// will report the same total inode and inode free values but no way of knowing
-	// how many inodes consumed in that filesystem are charged to this container.
-	// for now, we report 0 as inode usage pending support in cadvisor.
-	return resource.NewQuantity(int64(0), resource.BinarySI)
+	if fsStats == nil || fsStats.InodesUsed == nil {
+		return &resource.Quantity{Format: resource.BinarySI}
+	}
+	usage := int64(*fsStats.InodesUsed)
+	return resource.NewQuantity(usage, resource.BinarySI)
 }
 
 // memoryUsage converts working set into a resource quantity.

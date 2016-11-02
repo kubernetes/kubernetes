@@ -334,7 +334,7 @@ runTests() {
   hpa_min_field=".spec.minReplicas"
   hpa_max_field=".spec.maxReplicas"
   hpa_cpu_field=".spec.targetCPUUtilizationPercentage"
-  petset_replicas_field=".spec.replicas"
+  statefulset_replicas_field=".spec.replicas"
   job_parallelism_field=".spec.parallelism"
   deployment_replicas=".spec.replicas"
   secret_data=".data"
@@ -719,6 +719,25 @@ runTests() {
   ### Create valid-pod POD
   # Pre-condition: no POD exists
   create_and_use_new_namespace
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  ## kubectl create --edit can update the image field of a POD. tmp-editor.sh is a fake editor
+  TEMP=$(mktemp /tmp/tmp-editor-XXXXXXXX.sh)
+  echo -e "#!/bin/bash\n$SED -i \"s/gcr.io\/google_containers\/serve_hostname/nginx/g\" \$1" > ${TEMP}
+  chmod +x ${TEMP}
+  # Command
+  EDITOR=${TEMP} kubectl create --edit -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml "${kube_flags[@]}"
+  # Post-condition: valid-pod POD is created and has image gcr.io/google_containers/serve_hostname
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
+  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'nginx:'
+  # Clean up
+  rm ${TEMP}
+  kubectl delete pods/valid-pod "${kube_flags[@]}"
+
+  ## kubectl create --edit won't create anything if user makes no changes
+  [ "$(EDITOR=cat kubectl create --edit -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml -o json 2>&1 | grep 'Edit cancelled')" ]
+
+  ## Create valid-pod POD
+  # Pre-condition: no POD exists
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   kubectl create -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml "${kube_flags[@]}"
@@ -1185,7 +1204,7 @@ __EOF__
   kube::test::if_has_string "${output_message}" "/api/v1/namespaces/default/pods 200 OK"
   kube::test::if_has_string "${output_message}" "/api/v1/namespaces/default/replicationcontrollers 200 OK"
   kube::test::if_has_string "${output_message}" "/api/v1/namespaces/default/services 200 OK"
-  kube::test::if_has_string "${output_message}" "/apis/apps/v1alpha1/namespaces/default/petsets 200 OK"
+  kube::test::if_has_string "${output_message}" "/apis/apps/v1alpha1/namespaces/default/statefulsets 200 OK"
   kube::test::if_has_string "${output_message}" "/apis/autoscaling/v1/namespaces/default/horizontalpodautoscalers 200"
   kube::test::if_has_string "${output_message}" "/apis/batch/v1/namespaces/default/jobs 200 OK"
   kube::test::if_has_string "${output_message}" "/apis/extensions/v1beta1/namespaces/default/deployments 200 OK"
@@ -1561,15 +1580,15 @@ __EOF__
   ## Attempt to pause the replication controllers recursively
   output_message=$(! kubectl rollout pause -f hack/testdata/recursive/rc --recursive 2>&1 "${kube_flags[@]}")
   # Post-condition: busybox0 & busybox1 should error as they are RC's, and since busybox2 is malformed, it should error
-  kube::test::if_has_string "${output_message}" 'error when pausing "hack/testdata/recursive/rc/busybox.yaml'
-  kube::test::if_has_string "${output_message}" 'error when pausing "hack/testdata/recursive/rc/rc/busybox.yaml'
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
+  kube::test::if_has_string "${output_message}" 'replicationcontrollers "busybox0" pausing is not supported'
+  kube::test::if_has_string "${output_message}" 'replicationcontrollers "busybox1" pausing is not supported'
   ## Attempt to resume the replication controllers recursively
   output_message=$(! kubectl rollout resume -f hack/testdata/recursive/rc --recursive 2>&1 "${kube_flags[@]}")
   # Post-condition: busybox0 & busybox1 should error as they are RC's, and since busybox2 is malformed, it should error
-  kube::test::if_has_string "${output_message}" 'error when resuming "hack/testdata/recursive/rc/busybox.yaml'
-  kube::test::if_has_string "${output_message}" 'error when resuming "hack/testdata/recursive/rc/rc/busybox.yaml'
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
+  kube::test::if_has_string "${output_message}" 'replicationcontrollers "busybox0" resuming is not supported'
+  kube::test::if_has_string "${output_message}" 'replicationcontrollers "busybox0" resuming is not supported'
   # Clean up
   ! kubectl delete -f hack/testdata/recursive/rc --recursive "${kube_flags[@]}" --grace-period=0
   sleep 1
@@ -2249,6 +2268,13 @@ __EOF__
   kubectl get rs nginx-618515232 -o yaml | grep "deployment.kubernetes.io/revision-history: 1,3"
   # Check that trying to watch the status of a superseded revision returns an error
   ! kubectl rollout status deployment/nginx --revision=3
+  cat hack/testdata/deployment-revision1.yaml | $SED "s/name: nginx$/name: nginx2/" | kubectl create -f - "${kube_flags[@]}"
+  # Newest deployment should be marked as overlapping
+  kubectl get deployment nginx2 -o yaml "${kube_flags[@]}" | grep "deployment.kubernetes.io/error-selector-overlapping-with"
+  # Oldest deployment should not be marked as overlapping
+  ! kubectl get deployment nginx -o yaml "${kube_flags[@]}" | grep "deployment.kubernetes.io/error-selector-overlapping-with"
+  # Deletion of both deployments should not be blocked
+   kubectl delete deployment nginx2 "${kube_flags[@]}"
   # Clean up
   kubectl delete deployment nginx "${kube_flags[@]}"
 
@@ -2396,25 +2422,25 @@ __EOF__
 
 
 
-  ############
-  # Pet Sets #
-  ############
+  #################
+  # Stateful Sets #
+  #################
 
-  kube::log::status "Testing kubectl(${version}:petsets)"
+  kube::log::status "Testing kubectl(${version}:statefulsets)"
 
-  ### Create and stop petset, make sure it doesn't leak pods
-  # Pre-condition: no petset exists
-  kube::test::get_object_assert petset "{{range.items}}{{$id_field}}:{{end}}" ''
-  # Command: create petset
+  ### Create and stop statefulset, make sure it doesn't leak pods
+  # Pre-condition: no statefulset exists
+  kube::test::get_object_assert statefulset "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command: create statefulset
   kubectl create -f hack/testdata/nginx-petset.yaml "${kube_flags[@]}"
 
-  ### Scale petset test with current-replicas and replicas
+  ### Scale statefulset test with current-replicas and replicas
   # Pre-condition: 0 replicas
-  kube::test::get_object_assert 'petset nginx' "{{$petset_replicas_field}}" '0'
+  kube::test::get_object_assert 'statefulset nginx' "{{$statefulset_replicas_field}}" '0'
   # Command: Scale up
-  kubectl scale --current-replicas=0 --replicas=1 petset nginx "${kube_flags[@]}"
+  kubectl scale --current-replicas=0 --replicas=1 statefulset nginx "${kube_flags[@]}"
   # Post-condition: 1 replica, named nginx-0
-  kube::test::get_object_assert 'petset nginx' "{{$petset_replicas_field}}" '1'
+  kube::test::get_object_assert 'statefulset nginx' "{{$statefulset_replicas_field}}" '1'
   # Typically we'd wait and confirm that N>1 replicas are up, but this framework
   # doesn't start  the scheduler, so pet-0 will block all others.
   # TODO: test robust scaling in an e2e.
@@ -2422,7 +2448,7 @@ __EOF__
 
   ### Clean up
   kubectl delete -f hack/testdata/nginx-petset.yaml "${kube_flags[@]}"
-  # Post-condition: no pods from petset controller
+  # Post-condition: no pods from statefulset controller
   wait-for-pods-with-label "app=nginx-petset" ""
 
 

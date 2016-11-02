@@ -43,7 +43,7 @@ NODE_OS_DISTRIBUTION=${KUBE_NODE_OS_DISTRIBUTION:-${KUBE_OS_DISTRIBUTION:-gci}}
 # containervm. If you are updating the containervm version, update this
 # variable. Also please update corresponding image for node e2e at:
 # https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/jenkins/image-config.yaml
-CVM_VERSION=container-v1-3-v20160604
+CVM_VERSION=container-vm-v20161025
 GCI_VERSION="gci-dev-55-8872-18-0"
 MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
@@ -163,12 +163,7 @@ HAIRPIN_MODE="${HAIRPIN_MODE:-promiscuous-bridge}" # promiscuous-bridge, hairpin
 E2E_STORAGE_TEST_ENVIRONMENT=${KUBE_E2E_STORAGE_TEST_ENVIRONMENT:-false}
 
 # Evict pods whenever compute resource availability on the nodes gets below a threshold.
-# TODO: Get rid of the conditionals once https://github.com/kubernetes/kubernetes/issues/33444 is resolved.
-if [[ "${NODE_OS_DISTRIBUTION}" == "debian" ]]; then
-    EVICTION_HARD="${EVICTION_HARD:-memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5%}"
-else
-    EVICTION_HARD="${EVICTION_HARD:-memory.available<100Mi,imagefs.available<10%,imagefs.inodesFree<5%}"
-fi
+EVICTION_HARD="${EVICTION_HARD:-memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5%}"
 
 # Optional: custom scheduling algorithm
 SCHEDULING_ALGORITHM_PROVIDER="${SCHEDULING_ALGORITHM_PROVIDER:-}"

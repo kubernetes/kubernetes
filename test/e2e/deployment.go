@@ -1136,6 +1136,9 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	err = framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
 	Expect(err).NotTo(HaveOccurred())
 
+	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment)))
+	Expect(framework.WaitForDeploymentStatusValid(c, deployment)).NotTo(HaveOccurred())
+
 	oldRSs, _, rs, err := deploymentutil.GetAllReplicaSets(deployment, c)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -1148,10 +1151,6 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 		err = fmt.Errorf("unexpected desiredReplicas annotation %d for replica set %q", desired, rs.Name)
 		Expect(err).NotTo(HaveOccurred())
 	}
-
-	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment)))
-	err = framework.WaitForDeploymentStatusValid(c, deployment)
-	Expect(err).NotTo(HaveOccurred())
 
 	// Update the deployment with a non-existent image so that the new replica set will be blocked.
 	By(fmt.Sprintf("Updating deployment %q with a non-existent image", deploymentName))
@@ -1197,6 +1196,9 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	err = framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
 	Expect(err).NotTo(HaveOccurred())
 
+	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment)))
+	Expect(framework.WaitForDeploymentStatusValid(c, deployment)).NotTo(HaveOccurred())
+
 	oldRSs, _, rs, err = deploymentutil.GetAllReplicaSets(deployment, c)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -1209,10 +1211,6 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 		err = fmt.Errorf("unexpected desiredReplicas annotation %d for replica set %q", desired, rs.Name)
 		Expect(err).NotTo(HaveOccurred())
 	}
-
-	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment)))
-	err = framework.WaitForDeploymentStatusValid(c, deployment)
-	Expect(err).NotTo(HaveOccurred())
 }
 
 func testOverlappingDeployment(f *framework.Framework) {
@@ -1239,11 +1237,11 @@ func testOverlappingDeployment(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred(), "Failed creating the second deployment")
 
 	// Wait for overlapping annotation updated to both deployments
-	By("Waiting for both deployments to have overlapping annotations")
-	err = framework.WaitForOverlappingAnnotationMatch(c, ns, deploy.Name, deployOverlapping.Name)
-	Expect(err).NotTo(HaveOccurred(), "Failed to update the first deployment's overlapping annotation")
+	By("Waiting for the overlapping deployment to have overlapping annotation")
 	err = framework.WaitForOverlappingAnnotationMatch(c, ns, deployOverlapping.Name, deploy.Name)
 	Expect(err).NotTo(HaveOccurred(), "Failed to update the second deployment's overlapping annotation")
+	err = framework.WaitForOverlappingAnnotationMatch(c, ns, deploy.Name, "")
+	Expect(err).NotTo(HaveOccurred(), "The deployment that holds the oldest selector shouldn't have the overlapping annotation")
 
 	// Only the first deployment is synced
 	By("Checking only the first overlapping deployment is synced")
@@ -1295,11 +1293,11 @@ func testOverlappingDeployment(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Wait for overlapping annotation updated to both deployments
-	By("Waiting for both deployments to have overlapping annotations")
-	err = framework.WaitForOverlappingAnnotationMatch(c, ns, deployOverlapping.Name, deployLater.Name)
-	Expect(err).NotTo(HaveOccurred(), "Failed to update the second deployment's overlapping annotation")
+	By("Waiting for the third deployment to have the overlapping annotation")
 	err = framework.WaitForOverlappingAnnotationMatch(c, ns, deployLater.Name, deployOverlapping.Name)
 	Expect(err).NotTo(HaveOccurred(), "Failed to update the third deployment's overlapping annotation")
+	err = framework.WaitForOverlappingAnnotationMatch(c, ns, deployOverlapping.Name, "")
+	Expect(err).NotTo(HaveOccurred(), "The deployment that holds the oldest selector shouldn't have the overlapping annotation")
 
 	// The second deployment shouldn't be synced
 	By("Checking the second deployment is not synced")

@@ -75,7 +75,7 @@ func init() {
 	}
 }
 
-func (x *PetSet) CodecEncodeSelf(e *codec1978.Encoder) {
+func (x *StatefulSet) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
@@ -220,7 +220,7 @@ func (x *PetSet) CodecEncodeSelf(e *codec1978.Encoder) {
 	}
 }
 
-func (x *PetSet) CodecDecodeSelf(d *codec1978.Decoder) {
+func (x *StatefulSet) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -250,7 +250,7 @@ func (x *PetSet) CodecDecodeSelf(d *codec1978.Decoder) {
 	}
 }
 
-func (x *PetSet) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
+func (x *StatefulSet) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -293,14 +293,14 @@ func (x *PetSet) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 			}
 		case "spec":
 			if r.TryDecodeAsNil() {
-				x.Spec = PetSetSpec{}
+				x.Spec = StatefulSetSpec{}
 			} else {
 				yyv24 := &x.Spec
 				yyv24.CodecDecodeSelf(d)
 			}
 		case "status":
 			if r.TryDecodeAsNil() {
-				x.Status = PetSetStatus{}
+				x.Status = StatefulSetStatus{}
 			} else {
 				yyv25 := &x.Status
 				yyv25.CodecDecodeSelf(d)
@@ -312,7 +312,7 @@ func (x *PetSet) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
-func (x *PetSet) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
+func (x *StatefulSet) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -380,7 +380,7 @@ func (x *PetSet) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.Spec = PetSetSpec{}
+		x.Spec = StatefulSetSpec{}
 	} else {
 		yyv30 := &x.Spec
 		yyv30.CodecDecodeSelf(d)
@@ -397,7 +397,7 @@ func (x *PetSet) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.Status = PetSetStatus{}
+		x.Status = StatefulSetStatus{}
 	} else {
 		yyv31 := &x.Status
 		yyv31.CodecDecodeSelf(d)
@@ -418,7 +418,7 @@ func (x *PetSet) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
 
-func (x *PetSetSpec) CodecEncodeSelf(e *codec1978.Encoder) {
+func (x *StatefulSetSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
@@ -593,7 +593,7 @@ func (x *PetSetSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 	}
 }
 
-func (x *PetSetSpec) CodecDecodeSelf(d *codec1978.Decoder) {
+func (x *StatefulSetSpec) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -623,7 +623,7 @@ func (x *PetSetSpec) CodecDecodeSelf(d *codec1978.Decoder) {
 	}
 }
 
-func (x *PetSetSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
+func (x *StatefulSetSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -710,7 +710,7 @@ func (x *PetSetSpec) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
-func (x *PetSetSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
+func (x *StatefulSetSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -841,7 +841,7 @@ func (x *PetSetSpec) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
 
-func (x *PetSetStatus) CodecEncodeSelf(e *codec1978.Encoder) {
+func (x *StatefulSetStatus) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
@@ -935,7 +935,7 @@ func (x *PetSetStatus) CodecEncodeSelf(e *codec1978.Encoder) {
 	}
 }
 
-func (x *PetSetStatus) CodecDecodeSelf(d *codec1978.Decoder) {
+func (x *StatefulSetStatus) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -965,7 +965,7 @@ func (x *PetSetStatus) CodecDecodeSelf(d *codec1978.Decoder) {
 	}
 }
 
-func (x *PetSetStatus) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
+func (x *StatefulSetStatus) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -1016,7 +1016,7 @@ func (x *PetSetStatus) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
-func (x *PetSetStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
+func (x *StatefulSetStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -1081,7 +1081,7 @@ func (x *PetSetStatus) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
 
-func (x *PetSetList) CodecEncodeSelf(e *codec1978.Encoder) {
+func (x *StatefulSetList) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
@@ -1202,7 +1202,7 @@ func (x *PetSetList) CodecEncodeSelf(e *codec1978.Encoder) {
 					_ = yym105
 					if false {
 					} else {
-						h.encSlicePetSet(([]PetSet)(x.Items), e)
+						h.encSliceStatefulSet(([]StatefulSet)(x.Items), e)
 					}
 				}
 			} else {
@@ -1216,7 +1216,7 @@ func (x *PetSetList) CodecEncodeSelf(e *codec1978.Encoder) {
 					_ = yym106
 					if false {
 					} else {
-						h.encSlicePetSet(([]PetSet)(x.Items), e)
+						h.encSliceStatefulSet(([]StatefulSet)(x.Items), e)
 					}
 				}
 			}
@@ -1229,7 +1229,7 @@ func (x *PetSetList) CodecEncodeSelf(e *codec1978.Encoder) {
 	}
 }
 
-func (x *PetSetList) CodecDecodeSelf(d *codec1978.Decoder) {
+func (x *StatefulSetList) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -1259,7 +1259,7 @@ func (x *PetSetList) CodecDecodeSelf(d *codec1978.Decoder) {
 	}
 }
 
-func (x *PetSetList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
+func (x *StatefulSetList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -1315,7 +1315,7 @@ func (x *PetSetList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				_ = yym115
 				if false {
 				} else {
-					h.decSlicePetSet((*[]PetSet)(yyv114), d)
+					h.decSliceStatefulSet((*[]StatefulSet)(yyv114), d)
 				}
 			}
 		default:
@@ -1325,7 +1325,7 @@ func (x *PetSetList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
-func (x *PetSetList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
+func (x *StatefulSetList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -1406,7 +1406,7 @@ func (x *PetSetList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		_ = yym122
 		if false {
 		} else {
-			h.decSlicePetSet((*[]PetSet)(yyv121), d)
+			h.decSliceStatefulSet((*[]StatefulSet)(yyv121), d)
 		}
 	}
 	for {
@@ -1541,7 +1541,7 @@ func (x codecSelfer1234) decSlicev1_PersistentVolumeClaim(v *[]pkg2_v1.Persisten
 	}
 }
 
-func (x codecSelfer1234) encSlicePetSet(v []PetSet, e *codec1978.Encoder) {
+func (x codecSelfer1234) encSliceStatefulSet(v []StatefulSet, e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
@@ -1554,7 +1554,7 @@ func (x codecSelfer1234) encSlicePetSet(v []PetSet, e *codec1978.Encoder) {
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
 
-func (x codecSelfer1234) decSlicePetSet(v *[]PetSet, d *codec1978.Decoder) {
+func (x codecSelfer1234) decSliceStatefulSet(v *[]StatefulSet, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -1564,7 +1564,7 @@ func (x codecSelfer1234) decSlicePetSet(v *[]PetSet, d *codec1978.Decoder) {
 	var yyc131 bool
 	if yyl131 == 0 {
 		if yyv131 == nil {
-			yyv131 = []PetSet{}
+			yyv131 = []StatefulSet{}
 			yyc131 = true
 		} else if len(yyv131) != 0 {
 			yyv131 = yyv131[:0]
@@ -1582,10 +1582,10 @@ func (x codecSelfer1234) decSlicePetSet(v *[]PetSet, d *codec1978.Decoder) {
 				if yyrl131 <= cap(yyv131) {
 					yyv131 = yyv131[:yyrl131]
 				} else {
-					yyv131 = make([]PetSet, yyrl131)
+					yyv131 = make([]StatefulSet, yyrl131)
 				}
 			} else {
-				yyv131 = make([]PetSet, yyrl131)
+				yyv131 = make([]StatefulSet, yyrl131)
 			}
 			yyc131 = true
 			yyrr131 = len(yyv131)
@@ -1600,7 +1600,7 @@ func (x codecSelfer1234) decSlicePetSet(v *[]PetSet, d *codec1978.Decoder) {
 		for ; yyj131 < yyrr131; yyj131++ {
 			yyh131.ElemContainerState(yyj131)
 			if r.TryDecodeAsNil() {
-				yyv131[yyj131] = PetSet{}
+				yyv131[yyj131] = StatefulSet{}
 			} else {
 				yyv132 := &yyv131[yyj131]
 				yyv132.CodecDecodeSelf(d)
@@ -1609,10 +1609,10 @@ func (x codecSelfer1234) decSlicePetSet(v *[]PetSet, d *codec1978.Decoder) {
 		}
 		if yyrt131 {
 			for ; yyj131 < yyl131; yyj131++ {
-				yyv131 = append(yyv131, PetSet{})
+				yyv131 = append(yyv131, StatefulSet{})
 				yyh131.ElemContainerState(yyj131)
 				if r.TryDecodeAsNil() {
-					yyv131[yyj131] = PetSet{}
+					yyv131[yyj131] = StatefulSet{}
 				} else {
 					yyv133 := &yyv131[yyj131]
 					yyv133.CodecDecodeSelf(d)
@@ -1626,13 +1626,13 @@ func (x codecSelfer1234) decSlicePetSet(v *[]PetSet, d *codec1978.Decoder) {
 		for ; !r.CheckBreak(); yyj131++ {
 
 			if yyj131 >= len(yyv131) {
-				yyv131 = append(yyv131, PetSet{}) // var yyz131 PetSet
+				yyv131 = append(yyv131, StatefulSet{}) // var yyz131 StatefulSet
 				yyc131 = true
 			}
 			yyh131.ElemContainerState(yyj131)
 			if yyj131 < len(yyv131) {
 				if r.TryDecodeAsNil() {
-					yyv131[yyj131] = PetSet{}
+					yyv131[yyj131] = StatefulSet{}
 				} else {
 					yyv134 := &yyv131[yyj131]
 					yyv134.CodecDecodeSelf(d)
@@ -1647,7 +1647,7 @@ func (x codecSelfer1234) decSlicePetSet(v *[]PetSet, d *codec1978.Decoder) {
 			yyv131 = yyv131[:yyj131]
 			yyc131 = true
 		} else if yyj131 == 0 && yyv131 == nil {
-			yyv131 = []PetSet{}
+			yyv131 = []StatefulSet{}
 			yyc131 = true
 		}
 	}

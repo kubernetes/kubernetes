@@ -21,6 +21,7 @@ import (
 	api_v1 "k8s.io/client-go/pkg/api/v1"
 	v1 "k8s.io/client-go/pkg/apis/autoscaling/v1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // HorizontalPodAutoscalersGetter has a method to return a HorizontalPodAutoscalerInterface.
@@ -45,14 +46,14 @@ type HorizontalPodAutoscalerInterface interface {
 
 // horizontalPodAutoscalers implements HorizontalPodAutoscalerInterface
 type horizontalPodAutoscalers struct {
-	client *AutoscalingClient
+	client rest.Interface
 	ns     string
 }
 
 // newHorizontalPodAutoscalers returns a HorizontalPodAutoscalers
 func newHorizontalPodAutoscalers(c *AutoscalingClient, namespace string) *horizontalPodAutoscalers {
 	return &horizontalPodAutoscalers{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/watch/versioned"
 )
@@ -206,32 +205,13 @@ func NewNegotiatedSerializer(s runtime.NegotiatedSerializer, kind string, encode
 	}
 }
 
-func (t *thirdPartyResourceDataCodecFactory) SupportedMediaTypes() []string {
-	supported := sets.NewString(t.delegate.SupportedMediaTypes()...)
-	return supported.Intersection(sets.NewString("application/json", "application/yaml")).List()
-}
-
-func (t *thirdPartyResourceDataCodecFactory) SerializerForMediaType(mediaType string, params map[string]string) (runtime.SerializerInfo, bool) {
-	switch mediaType {
-	case "application/json", "application/yaml":
-		return t.delegate.SerializerForMediaType(mediaType, params)
-	default:
-		return runtime.SerializerInfo{}, false
+func (t *thirdPartyResourceDataCodecFactory) SupportedMediaTypes() []runtime.SerializerInfo {
+	for _, info := range t.delegate.SupportedMediaTypes() {
+		if info.MediaType == runtime.ContentTypeJSON {
+			return []runtime.SerializerInfo{info}
+		}
 	}
-}
-
-func (t *thirdPartyResourceDataCodecFactory) SupportedStreamingMediaTypes() []string {
-	supported := sets.NewString(t.delegate.SupportedStreamingMediaTypes()...)
-	return supported.Intersection(sets.NewString("application/json", "application/json;stream=watch")).List()
-}
-
-func (t *thirdPartyResourceDataCodecFactory) StreamingSerializerForMediaType(mediaType string, params map[string]string) (runtime.StreamSerializerInfo, bool) {
-	switch mediaType {
-	case "application/json", "application/json;stream=watch":
-		return t.delegate.StreamingSerializerForMediaType(mediaType, params)
-	default:
-		return runtime.StreamSerializerInfo{}, false
-	}
+	return nil
 }
 
 func (t *thirdPartyResourceDataCodecFactory) EncoderForVersion(s runtime.Encoder, gv runtime.GroupVersioner) runtime.Encoder {

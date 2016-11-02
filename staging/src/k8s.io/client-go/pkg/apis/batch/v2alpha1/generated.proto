@@ -21,11 +21,11 @@ syntax = 'proto2';
 
 package k8s.io.kubernetes.pkg.apis.batch.v2alpha1;
 
-import "k8s.io/client-go/pkg/api/resource/generated.proto";
-import "k8s.io/client-go/pkg/api/unversioned/generated.proto";
-import "k8s.io/client-go/pkg/api/v1/generated.proto";
-import "k8s.io/client-go/pkg/runtime/generated.proto";
-import "k8s.io/client-go/pkg/util/intstr/generated.proto";
+import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
+import "k8s.io/kubernetes/pkg/api/unversioned/generated.proto";
+import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
+import "k8s.io/kubernetes/pkg/runtime/generated.proto";
+import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v2alpha1";
@@ -34,14 +34,17 @@ option go_package = "v2alpha1";
 message Job {
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
   // Spec is a structure defining the expected behavior of a job.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+  // +optional
   optional JobSpec spec = 2;
 
   // Status is a structure describing current status of a job.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+  // +optional
   optional JobStatus status = 3;
 }
 
@@ -54,15 +57,19 @@ message JobCondition {
   optional string status = 2;
 
   // Last time the condition was checked.
+  // +optional
   optional k8s.io.kubernetes.pkg.api.unversioned.Time lastProbeTime = 3;
 
   // Last time the condition transit from one status to another.
+  // +optional
   optional k8s.io.kubernetes.pkg.api.unversioned.Time lastTransitionTime = 4;
 
   // (brief) reason for the condition's last transition.
+  // +optional
   optional string reason = 5;
 
   // Human readable message indicating details about last transition.
+  // +optional
   optional string message = 6;
 }
 
@@ -70,6 +77,7 @@ message JobCondition {
 message JobList {
   // Standard list metadata
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // +optional
   optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
 
   // Items is the list of Job.
@@ -83,6 +91,7 @@ message JobSpec {
   // be less than this number when ((.spec.completions - .status.successful) < .spec.parallelism),
   // i.e. when the work left to do is less than max parallelism.
   // More info: http://kubernetes.io/docs/user-guide/jobs
+  // +optional
   optional int32 parallelism = 1;
 
   // Completions specifies the desired number of successfully finished pods the
@@ -91,16 +100,19 @@ message JobSpec {
   // value.  Setting to 1 means that parallelism is limited to 1 and the success of that
   // pod signals the success of the job.
   // More info: http://kubernetes.io/docs/user-guide/jobs
+  // +optional
   optional int32 completions = 2;
 
   // Optional duration in seconds relative to the startTime that the job may be active
   // before the system tries to terminate it; value must be positive integer
+  // +optional
   optional int64 activeDeadlineSeconds = 3;
 
   // Selector is a label query over pods that should match the pod count.
   // Normally, the system sets this field for you.
   // More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
-  optional LabelSelector selector = 4;
+  // +optional
+  optional k8s.io.kubernetes.pkg.api.unversioned.LabelSelector selector = 4;
 
   // ManualSelector controls generation of pod labels and pod selectors.
   // Leave `manualSelector` unset unless you are certain what you are doing.
@@ -112,6 +124,7 @@ message JobSpec {
   // `manualSelector=true` in jobs that were created with the old `extensions/v1beta1`
   // API.
   // More info: http://releases.k8s.io/HEAD/docs/design/selector-generation.md
+  // +optional
   optional bool manualSelector = 5;
 
   // Template is the object that describes the pod that will be created when
@@ -124,25 +137,31 @@ message JobSpec {
 message JobStatus {
   // Conditions represent the latest available observations of an object's current state.
   // More info: http://kubernetes.io/docs/user-guide/jobs
+  // +optional
   repeated JobCondition conditions = 1;
 
   // StartTime represents time when the job was acknowledged by the Job Manager.
   // It is not guaranteed to be set in happens-before order across separate operations.
   // It is represented in RFC3339 form and is in UTC.
+  // +optional
   optional k8s.io.kubernetes.pkg.api.unversioned.Time startTime = 2;
 
   // CompletionTime represents time when the job was completed. It is not guaranteed to
   // be set in happens-before order across separate operations.
   // It is represented in RFC3339 form and is in UTC.
+  // +optional
   optional k8s.io.kubernetes.pkg.api.unversioned.Time completionTime = 3;
 
   // Active is the number of actively running pods.
+  // +optional
   optional int32 active = 4;
 
   // Succeeded is the number of pods which reached Phase Succeeded.
+  // +optional
   optional int32 succeeded = 5;
 
   // Failed is the number of pods which reached Phase Failed.
+  // +optional
   optional int32 failed = 6;
 }
 
@@ -150,10 +169,12 @@ message JobStatus {
 message JobTemplate {
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
   // Template defines jobs that will be created from this template
   // http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+  // +optional
   optional JobTemplateSpec template = 2;
 }
 
@@ -161,55 +182,30 @@ message JobTemplate {
 message JobTemplateSpec {
   // Standard object's metadata of the jobs created from this template.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
   // Specification of the desired behavior of the job.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+  // +optional
   optional JobSpec spec = 2;
-}
-
-// A label selector is a label query over a set of resources. The result of matchLabels and
-// matchExpressions are ANDed. An empty label selector matches all objects. A null
-// label selector matches no objects.
-message LabelSelector {
-  // matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
-  // map is equivalent to an element of matchExpressions, whose key field is "key", the
-  // operator is "In", and the values array contains only "value". The requirements are ANDed.
-  map<string, string> matchLabels = 1;
-
-  // matchExpressions is a list of label selector requirements. The requirements are ANDed.
-  repeated LabelSelectorRequirement matchExpressions = 2;
-}
-
-// A label selector requirement is a selector that contains values, a key, and an operator that
-// relates the key and values.
-message LabelSelectorRequirement {
-  // key is the label key that the selector applies to.
-  optional string key = 1;
-
-  // operator represents a key's relationship to a set of values.
-  // Valid operators ard In, NotIn, Exists and DoesNotExist.
-  optional string operator = 2;
-
-  // values is an array of string values. If the operator is In or NotIn,
-  // the values array must be non-empty. If the operator is Exists or DoesNotExist,
-  // the values array must be empty. This array is replaced during a strategic
-  // merge patch.
-  repeated string values = 3;
 }
 
 // ScheduledJob represents the configuration of a single scheduled job.
 message ScheduledJob {
   // Standard object's metadata.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
   // Spec is a structure defining the expected behavior of a job, including the schedule.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+  // +optional
   optional ScheduledJobSpec spec = 2;
 
   // Status is a structure describing current status of a job.
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+  // +optional
   optional ScheduledJobStatus status = 3;
 }
 
@@ -217,6 +213,7 @@ message ScheduledJob {
 message ScheduledJobList {
   // Standard list metadata
   // More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // +optional
   optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
 
   // Items is the list of ScheduledJob.
@@ -230,13 +227,16 @@ message ScheduledJobSpec {
 
   // Optional deadline in seconds for starting the job if it misses scheduled
   // time for any reason.  Missed jobs executions will be counted as failed ones.
+  // +optional
   optional int64 startingDeadlineSeconds = 2;
 
   // ConcurrencyPolicy specifies how to treat concurrent executions of a Job.
+  // +optional
   optional string concurrencyPolicy = 3;
 
   // Suspend flag tells the controller to suspend subsequent executions, it does
   // not apply to already started executions.  Defaults to false.
+  // +optional
   optional bool suspend = 4;
 
   // JobTemplate is the object that describes the job that will be created when
@@ -247,9 +247,11 @@ message ScheduledJobSpec {
 // ScheduledJobStatus represents the current state of a Job.
 message ScheduledJobStatus {
   // Active holds pointers to currently running jobs.
+  // +optional
   repeated k8s.io.kubernetes.pkg.api.v1.ObjectReference active = 1;
 
   // LastScheduleTime keeps information of when was the last time the job was successfully scheduled.
+  // +optional
   optional k8s.io.kubernetes.pkg.api.unversioned.Time lastScheduleTime = 4;
 }
 

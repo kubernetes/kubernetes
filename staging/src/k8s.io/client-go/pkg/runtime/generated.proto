@@ -21,8 +21,8 @@ syntax = 'proto2';
 
 package k8s.io.kubernetes.pkg.runtime;
 
-import "k8s.io/client-go/pkg/api/resource/generated.proto";
-import "k8s.io/client-go/pkg/util/intstr/generated.proto";
+import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
+import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "runtime";
@@ -94,8 +94,10 @@ message RawExtension {
 // +protobuf=true
 // +k8s:openapi-gen=true
 message TypeMeta {
+  // +optional
   optional string apiVersion = 1;
 
+  // +optional
   optional string kind = 2;
 }
 

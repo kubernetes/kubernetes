@@ -130,11 +130,11 @@ func validateObject(obj runtime.Object) (errors field.ErrorList) {
 			t.Namespace = api.NamespaceDefault
 		}
 		errors = expvalidation.ValidateDaemonSet(t)
-	case *apps.PetSet:
+	case *apps.StatefulSet:
 		if t.Namespace == "" {
 			t.Namespace = api.NamespaceDefault
 		}
-		errors = appsvalidation.ValidatePetSet(t)
+		errors = appsvalidation.ValidateStatefulSet(t)
 	default:
 		errors = field.ErrorList{}
 		errors = append(errors, field.InternalError(field.NewPath(""), fmt.Errorf("no validation defined for %#v", obj)))
@@ -221,7 +221,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"cassandra-daemonset":  &extensions.DaemonSet{},
 			"cassandra-controller": &api.ReplicationController{},
 			"cassandra-service":    &api.Service{},
-			"cassandra-petset":     &apps.PetSet{},
+			"cassandra-petset":     &apps.StatefulSet{},
 		},
 		"../examples/cluster-dns": {
 			"dns-backend-rc":      &api.ReplicationController{},

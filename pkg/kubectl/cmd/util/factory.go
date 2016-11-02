@@ -51,7 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
+	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
@@ -129,10 +129,10 @@ type Factory interface {
 	LabelsForObject(object runtime.Object) (map[string]string, error)
 	// LogsForObject returns a request for the logs associated with the provided object
 	LogsForObject(object, options runtime.Object) (*restclient.Request, error)
-	// PauseObject marks the provided object as paused ie. it will not be reconciled by its controller.
-	PauseObject(object runtime.Object) (bool, error)
-	// ResumeObject resumes a paused object ie. it will be reconciled by its controller.
-	ResumeObject(object runtime.Object) (bool, error)
+	// Pauser marks the object in the info as paused ie. it will not be reconciled by its controller.
+	Pauser(info *resource.Info) (bool, error)
+	// Resumer resumes a paused object inside the info ie. it will be reconciled by its controller.
+	Resumer(info *resource.Info) (bool, error)
 	// Returns a schema that can validate objects stored on disk.
 	Validator(validate bool, cacheDir string) (validation.Schema, error)
 	// SwaggerSchema returns the schema declaration for the provided group version kind.
@@ -178,6 +178,9 @@ type Factory interface {
 	PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (kubectl.ResourcePrinter, error)
 	// One stop shopping for a Builder
 	NewBuilder() *resource.Builder
+
+	// SuggestedPodTemplateResources returns a list of resource types that declare a pod template
+	SuggestedPodTemplateResources() []unversioned.GroupResource
 }
 
 const (
@@ -202,6 +205,7 @@ const (
 	SecretForDockerRegistryV1GeneratorName      = "secret-for-docker-registry/v1"
 	SecretForTLSV1GeneratorName                 = "secret-for-tls/v1"
 	ConfigMapV1GeneratorName                    = "configmap/v1"
+	ClusterV1Beta1GeneratorName                 = "cluster/v1beta1"
 )
 
 // DefaultGenerators returns the set of default generators for use in Factory instances
@@ -641,49 +645,29 @@ func (f *factory) LogsForObject(object, options runtime.Object) (*restclient.Req
 	}
 }
 
-func (f *factory) PauseObject(object runtime.Object) (bool, error) {
-	clientset, err := f.clients.ClientSetForVersion(nil)
-	if err != nil {
-		return false, err
-	}
-
-	switch t := object.(type) {
+func (f *factory) Pauser(info *resource.Info) (bool, error) {
+	switch obj := info.Object.(type) {
 	case *extensions.Deployment:
-		if t.Spec.Paused {
-			return true, nil
+		if obj.Spec.Paused {
+			return true, errors.New("is already paused")
 		}
-		t.Spec.Paused = true
-		_, err := clientset.Extensions().Deployments(t.Namespace).Update(t)
-		return false, err
+		obj.Spec.Paused = true
+		return true, nil
 	default:
-		gvks, _, err := api.Scheme.ObjectKinds(object)
-		if err != nil {
-			return false, err
-		}
-		return false, fmt.Errorf("cannot pause %v", gvks[0])
+		return false, fmt.Errorf("pausing is not supported")
 	}
 }
 
-func (f *factory) ResumeObject(object runtime.Object) (bool, error) {
-	clientset, err := f.clients.ClientSetForVersion(nil)
-	if err != nil {
-		return false, err
-	}
-
-	switch t := object.(type) {
+func (f *factory) Resumer(info *resource.Info) (bool, error) {
+	switch obj := info.Object.(type) {
 	case *extensions.Deployment:
-		if !t.Spec.Paused {
-			return true, nil
+		if !obj.Spec.Paused {
+			return true, errors.New("is not paused")
 		}
-		t.Spec.Paused = false
-		_, err := clientset.Extensions().Deployments(t.Namespace).Update(t)
-		return false, err
+		obj.Spec.Paused = false
+		return true, nil
 	default:
-		gvks, _, err := api.Scheme.ObjectKinds(object)
-		if err != nil {
-			return false, err
-		}
-		return false, fmt.Errorf("cannot resume %v", gvks[0])
+		return false, fmt.Errorf("resuming is not supported")
 	}
 }
 
@@ -863,7 +847,7 @@ func (f *factory) UpdatePodSpecForObject(obj runtime.Object, fn func(*api.PodSpe
 		return true, fn(&t.Spec.Template.Spec)
 	case *extensions.ReplicaSet:
 		return true, fn(&t.Spec.Template.Spec)
-	case *apps.PetSet:
+	case *apps.StatefulSet:
 		return true, fn(&t.Spec.Template.Spec)
 	case *batch.Job:
 		return true, fn(&t.Spec.Template.Spec)
@@ -1333,6 +1317,16 @@ func (f *factory) NewBuilder() *resource.Builder {
 	return resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true))
 }
 
+func (f *factory) SuggestedPodTemplateResources() []unversioned.GroupResource {
+	return []unversioned.GroupResource{
+		{Resource: "replicationcontroller"},
+		{Resource: "deployment"},
+		{Resource: "daemonset"},
+		{Resource: "job"},
+		{Resource: "replicaset"},
+	}
+}
+
 // registerThirdPartyResources inspects the discovery endpoint to find thirdpartyresources in the discovery doc
 // and then registers them with the apimachinery code.  I think this is done so that scheme/codec stuff works,
 // but I really don't know.  Feels like this code should go away once kubectl is completely generic for generic
@@ -1382,21 +1376,4 @@ func registerThirdPartyResources(discoveryClient discovery.DiscoveryInterface) e
 	}
 
 	return nil
-}
-
-func ResourcesWithPodSpecs() []*meta.RESTMapping {
-	restMaps := []*meta.RESTMapping{}
-	resourcesWithTemplates := []string{"ReplicationController", "Deployment", "DaemonSet", "Job", "ReplicaSet"}
-	mapper, _ := NewFactory(nil).Object()
-
-	for _, resource := range resourcesWithTemplates {
-		restmap, err := mapper.RESTMapping(unversioned.GroupKind{Kind: resource})
-		if err == nil {
-			restMaps = append(restMaps, restmap)
-		} else {
-			mapping, _ := mapper.RESTMapping(extensions.Kind(resource))
-			restMaps = append(restMaps, mapping)
-		}
-	}
-	return restMaps
 }

@@ -21,7 +21,6 @@ limitations under the License.
 package v1beta1
 
 import (
-	api "k8s.io/client-go/pkg/api"
 	authentication "k8s.io/client-go/pkg/apis/authentication"
 	conversion "k8s.io/client-go/pkg/conversion"
 	runtime "k8s.io/client-go/pkg/runtime"
@@ -47,9 +46,6 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 }
 
 func autoConvert_v1beta1_TokenReview_To_authentication_TokenReview(in *TokenReview, out *authentication.TokenReview, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
 	// TODO: Inefficient conversion - can we improve it?
 	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
 		return err
@@ -68,9 +64,6 @@ func Convert_v1beta1_TokenReview_To_authentication_TokenReview(in *TokenReview, 
 }
 
 func autoConvert_authentication_TokenReview_To_v1beta1_TokenReview(in *authentication.TokenReview, out *TokenReview, s conversion.Scope) error {
-	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
-		return err
-	}
 	// TODO: Inefficient conversion - can we improve it?
 	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
 		return err

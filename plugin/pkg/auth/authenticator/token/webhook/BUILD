@@ -21,7 +21,7 @@ go_library(
         "//pkg/apis/authentication/v1beta1:go_default_library",
         "//pkg/auth/authenticator:go_default_library",
         "//pkg/auth/user:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset/typed/authentication/unversioned:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset/typed/authentication/internalversion:go_default_library",
         "//pkg/util/cache:go_default_library",
         "//plugin/pkg/webhook:go_default_library",
     ],

@@ -431,10 +431,10 @@ func (c *Converter) SetStructFieldCopy(srcFieldType interface{}, srcFieldName st
 }
 
 // RegisterDefaultingFunc registers a value-defaulting func with the Converter.
-// defaultingFunc must take one parameters: a pointer to the input type.
+// defaultingFunc must take one parameter: a pointer to the input type.
 //
 // Example:
-// c.RegisteDefaultingFunc(
+// c.RegisterDefaultingFunc(
 //         func(in *v1.Pod) {
 //                 // defaulting logic...
 //          })

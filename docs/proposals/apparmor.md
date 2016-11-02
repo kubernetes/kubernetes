@@ -113,7 +113,7 @@ Ubuntu system. The profiles can be found at `{securityfs}/apparmor/profiles`
 
 ## API Changes
 
-The intial alpha support of AppArmor will follow the pattern
+The initial alpha support of AppArmor will follow the pattern
 [used by seccomp](https://github.com/kubernetes/kubernetes/pull/25324) and specify profiles through
 annotations. Profiles can be specified per-container through pod annotations. The annotation format
 is a key matching the container, and a profile name value:

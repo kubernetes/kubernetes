@@ -39,3 +39,11 @@ go_library(
         "//vendor:github.com/spf13/cobra",
     ],
 )
+
+go_test(
+    name = "go_default_test",
+    srcs = ["reset_test.go"],
+    library = "go_default_library",
+    tags = ["automanaged"],
+    deps = ["//cmd/kubeadm/app/preflight:go_default_library"],
+)

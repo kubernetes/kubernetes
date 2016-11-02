@@ -20,6 +20,7 @@ import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // PodsGetter has a method to return a PodInterface.
@@ -44,14 +45,14 @@ type PodInterface interface {
 
 // pods implements PodInterface
 type pods struct {
-	client *CoreClient
+	client rest.Interface
 	ns     string
 }
 
 // newPods returns a Pods
 func newPods(c *CoreClient, namespace string) *pods {
 	return &pods{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

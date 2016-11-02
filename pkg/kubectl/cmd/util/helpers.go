@@ -255,6 +255,26 @@ func MultilineError(prefix string, err error) string {
 	return fmt.Sprintf("%s%s\n", prefix, err)
 }
 
+// PrintErrorWithCauses prints an error's kind, name, and each of the error's causes in a new line.
+// The returned string will end with a newline.
+// Returns true if a case exists to handle the error type, or false otherwise.
+func PrintErrorWithCauses(err error, errOut io.Writer) bool {
+	switch t := err.(type) {
+	case *kerrors.StatusError:
+		errorDetails := t.Status().Details
+		if errorDetails != nil {
+			fmt.Fprintf(errOut, "error: %s %q is invalid\n\n", errorDetails.Kind, errorDetails.Name)
+			for _, cause := range errorDetails.Causes {
+				fmt.Fprintf(errOut, "* %s: %s\n", cause.Field, cause.Message)
+			}
+			return true
+		}
+	}
+
+	fmt.Fprintf(errOut, "error: %v\n", err)
+	return false
+}
+
 // MultipleErrors returns a newline delimited string containing
 // the prefix and referenced errors in standard form.
 func MultipleErrors(prefix string, errs []error) string {

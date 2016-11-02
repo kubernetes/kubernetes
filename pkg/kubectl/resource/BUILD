@@ -66,7 +66,7 @@ go_test(
         "//pkg/api/unversioned:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
-        "//pkg/client/unversioned/fake:go_default_library",
+        "//pkg/client/restclient/fake:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/runtime/serializer/streaming:go_default_library",

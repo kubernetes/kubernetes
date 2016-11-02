@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
+	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	horizontalpodautoscaleretcd "k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler/etcd"
 	jobetcd "k8s.io/kubernetes/pkg/registry/batch/job/etcd"
@@ -139,4 +139,8 @@ func (p RESTStorageProvider) postStartHookFunc(hookContext genericapiserver.Post
 	}, 10*time.Second)
 
 	return nil
+}
+
+func (p RESTStorageProvider) GroupName() string {
+	return extensions.GroupName
 }

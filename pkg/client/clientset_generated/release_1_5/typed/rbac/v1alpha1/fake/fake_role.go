@@ -28,7 +28,7 @@ import (
 
 // FakeRoles implements RoleInterface
 type FakeRoles struct {
-	Fake *FakeRbac
+	Fake *FakeRbacV1alpha1
 	ns   string
 }
 

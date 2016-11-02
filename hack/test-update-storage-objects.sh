@@ -160,11 +160,12 @@ killApiServer
 
 kube::etcd::stop
 TARGET_STORAGE="etcd3" \
-  TARGET_VERSION="3.0.10" \
+  TARGET_VERSION="3.0.13" \
   DATA_DIRECTORY="${ETCD_DIR}" \
   ETCD=$(which etcd) \
   ETCDCTL=$(which etcdctl) \
   ATTACHLEASE="${KUBE_OUTPUT_HOSTBIN}/attachlease" \
+  DO_NOT_MOVE_BINARIES="true" \
   ${KUBE_ROOT}/cluster/images/etcd/migrate-if-needed.sh
 kube::etcd::start
 

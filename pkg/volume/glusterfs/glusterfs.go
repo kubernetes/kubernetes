@@ -550,6 +550,10 @@ func (p *glusterfsVolumeProvisioner) CreateVolume() (r *api.GlusterfsVolumeSourc
 	endpoint, service, err := p.createEndpointService(epNamespace, epServiceName, dynamicHostIps, p.options.PVC.Name)
 	if err != nil {
 		glog.Errorf("glusterfs: failed to create endpoint/service")
+		err = cli.VolumeDelete(volume.Id)
+		if err != nil {
+			glog.Errorf("glusterfs: error when deleting the volume :%v , manual deletion required", err)
+		}
 		return nil, 0, fmt.Errorf("failed to create endpoint/service %v", err)
 	}
 	glog.V(3).Infof("glusterfs: dynamic ep %v and svc : %v ", endpoint, service)
@@ -623,7 +627,7 @@ func (d *glusterfsVolumeDeleter) deleteEndpointService(namespace string, epServi
 
 // parseSecret finds a given Secret instance and reads user password from it.
 func parseSecret(namespace, secretName string, kubeClient clientset.Interface) (string, error) {
-	secretMap, err := volutil.GetSecret(namespace, secretName, kubeClient)
+	secretMap, err := volutil.GetSecretForPV(namespace, secretName, glusterfsPluginName, kubeClient)
 	if err != nil {
 		glog.Errorf("failed to get secret from [%q/%q]", namespace, secretName)
 		return "", fmt.Errorf("failed to get secret from [%q/%q]", namespace, secretName)

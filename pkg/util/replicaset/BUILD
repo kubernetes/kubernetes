@@ -19,7 +19,7 @@ go_library(
         "//pkg/api/errors:go_default_library",
         "//pkg/api/unversioned:go_default_library",
         "//pkg/apis/extensions:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/util/errors:go_default_library",
         "//pkg/util/labels:go_default_library",

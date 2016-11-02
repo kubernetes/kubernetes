@@ -37,7 +37,7 @@ type selfSubjectAccessReviews struct {
 }
 
 // newSelfSubjectAccessReviews returns a SelfSubjectAccessReviews
-func newSelfSubjectAccessReviews(c *AuthorizationClient) *selfSubjectAccessReviews {
+func newSelfSubjectAccessReviews(c *AuthorizationV1beta1Client) *selfSubjectAccessReviews {
 	return &selfSubjectAccessReviews{
 		client: c.RESTClient(),
 	}

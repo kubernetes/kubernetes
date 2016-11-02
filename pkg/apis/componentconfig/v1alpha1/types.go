@@ -491,6 +491,9 @@ type KubeletConfiguration struct {
 	// Resource isolation might be lacking and pod might influence each other on the same node.
 	// +optional
 	AllowedUnsafeSysctls []string `json:"allowedUnsafeSysctls,omitempty"`
+	// featureGates is a string of comma-separated key=value pairs that describe feature
+	// gates for alpha/experimental features.
+	FeatureGates string `json:"featureGates,omitempty"`
 	// How to integrate with runtime. If set to CRI, kubelet will switch to
 	// using the new Container Runtine Interface.
 	// +optional

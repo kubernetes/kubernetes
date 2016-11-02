@@ -217,6 +217,22 @@ func (s base64Serializer) Decode(data []byte, defaults *unversioned.GroupVersion
 	return s.Serializer.Decode(out[:n], defaults, into)
 }
 
+// SerializerInfoForMediaType returns the first info in types that has a matching media type (which cannot
+// include media-type parameters), or the first info with an empty media type, or false if no type matches.
+func SerializerInfoForMediaType(types []SerializerInfo, mediaType string) (SerializerInfo, bool) {
+	for _, info := range types {
+		if info.MediaType == mediaType {
+			return info, true
+		}
+	}
+	for _, info := range types {
+		if len(info.MediaType) == 0 {
+			return info, true
+		}
+	}
+	return SerializerInfo{}, false
+}
+
 var (
 	// InternalGroupVersioner will always prefer the internal version for a given group version kind.
 	InternalGroupVersioner GroupVersioner = internalGroupVersioner{}

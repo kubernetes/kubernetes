@@ -38,5 +38,8 @@ export LOG_LEVEL=4
 
 cd /go/src/k8s.io/kubernetes
 
+# hack/verify-client-go.sh requires all dependencies exist in the GOPATH.
+godep restore
+
 ./hack/install-etcd.sh
 make verify

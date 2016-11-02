@@ -19,7 +19,6 @@ package apiserver
 import (
 	"net/http"
 	"net/url"
-	"reflect"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -30,38 +29,24 @@ type fakeNegotiater struct {
 	serializer, streamSerializer runtime.Serializer
 	framer                       runtime.Framer
 	types, streamTypes           []string
-	mediaType, streamMediaType   string
-	options, streamOptions       map[string]string
 }
 
-func (n *fakeNegotiater) SupportedMediaTypes() []string {
-	return n.types
-}
-func (n *fakeNegotiater) SupportedStreamingMediaTypes() []string {
-	return n.streamTypes
-}
-
-func (n *fakeNegotiater) SerializerForMediaType(mediaType string, options map[string]string) (runtime.SerializerInfo, bool) {
-	n.mediaType = mediaType
-	if len(options) > 0 {
-		n.options = options
+func (n *fakeNegotiater) SupportedMediaTypes() []runtime.SerializerInfo {
+	var out []runtime.SerializerInfo
+	for _, s := range n.types {
+		info := runtime.SerializerInfo{Serializer: n.serializer, MediaType: s, EncodesAsText: true}
+		for _, t := range n.streamTypes {
+			if t == s {
+				info.StreamSerializer = &runtime.StreamSerializerInfo{
+					EncodesAsText: true,
+					Framer:        n.framer,
+					Serializer:    n.streamSerializer,
+				}
+			}
+		}
+		out = append(out, info)
 	}
-	return runtime.SerializerInfo{Serializer: n.serializer, MediaType: n.mediaType, EncodesAsText: true}, n.serializer != nil
-}
-
-func (n *fakeNegotiater) StreamingSerializerForMediaType(mediaType string, options map[string]string) (runtime.StreamSerializerInfo, bool) {
-	n.streamMediaType = mediaType
-	if len(options) > 0 {
-		n.streamOptions = options
-	}
-	return runtime.StreamSerializerInfo{
-		SerializerInfo: runtime.SerializerInfo{
-			Serializer:    n.serializer,
-			MediaType:     mediaType,
-			EncodesAsText: true,
-		},
-		Framer: n.framer,
-	}, n.streamSerializer != nil
+	return out
 }
 
 func (n *fakeNegotiater) EncoderForVersion(serializer runtime.Encoder, gv runtime.GroupVersioner) runtime.Encoder {
@@ -202,12 +187,6 @@ func TestNegotiate(t *testing.T) {
 			},
 		},
 		{
-			ns: &fakeNegotiater{types: []string{"a/b/c"}},
-			errFn: func(err error) bool {
-				return err.Error() == "only the following media types are accepted: a/b/c"
-			},
-		},
-		{
 			ns: &fakeNegotiater{},
 			errFn: func(err error) bool {
 				return err.Error() == "only the following media types are accepted: "
@@ -218,13 +197,6 @@ func TestNegotiate(t *testing.T) {
 			ns:     &fakeNegotiater{},
 			errFn: func(err error) bool {
 				return err.Error() == "only the following media types are accepted: "
-			},
-		},
-		{
-			accept: "application/json",
-			ns:     &fakeNegotiater{types: []string{"application/json"}},
-			errFn: func(err error) bool {
-				return err.Error() == "only the following media types are accepted: application/json"
 			},
 		},
 	}
@@ -263,9 +235,6 @@ func TestNegotiate(t *testing.T) {
 		}
 		if s.Serializer != test.serializer {
 			t.Errorf("%d: unexpected %s %s", i, test.serializer, s.Serializer)
-		}
-		if !reflect.DeepEqual(test.params, test.ns.options) {
-			t.Errorf("%d: unexpected %#v %#v", i, test.params, test.ns.options)
 		}
 	}
 }

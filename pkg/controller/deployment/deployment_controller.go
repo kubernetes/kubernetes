@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
+	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
@@ -265,25 +265,6 @@ func (dc *DeploymentController) enqueueDeployment(deployment *extensions.Deploym
 	dc.queue.Add(key)
 }
 
-func (dc *DeploymentController) markDeploymentOverlap(deployment *extensions.Deployment, withDeployment string) (*extensions.Deployment, error) {
-	if deployment.Annotations[util.OverlapAnnotation] == withDeployment {
-		return deployment, nil
-	}
-	if deployment.Annotations == nil {
-		deployment.Annotations = make(map[string]string)
-	}
-	deployment.Annotations[util.OverlapAnnotation] = withDeployment
-	return dc.client.Extensions().Deployments(deployment.Namespace).Update(deployment)
-}
-
-func (dc *DeploymentController) clearDeploymentOverlap(deployment *extensions.Deployment) (*extensions.Deployment, error) {
-	if len(deployment.Annotations[util.OverlapAnnotation]) == 0 {
-		return deployment, nil
-	}
-	delete(deployment.Annotations, util.OverlapAnnotation)
-	return dc.client.Extensions().Deployments(deployment.Namespace).Update(deployment)
-}
-
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
 // It enforces that the syncHandler is never invoked concurrently with the same key.
 func (dc *DeploymentController) worker() {
@@ -342,17 +323,21 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	}
 
 	deployment := obj.(*extensions.Deployment)
-	everything := unversioned.LabelSelector{}
-	if reflect.DeepEqual(deployment.Spec.Selector, &everything) {
-		dc.eventRecorder.Eventf(deployment, api.EventTypeWarning, "SelectingAll", "This deployment is selecting all pods. A non-empty selector is required.")
-		return nil
-	}
-
 	// Deep-copy otherwise we are mutating our cache.
 	// TODO: Deep-copy only when needed.
 	d, err := util.DeploymentDeepCopy(deployment)
 	if err != nil {
 		return err
+	}
+
+	everything := unversioned.LabelSelector{}
+	if reflect.DeepEqual(d.Spec.Selector, &everything) {
+		dc.eventRecorder.Eventf(d, api.EventTypeWarning, "SelectingAll", "This deployment is selecting all pods. A non-empty selector is required.")
+		if d.Status.ObservedGeneration < d.Generation {
+			d.Status.ObservedGeneration = d.Generation
+			dc.client.Extensions().Deployments(d.Namespace).UpdateStatus(d)
+		}
+		return nil
 	}
 
 	if d.DeletionTimestamp != nil {
@@ -361,7 +346,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 
 	// Handle overlapping deployments by deterministically avoid syncing deployments that fight over ReplicaSets.
 	if err = dc.handleOverlap(d); err != nil {
-		dc.eventRecorder.Eventf(deployment, api.EventTypeWarning, "SelectorOverlap", err.Error())
+		dc.eventRecorder.Eventf(d, api.EventTypeWarning, "SelectorOverlap", err.Error())
 		return nil
 	}
 
@@ -413,17 +398,15 @@ func (dc *DeploymentController) handleOverlap(d *extensions.Deployment) error {
 				return err
 			}
 			overlapping = true
-			// We don't care if the overlapping annotation update failed or not (we don't make decision on it)
-			d, _ = dc.markDeploymentOverlap(d, other.Name)
-			deploymentCopy, _ = dc.markDeploymentOverlap(deploymentCopy, d.Name)
-			// Skip syncing this one if older overlapping one is found
-			// TODO: figure out a better way to determine which deployment to skip,
-			// either with controller reference, or with validation.
-			// Using oldest active replica set to determine which deployment to skip wouldn't make much difference,
-			// since new replica set hasn't been created after selector update
+			// Skip syncing this one if older overlapping one is found.
 			if util.SelectorUpdatedBefore(deploymentCopy, d) {
-				return fmt.Errorf("found deployment %s/%s has overlapping selector with an older deployment %s/%s, skip syncing it", d.Namespace, d.Name, other.Namespace, other.Name)
+				// We don't care if the overlapping annotation update failed or not (we don't make decision on it)
+				dc.markDeploymentOverlap(d, deploymentCopy.Name)
+				dc.clearDeploymentOverlap(deploymentCopy)
+				return fmt.Errorf("found deployment %s/%s has overlapping selector with an older deployment %s/%s, skip syncing it", d.Namespace, d.Name, deploymentCopy.Namespace, deploymentCopy.Name)
 			}
+			dc.markDeploymentOverlap(deploymentCopy, d.Name)
+			d, _ = dc.clearDeploymentOverlap(d)
 		}
 	}
 	if !overlapping {
@@ -431,4 +414,25 @@ func (dc *DeploymentController) handleOverlap(d *extensions.Deployment) error {
 		d, _ = dc.clearDeploymentOverlap(d)
 	}
 	return nil
+}
+
+func (dc *DeploymentController) markDeploymentOverlap(deployment *extensions.Deployment, withDeployment string) (*extensions.Deployment, error) {
+	if deployment.Annotations[util.OverlapAnnotation] == withDeployment && deployment.Status.ObservedGeneration >= deployment.Generation {
+		return deployment, nil
+	}
+	if deployment.Annotations == nil {
+		deployment.Annotations = make(map[string]string)
+	}
+	// Update observedGeneration for overlapping deployments so that their deletion won't be blocked.
+	deployment.Status.ObservedGeneration = deployment.Generation
+	deployment.Annotations[util.OverlapAnnotation] = withDeployment
+	return dc.client.Extensions().Deployments(deployment.Namespace).UpdateStatus(deployment)
+}
+
+func (dc *DeploymentController) clearDeploymentOverlap(deployment *extensions.Deployment) (*extensions.Deployment, error) {
+	if len(deployment.Annotations[util.OverlapAnnotation]) == 0 {
+		return deployment, nil
+	}
+	delete(deployment.Annotations, util.OverlapAnnotation)
+	return dc.client.Extensions().Deployments(deployment.Namespace).UpdateStatus(deployment)
 }

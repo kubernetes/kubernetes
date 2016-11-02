@@ -43,15 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
-// ListerWatcher is any object that knows how to perform an initial list and start a watch on a resource.
-type ListerWatcher interface {
-	// List should return a list type object; the Items field will be extracted, and the
-	// ResourceVersion field will be used to start the watch in the right place.
-	List(options api.ListOptions) (runtime.Object, error)
-	// Watch should begin a watch at the specified version.
-	Watch(options api.ListOptions) (watch.Interface, error)
-}
-
 // Reflector watches a specified resource and causes all changes to be reflected in the given store.
 type Reflector struct {
 	// name identifies this reflector.  By default it will be a file:line if possible.

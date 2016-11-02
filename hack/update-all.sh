@@ -59,6 +59,8 @@ BASH_TARGETS="
 	swagger-spec
 	openapi-spec
 	api-reference-docs"
+# TODO: (caesarxuchao) uncomment after 1.5 code freeze.
+#	staging-client-go"
 
 
 for t in $BASH_TARGETS

@@ -383,7 +383,7 @@ EOF
 
     # Wait for kube-apiserver to come up before launching the rest of the components.
     echo "Waiting for apiserver to come up"
-    kube::util::wait_for_url "https://${API_HOST}:${API_SECURE_PORT}/api/v1/pods" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} || exit 1
+    kube::util::wait_for_url "https://${API_HOST}:${API_SECURE_PORT}/version" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} || exit 1
 }
 
 function start_controller_manager {
@@ -418,18 +418,6 @@ function start_kubelet {
 
     mkdir -p /var/lib/kubelet
     if [[ -z "${DOCKERIZE_KUBELET}" ]]; then
-      # On selinux enabled systems, it might
-      # require to relabel /var/lib/kubelet
-      if which selinuxenabled &> /dev/null && \
-         selinuxenabled && \
-         which chcon > /dev/null ; then
-         if [[ ! $(ls -Zd /var/lib/kubelet) =~ system_u:object_r:svirt_sandbox_file_t:s0 ]] ; then
-            echo "Applying SELinux label to /var/lib/kubelet directory."
-            if ! sudo chcon -Rt svirt_sandbox_file_t /var/lib/kubelet; then
-               echo "Failed to apply selinux label to /var/lib/kubelet."
-            fi
-         fi
-      fi
       # Enable dns
       if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
          dns_args="--cluster-dns=${DNS_SERVER_IP} --cluster-domain=${DNS_DOMAIN}"
@@ -509,7 +497,7 @@ function start_kubelet {
         --volume=/var/run:/var/run:rw \
         --volume=/sys:/sys:ro \
         --volume=/var/lib/docker/:/var/lib/docker:ro \
-        --volume=/var/lib/kubelet/:/var/lib/kubelet:rw,z \
+        --volume=/var/lib/kubelet/:/var/lib/kubelet:rw \
         --volume=/dev:/dev \
         ${cred_bind} \
         --net=host \

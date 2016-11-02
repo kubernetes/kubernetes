@@ -519,15 +519,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 		for _, zone := range zones {
 			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
 				nodeUid, _ := value.UID.(string)
-				remaining, _ := deletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUid, nodeController.daemonSetStore)
-				if remaining {
-					nodeController.zoneTerminationEvictor[zone].Add(value.Value, nodeUid)
-				}
-				return true, 0
-			})
-			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
-				nodeUid, _ := value.UID.(string)
-				terminatePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUid, value.AddedAt, nodeController.maximumGracePeriod)
+				deletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUid, nodeController.daemonSetStore)
 				return true, 0
 			})
 		}
@@ -1054,15 +1046,7 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 		for _, zone := range zones {
 			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
 				uid, _ := value.UID.(string)
-				remaining, _ := deletePods(fakeNodeHandler, nodeController.recorder, value.Value, uid, nodeController.daemonSetStore)
-				if remaining {
-					nodeController.zoneTerminationEvictor[zone].Add(value.Value, value.UID)
-				}
-				return true, 0
-			})
-			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
-				uid, _ := value.UID.(string)
-				terminatePods(fakeNodeHandler, nodeController.recorder, value.Value, uid, value.AddedAt, nodeController.maximumGracePeriod)
+				deletePods(fakeNodeHandler, nodeController.recorder, value.Value, uid, nodeController.daemonSetStore)
 				return true, 0
 			})
 		}
@@ -1723,14 +1707,14 @@ func TestCheckPod(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{DeletionTimestamp: &unversioned.Time{}},
 				Spec:       api.PodSpec{NodeName: ""},
 			},
-			prune: true,
+			prune: false,
 		},
 		{
 			pod: api.Pod{
 				ObjectMeta: api.ObjectMeta{DeletionTimestamp: &unversioned.Time{}},
 				Spec:       api.PodSpec{NodeName: "nonexistant"},
 			},
-			prune: true,
+			prune: false,
 		},
 	}
 

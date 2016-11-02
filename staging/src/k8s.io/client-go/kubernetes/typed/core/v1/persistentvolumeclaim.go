@@ -20,6 +20,7 @@ import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // PersistentVolumeClaimsGetter has a method to return a PersistentVolumeClaimInterface.
@@ -44,14 +45,14 @@ type PersistentVolumeClaimInterface interface {
 
 // persistentVolumeClaims implements PersistentVolumeClaimInterface
 type persistentVolumeClaims struct {
-	client *CoreClient
+	client rest.Interface
 	ns     string
 }
 
 // newPersistentVolumeClaims returns a PersistentVolumeClaims
 func newPersistentVolumeClaims(c *CoreClient, namespace string) *persistentVolumeClaims {
 	return &persistentVolumeClaims{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

@@ -20,6 +20,7 @@ import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // PersistentVolumesGetter has a method to return a PersistentVolumeInterface.
@@ -44,13 +45,13 @@ type PersistentVolumeInterface interface {
 
 // persistentVolumes implements PersistentVolumeInterface
 type persistentVolumes struct {
-	client *CoreClient
+	client rest.Interface
 }
 
 // newPersistentVolumes returns a PersistentVolumes
 func newPersistentVolumes(c *CoreClient) *persistentVolumes {
 	return &persistentVolumes{
-		client: c,
+		client: c.RESTClient(),
 	}
 }
 

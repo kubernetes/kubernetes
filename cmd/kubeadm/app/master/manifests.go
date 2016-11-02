@@ -54,12 +54,11 @@ const (
 // WriteStaticPodManifests builds manifest objects based on user provided configuration and then dumps it to disk
 // where kubelet will pick and schedule them.
 func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
-	envParams := kubeadmapi.GetEnvParams()
 	// Prepare static pod specs
 	staticPodSpecs := map[string]api.Pod{
 		kubeAPIServer: componentPod(api.Container{
 			Name:          kubeAPIServer,
-			Image:         images.GetCoreImage(images.KubeAPIServerImage, cfg, envParams["hyperkube_image"]),
+			Image:         images.GetCoreImage(images.KubeAPIServerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
 			Command:       getAPIServerCommand(cfg),
 			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), k8sVolumeMount()},
 			LivenessProbe: componentProbe(8080, "/healthz"),
@@ -67,7 +66,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 		}, certsVolume(cfg), k8sVolume(cfg)),
 		kubeControllerManager: componentPod(api.Container{
 			Name:          kubeControllerManager,
-			Image:         images.GetCoreImage(images.KubeControllerManagerImage, cfg, envParams["hyperkube_image"]),
+			Image:         images.GetCoreImage(images.KubeControllerManagerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
 			Command:       getControllerManagerCommand(cfg),
 			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), k8sVolumeMount()},
 			LivenessProbe: componentProbe(10252, "/healthz"),
@@ -75,7 +74,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 		}, certsVolume(cfg), k8sVolume(cfg)),
 		kubeScheduler: componentPod(api.Container{
 			Name:          kubeScheduler,
-			Image:         images.GetCoreImage(images.KubeSchedulerImage, cfg, envParams["hyperkube_image"]),
+			Image:         images.GetCoreImage(images.KubeSchedulerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
 			Command:       getSchedulerCommand(cfg),
 			LivenessProbe: componentProbe(10251, "/healthz"),
 			Resources:     componentResources("100m"),
@@ -93,7 +92,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 				"--data-dir=/var/etcd/data",
 			},
 			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), etcdVolumeMount(), k8sVolumeMount()},
-			Image:         images.GetCoreImage(images.KubeEtcdImage, cfg, envParams["etcd_image"]),
+			Image:         images.GetCoreImage(images.KubeEtcdImage, cfg, kubeadmapi.GlobalEnvParams.EtcdImage),
 			LivenessProbe: componentProbe(2379, "/health"),
 			Resources:     componentResources("200m"),
 			SecurityContext: &api.SecurityContext{
@@ -108,7 +107,7 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 		}, certsVolume(cfg), etcdVolume(cfg), k8sVolume(cfg))
 	}
 
-	manifestsPath := path.Join(envParams["kubernetes_dir"], "manifests")
+	manifestsPath := path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests")
 	if err := os.MkdirAll(manifestsPath, 0700); err != nil {
 		return fmt.Errorf("<master/manifests> failed to create directory %q [%v]", manifestsPath, err)
 	}
@@ -127,11 +126,10 @@ func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
 
 // etcdVolume exposes a path on the host in order to guarantee data survival during reboot.
 func etcdVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
-	envParams := kubeadmapi.GetEnvParams()
 	return api.Volume{
 		Name: "etcd",
 		VolumeSource: api.VolumeSource{
-			HostPath: &api.HostPathVolumeSource{Path: envParams["host_etcd_path"]},
+			HostPath: &api.HostPathVolumeSource{Path: kubeadmapi.GlobalEnvParams.HostEtcdPath},
 		},
 	}
 }
@@ -162,11 +160,10 @@ func certsVolumeMount() api.VolumeMount {
 }
 
 func k8sVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
-	envParams := kubeadmapi.GetEnvParams()
 	return api.Volume{
 		Name: "pki",
 		VolumeSource: api.VolumeSource{
-			HostPath: &api.HostPathVolumeSource{Path: envParams["kubernetes_dir"]},
+			HostPath: &api.HostPathVolumeSource{Path: kubeadmapi.GlobalEnvParams.KubernetesDir},
 		},
 	}
 }
@@ -222,13 +219,12 @@ func componentPod(container api.Container, volumes ...api.Volume) api.Pod {
 }
 
 func getComponentBaseCommand(component string) (command []string) {
-	envParams := kubeadmapi.GetEnvParams()
-	if envParams["hyperkube_image"] != "" {
+	if kubeadmapi.GlobalEnvParams.HyperkubeImage != "" {
 		command = []string{"/hyperkube", component}
 	} else {
 		command = []string{"kube-" + component}
 	}
-	command = append(command, envParams["component_loglevel"])
+	command = append(command, kubeadmapi.GlobalEnvParams.ComponentLoglevel)
 	return
 }
 

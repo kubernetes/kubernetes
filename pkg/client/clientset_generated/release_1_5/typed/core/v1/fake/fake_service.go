@@ -27,7 +27,7 @@ import (
 
 // FakeServices implements ServiceInterface
 type FakeServices struct {
-	Fake *FakeCore
+	Fake *FakeCoreV1
 	ns   string
 }
 

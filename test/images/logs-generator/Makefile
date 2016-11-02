@@ -26,7 +26,7 @@ container:
 	docker build -t $(PREFIX)/logs-generator:$(TAG) .
 
 push:
-	gcloud docker push $(PREFIX)/logs-generator:$(TAG)
+	gcloud docker -- push $(PREFIX)/logs-generator:$(TAG)
 
 clean:
 	rm -f logs-generator

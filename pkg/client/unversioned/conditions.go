@@ -25,10 +25,10 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	appsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/unversioned"
-	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/unversioned"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
-	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
+	appsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
+	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
+	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -77,10 +77,11 @@ func ReplicaSetHasDesiredReplicas(rsClient extensionsclient.ReplicaSetsGetter, r
 	}
 }
 
-func PetSetHasDesiredPets(psClient appsclient.PetSetsGetter, petset *apps.PetSet) wait.ConditionFunc {
+// StatefulSetHasDesiredPets returns a conditon that checks the number of petset replicas
+func StatefulSetHasDesiredPets(psClient appsclient.StatefulSetsGetter, petset *apps.StatefulSet) wait.ConditionFunc {
 	// TODO: Differentiate between 0 pets and a really quick scale down using generation.
 	return func() (bool, error) {
-		ps, err := psClient.PetSets(petset.Namespace).Get(petset.Name)
+		ps, err := psClient.StatefulSets(petset.Namespace).Get(petset.Name)
 		if err != nil {
 			return false, err
 		}
@@ -104,11 +105,11 @@ func JobHasDesiredParallelism(jobClient batchclient.JobsGetter, job *batch.Job) 
 		if job.Spec.Completions == nil {
 			// A job without specified completions needs to wait for Active to reach Parallelism.
 			return false, nil
-		} else {
-			// otherwise count successful
-			progress := *job.Spec.Completions - job.Status.Active - job.Status.Succeeded
-			return progress == 0, nil
 		}
+
+		// otherwise count successful
+		progress := *job.Spec.Completions - job.Status.Active - job.Status.Succeeded
+		return progress == 0, nil
 	}
 }
 

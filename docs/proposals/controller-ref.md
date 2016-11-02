@@ -86,7 +86,7 @@ To prevent re-adoption of an object during deletion the `DeletionTimestamp` will
 Necessary related work:
 * `OwnerReferences` are correctly added/deleted,
 * GarbageCollector removes dangling references,
-* Controllers don't take any meaningfull actions when `DeletionTimestamps` is set.
+* Controllers don't take any meaningful actions when `DeletionTimestamps` is set.
 
 # Considered alternatives
 

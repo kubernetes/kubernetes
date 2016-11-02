@@ -37,7 +37,7 @@ type tokenReviews struct {
 }
 
 // newTokenReviews returns a TokenReviews
-func newTokenReviews(c *AuthenticationClient) *tokenReviews {
+func newTokenReviews(c *AuthenticationV1beta1Client) *tokenReviews {
 	return &tokenReviews{
 		client: c.RESTClient(),
 	}

@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup.k8s.io/v1"
+	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup/v1"
 
 	"github.com/golang/glog"
 	"github.com/stretchr/testify/assert"
@@ -42,11 +42,13 @@ var groupVersionForDiscovery = unversioned.GroupVersionForDiscovery{
 
 func TestRunServer(t *testing.T) {
 	serverIP := fmt.Sprintf("http://localhost:%d", apiserver.InsecurePort)
+	stopCh := make(chan struct{})
 	go func() {
-		if err := apiserver.Run(apiserver.NewServerRunOptions()); err != nil {
+		if err := apiserver.Run(apiserver.NewServerRunOptions(), stopCh); err != nil {
 			t.Fatalf("Error in bringing up the server: %v", err)
 		}
 	}()
+	defer close(stopCh)
 	if err := waitForApiserverUp(serverIP); err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -58,14 +60,16 @@ func TestRunServer(t *testing.T) {
 
 func TestRunSecureServer(t *testing.T) {
 	serverIP := fmt.Sprintf("https://localhost:%d", apiserver.SecurePort)
+	stopCh := make(chan struct{})
 	go func() {
 		options := apiserver.NewServerRunOptions()
 		options.InsecurePort = 0
 		options.SecurePort = apiserver.SecurePort
-		if err := apiserver.Run(options); err != nil {
+		if err := apiserver.Run(options, stopCh); err != nil {
 			t.Fatalf("Error in bringing up the server: %v", err)
 		}
 	}()
+	defer close(stopCh)
 	if err := waitForApiserverUp(serverIP); err != nil {
 		t.Fatalf("%v", err)
 	}

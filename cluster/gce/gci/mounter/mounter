@@ -17,4 +17,20 @@
 set -e
 set -o pipefail
 
-sudo /bin/mount "$@"
+MOUNTER_DOCKER_IMAGE=gcr.io/google_containers/gci-mounter
+MOUNTER_DOCKER_VERSION=v2
+MOUNTER_USER=root
+RKT_BINARY=/home/kubernetes/bin/rkt
+
+function gc {
+    ${RKT_BINARY} gc --grace-period=0s &> /dev/null
+}
+
+# Garbage collect old rkt containers on exit
+trap gc EXIT
+
+${RKT_BINARY} run --stage1-name="coreos.com/rkt/stage1-fly:1.18.0" \
+	--insecure-options=image \
+	--volume=rootfs,kind=host,source=/,readOnly=false,recursive=true \
+	--mount volume=rootfs,target=/media/root \
+	docker://${MOUNTER_DOCKER_IMAGE}:${MOUNTER_DOCKER_VERSION} --user=${MOUNTER_USER} --exec /bin/mount -- "$@"

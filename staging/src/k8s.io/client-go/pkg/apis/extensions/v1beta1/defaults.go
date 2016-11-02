@@ -17,12 +17,14 @@ limitations under the License.
 package v1beta1
 
 import (
+	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/util/intstr"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
+	RegisterDefaults(scheme)
 	return scheme.AddDefaultingFuncs(
 		SetDefaults_DaemonSet,
 		SetDefaults_Deployment,
@@ -39,7 +41,7 @@ func SetDefaults_DaemonSet(obj *DaemonSet) {
 	// TODO: support templates defined elsewhere when we support them in the API
 	if labels != nil {
 		if obj.Spec.Selector == nil {
-			obj.Spec.Selector = &LabelSelector{
+			obj.Spec.Selector = &unversioned.LabelSelector{
 				MatchLabels: labels,
 			}
 		}
@@ -55,7 +57,7 @@ func SetDefaults_Deployment(obj *Deployment) {
 
 	if labels != nil {
 		if obj.Spec.Selector == nil {
-			obj.Spec.Selector = &LabelSelector{MatchLabels: labels}
+			obj.Spec.Selector = &unversioned.LabelSelector{MatchLabels: labels}
 		}
 		if len(obj.Labels) == 0 {
 			obj.Labels = labels
@@ -71,7 +73,7 @@ func SetDefaults_Deployment(obj *Deployment) {
 	if strategy.Type == "" {
 		strategy.Type = RollingUpdateDeploymentStrategyType
 	}
-	if strategy.Type == RollingUpdateDeploymentStrategyType {
+	if strategy.Type == RollingUpdateDeploymentStrategyType || strategy.RollingUpdate != nil {
 		if strategy.RollingUpdate == nil {
 			rollingUpdate := RollingUpdateDeployment{}
 			strategy.RollingUpdate = &rollingUpdate
@@ -101,7 +103,7 @@ func SetDefaults_Job(obj *Job) {
 
 		// and default behavior for an unspecified manual selector is to use the pod template labels
 		if manualSelector && obj.Spec.Selector == nil {
-			obj.Spec.Selector = &LabelSelector{
+			obj.Spec.Selector = &unversioned.LabelSelector{
 				MatchLabels: labels,
 			}
 		}
@@ -139,7 +141,7 @@ func SetDefaults_ReplicaSet(obj *ReplicaSet) {
 	// TODO: support templates defined elsewhere when we support them in the API
 	if labels != nil {
 		if obj.Spec.Selector == nil {
-			obj.Spec.Selector = &LabelSelector{
+			obj.Spec.Selector = &unversioned.LabelSelector{
 				MatchLabels: labels,
 			}
 		}

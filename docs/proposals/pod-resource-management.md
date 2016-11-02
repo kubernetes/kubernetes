@@ -97,7 +97,7 @@ A pod can belong to one of the following 3 QoS classes: Guaranteed, Burstable, a
 
 #### Guaranteed
 
-`G` pods will be placed at the `$Root` cgroup by default. `$Root` is the system root ie. "/" by default and if `--cgroup-root` flag is used then we use the specified cgroup-root as the `$Root`. To ensure Kubelet's idempotent behaviour we follow a pod cgroup naming format which is opaque and deterministic. Say we have a pod with UID: `5f9b19c9-3a30-11e6-8eea-28d2444e470d` the pod cgroup PodUID would be named: `pod-5f9b19c93a3011e6-8eea28d2444e470d`.
+`G` pods will be placed at the `$Root` cgroup by default. `$Root` is the system root i.e. "/" by default and if `--cgroup-root` flag is used then we use the specified cgroup-root as the `$Root`. To ensure Kubelet's idempotent behaviour we follow a pod cgroup naming format which is opaque and deterministic. Say we have a pod with UID: `5f9b19c9-3a30-11e6-8eea-28d2444e470d` the pod cgroup PodUID would be named: `pod-5f9b19c93a3011e6-8eea28d2444e470d`.
 
 
 __Note__: The cgroup-root flag would allow the user to configure the root of the QoS cgroup hierarchy. Hence cgroup-root would be redefined as the root of QoS cgroup hierarchy and not containers.
@@ -274,7 +274,7 @@ Example:  We plan to have the following cgroup hierarchy on systemd systems
 
 ### Hierarchy Outline
 
-- "$Root" is the system root of the node ie. "/" by default and if `--cgroup-root` is specified then the specified cgroup-root is used as "$Root".
+- "$Root" is the system root of the node i.e. "/" by default and if `--cgroup-root` is specified then the specified cgroup-root is used as "$Root".
 - We have a top level QoS cgroup for the `Bu` and `BE` QoS classes.
 - But we __dont__ have a separate cgroup for the `G` QoS class. `G` pod cgroups are brought up directly under the `Root` cgroup.
 - Each pod has its own cgroup which is nested under the cgroup matching the pod's QoS class.
@@ -383,7 +383,7 @@ The implementation goals of the first milestone are outlined below.
 - [x] Add PodContainerManagerImpl Create and Destroy methods which implements the respective PodContainerManager methods using a cgroupfs driver. #28017
 - [x] Have docker manager create container cgroups under pod level cgroups. Inject creation and deletion of pod cgroups into the pod workers. Add e2e tests to test this behaviour. #29049
 - [x] Add support for updating policy for the pod cgroups. Add e2e tests to test this behaviour. #29087
-- [ ] Enabling 'cgroup-per-qos' flag in Kubelet: The user is expected to drain the node and restart it before eenabling this feature, but as a fallback we also want to allow the user to just restart the kubelet with the cgroup-per-qos flag enabled to use this feature. As a part of this we need to figure out a policy for pods having Restart Policy: Never. More details in this [issue](https://github.com/kubernetes/kubernetes/issues/29946).
+- [ ] Enabling 'cgroup-per-qos' flag in Kubelet: The user is expected to drain the node and restart it before enabling this feature, but as a fallback we also want to allow the user to just restart the kubelet with the cgroup-per-qos flag enabled to use this feature. As a part of this we need to figure out a policy for pods having Restart Policy: Never. More details in this [issue](https://github.com/kubernetes/kubernetes/issues/29946).
 - [ ] Removing terminated pod's Cgroup : We need to cleanup the pod's cgroup once the pod is terminated. More details in this [issue](https://github.com/kubernetes/kubernetes/issues/29927).
 - [ ] Kubelet needs to ensure that the cgroup settings are what the kubelet expects them to be. If security is not of concern, one can assume that once kubelet applies cgroups setting successfully, the values will never change unless kubelet changes it. If security is of concern, then kubelet will have to ensure that the cgroup values meet its requirements and then continue to watch for updates to cgroups via inotify and re-apply cgroup values if necessary.
 Updating QoS limits needs to happen before pod cgroups values are updated. When pod cgroups are being deleted, QoS limits have to be updated after pod cgroup values have been updated for deletion or pod cgroups have been removed. Given that kubelet doesn't have any checkpoints and updates to QoS and pod cgroups are not atomic, kubelet needs to reconcile cgroups status whenever it restarts to ensure that the cgroups values match kubelet's expectation.

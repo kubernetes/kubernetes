@@ -66,17 +66,32 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 
 var _ clientset.Interface = &Clientset{}
 
-// Federation retrieves the FederationClient
-func (c *Clientset) Federation() v1beta1federation.FederationInterface {
-	return &fakev1beta1federation.FakeFederation{Fake: &c.Fake}
+// CoreV1 retrieves the CoreV1Client
+func (c *Clientset) CoreV1() v1core.CoreV1Interface {
+	return &fakev1core.FakeCoreV1{Fake: &c.Fake}
 }
 
-// Core retrieves the CoreClient
-func (c *Clientset) Core() v1core.CoreInterface {
-	return &fakev1core.FakeCore{Fake: &c.Fake}
+// Core retrieves the CoreV1Client
+func (c *Clientset) Core() v1core.CoreV1Interface {
+	return &fakev1core.FakeCoreV1{Fake: &c.Fake}
 }
 
-// Extensions retrieves the ExtensionsClient
-func (c *Clientset) Extensions() v1beta1extensions.ExtensionsInterface {
-	return &fakev1beta1extensions.FakeExtensions{Fake: &c.Fake}
+// ExtensionsV1beta1 retrieves the ExtensionsV1beta1Client
+func (c *Clientset) ExtensionsV1beta1() v1beta1extensions.ExtensionsV1beta1Interface {
+	return &fakev1beta1extensions.FakeExtensionsV1beta1{Fake: &c.Fake}
+}
+
+// Extensions retrieves the ExtensionsV1beta1Client
+func (c *Clientset) Extensions() v1beta1extensions.ExtensionsV1beta1Interface {
+	return &fakev1beta1extensions.FakeExtensionsV1beta1{Fake: &c.Fake}
+}
+
+// FederationV1beta1 retrieves the FederationV1beta1Client
+func (c *Clientset) FederationV1beta1() v1beta1federation.FederationV1beta1Interface {
+	return &fakev1beta1federation.FakeFederationV1beta1{Fake: &c.Fake}
+}
+
+// Federation retrieves the FederationV1beta1Client
+func (c *Clientset) Federation() v1beta1federation.FederationV1beta1Interface {
+	return &fakev1beta1federation.FakeFederationV1beta1{Fake: &c.Fake}
 }

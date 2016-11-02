@@ -127,6 +127,7 @@ func ContainerStatsFromV1(spec *v1.ContainerSpec, stats []*v1.ContainerStats) []
 				stat.Filesystem = &FilesystemStats{
 					TotalUsageBytes: &val.Filesystem[0].Usage,
 					BaseUsageBytes:  &val.Filesystem[0].BaseUsage,
+					InodeUsage:      &val.Filesystem[0].Inodes,
 				}
 			} else if len(val.Filesystem) > 1 {
 				// Cannot handle multiple devices per container.

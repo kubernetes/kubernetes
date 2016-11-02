@@ -27,7 +27,7 @@ import (
 
 func TestPetQueueCreates(t *testing.T) {
 	replicas := 3
-	ps := newPetSet(replicas)
+	ps := newStatefulSet(replicas)
 	q := NewPetQueue(ps, []*api.Pod{})
 	for i := 0; i < replicas; i++ {
 		pet, _ := newPCB(fmt.Sprintf("%v", i), ps)
@@ -38,13 +38,13 @@ func TestPetQueueCreates(t *testing.T) {
 		}
 	}
 	if q.dequeue() != nil {
-		t.Errorf("Expected no pets")
+		t.Errorf("Expected no pods")
 	}
 }
 
 func TestPetQueueScaleDown(t *testing.T) {
 	replicas := 1
-	ps := newPetSet(replicas)
+	ps := newStatefulSet(replicas)
 
 	// knownPods are the pods in the system
 	knownPods := newPodList(ps, 3)
@@ -74,13 +74,13 @@ func TestPetQueueScaleDown(t *testing.T) {
 		}
 	}
 	if q.dequeue() != nil {
-		t.Errorf("Expected no pets")
+		t.Errorf("Expected no pods")
 	}
 }
 
 func TestPetQueueScaleUp(t *testing.T) {
 	replicas := 5
-	ps := newPetSet(replicas)
+	ps := newStatefulSet(replicas)
 
 	// knownPods are pods in the system
 	knownPods := newPodList(ps, 2)
@@ -94,14 +94,14 @@ func TestPetQueueScaleUp(t *testing.T) {
 		pet := q.dequeue()
 		expectedName := fmt.Sprintf("%v-%d", ps.Name, i)
 		if pet.event != syncPet || pet.pod.Name != expectedName {
-			t.Errorf("Unexpected pet %+v, expected %v", pet.pod.Name, expectedName)
+			t.Errorf("Unexpected pod %+v, expected %v", pet.pod.Name, expectedName)
 		}
 	}
 }
 
-func TestPetSetIteratorRelist(t *testing.T) {
+func TestStatefulSetIteratorRelist(t *testing.T) {
 	replicas := 5
-	ps := newPetSet(replicas)
+	ps := newStatefulSet(replicas)
 
 	// knownPods are pods in the system
 	knownPods := newPodList(ps, 5)
@@ -109,7 +109,7 @@ func TestPetSetIteratorRelist(t *testing.T) {
 		knownPods[i].Spec.NodeName = fmt.Sprintf("foo-node-%v", i)
 		knownPods[i].Status.Phase = api.PodRunning
 	}
-	pi := NewPetSetIterator(ps, knownPods)
+	pi := NewStatefulSetIterator(ps, knownPods)
 
 	// A simple resync should not change identity of pods in the system
 	i := 0
@@ -124,12 +124,12 @@ func TestPetSetIteratorRelist(t *testing.T) {
 		i++
 	}
 	if i != 5 {
-		t.Errorf("Unexpected iterations %v, this probably means too many/few pets", i)
+		t.Errorf("Unexpected iterations %v, this probably means too many/few pods", i)
 	}
 
 	// Scale to 0 should delete all pods in system
 	ps.Spec.Replicas = 0
-	pi = NewPetSetIterator(ps, knownPods)
+	pi = NewStatefulSetIterator(ps, knownPods)
 	i = 0
 	for pi.Next() {
 		p := pi.Value()
@@ -139,11 +139,11 @@ func TestPetSetIteratorRelist(t *testing.T) {
 		i++
 	}
 	if i != 5 {
-		t.Errorf("Unexpected iterations %v, this probably means too many/few pets", i)
+		t.Errorf("Unexpected iterations %v, this probably means too many/few pods", i)
 	}
 
 	// Relist with 0 replicas should no-op
-	pi = NewPetSetIterator(ps, []*api.Pod{})
+	pi = NewStatefulSetIterator(ps, []*api.Pod{})
 	if pi.Next() != false {
 		t.Errorf("Unexpected iteration without any replicas or pods in system")
 	}

@@ -67,46 +67,49 @@ type ServerRunOptions struct {
 	AuthorizationWebhookCacheUnauthorizedTTL time.Duration
 	AuthorizationRBACSuperUser               string
 
-	AnonymousAuth             bool
-	BasicAuthFile             string
-	BindAddress               net.IP
-	CertDirectory             string
-	ClientCAFile              string
-	CloudConfigFile           string
-	CloudProvider             string
-	CorsAllowedOriginList     []string
-	DefaultStorageMediaType   string
-	DeleteCollectionWorkers   int
-	AuditLogPath              string
-	AuditLogMaxAge            int
-	AuditLogMaxBackups        int
-	AuditLogMaxSize           int
-	EnableGarbageCollection   bool
-	EnableProfiling           bool
-	EnableSwaggerUI           bool
-	EnableWatchCache          bool
-	EtcdServersOverrides      []string
-	StorageConfig             storagebackend.Config
-	ExternalHost              string
-	InsecureBindAddress       net.IP
-	InsecurePort              int
-	KeystoneURL               string
-	KubernetesServiceNodePort int
-	LongRunningRequestRE      string
-	MasterCount               int
-	MasterServiceNamespace    string
-	MaxRequestsInFlight       int
-	MinRequestTimeout         int
-	OIDCCAFile                string
-	OIDCClientID              string
-	OIDCIssuerURL             string
-	OIDCUsernameClaim         string
-	OIDCGroupsClaim           string
-	RuntimeConfig             config.ConfigurationMap
-	SecurePort                int
-	ServiceClusterIPRange     net.IPNet // TODO: make this a list
-	ServiceNodePortRange      utilnet.PortRange
-	StorageVersions           string
+	AnonymousAuth                bool
+	BasicAuthFile                string
+	BindAddress                  net.IP
+	CertDirectory                string
+	ClientCAFile                 string
+	CloudConfigFile              string
+	CloudProvider                string
+	CorsAllowedOriginList        []string
+	DefaultStorageMediaType      string
+	DeleteCollectionWorkers      int
+	AuditLogPath                 string
+	AuditLogMaxAge               int
+	AuditLogMaxBackups           int
+	AuditLogMaxSize              int
+	EnableGarbageCollection      bool
+	EnableProfiling              bool
+	EnableSwaggerUI              bool
+	EnableWatchCache             bool
+	EtcdServersOverrides         []string
+	StorageConfig                storagebackend.Config
+	ExternalHost                 string
+	InsecureBindAddress          net.IP
+	InsecurePort                 int
+	KeystoneURL                  string
+	KubernetesServiceNodePort    int
+	LongRunningRequestRE         string
+	MasterCount                  int
+	MasterServiceNamespace       string
+	MaxRequestsInFlight          int
+	MinRequestTimeout            int
+	OIDCCAFile                   string
+	OIDCClientID                 string
+	OIDCIssuerURL                string
+	OIDCUsernameClaim            string
+	OIDCGroupsClaim              string
+	RequestHeaderUsernameHeaders []string
+	RequestHeaderClientCAFile    string
+	RequestHeaderAllowedNames    []string
+	RuntimeConfig                config.ConfigurationMap
+	SecurePort                   int
+	ServiceClusterIPRange        net.IPNet // TODO: make this a list
+	ServiceNodePortRange         utilnet.PortRange
+	StorageVersions              string
 	// The default values for StorageVersions. StorageVersions overrides
 	// these; you can change this if you want to change the defaults (e.g.,
 	// for testing). This is not actually exposed as a flag.
@@ -115,6 +118,7 @@ type ServerRunOptions struct {
 	TLSCAFile              string
 	TLSCertFile            string
 	TLSPrivateKeyFile      string
+	SNICertKeys            []config.NamedCertKey
 	TokenAuthFile          string
 	EnableAnyToken         bool
 	WatchCacheSizes        []string
@@ -390,7 +394,7 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"The number of apiservers running in the cluster.")
 
 	fs.StringVar(&s.MasterServiceNamespace, "master-service-namespace", s.MasterServiceNamespace, ""+
-		"The namespace from which the kubernetes master services should be injected into pods.")
+		"DEPRECATED: the namespace from which the kubernetes master services should be injected into pods.")
 
 	fs.IntVar(&s.MaxRequestsInFlight, "max-requests-inflight", s.MaxRequestsInFlight, ""+
 		"The maximum number of requests in flight at a given time. When the server exceeds this, "+
@@ -422,6 +426,18 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"If provided, the name of a custom OpenID Connect claim for specifying user groups. "+
 		"The claim value is expected to be a string or array of strings. This flag is experimental, "+
 		"please see the authentication documentation for further details.")
+
+	fs.StringSliceVar(&s.RequestHeaderUsernameHeaders, "requestheader-username-headers", s.RequestHeaderUsernameHeaders, ""+
+		"List of request headers to inspect for usernames. X-Remote-User is common.")
+
+	fs.StringVar(&s.RequestHeaderClientCAFile, "requestheader-client-ca-file", s.RequestHeaderClientCAFile, ""+
+		"Root certificate bundle to use to verify client certificates on incoming requests "+
+		"before trusting usernames in headers specified by --requestheader-username-headers")
+
+	fs.StringSliceVar(&s.RequestHeaderAllowedNames, "requestheader-allowed-names", s.RequestHeaderAllowedNames, ""+
+		"List of client certificate common names to allow to provide usernames in headers "+
+		"specified by --requestheader-username-headers. If empty, any client certificate validated "+
+		"by the authorities in --requestheader-client-ca-file is allowed.")
 
 	fs.Var(&s.RuntimeConfig, "runtime-config", ""+
 		"A set of key=value pairs that describe runtime configuration that may be passed "+
@@ -473,13 +489,22 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"Controllers. This must be a valid PEM-encoded CA bundle.")
 
 	fs.StringVar(&s.TLSCertFile, "tls-cert-file", s.TLSCertFile, ""+
-		"File containing x509 Certificate for HTTPS. (CA cert, if any, concatenated "+
+		"File containing the default x509 Certificate for HTTPS. (CA cert, if any, concatenated "+
 		"after server cert). If HTTPS serving is enabled, and --tls-cert-file and "+
 		"--tls-private-key-file are not provided, a self-signed certificate and key "+
 		"are generated for the public address and saved to /var/run/kubernetes.")
 
 	fs.StringVar(&s.TLSPrivateKeyFile, "tls-private-key-file", s.TLSPrivateKeyFile,
-		"File containing x509 private key matching --tls-cert-file.")
+		"File containing the default x509 private key matching --tls-cert-file.")
+
+	fs.Var(config.NewNamedCertKeyArray(&s.SNICertKeys), "tls-sni-cert-key", ""+
+		"A pair of x509 certificate and private key file paths, optionally suffixed with a list of "+
+		"domain patterns which are fully qualified domain names, possibly with prefixed wildcard "+
+		"segments. If no domain patterns are provided, the names of the certificate are "+
+		"extracted. Non-wildcard matches trump over wildcard matches, explicit domain patterns "+
+		"trump over extracted names. For multiple key/certificate pairs, use the "+
+		"--tls-sni-cert-key multiple times. "+
+		"Examples: \"example.key,example.crt\" or \"*.foo.com,foo.com:foo.key,foo.crt\".")
 
 	fs.StringVar(&s.TokenAuthFile, "token-auth-file", s.TokenAuthFile, ""+
 		"If set, the file that will be used to secure the secure port of the API server "+

@@ -19,6 +19,7 @@ package fs
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -44,24 +45,24 @@ const (
 	LabelRktImages    = "rkt-images"
 )
 
-// The maximum number of `du` tasks that can be running at once.
-const maxConsecutiveDus = 20
+// The maximum number of `du` and `find` tasks that can be running at once.
+const maxConcurrentOps = 20
 
-// A pool for restricting the number of consecutive `du` tasks running.
-var duPool = make(chan struct{}, maxConsecutiveDus)
+// A pool for restricting the number of consecutive `du` and `find` tasks running.
+var pool = make(chan struct{}, maxConcurrentOps)
 
 func init() {
-	for i := 0; i < maxConsecutiveDus; i++ {
-		releaseDuToken()
+	for i := 0; i < maxConcurrentOps; i++ {
+		releaseToken()
 	}
 }
 
-func claimDuToken() {
-	<-duPool
+func claimToken() {
+	<-pool
 }
 
-func releaseDuToken() {
-	duPool <- struct{}{}
+func releaseToken() {
+	pool <- struct{}{}
 }
 
 type partition struct {
@@ -428,12 +429,12 @@ func (self *RealFsInfo) GetDirFsDevice(dir string) (*DeviceInfo, error) {
 	return nil, fmt.Errorf("could not find device with major: %d, minor: %d in cached partitions map", major, minor)
 }
 
-func (self *RealFsInfo) GetDirUsage(dir string, timeout time.Duration) (uint64, error) {
+func (self *RealFsInfo) GetDirDiskUsage(dir string, timeout time.Duration) (uint64, error) {
 	if dir == "" {
 		return 0, fmt.Errorf("invalid directory")
 	}
-	claimDuToken()
-	defer releaseDuToken()
+	claimToken()
+	defer releaseToken()
 	cmd := exec.Command("nice", "-n", "19", "du", "-s", dir)
 	stdoutp, err := cmd.StdoutPipe()
 	if err != nil {
@@ -447,26 +448,68 @@ func (self *RealFsInfo) GetDirUsage(dir string, timeout time.Duration) (uint64, 
 	if err := cmd.Start(); err != nil {
 		return 0, fmt.Errorf("failed to exec du - %v", err)
 	}
-	stdoutb, souterr := ioutil.ReadAll(stdoutp)
-	stderrb, _ := ioutil.ReadAll(stderrp)
 	timer := time.AfterFunc(timeout, func() {
 		glog.Infof("killing cmd %v due to timeout(%s)", cmd.Args, timeout.String())
 		cmd.Process.Kill()
 	})
+	stdoutb, souterr := ioutil.ReadAll(stdoutp)
+	if souterr != nil {
+		glog.Errorf("failed to read from stdout for cmd %v - %v", cmd.Args, souterr)
+	}
+	stderrb, _ := ioutil.ReadAll(stderrp)
 	err = cmd.Wait()
 	timer.Stop()
 	if err != nil {
 		return 0, fmt.Errorf("du command failed on %s with output stdout: %s, stderr: %s - %v", dir, string(stdoutb), string(stderrb), err)
 	}
 	stdout := string(stdoutb)
-	if souterr != nil {
-		glog.Errorf("failed to read from stdout for cmd %v - %v", cmd.Args, souterr)
-	}
 	usageInKb, err := strconv.ParseUint(strings.Fields(stdout)[0], 10, 64)
 	if err != nil {
 		return 0, fmt.Errorf("cannot parse 'du' output %s - %s", stdout, err)
 	}
 	return usageInKb * 1024, nil
+}
+
+func (self *RealFsInfo) GetDirInodeUsage(dir string, timeout time.Duration) (uint64, error) {
+	if dir == "" {
+		return 0, fmt.Errorf("invalid directory")
+	}
+	var stdout, stdwcerr, stdfinderr bytes.Buffer
+	var err error
+	claimToken()
+	defer releaseToken()
+	findCmd := exec.Command("find", dir, "-xdev", "-printf", ".")
+	wcCmd := exec.Command("wc", "-c")
+	if wcCmd.Stdin, err = findCmd.StdoutPipe(); err != nil {
+		return 0, fmt.Errorf("failed to setup stdout for cmd %v - %v", findCmd.Args, err)
+	}
+	wcCmd.Stdout, wcCmd.Stderr, findCmd.Stderr = &stdout, &stdwcerr, &stdfinderr
+	if err = findCmd.Start(); err != nil {
+		return 0, fmt.Errorf("failed to exec cmd %v - %v; stderr: %v", findCmd.Args, err, stdfinderr.String())
+	}
+
+	if err = wcCmd.Start(); err != nil {
+		return 0, fmt.Errorf("failed to exec cmd %v - %v; stderr %v", wcCmd.Args, err, stdwcerr.String())
+	}
+	timer := time.AfterFunc(timeout, func() {
+		glog.Infof("killing cmd %v, and cmd %v due to timeout(%s)", findCmd.Args, wcCmd.Args, timeout.String())
+		wcCmd.Process.Kill()
+		findCmd.Process.Kill()
+	})
+	err = findCmd.Wait()
+	if err != nil {
+		return 0, fmt.Errorf("cmd %v failed. stderr: %s; err: %v", findCmd.Args, stdfinderr.String(), err)
+	}
+	err = wcCmd.Wait()
+	if err != nil {
+		return 0, fmt.Errorf("cmd %v failed. stderr: %s; err: %v", wcCmd.Args, stdwcerr.String(), err)
+	}
+	timer.Stop()
+	inodeUsage, err := strconv.ParseUint(strings.TrimSpace(stdout.String()), 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("cannot parse cmds: %v, %v output %s - %s", findCmd.Args, wcCmd.Args, stdout.String(), err)
+	}
+	return inodeUsage, nil
 }
 
 func getVfsStats(path string) (total uint64, free uint64, avail uint64, inodes uint64, inodesFree uint64, err error) {

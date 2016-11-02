@@ -111,7 +111,7 @@ var userResources = []unversioned.GroupResource{
 	{Group: "", Resource: "pods"},
 	{Group: "", Resource: "replicationcontrollers"},
 	{Group: "", Resource: "services"},
-	{Group: "apps", Resource: "petsets"},
+	{Group: "apps", Resource: "statefulsets"},
 	{Group: "autoscaling", Resource: "horizontalpodautoscalers"},
 	{Group: "extensions", Resource: "jobs"},
 	{Group: "extensions", Resource: "deployments"},

@@ -21,23 +21,26 @@ syntax = 'proto2';
 
 package k8s.io.kubernetes.pkg.apis.certificates.v1alpha1;
 
-import "k8s.io/client-go/pkg/api/resource/generated.proto";
-import "k8s.io/client-go/pkg/api/unversioned/generated.proto";
-import "k8s.io/client-go/pkg/api/v1/generated.proto";
-import "k8s.io/client-go/pkg/runtime/generated.proto";
-import "k8s.io/client-go/pkg/util/intstr/generated.proto";
+import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
+import "k8s.io/kubernetes/pkg/api/unversioned/generated.proto";
+import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
+import "k8s.io/kubernetes/pkg/runtime/generated.proto";
+import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1alpha1";
 
 // Describes a certificate signing request
 message CertificateSigningRequest {
+  // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
   // The certificate request itself and any additional information.
+  // +optional
   optional CertificateSigningRequestSpec spec = 2;
 
   // Derived information about the request.
+  // +optional
   optional CertificateSigningRequestStatus status = 3;
 }
 
@@ -46,16 +49,20 @@ message CertificateSigningRequestCondition {
   optional string type = 1;
 
   // brief reason for the request state
+  // +optional
   optional string reason = 2;
 
   // human readable message with details about the request state
+  // +optional
   optional string message = 3;
 
   // timestamp for the last update to this condition
+  // +optional
   optional k8s.io.kubernetes.pkg.api.unversioned.Time lastUpdateTime = 4;
 }
 
 message CertificateSigningRequestList {
+  // +optional
   optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
 
   repeated CertificateSigningRequest items = 2;
@@ -70,18 +77,23 @@ message CertificateSigningRequestSpec {
 
   // Information about the requesting user (if relevant)
   // See user.Info interface for details
+  // +optional
   optional string username = 2;
 
+  // +optional
   optional string uid = 3;
 
+  // +optional
   repeated string groups = 4;
 }
 
 message CertificateSigningRequestStatus {
   // Conditions applied to the request, such as approval or denial.
+  // +optional
   repeated CertificateSigningRequestCondition conditions = 1;
 
   // If request was approved, the controller will place the issued certificate here.
+  // +optional
   optional bytes certificate = 2;
 }
 

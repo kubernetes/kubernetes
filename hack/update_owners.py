@@ -115,10 +115,19 @@ def get_maintainers():
     return sorted(ret - SKIP_MAINTAINERS)
 
 
+def detect_github_username():
+    origin_url = subprocess.check_output(['git', 'config', 'remote.origin.url'])
+    m = re.search(r'github.com[:/](.*)/', origin_url)
+    if m and m.group(1) != 'kubernetes':
+        return m.group(1)
+    raise ValueError('unable to determine GitHub user from '
+                     '`git config remote.origin.url` output, run with --user instead')
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--history', action='store_true', help='Generate test list from result history.')
-    parser.add_argument('--user', help='User to assign new tests to (RANDOM for random assignment).')
+    parser.add_argument('--user', help='User to assign new tests to (or RANDOM, default: current GitHub user).')
     parser.add_argument('--check', action='store_true', help='Exit with a nonzero status if the test list has changed.')
     options = parser.parse_args()
 
@@ -135,7 +144,9 @@ def main():
     maintainers = get_maintainers()
 
     print '# OUTDATED TESTS (%d):' % len(outdated_tests)
-    print  '\n'.join(outdated_tests)
+    print  '\n'.join('%s -- %s%s' %
+                     (t, owners[t][0], ['', ' (random)'][owners[t][1]])
+                      for t in outdated_tests)
     print '# NEW TESTS (%d):' % len(new_tests)
     print  '\n'.join(new_tests)
 
@@ -145,6 +156,9 @@ def main():
             print 'ERROR: the test list has changed'
             sys.exit(1)
         sys.exit(0)
+
+    if not options.user:
+        options.user = detect_github_username()
 
     for name in outdated_tests:
         owners.pop(name)
@@ -161,18 +175,19 @@ def main():
         owner for name, (owner, random) in owners.iteritems()
         if owner in maintainers)
     for test_name in set(test_names) - set(owners):
-        if options.user == 'RANDOM':
+        random_assignment = True
+        if options.user.lower() == 'random':
             new_owner, _count = random.choice(owner_counts.most_common()[-4:])
-        elif options.user:
-            new_owner = options.user
         else:
-            raise AssertionError('--user must be specified for new tests')
+            new_owner = options.user
+            random_assignment = False
         owner_counts[new_owner] += 1
-        owners[test_name] = (new_owner, True)
+        owners[test_name] = (new_owner, random_assignment)
 
-    print '# Tests per maintainer:'
-    for owner, count in owner_counts.most_common():
-        print '%-20s %3d' % (owner, count)
+    if options.user.lower() == 'random':
+        print '# Tests per maintainer:'
+        for owner, count in owner_counts.most_common():
+            print '%-20s %3d' % (owner, count)
 
     write_owners(OWNERS_PATH, owners)
 

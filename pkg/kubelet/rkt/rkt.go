@@ -1082,7 +1082,7 @@ func (r *Runtime) preparePodArgs(manifest *appcschema.PodManifest, manifestFileN
 }
 
 func (r *Runtime) getSelinuxContext(opt *api.SELinuxOptions) (string, error) {
-	selinuxRunner := selinux.NewSelinuxContextRunner()
+	selinuxRunner := selinux.NewSELinuxRunner()
 	str, err := selinuxRunner.Getfilecon(r.config.Dir)
 	if err != nil {
 		return "", err
@@ -2177,6 +2177,12 @@ func (r *Runtime) PortForward(pod *kubecontainer.Pod, port uint16, stream io.Rea
 	}()
 
 	return command.Run()
+}
+
+// UpdatePodCIDR updates the runtimeconfig with the podCIDR.
+// Currently no-ops, just implemented to satisfy the cri.
+func (r *Runtime) UpdatePodCIDR(podCIDR string) error {
+	return nil
 }
 
 // appStateToContainerState converts rktapi.AppState to kubecontainer.ContainerState.

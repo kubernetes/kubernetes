@@ -18,18 +18,39 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+VERIFYONLY=false
+while getopts ":v" opt; do
+  case $opt in
+    v)
+      VERIFYONLY=true
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      ;;
+  esac
+done
+readonly VERIFYONLY
+
+echo "**PLEASE** run \"godep restore\" before running this script"
 # PREREQUISITES: run `godep restore` in the main repo before calling this script.
 CLIENTSET="release_1_5"
-MAIN_REPO_FROM_SRC="${1:-"k8s.io/kubernetes"}"
+MAIN_REPO_FROM_SRC="k8s.io/kubernetes"
 MAIN_REPO="${GOPATH%:*}/src/${MAIN_REPO_FROM_SRC}"
-CLIENT_REPO_FROM_SRC="${2:-"k8s.io/client-go"}"
+CLIENT_REPO_FROM_SRC="k8s.io/client-go"
+CLIENT_REPO_TEMP_FROM_SRC="k8s.io/_tmp"
 CLIENT_REPO="${MAIN_REPO}/staging/src/${CLIENT_REPO_FROM_SRC}"
-CLIENT_REPO_TEMP="${CLIENT_REPO}"/_tmp
+CLIENT_REPO_TEMP="${MAIN_REPO}/staging/src/${CLIENT_REPO_TEMP_FROM_SRC}"
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+cleanup() {
+    rm -rf "${CLIENT_REPO_TEMP}"
+}
+
+trap cleanup EXIT SIGINT
+
 # working in the ${CLIENT_REPO_TEMP} so 'godep save' won't complain about dirty working tree.
-echo "creating the _tmp directory"
+echo "creating the tmp directory"
 mkdir -p "${CLIENT_REPO_TEMP}"
 cd "${CLIENT_REPO}"
 
@@ -64,68 +85,65 @@ echo "generating vendor/"
 GO15VENDOREXPERIMENT=1 godep save ./...
 popd > /dev/null
 
-echo "move to the client repo"
-# clean the ${CLIENT_REPO}
-ls "${CLIENT_REPO}" | { grep -v '_tmp' || true; } | xargs rm -rf
-mv "${CLIENT_REPO_TEMP}"/* "${CLIENT_REPO}"
-rm -r "${CLIENT_REPO_TEMP}"
-
-echo "moving vendor/k8s.io/kubernetes"
-cp -rn "${CLIENT_REPO}"/vendor/k8s.io/kubernetes/. "${CLIENT_REPO}"/
-rm -rf "${CLIENT_REPO}"/vendor/k8s.io/kubernetes
+echo "moving vendor/k8s.io/kuberentes"
+cp -rn "${CLIENT_REPO_TEMP}"/vendor/k8s.io/kubernetes/. "${CLIENT_REPO_TEMP}"/
+rm -rf "${CLIENT_REPO_TEMP}"/vendor/k8s.io/kubernetes
 # client-go will share the vendor of the main repo for now. When client-go
 # becomes a standalone repo, it will have its own vendor
-mv "${CLIENT_REPO}"/vendor "${CLIENT_REPO}"/_vendor
+mv "${CLIENT_REPO_TEMP}"/vendor "${CLIENT_REPO_TEMP}"/_vendor
 
 echo "rewriting Godeps.json"
-go run "${DIR}/godeps-json-updater.go" --godeps-file="${CLIENT_REPO}/Godeps/Godeps.json" --client-go-import-path="${CLIENT_REPO_FROM_SRC}"
+go run "${DIR}/godeps-json-updater.go" --godeps-file="${CLIENT_REPO_TEMP}/Godeps/Godeps.json" --client-go-import-path="${CLIENT_REPO_FROM_SRC}"
 
 echo "rewriting imports"
-grep -Rl "\"${MAIN_REPO_FROM_SRC}" "${CLIENT_REPO}" | grep ".go" | grep -v "vendor/" | xargs sed -i "s|\"${MAIN_REPO_FROM_SRC}|\"${CLIENT_REPO_FROM_SRC}|g"
+grep -Rl "\"${MAIN_REPO_FROM_SRC}" "${CLIENT_REPO_TEMP}" | \
+    grep "\.go" | \
+    grep -v "vendor/" | \
+    xargs sed -i "s|\"${MAIN_REPO_FROM_SRC}|\"${CLIENT_REPO_FROM_SRC}|g"
 
 echo "converting pkg/client/record to v1"
 # need a v1 version of ref.go
-cp "${CLIENT_REPO}"/pkg/api/ref.go "${CLIENT_REPO}"/pkg/api/v1/ref.go
-gofmt -w -r 'api.a -> v1.a' "${CLIENT_REPO}"/pkg/api/v1/ref.go
-gofmt -w -r 'Scheme -> api.Scheme' "${CLIENT_REPO}"/pkg/api/v1/ref.go
+cp "${CLIENT_REPO_TEMP}"/pkg/api/ref.go "${CLIENT_REPO_TEMP}"/pkg/api/v1/ref.go
+gofmt -w -r 'api.a -> v1.a' "${CLIENT_REPO_TEMP}"/pkg/api/v1/ref.go
+gofmt -w -r 'Scheme -> api.Scheme' "${CLIENT_REPO_TEMP}"/pkg/api/v1/ref.go
 # rewriting package name to v1
-sed -i 's/package api/package v1/g' "${CLIENT_REPO}"/pkg/api/v1/ref.go
+sed -i 's/package api/package v1/g' "${CLIENT_REPO_TEMP}"/pkg/api/v1/ref.go
 # ref.go refers api.Scheme, so manually import /pkg/api
-sed -i "s,import (,import (\n\"${CLIENT_REPO_FROM_SRC}/pkg/api\",g" "${CLIENT_REPO}"/pkg/api/v1/ref.go
-gofmt -w "${CLIENT_REPO}"/pkg/api/v1/ref.go 
+sed -i "s,import (,import (\n\"${CLIENT_REPO_FROM_SRC}/pkg/api\",g" "${CLIENT_REPO_TEMP}"/pkg/api/v1/ref.go
+gofmt -w "${CLIENT_REPO_TEMP}"/pkg/api/v1/ref.go 
 # rewrite pkg/client/record to v1
-gofmt -w -r 'api.a -> v1.a' "${CLIENT_REPO}"/pkg/client/record
+gofmt -w -r 'api.a -> v1.a' "${CLIENT_REPO_TEMP}"/pkg/client/record
 # need to call sed to rewrite the strings in test cases...
-find "${CLIENT_REPO}"/pkg/client/record -type f -name "*.go" -print0 | xargs -0 sed -i "s/api.ObjectReference/v1.ObjectReference/g"
+find "${CLIENT_REPO_TEMP}"/pkg/client/record -type f -name "*.go" -print0 | xargs -0 sed -i "s/api.ObjectReference/v1.ObjectReference/g"
 # rewrite the imports
-find "${CLIENT_REPO}"/pkg/client/record -type f -name "*.go" -print0 | xargs -0 sed -i 's,pkg/api",pkg/api/v1",g'
+find "${CLIENT_REPO_TEMP}"/pkg/client/record -type f -name "*.go" -print0 | xargs -0 sed -i 's,pkg/api",pkg/api/v1",g'
 # gofmt the changed files
 
 echo "rewrite conflicting Prometheus registration"
-sed -i "s/request_latency_microseconds/request_latency_microseconds_copy/g" "${CLIENT_REPO}"/pkg/client/metrics/metrics.go
-sed -i "s/request_status_codes/request_status_codes_copy/g" "${CLIENT_REPO}"/pkg/client/metrics/metrics.go
-sed -i "s/kubernetes_build_info/kubernetes_build_info_copy/g" "${CLIENT_REPO}"/pkg/version/version.go
+sed -i "s/request_latency_microseconds/request_latency_microseconds_copy/g" "${CLIENT_REPO_TEMP}"/pkg/client/metrics/metrics.go
+sed -i "s/request_status_codes/request_status_codes_copy/g" "${CLIENT_REPO_TEMP}"/pkg/client/metrics/metrics.go
+sed -i "s/kubernetes_build_info/kubernetes_build_info_copy/g" "${CLIENT_REPO_TEMP}"/pkg/version/version.go
 
 echo "rewrite proto names in proto.RegisterType"
-find "${CLIENT_REPO}" -type f -name "generated.pb.go" -print0 | xargs -0 sed -i "s/k8s\.io\.kubernetes/k8s.io.client-go/g"
+find "${CLIENT_REPO_TEMP}" -type f -name "generated.pb.go" -print0 | xargs -0 sed -i "s/k8s\.io\.kubernetes/k8s.io.client-go/g"
 
 echo "rearranging directory layout"
-# $1 and $2 are relative to ${CLIENT_REPO}
+# $1 and $2 are relative to ${CLIENT_REPO_TEMP}
 function mvfolder {
     local src=${1%/#/}
     local dst=${2%/#/}
     # create the parent directory of dst
     if [ "${dst%/*}" != "${dst}" ]; then
-        mkdir -p "${CLIENT_REPO}/${dst%/*}"
+        mkdir -p "${CLIENT_REPO_TEMP}/${dst%/*}"
     fi
     # move
-    mv "${CLIENT_REPO}/${src}" "${CLIENT_REPO}/${dst}"
+    mv "${CLIENT_REPO_TEMP}/${src}" "${CLIENT_REPO_TEMP}/${dst}"
     # rewrite package
     local src_package="${src##*/}"
     local dst_package="${dst##*/}"
-    find "${CLIENT_REPO}/${dst}" -type f -name "*.go" -print0 | xargs -0 sed -i "s,package ${src_package},package ${dst_package},g"
+    find "${CLIENT_REPO_TEMP}/${dst}" -type f -name "*.go" -print0 | xargs -0 sed -i "s,package ${src_package},package ${dst_package},g"
 
-    { grep -Rl "\"${CLIENT_REPO_FROM_SRC}/${src}" "${CLIENT_REPO}" || true ; } | while read -r target ; do
+    { grep -Rl "\"${CLIENT_REPO_FROM_SRC}/${src}" "${CLIENT_REPO_TEMP}" || true ; } | while read -r target ; do
         # rewrite imports
         # the first rule is to convert import lines like `restclient "k8s.io/client-go/pkg/client/restclient"`,
         # where a package alias is the same the package name.
@@ -152,14 +170,43 @@ mvfolder pkg/client/metrics tools/metrics
 mvfolder pkg/client/testing/core testing
 mvfolder pkg/client/testing/cache tools/cache/testing
 mvfolder cmd/kubeadm/app/apis/kubeadm pkg/apis/kubeadm
-if [ "$(find "${CLIENT_REPO}"/pkg/client -type f -name "*.go")" ]; then
-    echo "${CLIENT_REPO}/pkg/client is expected to be empty"
+if [ "$(find "${CLIENT_REPO_TEMP}"/pkg/client -type f -name "*.go")" ]; then
+    echo "${CLIENT_REPO_TEMP}/pkg/client is expected to be empty"
     exit 1
 else 
-    rm -r "${CLIENT_REPO}"/pkg/client
+    rm -r "${CLIENT_REPO_TEMP}"/pkg/client
 fi
 mvfolder third_party pkg/third_party
 mvfolder federation pkg/federation
 
 echo "running gofmt"
-find "${CLIENT_REPO}" -type f -name "*.go" -print0 | xargs -0 gofmt -w
+find "${CLIENT_REPO_TEMP}" -type f -name "*.go" -print0 | xargs -0 gofmt -w
+
+echo "remove black listed files"
+find "${CLIENT_REPO_TEMP}" -type f \( \
+    -name "*BUILD" -o \
+    -name "*.json" -not -name "Godeps.json" -o \
+    -name "*.yaml" -o \
+    -name "*.yml" -o \
+    -name "*.sh" \
+    \) -delete
+
+if [ "${VERIFYONLY}" = true ]; then
+    echo "running verify-only"
+    ret=0
+    if diff -NauprB -I "GoVersion.*\|GodepVersion.*" "${CLIENT_REPO}" "${CLIENT_REPO_TEMP}"; then
+      echo "${CLIENT_REPO} up to date."
+      cleanup
+      exit 0
+    else
+      echo "${CLIENT_REPO} is out of date. Please run hack/update-client-go.sh"
+      cleanup
+      exit 1
+    fi
+fi
+
+echo "move to the client repo"
+# clean the ${CLIENT_REPO}
+ls "${CLIENT_REPO}" | { grep -v '_tmp' || true; } | xargs rm -rf
+mv "${CLIENT_REPO_TEMP}"/* "${CLIENT_REPO}"
+cleanup

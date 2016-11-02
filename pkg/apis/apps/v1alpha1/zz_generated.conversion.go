@@ -22,10 +22,12 @@ package v1alpha1
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
+	unsafe "unsafe"
 )
 
 func init() {
@@ -36,60 +38,60 @@ func init() {
 // Public to allow building arbitrary schemes.
 func RegisterConversions(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1alpha1_PetSet_To_apps_PetSet,
-		Convert_apps_PetSet_To_v1alpha1_PetSet,
-		Convert_v1alpha1_PetSetList_To_apps_PetSetList,
-		Convert_apps_PetSetList_To_v1alpha1_PetSetList,
-		Convert_v1alpha1_PetSetSpec_To_apps_PetSetSpec,
-		Convert_apps_PetSetSpec_To_v1alpha1_PetSetSpec,
-		Convert_v1alpha1_PetSetStatus_To_apps_PetSetStatus,
-		Convert_apps_PetSetStatus_To_v1alpha1_PetSetStatus,
+		Convert_v1alpha1_StatefulSet_To_apps_StatefulSet,
+		Convert_apps_StatefulSet_To_v1alpha1_StatefulSet,
+		Convert_v1alpha1_StatefulSetList_To_apps_StatefulSetList,
+		Convert_apps_StatefulSetList_To_v1alpha1_StatefulSetList,
+		Convert_v1alpha1_StatefulSetSpec_To_apps_StatefulSetSpec,
+		Convert_apps_StatefulSetSpec_To_v1alpha1_StatefulSetSpec,
+		Convert_v1alpha1_StatefulSetStatus_To_apps_StatefulSetStatus,
+		Convert_apps_StatefulSetStatus_To_v1alpha1_StatefulSetStatus,
 	)
 }
 
-func autoConvert_v1alpha1_PetSet_To_apps_PetSet(in *PetSet, out *apps.PetSet, s conversion.Scope) error {
+func autoConvert_v1alpha1_StatefulSet_To_apps_StatefulSet(in *StatefulSet, out *apps.StatefulSet, s conversion.Scope) error {
 	// TODO: Inefficient conversion - can we improve it?
 	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
 		return err
 	}
-	if err := Convert_v1alpha1_PetSetSpec_To_apps_PetSetSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := Convert_v1alpha1_StatefulSetSpec_To_apps_StatefulSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
-	if err := Convert_v1alpha1_PetSetStatus_To_apps_PetSetStatus(&in.Status, &out.Status, s); err != nil {
+	if err := Convert_v1alpha1_StatefulSetStatus_To_apps_StatefulSetStatus(&in.Status, &out.Status, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-func Convert_v1alpha1_PetSet_To_apps_PetSet(in *PetSet, out *apps.PetSet, s conversion.Scope) error {
-	return autoConvert_v1alpha1_PetSet_To_apps_PetSet(in, out, s)
+func Convert_v1alpha1_StatefulSet_To_apps_StatefulSet(in *StatefulSet, out *apps.StatefulSet, s conversion.Scope) error {
+	return autoConvert_v1alpha1_StatefulSet_To_apps_StatefulSet(in, out, s)
 }
 
-func autoConvert_apps_PetSet_To_v1alpha1_PetSet(in *apps.PetSet, out *PetSet, s conversion.Scope) error {
+func autoConvert_apps_StatefulSet_To_v1alpha1_StatefulSet(in *apps.StatefulSet, out *StatefulSet, s conversion.Scope) error {
 	// TODO: Inefficient conversion - can we improve it?
 	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
 		return err
 	}
-	if err := Convert_apps_PetSetSpec_To_v1alpha1_PetSetSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := Convert_apps_StatefulSetSpec_To_v1alpha1_StatefulSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
-	if err := Convert_apps_PetSetStatus_To_v1alpha1_PetSetStatus(&in.Status, &out.Status, s); err != nil {
+	if err := Convert_apps_StatefulSetStatus_To_v1alpha1_StatefulSetStatus(&in.Status, &out.Status, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-func Convert_apps_PetSet_To_v1alpha1_PetSet(in *apps.PetSet, out *PetSet, s conversion.Scope) error {
-	return autoConvert_apps_PetSet_To_v1alpha1_PetSet(in, out, s)
+func Convert_apps_StatefulSet_To_v1alpha1_StatefulSet(in *apps.StatefulSet, out *StatefulSet, s conversion.Scope) error {
+	return autoConvert_apps_StatefulSet_To_v1alpha1_StatefulSet(in, out, s)
 }
 
-func autoConvert_v1alpha1_PetSetList_To_apps_PetSetList(in *PetSetList, out *apps.PetSetList, s conversion.Scope) error {
+func autoConvert_v1alpha1_StatefulSetList_To_apps_StatefulSetList(in *StatefulSetList, out *apps.StatefulSetList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]apps.PetSet, len(*in))
+		*out = make([]apps.StatefulSet, len(*in))
 		for i := range *in {
-			if err := Convert_v1alpha1_PetSet_To_apps_PetSet(&(*in)[i], &(*out)[i], s); err != nil {
+			if err := Convert_v1alpha1_StatefulSet_To_apps_StatefulSet(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
 			}
 		}
@@ -99,17 +101,17 @@ func autoConvert_v1alpha1_PetSetList_To_apps_PetSetList(in *PetSetList, out *app
 	return nil
 }
 
-func Convert_v1alpha1_PetSetList_To_apps_PetSetList(in *PetSetList, out *apps.PetSetList, s conversion.Scope) error {
-	return autoConvert_v1alpha1_PetSetList_To_apps_PetSetList(in, out, s)
+func Convert_v1alpha1_StatefulSetList_To_apps_StatefulSetList(in *StatefulSetList, out *apps.StatefulSetList, s conversion.Scope) error {
+	return autoConvert_v1alpha1_StatefulSetList_To_apps_StatefulSetList(in, out, s)
 }
 
-func autoConvert_apps_PetSetList_To_v1alpha1_PetSetList(in *apps.PetSetList, out *PetSetList, s conversion.Scope) error {
+func autoConvert_apps_StatefulSetList_To_v1alpha1_StatefulSetList(in *apps.StatefulSetList, out *StatefulSetList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]PetSet, len(*in))
+		*out = make([]StatefulSet, len(*in))
 		for i := range *in {
-			if err := Convert_apps_PetSet_To_v1alpha1_PetSet(&(*in)[i], &(*out)[i], s); err != nil {
+			if err := Convert_apps_StatefulSet_To_v1alpha1_StatefulSet(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
 			}
 		}
@@ -119,74 +121,52 @@ func autoConvert_apps_PetSetList_To_v1alpha1_PetSetList(in *apps.PetSetList, out
 	return nil
 }
 
-func Convert_apps_PetSetList_To_v1alpha1_PetSetList(in *apps.PetSetList, out *PetSetList, s conversion.Scope) error {
-	return autoConvert_apps_PetSetList_To_v1alpha1_PetSetList(in, out, s)
+func Convert_apps_StatefulSetList_To_v1alpha1_StatefulSetList(in *apps.StatefulSetList, out *StatefulSetList, s conversion.Scope) error {
+	return autoConvert_apps_StatefulSetList_To_v1alpha1_StatefulSetList(in, out, s)
 }
 
-func autoConvert_v1alpha1_PetSetSpec_To_apps_PetSetSpec(in *PetSetSpec, out *apps.PetSetSpec, s conversion.Scope) error {
+func autoConvert_v1alpha1_StatefulSetSpec_To_apps_StatefulSetSpec(in *StatefulSetSpec, out *apps.StatefulSetSpec, s conversion.Scope) error {
 	if err := api.Convert_Pointer_int32_To_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
-	out.Selector = in.Selector
+	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
 	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
-	if in.VolumeClaimTemplates != nil {
-		in, out := &in.VolumeClaimTemplates, &out.VolumeClaimTemplates
-		*out = make([]api.PersistentVolumeClaim, len(*in))
-		for i := range *in {
-			// TODO: Inefficient conversion - can we improve it?
-			if err := s.Convert(&(*in)[i], &(*out)[i], 0); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.VolumeClaimTemplates = nil
-	}
+	out.VolumeClaimTemplates = *(*[]api.PersistentVolumeClaim)(unsafe.Pointer(&in.VolumeClaimTemplates))
 	out.ServiceName = in.ServiceName
 	return nil
 }
 
-func autoConvert_apps_PetSetSpec_To_v1alpha1_PetSetSpec(in *apps.PetSetSpec, out *PetSetSpec, s conversion.Scope) error {
+func autoConvert_apps_StatefulSetSpec_To_v1alpha1_StatefulSetSpec(in *apps.StatefulSetSpec, out *StatefulSetSpec, s conversion.Scope) error {
 	if err := api.Convert_int32_To_Pointer_int32(&in.Replicas, &out.Replicas, s); err != nil {
 		return err
 	}
-	out.Selector = in.Selector
+	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
 	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
-	if in.VolumeClaimTemplates != nil {
-		in, out := &in.VolumeClaimTemplates, &out.VolumeClaimTemplates
-		*out = make([]v1.PersistentVolumeClaim, len(*in))
-		for i := range *in {
-			// TODO: Inefficient conversion - can we improve it?
-			if err := s.Convert(&(*in)[i], &(*out)[i], 0); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.VolumeClaimTemplates = nil
-	}
+	out.VolumeClaimTemplates = *(*[]v1.PersistentVolumeClaim)(unsafe.Pointer(&in.VolumeClaimTemplates))
 	out.ServiceName = in.ServiceName
 	return nil
 }
 
-func autoConvert_v1alpha1_PetSetStatus_To_apps_PetSetStatus(in *PetSetStatus, out *apps.PetSetStatus, s conversion.Scope) error {
-	out.ObservedGeneration = in.ObservedGeneration
+func autoConvert_v1alpha1_StatefulSetStatus_To_apps_StatefulSetStatus(in *StatefulSetStatus, out *apps.StatefulSetStatus, s conversion.Scope) error {
+	out.ObservedGeneration = (*int64)(unsafe.Pointer(in.ObservedGeneration))
 	out.Replicas = in.Replicas
 	return nil
 }
 
-func Convert_v1alpha1_PetSetStatus_To_apps_PetSetStatus(in *PetSetStatus, out *apps.PetSetStatus, s conversion.Scope) error {
-	return autoConvert_v1alpha1_PetSetStatus_To_apps_PetSetStatus(in, out, s)
+func Convert_v1alpha1_StatefulSetStatus_To_apps_StatefulSetStatus(in *StatefulSetStatus, out *apps.StatefulSetStatus, s conversion.Scope) error {
+	return autoConvert_v1alpha1_StatefulSetStatus_To_apps_StatefulSetStatus(in, out, s)
 }
 
-func autoConvert_apps_PetSetStatus_To_v1alpha1_PetSetStatus(in *apps.PetSetStatus, out *PetSetStatus, s conversion.Scope) error {
-	out.ObservedGeneration = in.ObservedGeneration
+func autoConvert_apps_StatefulSetStatus_To_v1alpha1_StatefulSetStatus(in *apps.StatefulSetStatus, out *StatefulSetStatus, s conversion.Scope) error {
+	out.ObservedGeneration = (*int64)(unsafe.Pointer(in.ObservedGeneration))
 	out.Replicas = in.Replicas
 	return nil
 }
 
-func Convert_apps_PetSetStatus_To_v1alpha1_PetSetStatus(in *apps.PetSetStatus, out *PetSetStatus, s conversion.Scope) error {
-	return autoConvert_apps_PetSetStatus_To_v1alpha1_PetSetStatus(in, out, s)
+func Convert_apps_StatefulSetStatus_To_v1alpha1_StatefulSetStatus(in *apps.StatefulSetStatus, out *StatefulSetStatus, s conversion.Scope) error {
+	return autoConvert_apps_StatefulSetStatus_To_v1alpha1_StatefulSetStatus(in, out, s)
 }

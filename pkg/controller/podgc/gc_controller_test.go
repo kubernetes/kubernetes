@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -194,7 +195,12 @@ func TestGCOrphaned(t *testing.T) {
 		gcc.podController = &FakeController{}
 		gcc.nodeController = &FakeController{}
 
-		gcc.gc()
+		pods, err := gcc.podStore.List(labels.Everything())
+		if err != nil {
+			t.Errorf("Error while listing all Pods: %v", err)
+			return
+		}
+		gcc.gcOrphaned(pods)
 
 		pass := true
 		for _, pod := range deletedPodNames {
@@ -207,6 +213,89 @@ func TestGCOrphaned(t *testing.T) {
 		}
 		if !pass {
 			t.Errorf("[%v]pod's deleted expected and actual did not match.\n\texpected: %v\n\tactual: %v", i, test.deletedPodNames, deletedPodNames)
+		}
+	}
+}
+
+func TestGCUnscheduledTerminating(t *testing.T) {
+	type nameToPhase struct {
+		name              string
+		phase             api.PodPhase
+		deletionTimeStamp *unversioned.Time
+		nodeName          string
+	}
+
+	testCases := []struct {
+		name            string
+		pods            []nameToPhase
+		deletedPodNames sets.String
+	}{
+		{
+			name: "Unscheduled pod in any phase must be deleted",
+			pods: []nameToPhase{
+				{name: "a", phase: api.PodFailed, deletionTimeStamp: &unversioned.Time{}, nodeName: ""},
+				{name: "b", phase: api.PodSucceeded, deletionTimeStamp: &unversioned.Time{}, nodeName: ""},
+				{name: "c", phase: api.PodRunning, deletionTimeStamp: &unversioned.Time{}, nodeName: ""},
+			},
+			deletedPodNames: sets.NewString("a", "b", "c"),
+		},
+		{
+			name: "Scheduled pod in any phase must not be deleted",
+			pods: []nameToPhase{
+				{name: "a", phase: api.PodFailed, deletionTimeStamp: nil, nodeName: ""},
+				{name: "b", phase: api.PodSucceeded, deletionTimeStamp: nil, nodeName: "node"},
+				{name: "c", phase: api.PodRunning, deletionTimeStamp: &unversioned.Time{}, nodeName: "node"},
+			},
+			deletedPodNames: sets.NewString(),
+		},
+	}
+
+	for i, test := range testCases {
+		client := fake.NewSimpleClientset()
+		gcc := NewFromClient(client, -1)
+		deletedPodNames := make([]string, 0)
+		var lock sync.Mutex
+		gcc.deletePod = func(_, name string) error {
+			lock.Lock()
+			defer lock.Unlock()
+			deletedPodNames = append(deletedPodNames, name)
+			return nil
+		}
+
+		creationTime := time.Unix(0, 0)
+		for _, pod := range test.pods {
+			creationTime = creationTime.Add(1 * time.Hour)
+			gcc.podStore.Indexer.Add(&api.Pod{
+				ObjectMeta: api.ObjectMeta{Name: pod.name, CreationTimestamp: unversioned.Time{Time: creationTime},
+					DeletionTimestamp: pod.deletionTimeStamp},
+				Status: api.PodStatus{Phase: pod.phase},
+				Spec:   api.PodSpec{NodeName: pod.nodeName},
+			})
+		}
+
+		store := cache.NewStore(cache.MetaNamespaceKeyFunc)
+		gcc.nodeStore = cache.StoreToNodeLister{Store: store}
+		gcc.podController = &FakeController{}
+		gcc.nodeController = &FakeController{}
+
+		pods, err := gcc.podStore.List(labels.Everything())
+		if err != nil {
+			t.Errorf("Error while listing all Pods: %v", err)
+			return
+		}
+		gcc.gcUnscheduledTerminating(pods)
+
+		pass := true
+		for _, pod := range deletedPodNames {
+			if !test.deletedPodNames.Has(pod) {
+				pass = false
+			}
+		}
+		if len(deletedPodNames) != len(test.deletedPodNames) {
+			pass = false
+		}
+		if !pass {
+			t.Errorf("[%v]pod's deleted expected and actual did not match.\n\texpected: %v\n\tactual: %v, test: %v", i, test.deletedPodNames, deletedPodNames, test.name)
 		}
 	}
 }

@@ -19,12 +19,9 @@ package dynamic
 import (
 	"sync"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
 // ClientPool manages a pool of dynamic clients.
@@ -64,6 +61,7 @@ type clientPoolImpl struct {
 // resources or groups.
 func NewClientPool(config *restclient.Config, mapper meta.RESTMapper, apiPathResolverFunc APIPathResolverFunc) ClientPool {
 	confCopy := *config
+
 	return &clientPoolImpl{
 		config:              &confCopy,
 		clients:             map[unversioned.GroupVersion]*Client{},
@@ -107,11 +105,6 @@ func (c *clientPoolImpl) ClientForGroupVersionKind(kind unversioned.GroupVersion
 
 	// we need to make a client
 	conf.GroupVersion = &gv
-
-	if conf.NegotiatedSerializer == nil {
-		streamingInfo, _ := api.Codecs.StreamingSerializerForMediaType("application/json;stream=watch", nil)
-		conf.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: dynamicCodec{}}, streamingInfo)
-	}
 
 	dynamicClient, err := NewClient(conf)
 	if err != nil {

@@ -21,8 +21,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//cmd/libs/go2idl/client-gen/args:go_default_library",
-        "//cmd/libs/go2idl/client-gen/generators/normalization:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
+        "//cmd/libs/go2idl/client-gen/types:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:k8s.io/gengo/generator",
         "//vendor:k8s.io/gengo/namer",

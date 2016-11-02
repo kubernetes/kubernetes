@@ -21,7 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsapiv1alpha1 "k8s.io/kubernetes/pkg/apis/apps/v1alpha1"
 	"k8s.io/kubernetes/pkg/genericapiserver"
-	petsetetcd "k8s.io/kubernetes/pkg/registry/apps/petset/etcd"
+	statefulsetetcd "k8s.io/kubernetes/pkg/registry/apps/petset/etcd"
 )
 
 type RESTStorageProvider struct{}
@@ -43,10 +43,14 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapis
 	version := appsapiv1alpha1.SchemeGroupVersion
 
 	storage := map[string]rest.Storage{}
-	if apiResourceConfigSource.ResourceEnabled(version.WithResource("petsets")) {
-		petsetStorage, petsetStatusStorage := petsetetcd.NewREST(restOptionsGetter(apps.Resource("petsets")))
-		storage["petsets"] = petsetStorage
-		storage["petsets/status"] = petsetStatusStorage
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("statefulsets")) {
+		statefulsetStorage, statefulsetStatusStorage := statefulsetetcd.NewREST(restOptionsGetter(apps.Resource("statefulsets")))
+		storage["statefulsets"] = statefulsetStorage
+		storage["statefulsets/status"] = statefulsetStatusStorage
 	}
 	return storage
+}
+
+func (p RESTStorageProvider) GroupName() string {
+	return apps.GroupName
 }

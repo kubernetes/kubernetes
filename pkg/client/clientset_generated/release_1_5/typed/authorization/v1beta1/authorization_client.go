@@ -17,38 +17,40 @@ limitations under the License.
 package v1beta1
 
 import (
+	fmt "fmt"
 	api "k8s.io/kubernetes/pkg/api"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	registered "k8s.io/kubernetes/pkg/apimachinery/registered"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	serializer "k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
-type AuthorizationInterface interface {
+type AuthorizationV1beta1Interface interface {
 	RESTClient() restclient.Interface
 	LocalSubjectAccessReviewsGetter
 	SelfSubjectAccessReviewsGetter
 	SubjectAccessReviewsGetter
 }
 
-// AuthorizationClient is used to interact with features provided by the Authorization group.
-type AuthorizationClient struct {
+// AuthorizationV1beta1Client is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
+type AuthorizationV1beta1Client struct {
 	restClient restclient.Interface
 }
 
-func (c *AuthorizationClient) LocalSubjectAccessReviews(namespace string) LocalSubjectAccessReviewInterface {
+func (c *AuthorizationV1beta1Client) LocalSubjectAccessReviews(namespace string) LocalSubjectAccessReviewInterface {
 	return newLocalSubjectAccessReviews(c, namespace)
 }
 
-func (c *AuthorizationClient) SelfSubjectAccessReviews() SelfSubjectAccessReviewInterface {
+func (c *AuthorizationV1beta1Client) SelfSubjectAccessReviews() SelfSubjectAccessReviewInterface {
 	return newSelfSubjectAccessReviews(c)
 }
 
-func (c *AuthorizationClient) SubjectAccessReviews() SubjectAccessReviewInterface {
+func (c *AuthorizationV1beta1Client) SubjectAccessReviews() SubjectAccessReviewInterface {
 	return newSubjectAccessReviews(c)
 }
 
-// NewForConfig creates a new AuthorizationClient for the given config.
-func NewForConfig(c *restclient.Config) (*AuthorizationClient, error) {
+// NewForConfig creates a new AuthorizationV1beta1Client for the given config.
+func NewForConfig(c *restclient.Config) (*AuthorizationV1beta1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -57,12 +59,12 @@ func NewForConfig(c *restclient.Config) (*AuthorizationClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &AuthorizationClient{client}, nil
+	return &AuthorizationV1beta1Client{client}, nil
 }
 
-// NewForConfigOrDie creates a new AuthorizationClient for the given config and
+// NewForConfigOrDie creates a new AuthorizationV1beta1Client for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *AuthorizationClient {
+func NewForConfigOrDie(c *restclient.Config) *AuthorizationV1beta1Client {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -70,26 +72,26 @@ func NewForConfigOrDie(c *restclient.Config) *AuthorizationClient {
 	return client
 }
 
-// New creates a new AuthorizationClient for the given RESTClient.
-func New(c restclient.Interface) *AuthorizationClient {
-	return &AuthorizationClient{c}
+// New creates a new AuthorizationV1beta1Client for the given RESTClient.
+func New(c restclient.Interface) *AuthorizationV1beta1Client {
+	return &AuthorizationV1beta1Client{c}
 }
 
 func setConfigDefaults(config *restclient.Config) error {
-	// if authorization group is not registered, return an error
-	g, err := registered.Group("authorization.k8s.io")
+	gv, err := unversioned.ParseGroupVersion("authorization.k8s.io/v1beta1")
 	if err != nil {
 		return err
+	}
+	// if authorization.k8s.io/v1beta1 is not enabled, return an error
+	if !registered.IsEnabledVersion(gv) {
+		return fmt.Errorf("authorization.k8s.io/v1beta1 is not enabled")
 	}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = restclient.DefaultKubernetesUserAgent()
 	}
-	// TODO: Unconditionally set the config.Version, until we fix the config.
-	//if config.Version == "" {
-	copyGroupVersion := g.GroupVersion
+	copyGroupVersion := gv
 	config.GroupVersion = &copyGroupVersion
-	//}
 
 	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
 
@@ -98,7 +100,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *AuthorizationClient) RESTClient() restclient.Interface {
+func (c *AuthorizationV1beta1Client) RESTClient() restclient.Interface {
 	if c == nil {
 		return nil
 	}

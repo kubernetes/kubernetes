@@ -2977,7 +2977,6 @@ func DeepCopy_api_ReplicationControllerCondition(in interface{}, out interface{}
 		out := out.(*ReplicationControllerCondition)
 		out.Type = in.Type
 		out.Status = in.Status
-		out.LastProbeTime = in.LastProbeTime.DeepCopy()
 		out.LastTransitionTime = in.LastTransitionTime.DeepCopy()
 		out.Reason = in.Reason
 		out.Message = in.Message

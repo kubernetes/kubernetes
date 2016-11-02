@@ -38,7 +38,7 @@ type scales struct {
 }
 
 // newScales returns a Scales
-func newScales(c *ExtensionsClient, namespace string) *scales {
+func newScales(c *ExtensionsV1beta1Client, namespace string) *scales {
 	return &scales{
 		client: c.RESTClient(),
 		ns:     namespace,

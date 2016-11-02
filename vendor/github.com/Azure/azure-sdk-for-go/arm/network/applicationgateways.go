@@ -36,7 +36,13 @@ type ApplicationGatewaysClient struct {
 // NewApplicationGatewaysClient creates an instance of the
 // ApplicationGatewaysClient client.
 func NewApplicationGatewaysClient(subscriptionID string) ApplicationGatewaysClient {
-	return ApplicationGatewaysClient{New(subscriptionID)}
+	return NewApplicationGatewaysClientWithBaseURI(DefaultBaseURI, subscriptionID)
+}
+
+// NewApplicationGatewaysClientWithBaseURI creates an instance of the
+// ApplicationGatewaysClient client.
+func NewApplicationGatewaysClientWithBaseURI(baseURI string, subscriptionID string) ApplicationGatewaysClient {
+	return ApplicationGatewaysClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
 // CreateOrUpdate the Put ApplicationGateway operation creates/updates a
@@ -240,7 +246,7 @@ func (client ApplicationGatewaysClient) GetResponder(resp *http.Response) (resul
 	return
 }
 
-// List the List ApplicationGateway opertion retrieves all the
+// List the List ApplicationGateway operation retrieves all the
 // applicationgateways in a resource group.
 //
 // resourceGroupName is the name of the resource group.
@@ -326,7 +332,7 @@ func (client ApplicationGatewaysClient) ListNextResults(lastResults ApplicationG
 	return
 }
 
-// ListAll the List applicationgateway opertion retrieves all the
+// ListAll the List applicationgateway operation retrieves all the
 // applicationgateways in a subscription.
 func (client ApplicationGatewaysClient) ListAll() (result ApplicationGatewayListResult, err error) {
 	req, err := client.ListAllPreparer()

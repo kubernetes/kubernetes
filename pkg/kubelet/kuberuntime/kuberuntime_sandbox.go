@@ -18,13 +18,13 @@ package kuberuntime
 
 import (
 	"fmt"
+	"net"
 	"sort"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
@@ -153,7 +153,7 @@ func generatePodSandboxLinuxConfig(pod *api.Pod, cgroupParent string) *runtimeAp
 func (m *kubeGenericRuntimeManager) getKubeletSandboxes(all bool) ([]*runtimeApi.PodSandbox, error) {
 	var filter *runtimeApi.PodSandboxFilter
 	if !all {
-		readyState := runtimeApi.PodSandBoxState_READY
+		readyState := runtimeApi.PodSandboxState_SANDBOX_READY
 		filter = &runtimeApi.PodSandboxFilter{
 			State: &readyState,
 		}
@@ -180,33 +180,22 @@ func (m *kubeGenericRuntimeManager) getKubeletSandboxes(all bool) ([]*runtimeApi
 }
 
 // determinePodSandboxIP determines the IP address of the given pod sandbox.
-// TODO: remove determinePodSandboxIP after networking is delegated to the container runtime.
 func (m *kubeGenericRuntimeManager) determinePodSandboxIP(podNamespace, podName string, podSandbox *runtimeApi.PodSandboxStatus) string {
-	ip := ""
-
-	if podSandbox.Network != nil {
-		ip = podSandbox.Network.GetIp()
+	if podSandbox.Network == nil {
+		glog.Warningf("Pod Sandbox status doesn't have network information, cannot report IP")
+		return ""
 	}
-
-	if m.networkPlugin.Name() != network.DefaultPluginName {
-		// TODO: podInfraContainerID in GetPodNetworkStatus() interface should be renamed to sandboxID
-		netStatus, err := m.networkPlugin.GetPodNetworkStatus(podNamespace, podName, kubecontainer.ContainerID{
-			Type: m.runtimeName,
-			ID:   podSandbox.GetId(),
-		})
-		if err != nil {
-			glog.Errorf("NetworkPlugin %s failed on the status hook for pod '%s' - %v", m.networkPlugin.Name(), kubecontainer.BuildPodFullName(podName, podNamespace), err)
-		} else if netStatus != nil {
-			ip = netStatus.IP.String()
-		}
+	ip := podSandbox.Network.GetIp()
+	if net.ParseIP(ip) == nil {
+		glog.Warningf("Pod Sandbox reported an unparseable IP %v", ip)
+		return ""
 	}
-
 	return ip
 }
 
 // getPodSandboxID gets the sandbox id by podUID and returns ([]sandboxID, error).
 // Param state could be nil in order to get all sandboxes belonging to same pod.
-func (m *kubeGenericRuntimeManager) getSandboxIDByPodUID(podUID string, state *runtimeApi.PodSandBoxState) ([]string, error) {
+func (m *kubeGenericRuntimeManager) getSandboxIDByPodUID(podUID string, state *runtimeApi.PodSandboxState) ([]string, error) {
 	filter := &runtimeApi.PodSandboxFilter{
 		State:         state,
 		LabelSelector: map[string]string{types.KubernetesPodUIDLabel: podUID},

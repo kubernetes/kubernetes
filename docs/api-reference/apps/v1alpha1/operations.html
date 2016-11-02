@@ -443,10 +443,10 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_list_or_watch_objects_of_kind_petset">list or watch objects of kind PetSet</h3>
+<h3 id="_list_or_watch_objects_of_kind_statefulset">list or watch objects of kind StatefulSet</h3>
 <div class="listingblock">
 <div class="content">
-<pre>GET /apis/apps/v1alpha1/namespaces/{namespace}/petsets</pre>
+<pre>GET /apis/apps/v1alpha1/namespaces/{namespace}/statefulsets</pre>
 </div>
 </div>
 <div class="sect3">
@@ -550,7 +550,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1alpha1_petsetlist">v1alpha1.PetSetList</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1alpha1_statefulsetlist">v1alpha1.StatefulSetList</a></p></td>
 </tr>
 </tbody>
 </table>
@@ -579,6 +579,12 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <li>
 <p>application/vnd.kubernetes.protobuf</p>
 </li>
+<li>
+<p>application/json;stream=watch</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf;stream=watch</p>
+</li>
 </ul>
 </div>
 </div>
@@ -594,10 +600,10 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_delete_collection_of_petset">delete collection of PetSet</h3>
+<h3 id="_delete_collection_of_statefulset">delete collection of StatefulSet</h3>
 <div class="listingblock">
 <div class="content">
-<pre>DELETE /apis/apps/v1alpha1/namespaces/{namespace}/petsets</pre>
+<pre>DELETE /apis/apps/v1alpha1/namespaces/{namespace}/statefulsets</pre>
 </div>
 </div>
 <div class="sect3">
@@ -745,10 +751,10 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_create_a_petset">create a PetSet</h3>
+<h3 id="_create_a_statefulset">create a StatefulSet</h3>
 <div class="listingblock">
 <div class="content">
-<pre>POST /apis/apps/v1alpha1/namespaces/{namespace}/petsets</pre>
+<pre>POST /apis/apps/v1alpha1/namespaces/{namespace}/statefulsets</pre>
 </div>
 </div>
 <div class="sect3">
@@ -786,7 +792,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">body</p></td>
 <td class="tableblock halign-left valign-top"></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1alpha1_petset">v1alpha1.PetSet</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1alpha1_statefulset">v1alpha1.StatefulSet</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -820,7 +826,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1alpha1_petset">v1alpha1.PetSet</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1alpha1_statefulset">v1alpha1.StatefulSet</a></p></td>
 </tr>
 </tbody>
 </table>
@@ -864,10 +870,10 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_read_the_specified_petset">read the specified PetSet</h3>
+<h3 id="_read_the_specified_statefulset">read the specified StatefulSet</h3>
 <div class="listingblock">
 <div class="content">
-<pre>GET /apis/apps/v1alpha1/namespaces/{namespace}/petsets/{name}</pre>
+<pre>GET /apis/apps/v1alpha1/namespaces/{namespace}/statefulsets/{name}</pre>
 </div>
 </div>
 <div class="sect3">
@@ -927,7 +933,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">name of the PetSet</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the StatefulSet</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -955,7 +961,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1alpha1_petset">v1alpha1.PetSet</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1alpha1_statefulset">v1alpha1.StatefulSet</a></p></td>
 </tr>
 </tbody>
 </table>
@@ -999,10 +1005,10 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_replace_the_specified_petset">replace the specified PetSet</h3>
+<h3 id="_replace_the_specified_statefulset">replace the specified StatefulSet</h3>
 <div class="listingblock">
 <div class="content">
-<pre>PUT /apis/apps/v1alpha1/namespaces/{namespace}/petsets/{name}</pre>
+<pre>PUT /apis/apps/v1alpha1/namespaces/{namespace}/statefulsets/{name}</pre>
 </div>
 </div>
 <div class="sect3">
@@ -1040,7 +1046,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">body</p></td>
 <td class="tableblock halign-left valign-top"></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1alpha1_petset">v1alpha1.PetSet</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1alpha1_statefulset">v1alpha1.StatefulSet</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -1054,7 +1060,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">name of the PetSet</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the StatefulSet</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1082,7 +1088,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1alpha1_petset">v1alpha1.PetSet</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1alpha1_statefulset">v1alpha1.StatefulSet</a></p></td>
 </tr>
 </tbody>
 </table>
@@ -1126,10 +1132,10 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_delete_a_petset">delete a PetSet</h3>
+<h3 id="_delete_a_statefulset">delete a StatefulSet</h3>
 <div class="listingblock">
 <div class="content">
-<pre>DELETE /apis/apps/v1alpha1/namespaces/{namespace}/petsets/{name}</pre>
+<pre>DELETE /apis/apps/v1alpha1/namespaces/{namespace}/statefulsets/{name}</pre>
 </div>
 </div>
 <div class="sect3">
@@ -1181,7 +1187,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">name of the PetSet</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the StatefulSet</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1253,10 +1259,10 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_partially_update_the_specified_petset">partially update the specified PetSet</h3>
+<h3 id="_partially_update_the_specified_statefulset">partially update the specified StatefulSet</h3>
 <div class="listingblock">
 <div class="content">
-<pre>PATCH /apis/apps/v1alpha1/namespaces/{namespace}/petsets/{name}</pre>
+<pre>PATCH /apis/apps/v1alpha1/namespaces/{namespace}/statefulsets/{name}</pre>
 </div>
 </div>
 <div class="sect3">
@@ -1308,7 +1314,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">name of the PetSet</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the StatefulSet</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1336,7 +1342,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1alpha1_petset">v1alpha1.PetSet</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1alpha1_statefulset">v1alpha1.StatefulSet</a></p></td>
 </tr>
 </tbody>
 </table>
@@ -1386,10 +1392,10 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_read_status_of_the_specified_petset">read status of the specified PetSet</h3>
+<h3 id="_read_status_of_the_specified_statefulset">read status of the specified StatefulSet</h3>
 <div class="listingblock">
 <div class="content">
-<pre>GET /apis/apps/v1alpha1/namespaces/{namespace}/petsets/{name}/status</pre>
+<pre>GET /apis/apps/v1alpha1/namespaces/{namespace}/statefulsets/{name}/status</pre>
 </div>
 </div>
 <div class="sect3">
@@ -1433,7 +1439,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">name of the PetSet</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the StatefulSet</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1461,7 +1467,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1alpha1_petset">v1alpha1.PetSet</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1alpha1_statefulset">v1alpha1.StatefulSet</a></p></td>
 </tr>
 </tbody>
 </table>
@@ -1505,10 +1511,10 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_replace_status_of_the_specified_petset">replace status of the specified PetSet</h3>
+<h3 id="_replace_status_of_the_specified_statefulset">replace status of the specified StatefulSet</h3>
 <div class="listingblock">
 <div class="content">
-<pre>PUT /apis/apps/v1alpha1/namespaces/{namespace}/petsets/{name}/status</pre>
+<pre>PUT /apis/apps/v1alpha1/namespaces/{namespace}/statefulsets/{name}/status</pre>
 </div>
 </div>
 <div class="sect3">
@@ -1546,7 +1552,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">body</p></td>
 <td class="tableblock halign-left valign-top"></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1alpha1_petset">v1alpha1.PetSet</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1alpha1_statefulset">v1alpha1.StatefulSet</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -1560,7 +1566,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">name of the PetSet</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the StatefulSet</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1588,7 +1594,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1alpha1_petset">v1alpha1.PetSet</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1alpha1_statefulset">v1alpha1.StatefulSet</a></p></td>
 </tr>
 </tbody>
 </table>
@@ -1632,10 +1638,10 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_partially_update_status_of_the_specified_petset">partially update status of the specified PetSet</h3>
+<h3 id="_partially_update_status_of_the_specified_statefulset">partially update status of the specified StatefulSet</h3>
 <div class="listingblock">
 <div class="content">
-<pre>PATCH /apis/apps/v1alpha1/namespaces/{namespace}/petsets/{name}/status</pre>
+<pre>PATCH /apis/apps/v1alpha1/namespaces/{namespace}/statefulsets/{name}/status</pre>
 </div>
 </div>
 <div class="sect3">
@@ -1687,7 +1693,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">name of the PetSet</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the StatefulSet</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1715,7 +1721,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1alpha1_petset">v1alpha1.PetSet</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1alpha1_statefulset">v1alpha1.StatefulSet</a></p></td>
 </tr>
 </tbody>
 </table>
@@ -1765,10 +1771,10 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_list_or_watch_objects_of_kind_petset_2">list or watch objects of kind PetSet</h3>
+<h3 id="_list_or_watch_objects_of_kind_statefulset_2">list or watch objects of kind StatefulSet</h3>
 <div class="listingblock">
 <div class="content">
-<pre>GET /apis/apps/v1alpha1/petsets</pre>
+<pre>GET /apis/apps/v1alpha1/statefulsets</pre>
 </div>
 </div>
 <div class="sect3">
@@ -1864,7 +1870,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">200</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">success</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1alpha1_petsetlist">v1alpha1.PetSetList</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="../definitions#_v1alpha1_statefulsetlist">v1alpha1.StatefulSetList</a></p></td>
 </tr>
 </tbody>
 </table>
@@ -1893,6 +1899,12 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <li>
 <p>application/vnd.kubernetes.protobuf</p>
 </li>
+<li>
+<p>application/json;stream=watch</p>
+</li>
+<li>
+<p>application/vnd.kubernetes.protobuf;stream=watch</p>
+</li>
 </ul>
 </div>
 </div>
@@ -1908,10 +1920,10 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_watch_individual_changes_to_a_list_of_petset">watch individual changes to a list of PetSet</h3>
+<h3 id="_watch_individual_changes_to_a_list_of_statefulset">watch individual changes to a list of StatefulSet</h3>
 <div class="listingblock">
 <div class="content">
-<pre>GET /apis/apps/v1alpha1/watch/namespaces/{namespace}/petsets</pre>
+<pre>GET /apis/apps/v1alpha1/watch/namespaces/{namespace}/statefulsets</pre>
 </div>
 </div>
 <div class="sect3">
@@ -2039,10 +2051,13 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <p>application/json</p>
 </li>
 <li>
-<p>application/json;stream=watch</p>
+<p>application/yaml</p>
 </li>
 <li>
 <p>application/vnd.kubernetes.protobuf</p>
+</li>
+<li>
+<p>application/json;stream=watch</p>
 </li>
 <li>
 <p>application/vnd.kubernetes.protobuf;stream=watch</p>
@@ -2062,10 +2077,10 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_watch_changes_to_an_object_of_kind_petset">watch changes to an object of kind PetSet</h3>
+<h3 id="_watch_changes_to_an_object_of_kind_statefulset">watch changes to an object of kind StatefulSet</h3>
 <div class="listingblock">
 <div class="content">
-<pre>GET /apis/apps/v1alpha1/watch/namespaces/{namespace}/petsets/{name}</pre>
+<pre>GET /apis/apps/v1alpha1/watch/namespaces/{namespace}/statefulsets/{name}</pre>
 </div>
 </div>
 <div class="sect3">
@@ -2149,7 +2164,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">PathParameter</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">name of the PetSet</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name of the StatefulSet</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -2201,10 +2216,13 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <p>application/json</p>
 </li>
 <li>
-<p>application/json;stream=watch</p>
+<p>application/yaml</p>
 </li>
 <li>
 <p>application/vnd.kubernetes.protobuf</p>
+</li>
+<li>
+<p>application/json;stream=watch</p>
 </li>
 <li>
 <p>application/vnd.kubernetes.protobuf;stream=watch</p>
@@ -2224,10 +2242,10 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 </div>
 <div class="sect2">
-<h3 id="_watch_individual_changes_to_a_list_of_petset_2">watch individual changes to a list of PetSet</h3>
+<h3 id="_watch_individual_changes_to_a_list_of_statefulset_2">watch individual changes to a list of StatefulSet</h3>
 <div class="listingblock">
 <div class="content">
-<pre>GET /apis/apps/v1alpha1/watch/petsets</pre>
+<pre>GET /apis/apps/v1alpha1/watch/statefulsets</pre>
 </div>
 </div>
 <div class="sect3">
@@ -2347,10 +2365,13 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <p>application/json</p>
 </li>
 <li>
-<p>application/json;stream=watch</p>
+<p>application/yaml</p>
 </li>
 <li>
 <p>application/vnd.kubernetes.protobuf</p>
+</li>
+<li>
+<p>application/json;stream=watch</p>
 </li>
 <li>
 <p>application/vnd.kubernetes.protobuf;stream=watch</p>
@@ -2374,7 +2395,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-09-22 17:28:35 UTC
+Last updated 2016-10-28 05:32:49 UTC
 </div>
 </div>
 </body>

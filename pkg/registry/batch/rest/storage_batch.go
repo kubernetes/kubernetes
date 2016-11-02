@@ -73,3 +73,7 @@ func (p RESTStorageProvider) v2alpha1Storage(apiResourceConfigSource genericapis
 	}
 	return storage
 }
+
+func (p RESTStorageProvider) GroupName() string {
+	return batch.GroupName
+}

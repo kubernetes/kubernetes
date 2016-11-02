@@ -43,6 +43,26 @@ func GetHostname(hostnameOverride string) string {
 	return strings.ToLower(strings.TrimSpace(hostname))
 }
 
+// GetPreferredNodeAddress returns the address of the provided node, using the provided preference order.
+// If none of the preferred address types are found, an error is returned.
+func GetPreferredNodeAddress(node *api.Node, preferredAddressTypes []api.NodeAddressType) (string, error) {
+	for _, addressType := range preferredAddressTypes {
+		for _, address := range node.Status.Addresses {
+			if address.Type == addressType {
+				return address.Address, nil
+			}
+		}
+		// If hostname was requested and no Hostname address was registered...
+		if addressType == api.NodeHostName {
+			// ...fall back to the kubernetes.io/hostname label for compatibility with kubelets before 1.5
+			if hostname, ok := node.Labels[unversioned.LabelHostname]; ok && len(hostname) > 0 {
+				return hostname, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("no preferred addresses found; known addresses: %v", node.Status.Addresses)
+}
+
 // GetNodeHostIP returns the provided node's IP, based on the priority:
 // 1. NodeInternalIP
 // 2. NodeExternalIP

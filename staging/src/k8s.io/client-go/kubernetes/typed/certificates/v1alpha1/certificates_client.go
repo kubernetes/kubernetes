@@ -24,13 +24,13 @@ import (
 )
 
 type CertificatesInterface interface {
-	GetRESTClient() *rest.RESTClient
+	RESTClient() rest.Interface
 	CertificateSigningRequestsGetter
 }
 
 // CertificatesClient is used to interact with features provided by the Certificates group.
 type CertificatesClient struct {
-	*rest.RESTClient
+	restClient rest.Interface
 }
 
 func (c *CertificatesClient) CertificateSigningRequests() CertificateSigningRequestInterface {
@@ -61,7 +61,7 @@ func NewForConfigOrDie(c *rest.Config) *CertificatesClient {
 }
 
 // New creates a new CertificatesClient for the given RESTClient.
-func New(c *rest.RESTClient) *CertificatesClient {
+func New(c rest.Interface) *CertificatesClient {
 	return &CertificatesClient{c}
 }
 
@@ -86,11 +86,11 @@ func setConfigDefaults(config *rest.Config) error {
 	return nil
 }
 
-// GetRESTClient returns a RESTClient that is used to communicate
+// RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *CertificatesClient) GetRESTClient() *rest.RESTClient {
+func (c *CertificatesClient) RESTClient() rest.Interface {
 	if c == nil {
 		return nil
 	}
-	return c.RESTClient
+	return c.restClient
 }

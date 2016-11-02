@@ -317,6 +317,10 @@ func (testcase *testcase) DiskIsAttached(diskName string, nodeName types.NodeNam
 	return expected.isAttached, expected.ret
 }
 
+func (testcase *testcase) DisksAreAttached(diskNames []string, nodeName types.NodeName) (map[string]bool, error) {
+	return nil, errors.New("Not implemented")
+}
+
 func (testcase *testcase) CreateDisk(volumeOptions *aws.VolumeOptions) (volumeName string, err error) {
 	return "", errors.New("Not implemented")
 }

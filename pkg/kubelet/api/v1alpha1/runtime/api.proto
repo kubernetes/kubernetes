@@ -20,7 +20,7 @@ service RuntimeService {
     rpc RemovePodSandbox(RemovePodSandboxRequest) returns (RemovePodSandboxResponse) {}
     // PodSandboxStatus returns the status of the PodSandbox.
     rpc PodSandboxStatus(PodSandboxStatusRequest) returns (PodSandboxStatusResponse) {}
-    // ListPodSandbox returns a list of SandBox.
+    // ListPodSandbox returns a list of Sandbox.
     rpc ListPodSandbox(ListPodSandboxRequest) returns (ListPodSandboxResponse) {}
 
     // CreateContainer creates a new container in specified PodSandbox
@@ -270,15 +270,15 @@ message Namespace {
     optional NamespaceOption options = 2;
 }
 
-// LinuxSandBoxStatus contains status specific to Linux sandboxes.
+// LinuxSandboxStatus contains status specific to Linux sandboxes.
 message LinuxPodSandboxStatus {
     // Namespaces contains paths to the sandbox's namespaces.
     optional Namespace namespaces = 1;
 }
 
-enum PodSandBoxState {
-    READY = 0;
-    NOTREADY = 1;
+enum PodSandboxState {
+    SANDBOX_READY = 0;
+    SANDBOX_NOTREADY = 1;
 }
 
 // PodSandboxStatus contains the status of the PodSandbox.
@@ -288,7 +288,7 @@ message PodSandboxStatus {
     // Metadata of the sandbox.
     optional PodSandboxMetadata metadata = 2;
     // State of the sandbox.
-    optional PodSandBoxState state = 3;
+    optional PodSandboxState state = 3;
     // Creation timestamp of the sandbox in nanoseconds.
     optional int64 created_at = 4;
     // Network contains network status if network is handled by the runtime.
@@ -313,7 +313,7 @@ message PodSandboxFilter {
     // ID of the sandbox.
     optional string id = 1;
     // State of the sandbox.
-    optional PodSandBoxState state = 2;
+    optional PodSandboxState state = 2;
     // LabelSelector to select matches.
     // Only api.MatchLabels is supported for now and the requirements
     // are ANDed. MatchExpressions is not supported yet.
@@ -333,7 +333,7 @@ message PodSandbox {
     // Metadata of the sandbox
     optional PodSandboxMetadata metadata = 2;
     // The state of the PodSandbox
-    optional PodSandBoxState state = 3;
+    optional PodSandboxState state = 3;
     // Creation timestamps of the sandbox in nanoseconds
     optional int64 created_at = 4;
     // The labels of the PodSandbox
@@ -529,10 +529,10 @@ message RemoveContainerRequest {
 message RemoveContainerResponse {}
 
 enum ContainerState {
-    CREATED = 0;
-    RUNNING = 1;
-    EXITED  = 2;
-    UNKNOWN = 3;
+    CONTAINER_CREATED = 0;
+    CONTAINER_RUNNING = 1;
+    CONTAINER_EXITED  = 2;
+    CONTAINER_UNKNOWN = 3;
 }
 
 // ContainerFilter is used to filter containers.

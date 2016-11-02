@@ -175,25 +175,28 @@ __custom_func() {
     * configmaps (aka 'cm')
     * daemonsets (aka 'ds')
     * deployments (aka 'deploy')
-    * events (aka 'ev')
     * endpoints (aka 'ep')
+    * events (aka 'ev')
     * horizontalpodautoscalers (aka 'hpa')
-    * ingress (aka 'ing')
+    * ingresses (aka 'ing')
     * jobs
     * limitranges (aka 'limits')
-    * nodes (aka 'no')
     * namespaces (aka 'ns')
-    * petsets (alpha feature, may be unstable)
-    * pods (aka 'po')
-    * persistentvolumes (aka 'pv')
+    * networkpolicies
+    * nodes (aka 'no')
     * persistentvolumeclaims (aka 'pvc')
-    * quota
-    * resourcequotas (aka 'quota')
+    * persistentvolumes (aka 'pv')
+    * pods (aka 'po')
+    * podsecuritypolicies (aka 'psp')
+    * podtemplates
     * replicasets (aka 'rs')
     * replicationcontrollers (aka 'rc')
+    * resourcequotas (aka 'quota')
     * secrets
     * serviceaccounts (aka 'sa')
     * services (aka 'svc')
+    * storageclasses
+    * thirdpartyresources
     `
 )
 
@@ -221,7 +224,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 		{
 			Message: "Basic Commands (Beginner):",
 			Commands: []*cobra.Command{
-				NewCmdCreate(f, out),
+				NewCmdCreate(f, out, err),
 				NewCmdExposeService(f, out),
 				NewCmdRun(f, in, out, err),
 				set.NewCmdSet(f, out, err),
@@ -265,6 +268,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 				NewCmdExec(f, in, out, err),
 				NewCmdPortForward(f, out, err),
 				NewCmdProxy(f, out),
+				NewCmdCp(f, in, out, err),
 			},
 		},
 		{

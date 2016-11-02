@@ -61,6 +61,10 @@ type Scheme struct {
 	// resource field labels in that version to internal version.
 	fieldLabelConversionFuncs map[string]map[string]FieldLabelConversionFunc
 
+	// defaulterFuncs is an array of interfaces to be called with an object to provide defaulting
+	// the provided object must be a pointer.
+	defaulterFuncs map[reflect.Type]func(interface{})
+
 	// converter stores all registered conversion functions. It also has
 	// default coverting behavior.
 	converter *conversion.Converter
@@ -82,6 +86,7 @@ func NewScheme() *Scheme {
 		unversionedKinds: map[string]reflect.Type{},
 		cloner:           conversion.NewCloner(),
 		fieldLabelConversionFuncs: map[string]map[string]FieldLabelConversionFunc{},
+		defaulterFuncs:            map[reflect.Type]func(interface{}){},
 	}
 	s.converter = conversion.NewConverter(s.nameFunc)
 
@@ -419,6 +424,22 @@ func (s *Scheme) AddDefaultingFuncs(defaultingFuncs ...interface{}) error {
 		}
 	}
 	return nil
+}
+
+// AddTypeDefaultingFuncs registers a function that is passed a pointer to an
+// object and can default fields on the object. These functions will be invoked
+// when Default() is called. The function will never be called unless the
+// defaulted object matches srcType. If this function is invoked twice with the
+// same srcType, the fn passed to the later call will be used instead.
+func (s *Scheme) AddTypeDefaultingFunc(srcType Object, fn func(interface{})) {
+	s.defaulterFuncs[reflect.TypeOf(srcType)] = fn
+}
+
+// Default sets defaults on the provided Object.
+func (s *Scheme) Default(src Object) {
+	if fn, ok := s.defaulterFuncs[reflect.TypeOf(src)]; ok {
+		fn(src)
+	}
 }
 
 // Copy does a deep copy of an API object.

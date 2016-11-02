@@ -795,6 +795,12 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 		req.Header = r.headers
 
 		r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
+		if retries > 0 {
+			// We are retrying the request that we already send to apiserver
+			// at least once before.
+			// This request should also be throttled with the client-internal throttler.
+			r.tryThrottle()
+		}
 		resp, err := client.Do(req)
 		updateURLMetrics(r, resp, err)
 		if err != nil {

@@ -20,9 +20,9 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//federation/apis/federation/install:go_default_library",
-        "//federation/client/clientset_generated/federation_internalclientset/typed/core/unversioned:go_default_library",
-        "//federation/client/clientset_generated/federation_internalclientset/typed/extensions/unversioned:go_default_library",
-        "//federation/client/clientset_generated/federation_internalclientset/typed/federation/unversioned:go_default_library",
+        "//federation/client/clientset_generated/federation_internalclientset/typed/core/internalversion:go_default_library",
+        "//federation/client/clientset_generated/federation_internalclientset/typed/extensions/internalversion:go_default_library",
+        "//federation/client/clientset_generated/federation_internalclientset/typed/federation/internalversion:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/typed/discovery:go_default_library",
         "//pkg/util/flowcontrol:go_default_library",

@@ -473,8 +473,6 @@ function start-kubelet {
   flags+=" --cluster-dns=${DNS_SERVER_IP}"
   flags+=" --cluster-domain=${DNS_DOMAIN}"
   flags+=" --config=/etc/kubernetes/manifests"
-  flags+=" --kubelet-cgroups=/kubelet"
-  flags+=" --system-cgroups=/system"
 
   if [[ -n "${KUBELET_PORT:-}" ]]; then
     flags+=" --port=${KUBELET_PORT}"
@@ -628,8 +626,8 @@ function prepare-etcd-manifest {
   sed -i -e "s@{{ *etcd_cluster *}}@$etcd_cluster@g" "${temp_file}"
   sed -i -e "s@{{ *storage_backend *}}@${STORAGE_BACKEND:-}@g" "${temp_file}"
   sed -i -e "s@{{ *cluster_state *}}@$cluster_state@g" "${temp_file}"
-  if [[ -n "${TEST_ETCD_VERSION:-}" ]]; then
-    sed -i -e "s@{{ *pillar\.get('etcd_docker_tag', '\(.*\)') *}}@${TEST_ETCD_VERSION}@g" "${temp_file}"
+  if [[ -n "${ETCD_VERSION:-}" ]]; then
+    sed -i -e "s@{{ *pillar\.get('etcd_docker_tag', '\(.*\)') *}}@${ETCD_VERSION}@g" "${temp_file}"
   else
     sed -i -e "s@{{ *pillar\.get('etcd_docker_tag', '\(.*\)') *}}@\1@g" "${temp_file}"
   fi
@@ -1164,6 +1162,9 @@ For Kubernetes copyright and licensing information, see:
 EOF
 }
 
+function override-kubectl {
+    echo "export PATH=${KUBE_HOME}/bin:\$PATH" > /etc/profile.d/kube_env.sh
+}
 
 ########### Main Function ###########
 echo "Start to configure instance for kubernetes"
@@ -1198,6 +1199,7 @@ else
   create-kubeproxy-kubeconfig
 fi
 
+override-kubectl
 assemble-docker-flags
 load-docker-images
 start-kubelet

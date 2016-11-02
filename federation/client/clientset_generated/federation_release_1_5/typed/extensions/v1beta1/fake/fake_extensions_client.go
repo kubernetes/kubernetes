@@ -22,29 +22,29 @@ import (
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
-type FakeExtensions struct {
+type FakeExtensionsV1beta1 struct {
 	*core.Fake
 }
 
-func (c *FakeExtensions) DaemonSets(namespace string) v1beta1.DaemonSetInterface {
+func (c *FakeExtensionsV1beta1) DaemonSets(namespace string) v1beta1.DaemonSetInterface {
 	return &FakeDaemonSets{c, namespace}
 }
 
-func (c *FakeExtensions) Deployments(namespace string) v1beta1.DeploymentInterface {
+func (c *FakeExtensionsV1beta1) Deployments(namespace string) v1beta1.DeploymentInterface {
 	return &FakeDeployments{c, namespace}
 }
 
-func (c *FakeExtensions) Ingresses(namespace string) v1beta1.IngressInterface {
+func (c *FakeExtensionsV1beta1) Ingresses(namespace string) v1beta1.IngressInterface {
 	return &FakeIngresses{c, namespace}
 }
 
-func (c *FakeExtensions) ReplicaSets(namespace string) v1beta1.ReplicaSetInterface {
+func (c *FakeExtensionsV1beta1) ReplicaSets(namespace string) v1beta1.ReplicaSetInterface {
 	return &FakeReplicaSets{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeExtensions) RESTClient() restclient.Interface {
+func (c *FakeExtensionsV1beta1) RESTClient() restclient.Interface {
 	var ret *restclient.RESTClient
 	return ret
 }

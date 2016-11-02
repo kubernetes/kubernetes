@@ -39,7 +39,13 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeControllerManagerConfiguration, InType: reflect.TypeOf(&KubeControllerManagerConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeProxyConfiguration, InType: reflect.TypeOf(&KubeProxyConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeSchedulerConfiguration, InType: reflect.TypeOf(&KubeSchedulerConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletAnonymousAuthentication, InType: reflect.TypeOf(&KubeletAnonymousAuthentication{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletAuthentication, InType: reflect.TypeOf(&KubeletAuthentication{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletAuthorization, InType: reflect.TypeOf(&KubeletAuthorization{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletConfiguration, InType: reflect.TypeOf(&KubeletConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletWebhookAuthentication, InType: reflect.TypeOf(&KubeletWebhookAuthentication{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletWebhookAuthorization, InType: reflect.TypeOf(&KubeletWebhookAuthorization{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletX509Authentication, InType: reflect.TypeOf(&KubeletX509Authentication{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_LeaderElectionConfiguration, InType: reflect.TypeOf(&LeaderElectionConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_PersistentVolumeRecyclerConfiguration, InType: reflect.TypeOf(&PersistentVolumeRecyclerConfiguration{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_PortRangeVar, InType: reflect.TypeOf(&PortRangeVar{})},
@@ -190,6 +196,36 @@ func DeepCopy_componentconfig_KubeSchedulerConfiguration(in interface{}, out int
 	}
 }
 
+func DeepCopy_componentconfig_KubeletAnonymousAuthentication(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*KubeletAnonymousAuthentication)
+		out := out.(*KubeletAnonymousAuthentication)
+		out.Enabled = in.Enabled
+		return nil
+	}
+}
+
+func DeepCopy_componentconfig_KubeletAuthentication(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*KubeletAuthentication)
+		out := out.(*KubeletAuthentication)
+		out.X509 = in.X509
+		out.Webhook = in.Webhook
+		out.Anonymous = in.Anonymous
+		return nil
+	}
+}
+
+func DeepCopy_componentconfig_KubeletAuthorization(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*KubeletAuthorization)
+		out := out.(*KubeletAuthorization)
+		out.Mode = in.Mode
+		out.Webhook = in.Webhook
+		return nil
+	}
+}
+
 func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*KubeletConfiguration)
@@ -208,6 +244,8 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.TLSCertFile = in.TLSCertFile
 		out.TLSPrivateKeyFile = in.TLSPrivateKeyFile
 		out.CertDirectory = in.CertDirectory
+		out.Authentication = in.Authentication
+		out.Authorization = in.Authorization
 		out.HostnameOverride = in.HostnameOverride
 		out.PodInfraContainerImage = in.PodInfraContainerImage
 		out.DockerEndpoint = in.DockerEndpoint
@@ -277,11 +315,12 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.RemoteImageEndpoint = in.RemoteImageEndpoint
 		out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 		out.RktPath = in.RktPath
+		out.ExperimentalMounterPath = in.ExperimentalMounterPath
+		out.ExperimentalMounterRootfsPath = in.ExperimentalMounterRootfsPath
 		out.RktAPIEndpoint = in.RktAPIEndpoint
 		out.RktStage1Image = in.RktStage1Image
 		out.LockFilePath = in.LockFilePath
 		out.ExitOnLockContention = in.ExitOnLockContention
-		out.ConfigureCBR0 = in.ConfigureCBR0
 		out.HairpinMode = in.HairpinMode
 		out.BabysitDaemons = in.BabysitDaemons
 		out.MaxPods = in.MaxPods
@@ -349,6 +388,35 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 			out.AllowedUnsafeSysctls = nil
 		}
 		out.ExperimentalRuntimeIntegrationType = in.ExperimentalRuntimeIntegrationType
+		return nil
+	}
+}
+
+func DeepCopy_componentconfig_KubeletWebhookAuthentication(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*KubeletWebhookAuthentication)
+		out := out.(*KubeletWebhookAuthentication)
+		out.Enabled = in.Enabled
+		out.CacheTTL = in.CacheTTL
+		return nil
+	}
+}
+
+func DeepCopy_componentconfig_KubeletWebhookAuthorization(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*KubeletWebhookAuthorization)
+		out := out.(*KubeletWebhookAuthorization)
+		out.CacheAuthorizedTTL = in.CacheAuthorizedTTL
+		out.CacheUnauthorizedTTL = in.CacheUnauthorizedTTL
+		return nil
+	}
+}
+
+func DeepCopy_componentconfig_KubeletX509Authentication(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*KubeletX509Authentication)
+		out := out.(*KubeletX509Authentication)
+		out.ClientCAFile = in.ClientCAFile
 		return nil
 	}
 }

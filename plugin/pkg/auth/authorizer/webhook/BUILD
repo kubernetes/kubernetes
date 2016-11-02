@@ -20,7 +20,7 @@ go_library(
         "//pkg/apis/authorization/install:go_default_library",
         "//pkg/apis/authorization/v1beta1:go_default_library",
         "//pkg/auth/authorizer:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset/typed/authorization/unversioned:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset/typed/authorization/internalversion:go_default_library",
         "//pkg/util/cache:go_default_library",
         "//plugin/pkg/webhook:go_default_library",
         "//vendor:github.com/golang/glog",

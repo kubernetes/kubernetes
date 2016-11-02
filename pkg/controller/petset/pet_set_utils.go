@@ -23,61 +23,61 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/client/cache"
-	appsclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/unversioned"
+	appsclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
 	"k8s.io/kubernetes/pkg/controller"
 
 	"github.com/golang/glog"
 )
 
-// overlappingPetSets sorts a list of PetSets by creation timestamp, using their names as a tie breaker.
-// Generally used to tie break between PetSets that have overlapping selectors.
-type overlappingPetSets []apps.PetSet
+// overlappingStatefulSets sorts a list of StatefulSets by creation timestamp, using their names as a tie breaker.
+// Generally used to tie break between StatefulSets that have overlapping selectors.
+type overlappingStatefulSets []apps.StatefulSet
 
-func (o overlappingPetSets) Len() int      { return len(o) }
-func (o overlappingPetSets) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+func (o overlappingStatefulSets) Len() int      { return len(o) }
+func (o overlappingStatefulSets) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 
-func (o overlappingPetSets) Less(i, j int) bool {
+func (o overlappingStatefulSets) Less(i, j int) bool {
 	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
 		return o[i].Name < o[j].Name
 	}
 	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
 }
 
-// updatePetCount attempts to update the Status.Replicas of the given PetSet, with a single GET/PUT retry.
-func updatePetCount(psClient appsclientset.PetSetsGetter, ps apps.PetSet, numPets int) (updateErr error) {
+// updatePetCount attempts to update the Status.Replicas of the given StatefulSet, with a single GET/PUT retry.
+func updatePetCount(psClient appsclientset.StatefulSetsGetter, ps apps.StatefulSet, numPets int) (updateErr error) {
 	if ps.Status.Replicas == int32(numPets) || psClient == nil {
 		return nil
 	}
 	var getErr error
 	for i, ps := 0, &ps; ; i++ {
-		glog.V(4).Infof(fmt.Sprintf("Updating replica count for PetSet: %s/%s, ", ps.Namespace, ps.Name) +
+		glog.V(4).Infof(fmt.Sprintf("Updating replica count for StatefulSet: %s/%s, ", ps.Namespace, ps.Name) +
 			fmt.Sprintf("replicas %d->%d (need %d), ", ps.Status.Replicas, numPets, ps.Spec.Replicas))
 
-		ps.Status = apps.PetSetStatus{Replicas: int32(numPets)}
-		_, updateErr = psClient.PetSets(ps.Namespace).UpdateStatus(ps)
+		ps.Status = apps.StatefulSetStatus{Replicas: int32(numPets)}
+		_, updateErr = psClient.StatefulSets(ps.Namespace).UpdateStatus(ps)
 		if updateErr == nil || i >= statusUpdateRetries {
 			return updateErr
 		}
-		if ps, getErr = psClient.PetSets(ps.Namespace).Get(ps.Name); getErr != nil {
+		if ps, getErr = psClient.StatefulSets(ps.Namespace).Get(ps.Name); getErr != nil {
 			return getErr
 		}
 	}
 }
 
-// unhealthyPetTracker tracks unhealthy pets for petsets.
+// unhealthyPetTracker tracks unhealthy pets for statefulsets.
 type unhealthyPetTracker struct {
 	pc        petClient
 	store     cache.Store
 	storeLock sync.Mutex
 }
 
-// Get returns a previously recorded blocking pet for the given petset.
-func (u *unhealthyPetTracker) Get(ps *apps.PetSet, knownPets []*api.Pod) (*pcb, error) {
+// Get returns a previously recorded blocking pet for the given statefulset.
+func (u *unhealthyPetTracker) Get(ps *apps.StatefulSet, knownPets []*api.Pod) (*pcb, error) {
 	u.storeLock.Lock()
 	defer u.storeLock.Unlock()
 
 	// We "Get" by key but "Add" by object because the store interface doesn't
-	// allow us to Get/Add a related obj (eg petset: blocking pet).
+	// allow us to Get/Add a related obj (eg statefulset: blocking pet).
 	key, err := controller.KeyFunc(ps)
 	if err != nil {
 		return nil, err
@@ -93,16 +93,16 @@ func (u *unhealthyPetTracker) Get(ps *apps.PetSet, knownPets []*api.Pod) (*pcb, 
 	if !exists {
 		for _, p := range knownPets {
 			if hc.isHealthy(p) && !hc.isDying(p) {
-				glog.V(4).Infof("Ignoring healthy pet %v for PetSet %v", p.Name, ps.Name)
+				glog.V(4).Infof("Ignoring healthy pod %v for StatefulSet %v", p.Name, ps.Name)
 				continue
 			}
-			glog.Infof("No recorded blocking pet, but found unhealthy pet %v for PetSet %v", p.Name, ps.Name)
+			glog.Infof("No recorded blocking pod, but found unhealthy pod %v for StatefulSet %v", p.Name, ps.Name)
 			return &pcb{pod: p, parent: ps}, nil
 		}
 		return nil, nil
 	}
 
-	// This is a pet that's blocking further creates/deletes of a petset. If it
+	// This is a pet that's blocking further creates/deletes of a statefulset. If it
 	// disappears, it's no longer blocking. If it exists, it continues to block
 	// till it turns healthy or disappears.
 	bp := obj.(*pcb)
@@ -111,12 +111,12 @@ func (u *unhealthyPetTracker) Get(ps *apps.PetSet, knownPets []*api.Pod) (*pcb, 
 		return nil, err
 	}
 	if !exists {
-		glog.V(4).Infof("Clearing blocking pet %v for PetSet %v because it's been deleted", bp.pod.Name, ps.Name)
+		glog.V(4).Infof("Clearing blocking pod %v for StatefulSet %v because it's been deleted", bp.pod.Name, ps.Name)
 		return nil, nil
 	}
 	blockingPetPod := blockingPet.pod
 	if hc.isHealthy(blockingPetPod) && !hc.isDying(blockingPetPod) {
-		glog.V(4).Infof("Clearing blocking pet %v for PetSet %v because it's healthy", bp.pod.Name, ps.Name)
+		glog.V(4).Infof("Clearing blocking pod %v for StatefulSet %v because it's healthy", bp.pod.Name, ps.Name)
 		u.store.Delete(blockingPet)
 		blockingPet = nil
 	}
@@ -131,11 +131,11 @@ func (u *unhealthyPetTracker) Add(blockingPet *pcb) error {
 	if blockingPet == nil {
 		return nil
 	}
-	glog.V(4).Infof("Adding blocking pet %v for PetSet %v", blockingPet.pod.Name, blockingPet.parent.Name)
+	glog.V(4).Infof("Adding blocking pod %v for StatefulSet %v", blockingPet.pod.Name, blockingPet.parent.Name)
 	return u.store.Add(blockingPet)
 }
 
-// newUnHealthyPetTracker tracks unhealthy pets that block progress of petsets.
+// newUnHealthyPetTracker tracks unhealthy pets that block progress of statefulsets.
 func newUnHealthyPetTracker(pc petClient) *unhealthyPetTracker {
 	return &unhealthyPetTracker{pc: pc, store: cache.NewStore(pcbKeyFunc)}
 }
@@ -148,10 +148,10 @@ func pcbKeyFunc(obj interface{}) (string, error) {
 	}
 	p, ok := obj.(*pcb)
 	if !ok {
-		return "", fmt.Errorf("not a valid pet control block %#v", p)
+		return "", fmt.Errorf("not a valid pod control block %#v", p)
 	}
 	if p.parent == nil {
-		return "", fmt.Errorf("cannot compute pet control block key without parent pointer %#v", p)
+		return "", fmt.Errorf("cannot compute pod control block key without parent pointer %#v", p)
 	}
 	return controller.KeyFunc(p.parent)
 }

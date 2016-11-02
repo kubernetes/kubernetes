@@ -24,13 +24,13 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 )
 
-func TestPetSetStrategy(t *testing.T) {
+func TestStatefulSetStrategy(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	if !Strategy.NamespaceScoped() {
-		t.Errorf("PetSet must be namespace scoped")
+		t.Errorf("StatefulSet must be namespace scoped")
 	}
 	if Strategy.AllowCreateOnUpdate() {
-		t.Errorf("PetSet should not allow create on update")
+		t.Errorf("StatefulSet should not allow create on update")
 	}
 
 	validSelector := map[string]string{"a": "b"}
@@ -46,18 +46,18 @@ func TestPetSetStrategy(t *testing.T) {
 			},
 		},
 	}
-	ps := &apps.PetSet{
+	ps := &apps.StatefulSet{
 		ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
-		Spec: apps.PetSetSpec{
+		Spec: apps.StatefulSetSpec{
 			Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
 			Template: validPodTemplate.Template,
 		},
-		Status: apps.PetSetStatus{Replicas: 3},
+		Status: apps.StatefulSetStatus{Replicas: 3},
 	}
 
 	Strategy.PrepareForCreate(ctx, ps)
 	if ps.Status.Replicas != 0 {
-		t.Error("PetSet should not allow setting status.pets on create")
+		t.Error("StatefulSet should not allow setting status.replicas on create")
 	}
 	errs := Strategy.Validate(ctx, ps)
 	if len(errs) != 0 {
@@ -65,35 +65,35 @@ func TestPetSetStrategy(t *testing.T) {
 	}
 
 	// Just Spec.Replicas is allowed to change
-	validPs := &apps.PetSet{
+	validPs := &apps.StatefulSet{
 		ObjectMeta: api.ObjectMeta{Name: ps.Name, Namespace: ps.Namespace, ResourceVersion: "1", Generation: 1},
-		Spec: apps.PetSetSpec{
+		Spec: apps.StatefulSetSpec{
 			Selector: ps.Spec.Selector,
 			Template: validPodTemplate.Template,
 		},
-		Status: apps.PetSetStatus{Replicas: 4},
+		Status: apps.StatefulSetStatus{Replicas: 4},
 	}
 	Strategy.PrepareForUpdate(ctx, validPs, ps)
 	errs = Strategy.ValidateUpdate(ctx, validPs, ps)
 	if len(errs) != 0 {
-		t.Errorf("Updating spec.Replicas is allowed on a petset: %v", errs)
+		t.Errorf("Updating spec.Replicas is allowed on a statefulset: %v", errs)
 	}
 
 	validPs.Spec.Selector = &unversioned.LabelSelector{MatchLabels: map[string]string{"a": "bar"}}
 	Strategy.PrepareForUpdate(ctx, validPs, ps)
 	errs = Strategy.ValidateUpdate(ctx, validPs, ps)
 	if len(errs) == 0 {
-		t.Errorf("Expected a validation error since updates are disallowed on petsets.")
+		t.Errorf("Expected a validation error since updates are disallowed on statefulsets.")
 	}
 }
 
-func TestPetSetStatusStrategy(t *testing.T) {
+func TestStatefulSetStatusStrategy(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	if !StatusStrategy.NamespaceScoped() {
-		t.Errorf("PetSet must be namespace scoped")
+		t.Errorf("StatefulSet must be namespace scoped")
 	}
 	if StatusStrategy.AllowCreateOnUpdate() {
-		t.Errorf("PetSet should not allow create on update")
+		t.Errorf("StatefulSet should not allow create on update")
 	}
 	validSelector := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
@@ -108,34 +108,34 @@ func TestPetSetStatusStrategy(t *testing.T) {
 			},
 		},
 	}
-	oldPS := &apps.PetSet{
+	oldPS := &apps.StatefulSet{
 		ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault, ResourceVersion: "10"},
-		Spec: apps.PetSetSpec{
+		Spec: apps.StatefulSetSpec{
 			Replicas: 3,
 			Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
 			Template: validPodTemplate.Template,
 		},
-		Status: apps.PetSetStatus{
+		Status: apps.StatefulSetStatus{
 			Replicas: 1,
 		},
 	}
-	newPS := &apps.PetSet{
+	newPS := &apps.StatefulSet{
 		ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault, ResourceVersion: "9"},
-		Spec: apps.PetSetSpec{
+		Spec: apps.StatefulSetSpec{
 			Replicas: 1,
 			Selector: &unversioned.LabelSelector{MatchLabels: validSelector},
 			Template: validPodTemplate.Template,
 		},
-		Status: apps.PetSetStatus{
+		Status: apps.StatefulSetStatus{
 			Replicas: 2,
 		},
 	}
 	StatusStrategy.PrepareForUpdate(ctx, newPS, oldPS)
 	if newPS.Status.Replicas != 2 {
-		t.Errorf("PetSet status updates should allow change of pets: %v", newPS.Status.Replicas)
+		t.Errorf("StatefulSet status updates should allow change of pods: %v", newPS.Status.Replicas)
 	}
 	if newPS.Spec.Replicas != 3 {
-		t.Errorf("PetSet status updates should not clobber spec: %v", newPS.Spec)
+		t.Errorf("StatefulSet status updates should not clobber spec: %v", newPS.Spec)
 	}
 	errs := StatusStrategy.ValidateUpdate(ctx, newPS, oldPS)
 	if len(errs) != 0 {

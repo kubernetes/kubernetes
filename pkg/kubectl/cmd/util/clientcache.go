@@ -22,7 +22,8 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/typed/discovery"
+	oldclient "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 )
 
@@ -43,8 +44,9 @@ type ClientCache struct {
 	fedClientSets map[unversioned.GroupVersion]fed_clientset.Interface
 	configs       map[unversioned.GroupVersion]*restclient.Config
 	defaultConfig *restclient.Config
-	defaultClient *client.Client
-	matchVersion  bool
+	// TODO this is only ever read.  It should be moved to initialization at some point.
+	discoveryClient discovery.DiscoveryInterface
+	matchVersion    bool
 }
 
 // ClientConfigForVersion returns the correct config for a server
@@ -56,7 +58,7 @@ func (c *ClientCache) ClientConfigForVersion(version *unversioned.GroupVersion) 
 		}
 		c.defaultConfig = config
 		if c.matchVersion {
-			if err := client.MatchesServerVersion(c.defaultClient, config); err != nil {
+			if err := discovery.MatchesServerVersion(c.discoveryClient, config); err != nil {
 				return nil, err
 			}
 		}
@@ -77,8 +79,8 @@ func (c *ClientCache) ClientConfigForVersion(version *unversioned.GroupVersion) 
 		preferredGV = &versionCopy
 	}
 
-	client.SetKubernetesDefaults(&config)
-	negotiatedVersion, err := client.NegotiateVersion(c.defaultClient, &config, preferredGV, registered.EnabledVersions())
+	oldclient.SetKubernetesDefaults(&config)
+	negotiatedVersion, err := discovery.NegotiateVersion(c.discoveryClient, &config, preferredGV, registered.EnabledVersions())
 	if err != nil {
 		return nil, err
 	}

@@ -115,6 +115,18 @@ func (sb *summaryBuilder) build() (*stats.Summary, error) {
 		return nil, fmt.Errorf("Missing stats for root container")
 	}
 
+	var nodeFsInodesUsed *uint64
+	if sb.rootFsInfo.Inodes != nil && sb.rootFsInfo.InodesFree != nil {
+		nodeFsIU := *sb.rootFsInfo.Inodes - *sb.rootFsInfo.InodesFree
+		nodeFsInodesUsed = &nodeFsIU
+	}
+
+	var imageFsInodesUsed *uint64
+	if sb.imageFsInfo.Inodes != nil && sb.imageFsInfo.InodesFree != nil {
+		imageFsIU := *sb.imageFsInfo.Inodes - *sb.imageFsInfo.InodesFree
+		imageFsInodesUsed = &imageFsIU
+	}
+
 	rootStats := sb.containerInfoV2ToStats("", &rootInfo)
 	nodeStats := stats.NodeStats{
 		NodeName: sb.node.Name,
@@ -126,7 +138,9 @@ func (sb *summaryBuilder) build() (*stats.Summary, error) {
 			CapacityBytes:  &sb.rootFsInfo.Capacity,
 			UsedBytes:      &sb.rootFsInfo.Usage,
 			InodesFree:     sb.rootFsInfo.InodesFree,
-			Inodes:         sb.rootFsInfo.Inodes},
+			Inodes:         sb.rootFsInfo.Inodes,
+			InodesUsed:     nodeFsInodesUsed,
+		},
 		StartTime: rootStats.StartTime,
 		Runtime: &stats.RuntimeStats{
 			ImageFs: &stats.FsStats{
@@ -135,6 +149,7 @@ func (sb *summaryBuilder) build() (*stats.Summary, error) {
 				UsedBytes:      &sb.imageStats.TotalStorageBytes,
 				InodesFree:     sb.imageFsInfo.InodesFree,
 				Inodes:         sb.imageFsInfo.Inodes,
+				InodesUsed:     imageFsInodesUsed,
 			},
 		},
 	}
@@ -174,6 +189,11 @@ func (sb *summaryBuilder) containerInfoV2FsStats(
 		Inodes:         sb.rootFsInfo.Inodes,
 	}
 
+	if sb.rootFsInfo.Inodes != nil && sb.rootFsInfo.InodesFree != nil {
+		logsInodesUsed := *sb.rootFsInfo.Inodes - *sb.rootFsInfo.InodesFree
+		cs.Logs.InodesUsed = &logsInodesUsed
+	}
+
 	// The container rootFs lives on the imageFs devices (which may not be the node root fs)
 	cs.Rootfs = &stats.FsStats{
 		AvailableBytes: &sb.imageFsInfo.Available,
@@ -186,12 +206,19 @@ func (sb *summaryBuilder) containerInfoV2FsStats(
 		return
 	}
 	cfs := lcs.Filesystem
-	if cfs != nil && cfs.BaseUsageBytes != nil {
-		rootfsUsage := *cfs.BaseUsageBytes
-		cs.Rootfs.UsedBytes = &rootfsUsage
-		if cfs.TotalUsageBytes != nil {
-			logsUsage := *cfs.TotalUsageBytes - *cfs.BaseUsageBytes
-			cs.Logs.UsedBytes = &logsUsage
+
+	if cfs != nil {
+		if cfs.BaseUsageBytes != nil {
+			rootfsUsage := *cfs.BaseUsageBytes
+			cs.Rootfs.UsedBytes = &rootfsUsage
+			if cfs.TotalUsageBytes != nil {
+				logsUsage := *cfs.TotalUsageBytes - *cfs.BaseUsageBytes
+				cs.Logs.UsedBytes = &logsUsage
+			}
+		}
+		if cfs.InodeUsage != nil {
+			rootInodes := *cfs.InodeUsage
+			cs.Rootfs.InodesUsed = &rootInodes
 		}
 	}
 }

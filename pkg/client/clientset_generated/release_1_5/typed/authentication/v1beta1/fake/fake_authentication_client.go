@@ -22,17 +22,17 @@ import (
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
-type FakeAuthentication struct {
+type FakeAuthenticationV1beta1 struct {
 	*core.Fake
 }
 
-func (c *FakeAuthentication) TokenReviews() v1beta1.TokenReviewInterface {
+func (c *FakeAuthenticationV1beta1) TokenReviews() v1beta1.TokenReviewInterface {
 	return &FakeTokenReviews{c}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeAuthentication) RESTClient() restclient.Interface {
+func (c *FakeAuthenticationV1beta1) RESTClient() restclient.Interface {
 	var ret *restclient.RESTClient
 	return ret
 }

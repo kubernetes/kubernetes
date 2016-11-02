@@ -322,3 +322,27 @@ func (s storePersistentVolumeClaimsNamespacer) Get(name string) (*api.Persistent
 	}
 	return obj.(*api.PersistentVolumeClaim), nil
 }
+
+// IndexerToNamespaceLister gives an Indexer List method
+type IndexerToNamespaceLister struct {
+	Indexer
+}
+
+// List returns a list of namespaces
+func (i *IndexerToNamespaceLister) List(selector labels.Selector) (ret []*api.Namespace, err error) {
+	err = ListAll(i.Indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*api.Namespace))
+	})
+	return ret, err
+}
+
+func (i *IndexerToNamespaceLister) Get(name string) (*api.Namespace, error) {
+	obj, exists, err := i.Indexer.GetByKey(name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(api.Resource("namespace"), name)
+	}
+	return obj.(*api.Namespace), nil
+}

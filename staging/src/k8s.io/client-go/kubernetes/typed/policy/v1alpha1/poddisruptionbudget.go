@@ -21,6 +21,7 @@ import (
 	v1 "k8s.io/client-go/pkg/api/v1"
 	v1alpha1 "k8s.io/client-go/pkg/apis/policy/v1alpha1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // PodDisruptionBudgetsGetter has a method to return a PodDisruptionBudgetInterface.
@@ -45,14 +46,14 @@ type PodDisruptionBudgetInterface interface {
 
 // podDisruptionBudgets implements PodDisruptionBudgetInterface
 type podDisruptionBudgets struct {
-	client *PolicyClient
+	client rest.Interface
 	ns     string
 }
 
 // newPodDisruptionBudgets returns a PodDisruptionBudgets
 func newPodDisruptionBudgets(c *PolicyClient, namespace string) *podDisruptionBudgets {
 	return &podDisruptionBudgets{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }

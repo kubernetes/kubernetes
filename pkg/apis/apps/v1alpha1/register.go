@@ -37,8 +37,8 @@ var (
 // Adds the list of known types to api.Scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&PetSet{},
-		&PetSetList{},
+		&StatefulSet{},
+		&StatefulSetList{},
 		&v1.ListOptions{},
 		&v1.DeleteOptions{},
 	)
@@ -46,5 +46,5 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	return nil
 }
 
-func (obj *PetSet) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
-func (obj *PetSetList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
+func (obj *StatefulSet) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
+func (obj *StatefulSetList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }

@@ -23,13 +23,15 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
-	"k8s.io/kubernetes/pkg/client/unversioned/fake"
+	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -331,4 +333,98 @@ func TestGenerateService(t *testing.T) {
 			t.Errorf("expectPost: %v, sawPost: %v", test.expectPOST, sawPOST)
 		}
 	}
+}
+
+func TestRunValidations(t *testing.T) {
+	tests := []struct {
+		args        []string
+		flags       map[string]string
+		expectedErr string
+	}{
+		{
+			expectedErr: "NAME is required",
+		},
+		{
+			args:        []string{"test"},
+			expectedErr: "Invalid image name",
+		},
+		{
+			args: []string{"test"},
+			flags: map[string]string{
+				"image":    "busybox",
+				"stdin":    "true",
+				"replicas": "2",
+			},
+			expectedErr: "stdin requires that replicas is 1",
+		},
+		{
+			args: []string{"test"},
+			flags: map[string]string{
+				"image": "busybox",
+				"rm":    "true",
+			},
+			expectedErr: "rm should only be used for attached containers",
+		},
+		{
+			args: []string{"test"},
+			flags: map[string]string{
+				"image":   "busybox",
+				"attach":  "true",
+				"dry-run": "true",
+			},
+			expectedErr: "can't be used with attached containers options",
+		},
+		{
+			args: []string{"test"},
+			flags: map[string]string{
+				"image":   "busybox",
+				"stdin":   "true",
+				"dry-run": "true",
+			},
+			expectedErr: "can't be used with attached containers options",
+		},
+		{
+			args: []string{"test"},
+			flags: map[string]string{
+				"image":   "busybox",
+				"tty":     "true",
+				"stdin":   "true",
+				"dry-run": "true",
+			},
+			expectedErr: "can't be used with attached containers options",
+		},
+		{
+			args: []string{"test"},
+			flags: map[string]string{
+				"image": "busybox",
+				"tty":   "true",
+			},
+			expectedErr: "stdin is required for containers with -t/--tty",
+		},
+	}
+	for _, test := range tests {
+		f, tf, codec, ns := cmdtesting.NewTestFactory()
+		tf.Printer = &testPrinter{}
+		tf.Client = &fake.RESTClient{
+			NegotiatedSerializer: ns,
+			Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalType("", "", ""))},
+		}
+		tf.Namespace = "test"
+		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}}
+		inBuf := bytes.NewReader([]byte{})
+		outBuf := bytes.NewBuffer([]byte{})
+		errBuf := bytes.NewBuffer([]byte{})
+
+		cmd := NewCmdRun(f, inBuf, outBuf, errBuf)
+		for flagName, flagValue := range test.flags {
+			cmd.Flags().Set(flagName, flagValue)
+		}
+		err := Run(f, inBuf, outBuf, errBuf, cmd, test.args, cmd.ArgsLenAtDash())
+		if err != nil && len(test.expectedErr) > 0 {
+			if !strings.Contains(err.Error(), test.expectedErr) {
+				t.Errorf("unexpected error: %v", err)
+			}
+		}
+	}
+
 }

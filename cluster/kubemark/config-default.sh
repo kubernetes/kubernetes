@@ -47,7 +47,7 @@ RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 TERMINATED_POD_GC_THRESHOLD=${TERMINATED_POD_GC_THRESHOLD:-100}
 
 # Set etcd version (e.g. 3.0.4-migration.1) if you need non-default version.
-TEST_ETCD_VERSION="${TEST_ETCD_VERSION:-}"
+ETCD_VERSION="${TEST_ETCD_VERSION:-}"
 # Storage backend. 'etcd2' supported, 'etcd3' experimental.
 STORAGE_BACKEND=${STORAGE_BACKEND:-etcd2}
 

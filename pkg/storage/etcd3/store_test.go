@@ -97,7 +97,7 @@ func TestCreateWithKeyExist(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
-	key, _ := testPropogateStore(t, store, ctx, obj)
+	key, _ := testPropogateStore(ctx, t, store, obj)
 	out := &api.Pod{}
 	err := store.Create(ctx, key, obj, out, 0)
 	if err == nil || !storage.IsNodeExist(err) {
@@ -108,7 +108,7 @@ func TestCreateWithKeyExist(t *testing.T) {
 func TestGet(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(t, store, ctx, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
 
 	tests := []struct {
 		key               string
@@ -152,7 +152,7 @@ func TestGet(t *testing.T) {
 func TestUnconditionalDelete(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(t, store, ctx, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
 
 	tests := []struct {
 		key               string
@@ -189,7 +189,7 @@ func TestUnconditionalDelete(t *testing.T) {
 func TestConditionalDelete(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(t, store, ctx, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", UID: "A"}})
+	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", UID: "A"}})
 
 	tests := []struct {
 		precondition        *storage.Preconditions
@@ -217,14 +217,14 @@ func TestConditionalDelete(t *testing.T) {
 		if !reflect.DeepEqual(storedObj, out) {
 			t.Errorf("#%d: pod want=%#v, get=%#v", i, storedObj, out)
 		}
-		key, storedObj = testPropogateStore(t, store, ctx, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", UID: "A"}})
+		key, storedObj = testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", UID: "A"}})
 	}
 }
 
 func TestGetToList(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(t, store, ctx, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	key, storedObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
 
 	tests := []struct {
 		key         string
@@ -273,7 +273,7 @@ func TestGetToList(t *testing.T) {
 func TestGuaranteedUpdate(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, storeObj := testPropogateStore(t, store, ctx, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", UID: "A"}})
+	key, storeObj := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", UID: "A"}})
 
 	tests := []struct {
 		key                 string
@@ -404,7 +404,7 @@ func TestGuaranteedUpdateWithTTL(t *testing.T) {
 func TestGuaranteedUpdateWithConflict(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
-	key, _ := testPropogateStore(t, store, ctx, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	key, _ := testPropogateStore(ctx, t, store, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
 
 	errChan := make(chan error, 1)
 	var firstToFinish sync.WaitGroup
@@ -545,7 +545,7 @@ func testSetup(t *testing.T) (context.Context, *store, *integration.ClusterV3) {
 
 // testPropogateStore helps propogates store with objects, automates key generation, and returns
 // keys and stored objects.
-func testPropogateStore(t *testing.T, store *store, ctx context.Context, obj *api.Pod) (string, *api.Pod) {
+func testPropogateStore(ctx context.Context, t *testing.T, store *store, obj *api.Pod) (string, *api.Pod) {
 	// Setup store with a key and grab the output for returning.
 	key := "/testkey"
 	setOutput := &api.Pod{}

@@ -1224,11 +1224,12 @@ func TestMetadata(t *testing.T) {
 			matches[s] = i + 1
 		}
 	}
+
 	if matches["text/plain,application/json,application/yaml,application/vnd.kubernetes.protobuf"] == 0 ||
-		matches["application/json,application/json;stream=watch,application/vnd.kubernetes.protobuf,application/vnd.kubernetes.protobuf;stream=watch"] == 0 ||
+		matches["application/json,application/yaml,application/vnd.kubernetes.protobuf,application/json;stream=watch,application/vnd.kubernetes.protobuf;stream=watch"] == 0 ||
 		matches["application/json,application/yaml,application/vnd.kubernetes.protobuf"] == 0 ||
 		matches["*/*"] == 0 ||
-		len(matches) != 4 {
+		len(matches) != 5 {
 		t.Errorf("unexpected mime types: %v", matches)
 	}
 }
@@ -1318,6 +1319,89 @@ func TestGet(t *testing.T) {
 	}
 	if !selfLinker.called {
 		t.Errorf("Never set self link")
+	}
+}
+
+func TestGetPretty(t *testing.T) {
+	storage := map[string]rest.Storage{}
+	simpleStorage := SimpleRESTStorage{
+		item: apiservertesting.Simple{
+			Other: "foo",
+		},
+	}
+	selfLinker := &setTestSelfLinker{
+		t:           t,
+		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
+		name:        "id",
+		namespace:   "default",
+	}
+	storage["simple"] = &simpleStorage
+	handler := handleLinker(storage, selfLinker)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	tests := []struct {
+		accept    string
+		userAgent string
+		params    url.Values
+		pretty    bool
+	}{
+		{accept: runtime.ContentTypeJSON},
+		{accept: runtime.ContentTypeJSON + ";pretty=0"},
+		{accept: runtime.ContentTypeJSON, userAgent: "kubectl"},
+		{accept: runtime.ContentTypeJSON, params: url.Values{"pretty": {"0"}}},
+
+		{pretty: true, accept: runtime.ContentTypeJSON, userAgent: "curl"},
+		{pretty: true, accept: runtime.ContentTypeJSON, userAgent: "Mozilla/5.0"},
+		{pretty: true, accept: runtime.ContentTypeJSON, userAgent: "Wget"},
+		{pretty: true, accept: runtime.ContentTypeJSON + ";pretty=1"},
+		{pretty: true, accept: runtime.ContentTypeJSON, params: url.Values{"pretty": {"1"}}},
+		{pretty: true, accept: runtime.ContentTypeJSON, params: url.Values{"pretty": {"true"}}},
+	}
+	for i, test := range tests {
+		u, err := url.Parse(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id")
+		if err != nil {
+			t.Fatal(err)
+		}
+		u.RawQuery = test.params.Encode()
+		req := &http.Request{Method: "GET", URL: u}
+		req.Header = http.Header{}
+		req.Header.Set("Accept", test.accept)
+		req.Header.Set("User-Agent", test.userAgent)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Fatal(err)
+		}
+		var itemOut apiservertesting.Simple
+		body, err := extractBody(resp, &itemOut)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// to get stable ordering we need to use a go type
+		unstructured := apiservertesting.Simple{}
+		if err := json.Unmarshal([]byte(body), &unstructured); err != nil {
+			t.Fatal(err)
+		}
+		var expect string
+		if test.pretty {
+			out, err := json.MarshalIndent(unstructured, "", "  ")
+			if err != nil {
+				t.Fatal(err)
+			}
+			expect = string(out)
+		} else {
+			out, err := json.Marshal(unstructured)
+			if err != nil {
+				t.Fatal(err)
+			}
+			expect = string(out) + "\n"
+		}
+		if expect != body {
+			t.Errorf("%d: body did not match expected:\n%s\n%s", i, body, expect)
+		}
 	}
 }
 
@@ -2719,12 +2803,12 @@ func TestCreateYAML(t *testing.T) {
 	simple := &apiservertesting.Simple{
 		Other: "bar",
 	}
-	serializer, ok := api.Codecs.SerializerForMediaType("application/yaml", nil)
+	info, ok := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), "application/yaml")
 	if !ok {
 		t.Fatal("No yaml serializer")
 	}
-	encoder := api.Codecs.EncoderForVersion(serializer, testGroupVersion)
-	decoder := api.Codecs.DecoderToVersion(serializer, testInternalGroupVersion)
+	encoder := api.Codecs.EncoderForVersion(info.Serializer, testGroupVersion)
+	decoder := api.Codecs.DecoderToVersion(info.Serializer, testInternalGroupVersion)
 
 	data, err := runtime.Encode(encoder, simple)
 	if err != nil {
@@ -3216,7 +3300,7 @@ func BenchmarkUpdateProtobuf(b *testing.B) {
 	dest.Path = "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/foo/simples/bar"
 	dest.RawQuery = ""
 
-	info, _ := api.Codecs.SerializerForMediaType("application/vnd.kubernetes.protobuf", nil)
+	info, _ := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), "application/vnd.kubernetes.protobuf")
 	e := api.Codecs.EncoderForVersion(info.Serializer, newGroupVersion)
 	data, err := runtime.Encode(e, &items[0])
 	if err != nil {

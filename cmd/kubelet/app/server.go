@@ -43,7 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/chaosclient"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
+	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	clientauth "k8s.io/kubernetes/pkg/client/unversioned/auth"
@@ -321,6 +321,12 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		}
 	}
 
+	// Set feature gates based on the value in KubeletConfiguration
+	err = utilconfig.DefaultFeatureGate.Set(s.KubeletConfiguration.FeatureGates)
+	if err != nil {
+		return err
+	}
+
 	// Register current configuration with /configz endpoint
 	cfgz, cfgzErr := initConfigz(&s.KubeletConfiguration)
 	if utilconfig.DefaultFeatureGate.DynamicKubeletConfig() {
@@ -338,6 +344,11 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 					glog.Errorf("was unable to register configz before due to %s, will not be able to set now", cfgzErr)
 				} else {
 					setConfigz(cfgz, &s.KubeletConfiguration)
+				}
+				// Update feature gates from the new config
+				err = utilconfig.DefaultFeatureGate.Set(s.KubeletConfiguration.FeatureGates)
+				if err != nil {
+					return err
 				}
 			}
 		}
@@ -413,7 +424,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 	}
 
 	if kubeDeps.CAdvisorInterface == nil {
-		kubeDeps.CAdvisorInterface, err = cadvisor.New(uint(s.CAdvisorPort), s.ContainerRuntime)
+		kubeDeps.CAdvisorInterface, err = cadvisor.New(uint(s.CAdvisorPort), s.ContainerRuntime, s.RootDirectory)
 		if err != nil {
 			return err
 		}
@@ -502,9 +513,19 @@ func InitializeTLS(kc *componentconfig.KubeletConfiguration) (*server.TLSOptions
 		kc.TLSCertFile = path.Join(kc.CertDirectory, "kubelet.crt")
 		kc.TLSPrivateKeyFile = path.Join(kc.CertDirectory, "kubelet.key")
 		if !certutil.CanReadCertOrKey(kc.TLSCertFile, kc.TLSPrivateKeyFile) {
-			if err := certutil.GenerateSelfSignedCert(nodeutil.GetHostname(kc.HostnameOverride), kc.TLSCertFile, kc.TLSPrivateKeyFile, nil, nil); err != nil {
+			cert, key, err := certutil.GenerateSelfSignedCertKey(nodeutil.GetHostname(kc.HostnameOverride), nil, nil)
+			if err != nil {
 				return nil, fmt.Errorf("unable to generate self signed cert: %v", err)
 			}
+
+			if err := certutil.WriteCert(kc.TLSCertFile, cert); err != nil {
+				return nil, err
+			}
+
+			if err := certutil.WriteKey(kc.TLSPrivateKeyFile, key); err != nil {
+				return nil, err
+			}
+
 			glog.V(4).Infof("Using self-signed cert (%s, %s)", kc.TLSCertFile, kc.TLSPrivateKeyFile)
 		}
 	}

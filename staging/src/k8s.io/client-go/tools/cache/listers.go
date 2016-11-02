@@ -21,6 +21,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/api/errors"
 	"k8s.io/client-go/pkg/api/meta"
 	"k8s.io/client-go/pkg/api/unversioned"
 	"k8s.io/client-go/pkg/apis/apps"
@@ -28,7 +29,9 @@ import (
 	"k8s.io/client-go/pkg/apis/certificates"
 	"k8s.io/client-go/pkg/apis/extensions"
 	"k8s.io/client-go/pkg/apis/policy"
+	"k8s.io/client-go/pkg/apis/storage"
 	"k8s.io/client-go/pkg/labels"
+	"k8s.io/client-go/pkg/runtime"
 )
 
 // AppendFunc is used to add a matching item to whatever list the caller is using
@@ -88,6 +91,79 @@ func ListAllByNamespace(indexer Indexer, namespace string, selector labels.Selec
 	}
 
 	return nil
+}
+
+// GenericLister is a lister skin on a generic Indexer
+type GenericLister interface {
+	// List will return all objects across namespaces
+	List(selector labels.Selector) (ret []runtime.Object, err error)
+	// Get will attempt to retrieve assuming that name==key
+	Get(name string) (runtime.Object, error)
+	// ByNamespace will give you a GenericNamespaceLister for one namespace
+	ByNamespace(namespace string) GenericNamespaceLister
+}
+
+// GenericNamespaceLister is a lister skin on a generic Indexer
+type GenericNamespaceLister interface {
+	// List will return all objects in this namespace
+	List(selector labels.Selector) (ret []runtime.Object, err error)
+	// Get will attempt to retrieve by namespace and name
+	Get(name string) (runtime.Object, error)
+}
+
+func NewGenericLister(indexer Indexer, resource unversioned.GroupResource) GenericLister {
+	return &genericLister{indexer: indexer, resource: resource}
+}
+
+type genericLister struct {
+	indexer  Indexer
+	resource unversioned.GroupResource
+}
+
+func (s *genericLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
+	err = ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(runtime.Object))
+	})
+	return ret, err
+}
+
+func (s *genericLister) ByNamespace(namespace string) GenericNamespaceLister {
+	return &genericNamespaceLister{indexer: s.indexer, namespace: namespace, resource: s.resource}
+}
+
+func (s *genericLister) Get(name string) (runtime.Object, error) {
+	obj, exists, err := s.indexer.GetByKey(name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(s.resource, name)
+	}
+	return obj.(runtime.Object), nil
+}
+
+type genericNamespaceLister struct {
+	indexer   Indexer
+	namespace string
+	resource  unversioned.GroupResource
+}
+
+func (s *genericNamespaceLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
+	err = ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(runtime.Object))
+	})
+	return ret, err
+}
+
+func (s *genericNamespaceLister) Get(name string) (runtime.Object, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(s.resource, name)
+	}
+	return obj.(runtime.Object), nil
 }
 
 //  TODO: generate these classes and methods for all resources of interest using
@@ -288,32 +364,13 @@ func (s *StoreToPVFetcher) GetPersistentVolumeInfo(id string) (*api.PersistentVo
 	return o.(*api.PersistentVolume), nil
 }
 
-// Typed wrapper around a store of PersistentVolumeClaims
-type StoreToPVCFetcher struct {
+// StoreToStatefulSetLister gives a store List and Exists methods. The store must contain only StatefulSets.
+type StoreToStatefulSetLister struct {
 	Store
 }
 
-// GetPersistentVolumeClaimInfo returns cached data for the PersistentVolumeClaim 'id'.
-func (s *StoreToPVCFetcher) GetPersistentVolumeClaimInfo(namespace string, id string) (*api.PersistentVolumeClaim, error) {
-	o, exists, err := s.Get(&api.PersistentVolumeClaim{ObjectMeta: api.ObjectMeta{Namespace: namespace, Name: id}})
-	if err != nil {
-		return nil, fmt.Errorf("error retrieving PersistentVolumeClaim '%s/%s' from cache: %v", namespace, id, err)
-	}
-
-	if !exists {
-		return nil, fmt.Errorf("PersistentVolumeClaim '%s/%s' not found", namespace, id)
-	}
-
-	return o.(*api.PersistentVolumeClaim), nil
-}
-
-// StoreToPetSetLister gives a store List and Exists methods. The store must contain only PetSets.
-type StoreToPetSetLister struct {
-	Store
-}
-
-// Exists checks if the given PetSet exists in the store.
-func (s *StoreToPetSetLister) Exists(ps *apps.PetSet) (bool, error) {
+// Exists checks if the given StatefulSet exists in the store.
+func (s *StoreToStatefulSetLister) Exists(ps *apps.StatefulSet) (bool, error) {
 	_, exists, err := s.Store.Get(ps)
 	if err != nil {
 		return false, err
@@ -321,35 +378,35 @@ func (s *StoreToPetSetLister) Exists(ps *apps.PetSet) (bool, error) {
 	return exists, nil
 }
 
-// List lists all PetSets in the store.
-func (s *StoreToPetSetLister) List() (psList []apps.PetSet, err error) {
+// List lists all StatefulSets in the store.
+func (s *StoreToStatefulSetLister) List() (psList []apps.StatefulSet, err error) {
 	for _, ps := range s.Store.List() {
-		psList = append(psList, *(ps.(*apps.PetSet)))
+		psList = append(psList, *(ps.(*apps.StatefulSet)))
 	}
 	return psList, nil
 }
 
-type storePetSetsNamespacer struct {
+type storeStatefulSetsNamespacer struct {
 	store     Store
 	namespace string
 }
 
-func (s *StoreToPetSetLister) PetSets(namespace string) storePetSetsNamespacer {
-	return storePetSetsNamespacer{s.Store, namespace}
+func (s *StoreToStatefulSetLister) StatefulSets(namespace string) storeStatefulSetsNamespacer {
+	return storeStatefulSetsNamespacer{s.Store, namespace}
 }
 
-// GetPodPetSets returns a list of PetSets managing a pod. Returns an error only if no matching PetSets are found.
-func (s *StoreToPetSetLister) GetPodPetSets(pod *api.Pod) (psList []apps.PetSet, err error) {
+// GetPodStatefulSets returns a list of StatefulSets managing a pod. Returns an error only if no matching StatefulSets are found.
+func (s *StoreToStatefulSetLister) GetPodStatefulSets(pod *api.Pod) (psList []apps.StatefulSet, err error) {
 	var selector labels.Selector
-	var ps apps.PetSet
+	var ps apps.StatefulSet
 
 	if len(pod.Labels) == 0 {
-		err = fmt.Errorf("no PetSets found for pod %v because it has no labels", pod.Name)
+		err = fmt.Errorf("no StatefulSets found for pod %v because it has no labels", pod.Name)
 		return
 	}
 
 	for _, m := range s.Store.List() {
-		ps = *m.(*apps.PetSet)
+		ps = *m.(*apps.StatefulSet)
 		if ps.Namespace != pod.Namespace {
 			continue
 		}
@@ -359,14 +416,14 @@ func (s *StoreToPetSetLister) GetPodPetSets(pod *api.Pod) (psList []apps.PetSet,
 			return
 		}
 
-		// If a PetSet with a nil or empty selector creeps in, it should match nothing, not everything.
+		// If a StatefulSet with a nil or empty selector creeps in, it should match nothing, not everything.
 		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
 			continue
 		}
 		psList = append(psList, ps)
 	}
 	if len(psList) == 0 {
-		err = fmt.Errorf("could not find PetSet for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+		err = fmt.Errorf("could not find StatefulSet for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 	return
 }
@@ -391,23 +448,6 @@ func (s *StoreToCertificateRequestLister) List() (csrs certificates.CertificateS
 		csrs.Items = append(csrs.Items, *(c.(*certificates.CertificateSigningRequest)))
 	}
 	return csrs, nil
-}
-
-// IndexerToNamespaceLister gives an Indexer List method
-type IndexerToNamespaceLister struct {
-	Indexer
-}
-
-// List returns a list of namespaces
-func (i *IndexerToNamespaceLister) List(selector labels.Selector) (namespaces []*api.Namespace, err error) {
-	for _, m := range i.Indexer.List() {
-		namespace := m.(*api.Namespace)
-		if selector.Matches(labels.Set(namespace.Labels)) {
-			namespaces = append(namespaces, namespace)
-		}
-	}
-
-	return namespaces, nil
 }
 
 type StoreToPodDisruptionBudgetLister struct {
@@ -449,4 +489,41 @@ func (s *StoreToPodDisruptionBudgetLister) GetPodPodDisruptionBudgets(pod *api.P
 		err = fmt.Errorf("could not find PodDisruptionBudget for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 	return
+}
+
+// StorageClassLister knows how to list storage classes
+type StorageClassLister interface {
+	List(selector labels.Selector) (ret []*storage.StorageClass, err error)
+	Get(name string) (*storage.StorageClass, error)
+}
+
+// storageClassLister implements StorageClassLister
+type storageClassLister struct {
+	indexer Indexer
+}
+
+// NewStorageClassLister returns a new lister.
+func NewStorageClassLister(indexer Indexer) StorageClassLister {
+	return &storageClassLister{indexer: indexer}
+}
+
+// List returns a list of storage classes
+func (s *storageClassLister) List(selector labels.Selector) (ret []*storage.StorageClass, err error) {
+	err = ListAll(s.indexer, selector, func(m interface{}) {
+		ret = append(ret, m.(*storage.StorageClass))
+	})
+	return ret, err
+}
+
+// List returns a list of storage classes
+func (s *storageClassLister) Get(name string) (*storage.StorageClass, error) {
+	key := &storage.StorageClass{ObjectMeta: api.ObjectMeta{Name: name}}
+	obj, exists, err := s.indexer.Get(key)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(storage.Resource("storageclass"), name)
+	}
+	return obj.(*storage.StorageClass), nil
 }

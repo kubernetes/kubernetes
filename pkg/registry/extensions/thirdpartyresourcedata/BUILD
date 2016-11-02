@@ -35,7 +35,6 @@ go_library(
         "//pkg/labels:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/storage:go_default_library",
-        "//pkg/util/sets:go_default_library",
         "//pkg/util/validation/field:go_default_library",
         "//pkg/util/yaml:go_default_library",
         "//pkg/watch:go_default_library",

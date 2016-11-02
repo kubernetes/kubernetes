@@ -163,6 +163,11 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 				err = cs.Pods(ns).Evict(e)
 				Expect(err).Should(MatchError("Cannot evict pod as it would violate the pod's disruption budget."))
 			} else {
+				// Only wait for running pods in the "allow" case
+				// because one of shouldDeny cases relies on the
+				// replicaSet not fitting on the cluster.
+				waitForPodsOrDie(cs, ns, c.podCount+int(c.replicaSetSize))
+
 				// Since disruptionAllowed starts out false, if an eviction is ever allowed,
 				// that means the controller is working.
 				err = wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
@@ -266,7 +271,7 @@ func createReplicaSetOrDie(cs *kubernetes.Clientset, ns string, size int32, excl
 		},
 		Spec: extensions.ReplicaSetSpec{
 			Replicas: &size,
-			Selector: &extensions.LabelSelector{
+			Selector: &unversioned.LabelSelector{
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
 			Template: api.PodTemplateSpec{

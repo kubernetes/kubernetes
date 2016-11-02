@@ -242,7 +242,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 }
 
 // New creates a new Clientset for the given RESTClient.
-func New(c *rest.RESTClient) *Clientset {
+func New(c rest.Interface) *Clientset {
 	var clientset Clientset
 	clientset.CoreClient = v1core.New(c)
 	clientset.AppsClient = v1alpha1apps.New(c)

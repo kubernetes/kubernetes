@@ -244,8 +244,8 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 		})
 	})
 
-	framework.KubeDescribe("CassandraPetSet", func() {
-		It("should create petset", func() {
+	framework.KubeDescribe("CassandraStatefulSet", func() {
+		It("should create statefulset", func() {
 			mkpath := func(file string) string {
 				return filepath.Join(framework.TestContext.RepoRoot, "examples/storage/cassandra", file)
 			}
@@ -258,9 +258,9 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 			output := strings.Replace(string(input), "cassandra-0.cassandra.default.svc.cluster.local", "cassandra-0.cassandra."+ns+".svc.cluster.local", -1)
 
-			petSetYaml := "/tmp/cassandra-petset.yaml"
+			statefulsetYaml := "/tmp/cassandra-petset.yaml"
 
-			err = ioutil.WriteFile(petSetYaml, []byte(output), 0644)
+			err = ioutil.WriteFile(statefulsetYaml, []byte(output), 0644)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Starting the cassandra service")
@@ -269,21 +269,21 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			err = framework.WaitForService(c, ns, "cassandra", true, framework.Poll, framework.ServiceRespondingTimeout)
 			Expect(err).NotTo(HaveOccurred())
 
-			// Create an PetSet with n nodes in it.  Each node will then be verified.
-			By("Creating a Cassandra PetSet")
+			// Create an StatefulSet with n nodes in it.  Each node will then be verified.
+			By("Creating a Cassandra StatefulSet")
 
-			framework.RunKubectlOrDie("create", "-f", petSetYaml, nsFlag)
+			framework.RunKubectlOrDie("create", "-f", statefulsetYaml, nsFlag)
 
-			petsetPoll := 30 * time.Second
-			petsetTimeout := 10 * time.Minute
+			statefulsetPoll := 30 * time.Second
+			statefulsetTimeout := 10 * time.Minute
 			// TODO - parse this number out of the yaml
 			numPets := 3
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"app": "cassandra"}))
-			err = wait.PollImmediate(petsetPoll, petsetTimeout,
+			err = wait.PollImmediate(statefulsetPoll, statefulsetTimeout,
 				func() (bool, error) {
 					podList, err := c.Core().Pods(ns).List(api.ListOptions{LabelSelector: label})
 					if err != nil {
-						return false, fmt.Errorf("Unable to get list of pods in petset %s", label)
+						return false, fmt.Errorf("Unable to get list of pods in statefulset %s", label)
 					}
 					ExpectNoError(err)
 					if len(podList.Items) < numPets {
@@ -312,8 +312,8 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 					framework.Failf("Cassandra pod ip %s is not reporting Up and Normal 'UN' via nodetool status", pod.Status.PodIP)
 				}
 			})
-			// using out of petset e2e as deleting pvc is a pain
-			deleteAllPetSets(c, ns)
+			// using out of statefulset e2e as deleting pvc is a pain
+			deleteAllStatefulSets(c, ns)
 		})
 	})
 

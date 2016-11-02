@@ -53,12 +53,18 @@ type azureCloudProvider interface {
 	AttachDisk(diskName, diskUri string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes) error
 	// Detaches the disk, identified by disk name or uri, from the host machine.
 	DetachDiskByName(diskName, diskUri string, nodeName types.NodeName) error
+	// Check if a list of volumes are attached to the node with the specified NodeName
+	DisksAreAttached(diskNames []string, nodeName types.NodeName) (map[string]bool, error)
 	// Get the LUN number of the disk that is attached to the host
 	GetDiskLun(diskName, diskUri string, nodeName types.NodeName) (int32, error)
 	// Get the next available LUN number to attach a new VHD
 	GetNextDiskLun(nodeName types.NodeName) (int32, error)
 	// InstanceID returns the cloud provider ID of the specified instance.
 	InstanceID(nodeName types.NodeName) (string, error)
+	// Create a VHD blob
+	CreateVolume(name, storageAccount, storageType, location string, requestGB int) (string, string, int, error)
+	// Delete a VHD blob
+	DeleteVolume(name, uri string) error
 }
 
 var _ volume.VolumePlugin = &azureDataDiskPlugin{}
@@ -113,11 +119,20 @@ func (plugin *azureDataDiskPlugin) newMounterInternal(spec *volume.Spec, podUID 
 	if err != nil {
 		return nil, err
 	}
-
-	fsType := *azure.FSType
+	fsType := "ext4"
+	if azure.FSType != nil {
+		fsType = *azure.FSType
+	}
+	cachingMode := api.AzureDataDiskCachingNone
+	if azure.CachingMode != nil {
+		cachingMode = *azure.CachingMode
+	}
+	readOnly := false
+	if azure.ReadOnly != nil {
+		readOnly = *azure.ReadOnly
+	}
 	diskName := azure.DiskName
 	diskUri := azure.DataDiskURI
-	cachingMode := *azure.CachingMode
 	return &azureDiskMounter{
 		azureDisk: &azureDisk{
 			podUID:      podUID,
@@ -129,7 +144,7 @@ func (plugin *azureDataDiskPlugin) newMounterInternal(spec *volume.Spec, podUID 
 			plugin:      plugin,
 		},
 		fsType:      fsType,
-		readOnly:    *azure.ReadOnly,
+		readOnly:    readOnly,
 		diskMounter: &mount.SafeFormatAndMount{Interface: plugin.host.GetMounter(), Runner: exec.New()}}, nil
 }
 

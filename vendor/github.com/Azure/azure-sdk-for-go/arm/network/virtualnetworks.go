@@ -36,7 +36,81 @@ type VirtualNetworksClient struct {
 // NewVirtualNetworksClient creates an instance of the VirtualNetworksClient
 // client.
 func NewVirtualNetworksClient(subscriptionID string) VirtualNetworksClient {
-	return VirtualNetworksClient{New(subscriptionID)}
+	return NewVirtualNetworksClientWithBaseURI(DefaultBaseURI, subscriptionID)
+}
+
+// NewVirtualNetworksClientWithBaseURI creates an instance of the
+// VirtualNetworksClient client.
+func NewVirtualNetworksClientWithBaseURI(baseURI string, subscriptionID string) VirtualNetworksClient {
+	return VirtualNetworksClient{NewWithBaseURI(baseURI, subscriptionID)}
+}
+
+// CheckIPAddressAvailability checks whether a private Ip address is available
+// for use.
+//
+// resourceGroupName is the name of the resource group. virtualNetworkName is
+// the name of the virtual network. ipAddress is the private IP address to be
+// verified.
+func (client VirtualNetworksClient) CheckIPAddressAvailability(resourceGroupName string, virtualNetworkName string, ipAddress string) (result IPAddressAvailabilityResult, err error) {
+	req, err := client.CheckIPAddressAvailabilityPreparer(resourceGroupName, virtualNetworkName, ipAddress)
+	if err != nil {
+		return result, autorest.NewErrorWithError(err, "network.VirtualNetworksClient", "CheckIPAddressAvailability", nil, "Failure preparing request")
+	}
+
+	resp, err := client.CheckIPAddressAvailabilitySender(req)
+	if err != nil {
+		result.Response = autorest.Response{Response: resp}
+		return result, autorest.NewErrorWithError(err, "network.VirtualNetworksClient", "CheckIPAddressAvailability", resp, "Failure sending request")
+	}
+
+	result, err = client.CheckIPAddressAvailabilityResponder(resp)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "network.VirtualNetworksClient", "CheckIPAddressAvailability", resp, "Failure responding to request")
+	}
+
+	return
+}
+
+// CheckIPAddressAvailabilityPreparer prepares the CheckIPAddressAvailability request.
+func (client VirtualNetworksClient) CheckIPAddressAvailabilityPreparer(resourceGroupName string, virtualNetworkName string, ipAddress string) (*http.Request, error) {
+	pathParameters := map[string]interface{}{
+		"resourceGroupName":  autorest.Encode("path", resourceGroupName),
+		"subscriptionId":     autorest.Encode("path", client.SubscriptionID),
+		"virtualNetworkName": autorest.Encode("path", virtualNetworkName),
+	}
+
+	queryParameters := map[string]interface{}{
+		"api-version": client.APIVersion,
+	}
+	if len(ipAddress) > 0 {
+		queryParameters["ipAddress"] = autorest.Encode("query", ipAddress)
+	}
+
+	preparer := autorest.CreatePreparer(
+		autorest.AsGet(),
+		autorest.WithBaseURL(client.BaseURI),
+		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/virtualNetworks/{virtualNetworkName}/CheckIPAddressAvailability", pathParameters),
+		autorest.WithQueryParameters(queryParameters))
+	return preparer.Prepare(&http.Request{})
+}
+
+// CheckIPAddressAvailabilitySender sends the CheckIPAddressAvailability request. The method will close the
+// http.Response Body if it receives an error.
+func (client VirtualNetworksClient) CheckIPAddressAvailabilitySender(req *http.Request) (*http.Response, error) {
+	return autorest.SendWithSender(client, req)
+}
+
+// CheckIPAddressAvailabilityResponder handles the response to the CheckIPAddressAvailability request. The method always
+// closes the http.Response Body.
+func (client VirtualNetworksClient) CheckIPAddressAvailabilityResponder(resp *http.Response) (result IPAddressAvailabilityResult, err error) {
+	err = autorest.Respond(
+		resp,
+		client.ByInspecting(),
+		azure.WithErrorUnlessStatusCode(http.StatusOK),
+		autorest.ByUnmarshallingJSON(&result),
+		autorest.ByClosing())
+	result.Response = autorest.Response{Response: resp}
+	return
 }
 
 // CreateOrUpdate the Put VirtualNetwork operation creates/updates a virtual

@@ -18,7 +18,6 @@ package rkt
 import (
 	"fmt"
 	"os"
-	"time"
 
 	rktapi "github.com/coreos/rkt/api/v1alpha"
 	"github.com/google/cadvisor/container"
@@ -150,7 +149,7 @@ func newRktContainerHandler(name string, rktClient rktapi.PublicAPIClient, rktPa
 	}
 
 	if !ignoreMetrics.Has(container.DiskUsageMetrics) {
-		handler.fsHandler = common.NewFsHandler(time.Minute, rootfsStorageDir, "", fsInfo)
+		handler.fsHandler = common.NewFsHandler(common.DefaultPeriod, rootfsStorageDir, "", fsInfo)
 	}
 
 	return handler, nil
@@ -228,7 +227,10 @@ func (handler *rktContainerHandler) getFsStats(stats *info.ContainerStats) error
 
 	fsStat := info.FsStats{Device: deviceInfo.Device, Limit: limit}
 
-	fsStat.BaseUsage, fsStat.Usage = handler.fsHandler.Usage()
+	usage := handler.fsHandler.Usage()
+	fsStat.BaseUsage = usage.BaseUsageBytes
+	fsStat.Usage = usage.TotalUsageBytes
+	fsStat.Inodes = usage.InodeUsage
 
 	stats.Filesystem = append(stats.Filesystem, fsStat)
 

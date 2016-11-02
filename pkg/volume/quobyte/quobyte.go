@@ -371,7 +371,7 @@ func (provisioner *quobyteVolumeProvisioner) Provision() (*api.PersistentVolume,
 		}
 	}
 
-	secretMap, err := util.GetSecret(adminSecretNamespace, adminSecretName, provisioner.plugin.host.GetKubeClient())
+	secretMap, err := util.GetSecretForPV(adminSecretNamespace, adminSecretName, quobytePluginName, provisioner.plugin.host.GetKubeClient())
 	if err != nil {
 		return nil, err
 	}
@@ -444,9 +444,10 @@ func (deleter *quobyteVolumeDeleter) Delete() error {
 		return err
 	}
 
-	secretMap, err := util.GetSecret(
+	secretMap, err := util.GetSecretForPV(
 		annotations[annotationQuobyteAPISecretNamespace],
 		annotations[annotationQuobyteAPISecret],
+		quobytePluginName,
 		deleter.plugin.host.GetKubeClient())
 
 	if err != nil {

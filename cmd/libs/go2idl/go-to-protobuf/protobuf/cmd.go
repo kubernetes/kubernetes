@@ -138,9 +138,6 @@ func Run(g *Generator) {
 			d = d[1:]
 			outputPackage = false
 		}
-		if strings.Contains(d, "-") {
-			log.Fatalf("Package names must be valid protobuf package identifiers, which allow only [a-z0-9_]: %s", d)
-		}
 		name := protoSafePackage(d)
 		parts := strings.SplitN(d, "=", 2)
 		if len(parts) > 1 {

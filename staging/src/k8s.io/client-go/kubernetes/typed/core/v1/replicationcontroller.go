@@ -20,6 +20,7 @@ import (
 	api "k8s.io/client-go/pkg/api"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	watch "k8s.io/client-go/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // ReplicationControllersGetter has a method to return a ReplicationControllerInterface.
@@ -44,14 +45,14 @@ type ReplicationControllerInterface interface {
 
 // replicationControllers implements ReplicationControllerInterface
 type replicationControllers struct {
-	client *CoreClient
+	client rest.Interface
 	ns     string
 }
 
 // newReplicationControllers returns a ReplicationControllers
 func newReplicationControllers(c *CoreClient, namespace string) *replicationControllers {
 	return &replicationControllers{
-		client: c,
+		client: c.RESTClient(),
 		ns:     namespace,
 	}
 }
