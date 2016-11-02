@@ -17,6 +17,7 @@ go_library(
         "fake_authentication_client.go",
         "fake_generated_expansion.go",
         "fake_tokenreview.go",
+        "fake_tokenreview_expansion.go",
     ],
     tags = ["automanaged"],
     deps = [

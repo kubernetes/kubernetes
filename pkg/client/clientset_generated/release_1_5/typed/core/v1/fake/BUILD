@@ -24,6 +24,7 @@ go_library(
         "fake_namespace.go",
         "fake_namespace_expansion.go",
         "fake_node.go",
+        "fake_node_expansion.go",
         "fake_persistentvolume.go",
         "fake_persistentvolumeclaim.go",
         "fake_pod.go",
