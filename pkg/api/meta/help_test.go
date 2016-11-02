@@ -229,6 +229,27 @@ func TestSetListToRuntimeObjectArray(t *testing.T) {
 	}
 }
 
+func TestSetListToMatchingType(t *testing.T) {
+	pl := &runtime.UnstructuredList{}
+	list := []runtime.Object{
+		&runtime.Unstructured{Object: map[string]interface{}{"foo": 1}},
+		&runtime.Unstructured{Object: map[string]interface{}{"foo": 2}},
+		&runtime.Unstructured{Object: map[string]interface{}{"foo": 3}},
+	}
+	err := meta.SetList(pl, list)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
+	if e, a := len(list), len(pl.Items); e != a {
+		t.Fatalf("Expected %v, got %v", e, a)
+	}
+	for i := range list {
+		if e, a := list[i], pl.Items[i]; e != a {
+			t.Fatalf("%d: unmatched: %s", i, diff.ObjectDiff(e, a))
+		}
+	}
+}
+
 func TestSetExtractListRoundTrip(t *testing.T) {
 	fuzzer := fuzz.New().NilChance(0).NumElements(1, 5)
 	for i := 0; i < 5; i++ {
