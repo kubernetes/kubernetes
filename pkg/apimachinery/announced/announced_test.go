@@ -17,17 +17,21 @@ limitations under the License.
 package announced
 
 import (
-	"reflect"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func TestFactoryRegistry(t *testing.T) {
-	regA := make(APIGroupFactoryRegistry)
-	regB := make(APIGroupFactoryRegistry)
+	reg := make(APIGroupFactoryRegistry)
 
-	if err := regA.AnnounceGroup(&GroupMetaFactoryArgs{
+	if err := reg.AnnounceGroupVersion(&GroupVersionFactoryArgs{
+		GroupName:   "foo",
+		VersionName: "v1",
+	}); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if err := reg.AnnounceGroup(&GroupMetaFactoryArgs{
 		GroupName:              "foo",
 		VersionPreferenceOrder: []string{"v2", "v1"},
 		ImportPrefix:           "pkg/apis/foo",
@@ -35,32 +39,13 @@ func TestFactoryRegistry(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if err := regA.AnnounceGroupVersion(&GroupVersionFactoryArgs{
-		GroupName:   "foo",
-		VersionName: "v1",
-	}); err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	if err := regA.AnnounceGroupVersion(&GroupVersionFactoryArgs{
+	if err := reg.AnnounceGroupVersion(&GroupVersionFactoryArgs{
 		GroupName:   "foo",
 		VersionName: "v2",
 	}); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-
-	if err := regB.AnnouncePreconstructedFactory(NewGroupMetaFactory(
-		&GroupMetaFactoryArgs{
-			GroupName:              "foo",
-			VersionPreferenceOrder: []string{"v2", "v1"},
-			ImportPrefix:           "pkg/apis/foo",
-			RootScopedKinds:        sets.NewString("namespaces"),
-		},
-		VersionToSchemeFunc{"v1": nil, "v2": nil},
-	)); err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	if !reflect.DeepEqual(regA, regB) {
-		t.Errorf("Expected both ways of registering to be equivalent, but they were not.\n\n%#v\n\n%#v\n", regA, regB)
+	if a := len(reg["foo"].VersionArgs); a != 2 {
+		t.Errorf("Expected 2 args but got %v", a)
 	}
 }

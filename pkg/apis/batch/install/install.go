@@ -20,24 +20,13 @@ package install
 
 import (
 	"k8s.io/kubernetes/pkg/apimachinery/announced"
-	"k8s.io/kubernetes/pkg/apis/batch"
-	"k8s.io/kubernetes/pkg/apis/batch/v1"
-	"k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
+	_ "k8s.io/kubernetes/pkg/apis/batch"
+	_ "k8s.io/kubernetes/pkg/apis/batch/v1"
+	_ "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 )
 
 func init() {
-	if err := announced.NewGroupMetaFactory(
-		&announced.GroupMetaFactoryArgs{
-			GroupName:                  batch.GroupName,
-			VersionPreferenceOrder:     []string{v1.SchemeGroupVersion.Version, v2alpha1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/kubernetes/pkg/apis/batch",
-			AddInternalObjectsToScheme: batch.AddToScheme,
-		},
-		announced.VersionToSchemeFunc{
-			v1.SchemeGroupVersion.Version:       v1.AddToScheme,
-			v2alpha1.SchemeGroupVersion.Version: v2alpha1.AddToScheme,
-		},
-	).Announce().RegisterAndEnable(); err != nil {
+	if err := announced.DefaultGroupFactoryRegistry["batch"].RegisterAndEnable(); err != nil {
 		panic(err)
 	}
 }
