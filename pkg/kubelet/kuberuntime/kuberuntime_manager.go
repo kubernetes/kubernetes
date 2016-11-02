@@ -393,14 +393,14 @@ func (m *kubeGenericRuntimeManager) podSandboxChanged(pod *api.Pod, podStatus *k
 
 	readySandboxCount := 0
 	for _, s := range podStatus.SandboxStatuses {
-		if s.GetState() == runtimeApi.PodSandBoxState_READY {
+		if s.GetState() == runtimeApi.PodSandboxState_SANDBOX_READY {
 			readySandboxCount++
 		}
 	}
 
 	// Needs to create a new sandbox when readySandboxCount > 1 or the ready sandbox is not the latest one.
 	sandboxStatus := podStatus.SandboxStatuses[0]
-	if readySandboxCount > 1 || sandboxStatus.GetState() != runtimeApi.PodSandBoxState_READY {
+	if readySandboxCount > 1 || sandboxStatus.GetState() != runtimeApi.PodSandboxState_SANDBOX_READY {
 		glog.V(2).Infof("No ready sandbox for pod %q can be found. Need to start a new one", format.Pod(pod))
 		return true, sandboxStatus.Metadata.GetAttempt() + 1, sandboxStatus.GetId()
 	}
@@ -865,7 +865,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 		sandboxStatuses[idx] = podSandboxStatus
 
 		// Only get pod IP from latest sandbox
-		if idx == 0 && podSandboxStatus.GetState() == runtimeApi.PodSandBoxState_READY {
+		if idx == 0 && podSandboxStatus.GetState() == runtimeApi.PodSandboxState_SANDBOX_READY {
 			podIP = m.determinePodSandboxIP(namespace, name, podSandboxStatus)
 		}
 	}

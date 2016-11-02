@@ -206,11 +206,11 @@ func ConvertPodStatusToRunningPod(runtimeName string, podStatus *PodStatus) Pod 
 // This is only needed because we need to return sandboxes as if they were
 // kubecontainer.Containers to avoid substantial changes to PLEG.
 // TODO: Remove this once it becomes obsolete.
-func SandboxToContainerState(state runtimeApi.PodSandBoxState) ContainerState {
+func SandboxToContainerState(state runtimeApi.PodSandboxState) ContainerState {
 	switch state {
-	case runtimeApi.PodSandBoxState_READY:
+	case runtimeApi.PodSandboxState_SANDBOX_READY:
 		return ContainerStateRunning
-	case runtimeApi.PodSandBoxState_NOTREADY:
+	case runtimeApi.PodSandboxState_SANDBOX_NOTREADY:
 		return ContainerStateExited
 	}
 	return ContainerStateUnknown

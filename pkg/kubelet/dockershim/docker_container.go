@@ -327,7 +327,7 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 	var reason, message string
 	if r.State.Running {
 		// Container is running.
-		state = runtimeApi.ContainerState_RUNNING
+		state = runtimeApi.ContainerState_CONTAINER_RUNNING
 	} else {
 		// Container is *not* running. We need to get more details.
 		//    * Case 1: container has run and exited with non-zero finishedAt
@@ -336,7 +336,7 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 		//              time, but a non-zero exit code.
 		//    * Case 3: container has been created, but not started (yet).
 		if !finishedAt.IsZero() { // Case 1
-			state = runtimeApi.ContainerState_EXITED
+			state = runtimeApi.ContainerState_CONTAINER_EXITED
 			switch {
 			case r.State.OOMKilled:
 				// TODO: consider exposing OOMKilled via the runtimeAPI.
@@ -349,13 +349,13 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 				reason = "Error"
 			}
 		} else if r.State.ExitCode != 0 { // Case 2
-			state = runtimeApi.ContainerState_EXITED
+			state = runtimeApi.ContainerState_CONTAINER_EXITED
 			// Adjust finshedAt and startedAt time to createdAt time to avoid
 			// the confusion.
 			finishedAt, startedAt = createdAt, createdAt
 			reason = "ContainerCannotRun"
 		} else { // Case 3
-			state = runtimeApi.ContainerState_CREATED
+			state = runtimeApi.ContainerState_CONTAINER_CREATED
 		}
 		message = r.State.Error
 	}
