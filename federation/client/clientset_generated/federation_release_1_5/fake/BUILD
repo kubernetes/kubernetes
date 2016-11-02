@@ -19,6 +19,8 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//federation/client/clientset_generated/federation_release_1_5:go_default_library",
+        "//federation/client/clientset_generated/federation_release_1_5/typed/batch/v1:go_default_library",
+        "//federation/client/clientset_generated/federation_release_1_5/typed/batch/v1/fake:go_default_library",
         "//federation/client/clientset_generated/federation_release_1_5/typed/core/v1:go_default_library",
         "//federation/client/clientset_generated/federation_release_1_5/typed/core/v1/fake:go_default_library",
         "//federation/client/clientset_generated/federation_release_1_5/typed/extensions/v1beta1:go_default_library",

@@ -18,6 +18,7 @@ package federation_release_1_5
 
 import (
 	"github.com/golang/glog"
+	v1batch "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/typed/batch/v1"
 	v1core "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/typed/core/v1"
 	v1beta1extensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/typed/extensions/v1beta1"
 	v1beta1federation "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/typed/federation/v1beta1"
@@ -32,6 +33,9 @@ type Interface interface {
 	CoreV1() v1core.CoreV1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Core() v1core.CoreV1Interface
+	BatchV1() v1batch.BatchV1Interface
+	// Deprecated: please explicitly pick a version if possible.
+	Batch() v1batch.BatchV1Interface
 	ExtensionsV1beta1() v1beta1extensions.ExtensionsV1beta1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Extensions() v1beta1extensions.ExtensionsV1beta1Interface
@@ -45,6 +49,7 @@ type Interface interface {
 type Clientset struct {
 	*discovery.DiscoveryClient
 	*v1core.CoreV1Client
+	*v1batch.BatchV1Client
 	*v1beta1extensions.ExtensionsV1beta1Client
 	*v1beta1federation.FederationV1beta1Client
 }
@@ -64,6 +69,23 @@ func (c *Clientset) Core() v1core.CoreV1Interface {
 		return nil
 	}
 	return c.CoreV1Client
+}
+
+// BatchV1 retrieves the BatchV1Client
+func (c *Clientset) BatchV1() v1batch.BatchV1Interface {
+	if c == nil {
+		return nil
+	}
+	return c.BatchV1Client
+}
+
+// Deprecated: Batch retrieves the default version of BatchClient.
+// Please explicitly pick a version.
+func (c *Clientset) Batch() v1batch.BatchV1Interface {
+	if c == nil {
+		return nil
+	}
+	return c.BatchV1Client
 }
 
 // ExtensionsV1beta1 retrieves the ExtensionsV1beta1Client
@@ -117,6 +139,10 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	clientset.BatchV1Client, err = v1batch.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	clientset.ExtensionsV1beta1Client, err = v1beta1extensions.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -139,6 +165,7 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 func NewForConfigOrDie(c *restclient.Config) *Clientset {
 	var clientset Clientset
 	clientset.CoreV1Client = v1core.NewForConfigOrDie(c)
+	clientset.BatchV1Client = v1batch.NewForConfigOrDie(c)
 	clientset.ExtensionsV1beta1Client = v1beta1extensions.NewForConfigOrDie(c)
 	clientset.FederationV1beta1Client = v1beta1federation.NewForConfigOrDie(c)
 
@@ -150,6 +177,7 @@ func NewForConfigOrDie(c *restclient.Config) *Clientset {
 func New(c restclient.Interface) *Clientset {
 	var clientset Clientset
 	clientset.CoreV1Client = v1core.New(c)
+	clientset.BatchV1Client = v1batch.New(c)
 	clientset.ExtensionsV1beta1Client = v1beta1extensions.New(c)
 	clientset.FederationV1beta1Client = v1beta1federation.New(c)
 
