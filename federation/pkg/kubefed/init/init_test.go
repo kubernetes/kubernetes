@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -125,6 +126,8 @@ func TestInitFederation(t *testing.T) {
 				t.Errorf("[%d] expected error: %s, got: %s, output: %s", i, tc.expectedErr, cmdErrMsg, buf.String())
 			}
 		}
+
+		testKubeconfigUpdate(t, tc.federation, tc.lbIP, tc.kubeconfigGlobal, tc.kubeconfigExplicit)
 	}
 }
 
@@ -742,6 +745,60 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image s
 		}),
 	}
 	return f, nil
+}
+
+func testKubeconfigUpdate(t *testing.T, federationName, lbIP, kubeconfigGlobal, kubeconfigExplicit string) {
+	filename := kubeconfigGlobal
+	if kubeconfigExplicit != "" {
+		filename = kubeconfigExplicit
+	}
+	config, err := clientcmd.LoadFromFile(filename)
+	if err != nil {
+		t.Errorf("Failed to open kubeconfig file: %v", err)
+		return
+	}
+
+	cluster, ok := config.Clusters[federationName]
+	if !ok {
+		t.Errorf("No cluster info for %q", federationName)
+		return
+	}
+	endpoint := lbIP
+	if !strings.HasSuffix(lbIP, "https://") {
+		endpoint = fmt.Sprintf("https://%s", lbIP)
+	}
+	if cluster.Server != endpoint {
+		t.Errorf("Want federation API server endpoint %q, got %q", endpoint, cluster.Server)
+	}
+
+	authInfo, ok := config.AuthInfos[federationName]
+	if !ok {
+		t.Errorf("No credentials for %q", federationName)
+		return
+	}
+	if len(authInfo.ClientCertificateData) == 0 {
+		t.Errorf("Expected client certificate to be non-empty")
+		return
+	}
+	if len(authInfo.ClientKeyData) == 0 {
+		t.Errorf("Expected client key to be non-empty")
+		return
+	}
+	if authInfo.Username != AdminCN {
+		t.Errorf("Want username: %q, got: %q", AdminCN, authInfo.Username)
+	}
+
+	context, ok := config.Contexts[federationName]
+	if !ok {
+		t.Errorf("No context for %q", federationName)
+		return
+	}
+	if context.Cluster != federationName {
+		t.Errorf("Want context cluster name: %q, got: %q", federationName, context.Cluster)
+	}
+	if context.AuthInfo != federationName {
+		t.Errorf("Want context auth info: %q, got: %q", federationName, context.AuthInfo)
+	}
 }
 
 type clientServerTLSConfigs struct {
