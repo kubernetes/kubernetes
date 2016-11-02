@@ -78,6 +78,7 @@ go_library(
         "//pkg/util/async:go_default_library",
         "//pkg/util/intstr:go_default_library",
         "//pkg/util/net:go_default_library",
+        "//pkg/util/node:go_default_library",
         "//pkg/util/runtime:go_default_library",
         "//pkg/util/wait:go_default_library",
         "//vendor:github.com/golang/glog",
