@@ -74,6 +74,10 @@ type KubeProxyConfiguration struct {
 	// conntrackTCPEstablishedTimeout is how long an idle TCP connection will be kept open
 	// (e.g. '250ms', '2s').  Must be greater than 0.
 	ConntrackTCPEstablishedTimeout unversioned.Duration `json:"conntrackTCPEstablishedTimeout"`
+	// conntrackTCPCloseWaitTimeout is how long an idle conntrack entry
+	// in CLOSE_WAIT state will remain in the conntrack
+	// table. (e.g. '60s'). Must be greater than 0 to set.
+	ConntrackTCPCloseWaitTimeout unversioned.Duration `json:"conntrackTCPCloseWaitTimeout"`
 }
 
 // Currently two modes of proxying are available: 'userspace' (older, stable) or 'iptables'

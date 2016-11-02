@@ -100,6 +100,29 @@ func SetDefaults_KubeProxyConfiguration(obj *KubeProxyConfiguration) {
 	if obj.ConntrackTCPEstablishedTimeout == zero {
 		obj.ConntrackTCPEstablishedTimeout = unversioned.Duration{Duration: 24 * time.Hour} // 1 day (1/5 default)
 	}
+	if obj.ConntrackTCPCloseWaitTimeout == zero {
+		// See https://github.com/kubernetes/kubernetes/issues/32551.
+		//
+		// CLOSE_WAIT conntrack state occurs when the the Linux kernel
+		// sees a FIN from the remote server. Note: this is a half-close
+		// condition that persists as long as the local side keeps the
+		// socket open. The condition is rare as it is typical in most
+		// protocols for both sides to issue a close; this typically
+		// occurs when the local socket is lazily garbage collected.
+		//
+		// If the CLOSE_WAIT conntrack entry expires, then FINs from the
+		// local socket will not be properly SNAT'd and will not reach the
+		// remote server (if the connection was subject to SNAT). If the
+		// remote timeouts for FIN_WAIT* states exceed the CLOSE_WAIT
+		// timeout, then there will be an inconsistency in the state of
+		// the connection and a new connection reusing the SNAT (src,
+		// port) pair may be rejected by the remote side with RST. This
+		// can cause new calls to connect(2) to return with ECONNREFUSED.
+		//
+		// We set CLOSE_WAIT to one hour by default to better match
+		// typical server timeouts.
+		obj.ConntrackTCPCloseWaitTimeout = unversioned.Duration{Duration: 1 * time.Hour}
+	}
 }
 
 func SetDefaults_KubeSchedulerConfiguration(obj *KubeSchedulerConfiguration) {

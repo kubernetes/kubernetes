@@ -315,12 +315,22 @@ func (s *ProxyServer) Run() error {
 				// administrator should decide whether and how to handle this issue,
 				// whether to drain the node and restart docker.
 				// TODO(random-liu): Remove this when the docker bug is fixed.
-				const message = "DOCKER RESTART NEEDED (docker issue #24000): /sys is read-only: can't raise conntrack limits, problems may arise later."
+				const message = "DOCKER RESTART NEEDED (docker issue #24000): /sys is read-only: " +
+					"cannot modify conntrack limits, problems may arise later."
 				s.Recorder.Eventf(s.Config.NodeRef, api.EventTypeWarning, err.Error(), message)
 			}
 		}
+
 		if s.Config.ConntrackTCPEstablishedTimeout.Duration > 0 {
-			if err := s.Conntracker.SetTCPEstablishedTimeout(int(s.Config.ConntrackTCPEstablishedTimeout.Duration / time.Second)); err != nil {
+			timeout := int(s.Config.ConntrackTCPEstablishedTimeout.Duration / time.Second)
+			if err := s.Conntracker.SetTCPEstablishedTimeout(timeout); err != nil {
+				return err
+			}
+		}
+
+		if s.Config.ConntrackTCPCloseWaitTimeout.Duration > 0 {
+			timeout := int(s.Config.ConntrackTCPCloseWaitTimeout.Duration / time.Second)
+			if err := s.Conntracker.SetTCPCloseWaitTimeout(timeout); err != nil {
 				return err
 			}
 		}

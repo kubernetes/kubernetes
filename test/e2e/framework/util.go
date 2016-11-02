@@ -4007,7 +4007,7 @@ func LogSSHResult(result SSHResult) {
 	Logf("ssh %s: exit code: %d", remote, result.Code)
 }
 
-func IssueSSHCommand(cmd, provider string, node *api.Node) error {
+func IssueSSHCommandWithResult(cmd, provider string, node *api.Node) (*SSHResult, error) {
 	Logf("Getting external IP address for %s", node.Name)
 	host := ""
 	for _, a := range node.Status.Addresses {
@@ -4016,15 +4016,34 @@ func IssueSSHCommand(cmd, provider string, node *api.Node) error {
 			break
 		}
 	}
+
 	if host == "" {
-		return fmt.Errorf("couldn't find external IP address for node %s", node.Name)
+		return nil, fmt.Errorf("couldn't find external IP address for node %s", node.Name)
 	}
-	Logf("Calling %s on %s(%s)", cmd, node.Name, host)
+
+	Logf("SSH %q on %s(%s)", cmd, node.Name, host)
 	result, err := SSH(cmd, host, provider)
 	LogSSHResult(result)
+
 	if result.Code != 0 || err != nil {
-		return fmt.Errorf("failed running %q: %v (exit code %d)", cmd, err, result.Code)
+		return nil, fmt.Errorf("failed running %q: %v (exit code %d)",
+			cmd, err, result.Code)
 	}
+
+	return &result, nil
+}
+
+func IssueSSHCommand(cmd, provider string, node *api.Node) error {
+	result, err := IssueSSHCommandWithResult(cmd, provider, node)
+	if result != nil {
+		LogSSHResult(*result)
+	}
+
+	if result.Code != 0 || err != nil {
+		return fmt.Errorf("failed running %q: %v (exit code %d)",
+			cmd, err, result.Code)
+	}
+
 	return nil
 }
 

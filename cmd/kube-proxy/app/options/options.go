@@ -92,5 +92,10 @@ func (s *ProxyServerConfig) AddFlags(fs *pflag.FlagSet) {
 	fs.Int32Var(&s.ConntrackMin, "conntrack-min", s.ConntrackMin,
 		"Minimum number of conntrack entries to allocate, regardless of conntrack-max-per-core (set conntrack-max-per-core=0 to leave the limit as-is).")
 	fs.DurationVar(&s.ConntrackTCPEstablishedTimeout.Duration, "conntrack-tcp-timeout-established", s.ConntrackTCPEstablishedTimeout.Duration, "Idle timeout for established TCP connections (0 to leave as-is)")
+	fs.DurationVar(
+		&s.ConntrackTCPCloseWaitTimeout.Duration, "conntrack-tcp-timeout-close-wait",
+		s.ConntrackTCPCloseWaitTimeout.Duration,
+		"NAT timeout for TCP connections in the CLOSE_WAIT state")
+
 	config.DefaultFeatureGate.AddFlag(fs)
 }
