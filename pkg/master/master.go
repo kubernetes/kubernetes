@@ -222,7 +222,7 @@ func (m *Master) InstallGeneralEndpoints(c *Config) {
 	healthzChecks := []healthz.HealthzChecker{}
 	if c.Tunneler != nil {
 		nodeClient := coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes()
-		c.Tunneler.Run(nodeAddressProvider{nodeClient}.externalAddresses)
+		c.Tunneler.Run(nodeAddressProvider{nodeClient}.addresses)
 
 		healthzChecks = append(healthzChecks, healthz.NamedCheck("SSH Tunnel Check", genericapiserver.TunnelSyncHealthChecker(c.Tunneler)))
 		prometheus.NewGaugeFunc(prometheus.GaugeOpts{
@@ -303,7 +303,7 @@ type nodeAddressProvider struct {
 	nodeClient coreclient.NodeInterface
 }
 
-func (n nodeAddressProvider) externalAddresses() (addresses []string, err error) {
+func (n nodeAddressProvider) addresses() (addresses []string, err error) {
 	nodes, err := n.nodeClient.List(api.ListOptions{})
 	if err != nil {
 		return nil, err
@@ -311,7 +311,7 @@ func (n nodeAddressProvider) externalAddresses() (addresses []string, err error)
 	addrs := []string{}
 	for ix := range nodes.Items {
 		node := &nodes.Items[ix]
-		addr, err := findExternalAddress(node)
+		addr, err := findAddress(node)
 		if err != nil {
 			return nil, err
 		}
@@ -320,22 +320,29 @@ func (n nodeAddressProvider) externalAddresses() (addresses []string, err error)
 	return addrs, nil
 }
 
-// findExternalAddress returns ExternalIP of provided node with fallback to LegacyHostIP.
-func findExternalAddress(node *api.Node) (string, error) {
-	var fallback string
+// findAddress returns address in this order: ExternalIP, InternalIP, LegacyHostIP.
+func findAddress(node *api.Node) (string, error) {
+	var internalIP string
+	var legacyHostIP string
 	for ix := range node.Status.Addresses {
 		addr := &node.Status.Addresses[ix]
 		if addr.Type == api.NodeExternalIP {
 			return addr.Address, nil
 		}
-		if fallback == "" && addr.Type == api.NodeLegacyHostIP {
-			fallback = addr.Address
+		if internalIP == "" && addr.Type == api.NodeInternalIP {
+			internalIP = addr.Address
+		}
+		if legacyHostIP == "" && addr.Type == api.NodeLegacyHostIP {
+			legacyHostIP = addr.Address
 		}
 	}
-	if fallback != "" {
-		return fallback, nil
+	if internalIP != "" {
+		return internalIP, nil
 	}
-	return "", fmt.Errorf("Couldn't find external address: %v", node)
+	if legacyHostIP != "" {
+		return legacyHostIP, nil
+	}
+	return "", fmt.Errorf("Couldn't find address: %v", node)
 }
 
 func DefaultAPIResourceConfigSource() *genericapiserver.ResourceConfig {

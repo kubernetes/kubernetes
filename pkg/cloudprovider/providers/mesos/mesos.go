@@ -290,5 +290,9 @@ func (c *MesosCloud) NodeAddresses(nodeName types.NodeName) ([]api.NodeAddress, 
 	if err != nil {
 		return nil, err
 	}
-	return []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: ip.String()}}, nil
+	return []api.NodeAddress{
+		{Type: api.NodeLegacyHostIP, Address: ip.String()},
+		{Type: api.NodeInternalIP, Address: ip.String()},
+		{Type: api.NodeExternalIP, Address: ip.String()},
+	}, nil
 }

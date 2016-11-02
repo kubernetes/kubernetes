@@ -408,7 +408,11 @@ func (i *Instances) NodeAddresses(nodeName types.NodeName) ([]api.NodeAddress, e
 	glog.V(2).Infof("NodeAddresses(%v) => %v", serverName, ip)
 
 	// net.ParseIP().String() is to maintain compatibility with the old code
-	return []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: net.ParseIP(ip).String()}}, nil
+	return []api.NodeAddress{
+		{Type: api.NodeLegacyHostIP, Address: net.ParseIP(ip).String()},
+		{Type: api.NodeInternalIP, Address: net.ParseIP(ip).String()},
+		{Type: api.NodeExternalIP, Address: net.ParseIP(ip).String()},
+	}, nil
 }
 
 // mapNodeNameToServerName maps from a k8s NodeName to a rackspace Server Name
