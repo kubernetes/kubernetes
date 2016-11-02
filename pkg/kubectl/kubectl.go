@@ -48,28 +48,6 @@ func makeImageList(spec *api.PodSpec) string {
 	return strings.Join(listOfImages(spec), ",")
 }
 
-func NewThirdPartyResourceMapper(gvs []unversioned.GroupVersion, gvks []unversioned.GroupVersionKind) (meta.RESTMapper, error) {
-	mapper := meta.NewDefaultRESTMapper(gvs, func(gv unversioned.GroupVersion) (*meta.VersionInterfaces, error) {
-		for ix := range gvs {
-			if gvs[ix].Group == gv.Group && gvs[ix].Version == gv.Version {
-				return &meta.VersionInterfaces{
-					ObjectConvertor:  api.Scheme,
-					MetadataAccessor: meta.NewAccessor(),
-				}, nil
-			}
-		}
-		groupVersions := make([]string, 0, len(gvs))
-		for ix := range gvs {
-			groupVersions = append(groupVersions, gvs[ix].String())
-		}
-		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", gv.String(), strings.Join(groupVersions, ", "))
-	})
-	for ix := range gvks {
-		mapper.Add(gvks[ix], meta.RESTScopeNamespace)
-	}
-	return mapper, nil
-}
-
 // OutputVersionMapper is a RESTMapper that will prefer mappings that
 // correspond to a preferred output version (if feasible)
 type OutputVersionMapper struct {
