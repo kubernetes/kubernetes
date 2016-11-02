@@ -2236,6 +2236,15 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 		w = GetNewTabWriter(output)
 		defer w.Flush()
 	}
+
+	// check if the object is unstructured.  If so, let's attempt to convert it to a type we can understand before
+	// trying to print, since the printers are keyed by type.  This is extremely expensive.
+	if objBytes, err := runtime.Encode(api.Codecs.LegacyCodec(), obj); err == nil {
+		if decodedObj, err := runtime.Decode(api.Codecs.UniversalDecoder(), objBytes); err == nil {
+			obj = decodedObj
+		}
+	}
+
 	t := reflect.TypeOf(obj)
 	if handler := h.handlerMap[t]; handler != nil {
 		if !h.options.NoHeaders && t != h.lastType {
@@ -2256,7 +2265,76 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 		}
 		return resultValue.Interface().(error)
 	}
+
+	// we don't recognize this type, but we can still attempt to print some reasonable information about.
+	unstructured, ok := obj.(*runtime.Unstructured)
+	if !ok {
+		return fmt.Errorf("error: unknown type %#v", obj)
+	}
+
+	if _, err := meta.Accessor(obj); err == nil {
+		if !h.options.NoHeaders && t != h.lastType {
+			headers := []string{"NAME", "KIND"}
+			headers = append(headers, formatLabelHeaders(h.options.ColumnLabels)...)
+			// LABELS is always the last column.
+			headers = append(headers, formatShowLabelsHeader(h.options.ShowLabels, t)...)
+			if h.options.WithNamespace {
+				headers = append(withNamespacePrefixColumns, headers...)
+			}
+			h.printHeader(headers, w)
+			h.lastType = t
+		}
+		// if the error isn't nil, report the "I don't recognize this" error
+		if err := printUnstructured(unstructured, w, h.options); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	// we failed all reasonable printing efforts, report failure
 	return fmt.Errorf("error: unknown type %#v", obj)
+}
+
+func printUnstructured(unstructured *runtime.Unstructured, w io.Writer, options PrintOptions) error {
+	metadata, err := meta.Accessor(unstructured)
+	if err != nil {
+		return err
+	}
+
+	if options.WithNamespace {
+		if _, err := fmt.Fprintf(w, "%s\t", metadata.GetNamespace()); err != nil {
+			return err
+		}
+	}
+
+	kind := "<missing>"
+	if objKind, ok := unstructured.Object["kind"]; ok {
+		if str, ok := objKind.(string); ok {
+			kind = str
+		}
+	}
+	if objAPIVersion, ok := unstructured.Object["apiVersion"]; ok {
+		if str, ok := objAPIVersion.(string); ok {
+			version, err := unversioned.ParseGroupVersion(str)
+			if err != nil {
+				return err
+			}
+			kind = kind + "." + version.Version + "." + version.Group
+		}
+	}
+	name := formatResourceName(options.Kind, metadata.GetName(), options.WithKind)
+
+	if _, err := fmt.Fprintf(w, "%s\t%s", name, kind); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprint(w, AppendLabels(metadata.GetLabels(), options.ColumnLabels)); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprint(w, AppendAllLabels(options.ShowLabels, metadata.GetLabels())); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // TemplatePrinter is an implementation of ResourcePrinter which formats data with a Go Template.
@@ -2284,10 +2362,18 @@ func (p *TemplatePrinter) AfterPrint(w io.Writer, res string) error {
 
 // PrintObj formats the obj with the Go Template.
 func (p *TemplatePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
-	data, err := json.Marshal(obj)
+	var data []byte
+	var err error
+	if unstructured, ok := obj.(*runtime.Unstructured); ok {
+		data, err = json.Marshal(unstructured.Object)
+	} else {
+		data, err = json.Marshal(obj)
+
+	}
 	if err != nil {
 		return err
 	}
+
 	out := map[string]interface{}{}
 	if err := json.Unmarshal(data, &out); err != nil {
 		return err
@@ -2445,6 +2531,20 @@ func (j *JSONPathPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		if err := json.Unmarshal(data, &queryObj); err != nil {
 			return err
 		}
+	}
+
+	if unknown, ok := obj.(*runtime.Unknown); ok {
+		data, err := json.Marshal(unknown)
+		if err != nil {
+			return err
+		}
+		queryObj = map[string]interface{}{}
+		if err := json.Unmarshal(data, &queryObj); err != nil {
+			return err
+		}
+	}
+	if unstructured, ok := obj.(*runtime.Unstructured); ok {
+		queryObj = unstructured.Object
 	}
 
 	if err := j.JSONPath.Execute(w, queryObj); err != nil {

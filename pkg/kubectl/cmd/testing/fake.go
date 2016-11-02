@@ -182,7 +182,11 @@ func (f *FakeFactory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
 }
 
 func (f *FakeFactory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, error) {
-	return nil, nil, nil
+	groupResources := testDynamicResources()
+	mapper := discovery.NewRESTMapper(groupResources, meta.InterfacesForUnstructured)
+	typer := discovery.NewUnstructuredObjectTyper(groupResources)
+
+	return cmdutil.NewShortcutExpander(mapper, nil), typer, nil
 }
 
 func (f *FakeFactory) Decoder(bool) runtime.Decoder {

@@ -120,7 +120,8 @@ func testComponentStatusData() *api.ComponentStatusList {
 
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestGetUnknownSchemaObject(t *testing.T) {
-	f, tf, codec, ns := cmdtesting.NewTestFactory()
+	f, tf, _, ns := cmdtesting.NewAPIFactory()
+	_, _, codec, _ := cmdtesting.NewTestFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
