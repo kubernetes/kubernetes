@@ -1,11 +1,11 @@
 # Flex Volume API Proposal
 ## Abstract
-The goal of this proposal is to extend and enhance the existing flex volume storage plugin model (#13840). It bridges the gap with existing in-tree plugins and defines a stable api.
+The goal of this proposal is to extend and enhance the existing flex volume storage plugin model (#13840). It bridges the gap with existing in-tree plugins and defines a stable API.
 
 ## Background:
 The existing flex volume plugin enables administrators/vendors to create out-of-tree volume plugins, i.e., plugins which do not reside in Kubernetes project. But, it has the following gaps:
 * It lacks support for the latest enhancements to in-tree plugins like dynamic provisioning and centralized attach-detach controller
-* It does not define a stable driver api for administrators/vendors to work with.
+* It does not define a stable driver API for administrators/vendors to work with.
 * The current flex volume plugin deployment model is not suitable for environments like GCE & CoreOS, where access to the root file system is restricted. And in other environments the overall user experience is poor, as it requires manual installation of the plugin on every node and restart of kubelets & controller manager. This issue is covered in detail in another PR #32550.
 
 ### Goals:
@@ -14,7 +14,7 @@ The goals of this proposal are
 * API should be versioned and backward compatible.
 * API should be extensible to accommodate future enhancements.
 * Add support for dynamic provisioning and centralized attach-detach controller and
-* The biggest advantage of flex volume is it’s simplicity. It is just an adapter around the internal api. We will keep it simple in the new design and try to follow the same adapter pattern.
+* The biggest advantage of flex volume is it’s simplicity. It is just an adapter around the internal API. We will keep it simple in the new design and try to follow the same adapter pattern.
 
 ### Non Goals:
 * This proposal does not the address the poor installation model of existing model. It is covered in another PR #32550.
@@ -24,12 +24,12 @@ The goals of this proposal are
 
 **Plugin Driver API**: API calls defined by flex volume plugin.
 
-**Plugin Driver**: Out-of-tree driver/plugin which implements plugin driver api.
+**Plugin Driver**: Out-of-tree driver/plugin which implements plugin driver API.
 
 **In-tree plugin**: Plugins which are included in Kubernetes project/source tree.
 
 ## API:
-Existing flex volume plugin driver api is in alpha phase and are subject to change between Kubernetes versions. This section proposes stable api for plugin driver writers to work with.
+The existing flex volume plugin driver API is in the alpha phase and are subject to change between Kubernetes versions. This section proposes a stable API for plugin driver writers to work with.
 
 ### Proposal:
 Proposes fewer APIs with stable request & response API objects.
@@ -81,21 +81,13 @@ message ProbeDriverResponse {
 }
 
 service FlexVolumeService {
-    // Probe the driver capabilities.
     rpc ProbeDriver(ProbeDriverRequest) returns (ProbeDriverResponse) {}
-    // Create a volume.
     rpc Create(CreateRequest) returns (CreateResponse) {}
-    // Delete a volume.
     rpc Delete(DeleteRequest) returns (DeleteResponse) {}
-    // Attach the volume.
     rpc Attach(AttachRequest) returns (AttachResponse) {}
-    // Detach the volume.
     rpc Detach(DetachRequest) returns (DetachResponse) {}
-    // Mount the volume.
     rpc Mount(MountRequest) returns (MountResponse) {}
-    // unmount the volume.
     rpc Unmount(UnmountRequest) returns (UnmountResponse) {}
-    // Query the metrics.
     rpc GetMetrics(MetricsRequest) returns (MetricsResponse) {}
 }
 
