@@ -90,6 +90,7 @@ go_library(
         "github.com/Azure/azure-sdk-for-go/arm/network/version.go",
         "github.com/Azure/azure-sdk-for-go/arm/network/virtualnetworkgatewayconnections.go",
         "github.com/Azure/azure-sdk-for-go/arm/network/virtualnetworkgateways.go",
+        "github.com/Azure/azure-sdk-for-go/arm/network/virtualnetworkpeerings.go",
         "github.com/Azure/azure-sdk-for-go/arm/network/virtualnetworks.go",
     ],
     tags = ["automanaged"],
@@ -11472,4 +11473,44 @@ go_library(
         "//vendor:k8s.io/client-go/pkg/util/flowcontrol",
         "//vendor:k8s.io/client-go/rest",
     ],
+)
+
+go_library(
+    name = "github.com/Azure/azure-sdk-for-go/arm/storage",
+    srcs = [
+        "github.com/Azure/azure-sdk-for-go/arm/storage/accounts.go",
+        "github.com/Azure/azure-sdk-for-go/arm/storage/client.go",
+        "github.com/Azure/azure-sdk-for-go/arm/storage/models.go",
+        "github.com/Azure/azure-sdk-for-go/arm/storage/usageoperations.go",
+        "github.com/Azure/azure-sdk-for-go/arm/storage/version.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/Azure/go-autorest/autorest",
+        "//vendor:github.com/Azure/go-autorest/autorest/azure",
+        "//vendor:github.com/Azure/go-autorest/autorest/date",
+    ],
+)
+
+go_library(
+    name = "github.com/Azure/azure-sdk-for-go/storage",
+    srcs = [
+        "github.com/Azure/azure-sdk-for-go/storage/blob.go",
+        "github.com/Azure/azure-sdk-for-go/storage/client.go",
+        "github.com/Azure/azure-sdk-for-go/storage/file.go",
+        "github.com/Azure/azure-sdk-for-go/storage/queue.go",
+        "github.com/Azure/azure-sdk-for-go/storage/table.go",
+        "github.com/Azure/azure-sdk-for-go/storage/table_entities.go",
+        "github.com/Azure/azure-sdk-for-go/storage/util.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/rubiojr/go-vhd/vhd",
+    srcs = [
+        "github.com/rubiojr/go-vhd/vhd/util.go",
+        "github.com/rubiojr/go-vhd/vhd/vhd.go",
+    ],
+    tags = ["automanaged"],
 )
