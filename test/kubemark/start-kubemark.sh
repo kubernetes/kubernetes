@@ -278,5 +278,6 @@ until [[ "${ready}" -ge "${NUM_NODES}" ]]; do
 done
 echo ""
 
+echo "Master IP: ${MASTER_IP}"
 echo "Password to kubemark master: ${password}"
 echo "Kubeconfig for kubemark master is written in ${LOCAL_KUBECONFIG}"

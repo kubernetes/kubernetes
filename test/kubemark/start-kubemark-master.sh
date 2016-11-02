@@ -117,14 +117,13 @@ retry sudo docker run --net=host \
 	--listen-client-urls=http://0.0.0.0:2379 \
 	--data-dir=/var/etcd/data ${ETCD_QUOTA_BYTES} 1>> /var/log/etcd.log 2>&1"
 
-# Increase the allowed number of open file descriptors
-ulimit -n 65536
+ulimit_command='bash -c "ulimit -n 32768;'
 
 cd /
 tar xzf kubernetes-server-linux-amd64.tar.gz
 
-write_supervisor_conf "kube-scheduler" "/kubernetes/server/bin/kube-scheduler --master=127.0.0.1:8080 $(cat /scheduler_flags | tr '\n' ' ')"
-write_supervisor_conf "kube-apiserver" "/kubernetes/server/bin/kube-apiserver --insecure-bind-address=0.0.0.0 \
+write_supervisor_conf "kube-scheduler" "${ulimit_command} /kubernetes/server/bin/kube-scheduler --master=127.0.0.1:8080 $(cat /scheduler_flags | tr '\n' ' ')\""
+write_supervisor_conf "kube-apiserver" "${ulimit_command} /kubernetes/server/bin/kube-apiserver --insecure-bind-address=0.0.0.0 \
 	--etcd-servers=http://127.0.0.1:2379 \
 	--etcd-servers-overrides=/events#${EVENT_STORE_URL} \
 	--tls-cert-file=/srv/kubernetes/server.cert \
@@ -134,12 +133,12 @@ write_supervisor_conf "kube-apiserver" "/kubernetes/server/bin/kube-apiserver --
 	--secure-port=443 \
 	--basic-auth-file=/srv/kubernetes/basic_auth.csv \
 	--target-ram-mb=$((${NUM_NODES} * 60)) \
-	$(cat /apiserver_flags | tr '\n' ' ')"
-write_supervisor_conf "kube-contoller-manager" "/kubernetes/server/bin/kube-controller-manager \
+	$(cat /apiserver_flags | tr '\n' ' ')\""
+write_supervisor_conf "kube-contoller-manager" "${ulimit_command} /kubernetes/server/bin/kube-controller-manager \
   --master=127.0.0.1:8080 \
   --service-account-private-key-file=/srv/kubernetes/server.key \
   --root-ca-file=/srv/kubernetes/ca.crt \
-  $(cat /controllers_flags | tr '\n' ' ')"
+  $(cat /controllers_flags | tr '\n' ' ')\""
 
 supervisorctl reread
 supervisorctl update
