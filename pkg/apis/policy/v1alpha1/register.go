@@ -42,6 +42,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&Eviction{},
 		&v1.ListOptions{},
 		&v1.DeleteOptions{},
+		&v1.ExportOptions{},
 	)
 	// Add the watch version that applies
 	versionedwatch.AddToGroupVersion(scheme, SchemeGroupVersion)
