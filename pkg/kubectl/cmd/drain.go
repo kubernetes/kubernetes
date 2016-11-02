@@ -476,7 +476,6 @@ func (o *DrainOptions) deletePods(pods []api.Pod) error {
 			return fmt.Errorf("Drain did not complete within %v", o.Timeout)
 		}
 	}
-	return nil
 }
 
 func (o *DrainOptions) deleteRegularPods(pods []api.Pod, doneCh chan bool, errCh chan error) {
@@ -485,8 +484,8 @@ func (o *DrainOptions) deleteRegularPods(pods []api.Pod, doneCh chan bool, errCh
 		return
 	}
 	for _, pod := range pods {
-		// err := o.evictPod(pod)
-		err := o.deletePod(pod)
+		err := o.evictPod(pod)
+		// err := o.deletePod(pod)
 		if err != nil {
 			errCh <- err
 			return
@@ -510,8 +509,8 @@ func (o *DrainOptions) deleteStatefulPods(statefulPods []api.Pod, doneCh chan bo
 		return
 	}
 	for _, statefulPod := range statefulPods {
-		// err := o.evictPod(statefulPod)
-		err := o.deletePod(statefulPod)
+		err := o.evictPod(statefulPod)
+		// err := o.deletePod(statefulPod)
 		if err != nil {
 			errCh <- err
 			return
