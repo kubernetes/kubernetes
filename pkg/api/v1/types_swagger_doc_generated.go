@@ -1098,6 +1098,7 @@ var map_PersistentVolumeSource = map[string]string{
 	"vsphereVolume":        "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
 	"quobyte":              "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime",
 	"azureDisk":            "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
+	"photonPersistentDisk": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
 }
 
 func (PersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -1125,6 +1126,16 @@ var map_PersistentVolumeStatus = map[string]string{
 
 func (PersistentVolumeStatus) SwaggerDoc() map[string]string {
 	return map_PersistentVolumeStatus
+}
+
+var map_PhotonPersistentDiskVolumeSource = map[string]string{
+	"":       "Represents a Photon Controller persistent disk resource.",
+	"pdID":   "ID that identifies Photon Controller persistent disk",
+	"fsType": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+}
+
+func (PhotonPersistentDiskVolumeSource) SwaggerDoc() map[string]string {
+	return map_PhotonPersistentDiskVolumeSource
 }
 
 var map_Pod = map[string]string{
@@ -1787,18 +1798,19 @@ var map_VolumeSource = map[string]string{
 	"iscsi":                 "ISCSI represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: http://releases.k8s.io/HEAD/examples/volumes/iscsi/README.md",
 	"glusterfs":             "Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md",
 	"persistentVolumeClaim": "PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace. More info: http://kubernetes.io/docs/user-guide/persistent-volumes#persistentvolumeclaims",
-	"rbd":           "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md",
-	"flexVolume":    "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.",
-	"cinder":        "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
-	"cephfs":        "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime",
-	"flocker":       "Flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running",
-	"downwardAPI":   "DownwardAPI represents downward API about the pod that should populate this volume",
-	"fc":            "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.",
-	"azureFile":     "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
-	"configMap":     "ConfigMap represents a configMap that should populate this volume",
-	"vsphereVolume": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
-	"quobyte":       "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime",
-	"azureDisk":     "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
+	"rbd":                  "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md",
+	"flexVolume":           "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.",
+	"cinder":               "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
+	"cephfs":               "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime",
+	"flocker":              "Flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running",
+	"downwardAPI":          "DownwardAPI represents downward API about the pod that should populate this volume",
+	"fc":                   "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.",
+	"azureFile":            "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
+	"configMap":            "ConfigMap represents a configMap that should populate this volume",
+	"vsphereVolume":        "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
+	"quobyte":              "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime",
+	"azureDisk":            "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
+	"photonPersistentDisk": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
 }
 
 func (VolumeSource) SwaggerDoc() map[string]string {
