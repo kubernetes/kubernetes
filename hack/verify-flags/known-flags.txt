@@ -277,6 +277,7 @@ insecure-port
 insecure-skip-tls-verify
 instance-metadata
 instance-name-prefix
+internal-clientset-package
 iptables-drop-bit
 iptables-masquerade-bit
 iptables-min-sync-period
@@ -344,6 +345,7 @@ leader-elect-retry-period
 lease-duration
 leave-stdin-open
 limit-bytes
+listers-package
 load-balancer-ip
 lock-file
 log-flush-frequency
@@ -589,6 +591,7 @@ use-kubernetes-cluster-service
 use-kubernetes-version
 user-whitelist
 verify-only
+versioned-clientset-package
 viper-config
 volume-dir
 volume-plugin-dir
