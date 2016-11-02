@@ -297,22 +297,25 @@ type petHealthChecker interface {
 // It doesn't update, probe or get the pod.
 type defaultPetHealthChecker struct{}
 
-// isHealthy returns true if the pod is running and has the
-// "pod.alpha.kubernetes.io/initialized" set to "true".
+// isHealthy returns true if the pod is ready & running. If the pod has the
+// "pod.alpha.kubernetes.io/initialized" annotation set to "false", pod state is ignored.
 func (d *defaultPetHealthChecker) isHealthy(pod *api.Pod) bool {
 	if pod == nil || pod.Status.Phase != api.PodRunning {
 		return false
 	}
+	podReady := api.IsPodReady(pod)
+
+	// User may have specified a pod readiness override through a debug annotation.
 	initialized, ok := pod.Annotations[StatefulSetInitAnnotation]
-	if !ok {
-		glog.Infof("StatefulSet pod %v in %v, waiting on annotation %v", api.PodRunning, pod.Name, StatefulSetInitAnnotation)
-		return false
+	if ok {
+		if initAnnotation, err := strconv.ParseBool(initialized); err != nil {
+			glog.Infof("Failed to parse %v annotation on pod %v: %v", StatefulSetInitAnnotation, pod.Name, err)
+		} else if !initAnnotation {
+			glog.Infof("StatefulSet pod %v waiting on annotation %v", pod.Name, StatefulSetInitAnnotation)
+			podReady = initAnnotation
+		}
 	}
-	b, err := strconv.ParseBool(initialized)
-	if err != nil {
-		return false
-	}
-	return b && api.IsPodReady(pod)
+	return podReady
 }
 
 // isDying returns true if the pod has a non-nil deletion timestamp. Since the
