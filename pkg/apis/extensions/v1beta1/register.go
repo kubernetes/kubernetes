@@ -56,6 +56,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&IngressList{},
 		&v1.ListOptions{},
 		&v1.DeleteOptions{},
+		&v1.ExportOptions{},
 		&ReplicaSet{},
 		&ReplicaSetList{},
 		&PodSecurityPolicy{},
