@@ -21,6 +21,7 @@ package v1beta1
 import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
+	authorization "k8s.io/kubernetes/pkg/apis/authorization"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/labels"

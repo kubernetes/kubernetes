@@ -20,6 +20,7 @@ package v1
 
 import (
 	"k8s.io/kubernetes/pkg/api/errors"
+	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 	v1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/labels"
