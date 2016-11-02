@@ -44,31 +44,32 @@ type ServerRunOptions struct {
 	AdmissionControlConfigFile string
 	AdvertiseAddress           net.IP
 
-	CloudConfigFile           string
-	CloudProvider             string
-	CorsAllowedOriginList     []string
-	DefaultStorageMediaType   string
-	DeleteCollectionWorkers   int
-	AuditLogPath              string
-	AuditLogMaxAge            int
-	AuditLogMaxBackups        int
-	AuditLogMaxSize           int
-	EnableGarbageCollection   bool
-	EnableProfiling           bool
-	EnableContentionProfiling bool
-	EnableSwaggerUI           bool
-	EnableWatchCache          bool
-	ExternalHost              string
-	KubernetesServiceNodePort int
-	LongRunningRequestRE      string
-	MasterCount               int
-	MasterServiceNamespace    string
-	MaxRequestsInFlight       int
-	MinRequestTimeout         int
-	RuntimeConfig             config.ConfigurationMap
-	ServiceClusterIPRange     net.IPNet // TODO: make this a list
-	ServiceNodePortRange      utilnet.PortRange
-	StorageVersions           string
+	CloudConfigFile             string
+	CloudProvider               string
+	CorsAllowedOriginList       []string
+	DefaultStorageMediaType     string
+	DeleteCollectionWorkers     int
+	AuditLogPath                string
+	AuditLogMaxAge              int
+	AuditLogMaxBackups          int
+	AuditLogMaxSize             int
+	EnableGarbageCollection     bool
+	EnableProfiling             bool
+	EnableContentionProfiling   bool
+	EnableSwaggerUI             bool
+	EnableWatchCache            bool
+	ExternalHost                string
+	KubernetesServiceNodePort   int
+	LongRunningRequestRE        string
+	MasterCount                 int
+	MasterServiceNamespace      string
+	MaxRequestsInFlight         int
+	MaxMutatingRequestsInFlight int
+	MinRequestTimeout           int
+	RuntimeConfig               config.ConfigurationMap
+	ServiceClusterIPRange       net.IPNet // TODO: make this a list
+	ServiceNodePortRange        utilnet.PortRange
+	StorageVersions             string
 	// The default values for StorageVersions. StorageVersions overrides
 	// these; you can change this if you want to change the defaults (e.g.,
 	// for testing). This is not actually exposed as a flag.
@@ -80,22 +81,23 @@ type ServerRunOptions struct {
 
 func NewServerRunOptions() *ServerRunOptions {
 	return &ServerRunOptions{
-		AdmissionControl:          "AlwaysAdmit",
-		DefaultStorageMediaType:   "application/json",
-		DefaultStorageVersions:    registered.AllPreferredGroupVersions(),
-		DeleteCollectionWorkers:   1,
-		EnableGarbageCollection:   true,
-		EnableProfiling:           true,
-		EnableContentionProfiling: false,
-		EnableWatchCache:          true,
-		LongRunningRequestRE:      DefaultLongRunningRequestRE,
-		MasterCount:               1,
-		MasterServiceNamespace:    api.NamespaceDefault,
-		MaxRequestsInFlight:       400,
-		MinRequestTimeout:         1800,
-		RuntimeConfig:             make(config.ConfigurationMap),
-		ServiceNodePortRange:      DefaultServiceNodePortRange,
-		StorageVersions:           registered.AllPreferredGroupVersions(),
+		AdmissionControl:            "AlwaysAdmit",
+		DefaultStorageMediaType:     "application/json",
+		DefaultStorageVersions:      registered.AllPreferredGroupVersions(),
+		DeleteCollectionWorkers:     1,
+		EnableGarbageCollection:     true,
+		EnableProfiling:             true,
+		EnableContentionProfiling:   false,
+		EnableWatchCache:            true,
+		LongRunningRequestRE:        DefaultLongRunningRequestRE,
+		MasterCount:                 1,
+		MasterServiceNamespace:      api.NamespaceDefault,
+		MaxRequestsInFlight:         400,
+		MaxMutatingRequestsInFlight: 200,
+		MinRequestTimeout:           1800,
+		RuntimeConfig:               make(config.ConfigurationMap),
+		ServiceNodePortRange:        DefaultServiceNodePortRange,
+		StorageVersions:             registered.AllPreferredGroupVersions(),
 	}
 }
 
@@ -253,7 +255,11 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"DEPRECATED: the namespace from which the kubernetes master services should be injected into pods.")
 
 	fs.IntVar(&s.MaxRequestsInFlight, "max-requests-inflight", s.MaxRequestsInFlight, ""+
-		"The maximum number of requests in flight at a given time. When the server exceeds this, "+
+		"The maximum number of non-mutating requests in flight at a given time. When the server exceeds this, "+
+		"it rejects requests. Zero for no limit.")
+
+	fs.IntVar(&s.MaxMutatingRequestsInFlight, "max-mutating-requests-inflight", s.MaxMutatingRequestsInFlight, ""+
+		"The maximum number of mutating requests in flight at a given time. When the server exceeds this, "+
 		"it rejects requests. Zero for no limit.")
 
 	fs.IntVar(&s.MinRequestTimeout, "min-request-timeout", s.MinRequestTimeout, ""+
