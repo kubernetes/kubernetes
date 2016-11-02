@@ -79,7 +79,12 @@ func TestJobLister(t *testing.T) {
 				pod := &api.Pod{
 					ObjectMeta: api.ObjectMeta{Name: "pod", Namespace: "ns"},
 				}
-				return lister.GetPodJobs(pod)
+				podJobs, err := lister.GetPodJobs(pod)
+				jobs := make([]*batch.Job, 0, len(podJobs))
+				for i := range podJobs {
+					jobs = append(jobs, &podJobs[i])
+				}
+				return jobs, err
 			},
 			outJobNames: sets.NewString(),
 			expectErr:   true,
@@ -100,7 +105,12 @@ func TestJobLister(t *testing.T) {
 						Labels:    map[string]string{"foo": "bar"},
 					},
 				}
-				return lister.GetPodJobs(pod)
+				podJobs, err := lister.GetPodJobs(pod)
+				jobs := make([]*batch.Job, 0, len(podJobs))
+				for i := range podJobs {
+					jobs = append(jobs, &podJobs[i])
+				}
+				return jobs, err
 			},
 			outJobNames: sets.NewString(),
 			expectErr:   true,
@@ -134,7 +144,12 @@ func TestJobLister(t *testing.T) {
 						Namespace: "ns",
 					},
 				}
-				return lister.GetPodJobs(pod)
+				podJobs, err := lister.GetPodJobs(pod)
+				jobs := make([]*batch.Job, 0, len(podJobs))
+				for i := range podJobs {
+					jobs = append(jobs, &podJobs[i])
+				}
+				return jobs, err
 			},
 			outJobNames: sets.NewString("bar"),
 			msg:         "listing jobs with namespace and selector failed",
@@ -167,7 +182,12 @@ func TestJobLister(t *testing.T) {
 						Namespace: "baz",
 					},
 				}
-				return lister.GetPodJobs(pod)
+				podJobs, err := lister.GetPodJobs(pod)
+				jobs := make([]*batch.Job, 0, len(podJobs))
+				for i := range podJobs {
+					jobs = append(jobs, &podJobs[i])
+				}
+				return jobs, err
 			},
 			expectErr: true,
 			msg:       "listing jobs with namespace and selector failed: expected error, got none",
