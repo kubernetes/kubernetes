@@ -174,7 +174,7 @@ func (o *ResourcesOptions) Validate() error {
 
 func (o *ResourcesOptions) Run() error {
 	allErrs := []error{}
-	patches := CalculatePatches(o.f, o.Infos, o.Encoder, func(info *resource.Info) (bool, error) {
+	patches := CalculatePatches(o.f, o.Infos, o.Encoder, cmdutil.GetDryRunFlag(o.Cmd), func(info *resource.Info) (bool, error) {
 		transformed := false
 		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *api.PodSpec) error {
 			containers, _ := selectContainers(spec.Containers, o.ContainerSelector)

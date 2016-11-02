@@ -380,9 +380,9 @@ other: a
 func TestCustomStrategicMergePatch(t *testing.T) {
 	for _, c := range customStrategicMergePatchTestCaseData.TestCases {
 		originalJSON := yamlToJSONOrError(c.Original)
-		twoWWayJSON := yamlToJSONOrError(c.TwoWay)
+		twoWayJSON := yamlToJSONOrError(c.TwoWay)
 		modifiedJSON := yamlToJSONOrError(c.Modified)
-		testPatchApplication(t, originalJSON, twoWWayJSON, modifiedJSON, c.Description)
+		testPatchApplication(t, originalJSON, twoWayJSON, modifiedJSON, c.Description)
 	}
 }
 
@@ -414,29 +414,6 @@ value: 1
 name: 1
 value: 1
 other: a
-`),
-			},
-		},
-		{
-			Description: "nil patch",
-			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
-				Original: []byte(`
-name: 1
-`),
-				TwoWay: []byte(`
-{}
-`),
-				Modified: []byte(`
-name: 1
-`),
-				Current: []byte(`
-name: 1
-`),
-				ThreeWay: []byte(`
-{}
-`),
-				Result: []byte(`
-name: 1
 `),
 			},
 		},
@@ -1137,7 +1114,7 @@ mergingList:
 			},
 		},
 		{
-			Description: "add field to map in merging list with conflict",
+			Description: "add duplicate field to map in merging list",
 			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
 				Original: []byte(`
 mergingList:
@@ -1160,17 +1137,14 @@ mergingList:
 				Current: []byte(`
 mergingList:
   - name: 1
+    value: 1
     other: a
-  - name: 3
+  - name: 2
     value: 2
     other: b
 `),
 				ThreeWay: []byte(`
-mergingList:
-  - name: 1
-    value: 1
-  - name: 2
-    value: 2
+{}
 `),
 				Result: []byte(`
 mergingList:
@@ -1178,8 +1152,6 @@ mergingList:
     value: 1
     other: a
   - name: 2
-    value: 2
-  - name: 3
     value: 2
     other: b
 `),
@@ -1257,53 +1229,6 @@ mergingList:
 mergingList:
   - name: 1
     value: 1
-    other: a
-  - name: 2
-    value: 2
-    other: b
-`),
-				ThreeWay: []byte(`
-mergingList:
-  - name: 1
-    value: a
-`),
-				Result: []byte(`
-mergingList:
-  - name: 1
-    value: a
-    other: a
-  - name: 2
-    value: 2
-    other: b
-`),
-			},
-		},
-		{
-			Description: "replace map field value in merging list with conflict",
-			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
-				Original: []byte(`
-mergingList:
-  - name: 1
-    value: 1
-  - name: 2
-    value: 2
-`),
-				TwoWay: []byte(`
-mergingList:
-  - name: 1
-    value: a
-`),
-				Modified: []byte(`
-mergingList:
-  - name: 1
-    value: a
-  - name: 2
-    value: 2
-`),
-				Current: []byte(`
-mergingList:
-  - name: 1
-    value: 3
     other: a
   - name: 2
     value: 2

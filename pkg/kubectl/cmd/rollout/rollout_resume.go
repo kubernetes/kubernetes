@@ -138,7 +138,7 @@ func (o *ResumeConfig) CompleteResume(f cmdutil.Factory, cmd *cobra.Command, out
 
 func (o ResumeConfig) RunResume() error {
 	allErrs := []error{}
-	for _, patch := range set.CalculatePatches(o.f, o.Infos, o.Encoder, o.Resumer) {
+	for _, patch := range set.CalculatePatches(o.f, o.Infos, o.Encoder, false, o.Resumer) {
 		info := patch.Info
 
 		if patch.Err != nil {

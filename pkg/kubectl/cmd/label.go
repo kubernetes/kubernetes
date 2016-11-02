@@ -192,15 +192,19 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
+	ifUseSMPatchVersion_1_5 := true
+	if !o.local {
+		ifUseSMPatchVersion_1_5, err = cmdutil.RunDoesServerSupportSMPatchVersion_1_5(f)
+		if err != nil {
+			return err
+		}
+	}
+
 	// only apply resource version locking on a single resource
 	if !one && len(o.resourceVersion) > 0 {
 		return fmt.Errorf("--resource-version may only be used with a single resource")
 	}
 
-	ifUseNewPatchBehavior, err := cmdutil.TryToRunIfUseNewBehaviorForPatch(f)
-	if err != nil {
-		return err
-	}
 	// TODO: support bulk generic output a la Get
 	return r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
@@ -250,7 +254,7 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 			if !reflect.DeepEqual(oldData, newData) {
 				dataChangeMsg = "labeled"
 			}
-			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj, ifUseNewPatchBehavior)
+			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj, ifUseSMPatchVersion_1_5)
 			createdPatch := err == nil
 			if err != nil {
 				glog.V(2).Infof("couldn't compute patch: %v", err)

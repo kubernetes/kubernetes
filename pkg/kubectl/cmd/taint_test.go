@@ -32,7 +32,6 @@ import (
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/version"
 )
 
 func generateNodeAndTaintedNode(oldTaints []api.Taint, newTaints []api.Taint) (*api.Node, *api.Node) {
@@ -253,9 +252,6 @@ func TestTaint(t *testing.T) {
 
 	for _, test := range tests {
 		oldNode, expectNewNode := generateNodeAndTaintedNode(test.oldTaints, test.newTaints)
-		serverVersion := version.Info{
-			GitVersion: "v1.5.0",
-		}
 		new_node := &api.Node{}
 		tainted := false
 		f, tf, codec, ns := cmdtesting.NewAPIFactory()
@@ -266,11 +262,11 @@ func TestTaint(t *testing.T) {
 				m := &MyReq{req}
 				switch {
 				case m.isFor("GET", "/version"):
-					jsonBytes, err := json.Marshal(serverVersion)
+					resp, err := genServerVersionResponse(serverVersion_1_5_0)
 					if err != nil {
-						return nil, err
+						t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
 					}
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: jsonBody(jsonBytes)}, nil
+					return resp, nil
 				case m.isFor("GET", "/nodes/node-name"):
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, oldNode)}, nil
 				case m.isFor("PATCH", "/nodes/node-name"), m.isFor("PUT", "/nodes/node-name"):
@@ -288,7 +284,7 @@ func TestTaint(t *testing.T) {
 					}
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, new_node)}, nil
 				default:
-					t.Fatalf("%s: unexpected request: %v %#v\n%#v", test.description, req.Method, req.URL.Path, req)
+					t.Fatalf("%s: unexpected request: %v %#v\n%#v", test.description, req.Method, req.URL, req)
 					return nil, nil
 				}
 			}),
