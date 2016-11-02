@@ -33,23 +33,19 @@ import (
 	"time"
 
 	"github.com/emicklei/go-restful/swagger"
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
-	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/apimachinery"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -339,21 +335,10 @@ func (f *factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
 	mapper := registered.RESTMapper()
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
 	if err == nil {
-		// register third party resources with the api machinery groups.  This probably should be done, but
-		// its consistent with old code, so we'll start with it.
-		if err := registerThirdPartyResources(discoveryClient); err != nil {
-			glog.V(1).Infof("Unable to register third party resources: %v", err)
-		}
-		// ThirdPartyResourceData is special.  It's not discoverable, but needed for thirdparty resource listing
-		// TODO eliminate this once we're truly generic.
-		thirdPartyResourceDataMapper := meta.NewDefaultRESTMapper([]unversioned.GroupVersion{extensionsv1beta1.SchemeGroupVersion}, registered.InterfacesFor)
-		thirdPartyResourceDataMapper.Add(extensionsv1beta1.SchemeGroupVersion.WithKind("ThirdPartyResourceData"), meta.RESTScopeNamespace)
-
 		mapper = meta.FirstHitRESTMapper{
 			MultiRESTMapper: meta.MultiRESTMapper{
 				discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, registered.InterfacesFor),
-				thirdPartyResourceDataMapper, // needed for TPR printing
-				registered.RESTMapper(),      // hardcoded fall back
+				registered.RESTMapper(), // hardcoded fall back
 			},
 		}
 	}
@@ -1330,55 +1315,4 @@ func (f *factory) SuggestedPodTemplateResources() []unversioned.GroupResource {
 		{Resource: "job"},
 		{Resource: "replicaset"},
 	}
-}
-
-// registerThirdPartyResources inspects the discovery endpoint to find thirdpartyresources in the discovery doc
-// and then registers them with the apimachinery code.  I think this is done so that scheme/codec stuff works,
-// but I really don't know.  Feels like this code should go away once kubectl is completely generic for generic
-// CRUD
-func registerThirdPartyResources(discoveryClient discovery.DiscoveryInterface) error {
-	var versions []unversioned.GroupVersion
-	var gvks []unversioned.GroupVersionKind
-	var err error
-	retries := 3
-	for i := 0; i < retries; i++ {
-		versions, gvks, err = GetThirdPartyGroupVersions(discoveryClient)
-		// Retry if we got a NotFound error, because user may delete
-		// a thirdparty group when the GetThirdPartyGroupVersions is
-		// running.
-		if err == nil || !apierrors.IsNotFound(err) {
-			break
-		}
-	}
-	if err != nil {
-		return err
-	}
-
-	groupsMap := map[string][]unversioned.GroupVersion{}
-	for _, version := range versions {
-		groupsMap[version.Group] = append(groupsMap[version.Group], version)
-	}
-	for group, versionList := range groupsMap {
-		preferredExternalVersion := versionList[0]
-
-		thirdPartyMapper, err := kubectl.NewThirdPartyResourceMapper(versionList, getGroupVersionKinds(gvks, group))
-		if err != nil {
-			return err
-		}
-
-		accessor := meta.NewAccessor()
-		groupMeta := apimachinery.GroupMeta{
-			GroupVersion:  preferredExternalVersion,
-			GroupVersions: versionList,
-			RESTMapper:    thirdPartyMapper,
-			SelfLinker:    runtime.SelfLinker(accessor),
-			InterfacesFor: makeInterfacesFor(versionList),
-		}
-		if err := registered.RegisterGroup(groupMeta); err != nil {
-			return err
-		}
-		registered.AddThirdPartyAPIGroupVersions(versionList...)
-	}
-
-	return nil
 }

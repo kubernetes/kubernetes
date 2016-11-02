@@ -182,7 +182,11 @@ func (f *FakeFactory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
 }
 
 func (f *FakeFactory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, error) {
-	return nil, nil, nil
+	groupResources := testDynamicResources()
+	mapper := discovery.NewRESTMapper(groupResources, meta.InterfacesForUnstructured)
+	typer := discovery.NewUnstructuredObjectTyper(groupResources)
+
+	return cmdutil.NewShortcutExpander(mapper, nil), typer, nil
 }
 
 func (f *FakeFactory) Decoder(bool) runtime.Decoder {
@@ -379,7 +383,7 @@ func (f *fakeMixedFactory) ClientForMapping(m *meta.RESTMapping) (resource.RESTC
 }
 
 func NewMixedFactory(apiClient resource.RESTClient) (cmdutil.Factory, *TestFactory, runtime.Codec) {
-	f, t, c, _ := NewTestFactory()
+	f, t, c, _ := NewAPIFactory()
 	return &fakeMixedFactory{
 		Factory:   f,
 		tf:        t,
@@ -545,6 +549,9 @@ func testDynamicResources() []*discovery.APIGroupResources {
 					{Name: "pods", Namespaced: true, Kind: "Pod"},
 					{Name: "services", Namespaced: true, Kind: "Service"},
 					{Name: "replicationcontrollers", Namespaced: true, Kind: "ReplicationController"},
+					{Name: "componentstatuses", Namespaced: false, Kind: "ComponentStatus"},
+					{Name: "nodes", Namespaced: false, Kind: "Node"},
+					{Name: "type", Namespaced: false, Kind: "Type"},
 				},
 			},
 		},
