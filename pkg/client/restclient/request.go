@@ -553,7 +553,6 @@ func (r *Request) Body(obj interface{}) *Request {
 		if reflect.ValueOf(t).IsNil() {
 			return r
 		}
-		fmt.Println("reflect.TypeOf(t)", reflect.TypeOf(t))
 		switch typedObj := t.(type) {
 		// hack for eviction
 		case *policy.Eviction:

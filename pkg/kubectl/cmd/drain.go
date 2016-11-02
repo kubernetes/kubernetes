@@ -438,120 +438,34 @@ func (o *DrainOptions) evictPod(pod api.Pod) error {
 	return o.client.Policy().Evictions(eviction.Namespace).Evict(eviction)
 }
 
-func (o *DrainOptions) deletePod(pod api.Pod) error {
-	deleteOptions := &api.DeleteOptions{}
-	if o.GracePeriodSeconds >= 0 {
-		gracePeriodSeconds := int64(o.GracePeriodSeconds)
-		deleteOptions.GracePeriodSeconds = &gracePeriodSeconds
-	}
-	return o.client.Core().Pods(pod.Namespace).Delete(pod.Name, deleteOptions)
-}
-
 // deletePods deletes the pods on the api server
 func (o *DrainOptions) deletePods(pods []api.Pod) error {
-	pods, nameToStatefulPods, err := o.filterStatefulSets(pods)
-	if err != nil {
-		return err
-	}
-
-	doneCh := make(chan bool, len(nameToStatefulPods)+1)
-	errCh := make(chan error, 1)
-
-	go o.deleteRegularPods(pods, doneCh, errCh)
-	for name := range nameToStatefulPods {
-		go o.deleteStatefulPods(nameToStatefulPods[name], doneCh, errCh)
-	}
-
-	doneCount := 0
-	for {
-		select {
-		case err = <-errCh:
-			return err
-		case <-doneCh:
-			doneCount++
-			if doneCount == len(nameToStatefulPods)+1 {
-				return nil
-			}
-		case <-time.After(o.Timeout):
-			return fmt.Errorf("Drain did not complete within %v", o.Timeout)
-		}
-	}
-}
-
-func (o *DrainOptions) deleteRegularPods(pods []api.Pod, doneCh chan bool, errCh chan error) {
 	if len(pods) == 0 {
-		doneCh <- true
-		return
+		return nil
 	}
+	ifTooManyRequests := false
+	var e error
 	for _, pod := range pods {
 		err := o.evictPod(pod)
-		// err := o.deletePod(pod)
-		if err != nil {
-			errCh <- err
-			return
+		if apierrors.IsTooManyRequests(err) {
+			fmt.Println("IsTooManyRequests", err)
+			e = err
+			ifTooManyRequests = true
+			continue
 		}
+		if err != nil {
+			return err
+		}
+	}
+	if ifTooManyRequests {
+		return e
 	}
 
 	getPodFn := func(namespace, name string) (*api.Pod, error) {
 		return o.client.Core().Pods(namespace).Get(name)
 	}
 	_, err := o.waitForDelete(pods, kubectl.Interval, o.Timeout, getPodFn)
-	if err != nil {
-		errCh <- err
-		return
-	}
-	doneCh <- true
-}
-
-func (o *DrainOptions) deleteStatefulPods(statefulPods []api.Pod, doneCh chan bool, errCh chan error) {
-	if len(statefulPods) == 0 {
-		doneCh <- true
-		return
-	}
-	for _, statefulPod := range statefulPods {
-		err := o.evictPod(statefulPod)
-		// err := o.deletePod(statefulPod)
-		if err != nil {
-			errCh <- err
-			return
-		}
-		err = wait.PollImmediate(kubectl.Interval, o.Timeout, func() (bool, error) {
-			p, err := o.client.Core().Pods(statefulPod.Namespace).Get(statefulPod.Name)
-			if err == nil && p != nil && p.ObjectMeta.UID != statefulPod.ObjectMeta.UID && p.Status.Phase == api.PodRunning {
-				return true, nil
-			} else if apierrors.IsNotFound(err) {
-				return false, nil
-			} else {
-				return false, err
-			}
-		})
-		if err != nil {
-			errCh <- err
-			return
-		}
-	}
-	doneCh <- true
-}
-
-func (o *DrainOptions) filterStatefulSets(pods []api.Pod) ([]api.Pod, map[string][]api.Pod, error) {
-	nonStatefulPods := []api.Pod{}
-	nameToStatefulPods := make(map[string][]api.Pod)
-	for _, pod := range pods {
-		sr, err := o.getPodCreator(pod)
-		if err != nil {
-			return nonStatefulPods, nameToStatefulPods, err
-		}
-		if sr != nil && sr.Reference.Kind == "StatefulSet" {
-			if statefulPods, ok := nameToStatefulPods[sr.Reference.Name]; ok {
-				nameToStatefulPods[sr.Reference.Name] = append(statefulPods, pod)
-			} else {
-				nameToStatefulPods[sr.Reference.Name] = []api.Pod{pod}
-			}
-		} else {
-			nonStatefulPods = append(nonStatefulPods, pod)
-		}
-	}
-	return nonStatefulPods, nameToStatefulPods, nil
+	return err
 }
 
 func (o *DrainOptions) waitForDelete(pods []api.Pod, interval, timeout time.Duration, getPodFn func(string, string) (*api.Pod, error)) ([]api.Pod, error) {
