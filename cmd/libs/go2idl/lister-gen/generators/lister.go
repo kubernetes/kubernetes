@@ -114,19 +114,35 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			internalGVPkg = strings.Join(parts[0:len(parts)-1], "/")
 		}
 
+		var typesToGenerate []*types.Type
+		for _, t := range p.Types {
+			// filter out types which dont have genclient=true.
+			if extractBoolTagOrDie("genclient", t.SecondClosestCommentLines) == false {
+				continue
+			}
+			typesToGenerate = append(typesToGenerate, t)
+		}
+		orderer := namer.Orderer{Namer: namer.NewPrivateNamer(0)}
+		typesToGenerate = orderer.OrderTypes(typesToGenerate)
+
+		packagePath := filepath.Join(arguments.OutputPackagePath, strings.ToLower(gv.Group.NonEmpty()), strings.ToLower(gv.Version.NonEmpty()))
 		packageList = append(packageList, &generator.DefaultPackage{
 			PackageName: strings.ToLower(gv.Version.NonEmpty()),
-			PackagePath: filepath.Join(arguments.OutputPackagePath, strings.ToLower(gv.Group.NonEmpty()), strings.ToLower(gv.Version.NonEmpty())),
+			PackagePath: packagePath,
 			HeaderText:  boilerplate,
 			GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
-				for _, t := range p.Types {
-					// filter out types which dont have genclient=true.
-					if extractBoolTagOrDie("genclient", t.SecondClosestCommentLines) == false {
-						continue
-					}
+				generators = append(generators, &expansionGenerator{
+					DefaultGen: generator.DefaultGen{
+						OptionalName: "expansion_generated",
+					},
+					packagePath: filepath.Join(arguments.OutputBase, packagePath),
+					types:       typesToGenerate,
+				})
+
+				for _, t := range typesToGenerate {
 					generators = append(generators, &listerGenerator{
 						DefaultGen: generator.DefaultGen{
-							OptionalName: arguments.OutputFileBaseName + "." + strings.ToLower(t.Name.Name),
+							OptionalName: strings.ToLower(t.Name.Name),
 						},
 						outputPackage:  arguments.OutputPackagePath,
 						groupVersion:   gv,
@@ -248,6 +264,7 @@ type $.type|public$Lister interface {
 	List(selector labels.Selector) (ret []*$.type|raw$, err error)
 	// $.type|publicPlural$ returns an object that can list and get $.type|publicPlural$.
 	$.type|publicPlural$(namespace string) $.type|public$NamespaceLister
+	$.type|public$ListerExpansion
 }
 `
 
@@ -258,6 +275,7 @@ type $.type|public$Lister interface {
 	List(selector labels.Selector) (ret []*$.type|raw$, err error)
 	// Get retrieves the $.type|public$ from the index for a given name.
 	Get(name string) (*$.type|raw$, error)
+	$.type|public$ListerExpansion
 }
 `
 
@@ -314,6 +332,7 @@ type $.type|public$NamespaceLister interface {
 	List(selector labels.Selector) (ret []*$.type|raw$, err error)
 	// Get retrieves the $.type|public$ from the indexer for a given namespace and name.
 	Get(name string) (*$.type|raw$, error)
+	$.type|public$NamespaceListerExpansion
 }
 `
 
