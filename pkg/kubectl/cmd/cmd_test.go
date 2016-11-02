@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -37,7 +38,12 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/strings"
+	"k8s.io/kubernetes/pkg/version"
 )
+
+var serverVersion_1_5_0 = version.Info{
+	GitVersion: "v1.5.0",
+}
 
 func initTestErrorHandler(t *testing.T) {
 	cmdutil.BehaviorOnFatal(func(str string, code int) {
@@ -619,4 +625,12 @@ func TestNormalizationFuncGlobalExistence(t *testing.T) {
 	if reflect.ValueOf(sub.Flags().GetNormalizeFunc()).Pointer() != reflect.ValueOf(root.Flags().GetNormalizeFunc()).Pointer() {
 		t.Fatal("child and root commands should have the same normalization functions")
 	}
+}
+
+func genServerVersionResponse(serverVersion version.Info) (*http.Response, error) {
+	jsonBytes, err := json.Marshal(serverVersion)
+	if err != nil {
+		return nil, err
+	}
+	return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: jsonBody(jsonBytes)}, nil
 }

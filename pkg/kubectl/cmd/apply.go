@@ -159,7 +159,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *App
 	visitedNamespacedRESTMappings := map[unversioned.GroupVersionKind]*meta.RESTMapping{}
 	visitedNonNamespacedRESTMappings := map[unversioned.GroupVersionKind]*meta.RESTMapping{}
 
-	ifUseNewPatchBehavior, err := cmdutil.TryToRunIfUseNewBehaviorForPatch(f)
+	ifUseSMPatchVersion_1_5, err := cmdutil.RunDoesServerSupportSMPatchVersion_1_5(f)
 	if err != nil {
 		return err
 	}
@@ -225,13 +225,13 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *App
 			helper := resource.NewHelper(info.Client, info.Mapping)
 			patcher := NewPatcher(encoder, decoder, info.Mapping, helper, f, overwrite)
 
-			patchBytes, err := patcher.patch(info.Object, modified, info.Source, info.Namespace, info.Name, ifUseNewPatchBehavior)
+			patchBytes, err := patcher.patch(info.Object, modified, info.Source, info.Namespace, info.Name, ifUseSMPatchVersion_1_5)
 			if err != nil {
 				return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patchBytes, info), info.Source, err)
 			}
 
 			if cmdutil.ShouldRecord(cmd, info) {
-				patch, err := cmdutil.ChangeResourcePatch(info, f.Command(), ifUseNewPatchBehavior)
+				patch, err := cmdutil.ChangeResourcePatch(info, f.Command(), ifUseSMPatchVersion_1_5)
 				if err != nil {
 					return err
 				}
@@ -399,7 +399,7 @@ func NewPatcher(encoder runtime.Encoder, decoder runtime.Decoder, mapping *meta.
 	}
 }
 
-func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, namespace, name string, ifUseNewPatchBehavior bool) ([]byte, error) {
+func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, namespace, name string, ifUseSMPatchVersion_1_5 bool) ([]byte, error) {
 	// Serialize the current configuration of the object from the server.
 	current, err := runtime.Encode(p.encoder, obj)
 	if err != nil {
@@ -423,7 +423,7 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 	}
 
 	// Compute a three way strategic merge patch to send to server.
-	patch, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, versionedObject, p.overwrite, ifUseNewPatchBehavior)
+	patch, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, versionedObject, p.overwrite, ifUseSMPatchVersion_1_5)
 
 	if err != nil {
 		format := "creating patch with:\noriginal:\n%s\nmodified:\n%s\ncurrent:\n%s\nfor:"
@@ -434,9 +434,9 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 	return patch, err
 }
 
-func (p *patcher) patch(current runtime.Object, modified []byte, source, namespace, name string, ifUseNewPatchBehavior bool) ([]byte, error) {
+func (p *patcher) patch(current runtime.Object, modified []byte, source, namespace, name string, ifUseSMPatchVersion_1_5 bool) ([]byte, error) {
 	var getErr error
-	patchBytes, err := p.patchSimple(current, modified, source, namespace, name, ifUseNewPatchBehavior)
+	patchBytes, err := p.patchSimple(current, modified, source, namespace, name, ifUseSMPatchVersion_1_5)
 	for i := 1; i <= maxPatchRetry && errors.IsConflict(err); i++ {
 		if i > triesBeforeBackOff {
 			p.backOff.Sleep(backOffPeriod)
@@ -445,7 +445,7 @@ func (p *patcher) patch(current runtime.Object, modified []byte, source, namespa
 		if getErr != nil {
 			return nil, getErr
 		}
-		patchBytes, err = p.patchSimple(current, modified, source, namespace, name, ifUseNewPatchBehavior)
+		patchBytes, err = p.patchSimple(current, modified, source, namespace, name, ifUseSMPatchVersion_1_5)
 	}
 
 	return patchBytes, err

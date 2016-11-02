@@ -119,13 +119,18 @@ type Patch struct {
 
 // CalculatePatches calls the mutation function on each provided info object, and generates a strategic merge patch for
 // the changes in the object. Encoder must be able to encode the info into the appropriate destination type. If mutateFn
-// returns false, the object is not included in the final list of patches.
-func CalculatePatches(f cmdutil.Factory, infos []*resource.Info, encoder runtime.Encoder, mutateFn func(*resource.Info) (bool, error)) []*Patch {
+// returns false, the object is not included in the final list of patches. If local is false, it will contact the server to
+// check which StategicMergePatchVersion to use. Otherwise, it will default to SMPatchVersion_1_5.
+func CalculatePatches(f cmdutil.Factory, infos []*resource.Info, encoder runtime.Encoder, local bool, mutateFn func(*resource.Info) (bool, error)) []*Patch {
 	var patches []*Patch
 
-	ifUseNewPatchBehavior, err := cmdutil.TryToRunIfUseNewBehaviorForPatch(f)
-	if err != nil {
-		return patches
+	ifUseSMPatchVersion_1_5 := true
+	var err error
+	if !local {
+		ifUseSMPatchVersion_1_5, err = cmdutil.RunDoesServerSupportSMPatchVersion_1_5(f)
+		if err != nil {
+			return patches
+		}
 	}
 
 	for _, info := range infos {
@@ -162,7 +167,7 @@ func CalculatePatches(f cmdutil.Factory, infos []*resource.Info, encoder runtime
 			continue
 		}
 
-		patch.Patch, patch.Err = strategicpatch.CreateTwoWayMergePatch(patch.Before, patch.After, versioned, ifUseNewPatchBehavior)
+		patch.Patch, patch.Err = strategicpatch.CreateTwoWayMergePatch(patch.Before, patch.After, versioned, ifUseSMPatchVersion_1_5)
 	}
 	return patches
 }

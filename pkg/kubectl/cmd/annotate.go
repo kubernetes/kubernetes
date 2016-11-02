@@ -196,6 +196,14 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 		return err
 	}
 
+	ifUseSMPatchVersion_1_5 := true
+	if !o.local {
+		ifUseSMPatchVersion_1_5, err = cmdutil.RunDoesServerSupportSMPatchVersion_1_5(f)
+		if err != nil {
+			return err
+		}
+	}
+
 	var singularResource bool
 	r.IntoSingular(&singularResource)
 
@@ -205,11 +213,6 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 	// of resources when they are not passed in "resource/name" format.
 	if !singularResource && len(o.resourceVersion) > 0 {
 		return fmt.Errorf("--resource-version may only be used with a single resource")
-	}
-
-	ifUseNewPatchBehavior, err := cmdutil.TryToRunIfUseNewBehaviorForPatch(f)
-	if err != nil {
-		return err
 	}
 
 	return r.Visit(func(info *resource.Info, err error) error {
@@ -244,7 +247,7 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 			if err != nil {
 				return err
 			}
-			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj, ifUseNewPatchBehavior)
+			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj, ifUseSMPatchVersion_1_5)
 			createdPatch := err == nil
 			if err != nil {
 				glog.V(2).Infof("couldn't compute patch: %v", err)
