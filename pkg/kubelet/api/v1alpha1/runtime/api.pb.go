@@ -467,7 +467,7 @@ type SandboxSecurityContext struct {
 	// Optional SELinux context to be applied. Only for sandbox. Containers should
 	// confirm to SecurityContext.SelinuxOptions.
 	SelinuxOptions *SELinuxOption `protobuf:"bytes,2,opt,name=selinux_options,json=selinuxOptions" json:"selinux_options,omitempty"`
-	// The UID to run the entrypoint of the container process.
+	// The UID to run the entrypoint of the container process as.
 	// Defaults to user specified in image metadata if unspecified.
 	// Only for sandbox. Containers should confirm to SecurityContext.RunAsUser.
 	RunAsUser *int64 `protobuf:"varint,3,opt,name=run_as_user,json=runAsUser" json:"run_as_user,omitempty"`
@@ -1359,7 +1359,7 @@ type SecurityContext struct {
 	NamespaceOptions *NamespaceOption `protobuf:"bytes,3,opt,name=namespace_options,json=namespaceOptions" json:"namespace_options,omitempty"`
 	// Optional SELinux context to be applied.
 	SelinuxOptions *SELinuxOption `protobuf:"bytes,4,opt,name=selinux_options,json=selinuxOptions" json:"selinux_options,omitempty"`
-	// The UID to run the the container process.
+	// The UID to run the the container process as.
 	// Defaults to user specified in image metadata if unspecified.
 	RunAsUser *int64 `protobuf:"varint,5,opt,name=run_as_user,json=runAsUser" json:"run_as_user,omitempty"`
 	// Indicates that the container must run as a non-root user.

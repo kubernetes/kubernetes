@@ -150,17 +150,9 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 		// Note: ShmSize is handled in kube_docker_client.go
 
 		// Verify RunAsNonRoot.
-		if sc := lc.GetSecurityContext(); sc != nil && sc.RunAsNonRoot != nil {
-			if sc.RunAsUser != nil {
-				return "", fmt.Errorf("container's runAsUser breaks non-root policy")
-			}
-
-			imgRoot, err := ds.isImageRoot(image)
-			if err != nil {
-				return "", fmt.Errorf("can't tell if image runs as root: %v", err)
-			}
-			if imgRoot {
-				return "", fmt.Errorf("container has runAsNonRoot and image will run as root")
+		if lc.GetSecurityContext().GetRunAsNonRoot() {
+			if err := ds.verifyRunAsNonRoot(lc.GetSecurityContext().GetRunAsUser(), image); err != nil {
+				return "", err
 			}
 		}
 

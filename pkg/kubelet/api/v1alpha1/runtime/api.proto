@@ -141,7 +141,7 @@ message SandboxSecurityContext {
     // Optional SELinux context to be applied. Only for sandbox. Containers should
     // confirm to SecurityContext.SelinuxOptions.
     optional SELinuxOption selinux_options = 2;
-    // The UID to run the entrypoint of the container process.
+    // The UID to run the entrypoint of the container process as.
     // Defaults to user specified in image metadata if unspecified.
     // Only for sandbox. Containers should confirm to SecurityContext.RunAsUser.
     optional int64 run_as_user = 3;
@@ -154,7 +154,7 @@ message SandboxSecurityContext {
     // If set, the root filesystem of the container is read-only.
     optional bool readonly_rootfs = 5;
     // A list of groups applied to the first process run in the sandbox, in addition
-    // to the container's primary GID.  If unspecified, no groups will be added.
+    // to the sandbox's primary GID.  If unspecified, no groups will be added.
     repeated int64 supplemental_groups = 6;
     // A special supplemental group that applies to the sandbox.
     // Some volume types allow the Kubelet to change the ownership of that volume
@@ -439,7 +439,7 @@ message SecurityContext {
     optional NamespaceOption namespace_options = 3;
     // Optional SELinux context to be applied.
     optional SELinuxOption selinux_options = 4;
-    // The UID to run the the container process.
+    // The UID to run the the container process as.
     // Defaults to user specified in image metadata if unspecified.
     optional int64 run_as_user = 5;
     // Indicates that the container must run as a non-root user.

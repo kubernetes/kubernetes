@@ -18,11 +18,12 @@ package dockershim
 
 import (
 	"fmt"
-	"reflect"
 	"strconv"
 	"testing"
 
 	dockercontainer "github.com/docker/engine-api/types/container"
+	"github.com/stretchr/testify/assert"
+
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
@@ -53,9 +54,7 @@ func TestModifyContainerConfig(t *testing.T) {
 	for _, tc := range cases {
 		dockerCfg := &dockercontainer.Config{}
 		modifyContainerConfig(tc.sc, dockerCfg)
-		if e, a := tc.expected, dockerCfg; !reflect.DeepEqual(e, a) {
-			t.Errorf("%v: unexpected modification of docker config\nExpected:\n\n%#v\n\nGot:\n\n%#v", tc.name, e, a)
-		}
+		assert.Equal(t, tc.expected, dockerCfg, "[Test case %q]", tc.name)
 	}
 }
 
@@ -116,10 +115,7 @@ func TestModifyHostConfig(t *testing.T) {
 	for _, tc := range cases {
 		dockerCfg := &dockercontainer.HostConfig{}
 		modifyHostConfig(tc.sc, "", dockerCfg)
-
-		if e, a := tc.expected, dockerCfg; !reflect.DeepEqual(e, a) {
-			t.Errorf("%v: unexpected modification of host config\nExpected:\n\n%#v\n\nGot:\n\n%#v", tc.name, e, a)
-		}
+		assert.Equal(t, tc.expected, dockerCfg, "[Test case %q]", tc.name)
 	}
 }
 
@@ -162,9 +158,7 @@ func TestModifyHostConfigWithGroups(t *testing.T) {
 	for k, v := range testCases {
 		dockerCfg := &dockercontainer.HostConfig{}
 		modifyHostConfig(v.securityContext, "", dockerCfg)
-		if !reflect.DeepEqual(v.expected, dockerCfg) {
-			t.Errorf("unexpected modification of host config for %s.  Expected: %#v Got: %#v", k, v.expected, dockerCfg)
-		}
+		assert.Equal(t, v.expected, dockerCfg, "[Test case %q]", k)
 	}
 }
 
@@ -225,10 +219,7 @@ func TestModifyHostConfigWithSandboxID(t *testing.T) {
 	for _, tc := range cases {
 		dockerCfg := &dockercontainer.HostConfig{}
 		modifyHostConfig(tc.sc, sandboxID, dockerCfg)
-
-		if e, a := tc.expected, dockerCfg; !reflect.DeepEqual(e, a) {
-			t.Errorf("%v: unexpected modification of host config\nExpected:\n\n%#v\n\nGot:\n\n%#v", tc.name, e, a)
-		}
+		assert.Equal(t, tc.expected, dockerCfg, "[Test case %q]", tc.name)
 	}
 }
 
@@ -257,10 +248,8 @@ func TestModifySecurityOption(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		actual := modifySecurityOption(tc.config, tc.optName, tc.optVal)
-		if !reflect.DeepEqual(tc.expected, actual) {
-			t.Errorf("Failed to apply options correctly for tc: %s.  Expected: %v but got %v", tc.name, tc.expected, actual)
-		}
+		actual := modifySELinuxOption(tc.config, tc.optName, tc.optVal)
+		assert.Equal(t, tc.expected, actual, "[Test case %q]", tc.name)
 	}
 }
 
