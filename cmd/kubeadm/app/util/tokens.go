@@ -62,11 +62,10 @@ func GenerateToken(s *kubeadmapi.Secrets) error {
 
 func GenerateTokenIfNeeded(s *kubeadmapi.Secrets) error {
 	ok, err := UseGivenTokenIfValid(s)
-	// TODO(phase1+) @krousey: I know it won't happen with the way it is currently implemented, but this doesn't handle case where ok is true and err is non-nil.
+	if err != nil {
+		return err
+	}
 	if !ok {
-		if err != nil {
-			return err
-		}
 		err = GenerateToken(s)
 		if err != nil {
 			return err
