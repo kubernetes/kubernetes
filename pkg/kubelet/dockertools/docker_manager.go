@@ -1396,6 +1396,10 @@ func (dm *DockerManager) KillPod(pod *api.Pod, runningPod kubecontainer.Pod, gra
 
 // NOTE(random-liu): The pod passed in could be *nil* when kubelet restarted.
 func (dm *DockerManager) killPodWithSyncResult(pod *api.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) (result kubecontainer.PodSyncResult) {
+	// Short circuit if there's nothing to kill.
+	if len(runningPod.Containers) == 0 {
+		return
+	}
 	// Send the kills in parallel since they may take a long time.
 	// There may be len(runningPod.Containers) or len(runningPod.Containers)-1 of result in the channel
 	containerResults := make(chan *kubecontainer.SyncResult, len(runningPod.Containers))
