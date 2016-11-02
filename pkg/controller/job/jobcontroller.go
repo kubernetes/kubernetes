@@ -46,13 +46,6 @@ type JobController struct {
 	kubeClient clientset.Interface
 	podControl controller.PodControlInterface
 
-	// internalPodInformer is used to hold a personal informer.  If we're using
-	// a normal shared informer, then the informer will be started for us.  If
-	// we have a personal informer, we must start it ourselves.   If you start
-	// the controller using NewJobController(passing SharedInformer), this
-	// will be null
-	internalPodInformer cache.SharedInformer
-
 	// To allow injection of updateJobStatus for testing.
 	updateHandler func(job *batch.Job) error
 	syncHandler   func(jobKey string) error
@@ -135,10 +128,6 @@ func (jm *JobController) Run(workers int, stopCh <-chan struct{}) {
 
 	for i := 0; i < workers; i++ {
 		go wait.Until(jm.worker, time.Second, stopCh)
-	}
-
-	if jm.internalPodInformer != nil {
-		go jm.internalPodInformer.Run(stopCh)
 	}
 
 	<-stopCh

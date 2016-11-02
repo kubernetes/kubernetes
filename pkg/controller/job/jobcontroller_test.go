@@ -89,9 +89,7 @@ func getKey(job *batch.Job, t *testing.T) string {
 
 func newJobControllerFromClient(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc) (*JobController, informers.SharedInformerFactory) {
 	sharedInformers := informers.NewSharedInformerFactory(kubeClient, resyncPeriod())
-	podInformer := sharedInformers.Pods().Informer()
-	jm := NewJobController(podInformer, sharedInformers.Jobs(), kubeClient)
-	jm.internalPodInformer = podInformer
+	jm := NewJobController(sharedInformers.Pods().Informer(), sharedInformers.Jobs(), kubeClient)
 
 	return jm, sharedInformers
 }
@@ -713,7 +711,7 @@ func TestWatchPods(t *testing.T) {
 	// and make sure it hits the sync method for the right job.
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	go manager.internalPodInformer.Run(stopCh)
+	go sharedInformerFactory.Pods().Informer().Run(stopCh)
 	go wait.Until(manager.worker, 10*time.Millisecond, stopCh)
 
 	pods := newPodList(1, api.PodRunning, testJob)
