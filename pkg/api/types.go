@@ -2592,6 +2592,7 @@ type NodeAddressType string
 // These are valid address types of node. NodeLegacyHostIP is used to transit
 // from out-dated HostIP field to NodeAddress.
 const (
+	// Deprecated: NodeLegacyHostIP will be removed in 1.7.
 	NodeLegacyHostIP NodeAddressType = "LegacyHostIP"
 	NodeHostName     NodeAddressType = "Hostname"
 	NodeExternalIP   NodeAddressType = "ExternalIP"
