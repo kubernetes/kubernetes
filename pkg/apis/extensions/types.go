@@ -898,6 +898,7 @@ var (
 	VsphereVolume         FSType = "vsphereVolume"
 	Quobyte               FSType = "quobyte"
 	AzureDisk             FSType = "azureDisk"
+	PhotonPersistentDisk  FSType = "photonPersistentDisk"
 	All                   FSType = "*"
 )
 
