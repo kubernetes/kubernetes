@@ -75,7 +75,7 @@ func (a *APIInstaller) Install(ws *restful.WebService) (apiResources []unversion
 
 	// Register the paths in a deterministic (sorted) order to get a deterministic swagger spec.
 	paths := make([]string, len(a.group.Storage))
-	var i int = 0
+	var i int
 	for path := range a.group.Storage {
 		paths[i] = path
 		i++
