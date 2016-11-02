@@ -30,13 +30,23 @@
 		},
 		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/compute",
-			"Comment": "v3.0.0-beta",
-			"Rev": "2cdbb8553a20830507e4178b4d0803794136dde7"
+			"Comment": "v3.2.0-beta",
+			"Rev": "8316b9060f9c2443ba0864663245695d570a7fa2"
 		},
 		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/network",
-			"Comment": "v3.0.0-beta",
-			"Rev": "2cdbb8553a20830507e4178b4d0803794136dde7"
+			"Comment": "v3.2.0-beta",
+			"Rev": "8316b9060f9c2443ba0864663245695d570a7fa2"
+		},
+		{
+			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/storage",
+			"Comment": "v3.2.0-beta",
+			"Rev": "8316b9060f9c2443ba0864663245695d570a7fa2"
+		},
+		{
+			"ImportPath": "github.com/Azure/azure-sdk-for-go/storage",
+			"Comment": "v3.2.0-beta",
+			"Rev": "8316b9060f9c2443ba0864663245695d570a7fa2"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-ansiterm",
@@ -2070,6 +2080,10 @@
 			"ImportPath": "github.com/robfig/cron",
 			"Comment": "v1-40-g783cfcb",
 			"Rev": "783cfcb01fb00c48f740c9de79122bd410294149"
+		},
+		{
+			"ImportPath": "github.com/rubiojr/go-vhd/vhd",
+			"Rev": "0bfd3b39853cdde5762efda92289f14b0ac0491b"
 		},
 		{
 			"ImportPath": "github.com/russross/blackfriday",

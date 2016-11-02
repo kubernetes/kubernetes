@@ -770,6 +770,8 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 			printVsphereVolumeSource(pv.Spec.VsphereVolume, out)
 		case pv.Spec.Cinder != nil:
 			printCinderVolumeSource(pv.Spec.Cinder, out)
+		case pv.Spec.AzureDisk != nil:
+			printAzureDiskVolumeSource(pv.Spec.AzureDisk, out)
 		}
 
 		if events != nil {

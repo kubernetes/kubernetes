@@ -36,7 +36,13 @@ type VirtualNetworkGatewayConnectionsClient struct {
 // NewVirtualNetworkGatewayConnectionsClient creates an instance of the
 // VirtualNetworkGatewayConnectionsClient client.
 func NewVirtualNetworkGatewayConnectionsClient(subscriptionID string) VirtualNetworkGatewayConnectionsClient {
-	return VirtualNetworkGatewayConnectionsClient{New(subscriptionID)}
+	return NewVirtualNetworkGatewayConnectionsClientWithBaseURI(DefaultBaseURI, subscriptionID)
+}
+
+// NewVirtualNetworkGatewayConnectionsClientWithBaseURI creates an instance of
+// the VirtualNetworkGatewayConnectionsClient client.
+func NewVirtualNetworkGatewayConnectionsClientWithBaseURI(baseURI string, subscriptionID string) VirtualNetworkGatewayConnectionsClient {
+	return VirtualNetworkGatewayConnectionsClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
 // CreateOrUpdate the Put VirtualNetworkGatewayConnection operation
