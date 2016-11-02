@@ -244,15 +244,37 @@ var nonRoundTrippableTypes = sets.NewString(
 	"WatchEvent",
 )
 
-var commonKinds = []string{"ListOptions", "DeleteOptions"}
+var commonKinds = []string{"Status", "ListOptions", "DeleteOptions", "ExportOptions"}
 
-// verify all external group/versions have the common kinds like the ListOptions, DeleteOptions are registered.
+// verify all external group/versions have the common kinds registered.
 func TestCommonKindsRegistered(t *testing.T) {
 	for _, kind := range commonKinds {
 		for _, group := range testapi.Groups {
 			gv := group.GroupVersion()
-			if _, err := api.Scheme.New(gv.WithKind(kind)); err != nil {
+			gvk := gv.WithKind(kind)
+			obj, err := api.Scheme.New(gvk)
+			if err != nil {
 				t.Error(err)
+			}
+			defaults := gv.WithKind("")
+			if _, got, err := api.Codecs.LegacyCodec().Decode([]byte(`{"kind":"`+kind+`"}`), &defaults, nil); err != nil || gvk != *got {
+				t.Errorf("expected %v: %v %v", gvk, got, err)
+			}
+			data, err := runtime.Encode(api.Codecs.LegacyCodec(*gv), obj)
+			if err != nil {
+				t.Errorf("expected %v: %v\n%s", gvk, err, string(data))
+				continue
+			}
+			if !bytes.Contains(data, []byte(`"kind":"`+kind+`","apiVersion":"`+gv.String()+`"`)) {
+				if kind != "Status" {
+					t.Errorf("expected %v: %v\n%s", gvk, err, string(data))
+					continue
+				}
+				// TODO: this is wrong, but legacy clients expect it
+				if !bytes.Contains(data, []byte(`"kind":"`+kind+`","apiVersion":"v1"`)) {
+					t.Errorf("expected %v: %v\n%s", gvk, err, string(data))
+					continue
+				}
 			}
 		}
 	}
