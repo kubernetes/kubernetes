@@ -27,12 +27,14 @@ BUILD_TARGETS=(
   cmd/libs/go2idl/client-gen
   cmd/libs/go2idl/set-gen
   cmd/libs/go2idl/lister-gen
+  cmd/libs/go2idl/informer-gen
 )
 make -C "${KUBE_ROOT}" WHAT="${BUILD_TARGETS[*]}"
 
 clientgen=$(kube::util::find-binary "client-gen")
 setgen=$(kube::util::find-binary "set-gen")
 listergen=$(kube::util::find-binary "lister-gen")
+informergen=$(kube::util::find-binary "informer-gen")
 
 # Please do not add any logic to this shell script. Add logic to the go code
 # that generates the set-gen program.
@@ -78,5 +80,24 @@ LISTERGEN_APIS=(${LISTERGEN_APIS[@]/#/k8s.io/kubernetes/})
 LISTERGEN_APIS=$(IFS=,; echo "${LISTERGEN_APIS[*]}")
 
 ${listergen} --input-dirs "${LISTERGEN_APIS}" "$@"
+
+INFORMERGEN_APIS=(
+pkg/api
+pkg/api/v1
+$(
+  cd ${KUBE_ROOT}
+  # because client-gen doesn't do policy/v1alpha1, we have to skip it too
+  find pkg/apis -name types.go | xargs dirname | sort | grep -v pkg.apis.policy.v1alpha1
+)
+)
+
+INFORMERGEN_APIS=(${INFORMERGEN_APIS[@]/#/k8s.io/kubernetes/})
+INFORMERGEN_APIS=$(IFS=,; echo "${INFORMERGEN_APIS[*]}")
+${informergen} \
+  --input-dirs "${INFORMERGEN_APIS}" \
+  --versioned-clientset-package k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5 \
+  --internal-clientset-package k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset \
+  --listers-package k8s.io/kubernetes/pkg/client/listers \
+  "$@"
 
 # You may add additional calls of code generators like set-gen above.
