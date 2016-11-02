@@ -117,6 +117,11 @@ const annBoundByController = "pv.kubernetes.io/bound-by-controller"
 // recognize dynamically provisioned PVs in its decisions).
 const annDynamicallyProvisioned = "pv.kubernetes.io/provisioned-by"
 
+// This annotation is added to a PVC that is supposed to be dynamically
+// provisioned. Its value is name of volume plugin that is supposed to provision
+// a volume for this PVC.
+const annStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
+
 // Name of a tag attached to a real volume in cloud (e.g. AWS EBS or GCE PD)
 // with namespace of a persistent volume claim used to create this volume.
 const cloudVolumeCreatedForClaimNamespaceTag = "kubernetes.io/created-for/pvc/namespace"
@@ -1197,6 +1202,42 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 	claimClass := storageutil.GetClaimStorageClass(claim)
 	glog.V(4).Infof("provisionClaimOperation [%s] started, class: %q", claimToClaimKey(claim), claimClass)
 
+	plugin, storageClass, err := ctrl.findProvisionablePlugin(claim)
+	if err != nil {
+		ctrl.eventRecorder.Event(claim, api.EventTypeWarning, "ProvisioningFailed", err.Error())
+		glog.V(2).Infof("error finding provisioning plugin for claim %s: %v", claimToClaimKey(claim), err)
+		// The controller will retry provisioning the volume in every
+		// syncVolume() call.
+		return
+	}
+
+	if storageClass != nil {
+		// Add provisioner annotation so external provisioners know when to start
+		newClaim, err := ctrl.setClaimProvisioner(claim, storageClass)
+		if err != nil {
+			// Save failed, the controller will retry in the next sync
+			glog.V(2).Infof("error saving claim %s: %v", claimToClaimKey(claim), err)
+			return
+		}
+		claim = newClaim
+	}
+
+	if plugin == nil {
+		// findProvisionablePlugin returned no error nor plugin.
+		// This means that an unknown provisioner is requested. Report an event
+		// and wait for the external provisioner
+		if storageClass != nil {
+			msg := fmt.Sprintf("cannot find provisioner %q, expecting that a volume for the claim is provisioned either manually or via external software", storageClass.Provisioner)
+			ctrl.eventRecorder.Event(claim, api.EventTypeNormal, "ExternalProvisioning", msg)
+			glog.V(3).Infof("provisioning claim %q: %s", claimToClaimKey(claim), msg)
+		} else {
+			glog.V(3).Infof("cannot find storage class for claim %q", claimToClaimKey(claim))
+		}
+		return
+	}
+
+	// internal provisioning
+
 	//  A previous doProvisionClaim may just have finished while we were waiting for
 	//  the locks. Check that PV (with deterministic name) hasn't been provisioned
 	//  yet.
@@ -1214,28 +1255,6 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 	claimRef, err := api.GetReference(claim)
 	if err != nil {
 		glog.V(3).Infof("unexpected error getting claim reference: %v", err)
-		return
-	}
-
-	plugin, storageClass, err := ctrl.findProvisionablePlugin(claim)
-	if err != nil {
-		ctrl.eventRecorder.Event(claim, api.EventTypeWarning, "ProvisioningFailed", err.Error())
-		glog.V(2).Infof("error finding provisioning plugin for claim %s: %v", claimToClaimKey(claim), err)
-		// The controller will retry provisioning the volume in every
-		// syncVolume() call.
-		return
-	}
-	if plugin == nil {
-		// findProvisionablePlugin returned no error nor plugin.
-		// This means that an unknown provisioner is requested. Report an event
-		// and wait for the external provisioner
-		if storageClass != nil {
-			msg := fmt.Sprintf("cannot find provisioner %q, expecting that a volume for the claim is provisioned either manually or via external software", storageClass.Provisioner)
-			ctrl.eventRecorder.Event(claim, api.EventTypeNormal, "ExternalProvisioning", msg)
-			glog.V(3).Infof("provisioning claim %q: %s", claimToClaimKey(claim), msg)
-		} else {
-			glog.V(3).Infof("cannot find storage class for claim %q", claimToClaimKey(claim))
-		}
 		return
 	}
 
