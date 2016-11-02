@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/apis/authorization"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/certificates"
@@ -66,18 +67,19 @@ import (
 )
 
 var (
-	Groups       = make(map[string]TestGroup)
-	Default      TestGroup
-	Autoscaling  TestGroup
-	Batch        TestGroup
-	Extensions   TestGroup
-	Apps         TestGroup
-	Policy       TestGroup
-	Federation   TestGroup
-	Rbac         TestGroup
-	Certificates TestGroup
-	Storage      TestGroup
-	ImagePolicy  TestGroup
+	Groups        = make(map[string]TestGroup)
+	Default       TestGroup
+	Authorization TestGroup
+	Autoscaling   TestGroup
+	Batch         TestGroup
+	Extensions    TestGroup
+	Apps          TestGroup
+	Policy        TestGroup
+	Federation    TestGroup
+	Rbac          TestGroup
+	Certificates  TestGroup
+	Storage       TestGroup
+	ImagePolicy   TestGroup
 
 	serializer        runtime.SerializerInfo
 	storageSerializer runtime.SerializerInfo
@@ -258,6 +260,15 @@ func init() {
 			externalTypes:        api.Scheme.KnownTypes(externalGroupVersion),
 		}
 	}
+	if _, ok := Groups[authorization.GroupName]; !ok {
+		externalGroupVersion := unversioned.GroupVersion{Group: authorization.GroupName, Version: registered.GroupOrDie(authorization.GroupName).GroupVersion.Version}
+		Groups[authorization.GroupName] = TestGroup{
+			externalGroupVersion: externalGroupVersion,
+			internalGroupVersion: authorization.SchemeGroupVersion,
+			internalTypes:        api.Scheme.KnownTypes(authorization.SchemeGroupVersion),
+			externalTypes:        api.Scheme.KnownTypes(externalGroupVersion),
+		}
+	}
 	if _, ok := Groups[kubeadm.GroupName]; !ok {
 		externalGroupVersion := unversioned.GroupVersion{Group: kubeadm.GroupName, Version: registered.GroupOrDie(kubeadm.GroupName).GroupVersion.Version}
 		Groups[kubeadm.GroupName] = TestGroup{
@@ -279,6 +290,7 @@ func init() {
 	Rbac = Groups[rbac.GroupName]
 	Storage = Groups[storage.GroupName]
 	ImagePolicy = Groups[imagepolicy.GroupName]
+	Authorization = Groups[authorization.GroupName]
 }
 
 func (g TestGroup) ContentConfig() (string, *unversioned.GroupVersion, runtime.Codec) {
