@@ -44,7 +44,7 @@ var (
 	// DEPRECATED will be replace
 	DefaultClientConfig = DirectClientConfig{*clientcmdapi.NewConfig(), "", &ConfigOverrides{
 		ClusterDefaults: ClusterDefaults,
-	}, nil, NewDefaultClientConfigLoadingRules()}
+	}, nil, NewDefaultClientConfigLoadingRules(), PromptAuth{username: "", password: ""}}
 )
 
 // getDefaultServer returns a default setting for DefaultClientConfig
@@ -72,6 +72,11 @@ type ClientConfig interface {
 
 type PersistAuthProviderConfigForUser func(user string) restclient.AuthProviderConfigPersister
 
+type PromptAuth struct {
+	username string
+	password string
+}
+
 // DirectClientConfig is a ClientConfig interface that is backed by a clientcmdapi.Config, options overrides, and an optional fallbackReader for auth information
 type DirectClientConfig struct {
 	config         clientcmdapi.Config
@@ -79,21 +84,22 @@ type DirectClientConfig struct {
 	overrides      *ConfigOverrides
 	fallbackReader io.Reader
 	configAccess   ConfigAccess
+	auth           PromptAuth
 }
 
 // NewDefaultClientConfig creates a DirectClientConfig using the config.CurrentContext as the context name
 func NewDefaultClientConfig(config clientcmdapi.Config, overrides *ConfigOverrides) ClientConfig {
-	return &DirectClientConfig{config, config.CurrentContext, overrides, nil, NewDefaultClientConfigLoadingRules()}
+	return &DirectClientConfig{config, config.CurrentContext, overrides, nil, NewDefaultClientConfigLoadingRules(), PromptAuth{username: "", password: ""}}
 }
 
 // NewNonInteractiveClientConfig creates a DirectClientConfig using the passed context name and does not have a fallback reader for auth information
 func NewNonInteractiveClientConfig(config clientcmdapi.Config, contextName string, overrides *ConfigOverrides, configAccess ConfigAccess) ClientConfig {
-	return &DirectClientConfig{config, contextName, overrides, nil, configAccess}
+	return &DirectClientConfig{config, contextName, overrides, nil, configAccess, PromptAuth{username: "", password: ""}}
 }
 
 // NewInteractiveClientConfig creates a DirectClientConfig using the passed context name and a reader in case auth information is not provided via files or flags
 func NewInteractiveClientConfig(config clientcmdapi.Config, contextName string, overrides *ConfigOverrides, fallbackReader io.Reader, configAccess ConfigAccess) ClientConfig {
-	return &DirectClientConfig{config, contextName, overrides, fallbackReader, configAccess}
+	return &DirectClientConfig{config, contextName, overrides, fallbackReader, configAccess, PromptAuth{username: "", password: ""}}
 }
 
 func (config *DirectClientConfig) RawConfig() (clientcmdapi.Config, error) {
@@ -159,11 +165,23 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 			authInfoName, _ := config.getAuthInfoName()
 			persister = PersisterForUser(config.configAccess, authInfoName)
 		}
-		userAuthPartialConfig, err := getUserIdentificationPartialConfig(configAuthInfo, config.fallbackReader, persister)
-		if err != nil {
-			return nil, err
+
+		if len(config.auth.username) > 0 && len(config.auth.password) > 0 {
+			mergedConfig := &restclient.Config{}
+			mergedConfig.Username = config.auth.username
+			mergedConfig.Password = config.auth.password
+			mergo.Merge(clientConfig, mergedConfig)
+		} else {
+			userAuthPartialConfig, promptedAuth, err := getUserIdentificationPartialConfig(configAuthInfo, config.fallbackReader, persister)
+			if err != nil {
+				return nil, err
+			}
+			if promptedAuth {
+				config.auth.username = userAuthPartialConfig.Username
+				config.auth.password = userAuthPartialConfig.Password
+			}
+			mergo.Merge(clientConfig, userAuthPartialConfig)
 		}
-		mergo.Merge(clientConfig, userAuthPartialConfig)
 
 		serverAuthPartialConfig, err := getServerIdentificationPartialConfig(configAuthInfo, configClusterInfo)
 		if err != nil {
@@ -201,16 +219,17 @@ func getServerIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, 
 // 2.  configAuthInfo.auth-path (this file can contain information that conflicts with #1, and we want #1 to win the priority)
 // 3.  if there is not enough information to idenfity the user, load try the ~/.kubernetes_auth file
 // 4.  if there is not enough information to identify the user, prompt if possible
-func getUserIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, fallbackReader io.Reader, persistAuthConfig restclient.AuthProviderConfigPersister) (*restclient.Config, error) {
+func getUserIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, fallbackReader io.Reader, persistAuthConfig restclient.AuthProviderConfigPersister) (*restclient.Config, bool, error) {
 	mergedConfig := &restclient.Config{}
 
+	promptedAuth := false
 	// blindly overwrite existing values based on precedence
 	if len(configAuthInfo.Token) > 0 {
 		mergedConfig.BearerToken = configAuthInfo.Token
 	} else if len(configAuthInfo.TokenFile) > 0 {
 		tokenBytes, err := ioutil.ReadFile(configAuthInfo.TokenFile)
 		if err != nil {
-			return nil, err
+			return nil, promptedAuth, err
 		}
 		mergedConfig.BearerToken = string(tokenBytes)
 	}
@@ -237,8 +256,9 @@ func getUserIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, fa
 		prompter := NewPromptingAuthLoader(fallbackReader)
 		promptedAuthInfo, err := prompter.Prompt()
 		if err != nil {
-			return nil, err
+			return nil, promptedAuth, err
 		}
+		promptedAuth = true
 		promptedConfig := makeUserIdentificationConfig(*promptedAuthInfo)
 		previouslyMergedConfig := mergedConfig
 		mergedConfig = &restclient.Config{}
@@ -246,7 +266,7 @@ func getUserIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, fa
 		mergo.Merge(mergedConfig, previouslyMergedConfig)
 	}
 
-	return mergedConfig, nil
+	return mergedConfig, promptedAuth, nil
 }
 
 // makeUserIdentificationFieldsConfig returns a client.Config capable of being merged using mergo for only user identification information
