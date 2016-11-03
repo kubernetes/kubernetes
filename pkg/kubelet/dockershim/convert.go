@@ -57,11 +57,17 @@ func imageInspectToRuntimeAPIImage(image *dockertypes.ImageInspect) (*runtimeApi
 		return nil, fmt.Errorf("unable to convert a nil pointer to a runtime API image")
 	}
 
+	var err error
+	var uid int64
 	size := uint64(image.VirtualSize)
 	imageUid := dockertools.GetUidFromUser(image.Config.User)
-	uid, err := strconv.ParseInt(imageUid, 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("non-numeric user (%s)", imageUid)
+	// Convert image UID to int64 format. Not that it assumes the process in
+	// the image is running as root if image.Config.User is not set.
+	if imageUid != "" {
+		uid, err = strconv.ParseInt(imageUid, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("non-numeric user (%q)", imageUid)
+		}
 	}
 	return &runtimeApi.Image{
 		Id:          &image.ID,
@@ -70,7 +76,6 @@ func imageInspectToRuntimeAPIImage(image *dockertypes.ImageInspect) (*runtimeApi
 		Size_:       &size,
 		Uid:         &uid,
 	}, nil
-
 }
 
 func toPullableImageID(id string, image *dockertypes.ImageInspect) string {
