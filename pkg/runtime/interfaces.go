@@ -210,24 +210,6 @@ type ObjectCopier interface {
 	Copy(Object) (Object, error)
 }
 
-// ResourceVersioner provides methods for setting and retrieving
-// the resource version from an API object.
-type ResourceVersioner interface {
-	SetResourceVersion(obj Object, version string) error
-	ResourceVersion(obj Object) (string, error)
-}
-
-// SelfLinker provides methods for setting and retrieving the SelfLink field of an API object.
-type SelfLinker interface {
-	SetSelfLink(obj Object, selfLink string) error
-	SelfLink(obj Object) (string, error)
-
-	// Knowing Name is sometimes necessary to use a SelfLinker.
-	Name(obj Object) (string, error)
-	// Knowing Namespace is sometimes necessary to use a SelfLinker
-	Namespace(obj Object) (string, error)
-}
-
 // All API types registered with Scheme must support the Object interface. Since objects in a scheme are
 // expected to be serialized to the wire, the interface an Object must provide to the Scheme allows
 // serializers to set the kind, version, and group the object is represented as. An Object may choose

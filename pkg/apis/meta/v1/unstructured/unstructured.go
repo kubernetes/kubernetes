@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/meta/metatypes"
 	"k8s.io/kubernetes/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/json"
@@ -44,6 +45,8 @@ type Unstructured struct {
 	// children.
 	Object map[string]interface{}
 }
+
+var _ runtime.Object = &Unstructured{}
 
 func (obj *Unstructured) GetObjectKind() schema.ObjectKind     { return obj }
 func (obj *UnstructuredList) GetObjectKind() schema.ObjectKind { return obj }

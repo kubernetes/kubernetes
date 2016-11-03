@@ -20,29 +20,6 @@ import (
 	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
-// ListMetaAccessor retrieves the list interface from an object
-type ListMetaAccessor interface {
-	GetListMeta() List
-}
-
-// List lets you work with list metadata from any of the versioned or
-// internal API objects. Attempting to set or retrieve a field on an object that does
-// not support that field will be a no-op and return a default value.
-type List interface {
-	GetResourceVersion() string
-	SetResourceVersion(version string)
-	GetSelfLink() string
-	SetSelfLink(selfLink string)
-}
-
-// Type exposes the type and APIVersion of versioned or internal API objects.
-type Type interface {
-	GetAPIVersion() string
-	SetAPIVersion(version string)
-	GetKind() string
-	SetKind(kind string)
-}
-
 func (meta *ListMeta) GetResourceVersion() string        { return meta.ResourceVersion }
 func (meta *ListMeta) SetResourceVersion(version string) { meta.ResourceVersion = version }
 func (meta *ListMeta) GetSelfLink() string               { return meta.SelfLink }
@@ -60,4 +37,4 @@ func (obj *TypeMeta) GroupVersionKind() schema.GroupVersionKind {
 	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
 }
 
-func (obj *ListMeta) GetListMeta() List { return obj }
+func (obj *ListMeta) GetListMeta() ListAccessor { return obj }
