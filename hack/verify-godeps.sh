@@ -84,7 +84,8 @@ pushd "${_kubetmp}" 2>&1 > /dev/null
     popd > /dev/null
   }
   # Use to following if we ever need to pin godep to a specific version again
-  pin-godep 'v74'
+  pin-godep 'v73'
+  "${GODEP}" version
 
   # Fill out that nice clean place with the kube godeps
   echo "Starting to download all kubernetes godeps. This takes a while"
