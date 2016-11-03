@@ -4,6 +4,12 @@ git_repository(
     remote = "https://github.com/bazelbuild/rules_go.git",
 )
 
+git_repository(
+    name = "io_kubernetes_build",
+    commit = "863421b47a946ee6aeda946bc6c43e73ac67985d",
+    remote = "https://github.com/mikedanese/release.git",
+)
+
 load("@io_bazel_rules_go//go:def.bzl", "go_repositories")
 
 go_repositories()
@@ -37,3 +43,9 @@ debs = (
     sha256 = sha256,
     url = url,
 ) for name, sha256, url in debs]
+
+http_file(
+    name = "kubernetes_cni",
+    sha256 = "ddcb7a429f82b284a13bdb36313eeffd997753b6fa5191205f1e978dcfeb0792",
+    url = " https://storage.googleapis.com/kubernetes-release/network-plugins/cni-amd64-07a8a28637e97b22eb8dfe710eeae1344f69d16e.tar.gz",
+)
