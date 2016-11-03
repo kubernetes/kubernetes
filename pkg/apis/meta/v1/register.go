@@ -22,3 +22,22 @@ import (
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = schema.GroupVersion{Group: "meta.k8s.io", Version: "v1"}
+
+// AddToGroupVersion registers the watch external and internal kinds with the scheme, and ensures the proper
+// conversions are in place.
+func AddToGroupVersion(scheme *runtime.Scheme, groupVersion unversioned.GroupVersion) {
+	scheme.AddKnownTypeWithName(groupVersion.WithKind(WatchEventKind), &Event{})
+	scheme.AddKnownTypeWithName(
+		unversioned.GroupVersion{Group: groupVersion.Group, Version: runtime.APIVersionInternal}.WithKind(WatchEventKind),
+		&InternalEvent{},
+	)
+	scheme.AddConversionFuncs(
+		Convert_versioned_Event_to_watch_Event,
+		Convert_versioned_InternalEvent_to_versioned_Event,
+		Convert_watch_Event_to_versioned_Event,
+		Convert_versioned_Event_to_versioned_InternalEvent,
+	)
+}
+
+// WatchEventKind is name reserved for serializing watch events.
+const WatchEventKind = "WatchEvent"
