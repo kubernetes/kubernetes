@@ -1,7 +1,7 @@
 {
 	"ImportPath": "k8s.io/kubernetes",
 	"GoVersion": "go1.7",
-	"GodepVersion": "v74",
+	"GodepVersion": "v75",
 	"Packages": [
 		"github.com/ugorji/go/codec/codecgen",
 		"github.com/onsi/ginkgo/ginkgo",
@@ -20,32 +20,32 @@
 		},
 		{
 			"ImportPath": "cloud.google.com/go/compute/metadata",
-			"Comment": "v0.1.0-115-g3b1ae45",
-			"Rev": "3b1ae45394a234c385be014e9a488f2bb6eef821"
+			"Comment": "v0.4.0-8-g20998e5",
+			"Rev": "20998e5af6b27efa3573ca339e25b68cc8e7e974"
 		},
 		{
 			"ImportPath": "cloud.google.com/go/internal",
-			"Comment": "v0.1.0-115-g3b1ae45",
-			"Rev": "3b1ae45394a234c385be014e9a488f2bb6eef821"
+			"Comment": "v0.4.0-8-g20998e5",
+			"Rev": "20998e5af6b27efa3573ca339e25b68cc8e7e974"
 		},
 		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/compute",
-			"Comment": "v3.2.0-beta",
+			"Comment": "v3.1.0-beta-24-g8316b90",
 			"Rev": "8316b9060f9c2443ba0864663245695d570a7fa2"
 		},
 		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/network",
-			"Comment": "v3.2.0-beta",
+			"Comment": "v3.1.0-beta-24-g8316b90",
 			"Rev": "8316b9060f9c2443ba0864663245695d570a7fa2"
 		},
 		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/storage",
-			"Comment": "v3.2.0-beta",
+			"Comment": "v3.1.0-beta-24-g8316b90",
 			"Rev": "8316b9060f9c2443ba0864663245695d570a7fa2"
 		},
 		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/storage",
-			"Comment": "v3.2.0-beta",
+			"Comment": "v3.1.0-beta-24-g8316b90",
 			"Rev": "8316b9060f9c2443ba0864663245695d570a7fa2"
 		},
 		{
@@ -1424,14 +1424,17 @@
 		},
 		{
 			"ImportPath": "github.com/heketi/heketi/client/api/go-client",
+			"Comment": "v3.0.0-7-g28b5cc4",
 			"Rev": "28b5cc4cc6d2b9bdfa91ed1b93efaab4931aa697"
 		},
 		{
 			"ImportPath": "github.com/heketi/heketi/pkg/glusterfs/api",
+			"Comment": "v3.0.0-7-g28b5cc4",
 			"Rev": "28b5cc4cc6d2b9bdfa91ed1b93efaab4931aa697"
 		},
 		{
 			"ImportPath": "github.com/heketi/heketi/pkg/utils",
+			"Comment": "v3.0.0-7-g28b5cc4",
 			"Rev": "28b5cc4cc6d2b9bdfa91ed1b93efaab4931aa697"
 		},
 		{
