@@ -29,6 +29,7 @@ go_library(
         "secrets.go",
         "sysctl.go",
         "util.go",
+        "volumes.go",
     ],
     tags = ["automanaged"],
     deps = [
