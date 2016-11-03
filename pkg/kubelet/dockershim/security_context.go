@@ -21,14 +21,10 @@ import (
 	"strconv"
 
 	dockercontainer "github.com/docker/engine-api/types/container"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
-)
 
-const (
-	dockerLabelUser  string = "label:user"
-	dockerLabelRole  string = "label:role"
-	dockerLabelType  string = "label:type"
-	dockerLabelLevel string = "label:level"
+	"k8s.io/kubernetes/pkg/api"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
 // applySandboxSecurityContext updates docker sandbox options according to security context.
@@ -37,8 +33,24 @@ func applySandboxSecurityContext(lc *runtimeapi.LinuxPodSandboxConfig, config *d
 		return
 	}
 
-	modifySandboxContainerConfig(lc.SecurityContext, config)
-	modifySandboxHostConfig(lc.SecurityContext, hc)
+	var sc *runtimeapi.LinuxContainerSecurityContext
+	if lc.SecurityContext != nil {
+		sc = &runtimeapi.LinuxContainerSecurityContext{
+			// TODO: We skip application of supplemental groups to the
+			// sandbox container to work around a runc issue which
+			// requires containers to have the '/etc/group'. For more
+			// information see: https://github.com/opencontainers/runc/pull/313.
+			// This can be removed once the fix makes it into the required
+			// version of docker.
+			RunAsUser:        lc.SecurityContext.RunAsUser,
+			ReadonlyRootfs:   lc.SecurityContext.ReadonlyRootfs,
+			SelinuxOptions:   lc.SecurityContext.SelinuxOptions,
+			NamespaceOptions: lc.SecurityContext.NamespaceOptions,
+		}
+	}
+
+	modifyContainerConfig(sc, config)
+	modifyHostConfig(sc, "", hc)
 }
 
 // applyContainerSecurityContext updates docker container options according to security context.
@@ -52,40 +64,11 @@ func applyContainerSecurityContext(lc *runtimeapi.LinuxContainerConfig, sandboxI
 	return
 }
 
-// modifySandboxContainerConfig applies sandbox security context config to dockercontainer.Config.
-func modifySandboxContainerConfig(podSc *runtimeapi.LinuxSandboxSecurityContext, config *dockercontainer.Config) {
-	if podSc != nil {
-		modifyContainerConfig(&runtimeapi.LinuxContainerSecurityContext{
-			RunAsUser: podSc.RunAsUser,
-		}, config)
-	}
-}
-
 // modifyContainerConfig applies container security context config to dockercontainer.Config.
 func modifyContainerConfig(sc *runtimeapi.LinuxContainerSecurityContext, config *dockercontainer.Config) {
 	if sc != nil && sc.RunAsUser != nil {
 		config.User = strconv.FormatInt(sc.GetRunAsUser(), 10)
 	}
-}
-
-// modifySandboxHostConfig applies sandbox security context config to dockercontainer.HostConfig.
-func modifySandboxHostConfig(podSc *runtimeapi.LinuxSandboxSecurityContext, hc *dockercontainer.HostConfig) {
-	var sc *runtimeapi.LinuxContainerSecurityContext
-	if podSc != nil {
-		sc = &runtimeapi.LinuxContainerSecurityContext{
-			// TODO: We skip application of supplemental groups to the
-			// sandbox container to work around a runc issue which
-			// requires containers to have the '/etc/group'. For more
-			// information see: https://github.com/opencontainers/runc/pull/313.
-			// This can be removed once the fix makes it into the required
-			// version of docker.
-			ReadonlyRootfs:   podSc.ReadonlyRootfs,
-			SelinuxOptions:   podSc.SelinuxOptions,
-			NamespaceOptions: podSc.NamespaceOptions,
-		}
-	}
-
-	modifyHostConfig(sc, "", hc)
 }
 
 // modifyHostConfig applies security context config to dockercontainer.HostConfig.
@@ -114,10 +97,15 @@ func modifyHostConfig(sc *runtimeapi.LinuxContainerSecurityContext, sandboxID st
 		hostConfig.CapDrop = sc.GetCapabilities().GetDropCapabilities()
 	}
 	if sc.SelinuxOptions != nil {
-		hostConfig.SecurityOpt = modifySELinuxOption(hostConfig.SecurityOpt, dockerLabelUser, sc.SelinuxOptions.GetUser())
-		hostConfig.SecurityOpt = modifySELinuxOption(hostConfig.SecurityOpt, dockerLabelRole, sc.SelinuxOptions.GetRole())
-		hostConfig.SecurityOpt = modifySELinuxOption(hostConfig.SecurityOpt, dockerLabelType, sc.SelinuxOptions.GetType())
-		hostConfig.SecurityOpt = modifySELinuxOption(hostConfig.SecurityOpt, dockerLabelLevel, sc.SelinuxOptions.GetLevel())
+		hostConfig.SecurityOpt = securitycontext.ModifySecurityOptions(
+			hostConfig.SecurityOpt,
+			&api.SELinuxOptions{
+				User:  sc.SelinuxOptions.GetUser(),
+				Role:  sc.SelinuxOptions.GetRole(),
+				Type:  sc.SelinuxOptions.GetType(),
+				Level: sc.SelinuxOptions.GetLevel(),
+			},
+		)
 	}
 }
 
@@ -167,13 +155,4 @@ func modifyHostNetworkOptionForContainer(hostNetwork bool, sandboxID string, hc 
 	if hostNetwork {
 		hc.UTSMode = namespaceModeHost
 	}
-}
-
-// modifySELinuxOption adds the SELinux option of name to the config array with value in the form
-// of name:value
-func modifySELinuxOption(config []string, name, value string) []string {
-	if len(value) > 0 {
-		config = append(config, fmt.Sprintf("%s:%s", name, value))
-	}
-	return config
 }

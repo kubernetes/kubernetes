@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
 func TestModifyContainerConfig(t *testing.T) {
@@ -74,10 +75,10 @@ func TestModifyHostConfig(t *testing.T) {
 	setSELinuxHC := &dockercontainer.HostConfig{
 		NetworkMode: "none",
 		SecurityOpt: []string{
-			fmt.Sprintf("%s:%s", dockerLabelUser, "user"),
-			fmt.Sprintf("%s:%s", dockerLabelRole, "role"),
-			fmt.Sprintf("%s:%s", dockerLabelType, "type"),
-			fmt.Sprintf("%s:%s", dockerLabelLevel, "level"),
+			fmt.Sprintf("%s:%s", securitycontext.DockerLabelUser, "user"),
+			fmt.Sprintf("%s:%s", securitycontext.DockerLabelRole, "role"),
+			fmt.Sprintf("%s:%s", securitycontext.DockerLabelType, "type"),
+			fmt.Sprintf("%s:%s", securitycontext.DockerLabelLevel, "level"),
 		},
 	}
 
@@ -168,10 +169,10 @@ func TestModifyHostConfigWithSandboxID(t *testing.T) {
 	}
 	setSELinuxHC := &dockercontainer.HostConfig{
 		SecurityOpt: []string{
-			fmt.Sprintf("%s:%s", dockerLabelUser, "user"),
-			fmt.Sprintf("%s:%s", dockerLabelRole, "role"),
-			fmt.Sprintf("%s:%s", dockerLabelType, "type"),
-			fmt.Sprintf("%s:%s", dockerLabelLevel, "level"),
+			fmt.Sprintf("%s:%s", securitycontext.DockerLabelUser, "user"),
+			fmt.Sprintf("%s:%s", securitycontext.DockerLabelRole, "role"),
+			fmt.Sprintf("%s:%s", securitycontext.DockerLabelType, "type"),
+			fmt.Sprintf("%s:%s", securitycontext.DockerLabelLevel, "level"),
 		},
 		IpcMode:     dockercontainer.IpcMode(sandboxNSMode),
 		NetworkMode: dockercontainer.NetworkMode(sandboxNSMode),
@@ -207,36 +208,6 @@ func TestModifyHostConfigWithSandboxID(t *testing.T) {
 		dockerCfg := &dockercontainer.HostConfig{}
 		modifyHostConfig(tc.sc, sandboxID, dockerCfg)
 		assert.Equal(t, tc.expected, dockerCfg, "[Test case %q]", tc.name)
-	}
-}
-
-func TestModifySecurityOption(t *testing.T) {
-	testCases := []struct {
-		name     string
-		config   []string
-		optName  string
-		optVal   string
-		expected []string
-	}{
-		{
-			name:     "Empty val",
-			config:   []string{"a:b", "c:d"},
-			optName:  "optA",
-			optVal:   "",
-			expected: []string{"a:b", "c:d"},
-		},
-		{
-			name:     "Valid",
-			config:   []string{"a:b", "c:d"},
-			optName:  "e",
-			optVal:   "f",
-			expected: []string{"a:b", "c:d", "e:f"},
-		},
-	}
-
-	for _, tc := range testCases {
-		actual := modifySELinuxOption(tc.config, tc.optName, tc.optVal)
-		assert.Equal(t, tc.expected, actual, "[Test case %q]", tc.name)
 	}
 }
 
@@ -277,10 +248,10 @@ func fullValidHostConfig() *dockercontainer.HostConfig {
 		CapAdd:      []string{"addCapA", "addCapB"},
 		CapDrop:     []string{"dropCapA", "dropCapB"},
 		SecurityOpt: []string{
-			fmt.Sprintf("%s:%s", dockerLabelUser, "user"),
-			fmt.Sprintf("%s:%s", dockerLabelRole, "role"),
-			fmt.Sprintf("%s:%s", dockerLabelType, "type"),
-			fmt.Sprintf("%s:%s", dockerLabelLevel, "level"),
+			fmt.Sprintf("%s:%s", securitycontext.DockerLabelUser, "user"),
+			fmt.Sprintf("%s:%s", securitycontext.DockerLabelRole, "role"),
+			fmt.Sprintf("%s:%s", securitycontext.DockerLabelType, "type"),
+			fmt.Sprintf("%s:%s", securitycontext.DockerLabelLevel, "level"),
 		},
 	}
 }

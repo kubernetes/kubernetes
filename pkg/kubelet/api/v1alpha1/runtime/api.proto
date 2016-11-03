@@ -142,14 +142,11 @@ message LinuxSandboxSecurityContext {
     // The configurations for the sandbox's namespaces.
     // This will be used only if the PodSandbox uses namespace for isolation.
     optional NamespaceOption namespace_options = 1;
-    // Optional SELinux context to be applied. Only for sandbox. Containers should
-    // conform to SecurityContext.SelinuxOptions.
+    // Optional SELinux context to be applied.
     optional SELinuxOption selinux_options = 2;
-    // The UID to run the entrypoint of the container process as.
-    // Defaults to user specified in image metadata if unspecified.
-    // Only for sandbox. Containers should conform to SecurityContext.RunAsUser.
+    // The UID to run the entrypoint of the sandbox process.
     optional int64 run_as_user = 3;
-    // If set, the root filesystem of the container is read-only.
+    // If set, the root filesystem of the sandbox is read-only.
     optional bool readonly_rootfs = 4;
     // A list of groups applied to the first process run in the sandbox, in addition
     // to the sandbox's primary GID.

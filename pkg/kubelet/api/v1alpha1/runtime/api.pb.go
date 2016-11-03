@@ -468,14 +468,11 @@ type LinuxSandboxSecurityContext struct {
 	// The configurations for the sandbox's namespaces.
 	// This will be used only if the PodSandbox uses namespace for isolation.
 	NamespaceOptions *NamespaceOption `protobuf:"bytes,1,opt,name=namespace_options,json=namespaceOptions" json:"namespace_options,omitempty"`
-	// Optional SELinux context to be applied. Only for sandbox. Containers should
-	// conform to SecurityContext.SelinuxOptions.
+	// Optional SELinux context to be applied.
 	SelinuxOptions *SELinuxOption `protobuf:"bytes,2,opt,name=selinux_options,json=selinuxOptions" json:"selinux_options,omitempty"`
-	// The UID to run the entrypoint of the container process as.
-	// Defaults to user specified in image metadata if unspecified.
-	// Only for sandbox. Containers should conform to SecurityContext.RunAsUser.
+	// The UID to run the entrypoint of the sandbox process.
 	RunAsUser *int64 `protobuf:"varint,3,opt,name=run_as_user,json=runAsUser" json:"run_as_user,omitempty"`
-	// If set, the root filesystem of the container is read-only.
+	// If set, the root filesystem of the sandbox is read-only.
 	ReadonlyRootfs *bool `protobuf:"varint,4,opt,name=readonly_rootfs,json=readonlyRootfs" json:"readonly_rootfs,omitempty"`
 	// A list of groups applied to the first process run in the sandbox, in addition
 	// to the sandbox's primary GID.
