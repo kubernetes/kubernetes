@@ -794,7 +794,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 		},
 	}
 
-	checkNodeStatus := func(status api.ConditionStatus, reason, message string) {
+	checkNodeStatus := func(status api.ConditionStatus, reason string) {
 		kubeClient.ClearActions()
 		if err := kubelet.updateNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -827,11 +827,14 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 		if updatedNode.Status.Conditions[lastIndex].Type != api.NodeReady {
 			t.Errorf("unexpected node condition order. NodeReady should be last.")
 		}
+		if updatedNode.Status.Conditions[lastIndex].Message == "" {
+			t.Errorf("unexpected empty condition message")
+		}
+		updatedNode.Status.Conditions[lastIndex].Message = ""
 		expectedNode.Status.Conditions[lastIndex] = api.NodeCondition{
 			Type:               api.NodeReady,
 			Status:             status,
 			Reason:             reason,
-			Message:            message,
 			LastHeartbeatTime:  unversioned.Time{},
 			LastTransitionTime: unversioned.Time{},
 		}
@@ -840,23 +843,21 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 		}
 	}
 
-	readyMessage := "kubelet is posting ready status"
-	downMessage := "container runtime is down"
-
+	// TODO(random-liu): Refactor the unit test to be table driven test.
 	// Should report kubelet not ready if the runtime check is out of date
 	clock.SetTime(time.Now().Add(-maxWaitForContainerRuntime))
 	kubelet.updateRuntimeUp()
-	checkNodeStatus(api.ConditionFalse, "KubeletNotReady", downMessage)
+	checkNodeStatus(api.ConditionFalse, "KubeletNotReady")
 
 	// Should report kubelet ready if the runtime check is updated
 	clock.SetTime(time.Now())
 	kubelet.updateRuntimeUp()
-	checkNodeStatus(api.ConditionTrue, "KubeletReady", readyMessage)
+	checkNodeStatus(api.ConditionTrue, "KubeletReady")
 
 	// Should report kubelet not ready if the runtime check is out of date
 	clock.SetTime(time.Now().Add(-maxWaitForContainerRuntime))
 	kubelet.updateRuntimeUp()
-	checkNodeStatus(api.ConditionFalse, "KubeletNotReady", downMessage)
+	checkNodeStatus(api.ConditionFalse, "KubeletNotReady")
 
 	// Should report kubelet not ready if the runtime check failed
 	fakeRuntime := testKubelet.fakeRuntime
@@ -864,7 +865,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 	fakeRuntime.StatusErr = fmt.Errorf("injected runtime status error")
 	clock.SetTime(time.Now())
 	kubelet.updateRuntimeUp()
-	checkNodeStatus(api.ConditionFalse, "KubeletNotReady", downMessage)
+	checkNodeStatus(api.ConditionFalse, "KubeletNotReady")
 
 	// Test cri integration.
 	kubelet.kubeletConfiguration.ExperimentalRuntimeIntegrationType = "cri"
@@ -873,30 +874,42 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 	// Should report node not ready if runtime status is nil.
 	fakeRuntime.RuntimeStatus = nil
 	kubelet.updateRuntimeUp()
-	checkNodeStatus(api.ConditionFalse, "KubeletNotReady", downMessage)
+	checkNodeStatus(api.ConditionFalse, "KubeletNotReady")
 
 	// Should report node not ready if runtime status is empty.
 	fakeRuntime.RuntimeStatus = &kubecontainer.RuntimeStatus{}
 	kubelet.updateRuntimeUp()
-	checkNodeStatus(api.ConditionFalse, "KubeletNotReady", downMessage)
+	checkNodeStatus(api.ConditionFalse, "KubeletNotReady")
 
 	// Should report node not ready if RuntimeReady is false.
 	fakeRuntime.RuntimeStatus = &kubecontainer.RuntimeStatus{
 		Conditions: []kubecontainer.RuntimeCondition{
 			{Type: kubecontainer.RuntimeReady, Status: false},
+			{Type: kubecontainer.NetworkReady, Status: true},
 		},
 	}
 	kubelet.updateRuntimeUp()
-	checkNodeStatus(api.ConditionFalse, "KubeletNotReady", downMessage)
+	checkNodeStatus(api.ConditionFalse, "KubeletNotReady")
 
 	// Should report node ready if RuntimeReady is true.
 	fakeRuntime.RuntimeStatus = &kubecontainer.RuntimeStatus{
 		Conditions: []kubecontainer.RuntimeCondition{
 			{Type: kubecontainer.RuntimeReady, Status: true},
+			{Type: kubecontainer.NetworkReady, Status: true},
 		},
 	}
 	kubelet.updateRuntimeUp()
-	checkNodeStatus(api.ConditionTrue, "KubeletReady", readyMessage)
+	checkNodeStatus(api.ConditionTrue, "KubeletReady")
+
+	// Should report node not ready if NetworkReady is false.
+	fakeRuntime.RuntimeStatus = &kubecontainer.RuntimeStatus{
+		Conditions: []kubecontainer.RuntimeCondition{
+			{Type: kubecontainer.RuntimeReady, Status: true},
+			{Type: kubecontainer.NetworkReady, Status: false},
+		},
+	}
+	kubelet.updateRuntimeUp()
+	checkNodeStatus(api.ConditionFalse, "KubeletNotReady")
 }
 
 func TestUpdateNodeStatusError(t *testing.T) {

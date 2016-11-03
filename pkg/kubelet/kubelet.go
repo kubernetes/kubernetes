@@ -1951,21 +1951,27 @@ func (kl *Kubelet) updateRuntimeUp() {
 	}
 	// Only check specific conditions when runtime integration type is cri,
 	// because the old integration doesn't populate any runtime condition.
-	// TODO(random-liu): Add runtime error in runtimeState, and update it
-	// when when runtime is not ready, so that the information in RuntimeReady
-	// condition will be propagated to NodeReady condition.
-	// TODO(random-liu): Update network state according to NetworkReady runtime
-	// condition once it is implemented in dockershim.
 	if kl.kubeletConfiguration.ExperimentalRuntimeIntegrationType == "cri" {
 		if s == nil {
 			glog.Errorf("Container runtime status is nil")
 			return
 		}
-		runtimeReady := s.GetRuntimeCondition(kubecontainer.RuntimeReady)
 		// Periodically log the whole runtime status for debugging.
 		// TODO(random-liu): Consider to send node event when optional
 		// condition is unmet.
 		glog.V(4).Infof("Container runtime status: %v", s)
+		networkReady := s.GetRuntimeCondition(kubecontainer.NetworkReady)
+		if networkReady == nil || !networkReady.Status {
+			glog.Errorf("Container runtime network not ready: %v", networkReady)
+			kl.runtimeState.setNetworkState(fmt.Errorf("runtime network not ready: %v", networkReady))
+		} else {
+			// Set nil if the containe runtime network is ready.
+			kl.runtimeState.setNetworkState(nil)
+		}
+		// TODO(random-liu): Add runtime error in runtimeState, and update it
+		// when runtime is not ready, so that the information in RuntimeReady
+		// condition will be propagated to NodeReady condition.
+		runtimeReady := s.GetRuntimeCondition(kubecontainer.RuntimeReady)
 		// If RuntimeReady is not set or is false, report an error.
 		if runtimeReady == nil || !runtimeReady.Status {
 			glog.Errorf("Container runtime not ready: %v", runtimeReady)

@@ -76,4 +76,16 @@ func TestStatus(t *testing.T) {
 		runtimeApi.RuntimeReady: false,
 		runtimeApi.NetworkReady: true,
 	}, status)
+
+	// Should not report ready status is network plugin returns error.
+	mockPlugin := newTestNetworkPlugin(t)
+	ds.networkPlugin = mockPlugin
+	defer mockPlugin.Finish()
+	mockPlugin.EXPECT().Status().Return(errors.New("network error"))
+	status, err = ds.Status()
+	assert.NoError(t, err)
+	assertStatus(map[string]bool{
+		runtimeApi.RuntimeReady: true,
+		runtimeApi.NetworkReady: false,
+	}, status)
 }
