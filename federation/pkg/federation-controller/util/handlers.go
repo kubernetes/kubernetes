@@ -71,6 +71,7 @@ func NewTriggerOnMetaAndSpecChanges(triggerFunc func(pkgruntime.Object)) *cache.
 			oldMeta := getFieldOrPanic(old, "ObjectMeta").(metav1.ObjectMeta)
 			curMeta := getFieldOrPanic(cur, "ObjectMeta").(metav1.ObjectMeta)
 			if !ObjectMetaEquivalent(oldMeta, curMeta) ||
+				!reflect.DeepEqual(oldMeta.DeletionTimestamp, curMeta.DeletionTimestamp) ||
 				!reflect.DeepEqual(getFieldOrPanic(old, "Spec"), getFieldOrPanic(cur, "Spec")) {
 				triggerFunc(curObj)
 			}
