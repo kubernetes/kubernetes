@@ -222,17 +222,11 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		cmdArgs = append(cmdArgs, "--container-runtime-endpoint", framework.TestContext.ContainerRuntimeEndpoint)
 	}
 	if framework.TestContext.CgroupsPerQOS {
-		cmdArgs = append(cmdArgs,
-			"--cgroups-per-qos", "true",
-			"--cgroup-root", "/",
-		)
+		// TODO: enable this when the flag is stable and available in kubelet.
+		// cmdArgs = append(cmdArgs,
+		// 	"--cgroups-per-qos", "true",
+		// )
 	}
-	if framework.TestContext.CgroupDriver != "" {
-		cmdArgs = append(cmdArgs,
-			"--cgroup-driver", framework.TestContext.CgroupDriver,
-		)
-	}
-
 	if !framework.TestContext.DisableKubenet {
 		cwd, err := os.Getwd()
 		if err != nil {

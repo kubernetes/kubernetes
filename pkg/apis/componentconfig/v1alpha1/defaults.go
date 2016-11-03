@@ -368,22 +368,12 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		temp := int32(defaultIPTablesDropBit)
 		obj.IPTablesDropBit = &temp
 	}
-	if obj.CgroupsPerQOS == nil {
-		temp := false
-		obj.CgroupsPerQOS = &temp
-	}
 	if obj.CgroupDriver == "" {
 		obj.CgroupDriver = "cgroupfs"
 	}
-	// NOTE: this is for backwards compatibility with earlier releases where cgroup-root was optional.
-	// if cgroups per qos is not enabled, and cgroup-root is not specified, we need to default to the
-	// container runtime default and not default to the root cgroup.
-	if obj.CgroupsPerQOS != nil {
-		if *obj.CgroupsPerQOS {
-			if obj.CgroupRoot == "" {
-				obj.CgroupRoot = "/"
-			}
-		}
+	if obj.CgroupsPerQOS == nil {
+		temp := false
+		obj.CgroupsPerQOS = &temp
 	}
 }
 
