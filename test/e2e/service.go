@@ -481,6 +481,85 @@ var _ = framework.KubeDescribe("Services", func() {
 		}
 	})
 
+	It("should reject ClusterIP type service that has no endpoints", func() {
+		serviceName := "clusterip-reject-test"
+		ns := f.Namespace.Name
+
+		By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns)
+		jig := NewServiceTestJig(cs, serviceName)
+		servicePort := 8080
+		tcpService := jig.CreateTCPServiceWithPort(ns, nil, int32(servicePort))
+		jig.SanityCheckService(tcpService, api.ServiceTypeClusterIP)
+		defer func() {
+			framework.Logf("Cleaning up the clusterip test service")
+			err := cs.Core().Services(ns).Delete(serviceName, nil)
+			Expect(err).NotTo(HaveOccurred())
+		}()
+		serviceIp := tcpService.Spec.ClusterIP
+		framework.Logf("clusterip-reject-test cluster ip: %s", serviceIp)
+		// no endpoints
+
+		hosts, err := framework.NodeSSHHosts(cs)
+		Expect(err).NotTo(HaveOccurred())
+		if len(hosts) == 0 {
+			framework.Failf("No ssh-able nodes")
+		}
+		host := hosts[0]
+
+		By("verifying REJECT in iptables nat table")
+		cmd := fmt.Sprintf(`iptables-save -t filter | grep REJECT | grep '\s--dport %d\s' | grep '\s-d %s/32\s'`, servicePort, serviceIp)
+		result, err := framework.SSH(cmd, host, framework.TestContext.Provider)
+		if err != nil || result.Code != 0 {
+			framework.LogSSHResult(result)
+			framework.Failf("couldn't find REJECT in iptables filter table: %v", err)
+		}
+	})
+
+	It("should reject NodePort type service that has no endpoints", func() {
+		serviceName := "nodeport-reject-test"
+		ns := f.Namespace.Name
+
+		By("creating service " + serviceName + " with type=NodePort in namespace " + ns)
+		jig := NewServiceTestJig(cs, serviceName)
+		service := jig.CreateTCPServiceOrFail(ns, func(svc *api.Service) {
+			svc.Spec.Type = api.ServiceTypeNodePort
+		})
+		jig.SanityCheckService(service, api.ServiceTypeNodePort)
+		defer func() {
+			framework.Logf("Cleaning up the nodeport reject test service")
+			err := cs.Core().Services(ns).Delete(serviceName, nil)
+			Expect(err).NotTo(HaveOccurred())
+		}()
+		nodePort := int(service.Spec.Ports[0].NodePort)
+		framework.Logf("nodeport-reject-test node port: %s", nodePort)
+		// no endpoints
+
+		hosts, err := framework.NodeSSHHosts(cs)
+		Expect(err).NotTo(HaveOccurred())
+		if len(hosts) == 0 {
+			framework.Failf("No ssh-able nodes")
+		}
+		host := hosts[0]
+
+		By("verifying REJECT in iptables nat table")
+		cmd := fmt.Sprintf(`iptables-save -t filter | grep REJECT | grep '\s--dport %d\s'`, nodePort)
+		result, err := framework.SSH(cmd, host, framework.TestContext.Provider)
+		if err != nil || result.Code != 0 {
+			framework.LogSSHResult(result)
+			framework.Failf("couldn't find REJECT in iptables filter table: %v", err)
+		}
+
+		By("verifying the node port is locked even if service has no endpoints")
+		// Even if NodePort type service has no endpoints, we should hold the node port open.
+		// We don't want someone coming along later thinking they can use it.
+		cmd = fmt.Sprintf(`for i in $(seq 1 300); do if ss -ant46 'sport = :%d' | grep ^LISTEN; then exit 0; fi; sleep 1; done; exit 1`, nodePort)
+		result, err = framework.SSH(cmd, host, framework.TestContext.Provider)
+		if err != nil || result.Code != 0 {
+			framework.LogSSHResult(result)
+			framework.Failf("expected node port %d to be in use, err: %v", nodePort, err)
+		}
+	})
+
 	It("should be able to change the type and ports of a service [Slow]", func() {
 		// requires cloud load-balancer support
 		framework.SkipUnlessProviderIs("gce", "gke", "aws")

@@ -100,7 +100,7 @@ func getToken(line, seperator string) string {
 	return ""
 }
 
-// GetChain returns a list of rules for the givne chain.
+// GetChain returns a list of rules for the given chain.
 // The chain name must match exactly.
 // The matching is pretty dumb, don't rely on it for anything but testing.
 func (f *FakeIPTables) GetRules(chainName string) (rules []Rule) {

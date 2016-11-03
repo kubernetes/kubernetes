@@ -1065,6 +1065,8 @@ func (proxier *Proxier) syncProxyRules() {
 		if svcInfo.nodePort != 0 {
 			// Hold the local port open so no other process can open it
 			// (because the socket might open but it would never work).
+			// Even if NodePort type service don't have any endpoints, we should hold the
+			// port open as we don't want someone coming along later thinking they can use it.
 			lp := localPort{
 				desc:     "nodePort for " + svcName.String(),
 				ip:       "",
@@ -1082,22 +1084,33 @@ func (proxier *Proxier) syncProxyRules() {
 				}
 				replacementPortsMap[lp] = socket
 			} // We're holding the port, so it's OK to install iptables rules.
-
-			args := []string{
-				"-A", string(kubeNodePortsChain),
-				"-m", "comment", "--comment", svcName.String(),
-				"-m", protocol, "-p", protocol,
-				"--dport", fmt.Sprintf("%d", svcInfo.nodePort),
-			}
-			if !svcInfo.onlyNodeLocalEndpoints {
-				// Nodeports need SNAT, unless they're local.
-				writeLine(natRules, append(args, "-j", string(KubeMarkMasqChain))...)
-				// Jump to the service chain.
-				writeLine(natRules, append(args, "-j", string(svcChain))...)
+			if len(proxier.endpointsMap[svcName]) != 0 {
+				args := []string{
+					"-A", string(kubeNodePortsChain),
+					"-m", "comment", "--comment", svcName.String(),
+					"-m", protocol, "-p", protocol,
+					"--dport", fmt.Sprintf("%d", svcInfo.nodePort),
+				}
+				if !svcInfo.onlyNodeLocalEndpoints {
+					// Nodeports need SNAT, unless they're local.
+					writeLine(natRules, append(args, "-j", string(KubeMarkMasqChain))...)
+					// Jump to the service chain.
+					writeLine(natRules, append(args, "-j", string(svcChain))...)
+				} else {
+					// TODO: Make all nodePorts jump to the firewall chain.
+					// Currently we only create it for loadbalancers (#33586).
+					writeLine(natRules, append(args, "-j", string(svcXlbChain))...)
+				}
 			} else {
-				// TODO: Make all nodePorts jump to the firewall chain.
-				// Currently we only create it for loadbalancers (#33586).
-				writeLine(natRules, append(args, "-j", string(svcXlbChain))...)
+				// If the NodePort type service has no endpoints then reject packets.
+				glog.V(2).Infof("Reject NodePort type service %s has no endpoints", svcName.String())
+				writeLine(filterRules,
+					"-A", string(kubeServicesChain),
+					"-m", "comment", "--comment", fmt.Sprintf(`"NodePort type service %s has no endpoints"`, svcName.String()),
+					"-m", protocol, "-p", protocol,
+					"--dport", fmt.Sprintf("%d", svcInfo.nodePort),
+					"-j", "REJECT",
+				)
 			}
 		}
 

@@ -408,6 +408,8 @@ Services should create endpoints for unready pods,maisem,0
 Services should preserve source pod IP for traffic thru service cluster IP,Random-Liu,1
 Services should prevent NodePort collisions,bprashanth,0
 Services should provide secure master service,bprashanth,0
+Services should reject ClusterIP type service that has no endpoints,m1093782566,0
+Services should reject NodePort type service that has no endpoints,m1093782566,0
 Services should release NodePorts on delete,bprashanth,0
 Services should serve a basic endpoint from pods,bprashanth,0
 Services should serve multiport endpoints from pods,bprashanth,0
