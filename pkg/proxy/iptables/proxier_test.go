@@ -688,6 +688,36 @@ func TestClusterIPReject(t *testing.T) {
 	}
 }
 
+func TestNodePortReject(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	fp := NewFakeProxier(ipt)
+	svcName := "svc1"
+	svcIP := net.IPv4(10, 20, 30, 41)
+
+	svc := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "ns1", Name: svcName}, Port: "80"}
+	svcInfo := newFakeServiceInfo(svc, svcIP, 80, api.ProtocolTCP, false)
+	svcInfo.nodePort = 3001
+	fp.serviceMap[svc] = svcInfo
+	// no endpoints for svc1
+
+	fp.syncProxyRules()
+
+	proto := strings.ToLower(string(api.ProtocolTCP))
+	svcChain := string(servicePortChainName(svc, strings.ToLower(proto)))
+
+	svcRules := ipt.GetRules(svcChain)
+	if len(svcRules) != 0 {
+		errorf(fmt.Sprintf("Unexpected rule for chain %v service %v without endpoints", svcChain, svcName), svcRules, t)
+	}
+	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
+	if !hasJump(kubeSvcRules, iptablestest.Reject, svcIP.String(), "80") {
+		errorf(fmt.Sprintf("Failed to find a %v rule for service %v with no endpoints", iptablestest.Reject, svcName), kubeSvcRules, t)
+	}
+	if !hasJump(kubeSvcRules, iptablestest.Reject, "", "3001") {
+		errorf(fmt.Sprintf("Failed to find a %v rule for service %v with no endpoints", iptablestest.Reject, svcName), kubeSvcRules, t)
+	}
+}
+
 func TestClusterIPEndpointsJump(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
@@ -745,7 +775,6 @@ func TestLoadBalancer(t *testing.T) {
 	proto := strings.ToLower(string(api.ProtocolTCP))
 	fwChain := string(serviceFirewallChainName(svc, proto))
 	svcChain := string(servicePortChainName(svc, strings.ToLower(string(api.ProtocolTCP))))
-	//lbChain := string(serviceLBChainName(svc, proto))
 
 	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
 	if !hasJump(kubeSvcRules, fwChain, svcInfo.loadBalancerStatus.Ingress[0].IP, "80") {
