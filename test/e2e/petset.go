@@ -67,7 +67,7 @@ const (
 // GCE Api requirements: nodes and master need storage r/w permissions.
 var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 	options := framework.FrameworkOptions{
-		GroupVersion: &unversioned.GroupVersion{Group: apps.GroupName, Version: "v1alpha1"},
+		GroupVersion: &unversioned.GroupVersion{Group: apps.GroupName, Version: "v1beta1"},
 	}
 	f := framework.NewFramework("petset", options, nil)
 	var ns string
@@ -79,7 +79,7 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 		// In theory, tests that restart pets should pass on any platform with a
 		// dynamic volume provisioner.
 		if !framework.ProviderIs("gce") {
-			framework.SkipIfMissingResource(f.ClientPool, unversioned.GroupVersionResource{Group: apps.GroupName, Version: "v1alpha1", Resource: "statefulsets"}, f.Namespace.Name)
+			framework.SkipIfMissingResource(f.ClientPool, unversioned.GroupVersionResource{Group: apps.GroupName, Version: "v1beta1", Resource: "statefulsets"}, f.Namespace.Name)
 		}
 
 		c = f.ClientSet

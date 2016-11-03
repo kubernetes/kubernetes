@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 import (
 	fmt "fmt"
@@ -25,22 +25,22 @@ import (
 	serializer "k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
-type AppsV1alpha1Interface interface {
+type AppsV1beta1Interface interface {
 	RESTClient() restclient.Interface
 	StatefulSetsGetter
 }
 
-// AppsV1alpha1Client is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
-type AppsV1alpha1Client struct {
+// AppsV1beta1Client is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
+type AppsV1beta1Client struct {
 	restClient restclient.Interface
 }
 
-func (c *AppsV1alpha1Client) StatefulSets(namespace string) StatefulSetInterface {
+func (c *AppsV1beta1Client) StatefulSets(namespace string) StatefulSetInterface {
 	return newStatefulSets(c, namespace)
 }
 
-// NewForConfig creates a new AppsV1alpha1Client for the given config.
-func NewForConfig(c *restclient.Config) (*AppsV1alpha1Client, error) {
+// NewForConfig creates a new AppsV1beta1Client for the given config.
+func NewForConfig(c *restclient.Config) (*AppsV1beta1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -49,12 +49,12 @@ func NewForConfig(c *restclient.Config) (*AppsV1alpha1Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &AppsV1alpha1Client{client}, nil
+	return &AppsV1beta1Client{client}, nil
 }
 
-// NewForConfigOrDie creates a new AppsV1alpha1Client for the given config and
+// NewForConfigOrDie creates a new AppsV1beta1Client for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *restclient.Config) *AppsV1alpha1Client {
+func NewForConfigOrDie(c *restclient.Config) *AppsV1beta1Client {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -62,19 +62,19 @@ func NewForConfigOrDie(c *restclient.Config) *AppsV1alpha1Client {
 	return client
 }
 
-// New creates a new AppsV1alpha1Client for the given RESTClient.
-func New(c restclient.Interface) *AppsV1alpha1Client {
-	return &AppsV1alpha1Client{c}
+// New creates a new AppsV1beta1Client for the given RESTClient.
+func New(c restclient.Interface) *AppsV1beta1Client {
+	return &AppsV1beta1Client{c}
 }
 
 func setConfigDefaults(config *restclient.Config) error {
-	gv, err := unversioned.ParseGroupVersion("apps/v1alpha1")
+	gv, err := unversioned.ParseGroupVersion("apps/v1beta1")
 	if err != nil {
 		return err
 	}
-	// if apps/v1alpha1 is not enabled, return an error
+	// if apps/v1beta1 is not enabled, return an error
 	if !registered.IsEnabledVersion(gv) {
-		return fmt.Errorf("apps/v1alpha1 is not enabled")
+		return fmt.Errorf("apps/v1beta1 is not enabled")
 	}
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
@@ -90,7 +90,7 @@ func setConfigDefaults(config *restclient.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *AppsV1alpha1Client) RESTClient() restclient.Interface {
+func (c *AppsV1beta1Client) RESTClient() restclient.Interface {
 	if c == nil {
 		return nil
 	}

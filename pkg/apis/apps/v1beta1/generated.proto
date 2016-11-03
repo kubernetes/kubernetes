@@ -19,7 +19,7 @@ limitations under the License.
 
 syntax = 'proto2';
 
-package k8s.io.kubernetes.pkg.apis.apps.v1alpha1;
+package k8s.io.kubernetes.pkg.apis.apps.v1beta1;
 
 import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
 import "k8s.io/kubernetes/pkg/api/unversioned/generated.proto";
@@ -28,15 +28,14 @@ import "k8s.io/kubernetes/pkg/runtime/generated.proto";
 import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1alpha1";
+option go_package = "v1beta1";
 
 // StatefulSet represents a set of pods with consistent identities.
 // Identities are defined as:
 //  - Network: A single stable DNS and hostname.
 //  - Storage: As many VolumeClaims as requested.
 // The StatefulSet guarantees that a given network identity will always
-// map to the same storage identity. StatefulSet is currently in alpha
-// and subject to change without notice.
+// map to the same storage identity.
 message StatefulSet {
   // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;

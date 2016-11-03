@@ -22,8 +22,8 @@
     "description": "get available API versions"
    },
    {
-    "path": "/apis/apps/v1alpha1",
-    "description": "API at /apis/apps/v1alpha1"
+    "path": "/apis/apps/v1beta1",
+    "description": "API at /apis/apps/v1beta1"
    },
    {
     "path": "/apis/apps",

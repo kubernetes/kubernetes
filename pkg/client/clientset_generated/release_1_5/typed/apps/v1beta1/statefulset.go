@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	v1alpha1 "k8s.io/kubernetes/pkg/apis/apps/v1alpha1"
+	v1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -32,15 +32,15 @@ type StatefulSetsGetter interface {
 
 // StatefulSetInterface has methods to work with StatefulSet resources.
 type StatefulSetInterface interface {
-	Create(*v1alpha1.StatefulSet) (*v1alpha1.StatefulSet, error)
-	Update(*v1alpha1.StatefulSet) (*v1alpha1.StatefulSet, error)
-	UpdateStatus(*v1alpha1.StatefulSet) (*v1alpha1.StatefulSet, error)
+	Create(*v1beta1.StatefulSet) (*v1beta1.StatefulSet, error)
+	Update(*v1beta1.StatefulSet) (*v1beta1.StatefulSet, error)
+	UpdateStatus(*v1beta1.StatefulSet) (*v1beta1.StatefulSet, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string) (*v1alpha1.StatefulSet, error)
-	List(opts v1.ListOptions) (*v1alpha1.StatefulSetList, error)
+	Get(name string) (*v1beta1.StatefulSet, error)
+	List(opts v1.ListOptions) (*v1beta1.StatefulSetList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.StatefulSet, err error)
+	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.StatefulSet, err error)
 	StatefulSetExpansion
 }
 
@@ -51,7 +51,7 @@ type statefulSets struct {
 }
 
 // newStatefulSets returns a StatefulSets
-func newStatefulSets(c *AppsV1alpha1Client, namespace string) *statefulSets {
+func newStatefulSets(c *AppsV1beta1Client, namespace string) *statefulSets {
 	return &statefulSets{
 		client: c.RESTClient(),
 		ns:     namespace,
@@ -59,8 +59,8 @@ func newStatefulSets(c *AppsV1alpha1Client, namespace string) *statefulSets {
 }
 
 // Create takes the representation of a statefulSet and creates it.  Returns the server's representation of the statefulSet, and an error, if there is any.
-func (c *statefulSets) Create(statefulSet *v1alpha1.StatefulSet) (result *v1alpha1.StatefulSet, err error) {
-	result = &v1alpha1.StatefulSet{}
+func (c *statefulSets) Create(statefulSet *v1beta1.StatefulSet) (result *v1beta1.StatefulSet, err error) {
+	result = &v1beta1.StatefulSet{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("statefulsets").
@@ -71,8 +71,8 @@ func (c *statefulSets) Create(statefulSet *v1alpha1.StatefulSet) (result *v1alph
 }
 
 // Update takes the representation of a statefulSet and updates it. Returns the server's representation of the statefulSet, and an error, if there is any.
-func (c *statefulSets) Update(statefulSet *v1alpha1.StatefulSet) (result *v1alpha1.StatefulSet, err error) {
-	result = &v1alpha1.StatefulSet{}
+func (c *statefulSets) Update(statefulSet *v1beta1.StatefulSet) (result *v1beta1.StatefulSet, err error) {
+	result = &v1beta1.StatefulSet{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("statefulsets").
@@ -83,8 +83,8 @@ func (c *statefulSets) Update(statefulSet *v1alpha1.StatefulSet) (result *v1alph
 	return
 }
 
-func (c *statefulSets) UpdateStatus(statefulSet *v1alpha1.StatefulSet) (result *v1alpha1.StatefulSet, err error) {
-	result = &v1alpha1.StatefulSet{}
+func (c *statefulSets) UpdateStatus(statefulSet *v1beta1.StatefulSet) (result *v1beta1.StatefulSet, err error) {
+	result = &v1beta1.StatefulSet{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("statefulsets").
@@ -119,8 +119,8 @@ func (c *statefulSets) DeleteCollection(options *v1.DeleteOptions, listOptions v
 }
 
 // Get takes name of the statefulSet, and returns the corresponding statefulSet object, and an error if there is any.
-func (c *statefulSets) Get(name string) (result *v1alpha1.StatefulSet, err error) {
-	result = &v1alpha1.StatefulSet{}
+func (c *statefulSets) Get(name string) (result *v1beta1.StatefulSet, err error) {
+	result = &v1beta1.StatefulSet{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("statefulsets").
@@ -131,8 +131,8 @@ func (c *statefulSets) Get(name string) (result *v1alpha1.StatefulSet, err error
 }
 
 // List takes label and field selectors, and returns the list of StatefulSets that match those selectors.
-func (c *statefulSets) List(opts v1.ListOptions) (result *v1alpha1.StatefulSetList, err error) {
-	result = &v1alpha1.StatefulSetList{}
+func (c *statefulSets) List(opts v1.ListOptions) (result *v1beta1.StatefulSetList, err error) {
+	result = &v1beta1.StatefulSetList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("statefulsets").
@@ -153,8 +153,8 @@ func (c *statefulSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Patch applies the patch and returns the patched statefulSet.
-func (c *statefulSets) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.StatefulSet, err error) {
-	result = &v1alpha1.StatefulSet{}
+func (c *statefulSets) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1beta1.StatefulSet, err error) {
+	result = &v1beta1.StatefulSet{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("statefulsets").
