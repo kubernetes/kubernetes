@@ -16,7 +16,9 @@ limitations under the License.
 
 package schedulercache
 
-import "k8s.io/kubernetes/pkg/api"
+import (
+	"k8s.io/kubernetes/pkg/api"
+)
 
 // CreateNodeNameToInfoMap obtains a list of pods and pivots that list into a map where the keys are node names
 // and the values are the aggregated information for that node.

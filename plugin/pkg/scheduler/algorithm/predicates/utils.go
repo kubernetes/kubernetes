@@ -16,8 +16,10 @@ limitations under the License.
 
 package predicates
 
-import "k8s.io/kubernetes/pkg/labels"
-import "k8s.io/kubernetes/pkg/api"
+import (
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/labels"
+)
 
 // FindLabelsInSet gets as many key/value pairs as possible out of a label set.
 func FindLabelsInSet(labelsToKeep []string, selector labels.Set) map[string]string {
