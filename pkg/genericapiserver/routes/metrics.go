@@ -30,6 +30,7 @@ import (
 // DefaultMetrics installs the default prometheus metrics handler
 type DefaultMetrics struct{}
 
+// Install adds the DefaultMetrics handler
 func (m DefaultMetrics) Install(c *mux.APIContainer) {
 	c.NonSwaggerRoutes.Handle("/metrics", prometheus.Handler())
 }
@@ -38,6 +39,7 @@ func (m DefaultMetrics) Install(c *mux.APIContainer) {
 // which resets the metrics.
 type MetricsWithReset struct{}
 
+// Install adds the MetricsWithReset handler
 func (m MetricsWithReset) Install(c *mux.APIContainer) {
 	defaultMetricsHandler := prometheus.Handler().ServeHTTP
 	c.NonSwaggerRoutes.HandleFunc("/metrics", func(w http.ResponseWriter, req *http.Request) {
