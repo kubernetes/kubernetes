@@ -932,7 +932,8 @@ func addObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj in
 			switch sf.Type.Kind() {
 			case reflect.Interface, reflect.Struct:
 			case reflect.Ptr:
-				if sf.Type.Elem().Kind() == reflect.Interface || sf.Type.Elem().Kind() == reflect.Struct {
+				// TODO: This is a hack to let unversioned.Time through. This needs to be fixed in a more generic way eventually. bug #36191
+				if (sf.Type.Elem().Kind() == reflect.Interface || sf.Type.Elem().Kind() == reflect.Struct) && strings.TrimPrefix(sf.Type.String(), "*") != "unversioned.Time" {
 					continue
 				}
 				fallthrough
