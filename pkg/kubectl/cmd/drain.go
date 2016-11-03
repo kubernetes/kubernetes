@@ -418,6 +418,15 @@ func (o *DrainOptions) getPodsForDeletion() (pods []api.Pod, err error) {
 	return pods, nil
 }
 
+func (o *DrainOptions) deletePod(pod api.Pod) error {
+	deleteOptions := &api.DeleteOptions{}
+	if o.GracePeriodSeconds >= 0 {
+		gracePeriodSeconds := int64(o.GracePeriodSeconds)
+		deleteOptions.GracePeriodSeconds = &gracePeriodSeconds
+	}
+	return o.client.Core().Pods(pod.Namespace).Delete(pod.Name, deleteOptions)
+}
+
 func (o *DrainOptions) evictPod(pod api.Pod) error {
 	deleteOptions := &api.DeleteOptions{}
 	if o.GracePeriodSeconds >= 0 {
@@ -443,28 +452,43 @@ func (o *DrainOptions) deletePods(pods []api.Pod) error {
 	if len(pods) == 0 {
 		return nil
 	}
-	ifTooManyRequests := false
-	var e error
-	for _, pod := range pods {
-		err := o.evictPod(pod)
-		if apierrors.IsTooManyRequests(err) {
-			fmt.Println("IsTooManyRequests", err)
-			e = err
-			ifTooManyRequests = true
-			continue
-		}
-		if err != nil {
-			return err
-		}
+
+	supportEviction, err := doesSupportEviction(o.factory)
+	if err != nil {
+		return err
 	}
-	if ifTooManyRequests {
-		return e
+
+	if supportEviction {
+		ifTooManyRequests := false
+		var e error
+		for _, pod := range pods {
+			err := o.evictPod(pod)
+			if apierrors.IsTooManyRequests(err) {
+				fmt.Println("IsTooManyRequests", err)
+				e = err
+				ifTooManyRequests = true
+				continue
+			}
+			if err != nil {
+				return err
+			}
+		}
+		if ifTooManyRequests {
+			return e
+		}
+	} else {
+		for _, pod := range pods {
+			err := o.deletePod(pod)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	getPodFn := func(namespace, name string) (*api.Pod, error) {
 		return o.client.Core().Pods(namespace).Get(name)
 	}
-	_, err := o.waitForDelete(pods, kubectl.Interval, o.Timeout, getPodFn)
+	_, err = o.waitForDelete(pods, kubectl.Interval, o.Timeout, getPodFn)
 	return err
 }
 
@@ -489,6 +513,24 @@ func (o *DrainOptions) waitForDelete(pods []api.Pod, interval, timeout time.Dura
 		return true, nil
 	})
 	return pods, err
+}
+
+// Use Discovery API to find out if the server support eviction subresource
+func doesSupportEviction(f cmdutil.Factory) (bool, error) {
+	clientSet, err := f.ClientSet()
+	if err != nil {
+		return false, err
+	}
+	resourceList, err := clientSet.Discovery().ServerResourcesForGroupVersion("v1")
+	if err != nil {
+		return false, err
+	}
+	for _, resource := range resourceList.APIResources {
+		if resource.Name == "pods/eviction" && resource.Kind == "Eviction" {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // RunCordonOrUncordon runs either Cordon or Uncordon.  The desired value for
