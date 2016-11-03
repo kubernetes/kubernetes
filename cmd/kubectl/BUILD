@@ -14,5 +14,6 @@ go_binary(
     name = "kubectl",
     srcs = ["kubectl.go"],
     tags = ["automanaged"],
+    x_defs_file = "//build-tools:version-xdefs",
     deps = ["//cmd/kubectl/app:go_default_library"],
 )

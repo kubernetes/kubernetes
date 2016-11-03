@@ -57,3 +57,24 @@ docker_build(
     ],
     repository = "gcr.io/google-containers",
 )
+
+genrule(
+    name = "version-xdefs",
+    outs = ["git-version-xdefs"],
+    cmd = """
+set -o errexit
+set -o nounset
+set -o pipefail
+
+eval $$(cat bazel-out/volatile-status.txt | tr ' ' '=')
+
+cat <<EOF > $@
+k8s.io/kubernetes/pkg/version.gitVersion=$${BUILD_SCM_REVISION}
+k8s.io/kubernetes/pkg/version.gitCommit=$${BUILD_GIT_COMMIT}
+k8s.io/kubernetes/pkg/version.gitTreeState=$${BUILD_SCM_STATUS}
+k8s.io/kubernetes/pkg/version.gitMajor=$${BUILD_MAJOR_VERSION}
+k8s.io/kubernetes/pkg/version.gitMinor=$${BUILD_MINOR_VERSION}
+EOF
+    """,
+    stamp = True,
+)

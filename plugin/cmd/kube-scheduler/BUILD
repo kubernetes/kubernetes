@@ -14,6 +14,7 @@ go_binary(
     name = "kube-scheduler",
     srcs = ["scheduler.go"],
     tags = ["automanaged"],
+    x_defs_file = "//build-tools:version-xdefs",
     deps = [
         "//pkg/healthz:go_default_library",
         "//pkg/util/flag:go_default_library",

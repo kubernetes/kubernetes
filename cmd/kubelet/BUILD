@@ -14,6 +14,7 @@ go_binary(
     name = "kubelet",
     srcs = ["kubelet.go"],
     tags = ["automanaged"],
+    x_defs_file = "//build-tools:version-xdefs",
     deps = [
         "//cmd/kubelet/app:go_default_library",
         "//cmd/kubelet/app/options:go_default_library",

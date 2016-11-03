@@ -14,6 +14,7 @@ go_binary(
     name = "kube-proxy",
     srcs = ["proxy.go"],
     tags = ["automanaged"],
+    x_defs_file = "//build-tools:version-xdefs",
     deps = [
         "//cmd/kube-proxy/app:go_default_library",
         "//cmd/kube-proxy/app/options:go_default_library",

@@ -14,6 +14,7 @@ go_binary(
     name = "kubeadm",
     srcs = ["kubeadm.go"],
     tags = ["automanaged"],
+    x_defs_file = "//build-tools:version-xdefs",
     deps = [
         "//cmd/kubeadm/app:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
