@@ -324,6 +324,7 @@ const (
     SecretTypeOpaque              SecretType = "Opaque"                                 // Opaque (arbitrary data; default)
     SecretTypeServiceAccountToken SecretType = "kubernetes.io/service-account-token"    // Kubernetes auth token
     SecretTypeDockercfg           SecretType = "kubernetes.io/dockercfg"                // Docker registry auth
+    SecretTypeDockerConfigJson    SecretType = "kubernetes.io/dockerconfigjson"         // Latest Docker registry auth
     // FUTURE: other type values
 )
 
