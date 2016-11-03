@@ -2289,6 +2289,16 @@
 			"Rev": "b5ee639d7aa4b8dbb48ab4f75dddc19f71b5c514"
 		},
 		{
+			"ImportPath": "github.com/vmware/photon-controller-go-sdk/photon",
+			"Comment": "PROMOTED-336",
+			"Rev": "dd6be2029ef341cae37b2557ddd302f68176f832"
+		},
+		{
+			"ImportPath": "github.com/vmware/photon-controller-go-sdk/photon/lightwave",
+			"Comment": "PROMOTED-336",
+			"Rev": "dd6be2029ef341cae37b2557ddd302f68176f832"
+		},
+		{
 			"ImportPath": "github.com/xanzy/go-cloudstack/cloudstack",
 			"Comment": "v2.1.1-1-g1e2cbf6",
 			"Rev": "1e2cbf647e57fa90353612074fdfc42faf5073bf"
