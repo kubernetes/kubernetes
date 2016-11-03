@@ -202,8 +202,7 @@ func SyncOne(sj batch.ScheduledJob, js []batch.Job, now time.Time, jc jobControl
 		return
 	}
 	if sj.Spec.ConcurrencyPolicy == batch.ReplaceConcurrent {
-		for i := range sj.Status.Active {
-			j := sj.Status.Active[i]
+		for _, j := range sj.Status.Active {
 			// TODO: this should be replaced with server side job deletion
 			// currently this mimics JobReaper from pkg/kubectl/stop.go
 			glog.V(4).Infof("Deleting job %s of %s that was still running at next scheduled start time", j.Name, nameForLog)
