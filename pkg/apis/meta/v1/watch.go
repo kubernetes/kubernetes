@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package versioned
+package v1
 
 import (
 	"k8s.io/kubernetes/pkg/conversion"
@@ -23,23 +23,19 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
-// WatchEventKind is name reserved for serializing watch events.
-const WatchEventKind = "WatchEvent"
+// Event represents a single event to a watched resource.
+//
+// +protobuf=true
+// +k8s:openapi-gen=true
+type Event struct {
+	Type string `json:"type" protobuf:"bytes,1,opt,name=type"`
 
-// AddToGroupVersion registers the watch external and internal kinds with the scheme, and ensures the proper
-// conversions are in place.
-func AddToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion) {
-	scheme.AddKnownTypeWithName(groupVersion.WithKind(WatchEventKind), &Event{})
-	scheme.AddKnownTypeWithName(
-		schema.GroupVersion{Group: groupVersion.Group, Version: runtime.APIVersionInternal}.WithKind(WatchEventKind),
-		&InternalEvent{},
-	)
-	scheme.AddConversionFuncs(
-		Convert_versioned_Event_to_watch_Event,
-		Convert_versioned_InternalEvent_to_versioned_Event,
-		Convert_watch_Event_to_versioned_Event,
-		Convert_versioned_Event_to_versioned_InternalEvent,
-	)
+	// Object is:
+	//  * If Type is Added or Modified: the new state of the object.
+	//  * If Type is Deleted: the state of the object immediately before deletion.
+	//  * If Type is Error: *Status is recommended; other types may make sense
+	//    depending on context.
+	Object runtime.RawExtension `json:"object" protobuf:"bytes,2,opt,name=object"`
 }
 
 func Convert_watch_Event_to_versioned_Event(in *watch.Event, out *Event, s conversion.Scope) error {
