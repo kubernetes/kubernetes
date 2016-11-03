@@ -366,7 +366,28 @@ function start_apiserver {
     APISERVER_PID=$!
 
     # We created a kubeconfig that uses the apiserver.crt
-    cat <<EOF | sudo tee "${CERT_DIR}"/kubeconfig > /dev/null
+    if [[ -n "${ALLOW_ANY_TOKEN:-}" ]]; then
+        cat <<EOF | sudo tee "${CERT_DIR}"/kubeconfig > /dev/null
+apiVersion: v1
+kind: Config
+clusters:
+  - cluster:
+      certificate-authority: ${ROOT_CA_FILE}
+      server: https://${API_HOST}:${API_SECURE_PORT}/
+    name: local-up-cluster
+contexts:
+  - context:
+      cluster: local-up-cluster
+      user: kubelet
+    name: service-to-apiserver
+current-context: service-to-apiserver
+users:
+- name: kubelet
+  user:
+      token: admin/system:masters
+EOF
+  else
+        cat <<EOF | sudo tee "${CERT_DIR}"/kubeconfig > /dev/null
 apiVersion: v1
 kind: Config
 clusters:
@@ -380,6 +401,7 @@ contexts:
     name: service-to-apiserver
 current-context: service-to-apiserver
 EOF
+fi
 
     # Wait for kube-apiserver to come up before launching the rest of the components.
     echo "Waiting for apiserver to come up"
