@@ -172,7 +172,7 @@ func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath 
 				return devicePath, nil
 			} else {
 				//Log error, if any, and continue checking periodically
-				glog.Errorf("Error Stat Cinder disk (%q) is attached: %v", volumeID, err)
+				glog.Errorf("Error Stat Cinder disk (%q) (path: %q) is attached: %v", volumeID, devicePath, err)
 			}
 		case <-timer.C:
 			return "", fmt.Errorf("Could not find attached Cinder disk %q. Timeout waiting for mount paths to be created.", volumeID)

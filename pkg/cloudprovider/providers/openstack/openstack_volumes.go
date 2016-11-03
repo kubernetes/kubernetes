@@ -53,8 +53,12 @@ func (os *OpenStack) AttachDisk(instanceID string, diskName string) (string, err
 			glog.V(4).Infof("Disk: %q is already attached to compute: %q", diskName, instanceID)
 			return disk.ID, nil
 		} else {
-			errMsg := fmt.Sprintf("Disk %q is attached to a different compute: %q, should be detached before proceeding", diskName, disk.Attachments[0]["server_id"])
+			errMsg := fmt.Sprintf("Disk %q is attached to a different compute: %q, detaching", diskName, disk.Attachments[0]["server_id"])
 			glog.Errorf(errMsg)
+			err = os.DetachDisk(fmt.Sprintf("%s", disk.Attachments[0]["server_id"]), diskName)
+			if err != nil {
+				glog.Errorf(err.Error())
+			}
 			return "", errors.New(errMsg)
 		}
 	}
