@@ -190,10 +190,10 @@ func TestApplyObject(t *testing.T) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/version" && m == "GET":
 				resp, err := genServerVersionResponse(serverVersion_1_5_0)
-					if err != nil {
-						t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
-					}
-					return resp, nil
+				if err != nil {
+					t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
+				}
+				return resp, nil
 			case p == pathRC && m == "GET":
 				bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
@@ -239,10 +239,10 @@ func TestApplyRetry(t *testing.T) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/version" && m == "GET":
 				resp, err := genServerVersionResponse(serverVersion_1_5_0)
-					if err != nil {
-						t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
-					}
-					return resp, nil
+				if err != nil {
+					t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
+				}
+				return resp, nil
 			case p == pathRC && m == "GET":
 				getCount++
 				bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
@@ -298,10 +298,10 @@ func TestApplyNonExistObject(t *testing.T) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/version" && m == "GET":
 				resp, err := genServerVersionResponse(serverVersion_1_5_0)
-					if err != nil {
-						t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
-					}
-					return resp, nil
+				if err != nil {
+					t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
+				}
+				return resp, nil
 			case p == "/api/v1/namespaces/test" && m == "GET":
 				return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader(nil))}, nil
 			case p == pathNameRC && m == "GET":
@@ -354,10 +354,10 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/version" && m == "GET":
 				resp, err := genServerVersionResponse(serverVersion_1_5_0)
-					if err != nil {
-						t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
-					}
-					return resp, nil
+				if err != nil {
+					t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
+				}
+				return resp, nil
 			case p == pathRC && m == "GET":
 				bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil

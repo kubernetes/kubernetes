@@ -124,10 +124,10 @@ type Patch struct {
 func CalculatePatches(f cmdutil.Factory, infos []*resource.Info, encoder runtime.Encoder, local bool, mutateFn func(*resource.Info) (bool, error)) []*Patch {
 	var patches []*Patch
 
-	ifUseSMPatchVersion_1_5 := true
+	SMPatchVersion := strategicpatch.SMPatchVersionLatest
 	var err error
 	if !local {
-		ifUseSMPatchVersion_1_5, err = cmdutil.RunDoesServerSupportSMPatchVersion_1_5(f)
+		SMPatchVersion, err = cmdutil.GetServerSupportedSMPatchVersionFromFactory(f)
 		if err != nil {
 			return patches
 		}
@@ -167,7 +167,7 @@ func CalculatePatches(f cmdutil.Factory, infos []*resource.Info, encoder runtime
 			continue
 		}
 
-		patch.Patch, patch.Err = strategicpatch.CreateTwoWayMergePatch(patch.Before, patch.After, versioned, ifUseSMPatchVersion_1_5)
+		patch.Patch, patch.Err = strategicpatch.CreateTwoWayMergePatch(patch.Before, patch.After, versioned, SMPatchVersion)
 	}
 	return patches
 }

@@ -449,7 +449,6 @@ func TestLabelMultipleObjects(t *testing.T) {
 						t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
 					}
 					return resp, nil
-					return resp, nil
 				case "/namespaces/test/pods":
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)}, nil
 				default:

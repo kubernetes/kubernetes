@@ -48,8 +48,11 @@ const (
 	mergeDirective            = "merge"
 	listOfPrimitivesDirective = "patch"
 
-	// the version that start to support the new behavior of StrategicMergePatch
-	SMPatchVersion_1_5 StrategicMergePatchVersion = "v1.5.0"
+	// different versions of StrategicMergePatch
+	SMPatchVersion_1_0   StrategicMergePatchVersion = "v1.0.0"
+	SMPatchVersion_1_5   StrategicMergePatchVersion = "v1.5.0"
+	Unknown              StrategicMergePatchVersion = "Unknown"
+	SMPatchVersionLatest                            = SMPatchVersion_1_5
 )
 
 // IsPreconditionFailed returns true if the provided error indicates
@@ -141,15 +144,15 @@ func RequireMetadataKeyUnchanged(key string) PreconditionFunc {
 }
 
 // Deprecated: Use the synonym CreateTwoWayMergePatch, instead.
-func CreateStrategicMergePatch(original, modified []byte, dataStruct interface{}, ifUseSMPatchVersion_1_5 bool) ([]byte, error) {
-	return CreateTwoWayMergePatch(original, modified, dataStruct, ifUseSMPatchVersion_1_5)
+func CreateStrategicMergePatch(original, modified []byte, dataStruct interface{}, SMPatchVersion StrategicMergePatchVersion) ([]byte, error) {
+	return CreateTwoWayMergePatch(original, modified, dataStruct, SMPatchVersion)
 }
 
 // CreateTwoWayMergePatch creates a patch that can be passed to StrategicMergePatch from an original
 // document and a modified document, which are passed to the method as json encoded content. It will
 // return a patch that yields the modified document when applied to the original document, or an error
 // if either of the two documents is invalid.
-func CreateTwoWayMergePatch(original, modified []byte, dataStruct interface{}, ifUseSMPatchVersion_1_5 bool, fns ...PreconditionFunc) ([]byte, error) {
+func CreateTwoWayMergePatch(original, modified []byte, dataStruct interface{}, SMPatchVersion StrategicMergePatchVersion, fns ...PreconditionFunc) ([]byte, error) {
 	originalMap := map[string]interface{}{}
 	if len(original) > 0 {
 		if err := json.Unmarshal(original, &originalMap); err != nil {
@@ -169,7 +172,7 @@ func CreateTwoWayMergePatch(original, modified []byte, dataStruct interface{}, i
 		return nil, err
 	}
 
-	patchMap, err := diffMaps(originalMap, modifiedMap, t, false, false, ifUseSMPatchVersion_1_5)
+	patchMap, err := diffMaps(originalMap, modifiedMap, t, false, false, SMPatchVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +188,7 @@ func CreateTwoWayMergePatch(original, modified []byte, dataStruct interface{}, i
 }
 
 // Returns a (recursive) strategic merge patch that yields modified when applied to original.
-func diffMaps(original, modified map[string]interface{}, t reflect.Type, ignoreChangesAndAdditions, ignoreDeletions, ifUseSMPatchVersion_1_5 bool) (map[string]interface{}, error) {
+func diffMaps(original, modified map[string]interface{}, t reflect.Type, ignoreChangesAndAdditions, ignoreDeletions bool, SMPatchVersion StrategicMergePatchVersion) (map[string]interface{}, error) {
 	patch := map[string]interface{}{}
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
@@ -238,7 +241,7 @@ func diffMaps(original, modified map[string]interface{}, t reflect.Type, ignoreC
 				return nil, err
 			}
 
-			patchValue, err := diffMaps(originalValueTyped, modifiedValueTyped, fieldType, ignoreChangesAndAdditions, ignoreDeletions, ifUseSMPatchVersion_1_5)
+			patchValue, err := diffMaps(originalValueTyped, modifiedValueTyped, fieldType, ignoreChangesAndAdditions, ignoreDeletions, SMPatchVersion)
 			if err != nil {
 				return nil, err
 			}
@@ -256,7 +259,7 @@ func diffMaps(original, modified map[string]interface{}, t reflect.Type, ignoreC
 			}
 
 			if fieldPatchStrategy == mergeDirective {
-				patchValue, err := diffLists(originalValueTyped, modifiedValueTyped, fieldType.Elem(), fieldPatchMergeKey, ignoreChangesAndAdditions, ignoreDeletions, ifUseSMPatchVersion_1_5)
+				patchValue, err := diffLists(originalValueTyped, modifiedValueTyped, fieldType.Elem(), fieldPatchMergeKey, ignoreChangesAndAdditions, ignoreDeletions, SMPatchVersion)
 				if err != nil {
 					return nil, err
 				}
@@ -304,7 +307,7 @@ func diffMaps(original, modified map[string]interface{}, t reflect.Type, ignoreC
 
 // Returns a (recursive) strategic merge patch that yields modified when applied to original,
 // for a pair of lists with merge semantics.
-func diffLists(original, modified []interface{}, t reflect.Type, mergeKey string, ignoreChangesAndAdditions, ignoreDeletions, ifUseSMPatchVersion_1_5 bool) (interface{}, error) {
+func diffLists(original, modified []interface{}, t reflect.Type, mergeKey string, ignoreChangesAndAdditions, ignoreDeletions bool, SMPatchVersion StrategicMergePatchVersion) (interface{}, error) {
 	if len(original) == 0 {
 		if len(modified) == 0 || ignoreChangesAndAdditions {
 			return nil, nil
@@ -321,11 +324,11 @@ func diffLists(original, modified []interface{}, t reflect.Type, mergeKey string
 	var patch interface{}
 
 	if elementType.Kind() == reflect.Map {
-		patch, err = diffListsOfMaps(original, modified, t, mergeKey, ignoreChangesAndAdditions, ignoreDeletions, ifUseSMPatchVersion_1_5)
+		patch, err = diffListsOfMaps(original, modified, t, mergeKey, ignoreChangesAndAdditions, ignoreDeletions, SMPatchVersion)
 	} else if elementType.Kind() == reflect.Slice {
 		err = errNoListOfLists
 	} else {
-		patch, err = diffListsOfScalars(original, modified, ignoreChangesAndAdditions, ignoreDeletions, ifUseSMPatchVersion_1_5)
+		patch, err = diffListsOfScalars(original, modified, ignoreChangesAndAdditions, ignoreDeletions, SMPatchVersion)
 	}
 
 	if err != nil {
@@ -337,12 +340,13 @@ func diffLists(original, modified []interface{}, t reflect.Type, mergeKey string
 
 // Returns a (recursive) strategic merge patch that yields modified when applied to original,
 // for a pair of lists of scalars with merge semantics.
-func diffListsOfScalars(original, modified []interface{}, ignoreChangesAndAdditions, ignoreDeletions, ifUseSMPatchVersion_1_5 bool) (interface{}, error) {
+func diffListsOfScalars(original, modified []interface{}, ignoreChangesAndAdditions, ignoreDeletions bool, SMPatchVersion StrategicMergePatchVersion) (interface{}, error) {
 	originalScalars := uniqifyAndSortScalars(original)
 	modifiedScalars := uniqifyAndSortScalars(modified)
 	originalIndex, modifiedIndex := 0, 0
 
-	if ifUseSMPatchVersion_1_5 {
+	switch SMPatchVersion {
+	case SMPatchVersion_1_5:
 		patch := map[string]interface{}{}
 		patch[directiveMarker] = listOfPrimitivesDirective
 
@@ -389,7 +393,7 @@ func diffListsOfScalars(original, modified []interface{}, ignoreChangesAndAdditi
 		}
 
 		return patch, nil
-	} else {
+	case SMPatchVersion_1_0:
 		if len(modified) == 0 {
 			// There is no need to check the length of original because there is no way to create
 			// a patch that deletes a scalar from a list of scalars with merge semantics.
@@ -423,6 +427,8 @@ func diffListsOfScalars(original, modified []interface{}, ignoreChangesAndAdditi
 		}
 
 		return patch, nil
+	default:
+		return nil, fmt.Errorf("Unknown StrategicMergePatchVersion: %v", SMPatchVersion)
 	}
 }
 
@@ -431,7 +437,7 @@ var errBadArgTypeFmt = "expected a %s, but received a %s"
 
 // Returns a (recursive) strategic merge patch that yields modified when applied to original,
 // for a pair of lists of maps with merge semantics.
-func diffListsOfMaps(original, modified []interface{}, t reflect.Type, mergeKey string, ignoreChangesAndAdditions, ignoreDeletions, ifUseSMPatchVersion_1_5 bool) ([]interface{}, error) {
+func diffListsOfMaps(original, modified []interface{}, t reflect.Type, mergeKey string, ignoreChangesAndAdditions, ignoreDeletions bool, SMPatchVersion StrategicMergePatchVersion) ([]interface{}, error) {
 	patch := make([]interface{}, 0)
 
 	originalSorted, err := sortMergeListsByNameArray(original, t, mergeKey, false)
@@ -477,7 +483,7 @@ loopB:
 			if originalString >= modifiedString {
 				if originalString == modifiedString {
 					// Merge key values are equal, so recurse
-					patchValue, err := diffMaps(originalMap, modifiedMap, t, ignoreChangesAndAdditions, ignoreDeletions, ifUseSMPatchVersion_1_5)
+					patchValue, err := diffMaps(originalMap, modifiedMap, t, ignoreChangesAndAdditions, ignoreDeletions, SMPatchVersion)
 					if err != nil {
 						return nil, err
 					}
@@ -1302,7 +1308,7 @@ func mapsOfMapsHaveConflicts(typedLeft, typedRight map[string]interface{}, struc
 // than from original to current. In other words, a conflict occurs if modified changes any key
 // in a way that is different from how it is changed in current (e.g., deleting it, changing its
 // value).
-func CreateThreeWayMergePatch(original, modified, current []byte, dataStruct interface{}, overwrite, ifUseSMPatchVersion_1_5 bool, fns ...PreconditionFunc) ([]byte, error) {
+func CreateThreeWayMergePatch(original, modified, current []byte, dataStruct interface{}, overwrite bool, SMPatchVersion StrategicMergePatchVersion, fns ...PreconditionFunc) ([]byte, error) {
 	originalMap := map[string]interface{}{}
 	if len(original) > 0 {
 		if err := json.Unmarshal(original, &originalMap); err != nil {
@@ -1333,12 +1339,12 @@ func CreateThreeWayMergePatch(original, modified, current []byte, dataStruct int
 	// from original to modified. To find it, we compute deletions, which are the deletions from
 	// original to modified, and delta, which is the difference from current to modified without
 	// deletions, and then apply delta to deletions as a patch, which should be strictly additive.
-	deltaMap, err := diffMaps(currentMap, modifiedMap, t, false, true, ifUseSMPatchVersion_1_5)
+	deltaMap, err := diffMaps(currentMap, modifiedMap, t, false, true, SMPatchVersion)
 	if err != nil {
 		return nil, err
 	}
 
-	deletionsMap, err := diffMaps(originalMap, modifiedMap, t, true, false, ifUseSMPatchVersion_1_5)
+	deletionsMap, err := diffMaps(originalMap, modifiedMap, t, true, false, SMPatchVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -1358,7 +1364,7 @@ func CreateThreeWayMergePatch(original, modified, current []byte, dataStruct int
 	// If overwrite is false, and the patch contains any keys that were changed differently,
 	// then return a conflict error.
 	if !overwrite {
-		changedMap, err := diffMaps(originalMap, currentMap, t, false, false, ifUseSMPatchVersion_1_5)
+		changedMap, err := diffMaps(originalMap, currentMap, t, false, false, SMPatchVersion)
 		if err != nil {
 			return nil, err
 		}
@@ -1394,19 +1400,19 @@ func toYAML(v interface{}) (string, error) {
 	return string(y), nil
 }
 
-// DoesServerSupportSMPatchVersion takes a discoveryClient and a SMPatchVersion,
-// it will return a boolean indicating if the server supports a StrategicMergePatch version
-func DoesServerSupportSMPatchVersion(discoveryClient discovery.DiscoveryInterface, SMPatchVersion StrategicMergePatchVersion) (bool, error) {
+// GetServerSupportedSMPatchVersion takes a discoveryClient,
+// returns the max StrategicMergePatch version supported
+func GetServerSupportedSMPatchVersion(discoveryClient discovery.DiscoveryInterface) (StrategicMergePatchVersion, error) {
 	serverVersion, err := discoveryClient.ServerVersion()
 	if err != nil {
-		return false, err
+		return Unknown, err
 	}
 	serverGitVersion := serverVersion.GitVersion
-	var ifUseSMPatchVersion_1_5 bool
-	if serverGitVersion >= string(SMPatchVersion) {
-		ifUseSMPatchVersion_1_5 = true
-	} else {
-		ifUseSMPatchVersion_1_5 = false
+	if serverGitVersion >= string(SMPatchVersion_1_5) {
+		return SMPatchVersion_1_5, nil
 	}
-	return ifUseSMPatchVersion_1_5, nil
+	if serverGitVersion >= string(SMPatchVersion_1_5) {
+		return SMPatchVersion_1_0, nil
+	}
+	return Unknown, fmt.Errorf("The version is too old: %v\n", serverVersion)
 }

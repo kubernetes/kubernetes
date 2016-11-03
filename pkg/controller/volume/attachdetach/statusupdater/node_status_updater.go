@@ -59,7 +59,7 @@ type nodeStatusUpdater struct {
 }
 
 func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
-	ifUseSMPatchVersion_1_5, err := strategicpatch.DoesServerSupportSMPatchVersion(nsu.kubeClient.Discovery(), strategicpatch.SMPatchVersion_1_5)
+	SMPatchVersion, err := strategicpatch.GetServerSupportedSMPatchVersion(nsu.kubeClient.Discovery())
 	if err != nil {
 		return err
 	}
@@ -112,7 +112,7 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 		}
 
 		patchBytes, err :=
-			strategicpatch.CreateStrategicMergePatch(oldData, newData, node, ifUseSMPatchVersion_1_5)
+			strategicpatch.CreateStrategicMergePatch(oldData, newData, node, SMPatchVersion)
 		if err != nil {
 			return fmt.Errorf(
 				"failed to CreateStrategicMergePatch for node %q. %v",

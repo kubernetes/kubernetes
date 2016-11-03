@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
 
 // ImageOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -188,10 +189,10 @@ func (o *ImageOptions) Run() error {
 		return transformed, err
 	})
 
-	ifUseSMPatchVersion_1_5 := true
+	SMPatchVersion := strategicpatch.SMPatchVersionLatest
 	var err error
 	if !o.Local {
-		ifUseSMPatchVersion_1_5, err = cmdutil.RunDoesServerSupportSMPatchVersion_1_5(o.f)
+		SMPatchVersion, err = cmdutil.GetServerSupportedSMPatchVersionFromFactory(o.f)
 		if err != nil {
 			return err
 		}
@@ -222,7 +223,7 @@ func (o *ImageOptions) Run() error {
 
 		// record this change (for rollout history)
 		if o.Record || cmdutil.ContainsChangeCause(info) {
-			if patch, err := cmdutil.ChangeResourcePatch(info, o.ChangeCause, ifUseSMPatchVersion_1_5); err == nil {
+			if patch, err := cmdutil.ChangeResourcePatch(info, o.ChangeCause, SMPatchVersion); err == nil {
 				if obj, err = resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch); err != nil {
 					fmt.Fprintf(o.Err, "WARNING: changes to %s/%s can't be recorded: %v\n", info.Mapping.Resource, info.Name, err)
 				}

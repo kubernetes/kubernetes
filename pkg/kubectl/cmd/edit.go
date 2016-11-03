@@ -402,7 +402,7 @@ func visitToPatch(originalObj runtime.Object, updates *resource.Info,
 	results *editResults,
 	file string) error {
 
-	ifUseSMPatchVersion_1_5, err := cmdutil.RunDoesServerSupportSMPatchVersion_1_5(f)
+	SMPatchVersion, err := cmdutil.GetServerSupportedSMPatchVersionFromFactory(f)
 	if err != nil {
 		return err
 	}
@@ -469,7 +469,7 @@ func visitToPatch(originalObj runtime.Object, updates *resource.Info,
 
 		preconditions := []strategicpatch.PreconditionFunc{strategicpatch.RequireKeyUnchanged("apiVersion"),
 			strategicpatch.RequireKeyUnchanged("kind"), strategicpatch.RequireMetadataKeyUnchanged("name")}
-		patch, err := strategicpatch.CreateTwoWayMergePatch(originalJS, editedJS, currOriginalObj, ifUseSMPatchVersion_1_5, preconditions...)
+		patch, err := strategicpatch.CreateTwoWayMergePatch(originalJS, editedJS, currOriginalObj, SMPatchVersion, preconditions...)
 		if err != nil {
 			glog.V(4).Infof("Unable to calculate diff, no merge is possible: %v", err)
 			if strategicpatch.IsPreconditionFailed(err) {

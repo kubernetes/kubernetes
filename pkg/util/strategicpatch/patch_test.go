@@ -252,7 +252,7 @@ func TestSortMergeLists(t *testing.T) {
 var customStrategicMergePatchTestCaseData = StrategicMergePatchTestCases{
 	TestCases: []StrategicMergePatchTestCase{
 		{
-			Description: "unique scalars when merging lists",
+			Description: "unique scalars when merging lists using SMPatchVersion_1_0",
 			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
 				Original: []byte(`
 mergingIntList:
@@ -273,7 +273,7 @@ mergingIntList:
 			},
 		},
 		{
-			Description: "unique scalars when merging lists using new behavior for list of primitives",
+			Description: "unique scalars when merging lists for list of primitives",
 			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
 				Original: []byte(`
 mergingIntList:
@@ -802,7 +802,7 @@ nonMergingIntList:
 			},
 		},
 		{
-			Description: "merge lists of scalars",
+			Description: "merge lists of scalars using SMPatchVersion_1_0",
 			StrategicMergePatchTestCaseData: StrategicMergePatchTestCaseData{
 				Original: []byte(`
 mergingIntList:
@@ -2423,7 +2423,11 @@ func testTwoWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
 	originalJSON := yamlToJSONOrError(c.Original)
 	modifiedJSON := yamlToJSONOrError(c.Modified)
 	expectedJSON := yamlToJSONOrError(c.TwoWay)
-	actualJSON, err := CreateTwoWayMergePatch(originalJSON, modifiedJSON, mergeItem, strings.Contains(c.Description, "for list of primitives"))
+	SMPatchVersion := SMPatchVersion_1_5
+	if strings.Contains(c.Description, "using SMPatchVersion_1_0") {
+		SMPatchVersion = SMPatchVersion_1_0
+	}
+	actualJSON, err := CreateTwoWayMergePatch(originalJSON, modifiedJSON, mergeItem, SMPatchVersion)
 	if err != nil {
 		t.Errorf("error: %s\nin test case: %s\ncannot create two way patch:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
 			err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
@@ -2444,7 +2448,11 @@ func testThreeWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
 	currentJSON := yamlToJSONOrError(c.Current)
 	expectedJSON := yamlToJSONOrError(c.ThreeWay)
 	resultJSON := yamlToJSONOrError(c.Result)
-	actualJSON, err := CreateThreeWayMergePatch(originalJSON, modifiedJSON, currentJSON, mergeItem, false, strings.Contains(c.Description, "for list of primitives"))
+	SMPatchVersion := SMPatchVersion_1_5
+	if strings.Contains(c.Description, "using SMPatchVersion_1_0") {
+		SMPatchVersion = SMPatchVersion_1_0
+	}
+	actualJSON, err := CreateThreeWayMergePatch(originalJSON, modifiedJSON, currentJSON, mergeItem, false, SMPatchVersion)
 	if err != nil {
 		if !IsConflict(err) {
 			t.Errorf("error: %s\nin test case: %s\ncannot create three way patch:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
@@ -2458,7 +2466,7 @@ func testThreeWayPatch(t *testing.T, c StrategicMergePatchTestCase) {
 		}
 
 		if len(c.Result) > 0 {
-			actualJSON, err := CreateThreeWayMergePatch(originalJSON, modifiedJSON, currentJSON, mergeItem, true, strings.Contains(c.Description, "for list of primitives"))
+			actualJSON, err := CreateThreeWayMergePatch(originalJSON, modifiedJSON, currentJSON, mergeItem, true, SMPatchVersion)
 			if err != nil {
 				t.Errorf("error: %s\nin test case: %s\ncannot force three way patch application:\noriginal:%s\ntwoWay:%s\nmodified:%s\ncurrent:%s\nthreeWay:%s\nresult:%s\n",
 					err, c.Description, c.Original, c.TwoWay, c.Modified, c.Current, c.ThreeWay, c.Result)
@@ -2724,7 +2732,7 @@ func TestNumberConversion(t *testing.T) {
 	}
 
 	for k, tc := range testcases {
-		patch, err := CreateTwoWayMergePatch([]byte(tc.Old), []byte(tc.New), precisionItem, false)
+		patch, err := CreateTwoWayMergePatch([]byte(tc.Old), []byte(tc.New), precisionItem, SMPatchVersionLatest)
 		if err != nil {
 			t.Errorf("%s: unexpected error %v", k, err)
 			continue

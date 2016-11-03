@@ -192,9 +192,9 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	ifUseSMPatchVersion_1_5 := true
+	SMPatchVersion := strategicpatch.SMPatchVersionLatest
 	if !o.local {
-		ifUseSMPatchVersion_1_5, err = cmdutil.RunDoesServerSupportSMPatchVersion_1_5(f)
+		SMPatchVersion, err = cmdutil.GetServerSupportedSMPatchVersionFromFactory(f)
 		if err != nil {
 			return err
 		}
@@ -254,7 +254,7 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 			if !reflect.DeepEqual(oldData, newData) {
 				dataChangeMsg = "labeled"
 			}
-			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj, ifUseSMPatchVersion_1_5)
+			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj, SMPatchVersion)
 			createdPatch := err == nil
 			if err != nil {
 				glog.V(2).Infof("couldn't compute patch: %v", err)
