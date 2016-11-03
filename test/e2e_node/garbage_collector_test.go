@@ -1,0 +1,290 @@
+/*
+Copyright 2016 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package e2e_node
+
+import (
+	"fmt"
+	"strings"
+	"time"
+
+	dockertypes "github.com/docker/engine-api/types"
+	"k8s.io/kubernetes/pkg/api"
+	docker "k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/test/e2e/framework"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+)
+
+const (
+	defaultDockerEndpoint = "unix:///var/run/docker.sock"
+
+	//TODO (dashpole): Once dynamic config is possible, test different values for maxPerPodContainer and maxContainers
+	maxPerPodContainer = 2
+	maxTotalContainers = -1
+
+	defaultRuntimeRequestTimeoutDuration = 1 * time.Minute
+	garbageCollectDuration               = 2 * time.Minute
+	setupDuration                        = 10 * time.Minute
+	runtimePollInterval                  = 10 * time.Second
+	deleteTimeout                        = 4 * time.Minute
+)
+
+type testPodSpec struct {
+	podName string
+	// containerPrefix must be unique for each pod, and cannot end in a number.
+	// containerPrefix is used to identify which containers belong to which pod in the test.
+	containerPrefix string
+	// the number of times each container should restart
+	restartCount int32
+	// the number of containers in the test pod
+	numContainers int
+	// a function that returns the number of containers currently running on the node.
+	getContainerCount func() (int, error)
+}
+
+/*
+GarbageCollect tests that the Kubelet conforms to the Kubelet Garbage Collection Policy, found here:
+http://kubernetes.io/docs/admin/garbage-collection/
+*/
+var _ = framework.KubeDescribe("GarbageCollect [Serial]", func() {
+	f := framework.NewDefaultFramework("garbage-collect-test")
+	containerNamePrefix := "gc-test-container"
+	podNamePrefix := "gc-test-pod"
+
+	first_suffix := "-singlecontainer-norestarts"
+	second_suffix := "-manycontainers-manyrestarts-onepod"
+	third_suffix := "-manycontainers-manyrestarts-"
+	tests := [][]*testPodSpec{
+		{ // One Pod.  One Container. No Restarts
+			{
+				podName:         podNamePrefix + first_suffix,
+				containerPrefix: containerNamePrefix + first_suffix,
+				restartCount:    0,
+				numContainers:   1,
+			},
+		},
+		{ // One Pod. Many Containers.  Many Restarts
+			{
+				podName:         podNamePrefix + second_suffix,
+				containerPrefix: containerNamePrefix + second_suffix,
+				restartCount:    4,
+				numContainers:   4,
+			},
+		},
+		{ // Many Pods. Many Containers.  Many Restarts.
+			{
+				podName:         podNamePrefix + third_suffix + "one",
+				containerPrefix: containerNamePrefix + third_suffix + "one",
+				restartCount:    3,
+				numContainers:   4,
+			},
+			{
+				podName:         podNamePrefix + third_suffix + "two",
+				containerPrefix: containerNamePrefix + third_suffix + "two",
+				restartCount:    2,
+				numContainers:   6,
+			},
+			{
+				podName:         podNamePrefix + third_suffix + "three",
+				containerPrefix: containerNamePrefix + third_suffix + "three",
+				restartCount:    3,
+				numContainers:   5,
+			},
+		},
+	}
+	for _, test := range tests {
+		// TODO (dashpole): Once the Container Runtime Interface (CRI) is complete, generalize run on other runtimes (other than docker)
+		dockerContainerGCTest(f, test)
+	}
+})
+
+/*
+Tests the following:
+	pods are created, and all containers restart the specified number of times
+	while contianers are running, the number of copies of a single container does not exceed maxPerPodContainer
+	while containers are running, the total number of containers does not exceed maxTotalContainers
+	while containers are running, if not constrained by maxPerPodContainer or maxTotalContainers, keep an extra copy of each container
+	once pods are killed, all containers are eventually cleaned up
+*/
+func containerGCTest(f *framework.Framework, pods []*testPodSpec) {
+	Context("when we create and delete pods with containers", func() {
+		BeforeEach(func() {
+			realPods := getPods(pods)
+			f.PodClient().CreateBatch(realPods)
+			By("making sure all containers restart the specified number of times")
+			Eventually(func() error {
+				for _, podSpec := range pods {
+					updatedPod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(podSpec.podName)
+					if err != nil {
+						return err
+					}
+					if len(updatedPod.Status.ContainerStatuses) != podSpec.numContainers {
+						return fmt.Errorf("Expected pod %s to have %d containers, actual: %d",
+							updatedPod.Name, podSpec.numContainers, len(updatedPod.Status.ContainerStatuses))
+					}
+					for _, containerStatus := range updatedPod.Status.ContainerStatuses {
+						if containerStatus.RestartCount != podSpec.restartCount {
+							return fmt.Errorf("Pod %s had container with restartcount %d.  Should have been at least %d",
+								updatedPod.Name, containerStatus.RestartCount, podSpec.restartCount)
+						}
+					}
+				}
+				return nil
+			}, setupDuration, runtimePollInterval).Should(BeNil())
+		})
+
+		It(fmt.Sprintf("should eventually garbage collect containers when containers > maxPerPodContainer*numContainers	or totalContainers > maxTotalContainers"), func() {
+			totalContainers := 0
+			for _, pod := range pods {
+				totalContainers += pod.numContainers * 2
+			}
+			Eventually(func() error {
+				total := 0
+				for _, pod := range pods {
+					containerCount, err := pod.getContainerCount()
+					if err != nil {
+						return err
+					}
+					total += containerCount
+					// Check maxPerPodContainer
+					if containerCount > maxPerPodContainer*pod.numContainers {
+						return fmt.Errorf("expected total number of pod %v's containers: %v, to be <= maxPerPodContainer*numContainers %v",
+							pod.podName, containerCount, maxPerPodContainer*pod.numContainers)
+					}
+				}
+				//Check maxTotalContainers
+				if maxTotalContainers > 0 && total > maxTotalContainers {
+					return fmt.Errorf("expected total number of containers: %v, to be <= maxTotalContainers: %v", total, maxTotalContainers)
+				}
+				return nil
+			}, garbageCollectDuration, runtimePollInterval).Should(BeNil())
+
+			if maxPerPodContainer >= 2 && maxTotalContainers < 0 { // make sure constraints wouldn't make us gc old containers
+				By("Making sure the kubelet consistently keeps around an extra copy of each container.")
+				Consistently(func() error {
+					for _, pod := range pods {
+						containerCount, err := pod.getContainerCount()
+						if err != nil {
+							return err
+						}
+						if pod.restartCount > 0 && containerCount < pod.numContainers*2 {
+							return fmt.Errorf("expected pod %v to have extra copies of old containers", pod.podName)
+						}
+					}
+					return nil
+				}, garbageCollectDuration, runtimePollInterval).Should(BeNil())
+			}
+		})
+
+		AfterEach(func() {
+			for _, pod := range pods {
+				By(fmt.Sprintf("Deleting Pod %v", pod.podName))
+				f.PodClient().DeleteSync(pod.podName, &api.DeleteOptions{}, defaultRuntimeRequestTimeoutDuration)
+			}
+
+			By("Making sure all containers get cleaned up")
+			Eventually(func() error {
+				for _, pod := range pods {
+					containerCount, err := pod.getContainerCount()
+					if err != nil {
+						return err
+					}
+					if containerCount > 0 {
+						return fmt.Errorf("%v containers still remain", containerCount)
+					}
+				}
+				return nil
+			}, garbageCollectDuration, runtimePollInterval).Should(BeNil())
+
+			if CurrentGinkgoTestDescription().Failed && framework.TestContext.DumpLogsOnFailure {
+				framework.Logf("Summary of node events during the garbage collection test:")
+				err := framework.ListNamespaceEvents(f.ClientSet, f.Namespace.Name)
+				framework.ExpectNoError(err)
+				framework.Logf("Summary of pod events during the garbage collection test:")
+				err = framework.ListNamespaceEvents(f.ClientSet, "")
+				framework.ExpectNoError(err)
+			}
+		})
+	})
+}
+
+// Runs containerGCTest using the docker runtime.
+func dockerContainerGCTest(f *framework.Framework, pods []*testPodSpec) {
+	runtime := docker.ConnectToDockerOrDie(defaultDockerEndpoint, defaultRuntimeRequestTimeoutDuration)
+	for _, pod := range pods {
+		// Initialize the getContainerCount function to use the dockertools api
+		thisPrefix := pod.containerPrefix
+		pod.getContainerCount = func() (int, error) {
+			relevantContainers := []*dockertypes.Container{}
+			dockerContainers, err := docker.GetKubeletDockerContainers(runtime, true)
+			if err != nil {
+				return 0, err
+			}
+			for _, container := range dockerContainers {
+				// only look for containers from this testspec
+				if strings.Contains(container.Names[0], thisPrefix) {
+					relevantContainers = append(relevantContainers, container)
+				}
+			}
+			for i, container := range relevantContainers {
+				framework.Logf("%v containers; looking for %v; number %v; found %v", len(relevantContainers), thisPrefix, i, container.Names[0])
+			}
+			return len(relevantContainers), nil
+		}
+	}
+	containerGCTest(f, pods)
+}
+
+func getPods(specs []*testPodSpec) (pods []*api.Pod) {
+	for _, spec := range specs {
+		By(fmt.Sprintf("creating %v containers with restartCount: %v", spec.numContainers, spec.restartCount))
+		containers := []api.Container{}
+		for i := 0; i < spec.numContainers; i++ {
+			containers = append(containers, api.Container{
+				Image: "gcr.io/google_containers/busybox:1.24",
+				Name:  fmt.Sprintf("%s%d", spec.containerPrefix, i),
+				Command: []string{
+					"sh",
+					"-c",
+					fmt.Sprintf(`
+						f=/test-empty-dir-mnt/countfile%d
+						count=$(echo 'hello' >> $f ; wc -l $f | awk {'print $1'})
+						if [ $count -lt %d ]; then
+							exit 0
+						fi
+						while true; do sleep 1; done
+					`, i, spec.restartCount+1),
+				},
+				VolumeMounts: []api.VolumeMount{
+					{MountPath: "/test-empty-dir-mnt", Name: "test-empty-dir"},
+				},
+			})
+		}
+		pods = append(pods, &api.Pod{
+			ObjectMeta: api.ObjectMeta{Name: spec.podName},
+			Spec: api.PodSpec{
+				RestartPolicy: api.RestartPolicyAlways,
+				Containers:    containers,
+				Volumes: []api.Volume{
+					{Name: "test-empty-dir", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
+				},
+			},
+		})
+	}
+	return
+}
