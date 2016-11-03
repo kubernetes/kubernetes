@@ -378,7 +378,7 @@ func TestValidOpenAPISpec(t *testing.T) {
 	}
 
 	// TODO(mehdy): The actual validation part of these tests are timing out on jerkin but passing locally. Enable it after debugging timeout issue.
-	disableValidation := true
+	disableValidation := false
 
 	// Validate OpenApi spec
 	doc, err := loads.Spec(server.URL + "/swagger.json")
