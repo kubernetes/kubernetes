@@ -20,14 +20,14 @@ import (
 	"fmt"
 	"reflect"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 // CheckCodec makes sure that the codec can encode objects like internalType,
 // decode all of the external types listed, and also decode them into the given
 // object. (Will modify internalObject.) (Assumes JSON serialization.)
 // TODO: verify that the correct external version is chosen on encode...
-func CheckCodec(c Codec, internalType Object, externalTypes ...unversioned.GroupVersionKind) error {
+func CheckCodec(c Codec, internalType Object, externalTypes ...schema.GroupVersionKind) error {
 	_, err := Encode(c, internalType)
 	if err != nil {
 		return fmt.Errorf("Internal type not encodable: %v", err)

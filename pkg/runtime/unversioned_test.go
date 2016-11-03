@@ -25,16 +25,16 @@ import (
 	// pkg/conversion/test/... instead of importing pkg/api here.
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 func TestV1EncodeDecodeStatus(t *testing.T) {
-	status := &unversioned.Status{
-		Status:  unversioned.StatusFailure,
+	status := &v1.Status{
+		Status:  v1.StatusFailure,
 		Code:    200,
-		Reason:  unversioned.StatusReasonUnknown,
+		Reason:  v1.StatusReasonUnknown,
 		Message: "",
 	}
 
@@ -44,7 +44,7 @@ func TestV1EncodeDecodeStatus(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	typeMeta := unversioned.TypeMeta{}
+	typeMeta := v1.TypeMeta{}
 	if err := json.Unmarshal(encoded, &typeMeta); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -64,10 +64,10 @@ func TestV1EncodeDecodeStatus(t *testing.T) {
 }
 
 func TestExperimentalEncodeDecodeStatus(t *testing.T) {
-	status := &unversioned.Status{
-		Status:  unversioned.StatusFailure,
+	status := &v1.Status{
+		Status:  v1.StatusFailure,
 		Code:    200,
-		Reason:  unversioned.StatusReasonUnknown,
+		Reason:  v1.StatusReasonUnknown,
 		Message: "",
 	}
 	// TODO: caesarxuchao: use the testapi.Extensions.Codec() once the PR that
@@ -77,7 +77,7 @@ func TestExperimentalEncodeDecodeStatus(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	typeMeta := unversioned.TypeMeta{}
+	typeMeta := v1.TypeMeta{}
 	if err := json.Unmarshal(encoded, &typeMeta); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
