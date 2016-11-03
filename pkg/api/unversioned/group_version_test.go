@@ -152,7 +152,7 @@ func TestKindForGroupVersionKinds(t *testing.T) {
 	gvks := GroupVersions{
 		GroupVersion{Group: "batch", Version: "v1"},
 		GroupVersion{Group: "batch", Version: "v2alpha1"},
-		GroupVersion{Group: "policy", Version: "v1alpha1"},
+		GroupVersion{Group: "policy", Version: "v1beta1"},
 	}
 	cases := []struct {
 		input  []GroupVersionKind
@@ -170,8 +170,8 @@ func TestKindForGroupVersionKinds(t *testing.T) {
 			ok:     true,
 		},
 		{
-			input:  []GroupVersionKind{{Group: "policy", Version: "v1alpha1", Kind: "PodDisruptionBudget"}},
-			target: GroupVersionKind{Group: "policy", Version: "v1alpha1", Kind: "PodDisruptionBudget"},
+			input:  []GroupVersionKind{{Group: "policy", Version: "v1beta1", Kind: "PodDisruptionBudget"}},
+			target: GroupVersionKind{Group: "policy", Version: "v1beta1", Kind: "PodDisruptionBudget"},
 			ok:     true,
 		},
 		{

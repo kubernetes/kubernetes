@@ -17,6 +17,8 @@ limitations under the License.
 package etcd
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -103,11 +105,13 @@ func (r *EvictionREST) Create(ctx api.Context, obj runtime.Object) (runtime.Obje
 }
 
 func (r *EvictionREST) checkAndDecrement(namespace string, pdb policy.PodDisruptionBudget) (ok bool, err error) {
-	if !pdb.Status.PodDisruptionAllowed {
+	if pdb.Status.PodDisruptionsAllowed < 0 {
+		return false, fmt.Errorf("pdb disruptions allowed is negative")
+	}
+	if pdb.Status.PodDisruptionsAllowed == 0 {
 		return false, nil
 	}
-
-	pdb.Status.PodDisruptionAllowed = false
+	pdb.Status.PodDisruptionsAllowed--
 	if _, err := r.podDisruptionBudgetClient.PodDisruptionBudgets(namespace).UpdateStatus(&pdb); err != nil {
 		return false, err
 	}

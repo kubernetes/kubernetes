@@ -40,7 +40,7 @@ go_library(
         "//pkg/client/clientset_generated/release_1_5/typed/certificates/v1alpha1:go_default_library",
         "//pkg/client/clientset_generated/release_1_5/typed/core/v1:go_default_library",
         "//pkg/client/clientset_generated/release_1_5/typed/extensions/v1beta1:go_default_library",
-        "//pkg/client/clientset_generated/release_1_5/typed/policy/v1alpha1:go_default_library",
+        "//pkg/client/clientset_generated/release_1_5/typed/policy/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/release_1_5/typed/rbac/v1alpha1:go_default_library",
         "//pkg/client/clientset_generated/release_1_5/typed/storage/v1beta1:go_default_library",
         "//pkg/client/restclient:go_default_library",

@@ -109,6 +109,7 @@ pkg/client/listers/imagepolicy/internalversion
 pkg/client/listers/imagepolicy/v1alpha1
 pkg/client/listers/policy/internalversion
 pkg/client/listers/policy/v1alpha1
+pkg/client/listers/policy/v1beta1
 pkg/client/listers/rbac/internalversion
 pkg/client/listers/rbac/v1alpha1
 pkg/client/listers/storage/internalversion
