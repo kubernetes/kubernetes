@@ -34,6 +34,7 @@ import (
 	daemonset "k8s.io/kubernetes/federation/pkg/federation-controller/daemonset"
 	deploymentcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/deployment"
 	ingresscontroller "k8s.io/kubernetes/federation/pkg/federation-controller/ingress"
+	jobcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/job"
 	namespacecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/namespace"
 	replicasetcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/replicaset"
 	secretcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/secret"
@@ -176,6 +177,10 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 	replicaSetClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, replicasetcontroller.UserAgentName))
 	replicaSetController := replicasetcontroller.NewReplicaSetController(replicaSetClientset)
 	go replicaSetController.Run(s.ConcurrentReplicaSetSyncs, wait.NeverStop)
+
+	jobClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, jobcontroller.UserAgentName))
+	jobController := jobcontroller.NewJobController(jobClientset)
+	go jobController.Run(s.ConcurrentJobSyncs, wait.NeverStop)
 
 	deploymentClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, deploymentcontroller.UserAgentName))
 	deploymentController := deploymentcontroller.NewDeploymentController(deploymentClientset)
