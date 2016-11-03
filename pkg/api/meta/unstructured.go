@@ -17,7 +17,7 @@ limitations under the License.
 package meta
 
 import (
-	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/apis/meta/v1/unstructured"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
@@ -25,7 +25,7 @@ import (
 // dealing with runtime.Unstructured objects.
 func InterfacesForUnstructured(schema.GroupVersion) (*VersionInterfaces, error) {
 	return &VersionInterfaces{
-		ObjectConvertor:  &runtime.UnstructuredObjectConverter{},
+		ObjectConvertor:  &unstructured.UnstructuredObjectConverter{},
 		MetadataAccessor: NewAccessor(),
 	}, nil
 }

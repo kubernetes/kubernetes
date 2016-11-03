@@ -235,3 +235,17 @@ type SelfLinker interface {
 type Object interface {
 	GetObjectKind() schema.ObjectKind
 }
+
+// Unstructured objects store values as map[string]interface{}, with only values that can be serialized
+// to JSON allowed.
+type Unstructured interface {
+	// IsUnstructuredObject is a marker interface to allow objects that can be serialized but not introspected
+	// to bypass conversion.
+	IsUnstructuredObject()
+	// IsList returns true if this type is a list or matches the list convention - has an array called "items".
+	IsList() bool
+	// UnstructuredContent returns a non-nil, mutable map of the contents of this object. Values may be
+	// []interface{}, map[string]interface{}, or any primitive type. Contents are typically serialized to
+	// and from JSON.
+	UnstructuredContent() map[string]interface{}
+}
