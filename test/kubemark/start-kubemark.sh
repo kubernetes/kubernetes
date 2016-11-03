@@ -29,7 +29,7 @@ INSTANCE_PREFIX="${INSTANCE_PREFIX:-}"
 SERVICE_CLUSTER_IP_RANGE="${SERVICE_CLUSTER_IP_RANGE:-}"
 
 # Etcd related variables.
-ETCD_IMAGE="${ETCD_IMAGE:-2.2.1}"
+ETCD_IMAGE="${ETCD_IMAGE:-3.0.14-alpha.1}"
 ETCD_VERSION="${ETCD_VERSION:-}"
 
 # Controller-manager related variables.
