@@ -12,6 +12,7 @@ load(
 go_binary(
     name = "hyperkube",
     library = ":go_default_library",
+    linkstamp = "k8s.io/kubernetes/pkg/version",
     tags = ["automanaged"],
 )
 

@@ -40,4 +40,9 @@ STABLE_gitTreeState ${KUBE_GIT_TREE_STATE-}
 STABLE_gitVersion ${KUBE_GIT_VERSION-}
 STABLE_gitMajor ${KUBE_GIT_MAJOR-}
 STABLE_gitMinor ${KUBE_GIT_MINOR-}
+gitCommit ${KUBE_GIT_COMMIT-}
+gitTreeState ${KUBE_GIT_TREE_STATE-}
+gitVersion ${KUBE_GIT_VERSION-}
+gitMajor ${KUBE_GIT_MAJOR-}
+gitMinor ${KUBE_GIT_MINOR-}
 EOF

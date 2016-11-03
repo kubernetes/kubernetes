@@ -11,6 +11,7 @@ load(
 go_binary(
     name = "kubelet",
     library = ":go_default_library",
+    linkstamp = "k8s.io/kubernetes/pkg/version",
     tags = ["automanaged"],
 )
 
