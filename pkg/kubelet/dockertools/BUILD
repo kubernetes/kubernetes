@@ -31,7 +31,6 @@ go_library(
         "//pkg/api/unversioned:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/credentialprovider:go_default_library",
-        "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/custommetrics:go_default_library",
         "//pkg/kubelet/events:go_default_library",
