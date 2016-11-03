@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
@@ -25,10 +26,10 @@ var SchemeGroupVersion = schema.GroupVersion{Group: "meta.k8s.io", Version: "v1"
 
 // AddToGroupVersion registers the watch external and internal kinds with the scheme, and ensures the proper
 // conversions are in place.
-func AddToGroupVersion(scheme *runtime.Scheme, groupVersion unversioned.GroupVersion) {
+func AddToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion) {
 	scheme.AddKnownTypeWithName(groupVersion.WithKind(WatchEventKind), &Event{})
 	scheme.AddKnownTypeWithName(
-		unversioned.GroupVersion{Group: groupVersion.Group, Version: runtime.APIVersionInternal}.WithKind(WatchEventKind),
+		schema.GroupVersion{Group: groupVersion.Group, Version: runtime.APIVersionInternal}.WithKind(WatchEventKind),
 		&InternalEvent{},
 	)
 	scheme.AddConversionFuncs(

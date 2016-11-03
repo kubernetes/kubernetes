@@ -17,7 +17,9 @@ limitations under the License.
 package v1
 
 import (
+	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -74,5 +76,5 @@ func Convert_versioned_Event_to_versioned_InternalEvent(in *Event, out *Internal
 // InternalEvent makes watch.Event versioned
 type InternalEvent watch.Event
 
-func (e *InternalEvent) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
-func (e *Event) GetObjectKind() unversioned.ObjectKind         { return unversioned.EmptyObjectKind }
+func (e *InternalEvent) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
+func (e *Event) GetObjectKind() schema.ObjectKind         { return schema.EmptyObjectKind }
