@@ -38,8 +38,6 @@ func TestGenerateTokenIfNeeded(t *testing.T) {
 
 	for _, rt := range tests {
 		actual := generateTokenIfNeeded(&rt.s)
-		fmt.Println("here is a run:")
-		fmt.Println(actual)
 		if (actual == nil) != rt.expected {
 			t.Errorf(
 				"failed UseGivenTokenIfValid:\n\texpected: %t\n\t  actual: %t\n\t token:%s",
@@ -57,7 +55,6 @@ func TestCreateTokenAuthFile(t *testing.T) {
 		t.Fatalf("Couldn't create tmpdir")
 	}
 	defer os.Remove(tmpdir)
-	fmt.Println(tmpdir)
 
 	// set up tmp GlobalEnvParams values for testing
 	oldEnv := kubeadmapi.GlobalEnvParams
