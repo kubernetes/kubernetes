@@ -11545,12 +11545,6 @@ go_library(
 )
 
 go_library(
-    name = "github.com/vmware/photon-controller-go-sdk/photon/internal/mocks",
-    srcs = ["github.com/vmware/photon-controller-go-sdk/photon/internal/mocks/httpserver.go"],
-    tags = ["automanaged"],
-)
-
-go_library(
     name = "github.com/vmware/photon-controller-go-sdk/photon/lightwave",
     srcs = [
         "github.com/vmware/photon-controller-go-sdk/photon/lightwave/jwttoken.go",
