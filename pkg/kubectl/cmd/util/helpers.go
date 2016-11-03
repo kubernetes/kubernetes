@@ -753,8 +753,8 @@ func IsSiblingCommandExists(cmd *cobra.Command, targetCmdName string) bool {
 	return false
 }
 
-// RunGetServerSupportedSMPatchVersion takes a Factory,
-// returns if the server support SMPatchVersion_1_5
+// RunGetServerSupportedSMPatchVersion is a wrapper of GetServerSupportedSMPatchVersion(),
+// It takes a Factory, returns the max version the server supports.
 func GetServerSupportedSMPatchVersionFromFactory(f Factory) (strategicpatch.StrategicMergePatchVersion, error) {
 	clientSet, err := f.ClientSet()
 	if err != nil {

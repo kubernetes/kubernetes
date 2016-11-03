@@ -282,7 +282,7 @@ mergingIntList:
 `),
 				TwoWay: []byte(`
 mergingIntList:
-  $patch: patch
+  $patch: mergeprimitiveslist
   "2": 2
   "3": 3
 `),
@@ -848,7 +848,7 @@ mergingIntList:
 `),
 				TwoWay: []byte(`
 mergingIntList:
-  $patch: patch
+  $patch: mergeprimitiveslist
   "1": null
   "3": 3
 `),
@@ -865,7 +865,7 @@ mergingIntList:
 `),
 				ThreeWay: []byte(`
 mergingIntList:
-  $patch: patch
+  $patch: mergeprimitiveslist
   "1": null
   "3": 3
 `),
@@ -887,7 +887,7 @@ mergingIntList:
 `),
 				TwoWay: []byte(`
 mergingIntList:
-  $patch: patch
+  $patch: mergeprimitiveslist
   "1": null
   "3": 3
 `),
@@ -903,7 +903,7 @@ mergingIntList:
 `),
 				ThreeWay: []byte(`
 mergingIntList:
-  $patch: patch
+  $patch: mergeprimitiveslist
   "1": null
   "3": 3
 `),
@@ -2526,7 +2526,6 @@ func testPatchApplication(t *testing.T, original, patch, expected []byte, descri
 			err, description, jsonToYAMLOrError(patch), jsonToYAMLOrError(original))
 		return
 	}
-
 	sorted, err := sortMergeListsByName(result, mergeItem)
 	if err != nil {
 		t.Errorf("error: %s\nin test case: %s\ncannot sort result object:\n%s\n",

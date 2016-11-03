@@ -196,14 +196,6 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 		return err
 	}
 
-	SMPatchVersion := strategicpatch.SMPatchVersionLatest
-	if !o.local {
-		SMPatchVersion, err = cmdutil.GetServerSupportedSMPatchVersionFromFactory(f)
-		if err != nil {
-			return err
-		}
-	}
-
 	var singularResource bool
 	r.IntoSingular(&singularResource)
 
@@ -231,6 +223,12 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 			}
 			outputObj = obj
 		} else {
+			// retrieves server version to determine which SMPatchVersion to use.
+			SMPatchVersion, err := cmdutil.GetServerSupportedSMPatchVersionFromFactory(f)
+			if err != nil {
+				return err
+			}
+
 			name, namespace := info.Name, info.Namespace
 			oldData, err := json.Marshal(obj)
 			if err != nil {

@@ -119,11 +119,12 @@ type Patch struct {
 
 // CalculatePatches calls the mutation function on each provided info object, and generates a strategic merge patch for
 // the changes in the object. Encoder must be able to encode the info into the appropriate destination type. If mutateFn
-// returns false, the object is not included in the final list of patches. If local is false, it will contact the server to
-// check which StategicMergePatchVersion to use. Otherwise, it will default to SMPatchVersion_1_5.
+// returns false, the object is not included in the final list of patches.
+// If local is true, it will be default to use SMPatchVersionLatest to calculate a patch without contacting the server to
+// get the server supported SMPatchVersion. If you are using a patch's Patch field generated in local mode, be careful.
+// If local is false, it will talk to the server to check which StategicMergePatchVersion to use.
 func CalculatePatches(f cmdutil.Factory, infos []*resource.Info, encoder runtime.Encoder, local bool, mutateFn func(*resource.Info) (bool, error)) []*Patch {
 	var patches []*Patch
-
 	SMPatchVersion := strategicpatch.SMPatchVersionLatest
 	var err error
 	if !local {

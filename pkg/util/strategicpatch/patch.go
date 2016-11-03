@@ -42,11 +42,11 @@ import (
 type StrategicMergePatchVersion string
 
 const (
-	directiveMarker           = "$patch"
-	deleteDirective           = "delete"
-	replaceDirective          = "replace"
-	mergeDirective            = "merge"
-	listOfPrimitivesDirective = "patch"
+	directiveMarker              = "$patch"
+	deleteDirective              = "delete"
+	replaceDirective             = "replace"
+	mergeDirective               = "merge"
+	mergePrimitivesListDirective = "mergeprimitiveslist"
 
 	// different versions of StrategicMergePatch
 	SMPatchVersion_1_0   StrategicMergePatchVersion = "v1.0.0"
@@ -343,93 +343,102 @@ func diffLists(original, modified []interface{}, t reflect.Type, mergeKey string
 func diffListsOfScalars(original, modified []interface{}, ignoreChangesAndAdditions, ignoreDeletions bool, SMPatchVersion StrategicMergePatchVersion) (interface{}, error) {
 	originalScalars := uniqifyAndSortScalars(original)
 	modifiedScalars := uniqifyAndSortScalars(modified)
-	originalIndex, modifiedIndex := 0, 0
 
 	switch SMPatchVersion {
 	case SMPatchVersion_1_5:
-		patch := map[string]interface{}{}
-		patch[directiveMarker] = listOfPrimitivesDirective
-
-		for originalIndex < len(originalScalars) && modifiedIndex < len(modifiedScalars) {
-			originalString := fmt.Sprintf("%v", originalScalars[originalIndex])
-			modifiedString := fmt.Sprintf("%v", modifiedScalars[modifiedIndex])
-
-			// objects are identical
-			if originalString == modifiedString {
-				originalIndex++
-				modifiedIndex++
-				continue
-			}
-
-			if originalString > modifiedString {
-				if !ignoreChangesAndAdditions {
-					modifiedValue := modified[modifiedIndex]
-					patch[modifiedString] = modifiedValue
-				}
-				modifiedIndex++
-			} else {
-				if !ignoreDeletions {
-					patch[originalString] = nil
-				}
-				originalIndex++
-			}
-		}
-
-		// Delete any remaining items found only in original
-		if !ignoreDeletions {
-			for ; originalIndex < len(originalScalars); originalIndex++ {
-				originalString := fmt.Sprintf("%v", originalScalars[originalIndex])
-				patch[originalString] = nil
-			}
-		}
-
-		// Add any remaining items found only in modified
-		if !ignoreChangesAndAdditions {
-			for ; modifiedIndex < len(modifiedScalars); modifiedIndex++ {
-				modifiedString := fmt.Sprintf("%v", modifiedScalars[modifiedIndex])
-				modifiedValue := modified[modifiedIndex]
-				patch[modifiedString] = modifiedValue
-			}
-		}
-
-		return patch, nil
+		return diffListsOfScalarsIntoMap(originalScalars, modifiedScalars, ignoreChangesAndAdditions, ignoreDeletions)
 	case SMPatchVersion_1_0:
-		if len(modified) == 0 {
-			// There is no need to check the length of original because there is no way to create
-			// a patch that deletes a scalar from a list of scalars with merge semantics.
-			return nil, nil
-		}
-
-		patch := []interface{}{}
-
-	loopB:
-		for ; modifiedIndex < len(modifiedScalars); modifiedIndex++ {
-			for ; originalIndex < len(originalScalars); originalIndex++ {
-				originalString := fmt.Sprintf("%v", original[originalIndex])
-				modifiedString := fmt.Sprintf("%v", modified[modifiedIndex])
-				if originalString >= modifiedString {
-					if originalString != modifiedString {
-						patch = append(patch, modified[modifiedIndex])
-					}
-
-					continue loopB
-				}
-				// There is no else clause because there is no way to create a patch that deletes
-				// a scalar from a list of scalars with merge semantics.
-			}
-
-			break
-		}
-
-		// Add any remaining items found only in modified
-		for ; modifiedIndex < len(modifiedScalars); modifiedIndex++ {
-			patch = append(patch, modified[modifiedIndex])
-		}
-
-		return patch, nil
+		return diffListsOfScalarsIntoSlice(originalScalars, modifiedScalars, ignoreChangesAndAdditions, ignoreDeletions)
 	default:
 		return nil, fmt.Errorf("Unknown StrategicMergePatchVersion: %v", SMPatchVersion)
 	}
+}
+
+func diffListsOfScalarsIntoSlice(originalScalars, modifiedScalars []interface{}, ignoreChangesAndAdditions, ignoreDeletions bool) ([]interface{}, error) {
+	originalIndex, modifiedIndex := 0, 0
+	if len(modifiedScalars) == 0 {
+		// There is no need to check the length of original because there is no way to create
+		// a patch that deletes a scalar from a list of scalars with merge semantics.
+		return nil, nil
+	}
+
+	patch := []interface{}{}
+
+loopB:
+	for ; modifiedIndex < len(modifiedScalars); modifiedIndex++ {
+		for ; originalIndex < len(originalScalars); originalIndex++ {
+			originalString := fmt.Sprintf("%v", originalScalars[originalIndex])
+			modifiedString := fmt.Sprintf("%v", modifiedScalars[modifiedIndex])
+			if originalString >= modifiedString {
+				if originalString != modifiedString {
+					patch = append(patch, modifiedScalars[modifiedIndex])
+				}
+
+				continue loopB
+			}
+			// There is no else clause because there is no way to create a patch that deletes
+			// a scalar from a list of scalars with merge semantics.
+		}
+
+		break
+	}
+
+	// Add any remaining items found only in modified
+	for ; modifiedIndex < len(modifiedScalars); modifiedIndex++ {
+		patch = append(patch, modifiedScalars[modifiedIndex])
+	}
+
+	return patch, nil
+}
+
+func diffListsOfScalarsIntoMap(originalScalars, modifiedScalars []interface{}, ignoreChangesAndAdditions, ignoreDeletions bool) (map[string]interface{}, error) {
+	originalIndex, modifiedIndex := 0, 0
+	patch := map[string]interface{}{}
+	patch[directiveMarker] = mergePrimitivesListDirective
+
+	for originalIndex < len(originalScalars) && modifiedIndex < len(modifiedScalars) {
+		originalString := fmt.Sprintf("%v", originalScalars[originalIndex])
+		modifiedString := fmt.Sprintf("%v", modifiedScalars[modifiedIndex])
+
+		// objects are identical
+		if originalString == modifiedString {
+			originalIndex++
+			modifiedIndex++
+			continue
+		}
+
+		if originalString > modifiedString {
+			if !ignoreChangesAndAdditions {
+				modifiedValue := modifiedScalars[modifiedIndex]
+				patch[modifiedString] = modifiedValue
+			}
+			modifiedIndex++
+		} else {
+			if !ignoreDeletions {
+				patch[originalString] = nil
+			}
+			originalIndex++
+		}
+	}
+
+	// Delete any remaining items found only in original
+	if !ignoreDeletions {
+		for ; originalIndex < len(originalScalars); originalIndex++ {
+			originalString := fmt.Sprintf("%v", originalScalars[originalIndex])
+			patch[originalString] = nil
+		}
+	}
+
+	// Add any remaining items found only in modified
+	if !ignoreChangesAndAdditions {
+		for ; modifiedIndex < len(modifiedScalars); modifiedIndex++ {
+			modifiedString := fmt.Sprintf("%v", modifiedScalars[modifiedIndex])
+			modifiedValue := modifiedScalars[modifiedIndex]
+			patch[modifiedString] = modifiedValue
+		}
+	}
+
+	return patch, nil
 }
 
 var errNoMergeKeyFmt = "map: %v does not contain declared merge key: %s"
@@ -619,7 +628,11 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type) (map[strin
 			return map[string]interface{}{}, nil
 		}
 
-		if v == listOfPrimitivesDirective {
+		if v == mergePrimitivesListDirective {
+			// delete the directiveMarker's key-value pair to avoid delta map and delete map
+			// overlaping with each other when calculating a ThreeWayDiff for list of Primitives.
+			// Otherwise, the overlaping will cause it calling LookupPatchMetadata() which will
+			// return an error since the metadata shows it's a slice but it is actually a map.
 			delete(original, directiveMarker)
 		} else {
 			return nil, fmt.Errorf(errBadPatchTypeFmt, v, patch)
@@ -659,7 +672,9 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type) (map[strin
 		// If they're both maps or lists, recurse into the value.
 		originalType := reflect.TypeOf(original[k])
 		patchType := reflect.TypeOf(patchV)
-		if originalType == patchType || (originalType != nil && patchType != nil && originalType.Kind() == reflect.Slice && patchType.Kind() == reflect.Map) {
+		// check if we are trying to merge a slice with a map for list of primitives
+		isMergeSliceOfPrimitivesWithAPatchMap := originalType != nil && patchType != nil && originalType.Kind() == reflect.Slice && patchType.Kind() == reflect.Map
+		if originalType == patchType || isMergeSliceOfPrimitivesWithAPatchMap {
 			// First find the fieldPatchStrategy and fieldPatchMergeKey.
 			fieldType, fieldPatchStrategy, fieldPatchMergeKey, err := forkedjson.LookupPatchMetadata(t, k)
 			if err != nil {
@@ -703,6 +718,11 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type) (map[strin
 // Merge two slices together. Note: This may modify both the original slice and
 // the patch because getting a deep copy of a slice in golang is highly
 // non-trivial.
+// The patch could be a map[string]interface{} representing a slice of primitives.
+// If the patch map doesn't has the specific directiveMarker (mergePrimitivesListDirective),
+// it returns an error. Please check patch_test.go and find the test case named
+// "merge lists of scalars for list of primitives" to see what the patch looks like.
+// Patch is still []interface{} for all the other types.
 func mergeSlice(original []interface{}, patch interface{}, elemType reflect.Type, mergeKey string) ([]interface{}, error) {
 	t, err := sliceElementType(original)
 	if err != nil && err != errNoElementsInSlice {
@@ -710,8 +730,12 @@ func mergeSlice(original []interface{}, patch interface{}, elemType reflect.Type
 	}
 
 	if patchMap, ok := patch.(map[string]interface{}); ok {
-		if directiveValue, ok := patchMap[directiveMarker]; ok && directiveValue == listOfPrimitivesDirective {
-			return mergeSliceOfScalarsWithPatchMap(original, patchMap), nil
+		// We try to merge the original slice with a patch map only when the map has
+		// a specific directiveMarker. Otherwise, this patch will be treated as invalid.
+		if directiveValue, ok := patchMap[directiveMarker]; ok && directiveValue == mergePrimitivesListDirective {
+			return mergeSliceOfScalarsWithPatchMap(original, patchMap)
+		} else {
+			return nil, fmt.Errorf("Unable to merge a slice with an invalid map")
 		}
 	}
 
@@ -813,7 +837,14 @@ func mergeSlice(original []interface{}, patch interface{}, elemType reflect.Type
 	return original, nil
 }
 
-func mergeSliceOfScalarsWithPatchMap(original []interface{}, patch map[string]interface{}) []interface{} {
+// mergeSliceOfScalarsWithPatchMap merges the original slice with a patch map and
+// returns an uniqified and sorted slice of primitives.
+// The patch map must have the specific directiveMarker (mergePrimitivesListDirective).
+func mergeSliceOfScalarsWithPatchMap(original []interface{}, patch map[string]interface{}) ([]interface{}, error) {
+	// make sure the patch has the specific directiveMarker ()
+	if directiveValue, ok := patch[directiveMarker]; ok && directiveValue != mergePrimitivesListDirective {
+		return nil, fmt.Errorf("Unable to merge a slice with an invalid map")
+	}
 	delete(patch, directiveMarker)
 	output := make([]interface{}, 0, len(original)+len(patch))
 	for _, value := range original {
@@ -831,9 +862,9 @@ func mergeSliceOfScalarsWithPatchMap(original []interface{}, patch map[string]in
 		if value != nil {
 			output = append(output, value)
 		}
-		// for the entry that deleting an item that does not exist in the slice, ignore it.
+		// No action required to delete items that missing from the original slice.
 	}
-	return uniqifyAndSortScalars(output)
+	return uniqifyAndSortScalars(output), nil
 }
 
 // This method no longer panics if any element of the slice is not a map.
@@ -1151,7 +1182,7 @@ func mergingMapFieldsHaveConflicts(
 					return true, nil
 				}
 
-				if leftMarker == listOfPrimitivesDirective && rightMarker == listOfPrimitivesDirective {
+				if leftMarker == mergePrimitivesListDirective && rightMarker == mergePrimitivesListDirective {
 					return false, nil
 				}
 			}
@@ -1179,7 +1210,7 @@ func mapsHaveConflicts(typedLeft, typedRight map[string]interface{}, structType 
 	isForListOfPrimitives := false
 	if leftDirective, ok := typedLeft[directiveMarker]; ok {
 		if rightDirective, ok := typedRight[directiveMarker]; ok {
-			if leftDirective == listOfPrimitivesDirective && rightDirective == rightDirective {
+			if leftDirective == mergePrimitivesListDirective && rightDirective == rightDirective {
 				isForListOfPrimitives = true
 			}
 		}
