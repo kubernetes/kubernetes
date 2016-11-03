@@ -53,6 +53,7 @@ go_test(
         "//pkg/types:go_default_library",
         "//pkg/util/iptables/testing:go_default_library",
         "//pkg/util/net:go_default_library",
+        "//pkg/util/netsh/testing:go_default_library",
         "//pkg/util/runtime:go_default_library",
     ],
 )
