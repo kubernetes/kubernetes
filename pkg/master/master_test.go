@@ -90,6 +90,7 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	config.GenericConfig.APIResourceConfigSource = DefaultAPIResourceConfigSource()
 	config.GenericConfig.RequestContextMapper = api.NewRequestContextMapper()
 	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: api.Codecs}}
+	config.GenericConfig.EnableMetrics = true
 	config.EnableCoreControllers = false
 	config.KubeletClientConfig = kubeletclient.KubeletClientConfig{Port: 10250}
 	config.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{

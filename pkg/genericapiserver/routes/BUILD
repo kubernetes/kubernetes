@@ -15,6 +15,7 @@ go_library(
     srcs = [
         "doc.go",
         "index.go",
+        "metrics.go",
         "openapi.go",
         "profiling.go",
         "swagger.go",
@@ -25,15 +26,18 @@ go_library(
     deps = [
         "//pkg/api/unversioned:go_default_library",
         "//pkg/apiserver:go_default_library",
+        "//pkg/apiserver/metrics:go_default_library",
         "//pkg/genericapiserver/mux:go_default_library",
         "//pkg/genericapiserver/openapi:go_default_library",
         "//pkg/genericapiserver/openapi/common:go_default_library",
         "//pkg/genericapiserver/routes/data/swagger:go_default_library",
+        "//pkg/storage/etcd/metrics:go_default_library",
         "//pkg/version:go_default_library",
         "//vendor:github.com/elazarl/go-bindata-assetfs",
         "//vendor:github.com/emicklei/go-restful",
         "//vendor:github.com/emicklei/go-restful/swagger",
         "//vendor:github.com/golang/glog",
+        "//vendor:github.com/prometheus/client_golang/prometheus",
     ],
 )
 
