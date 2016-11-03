@@ -37,6 +37,16 @@ type PodDisruptionBudgetSpec struct {
 	Selector *unversioned.LabelSelector `json:"selector,omitempty"`
 }
 
+// DisruptedPod contains an information about a pod that was disrupted
+// recently. It is assumed that the pod is in the same namespace as PodDisruptionBudget.
+type DisruptedPod struct {
+	// Name of the pod that will be disrupted.
+	Name string `json:"name,omitempty"`
+
+	// DisruptionTime is the time of when the disruption was planned.
+	DisruptionTime unversioned.Time `json:"disruptionTime,omitempty"`
+}
+
 // PodDisruptionBudgetStatus represents information about the status of a
 // PodDisruptionBudget. Status may trail the actual state of a system.
 type PodDisruptionBudgetStatus struct {
@@ -51,6 +61,9 @@ type PodDisruptionBudgetStatus struct {
 
 	// total number of pods counted by this disruption budget
 	ExpectedPods int32 `json:"expectedPods"`
+
+	// List of pods that were disrupted recently.
+	DisruptedPods []*DisruptedPod `json:"disruptedPods" protobuf:"bytes,5,rep,name=disruptedPods"`
 }
 
 // +genclient=true
