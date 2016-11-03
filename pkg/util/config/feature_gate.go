@@ -54,7 +54,7 @@ var (
 		appArmor:                  {true, beta},
 		dynamicKubeletConfig:      {false, alpha},
 		dynamicVolumeProvisioning: {true, alpha},
-		streamingProxyRedirects:   {true, ga},
+		streamingProxyRedirects:   {false, alpha},
 	}
 
 	// Special handling for a few gates.
@@ -113,7 +113,7 @@ type FeatureGate interface {
 	DynamicKubeletConfig() bool
 
 	// owner: timstclair
-	// ga: v1.5
+	// alpha: v1.5
 	StreamingProxyRedirects() bool
 }
 
