@@ -27,6 +27,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
+	"net/url"
 	"reflect"
 	"strconv"
 	"strings"
@@ -35,6 +36,8 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
@@ -42,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainertesting "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/types"
@@ -70,6 +74,7 @@ type fakeKubelet struct {
 	resyncInterval                     time.Duration
 	loopEntryTime                      time.Time
 	plegHealth                         bool
+	redirectURL                        *url.URL
 }
 
 func (fk *fakeKubelet) ResyncInterval() time.Duration {
@@ -130,6 +135,18 @@ func (fk *fakeKubelet) AttachContainer(name string, uid types.UID, container str
 
 func (fk *fakeKubelet) PortForward(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error {
 	return fk.portForwardFunc(name, uid, port, stream)
+}
+
+func (fk *fakeKubelet) GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommand.Options) (*url.URL, error) {
+	return fk.redirectURL, nil
+}
+
+func (fk *fakeKubelet) GetAttach(podFullName string, podUID types.UID, containerName string, streamOpts remotecommand.Options) (*url.URL, error) {
+	return fk.redirectURL, nil
+}
+
+func (fk *fakeKubelet) GetPortForward(podName, podNamespace string, podUID types.UID) (*url.URL, error) {
+	return fk.redirectURL, nil
 }
 
 func (fk *fakeKubelet) StreamingConnectionIdleTimeout() time.Duration {
@@ -1136,6 +1153,7 @@ func testExecAttach(t *testing.T, verb string) {
 		tty                bool
 		responseStatusCode int
 		uid                bool
+		responseLocation   string
 	}{
 		{responseStatusCode: http.StatusBadRequest},
 		{stdin: true, responseStatusCode: http.StatusSwitchingProtocols},
@@ -1144,6 +1162,7 @@ func testExecAttach(t *testing.T, verb string) {
 		{stdout: true, stderr: true, responseStatusCode: http.StatusSwitchingProtocols},
 		{stdout: true, stderr: true, tty: true, responseStatusCode: http.StatusSwitchingProtocols},
 		{stdin: true, stdout: true, stderr: true, responseStatusCode: http.StatusSwitchingProtocols},
+		{responseStatusCode: http.StatusFound, responseLocation: "http://localhost:12345/" + verb},
 	}
 
 	for i, test := range tests {
@@ -1152,6 +1171,12 @@ func testExecAttach(t *testing.T, verb string) {
 
 		fw.fakeKubelet.streamingConnectionIdleTimeoutFunc = func() time.Duration {
 			return 0
+		}
+
+		if test.responseLocation != "" {
+			var err error
+			fw.fakeKubelet.redirectURL, err = url.Parse(test.responseLocation)
+			require.NoError(t, err)
 		}
 
 		podNamespace := "other"
@@ -1277,6 +1302,10 @@ func testExecAttach(t *testing.T, verb string) {
 
 		if test.responseStatusCode != http.StatusSwitchingProtocols {
 			c = &http.Client{}
+			// Don't follow redirects, since we want to inspect the redirect response.
+			c.CheckRedirect = func(*http.Request, []*http.Request) error {
+				return http.ErrUseLastResponse
+			}
 		} else {
 			upgradeRoundTripper = spdy.NewRoundTripper(nil)
 			c = &http.Client{Transport: upgradeRoundTripper}
@@ -1295,6 +1324,10 @@ func testExecAttach(t *testing.T, verb string) {
 
 		if e, a := test.responseStatusCode, resp.StatusCode; e != a {
 			t.Fatalf("%d: response status: expected %v, got %v", i, e, a)
+		}
+
+		if e, a := test.responseLocation, resp.Header.Get("Location"); e != a {
+			t.Errorf("%d: response location: expected %v, got %v", i, e, a)
 		}
 
 		if test.responseStatusCode != http.StatusSwitchingProtocols {
@@ -1435,11 +1468,12 @@ func TestServePortForwardIdleTimeout(t *testing.T) {
 
 func TestServePortForward(t *testing.T) {
 	tests := []struct {
-		port          string
-		uid           bool
-		clientData    string
-		containerData string
-		shouldError   bool
+		port             string
+		uid              bool
+		clientData       string
+		containerData    string
+		shouldError      bool
+		responseLocation string
 	}{
 		{port: "", shouldError: true},
 		{port: "abc", shouldError: true},
@@ -1451,6 +1485,7 @@ func TestServePortForward(t *testing.T) {
 		{port: "8000", clientData: "client data", containerData: "container data", shouldError: false},
 		{port: "65535", shouldError: false},
 		{port: "65535", uid: true, shouldError: false},
+		{port: "65535", responseLocation: "http://localhost:12345/portforward", shouldError: false},
 	}
 
 	podNamespace := "other"
@@ -1464,6 +1499,12 @@ func TestServePortForward(t *testing.T) {
 
 		fw.fakeKubelet.streamingConnectionIdleTimeoutFunc = func() time.Duration {
 			return 0
+		}
+
+		if test.responseLocation != "" {
+			var err error
+			fw.fakeKubelet.redirectURL, err = url.Parse(test.responseLocation)
+			require.NoError(t, err)
 		}
 
 		portForwardFuncDone := make(chan struct{})
@@ -1517,12 +1558,24 @@ func TestServePortForward(t *testing.T) {
 
 		upgradeRoundTripper := spdy.NewRoundTripper(nil)
 		c := &http.Client{Transport: upgradeRoundTripper}
+		// Don't follow redirects, since we want to inspect the redirect response.
+		c.CheckRedirect = func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		}
 
 		resp, err := c.Post(url, "", nil)
 		if err != nil {
 			t.Fatalf("%d: Got error POSTing: %v", i, err)
 		}
 		defer resp.Body.Close()
+
+		if test.responseLocation != "" {
+			assert.Equal(t, http.StatusFound, resp.StatusCode, "%d: status code", i)
+			assert.Equal(t, test.responseLocation, resp.Header.Get("Location"), "%d: location", i)
+			continue
+		} else {
+			assert.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode, "%d: status code", i)
+		}
 
 		conn, err := upgradeRoundTripper.NewConnection(resp)
 		if err != nil {

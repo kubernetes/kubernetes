@@ -22,6 +22,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -38,10 +39,10 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
 	"k8s.io/kubernetes/pkg/kubelet/images"
+	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -1186,14 +1187,13 @@ func (kl *Kubelet) findContainer(podFullName string, podUID types.UID, container
 	if err != nil {
 		return nil, err
 	}
+	podUID = kl.podManager.TranslatePodUID(podUID)
 	pod := kubecontainer.Pods(pods).FindPod(podFullName, podUID)
 	return pod.FindContainerByName(containerName), nil
 }
 
 // Run a command in a container, returns the combined stdout, stderr as an array of bytes
 func (kl *Kubelet) RunInContainer(podFullName string, podUID types.UID, containerName string, cmd []string) ([]byte, error) {
-	podUID = kl.podManager.TranslatePodUID(podUID)
-
 	container, err := kl.findContainer(podFullName, podUID, containerName)
 	if err != nil {
 		return nil, err
@@ -1201,20 +1201,16 @@ func (kl *Kubelet) RunInContainer(podFullName string, podUID types.UID, containe
 	if container == nil {
 		return nil, fmt.Errorf("container not found (%q)", containerName)
 	}
-
-	var buffer bytes.Buffer
-	output := ioutils.WriteCloserWrapper(&buffer)
-	err = kl.runner.ExecInContainer(container.ID, cmd, nil, output, output, false, nil)
-	// Even if err is non-nil, there still may be output (e.g. the exec wrote to stdout or stderr but
-	// the command returned a nonzero exit code). Therefore, always return the output along with the
-	// error.
-	return buffer.Bytes(), err
+	return kl.runner.RunInContainer(container.ID, cmd)
 }
 
 // ExecInContainer executes a command in a container, connecting the supplied
 // stdin/stdout/stderr to the command's IO streams.
 func (kl *Kubelet) ExecInContainer(podFullName string, podUID types.UID, containerName string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
-	podUID = kl.podManager.TranslatePodUID(podUID)
+	streamingRuntime, ok := kl.containerRuntime.(kubecontainer.DirectStreamingRuntime)
+	if !ok {
+		return fmt.Errorf("streaming methods not supported by runtime")
+	}
 
 	container, err := kl.findContainer(podFullName, podUID, containerName)
 	if err != nil {
@@ -1223,13 +1219,16 @@ func (kl *Kubelet) ExecInContainer(podFullName string, podUID types.UID, contain
 	if container == nil {
 		return fmt.Errorf("container not found (%q)", containerName)
 	}
-	return kl.runner.ExecInContainer(container.ID, cmd, stdin, stdout, stderr, tty, resize)
+	return streamingRuntime.ExecInContainer(container.ID, cmd, stdin, stdout, stderr, tty, resize)
 }
 
 // AttachContainer uses the container runtime to attach the given streams to
 // the given container.
 func (kl *Kubelet) AttachContainer(podFullName string, podUID types.UID, containerName string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
-	podUID = kl.podManager.TranslatePodUID(podUID)
+	streamingRuntime, ok := kl.containerRuntime.(kubecontainer.DirectStreamingRuntime)
+	if !ok {
+		return fmt.Errorf("streaming methods not supported by runtime")
+	}
 
 	container, err := kl.findContainer(podFullName, podUID, containerName)
 	if err != nil {
@@ -1238,23 +1237,92 @@ func (kl *Kubelet) AttachContainer(podFullName string, podUID types.UID, contain
 	if container == nil {
 		return fmt.Errorf("container not found (%q)", containerName)
 	}
-	return kl.containerRuntime.AttachContainer(container.ID, stdin, stdout, stderr, tty, resize)
+	return streamingRuntime.AttachContainer(container.ID, stdin, stdout, stderr, tty, resize)
 }
 
 // PortForward connects to the pod's port and copies data between the port
 // and the stream.
 func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port uint16, stream io.ReadWriteCloser) error {
-	podUID = kl.podManager.TranslatePodUID(podUID)
+	streamingRuntime, ok := kl.containerRuntime.(kubecontainer.DirectStreamingRuntime)
+	if !ok {
+		return fmt.Errorf("streaming methods not supported by runtime")
+	}
 
 	pods, err := kl.containerRuntime.GetPods(false)
 	if err != nil {
 		return err
 	}
+	podUID = kl.podManager.TranslatePodUID(podUID)
 	pod := kubecontainer.Pods(pods).FindPod(podFullName, podUID)
 	if pod.IsEmpty() {
 		return fmt.Errorf("pod not found (%q)", podFullName)
 	}
-	return kl.runner.PortForward(&pod, port, stream)
+	return streamingRuntime.PortForward(&pod, port, stream)
+}
+
+// GetExec gets the URL the exec will be served from, or nil if the Kubelet will serve it.
+func (kl *Kubelet) GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommand.Options) (*url.URL, error) {
+	switch streamingRuntime := kl.containerRuntime.(type) {
+	case kubecontainer.DirectStreamingRuntime:
+		// Kubelet will serve the exec directly.
+		return nil, nil
+	case kubecontainer.IndirectStreamingRuntime:
+		container, err := kl.findContainer(podFullName, podUID, containerName)
+		if err != nil {
+			return nil, err
+		}
+		if container == nil {
+			return nil, fmt.Errorf("container not found (%q)", containerName)
+		}
+		return streamingRuntime.GetExec(container.ID, cmd, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr, streamOpts.TTY)
+	default:
+		return nil, fmt.Errorf("container runtime does not support exec")
+	}
+}
+
+// GetAttach gets the URL the attach will be served from, or nil if the Kubelet will serve it.
+func (kl *Kubelet) GetAttach(podFullName string, podUID types.UID, containerName string, streamOpts remotecommand.Options) (*url.URL, error) {
+	switch streamingRuntime := kl.containerRuntime.(type) {
+	case kubecontainer.DirectStreamingRuntime:
+		// Kubelet will serve the attach directly.
+		return nil, nil
+	case kubecontainer.IndirectStreamingRuntime:
+		container, err := kl.findContainer(podFullName, podUID, containerName)
+		if err != nil {
+			return nil, err
+		}
+		if container == nil {
+			return nil, fmt.Errorf("container not found (%q)", containerName)
+		}
+
+		return streamingRuntime.GetAttach(container.ID, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr)
+	default:
+		return nil, fmt.Errorf("container runtime does not support attach")
+	}
+}
+
+// GetPortForward gets the URL the port-forward will be served from, or nil if the Kubelet will serve it.
+func (kl *Kubelet) GetPortForward(podName, podNamespace string, podUID types.UID) (*url.URL, error) {
+	switch streamingRuntime := kl.containerRuntime.(type) {
+	case kubecontainer.DirectStreamingRuntime:
+		// Kubelet will serve the attach directly.
+		return nil, nil
+	case kubecontainer.IndirectStreamingRuntime:
+		pods, err := kl.containerRuntime.GetPods(false)
+		if err != nil {
+			return nil, err
+		}
+		podUID = kl.podManager.TranslatePodUID(podUID)
+		podFullName := kubecontainer.BuildPodFullName(podName, podNamespace)
+		pod := kubecontainer.Pods(pods).FindPod(podFullName, podUID)
+		if pod.IsEmpty() {
+			return nil, fmt.Errorf("pod not found (%q)", podFullName)
+		}
+
+		return streamingRuntime.GetPortForward(podName, podNamespace, podUID)
+	default:
+		return nil, fmt.Errorf("container runtime does not support port-forward")
+	}
 }
 
 // cleanupOrphanedPodCgroups removes the Cgroups of pods that should not be

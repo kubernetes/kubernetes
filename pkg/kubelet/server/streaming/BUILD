@@ -24,6 +24,7 @@ go_library(
         "//pkg/types:go_default_library",
         "//pkg/util/term:go_default_library",
         "//vendor:github.com/emicklei/go-restful",
+        "//vendor:google.golang.org/grpc",
         "//vendor:google.golang.org/grpc/codes",
         "//vendor:k8s.io/client-go/pkg/api",
     ],
