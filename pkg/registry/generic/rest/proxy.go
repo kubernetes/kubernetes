@@ -171,8 +171,10 @@ func (h *UpgradeAwareProxyHandler) tryUpgrade(w http.ResponseWriter, req *http.R
 	defer requestHijackedConn.Close()
 
 	// Forward raw response bytes back to client.
-	if _, err = requestHijackedConn.Write(rawResponse); err != nil {
-		utilruntime.HandleError(fmt.Errorf("Error proxying response from backend to client: %v", err))
+	if len(rawResponse) > 0 {
+		if _, err = requestHijackedConn.Write(rawResponse); err != nil {
+			utilruntime.HandleError(fmt.Errorf("Error proxying response from backend to client: %v", err))
+		}
 	}
 
 	// Proxy the connection.
@@ -282,7 +284,7 @@ redirectLoop:
 		resp.Body.Close() // Unused.
 
 		switch resp.StatusCode {
-		case http.StatusFound, http.StatusSeeOther:
+		case http.StatusFound:
 			// Redirect, continue.
 		default:
 			// Don't redirect.
