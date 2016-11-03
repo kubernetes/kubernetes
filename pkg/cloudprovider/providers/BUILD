@@ -22,6 +22,7 @@ go_library(
         "//pkg/cloudprovider/providers/mesos:go_default_library",
         "//pkg/cloudprovider/providers/openstack:go_default_library",
         "//pkg/cloudprovider/providers/ovirt:go_default_library",
+        "//pkg/cloudprovider/providers/photon:go_default_library",
         "//pkg/cloudprovider/providers/rackspace:go_default_library",
         "//pkg/cloudprovider/providers/vsphere:go_default_library",
     ],
