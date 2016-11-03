@@ -635,6 +635,39 @@ func (*TrivialNodePrepareStrategy) CleanupNode(node *api.Node) *api.Node {
 	return &nodeCopy
 }
 
+type LabelNodePrepareStrategy struct {
+	labelKey   string
+	labelValue string
+}
+
+func NewLabelNodePrepareStrategy(labelKey string, labelValue string) *LabelNodePrepareStrategy {
+	return &LabelNodePrepareStrategy{
+		labelKey:   labelKey,
+		labelValue: labelValue,
+	}
+}
+
+func (s *LabelNodePrepareStrategy) PreparePatch(*api.Node) []byte {
+	labelString := fmt.Sprintf("{\"%v\":\"%v\"}", s.labelKey, s.labelValue)
+	patch := fmt.Sprintf(`{"metadata":{"labels":%v}}`, labelString)
+	return []byte(patch)
+}
+
+func (s *LabelNodePrepareStrategy) CleanupNode(node *api.Node) *api.Node {
+	objCopy, err := api.Scheme.DeepCopy(*node)
+	if err != nil {
+		return &api.Node{}
+	}
+	nodeCopy, ok := (objCopy).(*api.Node)
+	if !ok {
+		return &api.Node{}
+	}
+	if node.Labels != nil && len(node.Labels[s.labelKey]) != 0 {
+		delete(nodeCopy.Labels, s.labelKey)
+	}
+	return nodeCopy
+}
+
 func DoPrepareNode(client clientset.Interface, node *api.Node, strategy PrepareNodeStrategy) error {
 	var err error
 	patch := strategy.PreparePatch(node)
@@ -717,7 +750,7 @@ func (c *TestPodCreator) CreatePods() error {
 	return nil
 }
 
-func makePodSpec() api.PodSpec {
+func MakePodSpec() api.PodSpec {
 	return api.PodSpec{
 		Containers: []api.Container{{
 			Name:  "pause",
@@ -804,7 +837,7 @@ func NewSimpleCreatePodStrategy() TestPodCreateStrategy {
 		ObjectMeta: api.ObjectMeta{
 			GenerateName: "simple-pod-",
 		},
-		Spec: makePodSpec(),
+		Spec: MakePodSpec(),
 	}
 	return NewCustomCreatePodStrategy(basePod)
 }
@@ -816,7 +849,7 @@ func NewSimpleWithControllerCreatePodStrategy(controllerName string) TestPodCrea
 				GenerateName: controllerName + "-pod-",
 				Labels:       map[string]string{"name": controllerName},
 			},
-			Spec: makePodSpec(),
+			Spec: MakePodSpec(),
 		}
 		if err := createController(client, controllerName, namespace, podCount, basePod); err != nil {
 			return err
