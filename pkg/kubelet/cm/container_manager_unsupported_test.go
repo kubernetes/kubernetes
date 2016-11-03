@@ -57,6 +57,10 @@ func (mi *fakeMountInterface) PathIsDevice(pathname string) (bool, error) {
 	return true, nil
 }
 
+func (mi *fakeMountInterface) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
+	return "", nil
+}
+
 func fakeContainerMgrMountInt() mount.Interface {
 	return &fakeMountInterface{
 		[]mount.MountPoint{
