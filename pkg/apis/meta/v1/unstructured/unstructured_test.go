@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package runtime_test
+package unstructured_test
 
 import (
 	"fmt"
@@ -26,10 +26,10 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta/metatypes"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/types"
 )
 
@@ -198,11 +198,11 @@ func TestUnstructuredGetters(t *testing.T) {
 		t.Errorf("GetSelfLink() = %s, want %s", got, want)
 	}
 
-	if got, want := unstruct.GetCreationTimestamp(), unversioned.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC); !got.Equal(want) {
+	if got, want := unstruct.GetCreationTimestamp(), schema.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC); !got.Equal(want) {
 		t.Errorf("GetCreationTimestamp() = %s, want %s", got, want)
 	}
 
-	if got, want := unstruct.GetDeletionTimestamp(), unversioned.Date(2010, time.November, 10, 23, 0, 0, 0, time.UTC); got == nil || !got.Equal(want) {
+	if got, want := unstruct.GetDeletionTimestamp(), schema.Date(2010, time.November, 10, 23, 0, 0, 0, time.UTC); got == nil || !got.Equal(want) {
 		t.Errorf("GetDeletionTimestamp() = %s, want %s", got, want)
 	}
 
@@ -295,8 +295,8 @@ func TestUnstructuredSetters(t *testing.T) {
 	unstruct.SetUID(types.UID("test_uid"))
 	unstruct.SetResourceVersion("test_resourceVersion")
 	unstruct.SetSelfLink("test_selfLink")
-	unstruct.SetCreationTimestamp(unversioned.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC))
-	date := unversioned.Date(2010, time.November, 10, 23, 0, 0, 0, time.UTC)
+	unstruct.SetCreationTimestamp(schema.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC))
+	date := schema.Date(2010, time.November, 10, 23, 0, 0, 0, time.UTC)
 	unstruct.SetDeletionTimestamp(&date)
 	unstruct.SetLabels(map[string]string{"test_label": "test_value"})
 	unstruct.SetAnnotations(map[string]string{"test_annotation": "test_value"})
