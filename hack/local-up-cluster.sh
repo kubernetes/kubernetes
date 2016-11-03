@@ -340,6 +340,10 @@ function start_apiserver {
     if [[ -n "${RUNTIME_CONFIG}" ]]; then
       runtime_config="--runtime-config=${RUNTIME_CONFIG}"
     fi
+    client_ca_file_arg=""
+    if [[ -n "${CLIENT_CA_FILE:-}" ]]; then
+      client_ca_file_arg="--client-ca-file=${CLIENT_CA_FILE}"
+    fi
 
     # Let the API server pick a default address when API_HOST
     # is set to 127.0.0.1
@@ -354,6 +358,7 @@ function start_apiserver {
 
     APISERVER_LOG=/tmp/kube-apiserver.log
     sudo -E "${GO_OUT}/hyperkube" apiserver ${anytoken_arg} ${authorizer_arg} ${priv_arg} ${runtime_config}\
+      ${client_ca_file_arg} \
       ${advertise_address} \
       --v=${LOG_LEVEL} \
       --cert-dir="${CERT_DIR}" \
@@ -382,9 +387,16 @@ clusters:
       certificate-authority: ${ROOT_CA_FILE}
       server: https://${API_HOST}:${API_SECURE_PORT}/
     name: local-up-cluster
+users:
+  - user:
+      token: ${KUBECONFIG_TOKEN:-}
+      client-certificate: ${KUBECONFIG_CLIENT_CERTIFICATE:-}
+      client-key: ${KUBECONFIG_CLIENT_KEY:-}
+    name: local-up-cluster
 contexts:
   - context:
       cluster: local-up-cluster
+      user: local-up-cluster
     name: service-to-apiserver
 current-context: service-to-apiserver
 EOF
@@ -441,6 +453,17 @@ function start_kubelet {
         net_plugin_args="--network-plugin=${NET_PLUGIN}"
       fi
 
+      auth_args=""
+      if [[ -n "${KUBELET_AUTHORIZATION_WEBHOOK}" ]]; then
+        auth_args="${auth_args} --authorization-mode=Webhook"
+      fi
+      if [[ -n "${KUBELET_AUTHENTICATION_WEBHOOK}" ]]; then
+        auth_args="${auth_args} --authentication-token-webhook"
+      fi
+      if [[ -n "${CLIENT_CA_FILE:-}" ]]; then
+        auth_args="${auth_args} --client-ca-file=${CLIENT_CA_FILE}"
+      fi
+
       net_plugin_dir_args=""
       if [[ -n "${NET_PLUGIN_DIR}" ]]; then
         net_plugin_dir_args="--network-plugin-dir=${NET_PLUGIN_DIR}"
@@ -475,6 +498,7 @@ function start_kubelet {
         --cgroups-per-qos=${CGROUPS_PER_QOS} \
         --cgroup-driver=${CGROUP_DRIVER} \
         --cgroup-root=${CGROUP_ROOT} \
+        ${auth_args} \
         ${dns_args} \
         ${net_plugin_dir_args} \
         ${net_plugin_args} \
