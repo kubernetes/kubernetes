@@ -60,7 +60,7 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 	kubeClient := createTestClient()
 	fakeRecorder := &record.FakeRecorder{}
-	oex := operationexecutor.NewOperationExecutor(kubeClient, volumePluginMgr, fakeRecorder)
+	oex := operationexecutor.NewOperationExecutor(kubeClient, volumePluginMgr, fakeRecorder, false /* checkNodeCapabilitiesBeforeMount*/)
 	reconciler := NewReconciler(
 		kubeClient,
 		false, /* controllerAttachDetachEnabled */
@@ -97,7 +97,7 @@ func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 	kubeClient := createTestClient()
 	fakeRecorder := &record.FakeRecorder{}
-	oex := operationexecutor.NewOperationExecutor(kubeClient, volumePluginMgr, fakeRecorder)
+	oex := operationexecutor.NewOperationExecutor(kubeClient, volumePluginMgr, fakeRecorder, false)
 	reconciler := NewReconciler(
 		kubeClient,
 		false, /* controllerAttachDetachEnabled */
@@ -168,7 +168,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 	kubeClient := createTestClient()
 	fakeRecorder := &record.FakeRecorder{}
-	oex := operationexecutor.NewOperationExecutor(kubeClient, volumePluginMgr, fakeRecorder)
+	oex := operationexecutor.NewOperationExecutor(kubeClient, volumePluginMgr, fakeRecorder, false)
 	reconciler := NewReconciler(
 		kubeClient,
 		true, /* controllerAttachDetachEnabled */
@@ -240,7 +240,7 @@ func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 	kubeClient := createTestClient()
 	fakeRecorder := &record.FakeRecorder{}
-	oex := operationexecutor.NewOperationExecutor(kubeClient, volumePluginMgr, fakeRecorder)
+	oex := operationexecutor.NewOperationExecutor(kubeClient, volumePluginMgr, fakeRecorder, false)
 	reconciler := NewReconciler(
 		kubeClient,
 		false, /* controllerAttachDetachEnabled */
@@ -323,7 +323,7 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 	kubeClient := createTestClient()
 	fakeRecorder := &record.FakeRecorder{}
-	oex := operationexecutor.NewOperationExecutor(kubeClient, volumePluginMgr, fakeRecorder)
+	oex := operationexecutor.NewOperationExecutor(kubeClient, volumePluginMgr, fakeRecorder, false)
 	reconciler := NewReconciler(
 		kubeClient,
 		true, /* controllerAttachDetachEnabled */

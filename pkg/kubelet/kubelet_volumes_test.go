@@ -400,6 +400,10 @@ func (f *stubVolume) GetAttributes() volume.Attributes {
 	return volume.Attributes{}
 }
 
+func (f *stubVolume) CanMount() error {
+	return nil
+}
+
 func (f *stubVolume) SetUp(fsGroup *int64) error {
 	return nil
 }
