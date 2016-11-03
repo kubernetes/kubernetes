@@ -61,7 +61,7 @@ func TestCreateCertsAndConfigForClients(t *testing.T) {
 		_, actual := CreateCertsAndConfigForClients(rt.a, rt.cn, caKey, caCert)
 		if (actual == nil) != rt.expected {
 			t.Errorf(
-				"failed UseGivenTokenIfValid:\n\texpected: %t\n\t  actual: %t",
+				"failed CreateCertsAndConfigForClients:\n\texpected: %t\n\t  actual: %t",
 				rt.expected,
 				(actual == nil),
 			)
