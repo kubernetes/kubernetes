@@ -18,6 +18,7 @@ go_library(
         "doc.go",
         "kubelet.go",
         "kubelet_cadvisor.go",
+        "kubelet_componentconfigs.go",
         "kubelet_getters.go",
         "kubelet_network.go",
         "kubelet_node_status.go",
