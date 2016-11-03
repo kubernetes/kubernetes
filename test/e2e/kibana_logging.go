@@ -50,7 +50,7 @@ const (
 // ClusterLevelLoggingWithKibana is an end to end test that checks to see if Kibana is alive.
 func ClusterLevelLoggingWithKibana(f *framework.Framework) {
 	// graceTime is how long to keep retrying requests for status information.
-	const graceTime = 2 * time.Minute
+	const graceTime = 10 * time.Minute
 
 	// Check for the existence of the Kibana service.
 	By("Checking the Kibana service exists.")
