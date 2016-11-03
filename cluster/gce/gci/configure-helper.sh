@@ -474,6 +474,7 @@ function start-kubelet {
   flags+=" --cluster-domain=${DNS_DOMAIN}"
   flags+=" --config=/etc/kubernetes/manifests"
   flags+=" --experimental-mounter-path=${KUBE_HOME}/bin/mounter"
+  flags+=" --experimental-check-node-capabilities-before-mount=true"
 
   if [[ -n "${KUBELET_PORT:-}" ]]; then
     flags+=" --port=${KUBELET_PORT}"

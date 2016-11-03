@@ -195,7 +195,8 @@ func newTestVolumeManager(
 		&containertest.FakeRuntime{},
 		&mount.FakeMounter{},
 		"",
-		fakeRecorder)
+		fakeRecorder,
+		false /* experimentalCheckNodeCapabilitiesBeforeMount*/)
 
 	return vm, err
 }
