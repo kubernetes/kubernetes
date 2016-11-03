@@ -629,8 +629,10 @@ func (rs *Rackspace) DetachDisk(instanceID string, partialDiskId string) error {
 	return nil
 }
 
-// Get device path of attached volume to the compute running kubelet
+// Get device path of attached volume to the compute running kubelet, as known by cinder
 func (rs *Rackspace) GetAttachmentDiskPath(instanceID string, diskName string) (string, error) {
+	// See issue #33128 - Cinder does not always tell you the right device path, as such
+	// we must only use this value as a last resort.
 	disk, err := rs.getVolume(diskName)
 	if err != nil {
 		return "", err
@@ -680,4 +682,9 @@ func (rs *Rackspace) DisksAreAttached(diskNames []string, instanceID string) (ma
 
 	}
 	return attached, returnedErr
+}
+
+// query if we should trust the cinder provide deviceName, See issue #33128
+func (rs *Rackspace) ShouldTrustDevicePath() bool {
+	return true
 }
