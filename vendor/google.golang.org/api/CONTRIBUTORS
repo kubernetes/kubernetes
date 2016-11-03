@@ -1,0 +1,50 @@
+# This is the official list of people who can contribute
+# (and typically have contributed) code to the repository.
+# The AUTHORS file lists the copyright holders; this file
+# lists people.  For example, Google employees are listed here
+# but not in AUTHORS, because Google holds the copyright.
+#
+# The submission process automatically checks to make sure
+# that people submitting code are listed in this file (by email address).
+#
+# Names should be added to this file only after verifying that
+# the individual or the individual's organization has agreed to
+# the appropriate Contributor License Agreement, found here:
+#
+#     https://cla.developers.google.com/about/google-individual
+#     https://cla.developers.google.com/about/google-corporate
+#
+# The CLA can be filled out on the web:
+#
+#     https://cla.developers.google.com/
+#
+# When adding J Random Contributor's name to this file,
+# either J's name or J's organization's name should be
+# added to the AUTHORS file, depending on whether the
+# individual or corporate CLA was used.
+
+# Names should be added to this file like so:
+#     Name <email address>
+#
+# An entry with two email addresses specifies that the
+# first address should be used in the submit logs and
+# that the second address should be recognized as the
+# same person when interacting with Rietveld.
+
+# Please keep the list sorted.
+
+Alain Vongsouvanhalainv <alainv@google.com>
+Andrew Gerrand <adg@golang.org>
+Brad Fitzpatrick <bradfitz@golang.org>
+Eric Koleda <ekoleda+devrel@googlers.com>
+Francesc Campoy <campoy@golang.org>
+Garrick Evans <garrick@google.com>
+Glenn Lewis <gmlewis@google.com>
+Ivan Krasin <krasin@golang.org>
+Jason Hall <jasonhall@google.com>
+Johan Euphrosine <proppy@google.com>
+Kostik Shtoyk <kostik@google.com>
+Michael McGreevy <mcgreevy@golang.org>
+Nick Craig-Wood <nickcw@gmail.com>
+Scott Van Woudenberg <scottvw@google.com>
+Takashi Matsuo <tmatsuo@google.com>
