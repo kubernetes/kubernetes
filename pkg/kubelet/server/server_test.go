@@ -37,6 +37,7 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -50,7 +51,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/term"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
 )
 
 type fakeKubelet struct {
@@ -248,7 +248,6 @@ func getPodName(name, namespace string) string {
 	return name + "_" + namespace
 }
 
-
 func TestConfigs(t *testing.T) {
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
@@ -259,13 +258,13 @@ func TestConfigs(t *testing.T) {
 	expectedPort := int32(12512)
 
 	// set configuration to server.
-	fw.fakeKubelet.kubeletConfigurationFunc = func() componentconfig.KubeletConfiguration{
+	fw.fakeKubelet.kubeletConfigurationFunc = func() componentconfig.KubeletConfiguration {
 		return componentconfig.KubeletConfiguration{
 			PodManifestPath: expectedManifestPath,
-			MaxPods: expectedMaxPods,
-			EnableServer: expectedEnableServer,
-			Address: expectedAddress,
-			Port: expectedPort,
+			MaxPods:         expectedMaxPods,
+			EnableServer:    expectedEnableServer,
+			Address:         expectedAddress,
+			Port:            expectedPort,
 		}
 	}
 
@@ -947,7 +946,6 @@ func assertConfigsOk(t *testing.T, httpURL string) componentconfig.KubeletConfig
 
 	return result
 }
-
 
 func setPodByNameFunc(fw *serverTestFramework, namespace, pod, container string) {
 	fw.fakeKubelet.podByNameFunc = func(namespace, name string) (*api.Pod, bool) {
