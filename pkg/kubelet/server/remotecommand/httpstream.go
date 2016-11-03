@@ -36,18 +36,18 @@ import (
 	"github.com/golang/glog"
 )
 
-// options contains details about which streams are required for
+// Options contains details about which streams are required for
 // remote command execution.
-type options struct {
-	stdin           bool
-	stdout          bool
-	stderr          bool
-	tty             bool
+type Options struct {
+	Stdin           bool
+	Stdout          bool
+	Stderr          bool
+	TTY             bool
 	expectedStreams int
 }
 
-// newOptions creates a new options from the Request.
-func newOptions(req *http.Request) (*options, error) {
+// NewOptions creates a new Options from the Request.
+func NewOptions(req *http.Request) (*Options, error) {
 	tty := req.FormValue(api.ExecTTYParam) == "1"
 	stdin := req.FormValue(api.ExecStdinParam) == "1"
 	stdout := req.FormValue(api.ExecStdoutParam) == "1"
@@ -74,11 +74,11 @@ func newOptions(req *http.Request) (*options, error) {
 		return nil, fmt.Errorf("you must specify at least 1 of stdin, stdout, stderr")
 	}
 
-	return &options{
-		stdin:           stdin,
-		stdout:          stdout,
-		stderr:          stderr,
-		tty:             tty,
+	return &Options{
+		Stdin:           stdin,
+		Stdout:          stdout,
+		Stderr:          stderr,
+		TTY:             tty,
 		expectedStreams: expectedStreams,
 	}, nil
 }
@@ -116,7 +116,7 @@ func waitStreamReply(replySent <-chan struct{}, notify chan<- struct{}, stop <-c
 }
 
 func createStreams(req *http.Request, w http.ResponseWriter, supportedStreamProtocols []string, idleTimeout, streamCreationTimeout time.Duration) (*context, bool) {
-	opts, err := newOptions(req)
+	opts, err := NewOptions(req)
 	if err != nil {
 		runtime.HandleError(err)
 		w.WriteHeader(http.StatusBadRequest)
@@ -143,7 +143,7 @@ func createStreams(req *http.Request, w http.ResponseWriter, supportedStreamProt
 	return ctx, true
 }
 
-func createHttpStreamStreams(req *http.Request, w http.ResponseWriter, opts *options, supportedStreamProtocols []string, idleTimeout, streamCreationTimeout time.Duration) (*context, bool) {
+func createHttpStreamStreams(req *http.Request, w http.ResponseWriter, opts *Options, supportedStreamProtocols []string, idleTimeout, streamCreationTimeout time.Duration) (*context, bool) {
 	protocol, err := httpstream.Handshake(req, w, supportedStreamProtocols)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -183,7 +183,7 @@ func createHttpStreamStreams(req *http.Request, w http.ResponseWriter, opts *opt
 		handler = &v1ProtocolHandler{}
 	}
 
-	if opts.tty && handler.supportsTerminalResizing() {
+	if opts.TTY && handler.supportsTerminalResizing() {
 		opts.expectedStreams++
 	}
 
@@ -197,7 +197,7 @@ func createHttpStreamStreams(req *http.Request, w http.ResponseWriter, opts *opt
 	}
 
 	ctx.conn = conn
-	ctx.tty = opts.tty
+	ctx.tty = opts.TTY
 
 	return ctx, true
 }

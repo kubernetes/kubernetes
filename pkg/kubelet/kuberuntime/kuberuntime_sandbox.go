@@ -19,6 +19,7 @@ package kuberuntime
 import (
 	"fmt"
 	"net"
+	"net/url"
 	"sort"
 
 	"github.com/golang/glog"
@@ -27,6 +28,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	kubetypes "k8s.io/kubernetes/pkg/types"
 )
 
 // createPodSandbox creates a pod sandbox and returns (podSandBoxID, message, error).
@@ -195,10 +197,10 @@ func (m *kubeGenericRuntimeManager) determinePodSandboxIP(podNamespace, podName 
 
 // getPodSandboxID gets the sandbox id by podUID and returns ([]sandboxID, error).
 // Param state could be nil in order to get all sandboxes belonging to same pod.
-func (m *kubeGenericRuntimeManager) getSandboxIDByPodUID(podUID string, state *runtimeApi.PodSandboxState) ([]string, error) {
+func (m *kubeGenericRuntimeManager) getSandboxIDByPodUID(podUID kubetypes.UID, state *runtimeApi.PodSandboxState) ([]string, error) {
 	filter := &runtimeApi.PodSandboxFilter{
 		State:         state,
-		LabelSelector: map[string]string{types.KubernetesPodUIDLabel: podUID},
+		LabelSelector: map[string]string{types.KubernetesPodUIDLabel: string(podUID)},
 	}
 	sandboxes, err := m.runtimeService.ListPodSandbox(filter)
 	if err != nil {
@@ -218,4 +220,24 @@ func (m *kubeGenericRuntimeManager) getSandboxIDByPodUID(podUID string, state *r
 	}
 
 	return sandboxIDs, nil
+}
+
+// GetPortForward gets the endpoint the runtime will serve the port-forward request from.
+func (m *kubeGenericRuntimeManager) GetPortForward(podName, podNamespace string, podUID kubetypes.UID) (*url.URL, error) {
+	sandboxIDs, err := m.getSandboxIDByPodUID(podUID, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find sandboxID for pod %s: %v", format.PodDesc(podName, podNamespace, podUID), err)
+	}
+	if len(sandboxIDs) == 0 {
+		return nil, fmt.Errorf("failed to find sandboxID for pod %s", format.PodDesc(podName, podNamespace, podUID))
+	}
+	// TODO: Port is unused for now, but we may need it in the future.
+	req := &runtimeApi.PortForwardRequest{
+		PodSandboxId: &sandboxIDs[0],
+	}
+	resp, err := m.runtimeService.PortForward(req)
+	if err != nil {
+		return nil, err
+	}
+	return url.Parse(resp.GetUrl())
 }

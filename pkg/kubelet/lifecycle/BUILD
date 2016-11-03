@@ -25,7 +25,6 @@ go_library(
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
-        "//pkg/kubelet/util/ioutils:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util/intstr:go_default_library",
@@ -44,6 +43,5 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/util/intstr:go_default_library",
-        "//pkg/util/term:go_default_library",
     ],
 )
