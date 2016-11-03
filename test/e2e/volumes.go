@@ -55,6 +55,7 @@ import (
 	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
 // Configuration of one tests. The test consist of:
@@ -392,6 +393,72 @@ var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
 			}
 			// Must match content of test/images/volumes-tester/nfs/index.html
 			testVolumeClient(cs, config, volume, nil, "Hello from NFS!")
+		})
+
+		It("should be mountable after checking mount binaries", func() {
+
+			config := VolumeTestConfig{
+				namespace:   namespace.Name,
+				prefix:      "nfs",
+				serverImage: "gcr.io/google_containers/volume-nfs:0.6",
+				serverPorts: []int{2049},
+			}
+
+			serverPod := startVolumeServer(cs, config)
+
+			var (
+				volumeName = "nfs-mount-volume"
+				volumeMountPath = "/etc/nfs-mount-volume"
+			)
+
+			expectedOutput := []string{
+				"content of file \"/etc/nfs-mount-volume/data-1\": value-1",
+			}
+
+			pod := &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "pod-nfs-" + string(uuid.NewUUID()),
+					Namespace: f.Namespace.Name,
+				},
+				Spec: api.PodSpec{
+					Volumes: []api.Volume{
+						{
+							Name: "nfs-volume",
+							VolumeSource: api.VolumeSource{
+								NFS: &api.NFSVolumeSource{
+								},
+							},
+						},
+
+					},
+					Containers: []api.Container{
+						{
+							Name: "nfs-mount-test",
+							Image: "gcr.io/google_containers/mounttest:0.7",
+							Args: []string{
+								"--file_content=/etc/nfs-mount-volume/data-1",
+							},
+							VolumeMounts: []api.VolumeMount{
+								{
+									Name: volumeName,
+									MountPath: volumeMountPath,
+								},
+							},
+						},
+					},
+					RestartPolicy: api.RestartPolicyNever,
+				},
+			}
+
+			pod.Spec.Containers[0].VolumeMounts[0].Name = volumeName
+			pod.Spec.Volumes[0].NFS.Server = serverPod.Name
+			pod.Spec.Volumes[0].NFS.Path = volumeMountPath
+
+			pod, err := cs.Core().Pods(config.namespace).Create(pod)
+			framework.ExpectNoError(err, "Error creating my pod")
+
+			f.TestContainerOutput("mount nfs post check of binaries", pod, 0, expectedOutput)
+
 		})
 	})
 

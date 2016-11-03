@@ -210,6 +210,11 @@ func (b *flockerVolumeMounter) GetAttributes() volume.Attributes {
 		SupportsSELinux: false,
 	}
 }
+
+func (b *flockerVolumeMounter) CanMount() bool {
+	return true
+}
+
 func (b *flockerVolumeMounter) GetPath() string {
 	return getPath(b.podUID, b.volName, b.plugin.host)
 }

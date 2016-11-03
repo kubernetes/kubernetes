@@ -155,6 +155,10 @@ func (b *gitRepoVolumeMounter) GetAttributes() volume.Attributes {
 	}
 }
 
+func (b *gitRepoVolumeMounter) CanMount() bool {
+	return true
+}
+
 // SetUp creates new directory and clones a git repo.
 func (b *gitRepoVolumeMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)

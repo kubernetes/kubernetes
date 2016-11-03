@@ -217,6 +217,10 @@ func (b *azureDiskMounter) GetAttributes() volume.Attributes {
 	}
 }
 
+func (b *azureDiskMounter) CanMount() bool {
+	return true
+}
+
 // SetUp attaches the disk and bind mounts to the volume path.
 func (b *azureDiskMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)

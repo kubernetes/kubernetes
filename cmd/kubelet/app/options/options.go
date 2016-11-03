@@ -249,6 +249,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.ProtectKernelDefaults, "protect-kernel-defaults", s.ProtectKernelDefaults, "Default kubelet behaviour for kernel tuning. If set, kubelet errors if any of kernel tunables is different than kubelet defaults.")
 
 	// Hidden flags for experimental features that are still under development.
+	fs.BoolVar(&s.ExperimentalCheckMountBinariesType, "experimental-check-mount-binaries", s.ExperimentalCheckMountBinariesType, "[Experimental] if set true, the kubelet will check for binaries on the host before performing the mount")
 	fs.StringVar(&s.ExperimentalRuntimeIntegrationType, "experimental-runtime-integration-type", s.ExperimentalRuntimeIntegrationType, "Choose the integration path for the container runtime (specified via --container-runtime). Currently, this supports only Docker. If set to \"cri\", Kubelet will use interact with docker through the new Container Runtime Interface.")
 	fs.MarkHidden("experimental-runtime-integration-type")
 }

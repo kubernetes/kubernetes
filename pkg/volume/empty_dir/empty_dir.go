@@ -174,6 +174,10 @@ func (ed *emptyDir) GetAttributes() volume.Attributes {
 	}
 }
 
+func (b *emptyDir) CanMount() bool {
+	return true
+}
+
 // SetUp creates new directory.
 func (ed *emptyDir) SetUp(fsGroup *int64) error {
 	return ed.SetUpAt(ed.GetPath(), fsGroup)

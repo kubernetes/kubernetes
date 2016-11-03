@@ -141,6 +141,10 @@ func wrappedVolumeSpec() volume.Spec {
 	}
 }
 
+func (b *configMapVolumeMounter) CanMount() bool {
+	return true
+}
+
 func (b *configMapVolumeMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }

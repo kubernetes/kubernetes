@@ -193,6 +193,10 @@ func (b *hostPathMounter) GetAttributes() volume.Attributes {
 	}
 }
 
+func (b *hostPathMounter) CanMount() bool {
+	return true
+}
+
 // SetUp does nothing.
 func (b *hostPathMounter) SetUp(fsGroup *int64) error {
 	return nil

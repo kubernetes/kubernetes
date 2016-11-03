@@ -196,6 +196,10 @@ func (cephfsVolume *cephfsMounter) GetAttributes() volume.Attributes {
 	}
 }
 
+func (caphfsMounter *cephfsMounter) CanMount() bool {
+	return true
+}
+
 // SetUp attaches the disk and bind mounts to the volume path.
 func (cephfsVolume *cephfsMounter) SetUp(fsGroup *int64) error {
 	return cephfsVolume.SetUpAt(cephfsVolume.GetPath(), fsGroup)

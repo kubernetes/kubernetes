@@ -77,6 +77,10 @@ type Attributes struct {
 type Mounter interface {
 	// Uses Interface to provide the path for Docker binds.
 	Volume
+
+	//CanMount returns if the volume can be mounted
+	CanMount() bool
+
 	// SetUp prepares and mounts/unpacks the volume to a
 	// self-determined directory path. The mount point and its
 	// content should be owned by 'fsGroup' so that it can be

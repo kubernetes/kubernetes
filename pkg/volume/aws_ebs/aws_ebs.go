@@ -247,6 +247,11 @@ func (b *awsElasticBlockStoreMounter) GetAttributes() volume.Attributes {
 	}
 }
 
+
+func (b *awsElasticBlockStoreMounter) CanMount() bool {
+	return true
+}
+
 // SetUp attaches the disk and bind mounts to the volume path.
 func (b *awsElasticBlockStoreMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)

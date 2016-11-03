@@ -719,6 +719,9 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		return nil, err
 	}
 
+	if len(kubeCfg.ExperimentalMounterPath) != 0 {
+		kubeCfg.ExperimentalCheckMountBinariesType = false
+	}
 	// setup volumeManager
 	klet.volumeManager, err = volumemanager.NewVolumeManager(
 		kubeCfg.EnableControllerAttachDetach,
@@ -729,7 +732,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		klet.containerRuntime,
 		kubeDeps.Mounter,
 		klet.getPodsDir(),
-		kubeDeps.Recorder)
+		kubeDeps.Recorder,
+		kubeCfg.ExperimentalCheckMountBinariesType)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime)
 	if err != nil {

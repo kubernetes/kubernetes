@@ -281,6 +281,10 @@ func (b *cinderVolumeMounter) GetAttributes() volume.Attributes {
 	}
 }
 
+func (b *cinderVolumeMounter) CanMount() bool {
+	return true
+}
+
 func (b *cinderVolumeMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }

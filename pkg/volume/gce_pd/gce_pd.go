@@ -238,6 +238,10 @@ func (b *gcePersistentDiskMounter) GetAttributes() volume.Attributes {
 	}
 }
 
+func (b *gcePersistentDiskMounter) CanMount() bool {
+	return true
+}
+
 // SetUp bind mounts the disk global mount to the volume path.
 func (b *gcePersistentDiskMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)

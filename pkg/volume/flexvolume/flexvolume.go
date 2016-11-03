@@ -260,6 +260,10 @@ func (f flexVolumeMounter) GetAttributes() volume.Attributes {
 	}
 }
 
+func (f *flexVolumeMounter) CanMount() bool {
+	return true
+}
+
 // flexVolumeManager is the abstract interface to flex volume ops.
 type flexVolumeManager interface {
 	// Attaches the disk to the kubelet's host machine.

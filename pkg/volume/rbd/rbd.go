@@ -381,6 +381,10 @@ func (b *rbd) GetAttributes() volume.Attributes {
 	}
 }
 
+func (b *rbdMounter) CanMount() bool {
+	return true
+}
+
 func (b *rbdMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }

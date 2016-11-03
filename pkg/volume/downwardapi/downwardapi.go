@@ -147,6 +147,11 @@ func (d *downwardAPIVolume) GetAttributes() volume.Attributes {
 	}
 }
 
+func (b *downwardAPIVolumeMounter) CanMount() bool {
+	return true
+}
+
+
 // SetUp puts in place the volume plugin.
 // This function is not idempotent by design. We want the data to be refreshed periodically.
 // The internal sync interval of kubelet will drive the refresh of data.

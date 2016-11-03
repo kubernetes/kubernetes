@@ -37,7 +37,6 @@ import (
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
-
 // OperationExecutor defines a set of operations for attaching, detaching,
 // mounting, or unmounting a volume that are executed with a NewNestedPendingOperations which
 // prevents more than one operation from being triggered on the same volume.
@@ -119,7 +118,8 @@ type OperationExecutor interface {
 func NewOperationExecutor(
 	kubeClient internalclientset.Interface,
 	volumePluginMgr *volume.VolumePluginMgr,
-	recorder record.EventRecorder) OperationExecutor {
+	recorder record.EventRecorder,
+	checkBinariesBeforeMount bool) OperationExecutor {
 
 	return &operationExecutor{
 		kubeClient:      kubeClient,
@@ -127,6 +127,8 @@ func NewOperationExecutor(
 		pendingOperations: nestedpendingoperations.NewNestedPendingOperations(
 			true /* exponentialBackOffOnError */),
 		recorder: recorder,
+		checkBinariesBeforeMount: checkBinariesBeforeMount,
+
 	}
 }
 
@@ -371,6 +373,9 @@ type operationExecutor struct {
 
 	// recorder is used to record events in the API server
 	recorder record.EventRecorder
+
+	//This flag if set checks the binaries before mount
+	checkBinariesBeforeMount bool
 }
 
 func (oe *operationExecutor) IsOperationPending(volumeName api.UniqueVolumeName, podName volumetypes.UniquePodName) bool {
@@ -875,6 +880,12 @@ func (oe *operationExecutor) generateMountVolumeFunc(
 					volumeToMount.Pod.UID,
 					markDeviceMountedErr)
 			}
+		}
+
+		if oe.checkBinariesBeforeMount && !volumeMounter.CanMount() {
+			oe.recorder.Eventf(volumeToMount.Pod, api.EventTypeWarning, kevents.FailedMountVolume, "Unable to mount volume %v (spec.Name: %v) on pod %v (UID: %v). Binary required for mounting, does not exist on the node machine. Verify that your node machine has the required binaries before attempting to mount this volume type", volumeToMount.VolumeName, volumeToMount.VolumeSpec.Name(), volumeToMount.Pod.Name, volumeToMount.Pod.UID)
+			glog.Errorf("Unable to mount volume %v (spec.Name: %v) on pod %v (UID: %v). Binary required for mounting, does not exist on the node machine. Verify that your node machine has the required binaries before attempting to mount this volume type", volumeToMount.VolumeName, volumeToMount.VolumeSpec.Name(), volumeToMount.Pod.Name, volumeToMount.Pod.UID)
+			return fmt.Errorf("Unable to mount volume %v (spec.Name: %v) on pod %v (UID: %v). Binary required for mounting, does not exist on the node machine. Verify that your node machine has the required binaries before attempting to mount this volume type", volumeToMount.VolumeName, volumeToMount.VolumeSpec.Name(), volumeToMount.Pod.Name, volumeToMount.Pod.UID)
 		}
 
 		// Execute mount

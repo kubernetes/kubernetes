@@ -19,13 +19,14 @@ package nfs
 import (
 	"fmt"
 	"os"
+	"runtime"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
-
+	"k8s.io/kubernetes/pkg/util/exec"
 	"github.com/golang/glog"
 )
 
@@ -162,6 +163,20 @@ type nfs struct {
 func (nfsVolume *nfs) GetPath() string {
 	name := nfsPluginName
 	return nfsVolume.plugin.host.GetPodVolumeDir(nfsVolume.pod.UID, strings.EscapeQualifiedNameForDisk(name), nfsVolume.volName)
+}
+
+func (nfsMounter *nfsMounter) CanMount() bool {
+	exe := exec.New()
+	switch runtime.GOOS {
+	case "linux":
+		_, err1 := exe.Command("/bin/ls", "/sbin/mount.nfs").CombinedOutput()
+		_, err2 := exe.Command("/bin/ls", "/sbin/mount.nfs4").CombinedOutput()
+		return (err1 == nil || err2 == nil)
+	case "darwin":
+		_, err := exe.Command("/bin/ls", "/sbin/mount_nfs").CombinedOutput()
+		return err == nil
+	}
+	return true
 }
 
 type nfsMounter struct {

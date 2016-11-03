@@ -218,6 +218,10 @@ func (mounter *quobyteMounter) GetAttributes() volume.Attributes {
 	}
 }
 
+func (mounter *quobyteMounter) CanMount() bool {
+	return true
+}
+
 // SetUp attaches the disk and bind mounts to the volume path.
 func (mounter *quobyteMounter) SetUp(fsGroup *int64) error {
 	pluginDir := mounter.plugin.host.GetPluginDir(strings.EscapeQualifiedNameForDisk(quobytePluginName))

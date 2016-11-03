@@ -187,6 +187,11 @@ func (b *fcDiskMounter) GetAttributes() volume.Attributes {
 		SupportsSELinux: true,
 	}
 }
+
+func (b *fcDiskMounter) CanMount() bool {
+	return true
+}
+
 func (b *fcDiskMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }

@@ -207,6 +207,11 @@ func (b *glusterfsMounter) GetAttributes() volume.Attributes {
 	}
 }
 
+func (b *glusterfsMounter) CanMount() bool {
+	return true
+}
+
+
 // SetUp attaches the disk and bind mounts to the volume path.
 func (b *glusterfsMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)

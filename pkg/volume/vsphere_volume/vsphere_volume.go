@@ -177,6 +177,10 @@ func (b *vsphereVolumeMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }
 
+func (b *vsphereVolumeMounter) CanMount() bool {
+	return true
+}
+
 // SetUp attaches the disk and bind mounts to the volume path.
 func (b *vsphereVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	glog.V(5).Infof("vSphere volume setup %s to %s", b.volPath, dir)

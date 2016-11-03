@@ -496,6 +496,10 @@ type KubeletConfiguration struct {
 	// using the new Container Runtine Interface.
 	// +optional
 	ExperimentalRuntimeIntegrationType string `json:"experimentalRuntimeIntegrationType,omitempty"`
+	// This flag if set checks for mount binaries on the host
+	// If the binaries are not present, the mount is failed with
+	// a specific error message
+	ExperimentalCheckMountBinariesType bool `json: "experimentalCheckMountBinariesType,omitempty"`
 }
 
 type KubeletAuthorizationMode string

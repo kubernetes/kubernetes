@@ -156,6 +156,11 @@ func (sv *secretVolume) GetAttributes() volume.Attributes {
 		SupportsSELinux: true,
 	}
 }
+
+func (b *secretVolumeMounter) CanMount() bool {
+	return true
+}
+
 func (b *secretVolumeMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }

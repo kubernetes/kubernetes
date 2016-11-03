@@ -196,6 +196,10 @@ func (b *iscsiDiskMounter) GetAttributes() volume.Attributes {
 	}
 }
 
+func (b *iscsiDiskMounter) CanMount() bool {
+	return true
+}
+
 func (b *iscsiDiskMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)
 }
