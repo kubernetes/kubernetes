@@ -1063,41 +1063,53 @@ func (proxier *Proxier) syncProxyRules() {
 		// worthwhile to make a new per-service chain for nodeport rules, but
 		// with just 2 rules it ends up being a waste and a cognitive burden.
 		if svcInfo.nodePort != 0 {
-			// Hold the local port open so no other process can open it
-			// (because the socket might open but it would never work).
-			lp := localPort{
-				desc:     "nodePort for " + svcName.String(),
-				ip:       "",
-				port:     svcInfo.nodePort,
-				protocol: protocol,
-			}
-			if proxier.portsMap[lp] != nil {
-				glog.V(4).Infof("Port %s was open before and is still needed", lp.String())
-				replacementPortsMap[lp] = proxier.portsMap[lp]
-			} else {
-				socket, err := proxier.portMapper.OpenLocalPort(&lp)
-				if err != nil {
-					glog.Errorf("can't open %s, skipping this nodePort: %v", lp.String(), err)
-					continue
+			if len(proxier.endpointsMap[svcName]) != 0 {
+				// Hold the local port open so no other process can open it
+				// (because the socket might open but it would never work).
+				lp := localPort{
+					desc:     "nodePort for " + svcName.String(),
+					ip:       "",
+					port:     svcInfo.nodePort,
+					protocol: protocol,
 				}
-				replacementPortsMap[lp] = socket
-			} // We're holding the port, so it's OK to install iptables rules.
+				if proxier.portsMap[lp] != nil {
+					glog.V(4).Infof("Port %s was open before and is still needed", lp.String())
+					replacementPortsMap[lp] = proxier.portsMap[lp]
+				} else {
+					socket, err := proxier.portMapper.OpenLocalPort(&lp)
+					if err != nil {
+						glog.Errorf("can't open %s, skipping this nodePort: %v", lp.String(), err)
+						continue
+					}
+					replacementPortsMap[lp] = socket
+				} // We're holding the port, so it's OK to install iptables rules.
 
-			args := []string{
-				"-A", string(kubeNodePortsChain),
-				"-m", "comment", "--comment", svcName.String(),
-				"-m", protocol, "-p", protocol,
-				"--dport", fmt.Sprintf("%d", svcInfo.nodePort),
-			}
-			if !svcInfo.onlyNodeLocalEndpoints {
-				// Nodeports need SNAT, unless they're local.
-				writeLine(natRules, append(args, "-j", string(KubeMarkMasqChain))...)
-				// Jump to the service chain.
-				writeLine(natRules, append(args, "-j", string(svcChain))...)
+				args := []string{
+					"-A", string(kubeNodePortsChain),
+					"-m", "comment", "--comment", svcName.String(),
+					"-m", protocol, "-p", protocol,
+					"--dport", fmt.Sprintf("%d", svcInfo.nodePort),
+				}
+				if !svcInfo.onlyNodeLocalEndpoints {
+					// Nodeports need SNAT, unless they're local.
+					writeLine(natRules, append(args, "-j", string(KubeMarkMasqChain))...)
+					// Jump to the service chain.
+					writeLine(natRules, append(args, "-j", string(svcChain))...)
+				} else {
+					// TODO: Make all nodePorts jump to the firewall chain.
+					// Currently we only create it for loadbalancers (#33586).
+					writeLine(natRules, append(args, "-j", string(svcXlbChain))...)
+				}
 			} else {
-				// TODO: Make all nodePorts jump to the firewall chain.
-				// Currently we only create it for loadbalancers (#33586).
-				writeLine(natRules, append(args, "-j", string(svcXlbChain))...)
+				// If the NodePort type service has no endpoints then reject packets.
+				glog.V(2).Infof("Reject NodePort type service %s has no endpoints", svcName.String())
+				writeLine(filterRules,
+					"-A", string(kubeServicesChain),
+					"-m", "comment", "--comment", fmt.Sprintf(`"NodePort type service %s has no endpoints"`, svcName.String()),
+					"-m", protocol, "-p", protocol,
+					"--dport", fmt.Sprintf("%d", svcInfo.nodePort),
+					"-j", "REJECT",
+				)
 			}
 		}
 
