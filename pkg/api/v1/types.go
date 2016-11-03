@@ -322,6 +322,8 @@ type VolumeSource struct {
 	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 	// +optional
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty" protobuf:"bytes,22,opt,name=azureDisk"`
+	// PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine
+	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource `json:"photonPersistentDisk,omitempty" protobuf:"bytes,23,opt,name=photonPersistentDisk"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -405,6 +407,8 @@ type PersistentVolumeSource struct {
 	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 	// +optional
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty" protobuf:"bytes,16,opt,name=azureDisk"`
+	// PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine
+	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource `json:"photonPersistentDisk,omitempty" protobuf:"bytes,17,opt,name=photonPersistentDisk"`
 }
 
 // +genclient=true
@@ -1023,6 +1027,17 @@ type VsphereVirtualDiskVolumeSource struct {
 	// +optional
 	FSType string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
 }
+
+// Represents a Photon Controller persistent disk resource.
+type PhotonPersistentDiskVolumeSource struct {
+	// ID that identifies Photon Controller persistent disk
+	PdID string `json:"pdID" protobuf:"bytes,1,opt,name=pdID"`
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	FSType string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
+}
+
 type AzureDataDiskCachingMode string
 
 const (
