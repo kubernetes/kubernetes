@@ -121,8 +121,6 @@ type NodeTestContextType struct {
 	ContainerRuntimeEndpoint string
 	// MounterPath is the path to the program to run to perform a mount
 	MounterPath string
-	// MounterRootfsPath is the path to the root filesystem for the program used to perform a mount in kubelet
-	MounterRootfsPath string
 }
 
 type CloudConfig struct {
@@ -220,7 +218,6 @@ func RegisterNodeFlags() {
 	flag.StringVar(&TestContext.RuntimeIntegrationType, "runtime-integration-type", "", "Choose the integration path for the container runtime, mainly used for CRI validation.")
 	flag.StringVar(&TestContext.ContainerRuntimeEndpoint, "container-runtime-endpoint", "", "The endpoint of remote container runtime grpc server, mainly used for Remote CRI validation.")
 	flag.StringVar(&TestContext.MounterPath, "experimental-mounter-path", "", "Path of mounter binary. Leave empty to use the default mount.")
-	flag.StringVar(&TestContext.MounterRootfsPath, "experimental-mounter-rootfs-path", "", "Absolute path to root filesystem for the mounter binary.")
 }
 
 // overwriteFlagsWithViperConfig finds and writes values to flags using viper as input.
