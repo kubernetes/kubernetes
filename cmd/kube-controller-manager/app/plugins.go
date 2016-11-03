@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/photon"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	utilconfig "k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/pkg/util/io"
@@ -47,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/glusterfs"
 	"k8s.io/kubernetes/pkg/volume/host_path"
 	"k8s.io/kubernetes/pkg/volume/nfs"
+	"k8s.io/kubernetes/pkg/volume/photon_pd"
 	"k8s.io/kubernetes/pkg/volume/quobyte"
 	"k8s.io/kubernetes/pkg/volume/rbd"
 	"k8s.io/kubernetes/pkg/volume/vsphere_volume"
@@ -67,6 +69,7 @@ func ProbeAttachableVolumePlugins(config componentconfig.VolumeConfiguration) []
 	allPlugins = append(allPlugins, flexvolume.ProbeVolumePlugins(config.FlexVolumePluginDir)...)
 	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, photon_pd.ProbeVolumePlugins()...)
 	return allPlugins
 }
 
@@ -124,6 +127,8 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config componen
 			allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
 		case azure.CloudProviderName == cloud.ProviderName():
 			allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
+		case photon.ProviderName == cloud.ProviderName():
+			allPlugins = append(allPlugins, photon_pd.ProbeVolumePlugins()...)
 		}
 	}
 
@@ -154,6 +159,8 @@ func NewAlphaVolumeProvisioner(cloud cloudprovider.Interface, config componentco
 		return getProvisionablePluginFromVolumePlugins(vsphere_volume.ProbeVolumePlugins())
 	case cloud != nil && azure.CloudProviderName == cloud.ProviderName():
 		return getProvisionablePluginFromVolumePlugins(azure_dd.ProbeVolumePlugins())
+	case cloud != nil && photon.ProviderName == cloud.ProviderName():
+		return getProvisionablePluginFromVolumePlugins(photon_pd.ProbeVolumePlugins())
 	}
 	return nil, nil
 }
