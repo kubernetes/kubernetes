@@ -155,19 +155,17 @@ func (m *ThirdPartyResourceServer) RemoveThirdPartyResource(path string) error {
 	}
 
 	if ws != nil {
-		pattern := path + "/.*/" + resource + "/.*"
+		pattern := path + "/.*/" + resource + ".*"
 		routesToRemove := []struct {
 			method string
 			path   string
 		}{}
 		routes := ws.Routes()
-		current := 0
 		for _, route := range routes {
 			match, _ := regexp.MatchString(pattern, route.Path)
 			if match {
-				routesToRemove[current] = struct{ method, path string }{route.Method, route.Path}
+				routesToRemove = append(routesToRemove, struct{ method, path string }{route.Method, route.Path})
 			}
-			current = current + 1
 		}
 
 		for _, routeToeRemove := range routesToRemove {
