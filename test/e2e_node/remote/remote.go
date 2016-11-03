@@ -169,7 +169,9 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 
 	// Create the temp staging directory
 	glog.Infof("Staging test binaries on %s", host)
-	tmp := fmt.Sprintf("/tmp/gcloud-e2e-%d", rand.Int31())
+	dirName := fmt.Sprintf("gcloud-e2e-%d", rand.Int31())
+	tmp := fmt.Sprintf("/tmp/%s", dirName)
+
 	_, err := RunSshCommand("ssh", GetHostnameOrIp(host), "--", "mkdir", tmp)
 	if err != nil {
 		// Exit failure with the error
@@ -292,6 +294,32 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 
 	if err != nil {
 		aggErrs = append(aggErrs, err)
+	}
+
+	if err != nil {
+		// Encountered an unexpected error. The remote test harness may not
+		// have finished retrieved and stored all the logs in this case. Try
+		// to get some logs for debugging purposes.
+		// TODO: This is a best-effort, temporary hack that only works for
+		// journald nodes. We should have a more robust way to collect logs.
+		var (
+			logName  = fmt.Sprintf("%s-system.log", dirName)
+			logPath  = fmt.Sprintf("/tmp/%s-system.log", dirName)
+			destPath = fmt.Sprintf("%s/%s-%s", *resultsDir, host, logName)
+		)
+		glog.Infof("Test failed unexpectedly. Attempting to retreiving system logs (only works for nodes with journald)")
+		// Try getting the system logs from journald and store it to a file.
+		// Don't reuse the original test directory on the remote host because
+		// it could've be been removed if the node was rebooted.
+		_, err := RunSshCommand("ssh", GetHostnameOrIp(host), "--", "sh", "-c", fmt.Sprintf("'sudo journalctl --system --all > %s'", logPath))
+		if err == nil {
+			glog.Infof("Got the system logs from journald; copying it back...")
+			if _, err := RunSshCommand("scp", fmt.Sprintf("%s:%s", GetHostnameOrIp(host), logPath), destPath); err != nil {
+				glog.Infof("Failed to copy the log: err: %v", err)
+			}
+		} else {
+			glog.Infof("Failed to run journactl (normal if it doesn't exist on the node): %v", err)
+		}
 	}
 
 	glog.Infof("Copying test artifacts from %s", host)
