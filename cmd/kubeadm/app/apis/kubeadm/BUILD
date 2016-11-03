@@ -25,3 +25,11 @@ go_library(
         "//pkg/runtime:go_default_library",
     ],
 )
+
+go_test(
+    name = "go_default_test",
+    srcs = ["env_test.go"],
+    library = "go_default_library",
+    tags = ["automanaged"],
+    deps = [],
+)
