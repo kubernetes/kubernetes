@@ -552,7 +552,7 @@ kind: Namespace
 metadata:
   name: kube-system
 EOF
-        ${KUBECTL} config set-cluster local --server=https://${API_HOST}:${API_SECURE_PORT} --certificate-authority=$(ROOT_CA_FILE)
+        ${KUBECTL} config set-cluster local --server=https://${API_HOST}:${API_SECURE_PORT} --certificate-authority=${ROOT_CA_FILE}
         ${KUBECTL} config set-context local --cluster=local
         ${KUBECTL} config use-context local
 
