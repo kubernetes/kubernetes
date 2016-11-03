@@ -57,3 +57,19 @@ func (m *unsupportedCgroupManager) Create(_ *CgroupConfig) error {
 func (m *unsupportedCgroupManager) Pids(_ CgroupName) []int {
 	return nil
 }
+
+func (m *unsupportedCgroupManager) CgroupName(name string) CgroupName {
+	return ""
+}
+
+func (m *unsupportedCgroupManager) ReduceCPULimits(cgroupName CgroupName) error {
+	return nil
+}
+
+func ConvertCgroupFsNameToSystemd(cgroupfsName string) (string, error) {
+	return "", nil
+}
+
+func ConvertCgroupNameToSystemd(cgroupName CgroupName, outputToCgroupFs bool) string {
+	return ""
+}
