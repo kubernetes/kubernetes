@@ -14,10 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package schema
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -39,11 +38,9 @@ func ParseResourceArg(arg string) (*GroupVersionResource, GroupResource) {
 
 // GroupResource specifies a Group and a Resource, but does not force a version.  This is useful for identifying
 // concepts during lookup stages without having partially valid types
-//
-// +protobuf.options.(gogoproto.goproto_stringer)=false
 type GroupResource struct {
-	Group    string `protobuf:"bytes,1,opt,name=group"`
-	Resource string `protobuf:"bytes,2,opt,name=resource"`
+	Group    string
+	Resource string
 }
 
 func (gr GroupResource) WithVersion(version string) GroupVersionResource {
@@ -72,13 +69,11 @@ func ParseGroupResource(gr string) GroupResource {
 }
 
 // GroupVersionResource unambiguously identifies a resource.  It doesn't anonymously include GroupVersion
-// to avoid automatic coersion.  It doesn't use a GroupVersion to avoid custom marshalling
-//
-// +protobuf.options.(gogoproto.goproto_stringer)=false
+// to avoid automatic coercion.  It doesn't use a GroupVersion to avoid custom marshalling
 type GroupVersionResource struct {
-	Group    string `protobuf:"bytes,1,opt,name=group"`
-	Version  string `protobuf:"bytes,2,opt,name=version"`
-	Resource string `protobuf:"bytes,3,opt,name=resource"`
+	Group    string
+	Version  string
+	Resource string
 }
 
 func (gvr GroupVersionResource) Empty() bool {
@@ -99,11 +94,9 @@ func (gvr *GroupVersionResource) String() string {
 
 // GroupKind specifies a Group and a Kind, but does not force a version.  This is useful for identifying
 // concepts during lookup stages without having partially valid types
-//
-// +protobuf.options.(gogoproto.goproto_stringer)=false
 type GroupKind struct {
-	Group string `protobuf:"bytes,1,opt,name=group"`
-	Kind  string `protobuf:"bytes,2,opt,name=kind"`
+	Group string
+	Kind  string
 }
 
 func (gk GroupKind) Empty() bool {
@@ -122,13 +115,11 @@ func (gk *GroupKind) String() string {
 }
 
 // GroupVersionKind unambiguously identifies a kind.  It doesn't anonymously include GroupVersion
-// to avoid automatic coersion.  It doesn't use a GroupVersion to avoid custom marshalling
-//
-// +protobuf.options.(gogoproto.goproto_stringer)=false
+// to avoid automatic coercion.  It doesn't use a GroupVersion to avoid custom marshalling
 type GroupVersionKind struct {
-	Group   string `protobuf:"bytes,1,opt,name=group"`
-	Version string `protobuf:"bytes,2,opt,name=version"`
-	Kind    string `protobuf:"bytes,3,opt,name=kind"`
+	Group   string
+	Version string
+	Kind    string
 }
 
 // Empty returns true if group, version, and kind are empty
@@ -149,11 +140,9 @@ func (gvk GroupVersionKind) String() string {
 }
 
 // GroupVersion contains the "group" and the "version", which uniquely identifies the API.
-//
-// +protobuf.options.(gogoproto.goproto_stringer)=false
 type GroupVersion struct {
-	Group   string `protobuf:"bytes,1,opt,name=group"`
-	Version string `protobuf:"bytes,2,opt,name=version"`
+	Group   string
+	Version string
 }
 
 // Empty returns true if group and version are empty
@@ -228,38 +217,6 @@ func (gv GroupVersion) WithResource(resource string) GroupVersionResource {
 	return GroupVersionResource{Group: gv.Group, Version: gv.Version, Resource: resource}
 }
 
-// MarshalJSON implements the json.Marshaller interface.
-func (gv GroupVersion) MarshalJSON() ([]byte, error) {
-	s := gv.String()
-	if strings.Count(s, "/") > 1 {
-		return []byte{}, fmt.Errorf("illegal GroupVersion %v: contains more than one /", s)
-	}
-	return json.Marshal(s)
-}
-
-func (gv *GroupVersion) unmarshal(value []byte) error {
-	var s string
-	if err := json.Unmarshal(value, &s); err != nil {
-		return err
-	}
-	parsed, err := ParseGroupVersion(s)
-	if err != nil {
-		return err
-	}
-	*gv = parsed
-	return nil
-}
-
-// UnmarshalJSON implements the json.Unmarshaller interface.
-func (gv *GroupVersion) UnmarshalJSON(value []byte) error {
-	return gv.unmarshal(value)
-}
-
-// UnmarshalTEXT implements the Ugorji's encoding.TextUnmarshaler interface.
-func (gv *GroupVersion) UnmarshalText(value []byte) error {
-	return gv.unmarshal(value)
-}
-
 // GroupVersions can be used to represent a set of desired group versions.
 // TODO: Move GroupVersions to a package under pkg/runtime, since it's used by scheme.
 // TODO: Introduce an adapter type between GroupVersions and runtime.GroupVersioner, and use LegacyCodec(GroupVersion)
@@ -318,28 +275,3 @@ func FromAPIVersionAndKind(apiVersion, kind string) GroupVersionKind {
 	}
 	return GroupVersionKind{Kind: kind}
 }
-
-// All objects that are serialized from a Scheme encode their type information. This interface is used
-// by serialization to set type information from the Scheme onto the serialized version of an object.
-// For objects that cannot be serialized or have unique requirements, this interface may be a no-op.
-// TODO: this belongs in pkg/runtime, move unversioned.GVK into runtime.
-type ObjectKind interface {
-	// SetGroupVersionKind sets or clears the intended serialized kind of an object. Passing kind nil
-	// should clear the current setting.
-	SetGroupVersionKind(kind GroupVersionKind)
-	// GroupVersionKind returns the stored group, version, and kind of an object, or nil if the object does
-	// not expose or provide these fields.
-	GroupVersionKind() GroupVersionKind
-}
-
-// EmptyObjectKind implements the ObjectKind interface as a noop
-// TODO: this belongs in pkg/runtime, move unversioned.GVK into runtime.
-var EmptyObjectKind = emptyObjectKind{}
-
-type emptyObjectKind struct{}
-
-// SetGroupVersionKind implements the ObjectKind interface
-func (emptyObjectKind) SetGroupVersionKind(gvk GroupVersionKind) {}
-
-// GroupVersionKind implements the ObjectKind interface
-func (emptyObjectKind) GroupVersionKind() GroupVersionKind { return GroupVersionKind{} }

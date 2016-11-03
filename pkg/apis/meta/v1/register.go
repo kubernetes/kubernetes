@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,8 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:deepcopy-gen=package
-// +k8s:openapi-gen=true
-// +k8s:defaulter-gen=TypeMeta
+package v1
 
-package unversioned // import "k8s.io/kubernetes/pkg/api/unversioned"
+import (
+	"k8s.io/kubernetes/pkg/runtime/schema"
+)
+
+// SchemeGroupVersion is group version used to register these objects
+var SchemeGroupVersion = schema.GroupVersion{Group: "meta.k8s.io", Version: "v1"}
