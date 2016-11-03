@@ -72,7 +72,7 @@ func New() *Generator {
 			`k8s.io/kubernetes/pkg/apis/authorization/v1beta1`,
 			`k8s.io/kubernetes/pkg/apis/batch/v1`,
 			`k8s.io/kubernetes/pkg/apis/batch/v2alpha1`,
-			`k8s.io/kubernetes/pkg/apis/apps/v1alpha1`,
+			`k8s.io/kubernetes/pkg/apis/apps/v1beta1`,
 			`k8s.io/kubernetes/pkg/apis/authentication/v1beta1`,
 			`k8s.io/kubernetes/pkg/apis/rbac/v1alpha1`,
 			`k8s.io/kubernetes/federation/apis/federation/v1beta1`,

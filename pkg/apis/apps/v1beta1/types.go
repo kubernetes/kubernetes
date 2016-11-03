@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -28,8 +28,7 @@ import (
 //  - Network: A single stable DNS and hostname.
 //  - Storage: As many VolumeClaims as requested.
 // The StatefulSet guarantees that a given network identity will always
-// map to the same storage identity. StatefulSet is currently in alpha
-// and subject to change without notice.
+// map to the same storage identity.
 type StatefulSet struct {
 	unversioned.TypeMeta `json:",inline"`
 	// +optional

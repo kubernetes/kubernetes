@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 // This file contains a collection of methods that can be used from go-restful to
 // generate Swagger API documentation for its models. Please read this PR for more
@@ -28,7 +28,7 @@ package v1alpha1
 
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_StatefulSet = map[string]string{
-	"":       "StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity. StatefulSet is currently in alpha and subject to change without notice.",
+	"":       "StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.",
 	"spec":   "Spec defines the desired identities of pods in this set.",
 	"status": "Status is the current status of Pods in this StatefulSet. This data may be out of date by some window of time.",
 }

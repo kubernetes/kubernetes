@@ -49,7 +49,7 @@ KUBE_OUTPUT_HOSTBIN="${KUBE_OUTPUT_BINPATH}/$(kube::util::host_platform)"
 # most preferred version for a group should appear first
 KUBE_AVAILABLE_GROUP_VERSIONS="${KUBE_AVAILABLE_GROUP_VERSIONS:-\
 v1 \
-apps/v1alpha1 \
+apps/v1beta1 \
 authentication.k8s.io/v1beta1 \
 authorization.k8s.io/v1beta1 \
 autoscaling/v1 \

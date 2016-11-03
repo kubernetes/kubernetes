@@ -14447,7 +14447,7 @@
      }
     }
    },
-   "/apis/apps/v1alpha1/": {
+   "/apis/apps/v1beta1/": {
     "get": {
      "description": "get available resources",
      "consumes": [
@@ -14464,9 +14464,9 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "getAppsV1alpha1APIResources",
+     "operationId": "getAppsV1beta1APIResources",
      "responses": {
       "200": {
        "description": "OK",
@@ -14480,7 +14480,7 @@
      }
     }
    },
-   "/apis/apps/v1alpha1/namespaces/{namespace}/statefulsets": {
+   "/apis/apps/v1beta1/namespaces/{namespace}/statefulsets": {
     "get": {
      "description": "list or watch objects of kind StatefulSet",
      "consumes": [
@@ -14497,9 +14497,9 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "listAppsV1alpha1NamespacedStatefulSet",
+     "operationId": "listAppsV1beta1NamespacedStatefulSet",
      "parameters": [
       {
        "uniqueItems": true,
@@ -14541,7 +14541,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.StatefulSetList"
+        "$ref": "#/definitions/v1beta1.StatefulSetList"
        }
       },
       "401": {
@@ -14563,16 +14563,16 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "createAppsV1alpha1NamespacedStatefulSet",
+     "operationId": "createAppsV1beta1NamespacedStatefulSet",
      "parameters": [
       {
        "name": "body",
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/v1alpha1.StatefulSet"
+        "$ref": "#/definitions/v1beta1.StatefulSet"
        }
       }
      ],
@@ -14580,7 +14580,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.StatefulSet"
+        "$ref": "#/definitions/v1beta1.StatefulSet"
        }
       },
       "401": {
@@ -14602,9 +14602,9 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "deleteAppsV1alpha1CollectionNamespacedStatefulSet",
+     "operationId": "deleteAppsV1beta1CollectionNamespacedStatefulSet",
      "parameters": [
       {
        "uniqueItems": true,
@@ -14672,7 +14672,7 @@
      }
     ]
    },
-   "/apis/apps/v1alpha1/namespaces/{namespace}/statefulsets/{name}": {
+   "/apis/apps/v1beta1/namespaces/{namespace}/statefulsets/{name}": {
     "get": {
      "description": "read the specified StatefulSet",
      "consumes": [
@@ -14687,9 +14687,9 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "readAppsV1alpha1NamespacedStatefulSet",
+     "operationId": "readAppsV1beta1NamespacedStatefulSet",
      "parameters": [
       {
        "uniqueItems": true,
@@ -14710,7 +14710,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.StatefulSet"
+        "$ref": "#/definitions/v1beta1.StatefulSet"
        }
       },
       "401": {
@@ -14732,16 +14732,16 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "replaceAppsV1alpha1NamespacedStatefulSet",
+     "operationId": "replaceAppsV1beta1NamespacedStatefulSet",
      "parameters": [
       {
        "name": "body",
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/v1alpha1.StatefulSet"
+        "$ref": "#/definitions/v1beta1.StatefulSet"
        }
       }
      ],
@@ -14749,7 +14749,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.StatefulSet"
+        "$ref": "#/definitions/v1beta1.StatefulSet"
        }
       },
       "401": {
@@ -14771,9 +14771,9 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "deleteAppsV1alpha1NamespacedStatefulSet",
+     "operationId": "deleteAppsV1beta1NamespacedStatefulSet",
      "parameters": [
       {
        "name": "body",
@@ -14812,9 +14812,9 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "patchAppsV1alpha1NamespacedStatefulSet",
+     "operationId": "patchAppsV1beta1NamespacedStatefulSet",
      "parameters": [
       {
        "name": "body",
@@ -14829,7 +14829,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.StatefulSet"
+        "$ref": "#/definitions/v1beta1.StatefulSet"
        }
       },
       "401": {
@@ -14863,7 +14863,7 @@
      }
     ]
    },
-   "/apis/apps/v1alpha1/namespaces/{namespace}/statefulsets/{name}/status": {
+   "/apis/apps/v1beta1/namespaces/{namespace}/statefulsets/{name}/status": {
     "get": {
      "description": "read status of the specified StatefulSet",
      "consumes": [
@@ -14878,14 +14878,14 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "readAppsV1alpha1NamespacedStatefulSetStatus",
+     "operationId": "readAppsV1beta1NamespacedStatefulSetStatus",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.StatefulSet"
+        "$ref": "#/definitions/v1beta1.StatefulSet"
        }
       },
       "401": {
@@ -14907,16 +14907,16 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "replaceAppsV1alpha1NamespacedStatefulSetStatus",
+     "operationId": "replaceAppsV1beta1NamespacedStatefulSetStatus",
      "parameters": [
       {
        "name": "body",
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/v1alpha1.StatefulSet"
+        "$ref": "#/definitions/v1beta1.StatefulSet"
        }
       }
      ],
@@ -14924,7 +14924,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.StatefulSet"
+        "$ref": "#/definitions/v1beta1.StatefulSet"
        }
       },
       "401": {
@@ -14948,9 +14948,9 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "patchAppsV1alpha1NamespacedStatefulSetStatus",
+     "operationId": "patchAppsV1beta1NamespacedStatefulSetStatus",
      "parameters": [
       {
        "name": "body",
@@ -14965,7 +14965,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.StatefulSet"
+        "$ref": "#/definitions/v1beta1.StatefulSet"
        }
       },
       "401": {
@@ -14999,7 +14999,7 @@
      }
     ]
    },
-   "/apis/apps/v1alpha1/statefulsets": {
+   "/apis/apps/v1beta1/statefulsets": {
     "get": {
      "description": "list or watch objects of kind StatefulSet",
      "consumes": [
@@ -15016,14 +15016,14 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "listAppsV1alpha1StatefulSetForAllNamespaces",
+     "operationId": "listAppsV1beta1StatefulSetForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.StatefulSetList"
+        "$ref": "#/definitions/v1beta1.StatefulSetList"
        }
       },
       "401": {
@@ -15076,7 +15076,7 @@
      }
     ]
    },
-   "/apis/apps/v1alpha1/watch/namespaces/{namespace}/statefulsets": {
+   "/apis/apps/v1beta1/watch/namespaces/{namespace}/statefulsets": {
     "get": {
      "description": "watch individual changes to a list of StatefulSet",
      "consumes": [
@@ -15093,9 +15093,9 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "watchAppsV1alpha1NamespacedStatefulSetList",
+     "operationId": "watchAppsV1beta1NamespacedStatefulSetList",
      "responses": {
       "200": {
        "description": "OK",
@@ -15161,7 +15161,7 @@
      }
     ]
    },
-   "/apis/apps/v1alpha1/watch/namespaces/{namespace}/statefulsets/{name}": {
+   "/apis/apps/v1beta1/watch/namespaces/{namespace}/statefulsets/{name}": {
     "get": {
      "description": "watch changes to an object of kind StatefulSet",
      "consumes": [
@@ -15178,9 +15178,9 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "watchAppsV1alpha1NamespacedStatefulSet",
+     "operationId": "watchAppsV1beta1NamespacedStatefulSet",
      "responses": {
       "200": {
        "description": "OK",
@@ -15254,7 +15254,7 @@
      }
     ]
    },
-   "/apis/apps/v1alpha1/watch/statefulsets": {
+   "/apis/apps/v1beta1/watch/statefulsets": {
     "get": {
      "description": "watch individual changes to a list of StatefulSet",
      "consumes": [
@@ -15271,9 +15271,9 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "watchAppsV1alpha1StatefulSetListForAllNamespaces",
+     "operationId": "watchAppsV1beta1StatefulSetListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -32644,90 +32644,6 @@
      }
     }
    },
-   "v1alpha1.StatefulSet": {
-    "description": "StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity. StatefulSet is currently in alpha and subject to change without notice.",
-    "properties": {
-     "metadata": {
-      "$ref": "#/definitions/v1.ObjectMeta"
-     },
-     "spec": {
-      "description": "Spec defines the desired identities of pods in this set.",
-      "$ref": "#/definitions/v1alpha1.StatefulSetSpec"
-     },
-     "status": {
-      "description": "Status is the current status of Pods in this StatefulSet. This data may be out of date by some window of time.",
-      "$ref": "#/definitions/v1alpha1.StatefulSetStatus"
-     }
-    }
-   },
-   "v1alpha1.StatefulSetList": {
-    "description": "StatefulSetList is a collection of StatefulSets.",
-    "required": [
-     "items"
-    ],
-    "properties": {
-     "items": {
-      "type": "array",
-      "items": {
-       "$ref": "#/definitions/v1alpha1.StatefulSet"
-      }
-     },
-     "metadata": {
-      "$ref": "#/definitions/unversioned.ListMeta"
-     }
-    }
-   },
-   "v1alpha1.StatefulSetSpec": {
-    "description": "A StatefulSetSpec is the specification of a StatefulSet.",
-    "required": [
-     "template",
-     "serviceName"
-    ],
-    "properties": {
-     "replicas": {
-      "description": "Replicas is the desired number of replicas of the given Template. These are replicas in the sense that they are instantiations of the same Template, but individual replicas also have a consistent identity. If unspecified, defaults to 1.",
-      "type": "integer",
-      "format": "int32"
-     },
-     "selector": {
-      "description": "Selector is a label query over pods that should match the replica count. If empty, defaulted to labels on the pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
-      "$ref": "#/definitions/unversioned.LabelSelector"
-     },
-     "serviceName": {
-      "description": "ServiceName is the name of the service that governs this StatefulSet. This service must exist before the StatefulSet, and is responsible for the network identity of the set. Pods get DNS/hostnames that follow the pattern: pod-specific-string.serviceName.default.svc.cluster.local where \"pod-specific-string\" is managed by the StatefulSet controller.",
-      "type": "string"
-     },
-     "template": {
-      "description": "Template is the object that describes the pod that will be created if insufficient replicas are detected. Each pod stamped out by the StatefulSet will fulfill this Template, but have a unique identity from the rest of the StatefulSet.",
-      "$ref": "#/definitions/v1.PodTemplateSpec"
-     },
-     "volumeClaimTemplates": {
-      "description": "VolumeClaimTemplates is a list of claims that pods are allowed to reference. The StatefulSet controller is responsible for mapping network identities to claims in a way that maintains the identity of a pod. Every claim in this list must have at least one matching (by name) volumeMount in one container in the template. A claim in this list takes precedence over any volumes in the template, with the same name.",
-      "type": "array",
-      "items": {
-       "$ref": "#/definitions/v1.PersistentVolumeClaim"
-      }
-     }
-    }
-   },
-   "v1alpha1.StatefulSetStatus": {
-    "description": "StatefulSetStatus represents the current state of a StatefulSet.",
-    "required": [
-     "replicas"
-    ],
-    "properties": {
-     "observedGeneration": {
-      "description": "most recent generation observed by this autoscaler.",
-      "type": "integer",
-      "format": "int64"
-     },
-     "replicas": {
-      "description": "Replicas is the number of actual replicas.",
-      "type": "integer",
-      "format": "int32"
-     }
-    }
-   },
    "v1alpha1.Subject": {
     "description": "Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference, or a value for non-objects such as user and group names.",
     "required": [
@@ -33788,6 +33704,90 @@
      "resourceAttributes": {
       "description": "ResourceAuthorizationAttributes describes information for a resource access request",
       "$ref": "#/definitions/v1beta1.ResourceAttributes"
+     }
+    }
+   },
+   "v1beta1.StatefulSet": {
+    "description": "StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.",
+    "properties": {
+     "metadata": {
+      "$ref": "#/definitions/v1.ObjectMeta"
+     },
+     "spec": {
+      "description": "Spec defines the desired identities of pods in this set.",
+      "$ref": "#/definitions/v1beta1.StatefulSetSpec"
+     },
+     "status": {
+      "description": "Status is the current status of Pods in this StatefulSet. This data may be out of date by some window of time.",
+      "$ref": "#/definitions/v1beta1.StatefulSetStatus"
+     }
+    }
+   },
+   "v1beta1.StatefulSetList": {
+    "description": "StatefulSetList is a collection of StatefulSets.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1beta1.StatefulSet"
+      }
+     },
+     "metadata": {
+      "$ref": "#/definitions/unversioned.ListMeta"
+     }
+    }
+   },
+   "v1beta1.StatefulSetSpec": {
+    "description": "A StatefulSetSpec is the specification of a StatefulSet.",
+    "required": [
+     "template",
+     "serviceName"
+    ],
+    "properties": {
+     "replicas": {
+      "description": "Replicas is the desired number of replicas of the given Template. These are replicas in the sense that they are instantiations of the same Template, but individual replicas also have a consistent identity. If unspecified, defaults to 1.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "selector": {
+      "description": "Selector is a label query over pods that should match the replica count. If empty, defaulted to labels on the pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
+      "$ref": "#/definitions/unversioned.LabelSelector"
+     },
+     "serviceName": {
+      "description": "ServiceName is the name of the service that governs this StatefulSet. This service must exist before the StatefulSet, and is responsible for the network identity of the set. Pods get DNS/hostnames that follow the pattern: pod-specific-string.serviceName.default.svc.cluster.local where \"pod-specific-string\" is managed by the StatefulSet controller.",
+      "type": "string"
+     },
+     "template": {
+      "description": "Template is the object that describes the pod that will be created if insufficient replicas are detected. Each pod stamped out by the StatefulSet will fulfill this Template, but have a unique identity from the rest of the StatefulSet.",
+      "$ref": "#/definitions/v1.PodTemplateSpec"
+     },
+     "volumeClaimTemplates": {
+      "description": "VolumeClaimTemplates is a list of claims that pods are allowed to reference. The StatefulSet controller is responsible for mapping network identities to claims in a way that maintains the identity of a pod. Every claim in this list must have at least one matching (by name) volumeMount in one container in the template. A claim in this list takes precedence over any volumes in the template, with the same name.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1.PersistentVolumeClaim"
+      }
+     }
+    }
+   },
+   "v1beta1.StatefulSetStatus": {
+    "description": "StatefulSetStatus represents the current state of a StatefulSet.",
+    "required": [
+     "replicas"
+    ],
+    "properties": {
+     "observedGeneration": {
+      "description": "most recent generation observed by this autoscaler.",
+      "type": "integer",
+      "format": "int64"
+     },
+     "replicas": {
+      "description": "Replicas is the number of actual replicas.",
+      "type": "integer",
+      "format": "int32"
      }
     }
    },
