@@ -135,6 +135,7 @@ dns-bind-address
 dns-port
 dns-provider
 dns-provider-config
+dns-zone-name
 docker-email
 docker-endpoint
 docker-exec-handler
@@ -207,6 +208,7 @@ federated-api-burst
 federated-api-qps
 federated-kube-context
 federation-name
+federation-system-namespace
 file-check-frequency
 file-suffix
 file_content_in_loop
