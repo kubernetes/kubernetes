@@ -13,6 +13,7 @@ load(
 go_binary(
     name = "kube-apiserver",
     srcs = ["apiserver.go"],
+    linkstamp = "k8s.io/kubernetes/pkg/version",
     tags = ["automanaged"],
     deps = [
         "//cmd/kube-apiserver/app:go_default_library",

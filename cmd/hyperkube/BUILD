@@ -25,6 +25,7 @@ go_binary(
         "main.go",
         "server.go",
     ],
+    linkstamp = "k8s.io/kubernetes/pkg/version",
     tags = ["automanaged"],
     deps = [
         "//cmd/kube-apiserver/app:go_default_library",

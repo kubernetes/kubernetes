@@ -13,6 +13,7 @@ load(
 go_binary(
     name = "kube-scheduler",
     srcs = ["scheduler.go"],
+    linkstamp = "k8s.io/kubernetes/pkg/version",
     tags = ["automanaged"],
     deps = [
         "//pkg/healthz:go_default_library",
