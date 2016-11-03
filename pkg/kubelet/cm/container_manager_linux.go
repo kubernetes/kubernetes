@@ -165,18 +165,26 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
 func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig) (ContainerManager, error) {
-	// Check if Cgroup-root actually exists on the node
-	if nodeConfig.CgroupsPerQOS {
-		if nodeConfig.CgroupRoot == "" {
-			return nil, fmt.Errorf("invalid configuration: cgroups-per-qos was specified and cgroup-root was not specified. To enable the QoS cgroup hierarchy you need to specify a valid cgroup-root")
-		}
-		if _, err := os.Stat(nodeConfig.CgroupRoot); err != nil {
-			return nil, fmt.Errorf("invalid configuration: cgroup-root doesn't exist : %v", err)
-		}
-	}
 	subsystems, err := GetCgroupSubsystems()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
+	}
+
+	// Check if Cgroup-root actually exists on the node
+	if nodeConfig.CgroupsPerQOS {
+		// this does default to / when enabled, but this tests against regressions.
+		if nodeConfig.CgroupRoot == "" {
+			return nil, fmt.Errorf("invalid configuration: cgroups-per-qos was specified and cgroup-root was not specified. To enable the QoS cgroup hierarchy you need to specify a valid cgroup-root")
+		}
+
+		// we need to check that the cgroup root actually exists for each subsystem
+		// of note, we always use the cgroupfs driver when performing this check since
+		// the input is provided in that format.
+		// this is important because we do not want any name conversion to occur.
+		cgroupManager := NewCgroupManager(subsystems, "cgroupfs")
+		if !cgroupManager.Exists(CgroupName(nodeConfig.CgroupRoot)) {
+			return nil, fmt.Errorf("invalid configuration: cgroup-root doesn't exist: %v", err)
+		}
 	}
 	return &containerManagerImpl{
 		cadvisorInterface: cadvisorInterface,
@@ -195,11 +203,11 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 			qosContainersInfo: cm.qosContainers,
 			nodeInfo:          cm.nodeInfo,
 			subsystems:        cm.subsystems,
-			cgroupManager:     NewCgroupManager(cm.subsystems),
+			cgroupManager:     NewCgroupManager(cm.subsystems, cm.NodeConfig.CgroupDriver),
 		}
 	}
 	return &podContainerManagerNoop{
-		cgroupRoot: cm.NodeConfig.CgroupRoot,
+		cgroupRoot: CgroupName(cm.NodeConfig.CgroupRoot),
 	}
 }
 
@@ -229,10 +237,8 @@ const (
 // We create top level QoS containers for only Burstable and Best Effort
 // and not Guaranteed QoS class. All guaranteed pods are nested under the
 // RootContainer by default. InitQOS is called only once during kubelet bootstrapping.
-// TODO(@dubstack) Add support for cgroup-root to work on both systemd and cgroupfs
-// drivers. Currently we only support systems running cgroupfs driver
-func InitQOS(rootContainer string, subsystems *CgroupSubsystems) (QOSContainersInfo, error) {
-	cm := NewCgroupManager(subsystems)
+func InitQOS(cgroupDriver, rootContainer string, subsystems *CgroupSubsystems) (QOSContainersInfo, error) {
+	cm := NewCgroupManager(subsystems, cgroupDriver)
 	// Top level for Qos containers are created only for Burstable
 	// and Best Effort classes
 	qosClasses := [2]qos.QOSClass{qos.Burstable, qos.BestEffort}
@@ -240,15 +246,17 @@ func InitQOS(rootContainer string, subsystems *CgroupSubsystems) (QOSContainersI
 	// Create containers for both qos classes
 	for _, qosClass := range qosClasses {
 		// get the container's absolute name
-		absoluteContainerName := path.Join(rootContainer, string(qosClass))
+		absoluteContainerName := CgroupName(path.Join(rootContainer, string(qosClass)))
 		// containerConfig object stores the cgroup specifications
 		containerConfig := &CgroupConfig{
 			Name:               absoluteContainerName,
 			ResourceParameters: &ResourceConfig{},
 		}
-		// TODO(@dubstack) Add support on systemd cgroups driver
-		if err := cm.Create(containerConfig); err != nil {
-			return QOSContainersInfo{}, fmt.Errorf("failed to create top level %v QOS cgroup : %v", qosClass, err)
+		// check if it exists
+		if !cm.Exists(absoluteContainerName) {
+			if err := cm.Create(containerConfig); err != nil {
+				return QOSContainersInfo{}, fmt.Errorf("failed to create top level %v QOS cgroup : %v", qosClass, err)
+			}
 		}
 	}
 	// Store the top level qos container names
@@ -317,7 +325,7 @@ func (cm *containerManagerImpl) setupNode() error {
 
 	// Setup top level qos containers only if CgroupsPerQOS flag is specified as true
 	if cm.NodeConfig.CgroupsPerQOS {
-		qosContainersInfo, err := InitQOS(cm.NodeConfig.CgroupRoot, cm.subsystems)
+		qosContainersInfo, err := InitQOS(cm.NodeConfig.CgroupDriver, cm.NodeConfig.CgroupRoot, cm.subsystems)
 		if err != nil {
 			return fmt.Errorf("failed to initialise top level QOS containers: %v", err)
 		}

@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/images"
@@ -137,6 +138,9 @@ type DockerManager struct {
 
 	// Root of the Docker runtime.
 	dockerRoot string
+
+	// cgroup driver used by Docker runtime.
+	cgroupDriver string
 
 	// Directory of container logs.
 	containerLogsDir string
@@ -234,6 +238,14 @@ func NewDockerManager(
 	// Work out the location of the Docker runtime, defaulting to /var/lib/docker
 	// if there are any problems.
 	dockerRoot := "/var/lib/docker"
+
+	// cgroup driver is only detectable in docker 1.12+
+	// when the execution driver is not detectable, we provide the cgroupfs form.
+	// if your docker engine is configured to use the systemd cgroup driver, and you
+	// want to use pod level cgroups, you must be on docker 1.12+ to ensure cgroup-parent
+	// is converted appropriately.  otherwise, docker will fail to launch the container
+	// and complain the cgroup name provided did not conform to systemd conventions.
+	var cgroupDriver string
 	dockerInfo, err := client.Info()
 	if err != nil {
 		glog.Errorf("Failed to execute Info() call to the Docker client: %v", err)
@@ -241,6 +253,9 @@ func NewDockerManager(
 	} else {
 		dockerRoot = dockerInfo.DockerRootDir
 		glog.Infof("Setting dockerRoot to %s", dockerRoot)
+
+		cgroupDriver = dockerInfo.CgroupDriver
+		glog.Infof("Setting cgroupDriver to %s", cgroupDriver)
 	}
 
 	dm := &DockerManager{
@@ -252,6 +267,7 @@ func NewDockerManager(
 		podInfraContainerImage: podInfraContainerImage,
 		dockerPuller:           newDockerPuller(client),
 		dockerRoot:             dockerRoot,
+		cgroupDriver:           cgroupDriver,
 		containerLogsDir:       containerLogsDir,
 		networkPlugin:          networkPlugin,
 		livenessManager:        livenessManager,
@@ -625,11 +641,11 @@ func (dm *DockerManager) runContainer(
 	// API server does this for new containers, but we repeat this logic in Kubelet
 	// for containers running on existing Kubernetes clusters.
 	if cpuRequest.IsZero() && !cpuLimit.IsZero() {
-		cpuShares = milliCPUToShares(cpuLimit.MilliValue())
+		cpuShares = cm.MilliCPUToShares(cpuLimit.MilliValue())
 	} else {
 		// if cpuRequest.Amount is nil, then milliCPUToShares will return the minimal number
 		// of CPU shares.
-		cpuShares = milliCPUToShares(cpuRequest.MilliValue())
+		cpuShares = cm.MilliCPUToShares(cpuRequest.MilliValue())
 	}
 	var devices []dockercontainer.DeviceMapping
 	if nvidiaGPULimit.Value() != 0 {
@@ -715,14 +731,26 @@ func (dm *DockerManager) runContainer(
 
 	if dm.cpuCFSQuota {
 		// if cpuLimit.Amount is nil, then the appropriate default value is returned to allow full usage of cpu resource.
-		cpuQuota, cpuPeriod := milliCPUToQuota(cpuLimit.MilliValue())
+		cpuQuota, cpuPeriod := cm.MilliCPUToQuota(cpuLimit.MilliValue())
 
 		hc.CPUQuota = cpuQuota
 		hc.CPUPeriod = cpuPeriod
 	}
 
 	if len(opts.CgroupParent) > 0 {
-		hc.CgroupParent = opts.CgroupParent
+		cgroupParent := opts.CgroupParent
+		// if docker uses the systemd cgroup driver, it expects *.slice style names for cgroup parent.
+		// if we configured kubelet to use --cgroup-driver=cgroupfs, and docker is configured to use systemd driver
+		// docker will fail to launch the container because the name we provide will not be a valid slice.
+		// this is a very good thing.
+		if dm.cgroupDriver == "systemd" {
+			cgroupParent, err = cm.ConvertCgroupFsNameToSystemd(opts.CgroupParent)
+			if err != nil {
+				return kubecontainer.ContainerID{}, err
+			}
+		}
+		hc.CgroupParent = cgroupParent
+		glog.V(3).Infof("Container %v/%v/%v: setting cgroup parent: %v", pod.Namespace, pod.Name, container.Name, hc.CgroupParent)
 	}
 
 	dockerOpts := dockertypes.ContainerCreateConfig{
