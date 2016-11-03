@@ -18,6 +18,7 @@ package fake
 
 import (
 	"k8s.io/kubernetes/pkg/api"
+	policy "k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 )
@@ -30,6 +31,17 @@ func (c *FakePods) Bind(binding *api.Binding) error {
 	action.Object = binding
 
 	_, err := c.Fake.Invokes(action, binding)
+	return err
+}
+
+func (c *FakePods) Evict(eviction *policy.Eviction) error {
+	action := core.CreateActionImpl{}
+	action.Verb = "post"
+	action.Resource = podsResource
+	action.Subresource = "evictions"
+	action.Object = eviction
+
+	_, err := c.Fake.Invokes(action, eviction)
 	return err
 }
 

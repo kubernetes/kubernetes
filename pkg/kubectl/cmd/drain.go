@@ -444,7 +444,7 @@ func (o *DrainOptions) evictPod(pod api.Pod) error {
 		},
 		DeleteOptions: deleteOptions,
 	}
-	return o.client.Policy().Evictions(eviction.Namespace).Evict(eviction)
+	return o.client.Core().Pods(eviction.Namespace).Evict(eviction)
 }
 
 // deletePods deletes the pods on the api server
@@ -464,7 +464,6 @@ func (o *DrainOptions) deletePods(pods []api.Pod) error {
 		for _, pod := range pods {
 			err := o.evictPod(pod)
 			if apierrors.IsTooManyRequests(err) {
-				fmt.Println("IsTooManyRequests", err)
 				e = err
 				ifTooManyRequests = true
 				continue
