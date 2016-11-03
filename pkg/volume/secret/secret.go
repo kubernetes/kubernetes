@@ -158,6 +158,14 @@ func (sv *secretVolume) GetAttributes() volume.Attributes {
 		SupportsSELinux: true,
 	}
 }
+
+// Checks prior to mount operations to verify that the required components (binaries, etc.)
+// to mount the volume are available on the underlying node.
+// If not, it returns an error
+func (b *secretVolumeMounter) CanMount() error {
+	return nil
+}
+
 func (b *secretVolumeMounter) SetUp(fsGroup *int64) error {
 	// Update each Slash "/" character for Windows with seperator character
 	dir := b.GetPath()

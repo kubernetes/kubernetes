@@ -195,6 +195,7 @@ experimental-mounter-path
 experimental-nvidia-gpus
 experimental-prefix
 experimental-cri
+experimental-check-node-capabilities-before-mount
 external-etcd-cafile
 external-etcd-certfile
 external-etcd-endpoints
