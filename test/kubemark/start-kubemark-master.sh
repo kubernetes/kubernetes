@@ -22,7 +22,7 @@ NUM_NODES=$2
 KUBEMARK_ETCD_VERSION=$3
 if [[ -z "${KUBEMARK_ETCD_VERSION}" ]]; then
   # Default etcd version.
-  KUBEMARK_ETCD_VERSION="2.2.1"
+  KUBEMARK_ETCD_VERSION="3.0.14"
 fi
 
 function retry() {
