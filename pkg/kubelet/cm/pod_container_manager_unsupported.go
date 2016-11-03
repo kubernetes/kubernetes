@@ -47,3 +47,7 @@ func (m *unsupportedPodContainerManager) ReduceCPULimits(_ CgroupName) error {
 func (m *unsupportedPodContainerManager) GetAllPodsFromCgroups() (map[types.UID]CgroupName, error) {
 	return nil, nil
 }
+
+func (m *unsupportedPodContainerManager) Destroy(name CgroupName) error {
+	return nil
+}
