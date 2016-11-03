@@ -343,21 +343,14 @@ func TestValidOpenAPISpec(t *testing.T) {
 		assert.NoError(res.AsError())
 	}
 
-	// TODO(mehdy): The actual validation part of these tests are timing out on jerkin but passing locally. Enable it after debugging timeout issue.
-	disableValidation := true
-
 	// Validate OpenApi spec
 	doc, err := loads.Spec(server.URL + "/swagger.json")
 	if assert.NoError(err) {
 		validator := validate.NewSpecValidator(doc.Schema(), strfmt.Default)
-		if !disableValidation {
-			res, warns := validator.Validate(doc)
-			assert.NoError(res.AsError())
-			if !warns.IsValid() {
-				t.Logf("Open API spec on root has some warnings : %v", warns)
-			}
-		} else {
-			t.Logf("Validation is disabled because it is timing out on jenkins put passing locally.")
+		res, warns := validator.Validate(doc)
+		assert.NoError(res.AsError())
+		if !warns.IsValid() {
+			t.Logf("Open API spec on root has some warnings : %v", warns)
 		}
 	}
 }
