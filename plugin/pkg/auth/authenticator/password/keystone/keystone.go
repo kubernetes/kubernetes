@@ -17,10 +17,10 @@ limitations under the License.
 package keystone
 
 import (
-	"errors"
-	"strings"
 	"crypto/tls"
+	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/golang/glog"
 	"github.com/rackspace/gophercloud"
@@ -33,9 +33,8 @@ import (
 // KeystoneAuthenticator contacts openstack keystone to validate user's credentials passed in the request.
 // The keystone endpoint is passed during apiserver startup
 type KeystoneAuthenticator struct {
-	authURL string
-	TLSClientConfig *tls.Config
-	caFile string
+	authURL   string
+	transport *http.Transport
 }
 
 // AuthenticatePassword checks the username, password via keystone call
@@ -63,8 +62,8 @@ func (keystoneAuthenticator *KeystoneAuthenticator) AuthenticatedClient(options 
 		return nil, err
 	}
 
-	if keystoneAuthenticator.caFile != "" {
-		client.HTTPClient.Transport = netutil.SetOldTransportDefaults(&http.Transport{TLSClientConfig: keystoneAuthenticator.TLSClientConfig})
+	if keystoneAuthenticator.transport != "" {
+		client.HTTPClient.Transport = netutil.SetOldTransportDefaults(keystoneAuthenticator.transport)
 	}
 
 	err = openstack.Authenticate(client, options)
@@ -86,7 +85,8 @@ func NewKeystoneAuthenticator(authURL string, caFile string) (*KeystoneAuthentic
 		}
 		config := &tls.Config{}
 		config.RootCAs = roots
-		return &KeystoneAuthenticator{authURL, config, caFile}, nil
+		transport := &http.Transport{TLSClientConfig: config}
+		return &KeystoneAuthenticator{authURL, transport}, nil
 	}
 
 	return &KeystoneAuthenticator{authURL: authURL}, nil
