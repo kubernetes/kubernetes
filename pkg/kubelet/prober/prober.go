@@ -17,7 +17,6 @@ limitations under the License.
 package prober
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"net"
@@ -33,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
 	"k8s.io/kubernetes/pkg/probe"
 	execprobe "k8s.io/kubernetes/pkg/probe/exec"
 	httprobe "k8s.io/kubernetes/pkg/probe/http"
@@ -230,13 +228,7 @@ type execInContainer struct {
 
 func (p *prober) newExecInContainer(container api.Container, containerID kubecontainer.ContainerID, cmd []string) exec.Cmd {
 	return execInContainer{func() ([]byte, error) {
-		var buffer bytes.Buffer
-		output := ioutils.WriteCloserWrapper(&buffer)
-		err := p.runner.ExecInContainer(containerID, cmd, nil, output, output, false, nil)
-		// Even if err is non-nil, there still may be output (e.g. the exec wrote to stdout or stderr but
-		// the command returned a nonzero exit code). Therefore, always return the output along with the
-		// error.
-		return buffer.Bytes(), err
+		return p.runner.RunInContainer(containerID, cmd)
 	}}
 }
 

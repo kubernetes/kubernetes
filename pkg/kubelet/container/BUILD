@@ -33,6 +33,7 @@ go_library(
         "//pkg/client/record:go_default_library",
         "//pkg/kubelet/api/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
+        "//pkg/kubelet/util/ioutils:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util/errors:go_default_library",
