@@ -245,7 +245,7 @@ var _ = framework.KubeDescribe("Kubelet [Serial] [Slow]", func() {
 			{
 				podsPerNode: 35,
 				cpuLimits: framework.ContainersCPUSummary{
-					stats.SystemContainerKubelet: {0.50: 0.12, 0.95: 0.14},
+					stats.SystemContainerKubelet: {0.50: 0.12, 0.95: 0.16},
 					stats.SystemContainerRuntime: {0.50: 0.05, 0.95: 0.07},
 				},
 				// We set the memory limits generously because the distribution
@@ -257,7 +257,7 @@ var _ = framework.KubeDescribe("Kubelet [Serial] [Slow]", func() {
 			},
 			{
 				cpuLimits: framework.ContainersCPUSummary{
-					stats.SystemContainerKubelet: {0.50: 0.17, 0.95: 0.22},
+					stats.SystemContainerKubelet: {0.50: 0.20, 0.95: 0.29},
 					stats.SystemContainerRuntime: {0.50: 0.06, 0.95: 0.09},
 				},
 				podsPerNode: 100,
