@@ -174,6 +174,13 @@ func (ed *emptyDir) GetAttributes() volume.Attributes {
 	}
 }
 
+// Checks prior to mount operations to verify that the required components (binaries, etc.)
+// to mount the volume are available on the underlying node.
+// If not, it returns an error
+func (b *emptyDir) CanMount() error {
+	return nil
+}
+
 // SetUp creates new directory.
 func (ed *emptyDir) SetUp(fsGroup *int64) error {
 	return ed.SetUpAt(ed.GetPath(), fsGroup)

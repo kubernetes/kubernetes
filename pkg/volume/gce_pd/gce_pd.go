@@ -238,6 +238,13 @@ func (b *gcePersistentDiskMounter) GetAttributes() volume.Attributes {
 	}
 }
 
+// Checks prior to mount operations to verify that the required components (binaries, etc.)
+// to mount the volume are available on the underlying node.
+// If not, it returns an error
+func (b *gcePersistentDiskMounter) CanMount() error {
+	return nil
+}
+
 // SetUp bind mounts the disk global mount to the volume path.
 func (b *gcePersistentDiskMounter) SetUp(fsGroup *int64) error {
 	return b.SetUpAt(b.GetPath(), fsGroup)

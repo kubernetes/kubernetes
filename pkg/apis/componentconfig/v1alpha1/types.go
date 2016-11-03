@@ -505,6 +505,10 @@ type KubeletConfiguration struct {
 	// using the new Container Runtine Interface.
 	// +optional
 	ExperimentalRuntimeIntegrationType string `json:"experimentalRuntimeIntegrationType,omitempty"`
+	// This flag, if set, enables a check prior to mount operations to verify that the required components
+	// (binaries, etc.) to mount the volume are available on the underlying node. If the check is enabled
+	// and fails the mount operation fails.
+	ExperimentalCheckNodeCapabilitiesBeforeMount bool `json: "experimentalCheckNodeCapabilitiesBeforeMount,omitempty"`
 }
 
 type KubeletAuthorizationMode string

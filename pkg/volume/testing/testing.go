@@ -320,6 +320,10 @@ func (_ *FakeVolume) GetAttributes() Attributes {
 	}
 }
 
+func (fv *FakeVolume) CanMount() error {
+	return nil
+}
+
 func (fv *FakeVolume) SetUp(fsGroup *int64) error {
 	fv.Lock()
 	defer fv.Unlock()
