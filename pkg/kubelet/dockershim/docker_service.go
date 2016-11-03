@@ -237,11 +237,15 @@ func (ds *dockerService) Status() (*runtimeApi.RuntimeStatus, error) {
 		Status: proto.Bool(true),
 	}
 	conditions := []*runtimeApi.RuntimeCondition{runtimeReady, networkReady}
-	_, err := ds.client.Version()
-	if err != nil {
+	if _, err := ds.client.Version(); err != nil {
 		runtimeReady.Status = proto.Bool(false)
 		runtimeReady.Reason = proto.String("DockerDaemonNotReady")
 		runtimeReady.Message = proto.String(fmt.Sprintf("docker: failed to get docker version: %v", err))
+	}
+	if err := ds.networkPlugin.Status(); err != nil {
+		networkReady.Status = proto.Bool(false)
+		networkReady.Reason = proto.String("NetworkPluginNotReady")
+		networkReady.Message = proto.String(fmt.Sprintf("docker: network plugin is not ready: %v", err))
 	}
 	return &runtimeApi.RuntimeStatus{Conditions: conditions}, nil
 }
