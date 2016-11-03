@@ -912,7 +912,10 @@ func CreateTestingNS(baseName string, c clientset.Interface, labels map[string]s
 
 	if TestContext.VerifyServiceAccount {
 		if err := WaitForDefaultServiceAccountInNamespace(c, got.Name); err != nil {
-			return nil, err
+			// Even if we fail to create serviceAccount in the namespace,
+			// we have successfully create a namespace.
+			// So, return the created namespace.
+			return got, err
 		}
 	}
 	return got, nil
