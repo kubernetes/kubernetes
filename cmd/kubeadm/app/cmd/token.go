@@ -19,7 +19,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"os"
 	"path"
 	"text/tabwriter"
 	"time"
@@ -44,23 +43,23 @@ func NewCmdToken(out io.Writer) *cobra.Command {
 	tokenSecret := &kubeadmapi.Secrets{}
 	createCmd := &cobra.Command{
 		Use:   "create",
-		Short: "Create discovery tokens on the server.",
+		Short: "Create bootstrap tokens on the server.",
 		Run: func(tokenCmd *cobra.Command, args []string) {
 			err := RunCreateToken(out, tokenCmd, tokenDuration, tokenSecret)
 			kubeadmutil.CheckErr(err)
 		},
 	}
 	createCmd.PersistentFlags().DurationVar(&tokenDuration,
-		"duration", kubeadmutil.DefaultTokenDuration, "Duration the token should be valid")
+		"ttl", kubeadmutil.DefaultTokenDuration, "The duration before the token is automatically deleted.")
 	createCmd.PersistentFlags().StringVar(
 		&tokenSecret.GivenToken, "token", "",
-		"Shared secret used to secure cluster bootstrap; if none is provided, one will be generated for you",
+		"Shared secret used to secure cluster bootstrap. If none is provided, one will be generated for you.",
 	)
 	tokenCmd.AddCommand(createCmd)
 
 	listCmd := &cobra.Command{
 		Use:   "list",
-		Short: "List discovery tokens on the server.",
+		Short: "List bootstrap tokens on the server.",
 		Run: func(tokenCmd *cobra.Command, args []string) {
 			err := RunListTokens(out, tokenCmd)
 			kubeadmutil.CheckErr(err)
@@ -70,7 +69,7 @@ func NewCmdToken(out io.Writer) *cobra.Command {
 
 	deleteCmd := &cobra.Command{
 		Use:   "delete",
-		Short: "Delete discovery tokens on the server.",
+		Short: "Delete bootstrap tokens on the server.",
 		Run: func(tokenCmd *cobra.Command, args []string) {
 			err := RunDeleteToken(out, tokenCmd, args[0])
 			kubeadmutil.CheckErr(err)
@@ -97,7 +96,7 @@ func RunCreateToken(out io.Writer, cmd *cobra.Command, tokenDuration time.Durati
 	if err != nil {
 		return err
 	}
-	fmt.Println(tokenSecret.GivenToken)
+	fmt.Fprintln(out, tokenSecret.GivenToken)
 
 	return nil
 }
@@ -123,7 +122,7 @@ func RunListTokens(out io.Writer, cmd *cobra.Command) error {
 		return fmt.Errorf("<cmd/token> failed to list bootstrap tokens [%v]", err)
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 10, 4, 3, ' ', 0)
+	w := tabwriter.NewWriter(out, 10, 4, 3, ' ', 0)
 	fmt.Fprintln(w, "ID\tTOKEN\tEXPIRATION")
 	for _, secret := range results.Items {
 		tokenId := secret.Data["token-id"]
@@ -151,7 +150,7 @@ func RunDeleteToken(out io.Writer, cmd *cobra.Command, tokenId string) error {
 	if err := client.Secrets(api.NamespaceSystem).Delete(tokenSecretName, nil); err != nil {
 		return fmt.Errorf("<cmd/token> failed to delete bootstrap token [%v]", err)
 	}
-	fmt.Printf("<cmd/token> bootstrap token deleted: %s\n", tokenId)
+	fmt.Fprintf(out, "<cmd/token> bootstrap token deleted: %s\n", tokenId)
 
 	return nil
 }

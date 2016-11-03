@@ -41,12 +41,12 @@ func createAPIClient(adminKubeconfig *clientcmdapi.Config) (*clientset.Clientset
 		&clientcmd.ConfigOverrides{},
 	).ClientConfig()
 	if err != nil {
-		return nil, fmt.Errorf("<cmd/token> failed to create API client configuration [%v]", err)
+		return nil, fmt.Errorf("<master/apiclient> failed to create API client configuration [%v]", err)
 	}
 
 	client, err := clientset.NewForConfig(adminClientConfig)
 	if err != nil {
-		return nil, fmt.Errorf("<cmd/token> failed to create API client [%v]", err)
+		return nil, fmt.Errorf("<master/apiclient> failed to create API client [%v]", err)
 	}
 	return client, nil
 }

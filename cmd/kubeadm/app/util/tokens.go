@@ -128,6 +128,7 @@ func encodeTokenSecretData(tokenSecret *kubeadmapi.Secrets, duration time.Durati
 	t := time.Now()
 	t = t.Add(duration)
 	data["expiration"] = []byte(t.Format(time.RFC3339))
+	data["usage-bootstrap-signing"] = []byte("true")
 
 	return data
 }
