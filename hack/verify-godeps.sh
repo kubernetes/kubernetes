@@ -60,6 +60,7 @@ function cleanup {
     echo "Removing ${_tmpdir}"
     rm -rf "${_tmpdir}"
   fi
+  export GODEP=""
 }
 trap cleanup EXIT
 
@@ -76,7 +77,7 @@ export GOPATH="${_tmpdir}"
 pushd "${_kubetmp}" 2>&1 > /dev/null
   # Build the godep tool
   go get -u github.com/tools/godep 2>/dev/null
-  GODEP="${GOPATH}/bin/godep"
+  export GODEP="${GOPATH}/bin/godep"
   pin-godep() {
     pushd "${GOPATH}/src/github.com/tools/godep" > /dev/null
       git checkout "$1"
