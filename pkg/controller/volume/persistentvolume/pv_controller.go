@@ -492,6 +492,17 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *api.PersistentVolume)
 				// This volume was dynamically provisioned for this claim. The
 				// claim got bound elsewhere, and thus this volume is not
 				// needed. Delete it.
+				// Mark the volume as Released for external deleters and to let
+				// the user know. Don't overwrite existing Failed status!
+				if volume.Status.Phase != api.VolumeReleased && volume.Status.Phase != api.VolumeFailed {
+					// Also, log this only once:
+					glog.V(2).Infof("dynamically volume %q is released and it will be deleted", volume.Name)
+					if volume, err = ctrl.updateVolumePhase(volume, api.VolumeReleased, ""); err != nil {
+						// Nothing was saved; we will fall back into the same condition
+						// in the next call to this method
+						return err
+					}
+				}
 				if err = ctrl.reclaimVolume(volume); err != nil {
 					// Deletion failed, we will fall back into the same condition
 					// in the next call to this method
@@ -1131,6 +1142,12 @@ func (ctrl *PersistentVolumeController) isVolumeReleased(volume *api.PersistentV
 	}
 	if claim != nil && claim.UID == volume.Spec.ClaimRef.UID {
 		// the claim still exists and has the right UID
+
+		if len(claim.Spec.VolumeName) > 0 && claim.Spec.VolumeName != volume.Name {
+			// the claim is bound to another PV, this PV *is* released
+			return true, nil
+		}
+
 		glog.V(4).Infof("isVolumeReleased[%s]: ClaimRef is still valid, volume is not released", volume.Name)
 		return false, nil
 	}
