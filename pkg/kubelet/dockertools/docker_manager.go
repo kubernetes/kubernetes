@@ -282,7 +282,7 @@ func NewDockerManager(
 		imageStatsProvider:     newImageStatsProvider(client),
 		seccompProfileRoot:     seccompProfileRoot,
 	}
-	cmdRunner := &kubecontainer.ContainerCommandRunnerWrapper{dm}
+	cmdRunner := kubecontainer.DirectStreamingRunner(dm)
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, cmdRunner, dm)
 	dm.imagePuller = images.NewImageManager(kubecontainer.FilterEventRecorder(recorder), dm, imageBackOff, serializeImagePulls, qps, burst)
 	dm.containerGC = NewContainerGC(client, podGetter, containerLogsDir)

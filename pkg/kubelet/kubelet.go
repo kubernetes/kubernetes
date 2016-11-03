@@ -619,7 +619,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 				kubeDeps.ContainerRuntimeOptions...,
 			)
 			klet.containerRuntime = runtime
-			klet.runner = &kubecontainer.ContainerCommandRunnerWrapper{runtime}
+			klet.runner = kubecontainer.DirectStreamingRunner(runtime)
 		}
 	case "rkt":
 		// TODO: Include hairpin mode settings in rkt?
@@ -651,7 +651,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			return nil, err
 		}
 		klet.containerRuntime = rktRuntime
-		klet.runner = &kubecontainer.ContainerCommandRunnerWrapper{rktRuntime}
+		klet.runner = kubecontainer.DirectStreamingRunner(rktRuntime)
 	case "remote":
 		remoteRuntimeService, err := remote.NewRemoteRuntimeService(kubeCfg.RemoteRuntimeEndpoint, kubeCfg.RuntimeRequestTimeout.Duration)
 		if err != nil {

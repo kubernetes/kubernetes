@@ -226,13 +226,17 @@ func FormatPod(pod *Pod) string {
 	return fmt.Sprintf("%s_%s(%s)", pod.Name, pod.Namespace, pod.ID)
 }
 
-type ContainerCommandRunnerWrapper struct {
+type containerCommandRunnerWrapper struct {
 	DirectStreamingRuntime
 }
 
-var _ ContainerCommandRunner = &ContainerCommandRunnerWrapper{}
+var _ ContainerCommandRunner = &containerCommandRunnerWrapper{}
 
-func (r *ContainerCommandRunnerWrapper) RunInContainer(id ContainerID, cmd []string) ([]byte, error) {
+func DirectStreamingRunner(runtime DirectStreamingRuntime) ContainerCommandRunner {
+	return &containerCommandRunnerWrapper{runtime}
+}
+
+func (r *containerCommandRunnerWrapper) RunInContainer(id ContainerID, cmd []string) ([]byte, error) {
 	var buffer bytes.Buffer
 	output := ioutils.WriteCloserWrapper(&buffer)
 	err := r.ExecInContainer(id, cmd, nil, output, output, false, nil)

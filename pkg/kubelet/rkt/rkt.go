@@ -277,7 +277,7 @@ func New(
 		return nil, fmt.Errorf("rkt: cannot get config from rkt api service: %v", err)
 	}
 
-	cmdRunner := &kubecontainer.ContainerCommandRunnerWrapper{rkt}
+	cmdRunner := kubecontainer.DirectStreamingRunner(rkt)
 	rkt.runner = lifecycle.NewHandlerRunner(httpClient, cmdRunner, rkt)
 
 	rkt.imagePuller = images.NewImageManager(recorder, rkt, imageBackOff, serializeImagePulls, imagePullQPS, imagePullBurst)
