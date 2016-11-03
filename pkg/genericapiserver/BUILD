@@ -36,7 +36,6 @@ go_library(
         "//pkg/apimachinery/registered:go_default_library",
         "//pkg/apiserver:go_default_library",
         "//pkg/apiserver/filters:go_default_library",
-        "//pkg/apiserver/openapi:go_default_library",
         "//pkg/apiserver/request:go_default_library",
         "//pkg/auth/authenticator:go_default_library",
         "//pkg/auth/authorizer:go_default_library",

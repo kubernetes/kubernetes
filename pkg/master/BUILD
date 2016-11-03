@@ -50,6 +50,7 @@ go_library(
         "//pkg/apis/rbac/v1alpha1:go_default_library",
         "//pkg/apis/storage/install:go_default_library",
         "//pkg/apis/storage/v1beta1:go_default_library",
+        "//pkg/apiserver/openapi:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
         "//pkg/genericapiserver:go_default_library",
         "//pkg/healthz:go_default_library",
