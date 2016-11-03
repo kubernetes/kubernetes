@@ -53,7 +53,7 @@ func NewKubeFedCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 		{
 			Message: "Basic Commands:",
 			Commands: []*cobra.Command{
-				kubefedinit.NewCmdInit(f, out, util.NewAdminConfig(clientcmd.NewDefaultPathOptions())),
+				kubefedinit.NewCmdInit(out, util.NewAdminConfig(clientcmd.NewDefaultPathOptions())),
 				NewCmdJoin(f, out, util.NewAdminConfig(clientcmd.NewDefaultPathOptions())),
 				NewCmdUnjoin(f, out, err, util.NewAdminConfig(clientcmd.NewDefaultPathOptions())),
 			},
