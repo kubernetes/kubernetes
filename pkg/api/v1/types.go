@@ -2980,6 +2980,8 @@ const (
 	NodeDiskPressure NodeConditionType = "DiskPressure"
 	// NodeNetworkUnavailable means that network for the node is not correctly configured.
 	NodeNetworkUnavailable NodeConditionType = "NetworkUnavailable"
+	// NodeInodePressure means the kublet is under pressure due to insufficient available inodes.
+	NodeInodePressure NodeConditionType = "InodePressure"
 )
 
 // NodeCondition contains condition information for a node.
