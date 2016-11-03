@@ -1404,27 +1404,6 @@ func WaitForRCToStabilize(c clientset.Interface, ns, name string, timeout time.D
 	return err
 }
 
-// WaitForPodAddition waits for pods to be added within the timeout.
-func WaitForPodAddition(c clientset.Interface, ns string, timeout time.Duration) error {
-	options := api.ListOptions{FieldSelector: fields.Set{
-		"metadata.namespace": ns,
-	}.AsSelector()}
-
-	w, err := c.Core().Pods(ns).Watch(options)
-	if err != nil {
-		return err
-	}
-	_, err = watch.Until(timeout, w, func(event watch.Event) (bool, error) {
-		switch event.Type {
-		case watch.Added:
-			return true, nil
-		}
-		Logf("Waiting for pod(s) to be added in namespace %v", ns)
-		return false, nil
-	})
-	return err
-}
-
 func WaitForPodToDisappear(c clientset.Interface, ns, podName string, label labels.Selector, interval, timeout time.Duration) error {
 	return wait.PollImmediate(interval, timeout, func() (bool, error) {
 		Logf("Waiting for pod %s to disappear", podName)
