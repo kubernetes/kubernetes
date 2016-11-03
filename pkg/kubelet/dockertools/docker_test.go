@@ -982,61 +982,6 @@ func TestMakePortsAndBindings(t *testing.T) {
 	}
 }
 
-func TestMilliCPUToQuota(t *testing.T) {
-	testCases := []struct {
-		input  int64
-		quota  int64
-		period int64
-	}{
-		{
-			input:  int64(0),
-			quota:  int64(0),
-			period: int64(0),
-		},
-		{
-			input:  int64(5),
-			quota:  int64(1000),
-			period: int64(100000),
-		},
-		{
-			input:  int64(9),
-			quota:  int64(1000),
-			period: int64(100000),
-		},
-		{
-			input:  int64(10),
-			quota:  int64(1000),
-			period: int64(100000),
-		},
-		{
-			input:  int64(200),
-			quota:  int64(20000),
-			period: int64(100000),
-		},
-		{
-			input:  int64(500),
-			quota:  int64(50000),
-			period: int64(100000),
-		},
-		{
-			input:  int64(1000),
-			quota:  int64(100000),
-			period: int64(100000),
-		},
-		{
-			input:  int64(1500),
-			quota:  int64(150000),
-			period: int64(100000),
-		},
-	}
-	for _, testCase := range testCases {
-		quota, period := milliCPUToQuota(testCase.input)
-		if quota != testCase.quota || period != testCase.period {
-			t.Errorf("Input %v, expected quota %v period %v, but got quota %v period %v", testCase.input, testCase.quota, testCase.period, quota, period)
-		}
-	}
-}
-
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 func randStringBytes(n int) string {

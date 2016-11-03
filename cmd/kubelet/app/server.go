@@ -441,6 +441,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 			ContainerRuntime:       s.ContainerRuntime,
 			CgroupsPerQOS:          s.CgroupsPerQOS,
 			CgroupRoot:             s.CgroupRoot,
+			CgroupDriver:           s.CgroupDriver,
 			ProtectKernelDefaults:  s.ProtectKernelDefaults,
 			RuntimeIntegrationType: s.ExperimentalRuntimeIntegrationType,
 		})
