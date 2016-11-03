@@ -148,7 +148,7 @@ func (h *UpgradeAwareProxyHandler) tryUpgrade(w http.ResponseWriter, req *http.R
 	if h.InterceptRedirects && utilconfig.DefaultFeatureGate.StreamingProxyRedirects() {
 		backendConn, rawResponse, err = h.connectBackendWithRedirects(req)
 	} else {
-		backendConn, err = h.connectBackend(req, h.Location)
+		backendConn, err = h.connectBackend(req.Method, h.Location, req.Header, req.Body)
 	}
 	if err != nil {
 		h.Responder.Error(err)
@@ -214,18 +214,18 @@ func (h *UpgradeAwareProxyHandler) tryUpgrade(w http.ResponseWriter, req *http.R
 }
 
 // connectBackend dials the backend at location and forwards a copy of the client request.
-func (h *UpgradeAwareProxyHandler) connectBackend(req *http.Request, location *url.URL) (conn net.Conn, err error) {
+func (h *UpgradeAwareProxyHandler) connectBackend(method string, location *url.URL, header http.Header, body io.Reader) (conn net.Conn, err error) {
 	defer func() {
 		if err != nil && conn != nil {
 			conn.Close()
 		}
 	}()
 
-	beReq, err := http.NewRequest(req.Method, location.String(), req.Body)
+	beReq, err := http.NewRequest(method, location.String(), body)
 	if err != nil {
 		return nil, err
 	}
-	beReq.Header = req.Header
+	beReq.Header = header
 
 	conn, err = proxy.DialURL(location, h.Transport)
 	if err != nil {
@@ -248,6 +248,7 @@ func (h *UpgradeAwareProxyHandler) connectBackendWithRedirects(req *http.Request
 		maxResponseSize = 1024
 	)
 	var (
+		initialReq       = req
 		rawResponse      = bytes.NewBuffer(make([]byte, 0, 256))
 		location         = h.Location
 		intermediateConn net.Conn
@@ -265,7 +266,14 @@ redirectLoop:
 			return nil, nil, fmt.Errorf("too many redirects (%d)", redirects)
 		}
 
-		intermediateConn, err = h.connectBackend(req, location)
+		if redirects == 0 {
+			intermediateConn, err = h.connectBackend(req.Method, location, req.Header, req.Body)
+		} else {
+			// Redirected requests switch to "GET" according to the HTTP spec:
+			// https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.3
+			intermediateConn, err = h.connectBackend("GET", location, initialReq.Header, nil)
+		}
+
 		if err != nil {
 			return nil, nil, err
 		}
