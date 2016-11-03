@@ -18,4 +18,4 @@ limitations under the License.
 // +k8s:openapi-gen=true
 // +k8s:defaulter-gen=TypeMeta
 
-package unversioned // import "k8s.io/kubernetes/pkg/api/unversioned"
+package v1 // import "k8s.io/kubernetes/pkg/apis/meta/v1"
