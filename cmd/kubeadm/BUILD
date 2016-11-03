@@ -13,6 +13,7 @@ load(
 go_binary(
     name = "kubeadm",
     srcs = ["kubeadm.go"],
+    linkstamp = "k8s.io/kubernetes/pkg/version",
     tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app:go_default_library",

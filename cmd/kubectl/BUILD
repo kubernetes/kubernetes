@@ -13,6 +13,7 @@ load(
 go_binary(
     name = "kubectl",
     srcs = ["kubectl.go"],
+    linkstamp = "k8s.io/kubernetes/pkg/version",
     tags = ["automanaged"],
     deps = ["//cmd/kubectl/app:go_default_library"],
 )

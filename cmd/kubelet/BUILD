@@ -13,6 +13,7 @@ load(
 go_binary(
     name = "kubelet",
     srcs = ["kubelet.go"],
+    linkstamp = "k8s.io/kubernetes/pkg/version",
     tags = ["automanaged"],
     deps = [
         "//cmd/kubelet/app:go_default_library",
