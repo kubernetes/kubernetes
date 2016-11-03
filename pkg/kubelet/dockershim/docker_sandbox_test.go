@@ -187,7 +187,7 @@ func TestHostNetworkPluginInvocation(t *testing.T) {
 	)
 	hostNetwork := true
 	c.Linux = &runtimeApi.LinuxPodSandboxConfig{
-		SecurityContext: &runtimeApi.SandboxSecurityContext{
+		SecurityContext: &runtimeApi.LinuxSandboxSecurityContext{
 			NamespaceOptions: &runtimeApi.NamespaceOption{
 				HostNetwork: &hostNetwork,
 			},

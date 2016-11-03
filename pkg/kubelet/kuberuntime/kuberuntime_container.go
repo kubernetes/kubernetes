@@ -136,6 +136,15 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 		return nil, err
 	}
 
+	// Verify RunAsNonRoot.
+	imageUser, err := m.getImageUser(container.Image)
+	if err != nil {
+		return nil, err
+	}
+	if err := verifyRunAsNonRoot(pod, container, imageUser); err != nil {
+		return nil, err
+	}
+
 	command, args := kubecontainer.ExpandContainerCommandAndArgs(container, opts.Envs)
 	containerLogsPath := buildContainerLogsPath(container.Name, restartCount)
 	restartCountUint32 := uint32(restartCount)
@@ -155,7 +164,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 		Stdin:       &container.Stdin,
 		StdinOnce:   &container.StdinOnce,
 		Tty:         &container.TTY,
-		Linux:       m.generateLinuxContainerConfig(container, pod),
+		Linux:       m.generateLinuxContainerConfig(container, pod, imageUser),
 	}
 
 	// set environment variables
@@ -173,10 +182,10 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 }
 
 // generateLinuxContainerConfig generates linux container config for kubelet runtime api.
-func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *api.Container, pod *api.Pod) *runtimeApi.LinuxContainerConfig {
+func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *api.Container, pod *api.Pod, imageUser int64) *runtimeApi.LinuxContainerConfig {
 	lc := &runtimeApi.LinuxContainerConfig{
 		Resources:       &runtimeApi.LinuxContainerResources{},
-		SecurityContext: m.determineEffectiveSecurityContext(pod, container.SecurityContext),
+		SecurityContext: m.determineEffectiveSecurityContext(pod, container, imageUser),
 	}
 
 	// set linux container resources

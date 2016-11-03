@@ -149,13 +149,6 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 		}
 		// Note: ShmSize is handled in kube_docker_client.go
 
-		// Verify RunAsNonRoot.
-		if lc.GetSecurityContext().GetRunAsNonRoot() {
-			if err := ds.verifyRunAsNonRoot(lc.GetSecurityContext().GetRunAsUser(), image); err != nil {
-				return "", err
-			}
-		}
-
 		// Apply security context.
 		applyContainerSecurityContext(lc, podSandboxID, createConfig.Config, hc)
 	}

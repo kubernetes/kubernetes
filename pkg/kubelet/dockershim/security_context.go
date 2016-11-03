@@ -22,7 +22,6 @@ import (
 
 	dockercontainer "github.com/docker/engine-api/types/container"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 )
 
 const (
@@ -54,26 +53,26 @@ func applyContainerSecurityContext(lc *runtimeapi.LinuxContainerConfig, sandboxI
 }
 
 // modifySandboxContainerConfig applies sandbox security context config to dockercontainer.Config.
-func modifySandboxContainerConfig(podSc *runtimeapi.SandboxSecurityContext, config *dockercontainer.Config) {
+func modifySandboxContainerConfig(podSc *runtimeapi.LinuxSandboxSecurityContext, config *dockercontainer.Config) {
 	if podSc != nil {
-		modifyContainerConfig(&runtimeapi.SecurityContext{
+		modifyContainerConfig(&runtimeapi.LinuxContainerSecurityContext{
 			RunAsUser: podSc.RunAsUser,
 		}, config)
 	}
 }
 
 // modifyContainerConfig applies container security context config to dockercontainer.Config.
-func modifyContainerConfig(sc *runtimeapi.SecurityContext, config *dockercontainer.Config) {
+func modifyContainerConfig(sc *runtimeapi.LinuxContainerSecurityContext, config *dockercontainer.Config) {
 	if sc != nil && sc.RunAsUser != nil {
-		config.User = strconv.Itoa(int(sc.GetRunAsUser()))
+		config.User = strconv.FormatInt(sc.GetRunAsUser(), 10)
 	}
 }
 
 // modifySandboxHostConfig applies sandbox security context config to dockercontainer.HostConfig.
-func modifySandboxHostConfig(podSc *runtimeapi.SandboxSecurityContext, hc *dockercontainer.HostConfig) {
-	var sc *runtimeapi.SecurityContext
+func modifySandboxHostConfig(podSc *runtimeapi.LinuxSandboxSecurityContext, hc *dockercontainer.HostConfig) {
+	var sc *runtimeapi.LinuxContainerSecurityContext
 	if podSc != nil {
-		sc = &runtimeapi.SecurityContext{
+		sc = &runtimeapi.LinuxContainerSecurityContext{
 			// TODO: We skip application of supplemental groups to the
 			// sandbox container to work around a runc issue which
 			// requires containers to have the '/etc/group'. For more
@@ -90,7 +89,7 @@ func modifySandboxHostConfig(podSc *runtimeapi.SandboxSecurityContext, hc *docke
 }
 
 // modifyHostConfig applies security context config to dockercontainer.HostConfig.
-func modifyHostConfig(sc *runtimeapi.SecurityContext, sandboxID string, hostConfig *dockercontainer.HostConfig) {
+func modifyHostConfig(sc *runtimeapi.LinuxContainerSecurityContext, sandboxID string, hostConfig *dockercontainer.HostConfig) {
 	// Apply namespace options.
 	modifyNamespaceOptions(sc.GetNamespaceOptions(), sandboxID, hostConfig)
 
@@ -101,9 +100,6 @@ func modifyHostConfig(sc *runtimeapi.SecurityContext, sandboxID string, hostConf
 	// Apply supplemental groups.
 	for _, group := range sc.SupplementalGroups {
 		hostConfig.GroupAdd = append(hostConfig.GroupAdd, strconv.FormatInt(group, 10))
-	}
-	if sc.FsGroup != nil {
-		hostConfig.GroupAdd = append(hostConfig.GroupAdd, strconv.FormatInt(*sc.FsGroup, 10))
 	}
 
 	// Apply security context for the container.
@@ -180,21 +176,4 @@ func modifySELinuxOption(config []string, name, value string) []string {
 		config = append(config, fmt.Sprintf("%s:%s", name, value))
 	}
 	return config
-}
-
-// verifyRunAsNonRoot verifies RunAsNonRoot of security context.
-func (ds *dockerService) verifyRunAsNonRoot(runAsUser int64, image string) error {
-	if runAsUser == 0 {
-		return fmt.Errorf("container's runAsUser breaks non-root policy")
-	}
-
-	imgRoot, err := dockertools.IsImageRoot(ds.client, image)
-	if err != nil {
-		return fmt.Errorf("can't tell if image runs as root: %v", err)
-	}
-	if imgRoot {
-		return fmt.Errorf("container has runAsNonRoot and image will run as root")
-	}
-
-	return nil
 }

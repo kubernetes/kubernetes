@@ -138,14 +138,13 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *api.Pod, 
 	}
 	if pod.Spec.SecurityContext != nil {
 		sc := pod.Spec.SecurityContext
-		lc.SecurityContext = &runtimeApi.SandboxSecurityContext{
+		lc.SecurityContext = &runtimeApi.LinuxSandboxSecurityContext{
 			NamespaceOptions: &runtimeApi.NamespaceOption{
 				HostNetwork: &sc.HostNetwork,
 				HostIpc:     &sc.HostIPC,
 				HostPid:     &sc.HostPID,
 			},
-			RunAsUser:    sc.RunAsUser,
-			RunAsNonRoot: sc.RunAsNonRoot,
+			RunAsUser: sc.RunAsUser,
 		}
 
 		if groups := m.runtimeHelper.GetExtraSupplementalGroupsForPod(pod); len(groups) > 0 {

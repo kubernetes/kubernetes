@@ -2444,13 +2444,7 @@ func (dm *DockerManager) verifyNonRoot(container *api.Container) error {
 // or the user is set to root.  If there is an error inspecting the image this method will return
 // false and return the error.
 func (dm *DockerManager) isImageRoot(image string) (bool, error) {
-	return IsImageRoot(dm.client, image)
-}
-
-// Temporarily export this function to share with dockershim.
-// TODO: clean this up.
-func IsImageRoot(client DockerInterface, image string) (bool, error) {
-	img, err := client.InspectImageByRef(image)
+	img, err := dm.client.InspectImageByRef(image)
 	if err != nil {
 		return false, err
 	}
@@ -2458,7 +2452,7 @@ func IsImageRoot(client DockerInterface, image string) (bool, error) {
 		return false, fmt.Errorf("unable to inspect image %s, nil Config", image)
 	}
 
-	user := getUidFromUser(img.Config.User)
+	user := GetUidFromUser(img.Config.User)
 	// if no user is defined container will run as root
 	if user == "" {
 		return true, nil
@@ -2472,8 +2466,8 @@ func IsImageRoot(client DockerInterface, image string) (bool, error) {
 	return uid == 0, nil
 }
 
-// getUidFromUser splits the uid out of an uid:gid string.
-func getUidFromUser(id string) string {
+// GetUidFromUser splits the uid out of an uid:gid string.
+func GetUidFromUser(id string) string {
 	if id == "" {
 		return id
 	}

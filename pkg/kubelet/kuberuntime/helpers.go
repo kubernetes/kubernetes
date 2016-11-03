@@ -146,6 +146,16 @@ func getContainerSpec(pod *api.Pod, containerName string) *api.Container {
 	return nil
 }
 
+// getImageUID gets uid that will run the command(s) from image.
+func (m *kubeGenericRuntimeManager) getImageUser(image string) (int64, error) {
+	imageStatus, err := m.imageService.ImageStatus(&runtimeApi.ImageSpec{Image: &image})
+	if err != nil {
+		return 0, err
+	}
+
+	return imageStatus.GetUid(), nil
+}
+
 // isContainerFailed returns true if container has exited and exitcode is not zero.
 func isContainerFailed(status *kubecontainer.ContainerStatus) bool {
 	if status.State == kubecontainer.ContainerStateExited && status.ExitCode != 0 {

@@ -18,12 +18,14 @@ package dockershim
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	dockertypes "github.com/docker/engine-api/types"
 
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 )
 
 // This file contains helper functions to convert docker API types to runtime
@@ -56,11 +58,17 @@ func imageInspectToRuntimeAPIImage(image *dockertypes.ImageInspect) (*runtimeApi
 	}
 
 	size := uint64(image.VirtualSize)
+	imageUid := dockertools.GetUidFromUser(image.Config.User)
+	uid, err := strconv.ParseInt(imageUid, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("non-numeric user (%s)", imageUid)
+	}
 	return &runtimeApi.Image{
 		Id:          &image.ID,
 		RepoTags:    image.RepoTags,
 		RepoDigests: image.RepoDigests,
 		Size_:       &size,
+		Uid:         &uid,
 	}, nil
 
 }

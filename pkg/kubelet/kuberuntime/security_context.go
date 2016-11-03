@@ -17,69 +17,39 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/api"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
-// determineEffectiveSecurityContext gets container's security context from api.Pod and container.SecurityContext.
-func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *api.Pod, sc *api.SecurityContext) *runtimeapi.SecurityContext {
-	effectiveSc := m.getRuntimeSCFromPod(pod)
-	if effectiveSc == nil && sc == nil {
-		return nil
-	}
-	if effectiveSc != nil && sc == nil {
-		return effectiveSc
-	}
-	if effectiveSc == nil && sc != nil {
-		return convertToRuntimeSecurityContext(sc)
+// determineEffectiveSecurityContext gets container's security context from api.Pod and api.Container.
+func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *api.Pod, container *api.Container, imageUser int64) *runtimeapi.LinuxContainerSecurityContext {
+	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
+	synthesized := convertToRuntimeSecurityContext(effectiveSc)
+	if synthesized == nil {
+		synthesized = &runtimeapi.LinuxContainerSecurityContext{}
 	}
 
-	if sc.SELinuxOptions != nil {
-		effectiveSc.SelinuxOptions = convertToRuntimeSELinuxOption(sc.SELinuxOptions)
+	// set RunAsUser.
+	if synthesized.RunAsUser == nil {
+		synthesized.RunAsUser = &imageUser
 	}
 
-	if sc.Capabilities != nil {
-		effectiveSc.Capabilities = convertToRuntimeCapabilities(sc.Capabilities)
-	}
-
-	if sc.Privileged != nil {
-		effectiveSc.Privileged = sc.Privileged
-	}
-
-	if sc.RunAsUser != nil {
-		effectiveSc.RunAsUser = sc.RunAsUser
-	}
-
-	if sc.RunAsNonRoot != nil {
-		effectiveSc.RunAsNonRoot = sc.RunAsNonRoot
-	}
-
-	if sc.ReadOnlyRootFilesystem != nil {
-		effectiveSc.ReadonlyRootfs = sc.ReadOnlyRootFilesystem
-	}
-
-	return effectiveSc
-}
-
-// getRuntimeSCFromPod gets container security context from api.Pod.
-func (m *kubeGenericRuntimeManager) getRuntimeSCFromPod(pod *api.Pod) *runtimeapi.SecurityContext {
-	if pod.Spec.SecurityContext == nil {
-		return nil
-	}
-
+	// set namespace options and supplemental groups.
 	podSc := pod.Spec.SecurityContext
-	synthesized := &runtimeapi.SecurityContext{
-		FsGroup:      podSc.FSGroup,
-		RunAsUser:    podSc.RunAsUser,
-		RunAsNonRoot: podSc.RunAsNonRoot,
-		NamespaceOptions: &runtimeapi.NamespaceOption{
-			HostNetwork: &podSc.HostNetwork,
-			HostIpc:     &podSc.HostIPC,
-			HostPid:     &podSc.HostPID,
-		},
-		SelinuxOptions: convertToRuntimeSELinuxOption(podSc.SELinuxOptions),
+	if podSc == nil {
+		return synthesized
 	}
-
+	synthesized.NamespaceOptions = &runtimeapi.NamespaceOption{
+		HostNetwork: &podSc.HostNetwork,
+		HostIpc:     &podSc.HostIPC,
+		HostPid:     &podSc.HostPID,
+	}
+	if podSc.FSGroup != nil {
+		synthesized.SupplementalGroups = append(synthesized.SupplementalGroups, *podSc.FSGroup)
+	}
 	if groups := m.runtimeHelper.GetExtraSupplementalGroupsForPod(pod); len(groups) > 0 {
 		synthesized.SupplementalGroups = append(synthesized.SupplementalGroups, groups...)
 	}
@@ -90,16 +60,33 @@ func (m *kubeGenericRuntimeManager) getRuntimeSCFromPod(pod *api.Pod) *runtimeap
 	return synthesized
 }
 
+// verifyRunAsNonRoot verifies RunAsNonRoot.
+func verifyRunAsNonRoot(pod *api.Pod, container *api.Container, imageUser int64) error {
+	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
+	if effectiveSc == nil || effectiveSc.RunAsNonRoot == nil {
+		return nil
+	}
+
+	if effectiveSc.RunAsUser != nil && *effectiveSc.RunAsUser == 0 {
+		return fmt.Errorf("container's runAsUser breaks non-root policy")
+	}
+
+	if imageUser == 0 {
+		return fmt.Errorf("container has runAsNonRoot and image will run as root")
+	}
+
+	return nil
+}
+
 // convertToRuntimeSecurityContext converts api.SecurityContext to runtimeapi.SecurityContext.
-func convertToRuntimeSecurityContext(securityContext *api.SecurityContext) *runtimeapi.SecurityContext {
+func convertToRuntimeSecurityContext(securityContext *api.SecurityContext) *runtimeapi.LinuxContainerSecurityContext {
 	if securityContext == nil {
 		return nil
 	}
 
-	return &runtimeapi.SecurityContext{
+	return &runtimeapi.LinuxContainerSecurityContext{
 		RunAsUser:      securityContext.RunAsUser,
 		Privileged:     securityContext.Privileged,
-		RunAsNonRoot:   securityContext.RunAsNonRoot,
 		ReadonlyRootfs: securityContext.ReadOnlyRootFilesystem,
 		Capabilities:   convertToRuntimeCapabilities(securityContext.Capabilities),
 		SelinuxOptions: convertToRuntimeSELinuxOption(securityContext.SELinuxOptions),

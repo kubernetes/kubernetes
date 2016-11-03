@@ -32,12 +32,12 @@ func TestModifyContainerConfig(t *testing.T) {
 
 	cases := []struct {
 		name     string
-		sc       *runtimeapi.SecurityContext
+		sc       *runtimeapi.LinuxContainerSecurityContext
 		expected *dockercontainer.Config
 	}{
 		{
 			name: "container.SecurityContext.RunAsUser set",
-			sc: &runtimeapi.SecurityContext{
+			sc: &runtimeapi.LinuxContainerSecurityContext{
 				RunAsUser: &uid,
 			},
 			expected: &dockercontainer.Config{
@@ -46,7 +46,7 @@ func TestModifyContainerConfig(t *testing.T) {
 		},
 		{
 			name:     "no RunAsUser value set",
-			sc:       &runtimeapi.SecurityContext{},
+			sc:       &runtimeapi.LinuxContainerSecurityContext{},
 			expected: &dockercontainer.Config{},
 		},
 	}
@@ -60,7 +60,7 @@ func TestModifyContainerConfig(t *testing.T) {
 
 func TestModifyHostConfig(t *testing.T) {
 	priv := true
-	setPrivSC := &runtimeapi.SecurityContext{}
+	setPrivSC := &runtimeapi.LinuxContainerSecurityContext{}
 	setPrivSC.Privileged = &priv
 	setPrivHC := &dockercontainer.HostConfig{
 		Privileged:  true,
@@ -83,7 +83,7 @@ func TestModifyHostConfig(t *testing.T) {
 
 	cases := []struct {
 		name     string
-		sc       *runtimeapi.SecurityContext
+		sc       *runtimeapi.LinuxContainerSecurityContext
 		expected *dockercontainer.HostConfig
 	}{
 		{
@@ -98,14 +98,14 @@ func TestModifyHostConfig(t *testing.T) {
 		},
 		{
 			name: "container.SecurityContext.Capabilities",
-			sc: &runtimeapi.SecurityContext{
+			sc: &runtimeapi.LinuxContainerSecurityContext{
 				Capabilities: inputCapabilities(),
 			},
 			expected: setCapsHC,
 		},
 		{
 			name: "container.SecurityContext.SELinuxOptions",
-			sc: &runtimeapi.SecurityContext{
+			sc: &runtimeapi.LinuxContainerSecurityContext{
 				SelinuxOptions: inputSELinuxOptions(),
 			},
 			expected: setSELinuxHC,
@@ -120,45 +120,32 @@ func TestModifyHostConfig(t *testing.T) {
 }
 
 func TestModifyHostConfigWithGroups(t *testing.T) {
-	supplementalGroupsSC := &runtimeapi.SecurityContext{}
+	supplementalGroupsSC := &runtimeapi.LinuxContainerSecurityContext{}
 	supplementalGroupsSC.SupplementalGroups = []int64{2222}
 	supplementalGroupHC := &dockercontainer.HostConfig{NetworkMode: "none"}
 	supplementalGroupHC.GroupAdd = []string{"2222"}
-	fsGroupHC := &dockercontainer.HostConfig{NetworkMode: "none"}
-	fsGroupHC.GroupAdd = []string{"1234"}
-	bothHC := &dockercontainer.HostConfig{NetworkMode: "none"}
-	bothHC.GroupAdd = []string{"2222", "1234"}
-	fsGroup := int64(1234)
 
-	testCases := map[string]struct {
-		securityContext *runtimeapi.SecurityContext
+	testCases := []struct {
+		name            string
+		securityContext *runtimeapi.LinuxContainerSecurityContext
 		expected        *dockercontainer.HostConfig
 	}{
-		"nil": {
+		{
+			name:            "nil",
 			securityContext: nil,
 			expected:        &dockercontainer.HostConfig{NetworkMode: "none"},
 		},
-		"SupplementalGroup": {
+		{
+			name:            "SupplementalGroup",
 			securityContext: supplementalGroupsSC,
 			expected:        supplementalGroupHC,
 		},
-		"FSGroup": {
-			securityContext: &runtimeapi.SecurityContext{FsGroup: &fsGroup},
-			expected:        fsGroupHC,
-		},
-		"FSGroup + SupplementalGroups": {
-			securityContext: &runtimeapi.SecurityContext{
-				SupplementalGroups: []int64{2222},
-				FsGroup:            &fsGroup,
-			},
-			expected: bothHC,
-		},
 	}
 
-	for k, v := range testCases {
+	for _, tc := range testCases {
 		dockerCfg := &dockercontainer.HostConfig{}
-		modifyHostConfig(v.securityContext, "", dockerCfg)
-		assert.Equal(t, v.expected, dockerCfg, "[Test case %q]", k)
+		modifyHostConfig(tc.securityContext, "", dockerCfg)
+		assert.Equal(t, tc.expected, dockerCfg, "[Test case %q]", tc.name)
 	}
 }
 
@@ -166,7 +153,7 @@ func TestModifyHostConfigWithSandboxID(t *testing.T) {
 	priv := true
 	sandboxID := "sandbox"
 	sandboxNSMode := fmt.Sprintf("container:%v", sandboxID)
-	setPrivSC := &runtimeapi.SecurityContext{}
+	setPrivSC := &runtimeapi.LinuxContainerSecurityContext{}
 	setPrivSC.Privileged = &priv
 	setPrivHC := &dockercontainer.HostConfig{
 		Privileged:  true,
@@ -192,7 +179,7 @@ func TestModifyHostConfigWithSandboxID(t *testing.T) {
 
 	cases := []struct {
 		name     string
-		sc       *runtimeapi.SecurityContext
+		sc       *runtimeapi.LinuxContainerSecurityContext
 		expected *dockercontainer.HostConfig
 	}{
 		{
@@ -202,14 +189,14 @@ func TestModifyHostConfigWithSandboxID(t *testing.T) {
 		},
 		{
 			name: "container.SecurityContext.Capabilities",
-			sc: &runtimeapi.SecurityContext{
+			sc: &runtimeapi.LinuxContainerSecurityContext{
 				Capabilities: inputCapabilities(),
 			},
 			expected: setCapsHC,
 		},
 		{
 			name: "container.SecurityContext.SELinuxOptions",
-			sc: &runtimeapi.SecurityContext{
+			sc: &runtimeapi.LinuxContainerSecurityContext{
 				SelinuxOptions: inputSELinuxOptions(),
 			},
 			expected: setSELinuxHC,
@@ -253,9 +240,9 @@ func TestModifySecurityOption(t *testing.T) {
 	}
 }
 
-func fullValidSecurityContext() *runtimeapi.SecurityContext {
+func fullValidSecurityContext() *runtimeapi.LinuxContainerSecurityContext {
 	priv := true
-	return &runtimeapi.SecurityContext{
+	return &runtimeapi.LinuxContainerSecurityContext{
 		Privileged:     &priv,
 		Capabilities:   inputCapabilities(),
 		SelinuxOptions: inputSELinuxOptions(),

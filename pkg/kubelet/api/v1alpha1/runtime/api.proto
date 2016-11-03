@@ -133,39 +133,27 @@ message NamespaceOption {
     optional bool host_ipc = 3;
 }
 
-// SandboxSecurityContext holds security configuration that will be applied to a sandbox.
-message SandboxSecurityContext {
+// LinuxSandboxSecurityContext holds linux security configuration that will be
+// applied to a sandbox. Note that:
+// 1) It does not apply to containers in the pods.
+// 2) It may not be applicable to a PodSandbox which does not contain any running
+//    process.
+message LinuxSandboxSecurityContext {
     // The configurations for the sandbox's namespaces.
     // This will be used only if the PodSandbox uses namespace for isolation.
     optional NamespaceOption namespace_options = 1;
     // Optional SELinux context to be applied. Only for sandbox. Containers should
-    // confirm to SecurityContext.SelinuxOptions.
+    // conform to SecurityContext.SelinuxOptions.
     optional SELinuxOption selinux_options = 2;
     // The UID to run the entrypoint of the container process as.
     // Defaults to user specified in image metadata if unspecified.
-    // Only for sandbox. Containers should confirm to SecurityContext.RunAsUser.
+    // Only for sandbox. Containers should conform to SecurityContext.RunAsUser.
     optional int64 run_as_user = 3;
-    // Indicates that the container must run as a non-root user.
-    // If true, the runtime should validate the image at runtime to ensure that it
-    // does not run as UID 0 (root) and fail to start the container if it does.
-    // If unset or false, no such validation will be performed.
-    // Only for sandbox. Containers should confirm to SecurityContext.RunAsNonRoot.
-    optional bool run_as_non_root = 4;
     // If set, the root filesystem of the container is read-only.
-    optional bool readonly_rootfs = 5;
+    optional bool readonly_rootfs = 4;
     // A list of groups applied to the first process run in the sandbox, in addition
-    // to the sandbox's primary GID.  If unspecified, no groups will be added.
-    repeated int64 supplemental_groups = 6;
-    // A special supplemental group that applies to the sandbox.
-    // Some volume types allow the Kubelet to change the ownership of that volume
-    // to be owned by the pod:
-    //
-    // 1. The owning GID will be the FSGroup
-    // 2. The setgid bit is set (new files created in the volume will be owned by FSGroup)
-    // 3. The permission bits are OR'd with rw-rw----
-    //
-    // If unset, the Kubelet will not modify the ownership and permissions of any volume.
-    optional int64 fs_group = 7;
+    // to the sandbox's primary GID.
+    repeated int64 supplemental_groups = 5;
 }
 
 // LinuxPodSandboxConfig holds platform-specific configurations for Linux
@@ -175,8 +163,8 @@ message LinuxPodSandboxConfig {
     // The cgroupfs style syntax will be used, but the container runtime can
     // convert it to systemd semantics if needed.
     optional string cgroup_parent = 1;
-    // SandboxSecurityContext holds sandbox security attributes.
-    optional SandboxSecurityContext security_context = 2;
+    // LinuxSandboxSecurityContext holds sandbox security attributes.
+    optional LinuxSandboxSecurityContext security_context = 2;
 }
 
 // PodSandboxMetadata holds all necessary information for building the sandbox name.
@@ -428,8 +416,8 @@ message Capability {
     repeated string drop_capabilities = 2;
 }
 
-// SecurityContext holds security configuration that will be applied to a container.
-message SecurityContext {
+// LinuxContainerSecurityContext holds linux security configuration that will be applied to a container.
+message LinuxContainerSecurityContext {
     // Capabilities to add or drop.
     optional Capability capabilities = 1;
     // If set, run container in privileged mode.
@@ -442,26 +430,11 @@ message SecurityContext {
     // The UID to run the the container process as.
     // Defaults to user specified in image metadata if unspecified.
     optional int64 run_as_user = 5;
-    // Indicates that the container must run as a non-root user.
-    // If true, the runtime should validate the image at runtime to ensure that it
-    // does not run as UID 0 (root) and fail to start the container if it does.
-    // If unset or false, no such validation will be performed.
-    optional bool run_as_non_root = 6;
     // If set, the root filesystem of the container is read-only.
-    optional bool readonly_rootfs = 7;
+    optional bool readonly_rootfs = 6;
     // A list of groups applied to the first process run in the container, in addition
-    // to the container's primary GID.  If unspecified, no groups will be added.
-    repeated int64 supplemental_groups = 8;
-    // A special supplemental group that applies to the container.
-    // Some volume types allow the Kubelet to change the ownership of that volume
-    // to be owned by the pod:
-    //
-    // 1. The owning GID will be the FSGroup
-    // 2. The setgid bit is set (new files created in the volume will be owned by FSGroup)
-    // 3. The permission bits are OR'd with rw-rw----
-    //
-    // If unset, the Kubelet will not modify the ownership and permissions of any volume.
-    optional int64 fs_group = 9;
+    // to the container's primary GID.
+    repeated int64 supplemental_groups = 7;
 }
 
 // LinuxContainerConfig contains platform-specific configuration for
@@ -469,8 +442,8 @@ message SecurityContext {
 message LinuxContainerConfig {
     // Resources specification for the container.
     optional LinuxContainerResources resources = 1;
-    // SecurityContext configuration for the container.
-    optional SecurityContext security_context = 2;
+    // LinuxContainerSecurityContext configuration for the container.
+    optional LinuxContainerSecurityContext security_context = 2;
 }
 
 // ContainerMetadata holds all necessary information for building the container
@@ -759,6 +732,8 @@ message Image {
     repeated string repo_digests = 3;
     // The size of the image in bytes.
     optional uint64 size = 4;
+    // The uid that will run the command(s).
+    optional int64 uid = 5;
 }
 
 message ListImagesResponse {

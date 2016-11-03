@@ -291,14 +291,7 @@ func (ds *dockerService) applySandboxLinuxOptions(hc *dockercontainer.HostConfig
 	// Apply Cgroup options.
 	// TODO: Check if this works with per-pod cgroups.
 	hc.CgroupParent = lc.GetCgroupParent()
-
-	// Verify RunAsNonRoot of security context.
-	if lc.GetSecurityContext().GetRunAsNonRoot() {
-		if err := ds.verifyRunAsNonRoot(lc.GetSecurityContext().GetRunAsUser(), image); err != nil {
-			return err
-		}
-	}
-
+	// Apply security context.
 	applySandboxSecurityContext(lc, createConfig.Config, hc)
 
 	return nil
