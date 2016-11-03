@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"k8s.io/kubernetes/pkg/apis/meta/v1/unstructured"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -29,7 +30,7 @@ func IsListType(obj runtime.Object) bool {
 	// if we're a runtime.Unstructured, check to see if we have an `items` key
 	// This is a list type for recognition, but other Items type methods will fail on it
 	// and give you errors.
-	if unstructured, ok := obj.(*runtime.Unstructured); ok {
+	if unstructured, ok := obj.(*unstructured.Unstructured); ok {
 		_, ok := unstructured.Object["items"]
 		return ok
 	}
