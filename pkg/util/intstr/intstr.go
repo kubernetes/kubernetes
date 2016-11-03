@@ -55,9 +55,8 @@ const (
 // FromInt creates an IntOrString object with an int32 value. It is
 // your responsibility not to call this method with a value greater
 // than int32.
-// TODO: convert to (val int32)
-func FromInt(val int) IntOrString {
-	return IntOrString{Type: Int, IntVal: int32(val)}
+func FromInt(val int32) IntOrString {
+	return IntOrString{Type: Int, IntVal: val}
 }
 
 // FromString creates an IntOrString object with a string value.
