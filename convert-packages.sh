@@ -14,6 +14,9 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # STEP II. copy utility functions in pkg/api/..., 
 # TODO: they probably should live in pkg/util/
+cp "${KUBE_ROOT}"/pkg/api/generate.go "${KUBE_ROOT}"/pkg/api/v1/generate.go
+sed -i "s|package api|package v1|g" "${KUBE_ROOT}"/pkg/api/v1/generate.go
+#================
 cp "${KUBE_ROOT}"/pkg/api/resource_helpers.go "${KUBE_ROOT}"/pkg/api/v1/resource_helpers.go
 sed -i "s|package api|package v1|g" "${KUBE_ROOT}"/pkg/api/v1/resource_helpers.go
 
@@ -46,10 +49,10 @@ cp "${KUBE_ROOT}"/pkg/api/helpers_test.go "${KUBE_ROOT}"/pkg/api/v1/helpers_test
 sed -i "s|package api|package v1|g" "${KUBE_ROOT}"/pkg/api/v1/helpers_test.go
 #================
 #NOTE: these packages are used by pkg/validation as well, so need to duplicate them.
-cp -r ${KUBE_ROOT}/pkg/api/pod ${KUBE_ROOT}/pkg/api/v1/pod
-cp -r ${KUBE_ROOT}/pkg/api/service ${KUBE_ROOT}/pkg/api/v1/service
-cp -r ${KUBE_ROOT}/pkg/api/endpoints ${KUBE_ROOT}/pkg/api/v1/endpoints
-cp -r ${KUBE_ROOT}/pkg/apis/storage/util ${KUBE_ROOT}/pkg/apis/storage/v1beta1/util
+cp -r ${KUBE_ROOT}/pkg/api/pod ${KUBE_ROOT}/pkg/api/v1/
+cp -r ${KUBE_ROOT}/pkg/api/service ${KUBE_ROOT}/pkg/api/v1/
+cp -r ${KUBE_ROOT}/pkg/api/endpoints ${KUBE_ROOT}/pkg/api/v1/
+cp -r ${KUBE_ROOT}/pkg/apis/storage/util ${KUBE_ROOT}/pkg/apis/storage/v1beta1/
 #================
 
 
@@ -75,6 +78,7 @@ find ./ -type f -name "*.go" \
         -path './pkg/apis/storage/v1beta1/util/*' -o \
         -path './pkg/api/v1/endpoints/*' -o \
         -path './pkg/controller/*' -o \
+        -path './pkg/client/testing/cache/*' -o \
         -path './pkg/serviceaccount/*' -o \
         -path './pkg/fieldpath/*' -o \
         -path './pkg/cloudprovider/*' -o \
@@ -84,6 +88,7 @@ find ./ -type f -name "*.go" \
         -path './pkg/util/system/*' -o \
         -path './pkg/volume/*' -o \
         -path './pkg/kubelet/qos/*' -o \
+        -path './pkg/kubelet/util/format/*' -o \
         -path './plugin/pkg/scheduler/*' -o \
         -path './pkg/quota/*' \
     \) -print0 > "${files_to_convert}"
@@ -123,11 +128,37 @@ k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/extensions/v1
 
 sed -i "s|\
 k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/policy/internalversion|\
-k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/policy/v1alpha1|g" "${target}"
+k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/policy/v1beta1|g" "${target}"
+
+if [[ "${target}" == *jobcontroller.go ]] || [[ "${target}" == *informers/batch.go ]]; then
+sed -i "s|\
+batchinternallisters \"k8s.io/kubernetes/pkg/client/listers/batch/internalversion\"|\
+batchv1listers \"k8s.io/kubernetes/pkg/client/listers/batch/v1\"|g" "${target}"
+
+sed -i "s|\
+batchinternallisters|\
+batchv1listers|g" "${target}"
+fi
+
+
+# TODO: this will change after rebase
+if [[ "${target}" == *pet_set_test.go ]]; then
+sed -i "s|\
+internalversion.AppsInterface|\
+v1beta1.AppsV1beta1Interface|g" "${target}"
+
+sed -i "s|\
+internalversion.StatefulSetInterface|\
+v1beta1.StatefulSetInterface|g" "${target}"
+
+sed -i "s|\
+fake.FakeApps|\
+fake.FakeAppsV1beta1|g" "${target}"
+fi
 
 sed -i "s|\
 k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/apps/internalversion|\
-k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/apps/v1alpha1|g" "${target}"
+k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/apps/v1beta1|g" "${target}"
 
 sed -i "s|\
 k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/autoscaling/internalversion|\
@@ -153,10 +184,10 @@ sed -i "s|\"k8s.io/kubernetes/pkg/apis/autoscaling\"|\
 autoscaling \"k8s.io/kubernetes/pkg/apis/autoscaling/v1\"\n autoscalinginternal \"k8s.io/kubernetes/pkg/apis/autoscaling\"|g" "${target}"
 
 sed -i "s|\"k8s.io/kubernetes/pkg/apis/apps\"|\
-apps \"k8s.io/kubernetes/pkg/apis/apps/v1alpha1\"\n appsinternal \"k8s.io/kubernetes/pkg/apis/apps\"|g" "${target}"
+apps \"k8s.io/kubernetes/pkg/apis/apps/v1beta1\"\n appsinternal \"k8s.io/kubernetes/pkg/apis/apps\"|g" "${target}"
 
 sed -i "s|\"k8s.io/kubernetes/pkg/apis/policy\"|\
-policy \"k8s.io/kubernetes/pkg/apis/policy/v1alpha1\"\n policyinternal \"k8s.io/kubernetes/pkg/apis/policy\"|g" "${target}"
+policy \"k8s.io/kubernetes/pkg/apis/policy/v1beta1\"\n policyinternal \"k8s.io/kubernetes/pkg/apis/policy\"|g" "${target}"
 
 sed -i "s|\"k8s.io/kubernetes/pkg/apis/rbac\"|\
 rbac \"k8s.io/kubernetes/pkg/apis/rbac/v1alpha1\"\n rbacinternal \"k8s.io/kubernetes/pkg/apis/rbac\"|g" "${target}"
@@ -170,7 +201,7 @@ sed -i "s|\"k8s.io/kubernetes/pkg/apis/batch\"|\
 batch \"k8s.io/kubernetes/pkg/apis/batch/v1\"\n batchinternal \"k8s.io/kubernetes/pkg/apis/batch\"|g" "${target}"
 fi
 
-if [[ "${target}" == *pkg/controller/scheduledjob* ]]; then
+if [[ "${target}" == *pkg/controller/cronjob* ]]; then
 sed -i "s|\"k8s.io/kubernetes/pkg/apis/batch\"|\
 batch \"k8s.io/kubernetes/pkg/apis/batch/v2alpha1\"\n   batchinternal \"k8s.io/kubernetes/pkg/apis/batch\"|g" "${target}"
 fi
@@ -201,8 +232,11 @@ sed -i 's|v1.SecretTypeField|api.SecretTypeField|g' "${target}"
 sed -i 's|v1.Codecs|api.Codecs|g' "${target}"
 sed -i 's|v1.PatchType|api.PatchType|g' "${target}"
 sed -i 's|\<v1.WithNamespace|api.WithNamespace|g' "${target}"
+sed -i 's|\<v1.NamespaceValue|api.NamespaceValue|g' "${target}"
 sed -i 's|\<v1.NewContext|api.NewContext|g' "${target}"
 sed -i 's|\<v1.Kind(|api.Kind(|g' "${target}"
+sed -i 's|\<v1.ListMetaFor|api.ListMetaFor|g' "${target}"
+
 
 sed -i "s|\<v1\.Resource(|api.Resource(|g" "${target}"
 sed -i "s|\<rbac\.Resource(|rbacinternal.Resource(|g" "${target}"
@@ -221,6 +255,10 @@ if [[ "${target}" == *pkg/controller/podautoscaler* ]]; then
 sed -i "s,\
 unversioned.LabelSelectorAsSelector(scale.Status.Selector),\
 unversioned.LabelSelectorAsSelector(\&unversioned.LabelSelector{MatchLabels: scale.Status.Selector}),g" "${target}"
+
+sed -i "s|\
+Selector: selector,|\
+Selector: selector.MatchLabels,|g" "${target}"
 fi
 
 # *int32 to int32
@@ -236,6 +274,7 @@ if [[ "${target}" == *pkg/controller* ]]; then
     fi
     if [[ "${target}" == *controller_utils.go* ]]; then
         sed -i "s,o\[i\].Spec.Replicas > o\[j\].Spec.Replicas,*(o[i].Spec.Replicas) > *(o[j].Spec.Replicas),g" "${target}"
+        sed -i "s,o\[i\].Spec.Replicas == o\[j\].Spec.Replicas,*(o[i].Spec.Replicas) == *(o[j].Spec.Replicas),g" "${target}"
     fi
 fi
 
@@ -275,6 +314,27 @@ find "${deployment_util}" -type f -name "*.go" -print0 | xargs -0 sed -i "s|\
 GetValueFromIntOrPercent(\&deployment.Spec.Strategy.RollingUpdate.MaxSurge|\
 GetValueFromIntOrPercent(deployment.Spec.Strategy.RollingUpdate.MaxSurge|g"
 
+find "${deployment_util}" -type f -name "*deployment_util_test.go" -print0 | xargs -0 sed -i "s|\
+MaxUnavailable: intstr.FromInt(int(maxUnavailable)),|\
+MaxUnavailable: intstr.FromInt(int(maxUnavailable)),\n\
+MaxSurge:       func() *intstr.IntOrString { x := intstr.FromInt(0); return \&x }(),|g"
+
+find "${deployment_util}" -type f -name "*deployment_util_test.go" -print0 | xargs -0 sed -i "s|\
+Replicas: 1|\
+Replicas: func(i int32) *int32 { return \&i }(1)|g"
+
+find "${deployment_util}" -type f -name "*deployment_util_test.go" -print0 | xargs -0 sed -i "s|\
+Replicas: desired|\
+Replicas: \&desired|g"
+
+find "${deployment_util}" -type f -name "*deployment_util_test.go" -print0 | xargs -0 sed -i "s|\
+intstr.FromInt|\
+func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return \&x }|g"
+
+find "${deployment_util}" -type f -name "*deployment_util_test.go" -print0 | xargs -0 sed -i "s|\
+Template: template|\
+Replicas: func() *int32 { i := int32(0); return \&i }(),\n\
+    Template: template|g"
 #===================
 certificates_controller="${KUBE_ROOT}/pkg/controller/certificates/controller.go"
 find "${certificates_controller}" -type f -name *.go -print0 | xargs -0 sed -i "s|\
@@ -285,6 +345,12 @@ controllers="${KUBE_ROOT}/pkg/controller"
 find "${controllers}" -type f -name *.go -print0 | xargs -0 sed -i "s|\
 int32(replicas)|\
 func() *int32 { i := int32(replicas); return \&i }()|g"
+
+# special case
+find "${controllers}/replication" -type f -name replication_controller_test.go -print0 | xargs -0 sed -i "s|\
+\*(controllerSpec.Spec.Replicas) = func() \*int32 { i := int32(replicas); return \&i }()|\
+\*(controllerSpec.Spec.Replicas) =  int32(replicas)|g"
+
 #===================
 #TODO: might be useful elsewhere
 node_util="${KUBE_ROOT}/pkg/controller/node/"
@@ -296,13 +362,13 @@ Everything()|\
 Everything().String()|g"
 #===================
 #TODO: might be useful elsewhere
-deployment_sync="${KUBE_ROOT}/pkg/controller/deployment"
-find "${deployment_sync}" -type f -name *sync.go -print0 | xargs -0 sed -i "s|\
+deployment_controller="${KUBE_ROOT}/pkg/controller/deployment"
+find "${deployment_controller}" -type f -name *sync.go -print0 | xargs -0 sed -i "s|\
 \"k8s.io/kubernetes/pkg/api\"|\
 \"k8s.io/kubernetes/pkg/api\"\n\
 \"k8s.io/kubernetes/pkg/labels\"|g"
 
-find "${deployment_sync}" -type f -name *sync.go -print0 | xargs -0 sed -i "s|\
+find "${deployment_controller}" -type f -name *sync.go -print0 | xargs -0 sed -i "s|\
 ^\(.*\)List(options.LabelSelector)|\
 parsed, err := labels.Parse(options.LabelSelector)\n\
 if err != nil {\n\
@@ -310,9 +376,24 @@ if err != nil {\n\
 }\n\
 \1List(parsed)|g"
 
-find "${deployment_sync}" -type f -name *sync.go -print0 | xargs -0 sed -i "s|\
+find "${deployment_controller}" -type f -name *sync.go -print0 | xargs -0 sed -i "s|\
 Replicas:        0|\
 Replicas: func(i int32) *int32 { return \&i }(0)|g"
+
+find "${deployment_controller}" -type f -name *deployment_controller_test.go -print0 | xargs -0 sed -i "s|\
+\*maxSurge|\
+maxSurge|g"
+
+find "${deployment_controller}" -type f -name *deployment_controller_test.go -print0 | xargs -0 sed -i "s|\
+\*maxUnavailable|\
+maxUnavailable|g"
+
+find "${deployment_controller}" -type f -name *deployment_controller_test.go -print0 | xargs -0 sed -i "s|\
+RollingUpdate: \&extensions.RollingUpdateDeployment{},|\
+RollingUpdate: \&extensions.RollingUpdateDeployment{\n\
+    MaxUnavailable: func() *intstr.IntOrString { i := intstr.FromInt(0); return \&i }(),\n\
+    MaxSurge:       func() *intstr.IntOrString { i := intstr.FromInt(0); return \&i }(),\n\
+},|g"
 #===================
 # TODO: First 2 patterns occurred twice!
 quota="${KUBE_ROOT}/pkg/quota"
@@ -354,8 +435,8 @@ internalSecret, err := r.secrets.GetSecret(ctx, name)\n\
 	err = v1.Convert_api_Secret_To_v1_Secret(internalSecret, \&v1Secret, nil)\n\
 	return \&v1Secret, err\n|g"
 #===================
-scheduledjob="${KUBE_ROOT}/pkg/controller/scheduledjob"
-find "${scheduledjob}" -type f -name *.go -print0 | xargs -0 sed -i "s|\
+cronjob="${KUBE_ROOT}/pkg/controller/cronjob"
+find "${cronjob}" -type f -name *.go -print0 | xargs -0 sed -i "s|\
 Batch()\.|\
 BatchV2alpha1().|g"
 
@@ -368,12 +449,30 @@ func IsJobFinished(j *batch.Job) bool {
 		}
 	}
 	return false
-}" >> "${scheduledjob}"/utils.go
+}" >> "${cronjob}"/utils.go
 
-find "${scheduledjob}" -type f -name *.go -print0 | xargs -0 sed -i "s|\
+find "${cronjob}" -type f -name *.go -print0 | xargs -0 sed -i "s|\
 job.IsJobFinished(|\
 IsJobFinished(|g"
-goimports -w "${scheduledjob}"
+goimports -w "${cronjob}"
 #===================
+controllers="${KUBE_ROOT}/pkg/controller"
+
+find "${controllers}" -type f -name *controller_utils_test.go -print0 | xargs -0 sed -i "s|\
+actualPod, err := runtime.Decode(testapi.Default.Codec(), \[\]byte(fakeHandler.RequestBody))|\
+var actualPod = \&v1.Pod{}\n\
+err := json.Unmarshal([]byte(fakeHandler.RequestBody), actualPod)|g"
+goimports -w "${controllers}/controller_utils_test.go"
+
+#===================
+disruption_test="${KUBE_ROOT}/pkg/controller/disruption"
+find "${disruption_test}" -type f -name disruption_test.go -print0 | xargs -0 sed -i "s|\
+Replicas: size|\
+Replicas: \&size|g"
+#===================
+tokens_controller_test="${KUBE_ROOT}/pkg/controller/serviceaccount"
+find "${tokens_controller_test}" -type f -name tokens_controller_test.go -print0 | xargs -0 sed -i "s|\
+unversioned.GroupVersionResource{Resource|\
+unversioned.GroupVersionResource{Version: \"v1\", Resource|g"
 
 
