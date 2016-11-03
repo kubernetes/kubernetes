@@ -218,6 +218,7 @@ func (h *UpgradeAwareProxyHandler) connectBackend(method string, location *url.U
 	defer func() {
 		if err != nil && conn != nil {
 			conn.Close()
+			conn = nil
 		}
 	}()
 
