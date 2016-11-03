@@ -38,8 +38,8 @@ import (
 	fakev1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1/fake"
 	v1beta1extensions "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/extensions/v1beta1"
 	fakev1beta1extensions "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/extensions/v1beta1/fake"
-	v1alpha1policy "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/policy/v1alpha1"
-	fakev1alpha1policy "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/policy/v1alpha1/fake"
+	v1beta1policy "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/policy/v1beta1"
+	fakev1beta1policy "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/policy/v1beta1/fake"
 	v1alpha1rbac "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/rbac/v1alpha1"
 	fakev1alpha1rbac "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/rbac/v1alpha1/fake"
 	v1beta1storage "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/storage/v1beta1"
@@ -169,14 +169,14 @@ func (c *Clientset) Extensions() v1beta1extensions.ExtensionsV1beta1Interface {
 	return &fakev1beta1extensions.FakeExtensionsV1beta1{Fake: &c.Fake}
 }
 
-// PolicyV1alpha1 retrieves the PolicyV1alpha1Client
-func (c *Clientset) PolicyV1alpha1() v1alpha1policy.PolicyV1alpha1Interface {
-	return &fakev1alpha1policy.FakePolicyV1alpha1{Fake: &c.Fake}
+// PolicyV1beta1 retrieves the PolicyV1beta1Client
+func (c *Clientset) PolicyV1beta1() v1beta1policy.PolicyV1beta1Interface {
+	return &fakev1beta1policy.FakePolicyV1beta1{Fake: &c.Fake}
 }
 
-// Policy retrieves the PolicyV1alpha1Client
-func (c *Clientset) Policy() v1alpha1policy.PolicyV1alpha1Interface {
-	return &fakev1alpha1policy.FakePolicyV1alpha1{Fake: &c.Fake}
+// Policy retrieves the PolicyV1beta1Client
+func (c *Clientset) Policy() v1beta1policy.PolicyV1beta1Interface {
+	return &fakev1beta1policy.FakePolicyV1beta1{Fake: &c.Fake}
 }
 
 // RbacV1alpha1 retrieves the RbacV1alpha1Client

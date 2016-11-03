@@ -27,7 +27,7 @@ import (
 	v1alpha1certificates "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/certificates/v1alpha1"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1"
 	v1beta1extensions "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/extensions/v1beta1"
-	v1alpha1policy "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/policy/v1alpha1"
+	v1beta1policy "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/policy/v1beta1"
 	v1alpha1rbac "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/rbac/v1alpha1"
 	v1beta1storage "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/storage/v1beta1"
 	restclient "k8s.io/kubernetes/pkg/client/restclient"
@@ -64,9 +64,9 @@ type Interface interface {
 	ExtensionsV1beta1() v1beta1extensions.ExtensionsV1beta1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Extensions() v1beta1extensions.ExtensionsV1beta1Interface
-	PolicyV1alpha1() v1alpha1policy.PolicyV1alpha1Interface
+	PolicyV1beta1() v1beta1policy.PolicyV1beta1Interface
 	// Deprecated: please explicitly pick a version if possible.
-	Policy() v1alpha1policy.PolicyV1alpha1Interface
+	Policy() v1beta1policy.PolicyV1beta1Interface
 	RbacV1alpha1() v1alpha1rbac.RbacV1alpha1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Rbac() v1alpha1rbac.RbacV1alpha1Interface
@@ -88,7 +88,7 @@ type Clientset struct {
 	*v2alpha1batch.BatchV2alpha1Client
 	*v1alpha1certificates.CertificatesV1alpha1Client
 	*v1beta1extensions.ExtensionsV1beta1Client
-	*v1alpha1policy.PolicyV1alpha1Client
+	*v1beta1policy.PolicyV1beta1Client
 	*v1alpha1rbac.RbacV1alpha1Client
 	*v1beta1storage.StorageV1beta1Client
 }
@@ -237,21 +237,21 @@ func (c *Clientset) Extensions() v1beta1extensions.ExtensionsV1beta1Interface {
 	return c.ExtensionsV1beta1Client
 }
 
-// PolicyV1alpha1 retrieves the PolicyV1alpha1Client
-func (c *Clientset) PolicyV1alpha1() v1alpha1policy.PolicyV1alpha1Interface {
+// PolicyV1beta1 retrieves the PolicyV1beta1Client
+func (c *Clientset) PolicyV1beta1() v1beta1policy.PolicyV1beta1Interface {
 	if c == nil {
 		return nil
 	}
-	return c.PolicyV1alpha1Client
+	return c.PolicyV1beta1Client
 }
 
 // Deprecated: Policy retrieves the default version of PolicyClient.
 // Please explicitly pick a version.
-func (c *Clientset) Policy() v1alpha1policy.PolicyV1alpha1Interface {
+func (c *Clientset) Policy() v1beta1policy.PolicyV1beta1Interface {
 	if c == nil {
 		return nil
 	}
-	return c.PolicyV1alpha1Client
+	return c.PolicyV1beta1Client
 }
 
 // RbacV1alpha1 retrieves the RbacV1alpha1Client
@@ -337,7 +337,7 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
-	clientset.PolicyV1alpha1Client, err = v1alpha1policy.NewForConfig(&configShallowCopy)
+	clientset.PolicyV1beta1Client, err = v1beta1policy.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -371,7 +371,7 @@ func NewForConfigOrDie(c *restclient.Config) *Clientset {
 	clientset.BatchV2alpha1Client = v2alpha1batch.NewForConfigOrDie(c)
 	clientset.CertificatesV1alpha1Client = v1alpha1certificates.NewForConfigOrDie(c)
 	clientset.ExtensionsV1beta1Client = v1beta1extensions.NewForConfigOrDie(c)
-	clientset.PolicyV1alpha1Client = v1alpha1policy.NewForConfigOrDie(c)
+	clientset.PolicyV1beta1Client = v1beta1policy.NewForConfigOrDie(c)
 	clientset.RbacV1alpha1Client = v1alpha1rbac.NewForConfigOrDie(c)
 	clientset.StorageV1beta1Client = v1beta1storage.NewForConfigOrDie(c)
 
@@ -391,7 +391,7 @@ func New(c restclient.Interface) *Clientset {
 	clientset.BatchV2alpha1Client = v2alpha1batch.New(c)
 	clientset.CertificatesV1alpha1Client = v1alpha1certificates.New(c)
 	clientset.ExtensionsV1beta1Client = v1beta1extensions.New(c)
-	clientset.PolicyV1alpha1Client = v1alpha1policy.New(c)
+	clientset.PolicyV1beta1Client = v1beta1policy.New(c)
 	clientset.RbacV1alpha1Client = v1alpha1rbac.New(c)
 	clientset.StorageV1beta1Client = v1beta1storage.New(c)
 

@@ -71,6 +71,9 @@ const (
 	// Many tests create an endpoint per node, in large clusters, this is
 	// resource and time intensive.
 	maxNodesForEndpointsTests = 3
+
+	// timeout is used for most polling/waiting activities
+	timeout = 60 * time.Second
 )
 
 // This should match whatever the default/configured range is
