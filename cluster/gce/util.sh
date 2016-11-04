@@ -80,8 +80,7 @@ NODE_TAGS="${NODE_TAG}"
 
 ALLOCATE_NODE_CIDRS=true
 
-KUBE_PROMPT_FOR_UPDATE=y
-KUBE_SKIP_UPDATE=${KUBE_SKIP_UPDATE-"n"}
+KUBE_PROMPT_FOR_UPDATE=${KUBE_PROMPT_FOR_UPDATE:-"n"}
 # How long (in seconds) to wait for cluster initialization.
 KUBE_CLUSTER_INITIALIZATION_TIMEOUT=${KUBE_CLUSTER_INITIALIZATION_TIMEOUT:-300}
 
@@ -99,12 +98,10 @@ function verify-prereqs() {
   local cmd
   for cmd in gcloud gsutil; do
     if ! which "${cmd}" >/dev/null; then
-      local resp
+      local resp="n"
       if [[ "${KUBE_PROMPT_FOR_UPDATE}" == "y" ]]; then
         echo "Can't find ${cmd} in PATH.  Do you wish to install the Google Cloud SDK? [Y/n]"
         read resp
-      else
-        resp="y"
       fi
       if [[ "${resp}" != "n" && "${resp}" != "N" ]]; then
         curl https://sdk.cloud.google.com | bash
@@ -116,20 +113,7 @@ function verify-prereqs() {
       fi
     fi
   done
-  if [[ "${KUBE_SKIP_UPDATE}" == "y" ]]; then
-    return
-  fi
-  # update and install components as needed
-  if [[ "${KUBE_PROMPT_FOR_UPDATE}" != "y" ]]; then
-    gcloud_prompt="-q"
-  fi
-  local sudo_prefix=""
-  if [ ! -w $(dirname `which gcloud`) ]; then
-    sudo_prefix="sudo"
-  fi
-  ${sudo_prefix} gcloud ${gcloud_prompt:-} components install alpha || true
-  ${sudo_prefix} gcloud ${gcloud_prompt:-} components install beta || true
-  ${sudo_prefix} gcloud ${gcloud_prompt:-} components update || true
+  update-or-verify-gcloud
 }
 
 # Create a temp dir that'll be deleted at the end of this bash session.
