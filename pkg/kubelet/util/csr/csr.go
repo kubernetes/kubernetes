@@ -32,7 +32,7 @@ import (
 
 // RequestNodeCertificate will create a certificate signing request and send it to API server,
 // then it will watch the object's status, once approved by API server, it will return the API
-// server's issued certificate (pem-encoded). If there is any errors, or the watch timeouts,
+// server's issued certificate (pem-encoded). If there are any errors, or the watch timeouts,
 // it will return an error. This is intended for use on nodes (kubelet and kubeadm).
 func RequestNodeCertificate(client unversionedcertificates.CertificateSigningRequestInterface, privateKeyData []byte, nodeName types.NodeName) (certData []byte, err error) {
 	subject := &pkix.Name{

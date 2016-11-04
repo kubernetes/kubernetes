@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package pleg contains types and a generic implementation of the pod
-// lifecycle event generator (PLEG).
-package pleg // import "k8s.io/kubernetes/pkg/kubelet/pleg"
+// Package cache contains an expiration cache that allows expired values to be
+// updated in the cache on a cache miss.
+package cache // import "k8s.io/kubernetes/pkg/kubelet/util/cache"

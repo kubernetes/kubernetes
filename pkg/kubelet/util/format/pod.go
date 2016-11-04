@@ -26,8 +26,8 @@ import (
 
 type podHandler func(*api.Pod) string
 
-// Pod returns a string reprenetating a pod in a human readable format,
-// with pod UID as part of the string.
+// Pod returns a string representing a pod in a human readable format, with
+// pod UID as part of the string.
 func Pod(pod *api.Pod) string {
 	// Use underscore as the delimiter because it is not allowed in pod name
 	// (DNS subdomain format), while allowed in the container name format.

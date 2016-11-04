@@ -69,6 +69,7 @@ type podGetter interface {
 	GetPodByUID(kubetypes.UID) (*api.Pod, bool)
 }
 
+// kubeGenericRuntimeManager is the CRI runtime implementation.
 type kubeGenericRuntimeManager struct {
 	runtimeName         string
 	recorder            record.EventRecorder
@@ -109,6 +110,8 @@ type kubeGenericRuntimeManager struct {
 	// The version cache of runtime daemon.
 	versionCache *cache.ObjectCache
 }
+
+var _ kubecontainer.Runtime = &kubeGenericRuntimeManager{}
 
 // NewKubeGenericRuntimeManager creates a new kubeGenericRuntimeManager
 func NewKubeGenericRuntimeManager(
