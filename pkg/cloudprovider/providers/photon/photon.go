@@ -24,7 +24,6 @@ limitations under the License.
 package photon
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"github.com/golang/glog"
@@ -117,12 +116,6 @@ type VolumeOptions struct {
 	Flavor     string
 }
 
-func logError(msg string, err error) error {
-	s := "Photon Cloud Provider: " + msg + ". Error [" + err.Error() + "]"
-	glog.Errorf(s)
-	return fmt.Errorf(s)
-}
-
 func readConfig(config io.Reader) (PCConfig, error) {
 	if config == nil {
 		err := fmt.Errorf("cloud provider config file is missing. Please restart kubelet with --cloud-provider=photon --cloud-config=[path_to_config_file]")
@@ -138,7 +131,8 @@ func init() {
 	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
 		cfg, err := readConfig(config)
 		if err != nil {
-			return nil, logError("failed to read in cloud provider config file", err)
+			glog.Errorf("Photon Cloud Provider: failed to read in cloud provider config file. Error[%v]", err)
+			return nil, err
 		}
 		return newPCCloud(cfg)
 	})
@@ -148,14 +142,13 @@ func init() {
 func getVMIDbyNodename(project string, nodeName string) (string, error) {
 	vmList, err := photonClient.Projects.GetVMs(project, nil)
 	if err != nil {
-		return "", fmt.Errorf("Failed to GetVMs from project %s with nodeName %s, error: [%v]", project, nodeName, err)
+		glog.Errorf("Photon Cloud Provider: Failed to GetVMs from project %s with nodeName %s, error: [%v]", project, nodeName, err)
+		return "", err
 	}
 
 	for _, vm := range vmList.Items {
 		if vm.Name == nodeName {
-			if vm.State == "STARTED" {
-				return vm.ID, nil
-			}
+			return vm.ID, nil
 		}
 	}
 
@@ -166,7 +159,8 @@ func getVMIDbyNodename(project string, nodeName string) (string, error) {
 func getVMIDbyIP(project string, IPAddress string) (string, error) {
 	vmList, err := photonClient.Projects.GetVMs(project, nil)
 	if err != nil {
-		return "", fmt.Errorf("Failed to GetVMs for project %s, error [%v]", project, err)
+		glog.Errorf("Photon Cloud Provider: Failed to GetVMs for project %s. error: [%v]", project, err)
+		return "", err
 	}
 
 	for _, vm := range vmList.Items {
@@ -200,14 +194,16 @@ func getVMIDbyIP(project string, IPAddress string) (string, error) {
 func getProjIDbyName(tenantName, projName string) (string, error) {
 	tenants, err := photonClient.Tenants.GetAll()
 	if err != nil {
-		return "", fmt.Errorf("GetAll tenants failed with error [%v]", err)
+		glog.Errorf("Photon Cloud Provider: GetAll tenants failed with error [%v].", err)
+		return "", err
 	}
 
 	for _, tenant := range tenants.Items {
 		if tenant.Name == tenantName {
 			projects, err := photonClient.Tenants.GetProjects(tenant.ID, nil)
 			if err != nil {
-				return "", fmt.Errorf("Failed to GetProjects for tenant %s, error [%v]", tenantName, err)
+				glog.Errorf("Photon Cloud Provider: Failed to GetProjects for tenant %s. error [%v]", tenantName, err)
+				return "", err
 			}
 
 			for _, project := range projects.Items {
@@ -226,7 +222,7 @@ func newPCCloud(cfg PCConfig) (*PCCloud, error) {
 		return nil, fmt.Errorf("Photon Controller endpoint was not specified.")
 	}
 
-	//TODO: add handling of certification enabled situation
+	// Currently we support Photon Controller endpoint with authentication disabled.
 	options := &photon.ClientOptions{
 		IgnoreCertificate: cfg.Global.IgnoreCertificate,
 	}
@@ -234,31 +230,34 @@ func newPCCloud(cfg PCConfig) (*PCCloud, error) {
 	photonClient = photon.NewClient(cfg.Global.CloudTarget, options, logger)
 	status, err := photonClient.Status.Get()
 	if err != nil {
-		return nil, logError("new client creation failed", err)
+		glog.Errorf("Photon Cloud Provider: new client creation failed. Error[%v]", err)
+		return nil, err
 	}
 	glog.V(2).Info("Photon Cloud Provider: Status of the new photon controller client: %v", status)
 
 	// Get Photon Controller project ID for future use
 	projID, err := getProjIDbyName(cfg.Global.Tenant, cfg.Global.Project)
 	if err != nil {
-		return nil, logError("getProjIDbyName failed when creating new Photon Controller client", err)
+		glog.Errorf("Photon Cloud Provider: getProjIDbyName failed when creating new Photon Controller client. Error[%v]", err)
+		return nil, err
 	}
 
 	// Get local hostname for localInstanceID
 	cmd := exec.Command("bash", "-c", `echo $HOSTNAME`)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	err = cmd.Run()
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, logError("get local hostname bash command failed", err)
+		glog.Errorf("Photon Cloud Provider: get local hostname bash command failed. Error[%v]", err)
+		return nil, err
 	}
-	if out.Len() == 0 {
-		return nil, logError("unable to retrieve hostname for Instance ID", nil)
+	if len(out) == 0 {
+		glog.Errorf("unable to retrieve hostname for Instance ID")
+		return nil, fmt.Errorf("unable to retrieve hostname for Instance ID")
 	}
-	hostname := strings.TrimRight(out.String(), "\n")
+	hostname := strings.TrimRight(string(out), "\n")
 	vmID, err := getVMIDbyNodename(projID, hostname)
 	if err != nil {
-		return nil, logError("getVMIDbyNodename failed when creating new Photon Controller client", err)
+		glog.Errorf("Photon Cloud Provider: getVMIDbyNodename failed when creating new Photon Controller client. Error[%v]", err)
+		return nil, err
 	}
 
 	pc := PCCloud{
@@ -296,25 +295,29 @@ func (pc *PCCloud) NodeAddresses(nodeName k8stypes.NodeName) ([]api.NodeAddress,
 	} else {
 		vmID, err = getInstanceID(name, pc.projID)
 		if err != nil {
-			return addrs, logError("getInstanceID failed for NodeAddresses", err)
+			glog.Errorf("Photon Cloud Provider: getInstanceID failed for NodeAddresses. Error[%v]", err)
+			return addrs, err
 		}
 	}
 
 	// Retrieve the Photon VM's IP addresses from the Photon Controller endpoint based on the VM ID
 	vmList, err := photonClient.Projects.GetVMs(pc.projID, nil)
 	if err != nil {
-		return addrs, fmt.Errorf("Photon Cloud Provider: Failed to GetVMs for project %s, error [%v]", pc.projID, err)
+		glog.Errorf("Photon Cloud Provider: Failed to GetVMs for project %s. Error[%v]", pc.projID, err)
+		return addrs, err
 	}
 
 	for _, vm := range vmList.Items {
 		if vm.ID == vmID {
 			task, err := photonClient.VMs.GetNetworks(vm.ID)
 			if err != nil {
-				return addrs, logError("GetNetworks failed for node "+name+" with vm.ID "+vm.ID, err)
+				glog.Errorf("Photon Cloud Provider: GetNetworks failed for node %s with vm.ID %s. Error[%v]", name, vm.ID, err)
+				return addrs, err
 			} else {
 				task, err = photonClient.Tasks.Wait(task.ID)
 				if err != nil {
-					return addrs, logError("Wait task for GetNetworks failed for node"+name+" with vm.ID "+vm.ID, err)
+					glog.Errorf("Photon Cloud Provider: Wait task for GetNetworks failed for node %s with vm.ID %s. Error[%v]", name, vm.ID, err)
+					return addrs, err
 				} else {
 					networkConnections := task.ResourceProperties.(map[string]interface{})
 					networks := networkConnections["networkConnections"].([]interface{})
@@ -339,7 +342,8 @@ func (pc *PCCloud) NodeAddresses(nodeName k8stypes.NodeName) ([]api.NodeAddress,
 		}
 	}
 
-	return addrs, logError("Failed to find the node "+name+" from Photon Controller endpoint", nil)
+	glog.Errorf("Failed to find the node %s from Photon Controller endpoint", name)
+	return addrs, fmt.Errorf("Failed to find the node %s from Photon Controller endpoint", name)
 }
 
 func (pc *PCCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
@@ -379,7 +383,8 @@ func (pc *PCCloud) ExternalID(nodeName k8stypes.NodeName) (string, error) {
 	} else {
 		ID, err := getInstanceID(name, pc.projID)
 		if err != nil {
-			return ID, logError("getInstanceID failed for ExternalID", err)
+			glog.Errorf("Photon Cloud Provider: getInstanceID failed for ExternalID. Error[%v]", err)
+			return ID, err
 		} else {
 			return ID, nil
 		}
@@ -394,7 +399,8 @@ func (pc *PCCloud) InstanceID(nodeName k8stypes.NodeName) (string, error) {
 	} else {
 		ID, err := getInstanceID(name, pc.projID)
 		if err != nil {
-			return ID, logError("getInstanceID failed for InstanceID", err)
+			glog.Errorf("Photon Cloud Provider: getInstanceID failed for InstanceID. Error[%v]", err)
+			return ID, err
 		} else {
 			return ID, nil
 		}
@@ -421,7 +427,6 @@ func (pc *PCCloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 
 // Zones returns an implementation of Zones for Photon Controller.
 func (pc *PCCloud) Zones() (cloudprovider.Zones, bool) {
-	glog.V(4).Info("Claiming to support Zones")
 	return pc, true
 }
 
@@ -447,17 +452,20 @@ func (pc *PCCloud) AttachDisk(pdID string, nodeName k8stypes.NodeName) error {
 
 	vmID, err := pc.InstanceID(nodeName)
 	if err != nil {
-		return logError("pc.InstanceID failed for AttachDisk", err)
+		glog.Errorf("Photon Cloud Provider: pc.InstanceID failed for AttachDisk. Error[%v]", err)
+		return err
 	}
 
 	task, err := photonClient.VMs.AttachDisk(vmID, operation)
 	if err != nil {
-		return logError("Failed to attach disk with pdID "+pdID, err)
+		glog.Errorf("Photon Cloud Provider: Failed to attach disk with pdID %s. Error[%v]", pdID, err)
+		return err
 	}
 
 	_, err = photonClient.Tasks.Wait(task.ID)
 	if err != nil {
-		return logError("Failed to wait for task to attach disk with pdID "+pdID, err)
+		glog.Errorf("Photon Cloud Provider: Failed to wait for task to attach disk with pdID %s. Error[%v]", pdID, err)
+		return err
 	}
 
 	return nil
@@ -471,17 +479,20 @@ func (pc *PCCloud) DetachDisk(pdID string, nodeName k8stypes.NodeName) error {
 
 	vmID, err := pc.InstanceID(nodeName)
 	if err != nil {
-		return logError("pc.InstanceID failed for DetachDisk", err)
+		glog.Errorf("Photon Cloud Provider: pc.InstanceID failed for DetachDisk. Error[%v]", err)
+		return err
 	}
 
 	task, err := photonClient.VMs.DetachDisk(vmID, operation)
 	if err != nil {
-		return logError("Failed to detach disk with pdID "+pdID, err)
+		glog.Errorf("Photon Cloud Provider: Failed to detach disk with pdID %s. Error[%v]", pdID, err)
+		return err
 	}
 
 	_, err = photonClient.Tasks.Wait(task.ID)
 	if err != nil {
-		return logError("Failed to wait for task to detach disk with pdID "+pdID, err)
+		glog.Errorf("Photon Cloud Provider: Failed to wait for task to detach disk with pdID %s. Error[%v]", pdID, err)
+		return err
 	}
 
 	return nil
@@ -491,12 +502,14 @@ func (pc *PCCloud) DetachDisk(pdID string, nodeName k8stypes.NodeName) error {
 func (pc *PCCloud) DiskIsAttached(pdID string, nodeName k8stypes.NodeName) (bool, error) {
 	disk, err := photonClient.Disks.Get(pdID)
 	if err != nil {
-		return false, logError("Failed to Get disk with pdID "+pdID, err)
+		glog.Errorf("Photon Cloud Provider: Failed to Get disk with pdID %s. Error[%v]", pdID, err)
+		return false, err
 	}
 
 	vmID, err := pc.InstanceID(nodeName)
 	if err != nil {
-		return false, logError("pc.InstanceID failed for DiskIsAttached", err)
+		glog.Errorf("Photon Cloud Provider: pc.InstanceID failed for DiskIsAttached. Error[%v]", err)
+		return false, err
 	}
 
 	for _, vm := range disk.VMs {
@@ -517,7 +530,8 @@ func (pc *PCCloud) DisksAreAttached(pdIDs []string, nodeName k8stypes.NodeName) 
 
 	vmID, err := pc.InstanceID(nodeName)
 	if err != nil {
-		return attached, logError("pc.InstanceID failed for DiskIsAttached", err)
+		glog.Errorf("Photon Cloud Provider: pc.InstanceID failed for DiskIsAttached. Error[%v]", err)
+		return attached, err
 	}
 
 	for _, pdID := range pdIDs {
@@ -526,7 +540,7 @@ func (pc *PCCloud) DisksAreAttached(pdIDs []string, nodeName k8stypes.NodeName) 
 			glog.Warningf("Photon Cloud Provider: failed to get VMs for persistent disk %s, err [%v]", pdID, err)
 		} else {
 			for _, vm := range disk.VMs {
-				if strings.Compare(vm, vmID) == 0 {
+				if vm == vmID {
 					attached[pdID] = true
 				}
 			}
@@ -546,12 +560,14 @@ func (pc *PCCloud) CreateDisk(volumeOptions *VolumeOptions) (pdID string, err er
 
 	task, err := photonClient.Projects.CreateDisk(pc.projID, &diskSpec)
 	if err != nil {
-		return "", logError("Failed to CreateDisk", err)
+		glog.Errorf("Photon Cloud Provider: Failed to CreateDisk. Error[%v]", err)
+		return "", err
 	}
 
 	waitTask, err := photonClient.Tasks.Wait(task.ID)
 	if err != nil {
-		return "", logError("Failed to wait for task to CreateDisk", err)
+		glog.Errorf("Photon Cloud Provider: Failed to wait for task to CreateDisk. Error[%v]", err)
+		return "", err
 	}
 
 	return waitTask.Entity.ID, nil
@@ -561,12 +577,14 @@ func (pc *PCCloud) CreateDisk(volumeOptions *VolumeOptions) (pdID string, err er
 func (pc *PCCloud) DeleteDisk(pdID string) error {
 	task, err := photonClient.Disks.Delete(pdID)
 	if err != nil {
-		return logError("Failed to DeleteDisk", err)
+		glog.Errorf("Photon Cloud Provider: Failed to DeleteDisk. Error[%v]", err)
+		return err
 	}
 
 	_, err = photonClient.Tasks.Wait(task.ID)
 	if err != nil {
-		return logError("Failed to wait for task to DeleteDisk", err)
+		glog.Errorf("Photon Cloud Provider: Failed to wait for task to DeleteDisk. Error[%v]", err)
+		return err
 	}
 
 	return nil
