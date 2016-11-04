@@ -223,7 +223,7 @@ func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targ
 		// busybox timeout doesn't support non-integer values.
 		cmd = fmt.Sprintf("echo 'hostName' | timeout -t 2 nc -w 1 -u %s %d", targetIP, targetPort)
 	} else {
-		cmd = fmt.Sprintf("curl -q -s --connect-timeout 1 http://%s:%d/hostName", targetIP, targetPort)
+		cmd = fmt.Sprintf("timeout -t 15 curl -q -s --connect-timeout 1 --max-time 10 http://%s:%d/hostName", targetIP, targetPort)
 	}
 
 	// TODO: This simply tells us that we can reach the endpoints. Check that
@@ -435,7 +435,7 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 	config.setupCore(selector)
 
 	By("Getting node addresses")
-	ExpectNoError(WaitForAllNodesSchedulable(config.f.ClientSet))
+	ExpectNoError(WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
 	nodeList := GetReadySchedulableNodesOrDie(config.f.ClientSet)
 	config.ExternalAddrs = NodeAddresses(nodeList, api.NodeExternalIP)
 	if len(config.ExternalAddrs) < 2 {
@@ -486,7 +486,7 @@ func shuffleNodes(nodes []api.Node) []api.Node {
 }
 
 func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector map[string]string) []*api.Pod {
-	ExpectNoError(WaitForAllNodesSchedulable(config.f.ClientSet))
+	ExpectNoError(WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
 	nodeList := GetReadySchedulableNodesOrDie(config.f.ClientSet)
 
 	// To make this test work reasonably fast in large clusters,
