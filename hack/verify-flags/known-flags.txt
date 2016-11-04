@@ -389,6 +389,7 @@ no-suggestions
 no-suggestions
 node-cidr-mask-size
 node-eviction-rate
+node-initial-conditions
 node-instance-group
 node-ip
 node-labels
