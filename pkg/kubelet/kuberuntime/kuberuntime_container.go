@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	kubetypes "k8s.io/kubernetes/pkg/types"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/selinux"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/term"
 )
@@ -136,9 +137,17 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 		return nil, err
 	}
 
+	// Verify RunAsNonRoot.
+	imageUser, err := m.getImageUser(container.Image)
+	if err != nil {
+		return nil, err
+	}
+	if err := verifyRunAsNonRoot(pod, container, imageUser); err != nil {
+		return nil, err
+	}
+
 	command, args := kubecontainer.ExpandContainerCommandAndArgs(container, opts.Envs)
 	containerLogsPath := buildContainerLogsPath(container.Name, restartCount)
-	podHasSELinuxLabel := pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SELinuxOptions != nil
 	restartCountUint32 := uint32(restartCount)
 	config := &runtimeApi.ContainerConfig{
 		Metadata: &runtimeApi.ContainerMetadata{
@@ -151,24 +160,13 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 		WorkingDir:  &container.WorkingDir,
 		Labels:      newContainerLabels(container, pod),
 		Annotations: newContainerAnnotations(container, pod, restartCount),
-		Mounts:      m.makeMounts(opts, container, podHasSELinuxLabel),
 		Devices:     makeDevices(opts),
+		Mounts:      m.makeMounts(opts, container),
 		LogPath:     &containerLogsPath,
 		Stdin:       &container.Stdin,
 		StdinOnce:   &container.StdinOnce,
 		Tty:         &container.TTY,
-		Linux:       m.generateLinuxContainerConfig(container, pod),
-	}
-
-	// set privileged and readonlyRootfs
-	if container.SecurityContext != nil {
-		securityContext := container.SecurityContext
-		if securityContext.Privileged != nil {
-			config.Privileged = securityContext.Privileged
-		}
-		if securityContext.ReadOnlyRootFilesystem != nil {
-			config.ReadonlyRootfs = securityContext.ReadOnlyRootFilesystem
-		}
+		Linux:       m.generateLinuxContainerConfig(container, pod, imageUser),
 	}
 
 	// set environment variables
@@ -186,9 +184,10 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 }
 
 // generateLinuxContainerConfig generates linux container config for kubelet runtime api.
-func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *api.Container, pod *api.Pod) *runtimeApi.LinuxContainerConfig {
-	linuxConfig := &runtimeApi.LinuxContainerConfig{
-		Resources: &runtimeApi.LinuxContainerResources{},
+func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *api.Container, pod *api.Pod, imageUser int64) *runtimeApi.LinuxContainerConfig {
+	lc := &runtimeApi.LinuxContainerConfig{
+		Resources:       &runtimeApi.LinuxContainerResources{},
+		SecurityContext: m.determineEffectiveSecurityContext(pod, container, imageUser),
 	}
 
 	// set linux container resources
@@ -208,49 +207,23 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *api.
 		// of CPU shares.
 		cpuShares = milliCPUToShares(cpuRequest.MilliValue())
 	}
-	linuxConfig.Resources.CpuShares = &cpuShares
+	lc.Resources.CpuShares = &cpuShares
 	if memoryLimit != 0 {
-		linuxConfig.Resources.MemoryLimitInBytes = &memoryLimit
+		lc.Resources.MemoryLimitInBytes = &memoryLimit
 	}
 	// Set OOM score of the container based on qos policy. Processes in lower-priority pods should
 	// be killed first if the system runs out of memory.
-	linuxConfig.Resources.OomScoreAdj = &oomScoreAdj
+	lc.Resources.OomScoreAdj = &oomScoreAdj
 
 	if m.cpuCFSQuota {
 		// if cpuLimit.Amount is nil, then the appropriate default value is returned
 		// to allow full usage of cpu resource.
 		cpuQuota, cpuPeriod := milliCPUToQuota(cpuLimit.MilliValue())
-		linuxConfig.Resources.CpuQuota = &cpuQuota
-		linuxConfig.Resources.CpuPeriod = &cpuPeriod
+		lc.Resources.CpuQuota = &cpuQuota
+		lc.Resources.CpuPeriod = &cpuPeriod
 	}
 
-	// set security context options
-	if container.SecurityContext != nil {
-		securityContext := container.SecurityContext
-		if securityContext.Capabilities != nil {
-			linuxConfig.Capabilities = &runtimeApi.Capability{
-				AddCapabilities:  make([]string, len(securityContext.Capabilities.Add)),
-				DropCapabilities: make([]string, len(securityContext.Capabilities.Drop)),
-			}
-			for index, value := range securityContext.Capabilities.Add {
-				linuxConfig.Capabilities.AddCapabilities[index] = string(value)
-			}
-			for index, value := range securityContext.Capabilities.Drop {
-				linuxConfig.Capabilities.DropCapabilities[index] = string(value)
-			}
-		}
-
-		if securityContext.SELinuxOptions != nil {
-			linuxConfig.SelinuxOptions = &runtimeApi.SELinuxOption{
-				User:  &securityContext.SELinuxOptions.User,
-				Role:  &securityContext.SELinuxOptions.Role,
-				Type:  &securityContext.SELinuxOptions.Type,
-				Level: &securityContext.SELinuxOptions.Level,
-			}
-		}
-	}
-
-	return linuxConfig
+	return lc
 }
 
 // makeDevices generates container devices for kubelet runtime api.
@@ -270,21 +243,20 @@ func makeDevices(opts *kubecontainer.RunContainerOptions) []*runtimeApi.Device {
 }
 
 // makeMounts generates container volume mounts for kubelet runtime api.
-func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerOptions, container *api.Container, podHasSELinuxLabel bool) []*runtimeApi.Mount {
+func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerOptions, container *api.Container) []*runtimeApi.Mount {
 	volumeMounts := []*runtimeApi.Mount{}
 
 	for idx := range opts.Mounts {
 		v := opts.Mounts[idx]
-		m := &runtimeApi.Mount{
-			HostPath:      &v.HostPath,
-			ContainerPath: &v.ContainerPath,
-			Readonly:      &v.ReadOnly,
-		}
-		if podHasSELinuxLabel && v.SELinuxRelabel {
-			m.SelinuxRelabel = &v.SELinuxRelabel
+		selinuxRelabel := v.SELinuxRelabel && selinux.SELinuxEnabled()
+		mount := &runtimeApi.Mount{
+			HostPath:       &v.HostPath,
+			ContainerPath:  &v.ContainerPath,
+			Readonly:       &v.ReadOnly,
+			SelinuxRelabel: &selinuxRelabel,
 		}
 
-		volumeMounts = append(volumeMounts, m)
+		volumeMounts = append(volumeMounts, mount)
 	}
 
 	// The reason we create and mount the log file in here (not in kubelet) is because
@@ -301,9 +273,11 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 			glog.Errorf("Error on creating termination-log file %q: %v", containerLogPath, err)
 		} else {
 			fs.Close()
+			selinuxRelabel := selinux.SELinuxEnabled()
 			volumeMounts = append(volumeMounts, &runtimeApi.Mount{
-				HostPath:      &containerLogPath,
-				ContainerPath: &container.TerminationMessagePath,
+				HostPath:       &containerLogPath,
+				ContainerPath:  &container.TerminationMessagePath,
+				SelinuxRelabel: &selinuxRelabel,
 			})
 		}
 	}
