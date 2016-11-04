@@ -22,17 +22,11 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
-	"k8s.io/kubernetes/pkg/util/term"
 )
 
 // This file implements the functions that are needed for backward
 // compatibility. Therefore, it imports various kubernetes packages
 // directly.
-
-// TODO: implement the methods in this file.
-func (ds *dockerService) LegacyAttach(id kubecontainer.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) (err error) {
-	return ds.streamingRuntime.Attach(id.ID, stdin, stdout, stderr, resize)
-}
 
 func (ds *dockerService) GetContainerLogs(pod *api.Pod, containerID kubecontainer.ContainerID, logOptions *api.PodLogOptions, stdout, stderr io.Writer) (err error) {
 	container, err := ds.client.InspectContainer(containerID.ID)
@@ -40,12 +34,4 @@ func (ds *dockerService) GetContainerLogs(pod *api.Pod, containerID kubecontaine
 		return err
 	}
 	return dockertools.GetContainerLogs(ds.client, pod, containerID, logOptions, stdout, stderr, container.Config.Tty)
-}
-
-func (ds *dockerService) LegacyPortForward(sandboxID string, port uint16, stream io.ReadWriteCloser) error {
-	return ds.streamingRuntime.PortForward(sandboxID, int32(port), stream)
-}
-
-func (ds *dockerService) LegacyExec(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
-	return ds.streamingRuntime.Exec(containerID.ID, cmd, stdin, stdout, stderr, tty, resize)
 }

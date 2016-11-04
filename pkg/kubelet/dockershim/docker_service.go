@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network/cni"
 	"k8s.io/kubernetes/pkg/kubelet/network/kubenet"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
-	"k8s.io/kubernetes/pkg/util/term"
 )
 
 const (
@@ -146,10 +145,6 @@ type DockerService interface {
 type DockerLegacyService interface {
 	// Supporting legacy methods for docker.
 	GetContainerLogs(pod *api.Pod, containerID kubecontainer.ContainerID, logOptions *api.PodLogOptions, stdout, stderr io.Writer) (err error)
-
-	LegacyExec(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error
-	LegacyAttach(id kubecontainer.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error
-	LegacyPortForward(sandboxID string, port uint16, stream io.ReadWriteCloser) error
 }
 
 type dockerService struct {
