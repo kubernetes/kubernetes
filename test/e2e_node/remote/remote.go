@@ -274,9 +274,6 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 		}
 		// Insert args at beginning of testArgs, so any values from command line take precedence
 		testArgs = fmt.Sprintf("--experimental-mounter-path=%s ", mounterPath) + testArgs
-
-		// Temporarily disabled (associated Kubelet flags commented out in k8s.io/kubernetes/test/e2e_node/services/services.go):
-		// glog.Infof("GCI node and GCI mounter both detected, setting --experimental-mounter-path=%q and --experimental-mounter-rootfs-path=%q accordingly", mounterPath, mounterRootfsPath)
 	}
 
 	// Run the tests

@@ -473,11 +473,7 @@ function start-kubelet {
   flags+=" --cluster-dns=${DNS_SERVER_IP}"
   flags+=" --cluster-domain=${DNS_DOMAIN}"
   flags+=" --config=/etc/kubernetes/manifests"
-  flags+=" --kubelet-cgroups=/kubelet"
-  flags+=" --system-cgroups=/system"
   flags+=" --experimental-mounter-path=${KUBE_HOME}/bin/mounter"
-  # Note: This patch must match the rootfs path in mounter/mounter
-  flags+=" --experimental-mounter-rootfs-path=/media/root"
 
   if [[ -n "${KUBELET_PORT:-}" ]]; then
     flags+=" --port=${KUBELET_PORT}"
@@ -1173,11 +1169,22 @@ For Kubernetes copyright and licensing information, see:
 EOF
 }
 
+<<<<<<< d0853e1da810adce7301634c8fd85b1110833cd6
 function pre-warm-mounter {
     ${KUBE_HOME}/bin/mounter &> /dev/null
 }
 
 function pre-warm-mounter {
+    ${KUBE_HOME}/bin/mounter &> /dev/null
+=======
+function override-kubectl {
+    echo "overriding kubectl"
+    echo "export PATH=${KUBE_HOME}/bin:\$PATH" > /etc/profile.d/kube_env.sh
+>>>>>>> Revert "Revert "Merge pull request #35821 from vishh/gci-mounter-scope""
+}
+
+function pre-warm-mounter {
+    echo "prewarming mounter"
     ${KUBE_HOME}/bin/mounter &> /dev/null
 }
 
@@ -1214,6 +1221,10 @@ else
   create-kubeproxy-kubeconfig
 fi
 
+<<<<<<< d0853e1da810adce7301634c8fd85b1110833cd6
+=======
+override-kubectl
+>>>>>>> Revert "Revert "Merge pull request #35821 from vishh/gci-mounter-scope""
 # Run the containerized mounter once to pre-cache the container image.
 pre-warm-mounter
 assemble-docker-flags
