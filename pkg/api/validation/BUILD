@@ -31,6 +31,7 @@ go_library(
         "//pkg/api/util:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
+        "//pkg/apis/storage/util:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/runtime:go_default_library",
@@ -43,6 +44,7 @@ go_library(
         "//pkg/util/validation/field:go_default_library",
         "//pkg/util/yaml:go_default_library",
         "//vendor:github.com/emicklei/go-restful/swagger",
+        "//vendor:github.com/exponent-io/jsonpath",
         "//vendor:github.com/golang/glog",
     ],
 )
@@ -74,6 +76,7 @@ go_test(
         "//pkg/api/unversioned:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
         "//pkg/apis/extensions:go_default_library",
+        "//pkg/apis/storage/util:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/security/apparmor:go_default_library",

@@ -105,6 +105,7 @@ go_test(
         "//vendor:github.com/onsi/ginkgo/config",
         "//vendor:github.com/onsi/ginkgo/reporters",
         "//vendor:github.com/onsi/gomega",
+        "//vendor:github.com/onsi/gomega/gstruct",
         "//vendor:github.com/onsi/gomega/types",
         "//vendor:github.com/spf13/pflag",
     ],

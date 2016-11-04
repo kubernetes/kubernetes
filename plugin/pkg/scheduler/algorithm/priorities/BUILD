@@ -73,5 +73,7 @@ go_test(
         "//plugin/pkg/scheduler/algorithm/priorities/util:go_default_library",
         "//plugin/pkg/scheduler/api:go_default_library",
         "//plugin/pkg/scheduler/schedulercache:go_default_library",
+        "//vendor:k8s.io/gengo/parser",
+        "//vendor:k8s.io/gengo/types",
     ],
 )

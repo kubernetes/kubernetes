@@ -14,4 +14,8 @@ go_library(
     name = "go_default_library",
     srcs = ["codeinspector.go"],
     tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/gengo/parser",
+        "//vendor:k8s.io/gengo/types",
+    ],
 )

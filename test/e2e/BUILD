@@ -196,6 +196,7 @@ go_library(
         "//vendor:google.golang.org/api/compute/v1",
         "//vendor:google.golang.org/api/googleapi",
         "//vendor:gopkg.in/inf.v0",
+        "//vendor:k8s.io/client-go/pkg/api/v1",
     ],
 )
 
