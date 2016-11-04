@@ -152,14 +152,6 @@ func (f *fixture) expectCreateRSAction(rs *extensions.ReplicaSet) {
 	f.actions = append(f.actions, core.NewCreateAction(unversioned.GroupVersionResource{Resource: "replicasets"}, rs.Namespace, rs))
 }
 
-func (f *fixture) expectUpdateRSAction(rs *extensions.ReplicaSet) {
-	f.actions = append(f.actions, core.NewUpdateAction(unversioned.GroupVersionResource{Resource: "replicasets"}, rs.Namespace, rs))
-}
-
-func (f *fixture) expectListPodAction(namespace string, opt api.ListOptions) {
-	f.actions = append(f.actions, core.NewListAction(unversioned.GroupVersionResource{Resource: "pods"}, namespace, opt))
-}
-
 func newFixture(t *testing.T) *fixture {
 	f := &fixture{}
 	f.t = t

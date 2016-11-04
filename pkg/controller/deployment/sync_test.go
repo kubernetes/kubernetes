@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/record"
+	testclient "k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/controller/informers"
@@ -54,8 +55,9 @@ func TestScale(t *testing.T) {
 		newRS  *extensions.ReplicaSet
 		oldRSs []*extensions.ReplicaSet
 
-		expectedNew *extensions.ReplicaSet
-		expectedOld []*extensions.ReplicaSet
+		expectedNew  *extensions.ReplicaSet
+		expectedOld  []*extensions.ReplicaSet
+		wasntUpdated map[string]bool
 
 		desiredReplicasAnnotations map[string]int32
 	}{
@@ -193,8 +195,9 @@ func TestScale(t *testing.T) {
 			newRS:  rs("foo-v3", 0, nil, newTimestamp),
 			oldRSs: []*extensions.ReplicaSet{rs("foo-v2", 0, nil, oldTimestamp), rs("foo-v1", 0, nil, olderTimestamp)},
 
-			expectedNew: rs("foo-v3", 6, nil, newTimestamp),
-			expectedOld: []*extensions.ReplicaSet{rs("foo-v2", 0, nil, oldTimestamp), rs("foo-v1", 0, nil, olderTimestamp)},
+			expectedNew:  rs("foo-v3", 6, nil, newTimestamp),
+			expectedOld:  []*extensions.ReplicaSet{rs("foo-v2", 0, nil, oldTimestamp), rs("foo-v1", 0, nil, olderTimestamp)},
+			wasntUpdated: map[string]bool{"foo-v2": true, "foo-v1": true},
 		},
 		// Scenario: deployment.spec.replicas == 3 ( foo-v1.spec.replicas == foo-v2.spec.replicas == foo-v3.spec.replicas == 1 )
 		// Deployment is scaled to 5. foo-v3.spec.replicas and foo-v2.spec.replicas should increment by 1 but foo-v2 fails to
@@ -207,8 +210,9 @@ func TestScale(t *testing.T) {
 			newRS:  rs("foo-v3", 2, nil, newTimestamp),
 			oldRSs: []*extensions.ReplicaSet{rs("foo-v2", 1, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
 
-			expectedNew: rs("foo-v3", 2, nil, newTimestamp),
-			expectedOld: []*extensions.ReplicaSet{rs("foo-v2", 2, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
+			expectedNew:  rs("foo-v3", 2, nil, newTimestamp),
+			expectedOld:  []*extensions.ReplicaSet{rs("foo-v2", 2, nil, oldTimestamp), rs("foo-v1", 1, nil, olderTimestamp)},
+			wasntUpdated: map[string]bool{"foo-v3": true, "foo-v1": true},
 
 			desiredReplicasAnnotations: map[string]int32{"foo-v2": int32(3)},
 		},
@@ -279,8 +283,28 @@ func TestScale(t *testing.T) {
 			t.Errorf("%s: unexpected error: %v", test.name, err)
 			continue
 		}
-		if test.expectedNew != nil && test.newRS != nil && test.expectedNew.Spec.Replicas != test.newRS.Spec.Replicas {
-			t.Errorf("%s: expected new replicas: %d, got: %d", test.name, test.expectedNew.Spec.Replicas, test.newRS.Spec.Replicas)
+
+		// Construct the nameToSize map that will hold all the sizes we got our of tests
+		// Skip updating the map if the replica set wasn't updated since there will be
+		// no update action for it.
+		nameToSize := make(map[string]int32)
+		if test.newRS != nil {
+			nameToSize[test.newRS.Name] = test.newRS.Spec.Replicas
+		}
+		for i := range test.oldRSs {
+			rs := test.oldRSs[i]
+			nameToSize[rs.Name] = rs.Spec.Replicas
+		}
+		// Get all the UPDATE actions and update nameToSize with all the updated sizes.
+		for _, action := range fake.Actions() {
+			rs := action.(testclient.UpdateAction).GetObject().(*extensions.ReplicaSet)
+			if !test.wasntUpdated[rs.Name] {
+				nameToSize[rs.Name] = rs.Spec.Replicas
+			}
+		}
+
+		if test.expectedNew != nil && test.newRS != nil && test.expectedNew.Spec.Replicas != nameToSize[test.newRS.Name] {
+			t.Errorf("%s: expected new replicas: %d, got: %d", test.name, test.expectedNew.Spec.Replicas, nameToSize[test.newRS.Name])
 			continue
 		}
 		if len(test.expectedOld) != len(test.oldRSs) {
@@ -290,8 +314,8 @@ func TestScale(t *testing.T) {
 		for n := range test.oldRSs {
 			rs := test.oldRSs[n]
 			expected := test.expectedOld[n]
-			if expected.Spec.Replicas != rs.Spec.Replicas {
-				t.Errorf("%s: expected old (%s) replicas: %d, got: %d", test.name, rs.Name, expected.Spec.Replicas, rs.Spec.Replicas)
+			if expected.Spec.Replicas != nameToSize[rs.Name] {
+				t.Errorf("%s: expected old (%s) replicas: %d, got: %d", test.name, rs.Name, expected.Spec.Replicas, nameToSize[rs.Name])
 			}
 		}
 	}

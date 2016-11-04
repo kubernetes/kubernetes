@@ -42,7 +42,7 @@ func (dc *DeploymentController) rolloutRecreate(deployment *extensions.Deploymen
 	}
 	if scaledDown {
 		// Update DeploymentStatus
-		return dc.syncDeploymentStatus(allRSs, newRS, deployment)
+		return dc.syncRolloutStatus(allRSs, newRS, deployment)
 	}
 
 	// Wait for all old replica set to scale down to zero.
@@ -67,13 +67,13 @@ func (dc *DeploymentController) rolloutRecreate(deployment *extensions.Deploymen
 	}
 	if scaledUp {
 		// Update DeploymentStatus
-		return dc.syncDeploymentStatus(allRSs, newRS, deployment)
+		return dc.syncRolloutStatus(allRSs, newRS, deployment)
 	}
 
 	dc.cleanupDeployment(oldRSs, deployment)
 
 	// Sync deployment status
-	return dc.syncDeploymentStatus(allRSs, newRS, deployment)
+	return dc.syncRolloutStatus(allRSs, newRS, deployment)
 }
 
 // scaleDownOldReplicaSetsForRecreate scales down old replica sets when deployment strategy is "Recreate"
