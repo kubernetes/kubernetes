@@ -52,9 +52,15 @@ fi
 
 # Create a nice clean place to put our new godeps
 _tmpdir="$(mktemp -d -t gopath.XXXXXX)"
+KEEP_TMP=false
 function cleanup {
-  echo "Removing ${_tmpdir}"
-  rm -rf "${_tmpdir}"
+  if [ "${KEEP_TMP}" == "true" ]; then
+    echo "Leaving ${_tmpdir} for you to examine or copy. Please delete it manually when finished. (rm -rf ${_tmpdir})"
+  else
+    echo "Removing ${_tmpdir}"
+    rm -rf "${_tmpdir}"
+  fi
+  export GODEP=""
 }
 trap cleanup EXIT
 
@@ -67,48 +73,68 @@ _kubetmp="${_kubetmp}/kubernetes"
 
 # Do all our work in the new GOPATH
 export GOPATH="${_tmpdir}"
-cd "${_kubetmp}"
 
-# Build the godep tool
-go get -u github.com/tools/godep 2>/dev/null
-GODEP="${GOPATH}/bin/godep"
-pin-godep() {
-  pushd "${GOPATH}/src/github.com/tools/godep" > /dev/null
-    git checkout "$1"
-    "${GODEP}" go install
-  popd > /dev/null
-}
-# Use to following if we ever need to pin godep to a specific version again
-#pin-godep 'v63'
+pushd "${_kubetmp}" 2>&1 > /dev/null
+  # Build the godep tool
+  go get -u github.com/tools/godep 2>/dev/null
+  export GODEP="${GOPATH}/bin/godep"
+  pin-godep() {
+    pushd "${GOPATH}/src/github.com/tools/godep" > /dev/null
+      git checkout "$1"
+      "${GODEP}" go install
+    popd > /dev/null
+  }
+  # Use to following if we ever need to pin godep to a specific version again
+  pin-godep 'v74'
+  "${GODEP}" version
 
-# Fill out that nice clean place with the kube godeps
-echo "Starting to download all kubernetes godeps. This takes a while"
-"${GODEP}" restore
-echo "Download finished"
+  # Fill out that nice clean place with the kube godeps
+  echo "Starting to download all kubernetes godeps. This takes a while"
+  "${GODEP}" restore
+  echo "Download finished"
 
-# Destroy deps in the copy of the kube tree
-rm -rf ./Godeps ./vendor
+  # Destroy deps in the copy of the kube tree
+  rm -rf ./Godeps ./vendor
 
-# For some reason the kube tree needs to be a git repo for the godep tool to
-# run. Doesn't make sense.
-git init > /dev/null 2>&1
+  # For some reason the kube tree needs to be a git repo for the godep tool to
+  # run. Doesn't make sense.
+  git init > /dev/null 2>&1
 
-# Recreate the Godeps using the nice clean set we just downloaded
-hack/godep-save.sh
+  # Recreate the Godeps using the nice clean set we just downloaded
+  hack/godep-save.sh
+popd 2>&1 > /dev/null
 
-# Test for diffs
-if ! _out="$(diff -Naupr --ignore-matching-lines='^\s*\"GoVersion\":' --ignore-matching-line='^\s*\"GodepVersion\":' --ignore-matching-lines='^\s*\"Comment\":' ${KUBE_ROOT}/Godeps/Godeps.json ${_kubetmp}/Godeps/Godeps.json)"; then
-  echo "Your Godeps.json is different:"
-  echo "${_out}"
-  echo "Godeps Verify failed."
-  exit 1
-fi
+ret=0
 
-if ! _out="$(diff -Naupr ${KUBE_ROOT}/vendor ${_kubetmp}/vendor)"; then
-  echo "Your vendored results are different:"
-  echo "${_out}"
-  echo "Godeps Verify failed."
-  exit 1
+pushd "${KUBE_ROOT}" 2>&1 > /dev/null
+  # Test for diffs
+  if ! _out="$(diff -Naupr --ignore-matching-lines='^\s*\"GoVersion\":' --ignore-matching-line='^\s*\"GodepVersion\":' --ignore-matching-lines='^\s*\"Comment\":' Godeps/Godeps.json ${_kubetmp}/Godeps/Godeps.json)"; then
+    echo "Your Godeps.json is different:"
+    echo "${_out}"
+    echo "Godeps Verify failed."
+    echo "${_out}" > godepdiff.patch
+    echo "If you're seeing this locally, run the below command to fix your Godeps.json:"
+    echo "patch -p0 < godepdiff.patch"
+    echo "(The above output can be saved as godepdiff.patch if you're not running this locally)"
+    KEEP_TMP=true
+    ret=1
+  fi
+
+  if ! _out="$(diff -Naupr vendor ${_kubetmp}/vendor)"; then
+    echo "Your vendored results are different:"
+    echo "${_out}"
+    echo "Godeps Verify failed."
+    echo "${_out}" > vendordiff.patch
+    echo "If you're seeing this locally, run the below command to fix your directories:"
+    echo "patch -p0 < vendordiff.patch"
+    echo "(The above output can be saved as godepdiff.patch if you're not running this locally)"
+    KEEP_TMP=true
+    ret=1
+  fi
+popd 2>&1 > /dev/null
+
+if [[ ${ret} > 0 ]]; then
+  exit ${ret}
 fi
 
 echo "Godeps Verified."
