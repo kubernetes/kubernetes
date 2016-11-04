@@ -70,7 +70,110 @@ const (
 	// TODO: Delete this annotation when we gracefully handle overlapping selectors.
 	// See https://github.com/kubernetes/kubernetes/issues/2210
 	SelectorUpdateAnnotation = "deployment.kubernetes.io/selector-updated-at"
+
+	// Reasons for deployment conditions
+	//
+	// Progressing:
+	//
+	// ReplicaSetUpdatedReason is added in a deployment when one of its replica sets is updated as part
+	// of the rollout process.
+	ReplicaSetUpdatedReason = "ReplicaSetUpdated"
+	// FailedRSCreateReason is added in a deployment when it cannot create a new replica set.
+	FailedRSCreateReason = "ReplicaSetCreateError"
+	// NewReplicaSetReason is added in a deployment when it creates a new replica set.
+	NewReplicaSetReason = "NewReplicaSetCreated"
+	// FoundNewRSReason is added in a deployment when it adopts an existing replica set.
+	FoundNewRSReason = "FoundNewReplicaSet"
+	// NewRSAvailableReason is added in a deployment when its newest replica set is made available
+	// ie. the number of new pods that have passed readiness checks and run for at least minReadySeconds
+	// is at least the minimum available pods that need to run for the deployment.
+	NewRSAvailableReason = "NewReplicaSetAvailable"
+	// TimedOutReason is added in a deployment when its newest replica set fails to show any progress
+	// within the given deadline (progressDeadlineSeconds).
+	TimedOutReason = "ProgressDeadlineExceeded"
+	// PausedDeployReason is added in a deployment when it is paused. Lack of progress shouldn't be
+	// estimated once a deployment is paused.
+	PausedDeployReason = "DeploymentPaused"
+	// ResumedDeployReason is added in a deployment when it is resumed. Useful for not failing accidentally
+	// deployments that paused amidst a rollout and are bounded by a deadline.
+	ResumedDeployReason = "DeploymentResumed"
+	//
+	// Available:
+	//
+	// MinimumReplicasAvailable is added in a deployment when it has its minimum replicas required available.
+	MinimumReplicasAvailable = "MinimumReplicasAvailable"
+	// MinimumReplicasUnavailable is added in a deployment when it doesn't have the minimum required replicas
+	// available.
+	MinimumReplicasUnavailable = "MinimumReplicasUnavailable"
 )
+
+// NewDeploymentCondition creates a new deployment condition.
+func NewDeploymentCondition(condType extensions.DeploymentConditionType, status api.ConditionStatus, reason, message string) *extensions.DeploymentCondition {
+	return &extensions.DeploymentCondition{
+		Type:               condType,
+		Status:             status,
+		LastUpdateTime:     unversioned.Now(),
+		LastTransitionTime: unversioned.Now(),
+		Reason:             reason,
+		Message:            message,
+	}
+}
+
+// GetDeploymentCondition returns the condition with the provided type.
+func GetDeploymentCondition(status extensions.DeploymentStatus, condType extensions.DeploymentConditionType) *extensions.DeploymentCondition {
+	for i := range status.Conditions {
+		c := status.Conditions[i]
+		if c.Type == condType {
+			return &c
+		}
+	}
+	return nil
+}
+
+// SetDeploymentCondition updates the deployment to include the provided condition. If the condition that
+// we are about to add already exists and has the same status and reason then we are not going to update.
+func SetDeploymentCondition(status *extensions.DeploymentStatus, condition extensions.DeploymentCondition) {
+	currentCond := GetDeploymentCondition(*status, condition.Type)
+	if currentCond != nil && currentCond.Status == condition.Status && currentCond.Reason == condition.Reason {
+		return
+	}
+	// Do not update lastTransitionTime if the status of the condition doesn't change.
+	if currentCond != nil && currentCond.Status == condition.Status {
+		condition.LastTransitionTime = currentCond.LastTransitionTime
+	}
+	newConditions := filterOutCondition(status.Conditions, condition.Type)
+	status.Conditions = append(newConditions, condition)
+}
+
+// RemoveDeploymentCondition removes the deployment condition with the provided type.
+func RemoveDeploymentCondition(status *extensions.DeploymentStatus, condType extensions.DeploymentConditionType) {
+	status.Conditions = filterOutCondition(status.Conditions, condType)
+}
+
+// filterOutCondition returns a new slice of deployment conditions without conditions with the provided type.
+func filterOutCondition(conditions []extensions.DeploymentCondition, condType extensions.DeploymentConditionType) []extensions.DeploymentCondition {
+	var newConditions []extensions.DeploymentCondition
+	for _, c := range conditions {
+		if c.Type == condType {
+			continue
+		}
+		newConditions = append(newConditions, c)
+	}
+	return newConditions
+}
+
+// ReplicaSetToDeploymentCondition converts a replica set condition into a deployment condition.
+// Useful for promoting replica set failure conditions into deployments.
+func ReplicaSetToDeploymentCondition(cond extensions.ReplicaSetCondition) extensions.DeploymentCondition {
+	return extensions.DeploymentCondition{
+		Type:               extensions.DeploymentConditionType(cond.Type),
+		Status:             cond.Status,
+		LastTransitionTime: cond.LastTransitionTime,
+		LastUpdateTime:     cond.LastTransitionTime,
+		Reason:             cond.Reason,
+		Message:            cond.Message,
+	}
+}
 
 // SetDeploymentRevision updates the revision for a deployment.
 func SetDeploymentRevision(deployment *extensions.Deployment, revision string) bool {
@@ -694,6 +797,56 @@ func IsPodAvailable(pod *api.Pod, minReadySeconds int32, now time.Time) bool {
 // IsRollingUpdate returns true if the strategy type is a rolling update.
 func IsRollingUpdate(deployment *extensions.Deployment) bool {
 	return deployment.Spec.Strategy.Type == extensions.RollingUpdateDeploymentStrategyType
+}
+
+// DeploymentComplete considers a deployment to be complete once its desired replicas equals its
+// updatedReplicas and it doesn't violate minimum availability.
+func DeploymentComplete(deployment *extensions.Deployment, newStatus *extensions.DeploymentStatus) bool {
+	return newStatus.UpdatedReplicas == deployment.Spec.Replicas &&
+		newStatus.AvailableReplicas >= deployment.Spec.Replicas-MaxUnavailable(*deployment)
+}
+
+// DeploymentProgressing reports progress for a deployment. Progress is estimated by comparing the
+// current with the new status of the deployment that the controller is observing. The following
+// algorithm is already used in the kubectl rolling updater to report lack of progress.
+func DeploymentProgressing(deployment *extensions.Deployment, newStatus *extensions.DeploymentStatus) bool {
+	oldStatus := deployment.Status
+
+	// Old replicas that need to be scaled down
+	oldStatusOldReplicas := oldStatus.Replicas - oldStatus.UpdatedReplicas
+	newStatusOldReplicas := newStatus.Replicas - newStatus.UpdatedReplicas
+
+	return (newStatus.UpdatedReplicas > oldStatus.UpdatedReplicas) || (newStatusOldReplicas < oldStatusOldReplicas)
+}
+
+// used for unit testing
+var nowFn = func() time.Time { return time.Now() }
+
+// DeploymentTimedOut considers a deployment to have timed out once its condition that reports progress
+// is older than progressDeadlineSeconds or a Progressing condition with a TimedOutReason reason already
+// exists.
+func DeploymentTimedOut(deployment *extensions.Deployment, newStatus *extensions.DeploymentStatus) bool {
+	if deployment.Spec.ProgressDeadlineSeconds == nil {
+		return false
+	}
+
+	// Look for the Progressing condition. If it doesn't exist, we have no base to estimate progress.
+	// If it's already set with a TimedOutReason reason, we have already timed out, no need to check
+	// again.
+	condition := GetDeploymentCondition(*newStatus, extensions.DeploymentProgressing)
+	if condition == nil {
+		return false
+	}
+	if condition.Reason == TimedOutReason {
+		return true
+	}
+
+	// Look at the difference in seconds between now and the last time we reported any
+	// progress or tried to create a replica set, or resumed a paused deployment and
+	// compare against progressDeadlineSeconds.
+	from := condition.LastTransitionTime
+	delta := time.Duration(*deployment.Spec.ProgressDeadlineSeconds) * time.Second
+	return from.Add(delta).Before(nowFn())
 }
 
 // NewRSNewReplicas calculates the number of replicas a deployment's new RS should have.

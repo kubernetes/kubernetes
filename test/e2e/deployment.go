@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"math/rand"
 	"strings"
 	"time"
 
@@ -94,6 +95,12 @@ var _ = framework.KubeDescribe("Deployment", func() {
 	})
 	It("overlapping deployment should not fight with each other", func() {
 		testOverlappingDeployment(f)
+	})
+	It("lack of progress should be reported in the deployment status", func() {
+		testFailedDeployment(f)
+	})
+	It("iterative rollouts should eventually progress", func() {
+		testIterativeDeployments(f)
 	})
 	// TODO: add tests that cover deployment.Spec.MinReadySeconds once we solved clock-skew issues
 	// See https://github.com/kubernetes/kubernetes/issues/29229
@@ -391,8 +398,8 @@ func testRollingUpdateDeploymentEvents(f *framework.Framework) {
 	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(newRS).NotTo(Equal(nil))
-	Expect(events.Items[0].Message).Should(Equal(fmt.Sprintf("Scaled up replica set %s to 1", newRS.Name)))
-	Expect(events.Items[1].Message).Should(Equal(fmt.Sprintf("Scaled down replica set %s to 0", rsName)))
+	Expect(events.Items[0].Message).Should(Equal(fmt.Sprintf("Created new replica set %q and scaled up to 1", newRS.Name)))
+	Expect(events.Items[1].Message).Should(Equal(fmt.Sprintf("Scaled down replica set %q to 0", rsName)))
 }
 
 func testRecreateDeployment(f *framework.Framework) {
@@ -443,8 +450,8 @@ func testRecreateDeployment(f *framework.Framework) {
 	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(newRS).NotTo(Equal(nil))
-	Expect(events.Items[0].Message).Should(Equal(fmt.Sprintf("Scaled down replica set %s to 0", rsName)))
-	Expect(events.Items[1].Message).Should(Equal(fmt.Sprintf("Scaled up replica set %s to 3", newRS.Name)))
+	Expect(events.Items[0].Message).Should(Equal(fmt.Sprintf("Scaled down replica set %q to 0", rsName)))
+	Expect(events.Items[1].Message).Should(Equal(fmt.Sprintf("Created new replica set %q and scaled up to 3", newRS.Name)))
 }
 
 // testDeploymentCleanUpPolicy tests that deployment supports cleanup policy
@@ -1288,4 +1295,174 @@ func testOverlappingDeployment(f *framework.Framework) {
 	By("Checking the second deployment is now synced")
 	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deployOverlapping.Name, "2", redisImage)
 	Expect(err).NotTo(HaveOccurred(), "The second deployment failed to update to revision 2")
+}
+
+func testFailedDeployment(f *framework.Framework) {
+	ns := f.Namespace.Name
+	c := f.ClientSet
+
+	podLabels := map[string]string{"name": nginxImageName}
+	replicas := int32(1)
+
+	// Create a nginx deployment.
+	deploymentName := "nginx"
+	nonExistentImage := "nginx:not-there"
+	thirty := int32(30)
+	d := newDeployment(deploymentName, replicas, podLabels, nginxImageName, nonExistentImage, extensions.RecreateDeploymentStrategyType, nil)
+	d.Spec.ProgressDeadlineSeconds = &thirty
+
+	framework.Logf("Creating deployment %q with progressDeadlineSeconds set to %ds and a non-existent image", deploymentName, thirty)
+	deployment, err := c.Extensions().Deployments(ns).Create(d)
+	Expect(err).NotTo(HaveOccurred())
+
+	framework.Logf("Waiting for deployment %q to be observed by the controller", deploymentName)
+	Expect(framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)).NotTo(HaveOccurred())
+
+	framework.Logf("Waiting for deployment %q status", deploymentName)
+	Expect(framework.WaitForDeploymentStatus(c, deployment)).NotTo(HaveOccurred())
+
+	framework.Logf("Checking deployment %q for a timeout condition", deploymentName)
+	Expect(framework.WaitForDeploymentWithCondition(c, ns, deploymentName, deploymentutil.TimedOutReason, extensions.DeploymentProgressing)).NotTo(HaveOccurred())
+
+	framework.Logf("Updating deployment %q with a good image", deploymentName)
+	deployment, err = framework.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *extensions.Deployment) {
+		update.Spec.Template.Spec.Containers[0].Image = nginxImage
+	})
+	Expect(err).NotTo(HaveOccurred())
+
+	framework.Logf("Waiting for deployment %q to be observed by the controller", deploymentName)
+	Expect(framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)).NotTo(HaveOccurred())
+
+	framework.Logf("Waiting for deployment %q status", deploymentName)
+	Expect(framework.WaitForDeploymentStatus(c, deployment)).NotTo(HaveOccurred())
+
+	framework.Logf("Checking deployment %q for a complete condition", deploymentName)
+	Expect(framework.WaitForDeploymentWithCondition(c, ns, deploymentName, deploymentutil.NewRSAvailableReason, extensions.DeploymentProgressing)).NotTo(HaveOccurred())
+}
+
+func randomScale(d *extensions.Deployment, i int) {
+	switch r := rand.Float32(); {
+	case r < 0.3:
+		framework.Logf("%02d: scaling up", i)
+		d.Spec.Replicas++
+	case r < 0.6:
+		if d.Spec.Replicas > 1 {
+			framework.Logf("%02d: scaling down", i)
+			d.Spec.Replicas--
+		}
+	}
+}
+
+func testIterativeDeployments(f *framework.Framework) {
+	ns := f.Namespace.Name
+	c := f.ClientSet
+
+	podLabels := map[string]string{"name": nginxImageName}
+	replicas := int32(6)
+	zero := int64(0)
+	two := int32(2)
+
+	// Create a nginx deployment.
+	deploymentName := "nginx"
+	thirty := int32(30)
+	d := newDeployment(deploymentName, replicas, podLabels, nginxImageName, nginxImage, extensions.RollingUpdateDeploymentStrategyType, nil)
+	d.Spec.ProgressDeadlineSeconds = &thirty
+	d.Spec.RevisionHistoryLimit = &two
+	d.Spec.Template.Spec.TerminationGracePeriodSeconds = &zero
+	framework.Logf("Creating deployment %q", deploymentName)
+	deployment, err := c.Extensions().Deployments(ns).Create(d)
+	Expect(err).NotTo(HaveOccurred())
+
+	iterations := 20
+	for i := 0; i < iterations; i++ {
+		if r := rand.Float32(); r < 0.6 {
+			time.Sleep(time.Duration(float32(i) * r * float32(time.Second)))
+		}
+
+		switch n := rand.Float32(); {
+		case n < 0.2:
+			// trigger a new deployment
+			framework.Logf("%02d: triggering a new rollout for deployment %q", i, deployment.Name)
+			deployment, err = framework.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *extensions.Deployment) {
+				newEnv := api.EnvVar{Name: "A", Value: fmt.Sprintf("%d", i)}
+				update.Spec.Template.Spec.Containers[0].Env = append(update.Spec.Template.Spec.Containers[0].Env, newEnv)
+				randomScale(update, i)
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+		case n < 0.4:
+			// rollback to the previous version
+			framework.Logf("%02d: rolling back a rollout for deployment %q", i, deployment.Name)
+			deployment, err = framework.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *extensions.Deployment) {
+				rollbackTo := &extensions.RollbackConfig{Revision: 0}
+				update.Spec.RollbackTo = rollbackTo
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+		case n < 0.6:
+			// just scaling
+			framework.Logf("%02d: scaling deployment %q", i, deployment.Name)
+			deployment, err = framework.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *extensions.Deployment) {
+				randomScale(update, i)
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+		case n < 0.8:
+			// toggling the deployment
+			if deployment.Spec.Paused {
+				framework.Logf("%02d: pausing deployment %q", i, deployment.Name)
+				deployment, err = framework.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *extensions.Deployment) {
+					update.Spec.Paused = true
+					randomScale(update, i)
+				})
+				Expect(err).NotTo(HaveOccurred())
+			} else {
+				framework.Logf("%02d: resuming deployment %q", i, deployment.Name)
+				deployment, err = framework.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *extensions.Deployment) {
+					update.Spec.Paused = false
+					randomScale(update, i)
+				})
+				Expect(err).NotTo(HaveOccurred())
+			}
+
+		default:
+			// arbitrarily delete deployment pods
+			framework.Logf("%02d: arbitrarily deleting one or more deployment pods for deployment %q", i, deployment.Name)
+			selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
+			Expect(err).NotTo(HaveOccurred())
+			opts := api.ListOptions{LabelSelector: selector}
+			podList, err := c.Core().Pods(ns).List(opts)
+			Expect(err).NotTo(HaveOccurred())
+			if len(podList.Items) == 0 {
+				framework.Logf("%02d: no deployment pods to delete", i)
+				continue
+			}
+			for p := range podList.Items {
+				if rand.Float32() < 0.5 {
+					continue
+				}
+				name := podList.Items[p].Name
+				framework.Logf("%02d: deleting deployment pod %q", i, name)
+				Expect(c.Core().Pods(ns).Delete(name, nil)).NotTo(HaveOccurred())
+			}
+		}
+	}
+
+	// unpause the deployment if we end up pausing it
+	deployment, err = c.Extensions().Deployments(ns).Get(deployment.Name)
+	Expect(err).NotTo(HaveOccurred())
+	if deployment.Spec.Paused {
+		deployment, err = framework.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *extensions.Deployment) {
+			update.Spec.Paused = false
+		})
+	}
+
+	framework.Logf("Waiting for deployment %q to be observed by the controller", deploymentName)
+	Expect(framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)).NotTo(HaveOccurred())
+
+	framework.Logf("Waiting for deployment %q status", deploymentName)
+	Expect(framework.WaitForDeploymentStatusValid(c, deployment)).NotTo(HaveOccurred())
+
+	framework.Logf("Checking deployment %q for a complete condition", deploymentName)
+	Expect(framework.WaitForDeploymentWithCondition(c, ns, deploymentName, deploymentutil.NewRSAvailableReason, extensions.DeploymentProgressing)).NotTo(HaveOccurred())
 }

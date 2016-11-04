@@ -3177,6 +3177,23 @@ func WaitForObservedDeployment(c clientset.Interface, ns, deploymentName string,
 	return deploymentutil.WaitForObservedDeployment(func() (*extensions.Deployment, error) { return c.Extensions().Deployments(ns).Get(deploymentName) }, desiredGeneration, Poll, 1*time.Minute)
 }
 
+func WaitForDeploymentWithCondition(c clientset.Interface, ns, deploymentName, reason string, condType extensions.DeploymentConditionType) error {
+	var conditions []extensions.DeploymentCondition
+	pollErr := wait.PollImmediate(time.Second, 1*time.Minute, func() (bool, error) {
+		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
+		if err != nil {
+			return false, err
+		}
+		conditions = deployment.Status.Conditions
+		cond := deploymentutil.GetDeploymentCondition(deployment.Status, condType)
+		return cond != nil && cond.Reason == reason, nil
+	})
+	if pollErr == wait.ErrWaitTimeout {
+		pollErr = fmt.Errorf("deployment %q never updated with the desired condition and reason: %v", deploymentName, conditions)
+	}
+	return pollErr
+}
+
 func logPodsOfDeployment(c clientset.Interface, deployment *extensions.Deployment) {
 	minReadySeconds := deployment.Spec.MinReadySeconds
 	podList, err := deploymentutil.ListPods(deployment,
