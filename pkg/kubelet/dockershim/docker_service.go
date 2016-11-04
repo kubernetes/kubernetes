@@ -18,6 +18,7 @@ package dockershim
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
@@ -136,6 +137,8 @@ type DockerService interface {
 	internalApi.RuntimeService
 	internalApi.ImageManagerService
 	Start() error
+	// For serving streaming calls.
+	http.Handler
 }
 
 type dockerService struct {
@@ -235,4 +238,12 @@ func (ds *dockerService) Status() (*runtimeApi.RuntimeStatus, error) {
 		networkReady.Message = proto.String(fmt.Sprintf("docker: network plugin is not ready: %v", err))
 	}
 	return &runtimeApi.RuntimeStatus{Conditions: conditions}, nil
+}
+
+func (ds *dockerService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if ds.streamingServer != nil {
+		ds.streamingServer.ServeHTTP(w, r)
+	} else {
+		http.NotFound(w, r)
+	}
 }

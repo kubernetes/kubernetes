@@ -74,6 +74,7 @@ go_test(
         "//pkg/util/httpstream/spdy:go_default_library",
         "//pkg/util/sets:go_default_library",
         "//pkg/util/term:go_default_library",
+        "//pkg/util/testing:go_default_library",
         "//pkg/volume:go_default_library",
         "//vendor:github.com/google/cadvisor/info/v1",
         "//vendor:github.com/google/cadvisor/info/v2",

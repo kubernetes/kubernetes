@@ -17,7 +17,6 @@ limitations under the License.
 package remote
 
 import (
-	"fmt"
 	"time"
 
 	"golang.org/x/net/context"
@@ -165,15 +164,15 @@ func (d *dockerService) ExecSync(ctx context.Context, r *runtimeApi.ExecSyncRequ
 }
 
 func (d *dockerService) Exec(ctx context.Context, r *runtimeApi.ExecRequest) (*runtimeApi.ExecResponse, error) {
-	return nil, fmt.Errorf("not implemented")
+	return d.runtimeService.Exec(r)
 }
 
 func (d *dockerService) Attach(ctx context.Context, r *runtimeApi.AttachRequest) (*runtimeApi.AttachResponse, error) {
-	return nil, fmt.Errorf("not implemented")
+	return d.runtimeService.Attach(r)
 }
 
 func (d *dockerService) PortForward(ctx context.Context, r *runtimeApi.PortForwardRequest) (*runtimeApi.PortForwardResponse, error) {
-	return nil, fmt.Errorf("not implemented")
+	return d.runtimeService.PortForward(r)
 }
 
 func (d *dockerService) UpdateRuntimeConfig(ctx context.Context, r *runtimeApi.UpdateRuntimeConfigRequest) (*runtimeApi.UpdateRuntimeConfigResponse, error) {

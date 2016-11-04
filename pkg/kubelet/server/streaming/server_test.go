@@ -68,6 +68,17 @@ func TestGetExec(t *testing.T) {
 	}, nil)
 	assert.NoError(t, err)
 
+	const pathPrefix = "cri/shim"
+	prefixServer, err := NewServer(Config{
+		Addr: testAddr,
+		BaseURL: &url.URL{
+			Scheme: "http",
+			Host:   testAddr,
+			Path:   "/" + pathPrefix + "/",
+		},
+	}, nil)
+	assert.NoError(t, err)
+
 	containerID := testContainerID
 	for _, test := range testcases {
 		request := &runtimeapi.ExecRequest{
@@ -86,6 +97,12 @@ func TestGetExec(t *testing.T) {
 		resp, err = tlsServer.GetExec(request)
 		assert.NoError(t, err, "testcase=%+v", test)
 		expectedURL = "https://" + testAddr + "/exec/" + testContainerID + test.expectedQuery
+		assert.Equal(t, expectedURL, resp.GetUrl(), "testcase=%+v", test)
+
+		// Path prefix
+		resp, err = prefixServer.GetExec(request)
+		assert.NoError(t, err, "testcase=%+v", test)
+		expectedURL = "http://" + testAddr + "/" + pathPrefix + "/exec/" + testContainerID + test.expectedQuery
 		assert.Equal(t, expectedURL, resp.GetUrl(), "testcase=%+v", test)
 	}
 }

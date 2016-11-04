@@ -21,7 +21,6 @@ go_library(
         "docker_service.go",
         "docker_streaming.go",
         "helpers.go",
-        "legacy.go",
         "naming.go",
         "security_context.go",
     ],
