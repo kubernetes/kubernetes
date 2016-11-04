@@ -24,6 +24,7 @@ go_library(
         "//federation/pkg/dnsprovider/providers/aws/route53:go_default_library",
         "//federation/pkg/dnsprovider/providers/google/clouddns:go_default_library",
         "//federation/pkg/federation-controller/cluster:go_default_library",
+        "//federation/pkg/federation-controller/configmap:go_default_library",
         "//federation/pkg/federation-controller/daemonset:go_default_library",
         "//federation/pkg/federation-controller/deployment:go_default_library",
         "//federation/pkg/federation-controller/ingress:go_default_library",

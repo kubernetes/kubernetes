@@ -477,6 +477,7 @@ k8s.io/kubernetes/federation/pkg/dnsprovider,sttts,1
 k8s.io/kubernetes/federation/pkg/dnsprovider/providers/aws/route53,cjcullen,1
 k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns,jsafrane,1
 k8s.io/kubernetes/federation/pkg/federation-controller/cluster,nikhiljindal,0
+k8s.io/kubernetes/federation/pkg/federation-controller/configmap,mwielgus,0
 k8s.io/kubernetes/federation/pkg/federation-controller/daemonset,childsb,1
 k8s.io/kubernetes/federation/pkg/federation-controller/deployment,zmerlynn,1
 k8s.io/kubernetes/federation/pkg/federation-controller/ingress,vishh,1
@@ -800,6 +801,7 @@ k8s.io/kubernetes/pkg/util/sets,quinton-hoole,0
 k8s.io/kubernetes/pkg/util/slice,quinton-hoole,0
 k8s.io/kubernetes/pkg/util/strategicpatch,brendandburns,1
 k8s.io/kubernetes/pkg/util/strings,quinton-hoole,0
+k8s.io/kubernetes/pkg/util/system,mwielgus,0
 k8s.io/kubernetes/pkg/util/term,davidopp,1
 k8s.io/kubernetes/pkg/util/testing,jlowdermilk,1
 k8s.io/kubernetes/pkg/util/threading,roberthbailey,1
