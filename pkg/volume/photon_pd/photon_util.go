@@ -39,15 +39,13 @@ const (
 )
 
 var ErrProbeVolume = errors.New("Error scanning attached volumes")
+
+// volNameToDeviceName is a mapping between spec.Name from detacher
+// and the device name inside scsi path. Once pvscsi controller is
+// supported, this won't be needed.
 var volNameToDeviceName = make(map[string]string)
 
 type PhotonDiskUtil struct{}
-
-func logError(msg string, err error) error {
-	s := "Photon Controller utility: " + msg + ". Error [" + err.Error() + "]"
-	glog.Errorf(s)
-	return fmt.Errorf(s)
-}
 
 func removeFromScsiSubsystem(volName string) {
 	// TODO: if using pvscsi controller, this won't be needed
@@ -85,7 +83,8 @@ func verifyDevicePath(path string) (string, error) {
 func (util *PhotonDiskUtil) CreateVolume(p *photonPersistentDiskProvisioner) (pdID string, capacityGB int, err error) {
 	cloud, err := getCloudProvider(p.plugin.host.GetCloudProvider())
 	if err != nil {
-		return "", 0, logError("CreateVolume failed to get cloud provider", err)
+		glog.Errorf("Photon Controller Util: CreateVolume failed to get cloud provider. Error [%v]", err)
+		return "", 0, err
 	}
 
 	capacity := p.options.PVC.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
@@ -104,13 +103,15 @@ func (util *PhotonDiskUtil) CreateVolume(p *photonPersistentDiskProvisioner) (pd
 		case "flavor":
 			volumeOptions.Flavor = value
 		default:
-			return "", 0, logError("invalid option "+parameter+" for volume plugin "+p.plugin.GetPluginName(), err)
+			glog.Errorf("Photon Controller Util: invalid option %s for volume plugin %s.", parameter, p.plugin.GetPluginName())
+			return "", 0, fmt.Errorf("Photon Controller Util: invalid option %s for volume plugin %s.", parameter, p.plugin.GetPluginName())
 		}
 	}
 
 	pdID, err = cloud.CreateDisk(volumeOptions)
 	if err != nil {
-		return "", 0, logError("failed to CreateDisk", err)
+		glog.Errorf("Photon Controller Util: failed to CreateDisk. Error [%v]", err)
+		return "", 0, err
 	}
 
 	glog.V(4).Infof("Successfully created Photon Controller persistent disk %s", name)
@@ -121,11 +122,13 @@ func (util *PhotonDiskUtil) CreateVolume(p *photonPersistentDiskProvisioner) (pd
 func (util *PhotonDiskUtil) DeleteVolume(pd *photonPersistentDiskDeleter) error {
 	cloud, err := getCloudProvider(pd.plugin.host.GetCloudProvider())
 	if err != nil {
-		return logError("DeleteVolume failed to get cloud provider", err)
+		glog.Errorf("Photon Controller Util: DeleteVolume failed to get cloud provider. Error [%v]", err)
+		return err
 	}
 
 	if err = cloud.DeleteDisk(pd.pdID); err != nil {
-		return logError("failed to DeleteDisk for pdID "+pd.pdID, err)
+		glog.Errorf("Photon Controller Util: failed to DeleteDisk for pdID %s. Error [%v]", pd.pdID, err)
+		return err
 	}
 
 	glog.V(4).Infof("Successfully deleted PhotonController persistent disk %s", pd.pdID)
@@ -134,12 +137,14 @@ func (util *PhotonDiskUtil) DeleteVolume(pd *photonPersistentDiskDeleter) error 
 
 func getCloudProvider(cloud cloudprovider.Interface) (*photon.PCCloud, error) {
 	if cloud == nil {
-		return nil, logError("Cloud provider not initialized properly", nil)
+		glog.Errorf("Photon Controller Util: Cloud provider not initialized properly")
+		return nil, fmt.Errorf("Photon Controller Util: Cloud provider not initialized properly")
 	}
 
 	pcc := cloud.(*photon.PCCloud)
 	if pcc == nil {
-		return nil, logError("Invalid cloud provider: expected Photon Controller", nil)
+		glog.Errorf("Invalid cloud provider: expected Photon Controller")
+		return nil, fmt.Errorf("Invalid cloud provider: expected Photon Controller")
 	}
 	return pcc, nil
 }

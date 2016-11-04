@@ -28,7 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/photon"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
-	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -41,9 +40,6 @@ type photonPersistentDiskAttacher struct {
 
 var _ volume.Attacher = &photonPersistentDiskAttacher{}
 var _ volume.AttachableVolumePlugin = &photonPersistentDiskPlugin{}
-
-// Singleton key mutex for keeping attach operations for the same host atomic
-var attachdetachMutex = keymutex.NewKeyMutex()
 
 func (plugin *photonPersistentDiskPlugin) NewAttacher() (volume.Attacher, error) {
 	photonCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
@@ -73,10 +69,6 @@ func (attacher *photonPersistentDiskAttacher) Attach(spec *volume.Spec, nodeName
 	}
 
 	glog.V(4).Infof("Photon Controller: Attach disk called for host %s", hostName)
-
-	// Keeps concurrent attach operations to same host atomic
-	attachdetachMutex.LockKey(hostName)
-	defer attachdetachMutex.UnlockKey(hostName)
 
 	// TODO: if disk is already attached?
 	err = attacher.photonDisks.AttachDisk(volumeSource.PdID, nodeName)
@@ -260,8 +252,6 @@ func (detacher *photonPersistentDiskDetacher) Detach(deviceMountPath string, nod
 		return nil
 	}
 
-	attachdetachMutex.LockKey(hostName)
-	defer attachdetachMutex.UnlockKey(hostName)
 	if err := detacher.photonDisks.DetachDisk(pdID, nodeName); err != nil {
 		glog.Errorf("Error detaching volume %q: %v", pdID, err)
 		return err
