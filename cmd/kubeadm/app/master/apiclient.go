@@ -173,7 +173,11 @@ func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset, sched
 	n.ObjectMeta.Labels["kubeadm.alpha.kubernetes.io/role"] = "master"
 
 	if !schedulable {
-		taintsAnnotation, _ := json.Marshal([]api.Taint{{Key: "dedicated", Value: "master", Effect: "NoSchedule"}})
+		taintsAnnotation, _ := json.Marshal([]api.Taint{{
+			Key:    unversionedapi.TaintKeyDedicated,
+			Value:  unversionedapi.TaintValueMaster,
+			Effect: api.TaintEffectNoSchedule,
+		}})
 		n.ObjectMeta.Annotations[api.TaintsAnnotationKey] = string(taintsAnnotation)
 	}
 
@@ -200,7 +204,13 @@ func UpdateMasterRoleLabelsAndTaints(client *clientset.Clientset, schedulable bo
 }
 
 func SetMasterTaintTolerations(meta *api.ObjectMeta) {
-	tolerationsAnnotation, _ := json.Marshal([]api.Toleration{{Key: "dedicated", Value: "master", Effect: "NoSchedule"}})
+	tolerationsAnnotation, _ := json.Marshal([]api.Toleration{
+		{
+			Key:    unversionedapi.TaintKeyDedicated,
+			Value:  unversionedapi.TaintValueMaster,
+			Effect: api.TaintEffectNoSchedule,
+		},
+	})
 	if meta.Annotations == nil {
 		meta.Annotations = map[string]string{}
 	}

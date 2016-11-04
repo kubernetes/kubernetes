@@ -25,6 +25,7 @@ go_library(
         "types.go",
         "types_swagger_doc_generated.go",
         "well_known_labels.go",
+        "well_known_taints.go",
         "zz_generated.deepcopy.go",
     ],
     tags = ["automanaged"],
