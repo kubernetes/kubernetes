@@ -845,6 +845,7 @@ k8s.io/kubernetes/plugin/pkg/admission/limitranger,ncdc,1
 k8s.io/kubernetes/plugin/pkg/admission/namespace/autoprovision,derekwaynecarr,0
 k8s.io/kubernetes/plugin/pkg/admission/namespace/exists,derekwaynecarr,0
 k8s.io/kubernetes/plugin/pkg/admission/namespace/lifecycle,derekwaynecarr,0
+k8s.io/kubernetes/plugin/pkg/admission/node/condition,justinsb,0
 k8s.io/kubernetes/plugin/pkg/admission/persistentvolume/label,jdef,1
 k8s.io/kubernetes/plugin/pkg/admission/podnodeselector,ixdy,1
 k8s.io/kubernetes/plugin/pkg/admission/resourcequota,fabioy,1

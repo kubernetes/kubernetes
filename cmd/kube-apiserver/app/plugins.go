@@ -36,6 +36,7 @@ import (
 	_ "k8s.io/kubernetes/plugin/pkg/admission/namespace/autoprovision"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/namespace/exists"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/namespace/lifecycle"
+	_ "k8s.io/kubernetes/plugin/pkg/admission/node/condition"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/persistentvolume/label"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/podnodeselector"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/resourcequota"
