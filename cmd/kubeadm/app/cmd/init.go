@@ -263,7 +263,7 @@ func (i *Init) Run(out io.Writer) error {
 	// TODO: When discovery flips over to the new config map + kubeconfig mechanism,
 	// we will need to keep this step of storing the token secret:
 	// Store the bootstrap token as a secret:
-	if err := kubeadmutil.CreateToken(client, &i.cfg.Secrets, kubeadmutil.DefaultTokenDuration); err != nil {
+	if err := kubeadmutil.UpdateOrCreateToken(client, &i.cfg.Secrets, kubeadmutil.DefaultTokenDuration); err != nil {
 		return err
 	}
 

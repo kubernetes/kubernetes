@@ -25,6 +25,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/pkg/api"
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
 
@@ -33,6 +34,7 @@ const (
 	TokenBytes                 = 8
 	BootstrapTokenSecretPrefix = "bootstrap-token-"
 	DefaultTokenDuration       = time.Duration(8) * time.Hour
+	tokenCreateRetries         = 5
 )
 
 func RandBytes(length int) ([]byte, string, error) {
@@ -103,18 +105,45 @@ func UseGivenTokenIfValid(s *kubeadmapi.Secrets) (bool, error) {
 	return true, nil // given and valid
 }
 
-func CreateToken(client *clientset.Clientset, tokenSecret *kubeadmapi.Secrets, tokenDuration time.Duration) error {
-	secret := &api.Secret{
-		ObjectMeta: api.ObjectMeta{
-			Name: fmt.Sprintf("%s%s", BootstrapTokenSecretPrefix, tokenSecret.TokenID),
-		},
-		Type: api.SecretTypeBootstrapToken,
-		Data: encodeTokenSecretData(tokenSecret, tokenDuration),
+// UpdateOrCreateToken attempts to update a token with the given ID, or create if it does
+// not already exist.
+func UpdateOrCreateToken(client *clientset.Clientset, tokenSecret *kubeadmapi.Secrets, tokenDuration time.Duration) error {
+	secretName := fmt.Sprintf("%s%s", BootstrapTokenSecretPrefix, tokenSecret.TokenID)
+
+	var lastErr error
+	for i := 0; i < tokenCreateRetries; i++ {
+		secret, err := client.Secrets(api.NamespaceSystem).Get(secretName)
+		if err == nil {
+			// Secret with this ID already exists, update it:
+			secret.Data = encodeTokenSecretData(tokenSecret, tokenDuration)
+			if _, err := client.Secrets(api.NamespaceSystem).Update(secret); err == nil {
+				return nil
+			} else {
+				lastErr = err
+			}
+			continue
+		}
+
+		// Secret does not already exist:
+		if apierrors.IsNotFound(err) {
+			secret = &api.Secret{
+				ObjectMeta: api.ObjectMeta{
+					Name: secretName,
+				},
+				Type: api.SecretTypeBootstrapToken,
+				Data: encodeTokenSecretData(tokenSecret, tokenDuration),
+			}
+			if _, err := client.Secrets(api.NamespaceSystem).Create(secret); err == nil {
+				return nil
+			} else {
+				lastErr = err
+			}
+
+			continue
+		}
+
 	}
-	if _, err := client.Secrets(api.NamespaceSystem).Create(secret); err != nil {
-		return fmt.Errorf("<util/tokens> failed to create bootstrap token [%v]", err)
-	}
-	return nil
+	return fmt.Errorf("<util/tokens> unable to create bootstrap token after %s attempts [%v]", tokenCreateRetries, lastErr)
 }
 
 func encodeTokenSecretData(tokenSecret *kubeadmapi.Secrets, duration time.Duration) map[string][]byte {

@@ -92,7 +92,7 @@ func RunCreateToken(out io.Writer, cmd *cobra.Command, tokenDuration time.Durati
 		return err
 	}
 
-	err = kubeadmutil.CreateToken(client, tokenSecret, tokenDuration)
+	err = kubeadmutil.UpdateOrCreateToken(client, tokenSecret, tokenDuration)
 	if err != nil {
 		return err
 	}
