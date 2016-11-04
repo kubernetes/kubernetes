@@ -15,6 +15,7 @@ go_library(
     srcs = [
         "backoff.go",
         "cluster_util.go",
+        "configmap.go",
         "delaying_deliverer.go",
         "federated_informer.go",
         "federated_updater.go",
