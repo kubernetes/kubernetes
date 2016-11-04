@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 // TODO(madhusdancs):
+// 1. Make printSuccess prepend protocol/scheme to the IPs/hostnames.
 // 1. Add a dry-run support.
 // 2. Make all the API object names customizable.
 //    Ex: federation-apiserver, federation-controller-manager, etc.
@@ -31,6 +32,7 @@ package init
 import (
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -197,7 +199,8 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	if err != nil {
 		return err
 	}
-	return nil
+
+	return printSuccess(cmdOut, ips, hostnames)
 }
 
 func createNamespace(clientset *client.Clientset, namespace string) (*api.Namespace, error) {
@@ -514,4 +517,10 @@ func createControllerManager(clientset *client.Clientset, namespace, name, kubec
 	}
 
 	return clientset.Extensions().Deployments(namespace).Create(dep)
+}
+
+func printSuccess(cmdOut io.Writer, ips, hostnames []string) error {
+	svcEndpoints := append(ips, hostnames...)
+	_, err := fmt.Fprintf(cmdOut, "Federation API server is running at: %s\n", strings.Join(svcEndpoints, ", "))
+	return err
 }
