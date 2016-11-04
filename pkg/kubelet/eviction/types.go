@@ -105,9 +105,6 @@ type Manager interface {
 
 	// IsUnderDiskPressure returns true if the node is under disk pressure.
 	IsUnderDiskPressure() bool
-
-	// IsUnderInodePressure returns true if the node is under disk pressure.
-	IsUnderInodePressure() bool
 }
 
 // DiskInfoProvider is responsible for informing the manager how disk is configured.

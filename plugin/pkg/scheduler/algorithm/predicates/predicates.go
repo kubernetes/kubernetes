@@ -1219,21 +1219,3 @@ func CheckNodeDiskPressurePredicate(pod *api.Pod, meta interface{}, nodeInfo *sc
 
 	return true, nil, nil
 }
-
-// CheckNodeInodePressurePredicate checks if a pod can be scheduled on a node
-// reporting inode pressure condition.
-func CheckNodeInodePressurePredicate(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
-	node := nodeInfo.Node()
-	if node == nil {
-		return false, nil, fmt.Errorf("node not found")
-	}
-
-	// is node under presure?
-	for _, cond := range node.Status.Conditions {
-		if cond.Type == api.NodeInodePressure && cond.Status == api.ConditionTrue {
-			return false, []algorithm.PredicateFailureReason{ErrNodeUnderInodePressure}, nil
-		}
-	}
-
-	return true, nil, nil
-}

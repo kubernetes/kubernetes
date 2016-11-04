@@ -138,13 +138,6 @@ func (m *managerImpl) IsUnderDiskPressure() bool {
 	return hasNodeCondition(m.nodeConditions, api.NodeDiskPressure)
 }
 
-// IsUnderDiskPressure returns true if the node is under disk pressure.
-func (m *managerImpl) IsUnderInodePressure() bool {
-	m.RLock()
-	defer m.RUnlock()
-	return hasNodeCondition(m.nodeConditions, api.NodeInodePressure)
-}
-
 // synchronize is the main control loop that enforces eviction thresholds.
 func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc) {
 	// if we have nothing to do, just return
