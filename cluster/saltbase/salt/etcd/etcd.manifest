@@ -14,7 +14,7 @@
 {% endfor -%}
 {% set etcd_cluster = vars.etcd_cluster -%}
 {% set cluster_state = vars.cluster_state -%}
-{% set storage_backend = pillar.get('storage_backend', 'etcd2') -%}
+{% set storage_backend = pillar.get('storage_backend', 'etcd3') -%}
 
 {
 "apiVersion": "v1",
