@@ -18,15 +18,16 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
+        "//pkg/api:go_default_library",
         "//pkg/kubelet/api/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/server/portforward:go_default_library",
         "//pkg/kubelet/server/remotecommand:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util/term:go_default_library",
         "//vendor:github.com/emicklei/go-restful",
+        "//vendor:github.com/golang/glog",
         "//vendor:google.golang.org/grpc",
         "//vendor:google.golang.org/grpc/codes",
-        "//vendor:k8s.io/client-go/pkg/api",
     ],
 )
 

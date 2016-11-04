@@ -19,6 +19,7 @@ package dockershim
 import (
 	"fmt"
 	"io"
+	"net/http"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
@@ -138,6 +139,8 @@ type DockerService interface {
 	internalApi.ImageManagerService
 	DockerLegacyService
 	Start() error
+	// For serving streaming calls.
+	http.Handler
 }
 
 // DockerLegacyService is an interface that embeds all legacy methods for
@@ -219,4 +222,12 @@ type dockerNetworkHost struct {
 // Start initializes and starts components in dockerService.
 func (ds *dockerService) Start() error {
 	return ds.containerManager.Start()
+}
+
+func (ds *dockerService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if ds.streamingServer != nil {
+		ds.streamingServer.ServeHTTP(w, r)
+	} else {
+		http.NotFound(w, r)
+	}
 }

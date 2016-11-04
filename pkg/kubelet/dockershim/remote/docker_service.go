@@ -17,13 +17,14 @@ limitations under the License.
 package remote
 
 import (
-	"fmt"
+	"time"
 
 	"golang.org/x/net/context"
 
 	internalApi "k8s.io/kubernetes/pkg/kubelet/api"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
+	"k8s.io/kubernetes/pkg/util/exec"
 )
 
 // DockerService is the interface implement CRI remote service server.
@@ -138,19 +139,32 @@ func (d *dockerService) ContainerStatus(ctx context.Context, r *runtimeApi.Conta
 }
 
 func (d *dockerService) ExecSync(ctx context.Context, r *runtimeApi.ExecSyncRequest) (*runtimeApi.ExecSyncResponse, error) {
-	return nil, fmt.Errorf("not implemented")
+	stdout, stderr, err := d.runtimeService.ExecSync(r.GetContainerId(), r.GetCmd(), time.Duration(r.GetTimeout())*time.Second)
+	var exitCode int32 = 0
+	if err != nil {
+		if exitErr, ok := err.(exec.ExitError); ok {
+			exitCode = int32(exitErr.ExitStatus())
+		} else {
+			return nil, err
+		}
+	}
+	return &runtimeApi.ExecSyncResponse{
+		Stdout:   stdout,
+		Stderr:   stderr,
+		ExitCode: &exitCode,
+	}, nil
 }
 
 func (d *dockerService) Exec(ctx context.Context, r *runtimeApi.ExecRequest) (*runtimeApi.ExecResponse, error) {
-	return nil, fmt.Errorf("not implemented")
+	return d.runtimeService.Exec(r)
 }
 
 func (d *dockerService) Attach(ctx context.Context, r *runtimeApi.AttachRequest) (*runtimeApi.AttachResponse, error) {
-	return nil, fmt.Errorf("not implemented")
+	return d.runtimeService.Attach(r)
 }
 
 func (d *dockerService) PortForward(ctx context.Context, r *runtimeApi.PortForwardRequest) (*runtimeApi.PortForwardResponse, error) {
-	return nil, fmt.Errorf("not implemented")
+	return d.runtimeService.PortForward(r)
 }
 
 func (d *dockerService) UpdateRuntimeConfig(ctx context.Context, r *runtimeApi.UpdateRuntimeConfigRequest) (*runtimeApi.UpdateRuntimeConfigResponse, error) {
