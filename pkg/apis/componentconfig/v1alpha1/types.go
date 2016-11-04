@@ -71,8 +71,8 @@ type KubeProxyConfiguration struct {
 	// conntrackMin is the minimum value of connect-tracking records to allocate,
 	// regardless of conntrackMaxPerCore (set conntrackMaxPerCore=0 to leave the limit as-is).
 	ConntrackMin int32 `json:"conntrackMin"`
-	// conntrackTCPEstablishedTimeout is how long an idle TCP connection will be kept open
-	// (e.g. '250ms', '2s').  Must be greater than 0.
+	// conntrackTCPEstablishedTimeout is how long an idle TCP connection
+	// will be kept open (e.g. '2s').  Must be greater than 0.
 	ConntrackTCPEstablishedTimeout unversioned.Duration `json:"conntrackTCPEstablishedTimeout"`
 	// conntrackTCPCloseWaitTimeout is how long an idle conntrack entry
 	// in CLOSE_WAIT state will remain in the conntrack

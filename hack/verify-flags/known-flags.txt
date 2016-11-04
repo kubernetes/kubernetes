@@ -81,6 +81,9 @@ concurrent-service-syncs
 concurrent-resource-quota-syncs
 concurrent-serviceaccount-token-syncs
 concurrent-gc-syncs
+concurrent-resource-quota-syncs
+concurrent-serviceaccount-token-syncs
+concurrent-service-syncs
 config-sync-period
 configure-cbr0
 configure-cloud-routes
@@ -92,10 +95,10 @@ conntrack-tcp-timeout-established
 consumer-port
 consumer-service-name
 consumer-service-namespace
-contain-pod-resources
 container-port
 container-runtime
 container-runtime-endpoint
+contain-pod-resources
 controller-start-interval
 cors-allowed-origins
 cpu-cfs-quota

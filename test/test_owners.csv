@@ -275,6 +275,29 @@ Networking Granular Checks should function for pod communication between nodes,f
 Networking Granular Checks should function for pod communication on a single node,freehan,0
 Networking IPerf should transfer ~ 1GB onto the service endpoint 1 servers (maximum of 1 clients),ghodss,1
 Networking should function for intra-pod communication,sttts,0
+Network Partition *,foxish,0
+Network Partition Pods should return to running and ready state after network partition is healed *,foxish,0
+Network Partition should come back up if node goes down,foxish,0
+Network Partition should create new pods when node is partitioned,foxish,0
+Network Partition should eagerly create replacement pod during network partition when termination grace is non-zero,foxish,0
+Network Partition should not reschedule pets if there is a network partition,foxish,0
+Network should set TCP CLOSE_WAIT timeout,bowei,0
+Networking Granular Checks: Pods should function for intra-pod communication: http,stts,0
+Networking Granular Checks: Pods should function for intra-pod communication: udp,freehan,0
+Networking Granular Checks: Pods should function for node-pod communication: http,spxtr,1
+Networking Granular Checks: Pods should function for node-pod communication: udp,wojtek-t,1
+Networking Granular Checks: Services should function for endpoint-Service: http,bgrant0607,1
+Networking Granular Checks: Services should function for endpoint-Service: udp,maisem,1
+Networking Granular Checks: Services should function for node-Service: http,thockin,1
+Networking Granular Checks: Services should function for node-Service: udp,yifan-gu,1
+Networking Granular Checks: Services should function for pod-Service: http,childsb,1
+Networking Granular Checks: Services should function for pod-Service: udp,brendandburns,1
+Networking Granular Checks: Services should update endpoints: http,jdef,1
+Networking Granular Checks: Services should update endpoints: udp,freehan,1
+Networking Granular Checks: Services should update nodePort: http,nikhiljindal,1
+Networking Granular Checks: Services should update nodePort: udp,smarterclayton,1
+Networking IPerf should transfer ~ 1GB onto the service endpoint * servers (maximum of * clients),fabioy,1
+Networking should check kube-proxy urls,lavalamp,1
 Networking should provide Internet connection for containers,sttts,0
 "Networking should provide unchanging, static URL paths for kubernetes api services",freehan,0
 NodeOutOfDisk runs out of disk space,vishh,0
