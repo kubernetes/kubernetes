@@ -35,7 +35,6 @@ go_library(
         "//pkg/util/homedir:go_default_library",
         "//pkg/util/validation:go_default_library",
         "//vendor:github.com/golang/glog",
-        "//vendor:github.com/howeyc/gopass",
         "//vendor:github.com/imdario/mergo",
         "//vendor:github.com/spf13/pflag",
     ],

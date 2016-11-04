@@ -32,7 +32,6 @@ go_library(
         "//pkg/util/wait:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
-        "//vendor:github.com/Azure/azure-sdk-for-go/arm/compute",
         "//vendor:github.com/golang/glog",
     ],
 )
@@ -53,6 +52,5 @@ go_test(
         "//pkg/util/testing:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",
-        "//vendor:github.com/Azure/azure-sdk-for-go/arm/compute",
     ],
 )

@@ -43,7 +43,6 @@ go_library(
         "//pkg/util/validation/field:go_default_library",
         "//pkg/util/yaml:go_default_library",
         "//vendor:github.com/emicklei/go-restful/swagger",
-        "//vendor:github.com/exponent-io/jsonpath",
         "//vendor:github.com/golang/glog",
     ],
 )

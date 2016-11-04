@@ -52,7 +52,6 @@ go_test(
         "//vendor:github.com/coreos/etcd/client",
         "//vendor:github.com/miekg/dns",
         "//vendor:github.com/skynetservices/skydns/msg",
-        "//vendor:github.com/skynetservices/skydns/server",
         "//vendor:github.com/stretchr/testify/assert",
         "//vendor:github.com/stretchr/testify/require",
     ],

@@ -18,10 +18,7 @@ go_library(
         "routes.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/gorilla/mux",
-        "//vendor:github.com/square/go-jose",
-    ],
+    deps = ["//vendor:github.com/gorilla/mux"],
 )
 
 go_test(
@@ -29,5 +26,5 @@ go_test(
     srcs = ["handlers_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/square/go-jose"],
+    deps = [],
 )

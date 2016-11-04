@@ -63,7 +63,6 @@ go_library(
         "//test/e2e/framework:go_default_library",
         "//test/utils:go_default_library",
         "//vendor:github.com/coreos/etcd/client",
-        "//vendor:github.com/go-openapi/spec",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/pborman/uuid",
         "//vendor:golang.org/x/net/context",

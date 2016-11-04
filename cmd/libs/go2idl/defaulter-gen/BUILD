@@ -17,7 +17,5 @@ go_binary(
     deps = [
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/spf13/pflag",
-        "//vendor:k8s.io/gengo/args",
-        "//vendor:k8s.io/gengo/examples/defaulter-gen/generators",
     ],
 )

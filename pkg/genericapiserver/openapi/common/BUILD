@@ -17,8 +17,5 @@ go_library(
         "doc.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/emicklei/go-restful",
-        "//vendor:github.com/go-openapi/spec",
-    ],
+    deps = ["//vendor:github.com/emicklei/go-restful"],
 )
