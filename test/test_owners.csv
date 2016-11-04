@@ -181,7 +181,7 @@ Kubectl alpha client Kubectl run ScheduledJob should create a ScheduledJob,karga
 Kubectl client Guestbook application should create and stop a working application,pwittrock,0
 Kubectl client Kubectl api-versions should check if v1 is in available api versions,pwittrock,0
 Kubectl client Kubectl apply should apply a new configuration to an existing RC,pwittrock,0
-Kubectl client Kubectl apply should reuse nodePort when apply to an existing SVC,pwittrock,0
+Kubectl client Kubectl apply should reuse port when apply to an existing SVC,deads2k,0
 Kubectl client Kubectl cluster-info should check if Kubernetes master services is included in cluster-info,pwittrock,0
 Kubectl client Kubectl create quota should create a quota with scopes,jdef,1
 Kubectl client Kubectl create quota should create a quota without scopes,xiang90,1
