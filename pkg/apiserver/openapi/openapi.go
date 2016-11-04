@@ -29,7 +29,7 @@ import (
 
 var verbs = util.CreateTrie([]string{"get", "log", "read", "replace", "patch", "delete", "deletecollection", "watch", "connect", "proxy", "list", "create", "patch"})
 
-// ToValidOperationID makes an string a valid op ID (e.g. removing punctuations and whitespaces and make it camel case)
+// ToValidOperationID converts a string to a valid op ID (e.g. removing punctuations and whitespaces and make it camel case)
 func ToValidOperationID(s string, capitalizeFirstLetter bool) string {
 	var buffer bytes.Buffer
 	capitalize := capitalizeFirstLetter
@@ -48,40 +48,56 @@ func ToValidOperationID(s string, capitalizeFirstLetter bool) string {
 	return buffer.String()
 }
 
-// GetOperationIDAndTags returns a customize operation ID and a list of tags for kubernetes API server's OpenAPI spec to prevent duplicate IDs.
-func GetOperationIDAndTags(servePath string, r *restful.Route) (string, []string, error) {
-	op := r.Operation
-	path := r.Path
-	var tags []string
-	// TODO: This is hacky, figure out where this name conflict is created and fix it at the root.
-	if strings.HasPrefix(path, "/apis/extensions/v1beta1/namespaces/{namespace}/") && strings.HasSuffix(op, "ScaleScale") {
-		op = op[:len(op)-10] + strings.Title(strings.Split(path[48:], "/")[0]) + "Scale"
+// GetOperationIDAndTagsFunc returns a customization function to customize OpenAPI operation IDs and tags.
+// tagsWithForcedPrefix is the list of tags which their Operation IDs will get a prefix (usually GroupVersion)
+// operationIdsWithForcedPrefix is the list of Operation IDs that will get the prefix.
+func GetOperationIDAndTagsFunc(tagsWithForcedPrefix []string, operationIdsWithForcedPrefix []string) func(servePath string, r *restful.Route) (string, []string, error) {
+	var forcePrefixForOpIDs = map[string]bool{}
+	var forcePrefixForTags = map[string]bool{}
+	for _, tag := range tagsWithForcedPrefix {
+		forcePrefixForTags[tag] = true
 	}
-	switch servePath {
-	case "/swagger.json":
-		prefix, exists := verbs.GetPrefix(op)
-		if !exists {
-			return op, tags, fmt.Errorf("operation names should start with a verb. Cannot determine operation verb from %v", op)
+	for _, opID := range operationIdsWithForcedPrefix {
+		forcePrefixForOpIDs[opID] = true
+	}
+	return func(servePath string, r *restful.Route) (string, []string, error) {
+		op := r.Operation
+		path := r.Path
+		var tags []string
+		// TODO: This is hacky, figure out where this name conflict is created and fix it at the root.
+		if strings.HasPrefix(path, "/apis/extensions/v1beta1/namespaces/{namespace}/") && strings.HasSuffix(op, "ScaleScale") {
+			op = op[:len(op)-10] + strings.Title(strings.Split(path[48:], "/")[0]) + "Scale"
 		}
-		op = op[len(prefix):]
-		parts := strings.Split(strings.Trim(path, "/"), "/")
-		// Assume /api is /apis/core, remove this when we actually server /api/... on /apis/core/...
-		if len(parts) >= 1 && parts[0] == "api" {
-			parts = append([]string{"apis", "core"}, parts[1:]...)
-		}
-		if len(parts) >= 2 && parts[0] == "apis" {
-			prefix = prefix + ToValidOperationID(strings.TrimSuffix(parts[1], ".k8s.io"), prefix != "")
-			tag := ToValidOperationID(strings.TrimSuffix(parts[1], ".k8s.io"), false)
-			if len(parts) > 2 {
-				prefix = prefix + ToValidOperationID(parts[2], prefix != "")
-				tag = tag + "_" + ToValidOperationID(parts[2], false)
+		switch servePath {
+		case "/swagger.json":
+			forcePrefixForID, _ := forcePrefixForOpIDs[op]
+			prefix, exists := verbs.GetPrefix(op)
+			if !exists {
+				return op, tags, fmt.Errorf("operation names should start with a verb. Cannot determine operation verb from %v", op)
 			}
-			tags = append(tags, tag)
-		} else if len(parts) >= 1 {
-			tags = append(tags, ToValidOperationID(parts[0], false))
+			op = op[len(prefix):]
+			parts := strings.Split(strings.Trim(path, "/"), "/")
+			// Assume /api is /apis/core, remove this when we actually server /api/... on /apis/core/...
+			if len(parts) >= 1 && parts[0] == "api" {
+				parts = append([]string{"apis", "core"}, parts[1:]...)
+			}
+			if len(parts) >= 2 && parts[0] == "apis" {
+				p := ToValidOperationID(strings.TrimSuffix(parts[1], ".k8s.io"), prefix != "")
+				tag := ToValidOperationID(strings.TrimSuffix(parts[1], ".k8s.io"), false)
+				if len(parts) > 2 {
+					p = p + ToValidOperationID(parts[2], prefix != "")
+					tag = tag + "_" + ToValidOperationID(parts[2], false)
+				}
+				tags = append(tags, tag)
+				if forcePrefixForTags[tag] || forcePrefixForID {
+					prefix = prefix + p
+				}
+			} else if len(parts) >= 1 {
+				tags = append(tags, ToValidOperationID(parts[0], false))
+			}
+			return prefix + ToValidOperationID(op, prefix != ""), tags, nil
+		default:
+			return op, tags, nil
 		}
-		return prefix + ToValidOperationID(op, prefix != ""), tags, nil
-	default:
-		return op, tags, nil
 	}
 }

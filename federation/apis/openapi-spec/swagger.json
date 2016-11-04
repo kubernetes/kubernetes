@@ -65,6 +65,80 @@
      }
     }
    },
+   "/api/v1/configmaps": {
+    "get": {
+     "description": "list or watch objects of kind ConfigMap",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "listConfigMapForAllNamespaces",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.ConfigMapList"
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
    "/api/v1/events": {
     "get": {
      "description": "list or watch objects of kind Event",
@@ -74,7 +148,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -82,7 +158,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1EventForAllNamespaces",
+     "operationId": "listEventForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -146,7 +222,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -154,7 +232,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1Namespace",
+     "operationId": "listNamespace",
      "parameters": [
       {
        "uniqueItems": true,
@@ -217,7 +295,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "createCoreV1Namespace",
+     "operationId": "createNamespace",
      "parameters": [
       {
        "name": "body",
@@ -253,7 +331,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1CollectionNamespace",
+     "operationId": "deleteCollectionNamespace",
      "parameters": [
       {
        "uniqueItems": true,
@@ -310,9 +388,74 @@
      }
     ]
    },
-   "/api/v1/namespaces/{namespace}/events": {
+   "/api/v1/namespaces/{namespace}/configmaps": {
     "get": {
-     "description": "list or watch objects of kind Event",
+     "description": "list or watch objects of kind ConfigMap",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "listNamespacedConfigMap",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.ConfigMapList"
+       }
+      }
+     }
+    },
+    "post": {
+     "description": "create a ConfigMap",
      "consumes": [
       "*/*"
      ],
@@ -327,7 +470,306 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1NamespacedEvent",
+     "operationId": "createNamespacedConfigMap",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v1.ConfigMap"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.ConfigMap"
+       }
+      }
+     }
+    },
+    "delete": {
+     "description": "delete collection of ConfigMap",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "deleteCollectionNamespacedConfigMap",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+       "name": "fieldSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+       "name": "labelSelector",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "string",
+       "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+       "name": "resourceVersion",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "integer",
+       "description": "Timeout for the list/watch call.",
+       "name": "timeoutSeconds",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+       "name": "watch",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/unversioned.Status"
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/api/v1/namespaces/{namespace}/configmaps/{name}": {
+    "get": {
+     "description": "read the specified ConfigMap",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "readNamespacedConfigMap",
+     "parameters": [
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should the export be exact.  Exact export maintains cluster-specific fields like 'Namespace'",
+       "name": "exact",
+       "in": "query"
+      },
+      {
+       "uniqueItems": true,
+       "type": "boolean",
+       "description": "Should this value be exported.  Export strips fields that a user can not specify.`",
+       "name": "export",
+       "in": "query"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.ConfigMap"
+       }
+      }
+     }
+    },
+    "put": {
+     "description": "replace the specified ConfigMap",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "replaceNamespacedConfigMap",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v1.ConfigMap"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.ConfigMap"
+       }
+      }
+     }
+    },
+    "delete": {
+     "description": "delete a ConfigMap",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "deleteNamespacedConfigMap",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/v1.DeleteOptions"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/unversioned.Status"
+       }
+      }
+     }
+    },
+    "patch": {
+     "description": "partially update the specified ConfigMap",
+     "consumes": [
+      "application/json-patch+json",
+      "application/merge-patch+json",
+      "application/strategic-merge-patch+json"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "patchNamespacedConfigMap",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/unversioned.Patch"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1.ConfigMap"
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the ConfigMap",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
+   "/api/v1/namespaces/{namespace}/events": {
+    "get": {
+     "description": "list or watch objects of kind Event",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "listNamespacedEvent",
      "parameters": [
       {
        "uniqueItems": true,
@@ -375,7 +817,7 @@
      }
     },
     "post": {
-     "description": "create a Event",
+     "description": "create an Event",
      "consumes": [
       "*/*"
      ],
@@ -390,7 +832,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "createCoreV1NamespacedEvent",
+     "operationId": "createNamespacedEvent",
      "parameters": [
       {
        "name": "body",
@@ -426,7 +868,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1CollectionNamespacedEvent",
+     "operationId": "deleteCollectionNamespacedEvent",
      "parameters": [
       {
        "uniqueItems": true,
@@ -508,7 +950,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1NamespacedEvent",
+     "operationId": "readNamespacedEvent",
      "parameters": [
       {
        "uniqueItems": true,
@@ -550,7 +992,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1NamespacedEvent",
+     "operationId": "replaceNamespacedEvent",
      "parameters": [
       {
        "name": "body",
@@ -571,7 +1013,7 @@
      }
     },
     "delete": {
-     "description": "delete a Event",
+     "description": "delete an Event",
      "consumes": [
       "*/*"
      ],
@@ -586,7 +1028,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1NamespacedEvent",
+     "operationId": "deleteNamespacedEvent",
      "parameters": [
       {
        "name": "body",
@@ -624,7 +1066,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1NamespacedEvent",
+     "operationId": "patchNamespacedEvent",
      "parameters": [
       {
        "name": "body",
@@ -679,7 +1121,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -687,7 +1131,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1NamespacedSecret",
+     "operationId": "listNamespacedSecret",
      "parameters": [
       {
        "uniqueItems": true,
@@ -750,7 +1194,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "createCoreV1NamespacedSecret",
+     "operationId": "createNamespacedSecret",
      "parameters": [
       {
        "name": "body",
@@ -786,7 +1230,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1CollectionNamespacedSecret",
+     "operationId": "deleteCollectionNamespacedSecret",
      "parameters": [
       {
        "uniqueItems": true,
@@ -868,7 +1312,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1NamespacedSecret",
+     "operationId": "readNamespacedSecret",
      "parameters": [
       {
        "uniqueItems": true,
@@ -910,7 +1354,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1NamespacedSecret",
+     "operationId": "replaceNamespacedSecret",
      "parameters": [
       {
        "name": "body",
@@ -946,7 +1390,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1NamespacedSecret",
+     "operationId": "deleteNamespacedSecret",
      "parameters": [
       {
        "name": "body",
@@ -984,7 +1428,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1NamespacedSecret",
+     "operationId": "patchNamespacedSecret",
      "parameters": [
       {
        "name": "body",
@@ -1039,7 +1483,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -1047,7 +1493,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1NamespacedService",
+     "operationId": "listNamespacedService",
      "parameters": [
       {
        "uniqueItems": true,
@@ -1110,7 +1556,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "createCoreV1NamespacedService",
+     "operationId": "createNamespacedService",
      "parameters": [
       {
        "name": "body",
@@ -1146,7 +1592,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1CollectionNamespacedService",
+     "operationId": "deleteCollectionNamespacedService",
      "parameters": [
       {
        "uniqueItems": true,
@@ -1228,7 +1674,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1NamespacedService",
+     "operationId": "readNamespacedService",
      "parameters": [
       {
        "uniqueItems": true,
@@ -1270,7 +1716,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1NamespacedService",
+     "operationId": "replaceNamespacedService",
      "parameters": [
       {
        "name": "body",
@@ -1306,7 +1752,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1NamespacedService",
+     "operationId": "deleteNamespacedService",
      "parameters": [
       {
        "name": "body",
@@ -1344,7 +1790,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1NamespacedService",
+     "operationId": "patchNamespacedService",
      "parameters": [
       {
        "name": "body",
@@ -1407,7 +1853,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1NamespacedServiceStatus",
+     "operationId": "readNamespacedServiceStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -1433,7 +1879,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1NamespacedServiceStatus",
+     "operationId": "replaceNamespacedServiceStatus",
      "parameters": [
       {
        "name": "body",
@@ -1471,7 +1917,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1NamespacedServiceStatus",
+     "operationId": "patchNamespacedServiceStatus",
      "parameters": [
       {
        "name": "body",
@@ -1534,7 +1980,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1Namespace",
+     "operationId": "readNamespace",
      "parameters": [
       {
        "uniqueItems": true,
@@ -1576,7 +2022,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1Namespace",
+     "operationId": "replaceNamespace",
      "parameters": [
       {
        "name": "body",
@@ -1612,7 +2058,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "deleteCoreV1Namespace",
+     "operationId": "deleteNamespace",
      "parameters": [
       {
        "name": "body",
@@ -1650,7 +2096,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1Namespace",
+     "operationId": "patchNamespace",
      "parameters": [
       {
        "name": "body",
@@ -1705,7 +2151,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1NamespaceFinalize",
+     "operationId": "replaceNamespaceFinalize",
      "responses": {
       "200": {
        "description": "OK",
@@ -1758,7 +2204,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "readCoreV1NamespaceStatus",
+     "operationId": "readNamespaceStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -1784,7 +2230,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "replaceCoreV1NamespaceStatus",
+     "operationId": "replaceNamespaceStatus",
      "parameters": [
       {
        "name": "body",
@@ -1822,7 +2268,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "patchCoreV1NamespaceStatus",
+     "operationId": "patchNamespaceStatus",
      "parameters": [
       {
        "name": "body",
@@ -1869,7 +2315,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -1877,7 +2325,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1SecretForAllNamespaces",
+     "operationId": "listSecretForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -1941,7 +2389,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -1949,12 +2399,86 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "listCoreV1ServiceForAllNamespaces",
+     "operationId": "listServiceForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
         "$ref": "#/definitions/v1.ServiceList"
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/api/v1/watch/configmaps": {
+    "get": {
+     "description": "watch individual changes to a list of ConfigMap",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "watchConfigMapListForAllNamespaces",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/versioned.Event"
        }
       }
      }
@@ -2012,8 +2536,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -2022,7 +2547,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1EventListForAllNamespaces",
+     "operationId": "watchEventListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -2085,8 +2610,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -2095,7 +2621,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespaceList",
+     "operationId": "watchNamespaceList",
      "responses": {
       "200": {
        "description": "OK",
@@ -2150,16 +2676,17 @@
      }
     ]
    },
-   "/api/v1/watch/namespaces/{namespace}/events": {
+   "/api/v1/watch/namespaces/{namespace}/configmaps": {
     "get": {
-     "description": "watch individual changes to a list of Event",
+     "description": "watch individual changes to a list of ConfigMap",
      "consumes": [
       "*/*"
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -2168,7 +2695,179 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedEventList",
+     "operationId": "watchNamespacedConfigMapList",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/versioned.Event"
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/api/v1/watch/namespaces/{namespace}/configmaps/{name}": {
+    "get": {
+     "description": "watch changes to an object of kind ConfigMap",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "watchNamespacedConfigMap",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/versioned.Event"
+       }
+      }
+     }
+    },
+    "parameters": [
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+      "name": "fieldSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+      "name": "labelSelector",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "name of the ConfigMap",
+      "name": "name",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history.",
+      "name": "resourceVersion",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "integer",
+      "description": "Timeout for the list/watch call.",
+      "name": "timeoutSeconds",
+      "in": "query"
+     },
+     {
+      "uniqueItems": true,
+      "type": "boolean",
+      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+      "name": "watch",
+      "in": "query"
+     }
+    ]
+   },
+   "/api/v1/watch/namespaces/{namespace}/events": {
+    "get": {
+     "description": "watch individual changes to a list of Event",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "core_v1"
+     ],
+     "operationId": "watchNamespacedEventList",
      "responses": {
       "200": {
        "description": "OK",
@@ -2239,8 +2938,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -2249,7 +2949,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedEvent",
+     "operationId": "watchNamespacedEvent",
      "responses": {
       "200": {
        "description": "OK",
@@ -2328,8 +3028,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -2338,7 +3039,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedSecretList",
+     "operationId": "watchNamespacedSecretList",
      "responses": {
       "200": {
        "description": "OK",
@@ -2409,8 +3110,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -2419,7 +3121,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedSecret",
+     "operationId": "watchNamespacedSecret",
      "responses": {
       "200": {
        "description": "OK",
@@ -2498,8 +3200,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -2508,7 +3211,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedServiceList",
+     "operationId": "watchNamespacedServiceList",
      "responses": {
       "200": {
        "description": "OK",
@@ -2579,8 +3282,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -2589,7 +3293,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1NamespacedService",
+     "operationId": "watchNamespacedService",
      "responses": {
       "200": {
        "description": "OK",
@@ -2668,8 +3372,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -2678,7 +3383,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1Namespace",
+     "operationId": "watchNamespace",
      "responses": {
       "200": {
        "description": "OK",
@@ -2749,8 +3454,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -2759,7 +3465,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1SecretListForAllNamespaces",
+     "operationId": "watchSecretListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -2822,8 +3528,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -2832,7 +3539,7 @@
      "tags": [
       "core_v1"
      ],
-     "operationId": "watchCoreV1ServiceListForAllNamespaces",
+     "operationId": "watchServiceListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -2986,7 +3693,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -3058,7 +3767,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -3130,7 +3841,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -3202,7 +3915,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -3689,7 +4404,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -4364,7 +5081,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -4420,7 +5139,7 @@
      }
     },
     "post": {
-     "description": "create a Ingress",
+     "description": "create an Ingress",
      "consumes": [
       "*/*"
      ],
@@ -4616,7 +5335,7 @@
      }
     },
     "delete": {
-     "description": "delete a Ingress",
+     "description": "delete an Ingress",
      "consumes": [
       "*/*"
      ],
@@ -4851,7 +5570,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -5465,7 +6186,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -5536,8 +6259,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -5609,8 +6333,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -5682,8 +6407,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -5755,8 +6481,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -5836,8 +6563,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -5925,8 +6653,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -6006,8 +6735,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -6095,8 +6825,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -6176,8 +6907,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -6265,8 +6997,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -6346,8 +7079,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -6435,8 +7169,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -6569,7 +7304,9 @@
      "produces": [
       "application/json",
       "application/yaml",
-      "application/vnd.kubernetes.protobuf"
+      "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
+      "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
       "https"
@@ -6577,7 +7314,7 @@
      "tags": [
       "federation_v1beta1"
      ],
-     "operationId": "listFederationV1beta1Cluster",
+     "operationId": "listCluster",
      "parameters": [
       {
        "uniqueItems": true,
@@ -6640,7 +7377,7 @@
      "tags": [
       "federation_v1beta1"
      ],
-     "operationId": "createFederationV1beta1Cluster",
+     "operationId": "createCluster",
      "parameters": [
       {
        "name": "body",
@@ -6676,7 +7413,7 @@
      "tags": [
       "federation_v1beta1"
      ],
-     "operationId": "deleteFederationV1beta1CollectionCluster",
+     "operationId": "deleteCollectionCluster",
      "parameters": [
       {
        "uniqueItems": true,
@@ -6750,7 +7487,7 @@
      "tags": [
       "federation_v1beta1"
      ],
-     "operationId": "readFederationV1beta1Cluster",
+     "operationId": "readCluster",
      "parameters": [
       {
        "uniqueItems": true,
@@ -6792,7 +7529,7 @@
      "tags": [
       "federation_v1beta1"
      ],
-     "operationId": "replaceFederationV1beta1Cluster",
+     "operationId": "replaceCluster",
      "parameters": [
       {
        "name": "body",
@@ -6828,7 +7565,7 @@
      "tags": [
       "federation_v1beta1"
      ],
-     "operationId": "deleteFederationV1beta1Cluster",
+     "operationId": "deleteCluster",
      "parameters": [
       {
        "name": "body",
@@ -6866,7 +7603,7 @@
      "tags": [
       "federation_v1beta1"
      ],
-     "operationId": "patchFederationV1beta1Cluster",
+     "operationId": "patchCluster",
      "parameters": [
       {
        "name": "body",
@@ -6921,7 +7658,7 @@
      "tags": [
       "federation_v1beta1"
      ],
-     "operationId": "replaceFederationV1beta1ClusterStatus",
+     "operationId": "replaceClusterStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -6965,8 +7702,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -6975,7 +7713,7 @@
      "tags": [
       "federation_v1beta1"
      ],
-     "operationId": "watchFederationV1beta1ClusterList",
+     "operationId": "watchClusterList",
      "responses": {
       "200": {
        "description": "OK",
@@ -7038,8 +7776,9 @@
      ],
      "produces": [
       "application/json",
-      "application/json;stream=watch",
+      "application/yaml",
       "application/vnd.kubernetes.protobuf",
+      "application/json;stream=watch",
       "application/vnd.kubernetes.protobuf;stream=watch"
      ],
      "schemes": [
@@ -7048,7 +7787,7 @@
      "tags": [
       "federation_v1beta1"
      ],
-     "operationId": "watchFederationV1beta1Cluster",
+     "operationId": "watchCluster",
      "responses": {
       "200": {
        "description": "OK",
@@ -7330,6 +8069,49 @@
      }
     }
    },
+   "unversioned.LabelSelector": {
+    "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
+    "properties": {
+     "matchExpressions": {
+      "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/unversioned.LabelSelectorRequirement"
+      }
+     },
+     "matchLabels": {
+      "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "string"
+      }
+     }
+    }
+   },
+   "unversioned.LabelSelectorRequirement": {
+    "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+    "required": [
+     "key",
+     "operator"
+    ],
+    "properties": {
+     "key": {
+      "description": "key is the label key that the selector applies to.",
+      "type": "string"
+     },
+     "operator": {
+      "description": "operator represents a key's relationship to a set of values. Valid operators ard In, NotIn, Exists and DoesNotExist.",
+      "type": "string"
+     },
+     "values": {
+      "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    }
+   },
    "unversioned.ListMeta": {
     "description": "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
     "properties": {
@@ -7462,6 +8244,22 @@
      }
     }
    },
+   "v1.ConfigMap": {
+    "description": "ConfigMap holds configuration data for pods to consume.",
+    "properties": {
+     "data": {
+      "description": "Data contains the configuration data. Each key must be a valid DNS_SUBDOMAIN with an optional leading dot.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "string"
+      }
+     },
+     "metadata": {
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+      "$ref": "#/definitions/v1.ObjectMeta"
+     }
+    }
+   },
    "v1.ConfigMapKeySelector": {
     "description": "Selects a key from a ConfigMap.",
     "required": [
@@ -7471,6 +8269,25 @@
      "key": {
       "description": "The key to select.",
       "type": "string"
+     }
+    }
+   },
+   "v1.ConfigMapList": {
+    "description": "ConfigMapList is a resource containing a list of ConfigMap objects.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "items": {
+      "description": "Items is the list of ConfigMaps.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1.ConfigMap"
+      }
+     },
+     "metadata": {
+      "description": "More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+      "$ref": "#/definitions/unversioned.ListMeta"
      }
     }
    },
@@ -8743,7 +9560,7 @@
     "properties": {
      "selector": {
       "description": "Selector is a label query over pods that are managed by the daemon set. Must match in order to be controlled. If empty, defaulted to labels on Pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
-      "$ref": "#/definitions/v1beta1.LabelSelector"
+      "$ref": "#/definitions/unversioned.LabelSelector"
      },
      "template": {
       "description": "Template is the object that describes the pod that will be created. The DaemonSet will create exactly one copy of this pod on every node that matches the template's node selector (or on every node if no node selector is specified). More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template",
@@ -8799,6 +9616,43 @@
      }
     }
    },
+   "v1beta1.DeploymentCondition": {
+    "description": "DeploymentCondition describes the state of a deployment at a certain point.",
+    "required": [
+     "type",
+     "status",
+     "lastUpdateTime",
+     "lastTransitionTime",
+     "reason",
+     "message"
+    ],
+    "properties": {
+     "lastTransitionTime": {
+      "description": "Last time the condition transitioned from one status to another.",
+      "$ref": "#/definitions/unversioned.Time"
+     },
+     "lastUpdateTime": {
+      "description": "The last time this condition was updated.",
+      "$ref": "#/definitions/unversioned.Time"
+     },
+     "message": {
+      "description": "A human readable message indicating details about the transition.",
+      "type": "string"
+     },
+     "reason": {
+      "description": "The reason for the condition's last transition.",
+      "type": "string"
+     },
+     "status": {
+      "description": "Status of the condition, one of True, False, Unknown.",
+      "type": "string"
+     },
+     "type": {
+      "description": "Type of deployment condition.",
+      "type": "string"
+     }
+    }
+   },
    "v1beta1.DeploymentList": {
     "description": "DeploymentList is a list of Deployments.",
     "required": [
@@ -8845,7 +9699,8 @@
    "v1beta1.DeploymentSpec": {
     "description": "DeploymentSpec is the specification of the desired behavior of the Deployment.",
     "required": [
-     "template"
+     "template",
+     "progressDeadlineSeconds"
     ],
     "properties": {
      "minReadySeconds": {
@@ -8856,6 +9711,11 @@
      "paused": {
       "description": "Indicates that the deployment is paused and will not be processed by the deployment controller.",
       "type": "boolean"
+     },
+     "progressDeadlineSeconds": {
+      "description": "The maximum time in seconds for a deployment to make progress before it is considered to be failed. The deployment controller will continue to process failed deployments and a condition with a ProgressDeadlineExceeded reason will be surfaced in the deployment status. Once autoRollback is implemented, the deployment controller will automatically rollback failed deployments. Note that progress will not be estimated during the time a deployment is paused. This is not set by default.",
+      "type": "integer",
+      "format": "int32"
      },
      "replicas": {
       "description": "Number of desired pods. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1.",
@@ -8873,7 +9733,7 @@
      },
      "selector": {
       "description": "Label selector for pods. Existing ReplicaSets whose pods are selected by this will be the ones affected by this deployment.",
-      "$ref": "#/definitions/v1beta1.LabelSelector"
+      "$ref": "#/definitions/unversioned.LabelSelector"
      },
      "strategy": {
       "description": "The deployment strategy to use to replace existing pods with new ones.",
@@ -8887,11 +9747,21 @@
    },
    "v1beta1.DeploymentStatus": {
     "description": "DeploymentStatus is the most recently observed status of the Deployment.",
+    "required": [
+     "conditions"
+    ],
     "properties": {
      "availableReplicas": {
       "description": "Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.",
       "type": "integer",
       "format": "int32"
+     },
+     "conditions": {
+      "description": "Represents the latest available observations of a deployment's current state.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1beta1.DeploymentCondition"
+      }
      },
      "observedGeneration": {
       "description": "The generation observed by the deployment controller.",
@@ -9038,49 +9908,6 @@
      }
     }
    },
-   "v1beta1.LabelSelector": {
-    "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
-    "properties": {
-     "matchExpressions": {
-      "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
-      "type": "array",
-      "items": {
-       "$ref": "#/definitions/v1beta1.LabelSelectorRequirement"
-      }
-     },
-     "matchLabels": {
-      "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
-      "type": "object",
-      "additionalProperties": {
-       "type": "string"
-      }
-     }
-    }
-   },
-   "v1beta1.LabelSelectorRequirement": {
-    "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
-    "required": [
-     "key",
-     "operator"
-    ],
-    "properties": {
-     "key": {
-      "description": "key is the label key that the selector applies to.",
-      "type": "string"
-     },
-     "operator": {
-      "description": "operator represents a key's relationship to a set of values. Valid operators ard In, NotIn, Exists and DoesNotExist.",
-      "type": "string"
-     },
-     "values": {
-      "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
-      "type": "array",
-      "items": {
-       "type": "string"
-      }
-     }
-    }
-   },
    "v1beta1.ReplicaSet": {
     "description": "ReplicaSet represents the configuration of a ReplicaSet.",
     "properties": {
@@ -9161,7 +9988,7 @@
      },
      "selector": {
       "description": "Selector is a label query over pods that should match the replica count. If the selector is empty, it is defaulted to the labels present on the pod template. Label keys and values that must match in order to be controlled by this replica set. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
-      "$ref": "#/definitions/v1beta1.LabelSelector"
+      "$ref": "#/definitions/unversioned.LabelSelector"
      },
      "template": {
       "description": "Template is the object that describes the pod that will be created if insufficient replicas are detected. More info: http://kubernetes.io/docs/user-guide/replication-controller#pod-template",

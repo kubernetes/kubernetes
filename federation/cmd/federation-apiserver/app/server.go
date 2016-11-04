@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
+	apiserveropenapi "k8s.io/kubernetes/pkg/apiserver/openapi"
 	authorizerunion "k8s.io/kubernetes/pkg/auth/authorizer/union"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/controller/informers"
@@ -72,6 +73,11 @@ func Run(s *options.ServerRunOptions) error {
 	genericConfig := genericapiserver.NewConfig(). // create the new config
 							ApplyOptions(s.GenericServerRunOptions). // apply the options selected
 							Complete()                               // set default values based on the known values
+
+	// Avoid duplicate OpenAPI operation IDs and add GroupVersion tags to all operation definitions.
+	genericConfig.OpenAPIConfig.GetOperationIDAndTags = apiserveropenapi.GetOperationIDAndTagsFunc(
+		[]string{"extensions_v1beta1", "batch_v2alpha1"},
+		[]string{"getAPIResources", "getAPIGroup", "getAPIVersions"})
 
 	if err := genericConfig.MaybeGenerateServingCerts(); err != nil {
 		glog.Fatalf("Failed to generate service certificate: %v", err)
