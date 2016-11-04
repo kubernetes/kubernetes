@@ -158,7 +158,11 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 		mockClient := fake.NewSimpleClientset(testInput.testNamespace)
 		clientPool := dynamic.NewClientPool(clientConfig, registered.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
 
-		err := syncNamespace(mockClient, clientPool, &operationNotSupportedCache{m: make(map[operationKey]bool)}, groupVersionResources, testInput.testNamespace, api.FinalizerKubernetes)
+		fn := func() ([]unversioned.GroupVersionResource, error) {
+			return groupVersionResources, nil
+		}
+
+		err := syncNamespace(mockClient, clientPool, &operationNotSupportedCache{m: make(map[operationKey]bool)}, fn, testInput.testNamespace, api.FinalizerKubernetes)
 		if err != nil {
 			t.Errorf("scenario %s - Unexpected error when synching namespace %v", scenario, err)
 		}
@@ -227,9 +231,27 @@ func TestSyncNamespaceThatIsActive(t *testing.T) {
 			Phase: api.NamespaceActive,
 		},
 	}
+	fn := func() ([]unversioned.GroupVersionResource, error) {
+		return testGroupVersionResources(), nil
+	}
 	err := syncNamespace(mockClient, nil, &operationNotSupportedCache{m: make(map[operationKey]bool)}, testGroupVersionResources(), testNamespace, api.FinalizerKubernetes)
 	if err != nil {
 		t.Errorf("Unexpected error when synching namespace %v", err)
+	}
+	if len(mockClient.Actions()) != 0 {
+		t.Errorf("Expected no action from controller, but got: %v", mockClient.Actions())
+	}
+}
+
+func TestSyncNamespaceWithError(t *testing.T) {
+	mockClient := &fake.Clientset{}
+	testNamespace := &api.Namespace{}
+	fn := func() ([]unversioned.GroupVersionResource, error) {
+		return testGroupVersionResources(), fmt.Errorf("test error")
+	}
+	err := syncNamespace(mockClient, nil, operationNotSupportedCache{}, fn, testNamespace, api.FinalizerKubernetes)
+	if err == nil {
+		t.Errorf("Unexpected non-error when synching namespace.")
 	}
 	if len(mockClient.Actions()) != 0 {
 		t.Errorf("Expected no action from controller, but got: %v", mockClient.Actions())

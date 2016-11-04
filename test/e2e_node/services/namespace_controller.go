@@ -19,10 +19,7 @@ package services
 import (
 	"time"
 
-	"github.com/golang/glog"
-
 	"k8s.io/kubernetes/pkg/api"
-	k8s_unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -59,14 +56,7 @@ func (n *NamespaceController) Start() error {
 		return err
 	}
 	clientPool := dynamic.NewClientPool(config, registered.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
-	gvrFn := func() []k8s_unversioned.GroupVersionResource {
-		resources, err := client.Discovery().ServerPreferredNamespacedResources()
-		if err != nil {
-			glog.Warningf("Error while syncing resources: %v", err)
-			return []k8s_unversioned.GroupVersionResource{}
-		}
-		return resources
-	}
+	gvrFn := client.Discovery().ServerPreferredNamespacedResources
 	nc := namespacecontroller.NewNamespaceController(client, clientPool, gvrFn, ncResyncPeriod, api.FinalizerKubernetes)
 	go nc.Run(ncConcurrency, n.stopCh)
 	return nil
