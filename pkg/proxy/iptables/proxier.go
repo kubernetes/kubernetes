@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	featuregate "k8s.io/kubernetes/pkg/util/config"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/slice"
@@ -167,9 +168,11 @@ type Proxier struct {
 	portsMap                    map[localPort]closeable
 	haveReceivedServiceUpdate   bool // true once we've seen an OnServiceUpdate event
 	haveReceivedEndpointsUpdate bool // true once we've seen an OnEndpointsUpdate event
+	throttle                    flowcontrol.RateLimiter
 
 	// These are effectively const and do not need the mutex to be held.
 	syncPeriod     time.Duration
+	minSyncPeriod  time.Duration
 	iptables       utiliptables.Interface
 	masqueradeAll  bool
 	masqueradeMark string
@@ -217,7 +220,12 @@ var _ proxy.ProxyProvider = &Proxier{}
 // An error will be returned if iptables fails to update or acquire the initial lock.
 // Once a proxier is created, it will keep iptables up to date in the background and
 // will not terminate if a particular iptables call fails.
-func NewProxier(ipt utiliptables.Interface, sysctl utilsysctl.Interface, exec utilexec.Interface, syncPeriod time.Duration, masqueradeAll bool, masqueradeBit int, clusterCIDR string, hostname string, nodeIP net.IP) (*Proxier, error) {
+func NewProxier(ipt utiliptables.Interface, sysctl utilsysctl.Interface, exec utilexec.Interface, syncPeriod time.Duration, minSyncPeriod time.Duration, masqueradeAll bool, masqueradeBit int, clusterCIDR string, hostname string, nodeIP net.IP) (*Proxier, error) {
+	// check valid user input
+	if minSyncPeriod == 0 || minSyncPeriod > syncPeriod {
+		return nil, fmt.Errorf("min-sync (%v) must be < sync(%v) and > 0 ", minSyncPeriod, syncPeriod)
+	}
+
 	// Set the route_localnet sysctl we need for
 	if err := sysctl.SetSysctl(sysctlRouteLocalnet, 1); err != nil {
 		return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlRouteLocalnet, err)
@@ -244,11 +252,16 @@ func NewProxier(ipt utiliptables.Interface, sysctl utilsysctl.Interface, exec ut
 
 	go healthcheck.Run()
 
+	syncsPerSecond := float32(time.Second) / float32(minSyncPeriod)
+
 	return &Proxier{
-		serviceMap:     make(map[proxy.ServicePortName]*serviceInfo),
-		endpointsMap:   make(map[proxy.ServicePortName][]*endpointsInfo),
-		portsMap:       make(map[localPort]closeable),
-		syncPeriod:     syncPeriod,
+		serviceMap:    make(map[proxy.ServicePortName]*serviceInfo),
+		endpointsMap:  make(map[proxy.ServicePortName][]*endpointsInfo),
+		portsMap:      make(map[localPort]closeable),
+		syncPeriod:    syncPeriod,
+		minSyncPeriod: minSyncPeriod,
+		// The average use case will process 2 updates in short succession
+		throttle:       flowcontrol.NewTokenBucketRateLimiter(syncsPerSecond, 2),
 		iptables:       ipt,
 		masqueradeAll:  masqueradeAll,
 		masqueradeMark: masqueradeMark,
@@ -765,6 +778,9 @@ func (proxier *Proxier) execConntrackTool(parameters ...string) error {
 // The only other iptables rules are those that are setup in iptablesInit()
 // assumes proxier.mu is held
 func (proxier *Proxier) syncProxyRules() {
+	if proxier.throttle != nil {
+		proxier.throttle.Accept()
+	}
 	start := time.Now()
 	defer func() {
 		glog.V(4).Infof("syncProxyRules took %v", time.Since(start))

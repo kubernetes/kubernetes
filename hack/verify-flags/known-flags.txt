@@ -272,6 +272,7 @@ instance-metadata
 instance-name-prefix
 iptables-drop-bit
 iptables-masquerade-bit
+iptables-min-sync-period
 iptables-sync-period
 ir-data-source
 ir-dbname
