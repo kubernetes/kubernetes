@@ -74,6 +74,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_EndpointSubset, InType: reflect.TypeOf(&EndpointSubset{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Endpoints, InType: reflect.TypeOf(&Endpoints{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_EndpointsList, InType: reflect.TypeOf(&EndpointsList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_EnvFromSource, InType: reflect.TypeOf(&EnvFromSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_EnvVar, InType: reflect.TypeOf(&EnvVar{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_EnvVarSource, InType: reflect.TypeOf(&EnvVarSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Event, InType: reflect.TypeOf(&Event{})},
@@ -568,6 +569,17 @@ func DeepCopy_api_Container(in interface{}, out interface{}, c *conversion.Clone
 		} else {
 			out.Env = nil
 		}
+		if in.EnvFrom != nil {
+			in, out := &in.EnvFrom, &out.EnvFrom
+			*out = make([]EnvFromSource, len(*in))
+			for i := range *in {
+				if err := DeepCopy_api_EnvFromSource(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		} else {
+			out.EnvFrom = nil
+		}
 		if err := DeepCopy_api_ResourceRequirements(&in.Resources, &out.Resources, c); err != nil {
 			return err
 		}
@@ -985,6 +997,21 @@ func DeepCopy_api_EndpointsList(in interface{}, out interface{}, c *conversion.C
 			}
 		} else {
 			out.Items = nil
+		}
+		return nil
+	}
+}
+
+func DeepCopy_api_EnvFromSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*EnvFromSource)
+		out := out.(*EnvFromSource)
+		if in.ConfigMap != nil {
+			in, out := &in.ConfigMap, &out.ConfigMap
+			*out = new(LocalObjectReference)
+			**out = **in
+		} else {
+			out.ConfigMap = nil
 		}
 		return nil
 	}

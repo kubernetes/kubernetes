@@ -1133,6 +1133,12 @@ type SecretKeySelector struct {
 	Key string `json:"key"`
 }
 
+type EnvFromSource struct {
+	// The ConfigMap to select from.
+	//+optional
+	ConfigMap *LocalObjectReference `json:"configMap,omitempty"`
+}
+
 // HTTPHeader describes a custom header to be used in HTTP probes
 type HTTPHeader struct {
 	// The header field name
@@ -1276,6 +1282,8 @@ type Container struct {
 	Ports []ContainerPort `json:"ports,omitempty"`
 	// +optional
 	Env []EnvVar `json:"env,omitempty"`
+	// +optional
+	EnvFrom []EnvFromSource `json:"envFrom,omitempty"`
 	// Compute resource requirements.
 	// +optional
 	Resources ResourceRequirements `json:"resources,omitempty"`

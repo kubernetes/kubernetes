@@ -107,6 +107,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_Endpoints_To_v1_Endpoints,
 		Convert_v1_EndpointsList_To_api_EndpointsList,
 		Convert_api_EndpointsList_To_v1_EndpointsList,
+		Convert_v1_EnvFromSource_To_api_EnvFromSource,
+		Convert_api_EnvFromSource_To_v1_EnvFromSource,
 		Convert_v1_EnvVar_To_api_EnvVar,
 		Convert_api_EnvVar_To_v1_EnvVar,
 		Convert_v1_EnvVarSource_To_api_EnvVarSource,
@@ -765,6 +767,7 @@ func autoConvert_v1_Container_To_api_Container(in *Container, out *api.Container
 	out.Stdin = in.Stdin
 	out.StdinOnce = in.StdinOnce
 	out.TTY = in.TTY
+	out.EnvFrom = *(*[]api.EnvFromSource)(unsafe.Pointer(&in.EnvFrom))
 	return nil
 }
 
@@ -780,6 +783,7 @@ func autoConvert_api_Container_To_v1_Container(in *api.Container, out *Container
 	out.WorkingDir = in.WorkingDir
 	out.Ports = *(*[]ContainerPort)(unsafe.Pointer(&in.Ports))
 	out.Env = *(*[]EnvVar)(unsafe.Pointer(&in.Env))
+	out.EnvFrom = *(*[]EnvFromSource)(unsafe.Pointer(&in.EnvFrom))
 	if err := Convert_api_ResourceRequirements_To_v1_ResourceRequirements(&in.Resources, &out.Resources, s); err != nil {
 		return err
 	}
@@ -1188,6 +1192,24 @@ func autoConvert_api_EndpointsList_To_v1_EndpointsList(in *api.EndpointsList, ou
 
 func Convert_api_EndpointsList_To_v1_EndpointsList(in *api.EndpointsList, out *EndpointsList, s conversion.Scope) error {
 	return autoConvert_api_EndpointsList_To_v1_EndpointsList(in, out, s)
+}
+
+func autoConvert_v1_EnvFromSource_To_api_EnvFromSource(in *EnvFromSource, out *api.EnvFromSource, s conversion.Scope) error {
+	out.ConfigMap = (*api.LocalObjectReference)(unsafe.Pointer(in.ConfigMap))
+	return nil
+}
+
+func Convert_v1_EnvFromSource_To_api_EnvFromSource(in *EnvFromSource, out *api.EnvFromSource, s conversion.Scope) error {
+	return autoConvert_v1_EnvFromSource_To_api_EnvFromSource(in, out, s)
+}
+
+func autoConvert_api_EnvFromSource_To_v1_EnvFromSource(in *api.EnvFromSource, out *EnvFromSource, s conversion.Scope) error {
+	out.ConfigMap = (*LocalObjectReference)(unsafe.Pointer(in.ConfigMap))
+	return nil
+}
+
+func Convert_api_EnvFromSource_To_v1_EnvFromSource(in *api.EnvFromSource, out *EnvFromSource, s conversion.Scope) error {
+	return autoConvert_api_EnvFromSource_To_v1_EnvFromSource(in, out, s)
 }
 
 func autoConvert_v1_EnvVar_To_api_EnvVar(in *EnvVar, out *api.EnvVar, s conversion.Scope) error {
@@ -3067,8 +3089,28 @@ func autoConvert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conv
 	} else {
 		out.Volumes = nil
 	}
-	out.InitContainers = *(*[]api.Container)(unsafe.Pointer(&in.InitContainers))
-	out.Containers = *(*[]api.Container)(unsafe.Pointer(&in.Containers))
+	if in.InitContainers != nil {
+		in, out := &in.InitContainers, &out.InitContainers
+		*out = make([]api.Container, len(*in))
+		for i := range *in {
+			if err := Convert_v1_Container_To_api_Container(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.InitContainers = nil
+	}
+	if in.Containers != nil {
+		in, out := &in.Containers, &out.Containers
+		*out = make([]api.Container, len(*in))
+		for i := range *in {
+			if err := Convert_v1_Container_To_api_Container(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Containers = nil
+	}
 	out.RestartPolicy = api.RestartPolicy(in.RestartPolicy)
 	out.TerminationGracePeriodSeconds = (*int64)(unsafe.Pointer(in.TerminationGracePeriodSeconds))
 	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
@@ -3107,8 +3149,28 @@ func autoConvert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conv
 	} else {
 		out.Volumes = nil
 	}
-	out.InitContainers = *(*[]Container)(unsafe.Pointer(&in.InitContainers))
-	out.Containers = *(*[]Container)(unsafe.Pointer(&in.Containers))
+	if in.InitContainers != nil {
+		in, out := &in.InitContainers, &out.InitContainers
+		*out = make([]Container, len(*in))
+		for i := range *in {
+			if err := Convert_api_Container_To_v1_Container(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.InitContainers = nil
+	}
+	if in.Containers != nil {
+		in, out := &in.Containers, &out.Containers
+		*out = make([]Container, len(*in))
+		for i := range *in {
+			if err := Convert_api_Container_To_v1_Container(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Containers = nil
+	}
 	out.RestartPolicy = RestartPolicy(in.RestartPolicy)
 	out.TerminationGracePeriodSeconds = (*int64)(unsafe.Pointer(in.TerminationGracePeriodSeconds))
 	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))

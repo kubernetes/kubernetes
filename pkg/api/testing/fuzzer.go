@@ -372,6 +372,11 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 				ev.ValueFrom.FieldRef.FieldPath = c.RandString()
 			}
 		},
+		func(ev *api.EnvFromSource, c fuzz.Continue) {
+			if c.RandBool() {
+				ev.ConfigMap = &api.LocalObjectReference{Name: c.RandString()}
+			}
+		},
 		func(sc *api.SecurityContext, c fuzz.Continue) {
 			c.FuzzNoCustom(sc) // fuzz self without calling this function again
 			if c.RandBool() {
