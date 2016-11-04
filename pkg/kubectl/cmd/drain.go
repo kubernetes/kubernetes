@@ -444,7 +444,8 @@ func (o *DrainOptions) evictPod(pod api.Pod) error {
 		},
 		DeleteOptions: deleteOptions,
 	}
-	return o.client.Core().Pods(eviction.Namespace).Evict(eviction)
+	// Remember to change change the URL manipulation func when Evction's version change
+	return o.client.Policy().Evictions(eviction.Namespace).Evict(eviction)
 }
 
 // deletePods deletes the pods on the api server
@@ -453,7 +454,7 @@ func (o *DrainOptions) deletePods(pods []api.Pod) error {
 		return nil
 	}
 
-	supportEviction, err := doesSupportEviction(o.factory)
+	supportEviction, err := doesSupportEviction(o.client)
 	if err != nil {
 		return err
 	}
@@ -515,12 +516,8 @@ func (o *DrainOptions) waitForDelete(pods []api.Pod, interval, timeout time.Dura
 }
 
 // Use Discovery API to find out if the server support eviction subresource
-func doesSupportEviction(f cmdutil.Factory) (bool, error) {
-	clientSet, err := f.ClientSet()
-	if err != nil {
-		return false, err
-	}
-	resourceList, err := clientSet.Discovery().ServerResourcesForGroupVersion("v1")
+func doesSupportEviction(clientset *internalclientset.Clientset) (bool, error) {
+	resourceList, err := clientset.Discovery().ServerResourcesForGroupVersion("v1")
 	if err != nil {
 		return false, err
 	}

@@ -12,7 +12,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["zz_generated.poddisruptionbudget.go"],
+    srcs = [
+        "zz_generated.eviction.go",
+        "zz_generated.poddisruptionbudget.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//pkg/api/errors:go_default_library",

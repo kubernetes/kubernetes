@@ -471,7 +471,6 @@ func TestDrain(t *testing.T) {
 			new_node := &api.Node{}
 			deleted := false
 			f, tf, codec, ns := cmdtesting.NewAPIFactory()
-
 			tf.Client = &fake.RESTClient{
 				NegotiatedSerializer: ns,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
