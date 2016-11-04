@@ -17,6 +17,7 @@ limitations under the License.
 package eviction
 
 import (
+	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -113,7 +114,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	return lifecycle.PodAdmitResult{
 		Admit:   false,
 		Reason:  reason,
-		Message: message,
+		Message: fmt.Sprintf(message, m.nodeConditions),
 	}
 }
 
@@ -254,11 +255,11 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		pod := activePods[i]
 		status := api.PodStatus{
 			Phase:   api.PodFailed,
-			Message: message,
+			Message: fmt.Sprintf(message, resourceToReclaim),
 			Reason:  reason,
 		}
 		// record that we are evicting the pod
-		m.recorder.Eventf(pod, api.EventTypeWarning, reason, message)
+		m.recorder.Eventf(pod, api.EventTypeWarning, reason, fmt.Sprintf(message, resourceToReclaim))
 		gracePeriodOverride := int64(0)
 		if softEviction {
 			gracePeriodOverride = m.config.MaxPodGracePeriodSeconds
