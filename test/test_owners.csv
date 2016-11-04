@@ -261,6 +261,7 @@ Network Partition should come back up if node goes down,foxish,0
 Network Partition should create new pods when node is partitioned,foxish,0
 Network Partition should eagerly create replacement pod during network partition when termination grace is non-zero,foxish,0
 Network Partition should not reschedule pets if there is a network partition,foxish,0
+Network should set TCP CLOSE_WAIT timeout,bowei,0
 Networking Granular Checks: Pods should function for intra-pod communication: http,stts,0
 Networking Granular Checks: Pods should function for intra-pod communication: udp,freehan,0
 Networking Granular Checks: Pods should function for node-pod communication: http,spxtr,1
