@@ -682,11 +682,16 @@ func (f *factory) Scaler(mapping *meta.RESTMapping) (kubectl.Scaler, error) {
 
 func (f *factory) Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
 	mappingVersion := mapping.GroupVersionKind.GroupVersion()
-	clientset, err := f.clients.ClientSetForVersion(&mappingVersion)
-	if err != nil {
-		return nil, err
+	clientset, clientsetErr := f.clients.ClientSetForVersion(&mappingVersion)
+	reaper, reaperErr := kubectl.ReaperFor(mapping.GroupVersionKind.GroupKind(), clientset)
+
+	if kubectl.IsNoSuchReaperError(reaperErr) {
+		return nil, reaperErr
 	}
-	return kubectl.ReaperFor(mapping.GroupVersionKind.GroupKind(), clientset)
+	if clientsetErr != nil {
+		return nil, clientsetErr
+	}
+	return reaper, reaperErr
 }
 
 func (f *factory) HistoryViewer(mapping *meta.RESTMapping) (kubectl.HistoryViewer, error) {
