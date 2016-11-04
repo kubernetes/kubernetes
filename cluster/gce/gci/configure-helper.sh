@@ -1169,10 +1169,12 @@ EOF
 }
 
 function override-kubectl {
+    echo "overriding kubectl"
     echo "export PATH=${KUBE_HOME}/bin:\$PATH" > /etc/profile.d/kube_env.sh
 }
 
 function pre-warm-mounter {
+    echo "prewarming mounter"
     ${KUBE_HOME}/bin/mounter &> /dev/null
 }
 
