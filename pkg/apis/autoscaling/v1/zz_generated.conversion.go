@@ -115,7 +115,17 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(i
 
 func autoConvert_v1_HorizontalPodAutoscalerList_To_autoscaling_HorizontalPodAutoscalerList(in *HorizontalPodAutoscalerList, out *autoscaling.HorizontalPodAutoscalerList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]autoscaling.HorizontalPodAutoscaler)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]autoscaling.HorizontalPodAutoscaler, len(*in))
+		for i := range *in {
+			if err := Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -125,7 +135,17 @@ func Convert_v1_HorizontalPodAutoscalerList_To_autoscaling_HorizontalPodAutoscal
 
 func autoConvert_autoscaling_HorizontalPodAutoscalerList_To_v1_HorizontalPodAutoscalerList(in *autoscaling.HorizontalPodAutoscalerList, out *HorizontalPodAutoscalerList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]HorizontalPodAutoscaler)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]HorizontalPodAutoscaler, len(*in))
+		for i := range *in {
+			if err := Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -139,12 +159,8 @@ func autoConvert_v1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAuto
 	}
 	out.MinReplicas = (*int32)(unsafe.Pointer(in.MinReplicas))
 	out.MaxReplicas = in.MaxReplicas
-	out.TargetCPUUtilizationPercentage = (*int32)(unsafe.Pointer(in.TargetCPUUtilizationPercentage))
+	// WARNING: in.TargetCPUUtilizationPercentage requires manual conversion: does not exist in peer-type
 	return nil
-}
-
-func Convert_v1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec(in *HorizontalPodAutoscalerSpec, out *autoscaling.HorizontalPodAutoscalerSpec, s conversion.Scope) error {
-	return autoConvert_v1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec(in, out, s)
 }
 
 func autoConvert_autoscaling_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutoscalerSpec(in *autoscaling.HorizontalPodAutoscalerSpec, out *HorizontalPodAutoscalerSpec, s conversion.Scope) error {
@@ -153,12 +169,8 @@ func autoConvert_autoscaling_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAuto
 	}
 	out.MinReplicas = (*int32)(unsafe.Pointer(in.MinReplicas))
 	out.MaxReplicas = in.MaxReplicas
-	out.TargetCPUUtilizationPercentage = (*int32)(unsafe.Pointer(in.TargetCPUUtilizationPercentage))
+	// WARNING: in.Metrics requires manual conversion: does not exist in peer-type
 	return nil
-}
-
-func Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutoscalerSpec(in *autoscaling.HorizontalPodAutoscalerSpec, out *HorizontalPodAutoscalerSpec, s conversion.Scope) error {
-	return autoConvert_autoscaling_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutoscalerSpec(in, out, s)
 }
 
 func autoConvert_v1_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAutoscalerStatus(in *HorizontalPodAutoscalerStatus, out *autoscaling.HorizontalPodAutoscalerStatus, s conversion.Scope) error {
@@ -166,12 +178,8 @@ func autoConvert_v1_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAu
 	out.LastScaleTime = (*unversioned.Time)(unsafe.Pointer(in.LastScaleTime))
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
-	out.CurrentCPUUtilizationPercentage = (*int32)(unsafe.Pointer(in.CurrentCPUUtilizationPercentage))
+	// WARNING: in.CurrentCPUUtilizationPercentage requires manual conversion: does not exist in peer-type
 	return nil
-}
-
-func Convert_v1_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAutoscalerStatus(in *HorizontalPodAutoscalerStatus, out *autoscaling.HorizontalPodAutoscalerStatus, s conversion.Scope) error {
-	return autoConvert_v1_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAutoscalerStatus(in, out, s)
 }
 
 func autoConvert_autoscaling_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAutoscalerStatus(in *autoscaling.HorizontalPodAutoscalerStatus, out *HorizontalPodAutoscalerStatus, s conversion.Scope) error {
@@ -179,12 +187,8 @@ func autoConvert_autoscaling_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAu
 	out.LastScaleTime = (*unversioned.Time)(unsafe.Pointer(in.LastScaleTime))
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
-	out.CurrentCPUUtilizationPercentage = (*int32)(unsafe.Pointer(in.CurrentCPUUtilizationPercentage))
+	// WARNING: in.CurrentMetrics requires manual conversion: does not exist in peer-type
 	return nil
-}
-
-func Convert_autoscaling_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAutoscalerStatus(in *autoscaling.HorizontalPodAutoscalerStatus, out *HorizontalPodAutoscalerStatus, s conversion.Scope) error {
-	return autoConvert_autoscaling_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAutoscalerStatus(in, out, s)
 }
 
 func autoConvert_v1_Scale_To_autoscaling_Scale(in *Scale, out *autoscaling.Scale, s conversion.Scope) error {

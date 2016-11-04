@@ -709,46 +709,52 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 	"autoscaling.HorizontalPodAutoscalerSpec": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "specification of a horizontal pod autoscaler.",
+				Description: "specification of a horizontal pod autoscaler",
 				Properties: map[string]spec.Schema{
 					"scaleTargetRef": {
 						SchemaProps: spec.SchemaProps{
-							Description: "reference to scaled resource; horizontal pod autoscaler will learn the current resource consumption and will set the desired number of pods by using its Scale subresource.",
+							Description: "the target scalable object to autoscale",
 							Ref:         spec.MustCreateRef("#/definitions/autoscaling.CrossVersionObjectReference"),
 						},
 					},
 					"minReplicas": {
 						SchemaProps: spec.SchemaProps{
-							Description: "lower limit for the number of pods that can be set by the autoscaler, default 1.",
+							Description: "the minimum number of replicas to which the autoscaler may scale",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"maxReplicas": {
 						SchemaProps: spec.SchemaProps{
-							Description: "upper limit for the number of pods that can be set by the autoscaler. It cannot be smaller than MinReplicas.",
+							Description: "the maximum number of replicas to which the autoscaler may scale",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
-					"targetCPUUtilizationPercentage": {
+					"metrics": {
 						SchemaProps: spec.SchemaProps{
-							Description: "target average CPU utilization (represented as a percentage of requested CPU) over all the pods; if not specified the default autoscaling policy will be used.",
-							Type:        []string{"integer"},
-							Format:      "int32",
+							Description: "the metrics to use to calculate the desired replica count (the maximum replica count across all metrics will be used).  It is expected that any metrics used will decrease as the replica count increases, and will eventually increase if we decrease the replica count.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/autoscaling.MetricSpec"),
+									},
+								},
+							},
 						},
 					},
 				},
-				Required: []string{"scaleTargetRef", "maxReplicas"},
+				Required: []string{"scaleTargetRef", "maxReplicas", "metrics"},
 			},
 		},
 		Dependencies: []string{
-			"autoscaling.CrossVersionObjectReference"},
+			"autoscaling.CrossVersionObjectReference", "autoscaling.MetricSpec"},
 	},
 	"autoscaling.HorizontalPodAutoscalerStatus": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "current status of a horizontal pod autoscaler",
+				Description: "the status of a horizontal pod autoscaler",
 				Properties: map[string]spec.Schema{
 					"observedGeneration": {
 						SchemaProps: spec.SchemaProps{
@@ -759,37 +765,293 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					},
 					"lastScaleTime": {
 						SchemaProps: spec.SchemaProps{
-							Description: "last time the HorizontalPodAutoscaler scaled the number of pods; used by the autoscaler to control how often the number of pods is changed.",
+							Description: "last time the autoscaler scaled the number of pods; used by the autoscaler to control how often the number of pods is changed.",
 							Ref:         spec.MustCreateRef("#/definitions/unversioned.Time"),
 						},
 					},
 					"currentReplicas": {
 						SchemaProps: spec.SchemaProps{
-							Description: "current number of replicas of pods managed by this autoscaler.",
+							Description: "the last observed number of replicas from the target object.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"desiredReplicas": {
 						SchemaProps: spec.SchemaProps{
-							Description: "desired number of replicas of pods managed by this autoscaler.",
+							Description: "the desired number of replicas as last computed by the autoscaler",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
-					"currentCPUUtilizationPercentage": {
+					"currentMetrics": {
 						SchemaProps: spec.SchemaProps{
-							Description: "current average CPU utilization over all pods, represented as a percentage of requested CPU, e.g. 70 means that an average pod is using now 70% of its requested CPU.",
-							Type:        []string{"integer"},
-							Format:      "int32",
+							Description: "the last read state of the metrics used by this autoscaler",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/autoscaling.MetricStatus"),
+									},
+								},
+							},
 						},
 					},
 				},
-				Required: []string{"currentReplicas", "desiredReplicas"},
+				Required: []string{"observedGeneration", "lastScaleTime", "currentReplicas", "desiredReplicas", "currentMetrics"},
 			},
 		},
 		Dependencies: []string{
-			"unversioned.Time"},
+			"autoscaling.MetricStatus", "unversioned.Time"},
+	},
+	"autoscaling.MetricSpec": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "a specification for how to scale based on a single metric (only `type` and one other matching field should be set at once)",
+				Properties: map[string]spec.Schema{
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the type of metric source (should match one of the fields below)",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"object": {
+						SchemaProps: spec.SchemaProps{
+							Description: "metric describing a single Kubernetes object",
+							Ref:         spec.MustCreateRef("#/definitions/autoscaling.ObjectMetricSource"),
+						},
+					},
+					"pods": {
+						SchemaProps: spec.SchemaProps{
+							Description: "metric describing pods in the scale target",
+							Ref:         spec.MustCreateRef("#/definitions/autoscaling.PodsMetricSource"),
+						},
+					},
+					"resource": {
+						SchemaProps: spec.SchemaProps{
+							Description: "resource metric describing pods in the scale target (guaranteed to be available and have the same names across clusters)",
+							Ref:         spec.MustCreateRef("#/definitions/autoscaling.ResourceMetricSource"),
+						},
+					},
+				},
+				Required: []string{"type", "object", "pods", "resource"},
+			},
+		},
+		Dependencies: []string{
+			"autoscaling.ObjectMetricSource", "autoscaling.PodsMetricSource", "autoscaling.ResourceMetricSource"},
+	},
+	"autoscaling.MetricStatus": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "the status of a single metric",
+				Properties: map[string]spec.Schema{
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the type of metric source",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"object": {
+						SchemaProps: spec.SchemaProps{
+							Description: "metric describing a single Kubernetes object",
+							Ref:         spec.MustCreateRef("#/definitions/autoscaling.ObjectMetricStatus"),
+						},
+					},
+					"pods": {
+						SchemaProps: spec.SchemaProps{
+							Description: "metric describing pods in the scale target",
+							Ref:         spec.MustCreateRef("#/definitions/autoscaling.PodsMetricStatus"),
+						},
+					},
+					"resource": {
+						SchemaProps: spec.SchemaProps{
+							Description: "resource metric describing pods in the scale target",
+							Ref:         spec.MustCreateRef("#/definitions/autoscaling.ResourceMetricStatus"),
+						},
+					},
+				},
+				Required: []string{"type", "object", "pods", "resource"},
+			},
+		},
+		Dependencies: []string{
+			"autoscaling.ObjectMetricStatus", "autoscaling.PodsMetricStatus", "autoscaling.ResourceMetricStatus"},
+	},
+	"autoscaling.ObjectMetricSource": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "a metric describing a Kubernetes object",
+				Properties: map[string]spec.Schema{
+					"target": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the described Kubernetes object",
+							Ref:         spec.MustCreateRef("#/definitions/autoscaling.CrossVersionObjectReference"),
+						},
+					},
+					"metricName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the name of the metric in question",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"targetValue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the target value of the metric (as a quantity)",
+							Ref:         spec.MustCreateRef("#/definitions/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"target", "metricName", "targetValue"},
+			},
+		},
+		Dependencies: []string{
+			"autoscaling.CrossVersionObjectReference", "resource.Quantity"},
+	},
+	"autoscaling.ObjectMetricStatus": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "a metric describing a Kubernetes object",
+				Properties: map[string]spec.Schema{
+					"target": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the described Kubernetes object",
+							Ref:         spec.MustCreateRef("#/definitions/autoscaling.CrossVersionObjectReference"),
+						},
+					},
+					"metricName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the name of the metric in question",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"targetValue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the current value of the metric (as a quantity)",
+							Ref:         spec.MustCreateRef("#/definitions/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"target", "metricName", "targetValue"},
+			},
+		},
+		Dependencies: []string{
+			"autoscaling.CrossVersionObjectReference", "resource.Quantity"},
+	},
+	"autoscaling.PodsMetricSource": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "metric describing pods in the scale target",
+				Properties: map[string]spec.Schema{
+					"metricName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the name of the metric in question",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"targetValue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the target value of the metric (as a quantity)",
+							Ref:         spec.MustCreateRef("#/definitions/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"metricName", "targetValue"},
+			},
+		},
+		Dependencies: []string{
+			"resource.Quantity"},
+	},
+	"autoscaling.PodsMetricStatus": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "metric describing pods in the scale target",
+				Properties: map[string]spec.Schema{
+					"metricName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the name of the metric in question",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"targetValue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the current value of the metric (as a quantity)",
+							Ref:         spec.MustCreateRef("#/definitions/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"metricName", "targetValue"},
+			},
+		},
+		Dependencies: []string{
+			"resource.Quantity"},
+	},
+	"autoscaling.ResourceMetricSource": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "resource metric describing pods in the scale target (guaranteed to be available and have the same names across clusters)",
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the name of the resource in question",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"targetPercentageOfRequest": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the target value of the resource metric as a percentage of the request on the pods",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"targetRawValue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the target value of the resource metric as a raw value",
+							Ref:         spec.MustCreateRef("#/definitions/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+		Dependencies: []string{
+			"resource.Quantity"},
+	},
+	"autoscaling.ResourceMetricStatus": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "resource metric describing pods in the scale target",
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the name of the resource in question",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"targetPercentageOfRequest": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the target value of the resource metric as a percentage of the request on the pods (only populated if request is available)",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"targetRawValue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the target value of the resource metric as a raw value",
+							Ref:         spec.MustCreateRef("#/definitions/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"name", "targetRawValue"},
+			},
+		},
+		Dependencies: []string{
+			"resource.Quantity"},
 	},
 	"autoscaling.Scale": {
 		Schema: spec.Schema{
@@ -18325,6 +18587,195 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{},
 	},
+	"v2alpha1.CrossVersionObjectReference": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "contains enough information to let you identify a resource in the current namespace",
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds\"",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "API version of the referent",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"kind", "name"},
+			},
+		},
+		Dependencies: []string{},
+	},
+	"v2alpha1.HorizontalPodAutoscaler": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "configuration of a horizontal pod autoscaler.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.",
+							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.HorizontalPodAutoscalerSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "current information about the autoscaler.",
+							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.HorizontalPodAutoscalerStatus"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"v1.ObjectMeta", "v2alpha1.HorizontalPodAutoscalerSpec", "v2alpha1.HorizontalPodAutoscalerStatus"},
+	},
+	"v2alpha1.HorizontalPodAutoscalerList": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "list of horizontal pod autoscaler objects.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata.",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "list of horizontal pod autoscaler objects.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/v2alpha1.HorizontalPodAutoscaler"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"unversioned.ListMeta", "v2alpha1.HorizontalPodAutoscaler"},
+	},
+	"v2alpha1.HorizontalPodAutoscalerSpec": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "specification of a horizontal pod autoscaler",
+				Properties: map[string]spec.Schema{
+					"scaleTargetRef": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the target scalable object to autoscale",
+							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.CrossVersionObjectReference"),
+						},
+					},
+					"minReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the minimum number of replicas to which the autoscaler may scale",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"maxReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the maximum number of replicas to which the autoscaler may scale",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"metrics": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the metrics to use to calculate the desired replica count (the maximum replica count across all metrics will be used).  It is expected that any metrics used will decrease as the replica count increases, and will eventually increase if we decrease the replica count.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/v2alpha1.MetricSpec"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"scaleTargetRef", "maxReplicas", "metrics"},
+			},
+		},
+		Dependencies: []string{
+			"v2alpha1.CrossVersionObjectReference", "v2alpha1.MetricSpec"},
+	},
+	"v2alpha1.HorizontalPodAutoscalerStatus": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "the status of a horizontal pod autoscaler",
+				Properties: map[string]spec.Schema{
+					"observedGeneration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "most recent generation observed by this autoscaler.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"lastScaleTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "last time the HorizontalPodAutoscaler scaled the number of pods; used by the autoscaler to control how often the number of pods is changed.",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.Time"),
+						},
+					},
+					"currentReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the last observed number of replicas from the target object.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"desiredReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the desired number of replicas as last computed by the autoscaler",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"currentMetrics": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the last read state of the metrics used by this autoscaler",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/v2alpha1.MetricStatus"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"currentReplicas", "desiredReplicas", "currentMetrics"},
+			},
+		},
+		Dependencies: []string{
+			"unversioned.Time", "v2alpha1.MetricStatus"},
+	},
 	"v2alpha1.Job": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -18591,6 +19042,256 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{
 			"v1.ObjectMeta", "v2alpha1.JobSpec"},
+	},
+	"v2alpha1.MetricSpec": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "a specification for how to scale based on a single metric (only `type` and one other matching field should be set at once)",
+				Properties: map[string]spec.Schema{
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the type of metric source (should match one of the fields below)",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"object": {
+						SchemaProps: spec.SchemaProps{
+							Description: "metric describing a single Kubernetes object",
+							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.ObjectMetricSource"),
+						},
+					},
+					"pods": {
+						SchemaProps: spec.SchemaProps{
+							Description: "metric describing pods in the scale target",
+							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.PodsMetricSource"),
+						},
+					},
+					"resource": {
+						SchemaProps: spec.SchemaProps{
+							Description: "resource metric describing pods in the scale target (guaranteed to be available and have the same names across clusters)",
+							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.ResourceMetricSource"),
+						},
+					},
+				},
+				Required: []string{"type", "object", "pods", "resource"},
+			},
+		},
+		Dependencies: []string{
+			"v2alpha1.ObjectMetricSource", "v2alpha1.PodsMetricSource", "v2alpha1.ResourceMetricSource"},
+	},
+	"v2alpha1.MetricStatus": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "the status of a single metric",
+				Properties: map[string]spec.Schema{
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the type of metric source (should match one of the fields below)",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"object": {
+						SchemaProps: spec.SchemaProps{
+							Description: "metric describing a single Kubernetes object",
+							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.ObjectMetricStatus"),
+						},
+					},
+					"pods": {
+						SchemaProps: spec.SchemaProps{
+							Description: "metric describing pods in the scale target",
+							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.PodsMetricStatus"),
+						},
+					},
+					"resource": {
+						SchemaProps: spec.SchemaProps{
+							Description: "resource metric describing pods in the scale target (guaranteed to be available and have the same names across clusters)",
+							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.ResourceMetricStatus"),
+						},
+					},
+				},
+				Required: []string{"type", "object", "pods", "resource"},
+			},
+		},
+		Dependencies: []string{
+			"v2alpha1.ObjectMetricStatus", "v2alpha1.PodsMetricStatus", "v2alpha1.ResourceMetricStatus"},
+	},
+	"v2alpha1.ObjectMetricSource": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "a metric describing a Kubernetes object",
+				Properties: map[string]spec.Schema{
+					"target": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the described Kubernetes object",
+							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.CrossVersionObjectReference"),
+						},
+					},
+					"metricName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the name of the metric in question",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"targetValue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the target value of the metric (as a quantity)",
+							Ref:         spec.MustCreateRef("#/definitions/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"target", "metricName", "targetValue"},
+			},
+		},
+		Dependencies: []string{
+			"resource.Quantity", "v2alpha1.CrossVersionObjectReference"},
+	},
+	"v2alpha1.ObjectMetricStatus": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "a metric describing a Kubernetes object",
+				Properties: map[string]spec.Schema{
+					"target": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the described Kubernetes object",
+							Ref:         spec.MustCreateRef("#/definitions/v2alpha1.CrossVersionObjectReference"),
+						},
+					},
+					"metricName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the name of the metric in question",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"currentValue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the target value of the metric (as a quantity)",
+							Ref:         spec.MustCreateRef("#/definitions/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"target", "metricName", "currentValue"},
+			},
+		},
+		Dependencies: []string{
+			"resource.Quantity", "v2alpha1.CrossVersionObjectReference"},
+	},
+	"v2alpha1.PodsMetricSource": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "metric describing pods in the scale target",
+				Properties: map[string]spec.Schema{
+					"metricName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the name of the metric in question",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"targetValue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the target value of the metric (as a quantity)",
+							Ref:         spec.MustCreateRef("#/definitions/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"metricName", "targetValue"},
+			},
+		},
+		Dependencies: []string{
+			"resource.Quantity"},
+	},
+	"v2alpha1.PodsMetricStatus": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "metric describing pods in the scale target",
+				Properties: map[string]spec.Schema{
+					"metricName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the name of the metric in question",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"currentValue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the current value of the metric (as a quantity)",
+							Ref:         spec.MustCreateRef("#/definitions/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"metricName", "currentValue"},
+			},
+		},
+		Dependencies: []string{
+			"resource.Quantity"},
+	},
+	"v2alpha1.ResourceMetricSource": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "resource metric describing pods in the scale target (guaranteed to be available and have the same names across clusters)",
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the name of the resource in question",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"targetPercentageOfRequest": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the target value of the resource metric as a percentage of the request on the pods",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"targetRawValue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the target value of the resource metric as a raw value",
+							Ref:         spec.MustCreateRef("#/definitions/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+		Dependencies: []string{
+			"resource.Quantity"},
+	},
+	"v2alpha1.ResourceMetricStatus": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "resource metric describing pods in the scale target",
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the name of the resource in question",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"currentPercentageOfRequest": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the current value of the resource metric as a percentage of the request on the pods (only populated if request is available)",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"currentRawValue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "the target value of the resource metric as a raw value",
+							Ref:         spec.MustCreateRef("#/definitions/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+		Dependencies: []string{
+			"resource.Quantity"},
 	},
 	"v2alpha1.ScheduledJob": {
 		Schema: spec.Schema{

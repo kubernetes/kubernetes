@@ -12,12 +12,12 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["install.go"],
+    srcs = ["zz_generated.horizontalpodautoscaler.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/apimachinery/announced:go_default_library",
-        "//pkg/apis/autoscaling:go_default_library",
-        "//pkg/apis/autoscaling/v1:go_default_library",
+        "//pkg/api/errors:go_default_library",
         "//pkg/apis/autoscaling/v2alpha1:go_default_library",
+        "//pkg/client/cache:go_default_library",
+        "//pkg/labels:go_default_library",
     ],
 )
