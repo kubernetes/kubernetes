@@ -277,7 +277,7 @@ function upload-server-tars() {
     local staging_bucket="gs://kubernetes-staging-${project_hash}${suffix}"
 
     # Ensure the buckets are created
-    if ! gsutil ls "${staging_bucket}" ; then
+    if ! gsutil ls "${staging_bucket}" >/dev/null; then
       echo "Creating ${staging_bucket}"
       gsutil mb -l "${region}" "${staging_bucket}"
     fi
@@ -1167,6 +1167,7 @@ function check-cluster() {
 # returns the result of ssh command which removes replica
 function remove-replica-from-etcd() {
   local -r port="${1}"
+  [[ -n "${EXISTING_MASTER_NAME}" ]] || return
   gcloud compute ssh "${EXISTING_MASTER_NAME}" \
     --project "${PROJECT}" \
     --zone "${EXISTING_MASTER_ZONE}" \
