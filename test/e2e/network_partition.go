@@ -391,7 +391,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			pst := statefulSetTester{c: c}
-			pst.saturate(ps)
+			pst.waitForRunning(ps.Spec.Replicas, ps)
 
 			nn := framework.TestContext.CloudConfig.NumNodes
 			nodeNames, err := framework.CheckNodesReady(f.ClientSet, framework.NodeReadyInitialTimeout, nn)
@@ -408,7 +408,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			pst := statefulSetTester{c: c}
-			pst.saturate(ps)
+			pst.waitForRunning(ps.Spec.Replicas, ps)
 
 			pod := pst.getPodList(ps).Items[0]
 			node, err := c.Core().Nodes().Get(pod.Spec.NodeName)

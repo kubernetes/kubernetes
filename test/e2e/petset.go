@@ -114,6 +114,8 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 			petMounts := []api.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
 			podMounts := []api.VolumeMount{{Name: "home", MountPath: "/home"}}
 			ps := newStatefulSet(psName, ns, headlessSvcName, 3, petMounts, podMounts, labels)
+			setInitializedAnnotation(ps, "false")
+
 			_, err := c.Apps().StatefulSets(ns).Create(ps)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -147,6 +149,7 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 			petMounts := []api.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
 			podMounts := []api.VolumeMount{{Name: "home", MountPath: "/home"}}
 			ps := newStatefulSet(psName, ns, headlessSvcName, 2, petMounts, podMounts, labels)
+			setInitializedAnnotation(ps, "false")
 			_, err := c.Apps().StatefulSets(ns).Create(ps)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -311,6 +314,7 @@ var _ = framework.KubeDescribe("Pet set recreate [Slow] [Feature:PetSet]", func(
 
 		By("creating statefulset with conflicting port in namespace " + f.Namespace.Name)
 		ps := newStatefulSet(statefulSetName, f.Namespace.Name, headlessSvcName, 1, nil, nil, labels)
+		setInitializedAnnotation(ps, "false")
 		petContainer := &ps.Spec.Template.Spec.Containers[0]
 		petContainer.Ports = append(petContainer.Ports, conflictingPort)
 		ps.Spec.Template.Spec.NodeName = node.Name
@@ -897,10 +901,8 @@ func newStatefulSet(name, ns, governingSvcName string, replicas int32, petMounts
 			Replicas: replicas,
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
-					Labels: labels,
-					Annotations: map[string]string{
-						"pod.alpha.kubernetes.io/initialized": "false",
-					},
+					Labels:      labels,
+					Annotations: map[string]string{},
 				},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
@@ -917,4 +919,9 @@ func newStatefulSet(name, ns, governingSvcName string, replicas int32, petMounts
 			ServiceName:          governingSvcName,
 		},
 	}
+}
+
+func setInitializedAnnotation(ss *apps.StatefulSet, value string) {
+	framework.Logf("Setting annotation %v to %v in StatefulSet pod template", petset.StatefulSetInitAnnotation, value)
+	ss.Spec.Template.ObjectMeta.Annotations[petset.StatefulSetInitAnnotation] = value
 }
