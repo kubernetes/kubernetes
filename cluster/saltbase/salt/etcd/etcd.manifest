@@ -20,9 +20,9 @@
 {% endfor -%}
 {% set etcd_cluster = vars.etcd_cluster -%}
 {% set cluster_state = vars.cluster_state -%}
-{% set storage_backend = pillar.get('storage_backend', 'etcd2') -%}
+{% set storage_backend = pillar.get('storage_backend', 'etcd3') -%}
 {% set quota_bytes = '' -%}
-{% if pillar.get('storage_backend', 'etcd2') == 'etcd3' -%}
+{% if pillar.get('storage_backend', 'etcd3') == 'etcd3' -%}
   {% set quota_bytes = '--quota-backend-bytes=4294967296' -%}
 {% endif -%}
 {% set srv_kube_path = "/srv/kubernetes" -%}
