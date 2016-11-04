@@ -117,7 +117,7 @@ function download_tarball() {
   url="${DOWNLOAD_URL_PREFIX}/${file}"
   mkdir -p "${download_path}"
   if [[ $(which curl) ]]; then
-    curl -L --retry 3 --keepalive-time 2 "${url}" -o "${download_path}/${file}"
+    curl -fL --retry 3 --keepalive-time 2 "${url}" -o "${download_path}/${file}"
   elif [[ $(which wget) ]]; then
     wget "${url}" -O "${download_path}/${file}"
   else

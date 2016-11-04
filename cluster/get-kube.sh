@@ -18,7 +18,7 @@
 # Usage:
 #   wget -q -O - https://get.k8s.io | bash
 # or
-#   curl -sS https://get.k8s.io | bash
+#   curl -fsSL https://get.k8s.io | bash
 #
 # Advanced options
 #  Set KUBERNETES_PROVIDER to choose between different providers:
@@ -115,7 +115,7 @@ function get_latest_version_number {
   if [[ $(which wget) ]]; then
     wget -qO- "${latest_url}"
   elif [[ $(which curl) ]]; then
-    curl -Ssf --retry 3 --keepalive-time 2 "${latest_url}"
+    curl -sSfL --retry 3 --keepalive-time 2 "${latest_url}"
   else
     echo "Couldn't find curl or wget.  Bailing out." >&2
     exit 4
@@ -203,7 +203,7 @@ fi
 
 if "${need_download}"; then
   if [[ $(which curl) ]]; then
-    curl -L --retry 3 --keepalive-time 2 "${release_url}" -o "${file}"
+    curl -fL --retry 3 --keepalive-time 2 "${release_url}" -o "${file}"
   elif [[ $(which wget) ]]; then
     wget "${release_url}"
   else
