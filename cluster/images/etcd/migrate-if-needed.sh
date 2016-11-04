@@ -145,6 +145,18 @@ stop_etcd() {
 ATTACHLEASE="${ATTACHLEASE:-/usr/local/bin/attachlease}"
 ROLLBACK="${ROLLBACK:-/usr/local/bin/rollback}"
 
+# If we are upgrading from 2.2.1 and this is the first try for upgrade,
+# do the backup to allow restoring from it in case of failed upgrade.
+BACKUP_DIR="${DATA_DIRECTORY}/migration-backup"
+if [ "${CURRENT_VERSION}" = "2.2.1" -a ! -d "${BACKUP_DIR}" ]; then
+  echo "Backup etcd before starting migration"
+  mkdir ${BACKUP_DIR}
+  ETCDCTL_CMD="/usr/local/bin/etcdctl-2.2.1"
+  ETCDCTL_API=2 ${ETCDCTL_CMD} backup --data-dir=${DATA_DIRECTORY} \
+    --backup-dir=${BACKUP_DIR}
+  echo "Backup done in ${BACKUP_DIR}"
+fi
+
 # Do the roll-forward migration if needed.
 # The migration goes as following:
 # 1. for all versions starting one after the current version of etcd
