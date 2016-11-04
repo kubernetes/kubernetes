@@ -112,7 +112,7 @@ func TestStatefulSetControllerCreates(t *testing.T) {
 	}
 	checkPets(ps, replicas+1, 0, fc, t)
 	for _, pet := range fc.pets {
-		if r := getReplicas(pet.pod); r != ps.Spec.Replicas {
+		if r := getReplicasAnnotation(pet.pod); r != ps.Spec.Replicas {
 			t.Errorf("Expected %d replicas found %d", ps.Spec.Replicas, r)
 		}
 	}
@@ -143,7 +143,7 @@ func TestStatefulSetControllerDeletes(t *testing.T) {
 	}
 	checkPets(ps, replicas, replicas, fc, t)
 	for _, pet := range fc.pets {
-		if r := getReplicas(pet.pod); r != ps.Spec.Replicas {
+		if r := getReplicasAnnotation(pet.pod); r != ps.Spec.Replicas {
 			t.Errorf("Expected %d replicas found %d", ps.Spec.Replicas, r)
 		}
 	}
