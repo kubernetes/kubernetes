@@ -23,6 +23,7 @@ type EnvParams struct {
 	HostPKIPath       string
 	HostEtcdPath      string
 	HyperkubeImage    string
+	RepositoryPrefix  string
 	DiscoveryImage    string
 	EtcdImage         string
 	ComponentLoglevel string
