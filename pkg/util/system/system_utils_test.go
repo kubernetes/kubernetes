@@ -17,13 +17,30 @@ limitations under the License.
 package system
 
 import (
-	"regexp"
+	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 )
 
-// TODO: find a better way of figuring out if given node is a registered master.
-func IsMasterNode(node *api.Node) bool {
-	r := regexp.MustCompile("master(-...)?$")
-	return r.MatchString(node.Name)
+func TestIsMasterNode(t *testing.T) {
+	testCases := []struct {
+		input  string
+		result bool
+	}{
+		{"foo-master", true},
+		{"foo-master-", false},
+		{"foo-master-a", false},
+		{"foo-master-ab", false},
+		{"foo-master-abc", true},
+		{"foo-master-abdc", false},
+		{"foo-bar", false},
+	}
+
+	for _, tc := range testCases {
+		node := api.Node{ObjectMeta: api.ObjectMeta{Name: tc.input}}
+		res := IsMasterNode(&node)
+		if res != tc.result {
+			t.Errorf("case \"%s\": expected %t, got %t", tc.input, tc.result, res)
+		}
+	}
 }
