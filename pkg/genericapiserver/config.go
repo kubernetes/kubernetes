@@ -50,7 +50,6 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/genericapiserver/routes"
 	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
-	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/runtime"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -107,52 +106,24 @@ type Config struct {
 	// Note that it is up to the request handlers to ignore or honor this timeout. In seconds.
 	MinRequestTimeout int
 
-	// Number of masters running; all masters must be started with the
-	// same value for this field. (Numbers > 1 currently untested.)
-	MasterCount int
-
 	SecureServingInfo   *SecureServingInfo
 	InsecureServingInfo *ServingInfo
+
+	// DiscoveryAddresses is used to build the IPs pass to discovery.  If nil, the ExternalAddress is
+	// always reported
+	DiscoveryAddresses DiscoveryAddresses
 
 	// The port on PublicAddress where a read-write server will be installed.
 	// Defaults to 6443 if not set.
 	ReadWritePort int
 
-	// ExternalHost is the host name to use for external (public internet) facing URLs (e.g. Swagger)
-	ExternalHost string
+	// ExternalAddress is the host name to use for external (public internet) facing URLs (e.g. Swagger)
+	ExternalAddress string
 
 	// PublicAddress is the IP address where members of the cluster (kubelet,
 	// kube-proxy, services, etc.) can reach the GenericAPIServer.
 	// If nil or 0.0.0.0, the host's default interface will be used.
 	PublicAddress net.IP
-
-	// The range of IPs to be assigned to services with type=ClusterIP or greater
-	ServiceClusterIPRange *net.IPNet
-
-	// The IP address for the GenericAPIServer service (must be inside ServiceClusterIPRange)
-	ServiceReadWriteIP net.IP
-
-	// Port for the apiserver service.
-	ServiceReadWritePort int
-
-	// The range of ports to be assigned to services with type=NodePort or greater
-	ServiceNodePortRange utilnet.PortRange
-
-	// Additional ports to be exposed on the GenericAPIServer service
-	// extraServicePorts is injectable in the event that more ports
-	// (other than the default 443/tcp) are exposed on the GenericAPIServer
-	// and those ports need to be load balanced by the GenericAPIServer
-	// service because this pkg is linked by out-of-tree projects
-	// like openshift which want to use the GenericAPIServer but also do
-	// more stuff.
-	ExtraServicePorts []api.ServicePort
-	// Additional ports to be exposed on the GenericAPIServer endpoints
-	// Port names should align with ports defined in ExtraServicePorts
-	ExtraEndpointPorts []api.EndpointPort
-
-	// If non-zero, the "kubernetes" services uses this port as NodePort.
-	// TODO(sttts): move into master
-	KubernetesServiceNodePort int
 
 	// EnableOpenAPISupport enables OpenAPI support. Allow downstream customers to disable OpenAPI spec.
 	EnableOpenAPISupport bool
@@ -221,9 +192,7 @@ func NewConfig() *Config {
 
 	config := &Config{
 		Serializer:             api.Codecs,
-		MasterCount:            1,
 		ReadWritePort:          6443,
-		ServiceReadWritePort:   443,
 		RequestContextMapper:   api.NewRequestContextMapper(),
 		BuildHandlerChainsFunc: DefaultBuildHandlerChain,
 		LegacyAPIGroupPrefixes: sets.NewString(DefaultLegacyAPIPrefix),
@@ -317,14 +286,10 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 	c.EnableGarbageCollection = options.EnableGarbageCollection
 	c.EnableProfiling = options.EnableProfiling
 	c.EnableSwaggerUI = options.EnableSwaggerUI
-	c.ExternalHost = options.ExternalHost
-	c.KubernetesServiceNodePort = options.KubernetesServiceNodePort
-	c.MasterCount = options.MasterCount
+	c.ExternalAddress = options.ExternalHost
 	c.MaxRequestsInFlight = options.MaxRequestsInFlight
 	c.MinRequestTimeout = options.MinRequestTimeout
 	c.PublicAddress = options.AdvertiseAddress
-	c.ServiceClusterIPRange = &options.ServiceClusterIPRange
-	c.ServiceNodePortRange = options.ServiceNodePortRange
 	c.SupportsBasicAuth = len(options.BasicAuthFile) > 0
 
 	return c
@@ -337,41 +302,12 @@ type completedConfig struct {
 // Complete fills in any fields not set that are required to have valid data and can be derived
 // from other fields.  If you're going to `ApplyOptions`, do that first.  It's mutating the receiver.
 func (c *Config) Complete() completedConfig {
-	if c.ServiceClusterIPRange == nil || c.ServiceClusterIPRange.IP == nil {
-		defaultNet := "10.0.0.0/24"
-		glog.Warningf("Network range for service cluster IPs is unspecified. Defaulting to %v.", defaultNet)
-		_, serviceClusterIPRange, err := net.ParseCIDR(defaultNet)
-		if err != nil {
-			glog.Fatalf("Unable to parse CIDR: %v", err)
-		}
-		if size := ipallocator.RangeSize(serviceClusterIPRange); size < 8 {
-			glog.Fatalf("The service cluster IP range must be at least %d IP addresses", 8)
-		}
-		c.ServiceClusterIPRange = serviceClusterIPRange
-	}
-	if c.ServiceReadWriteIP == nil {
-		// Select the first valid IP from ServiceClusterIPRange to use as the GenericAPIServer service IP.
-		serviceReadWriteIP, err := ipallocator.GetIndexedIP(c.ServiceClusterIPRange, 1)
-		if err != nil {
-			glog.Fatalf("Failed to generate service read-write IP for GenericAPIServer service: %v", err)
-		}
-		glog.V(4).Infof("Setting GenericAPIServer service IP to %q (read-write).", serviceReadWriteIP)
-		c.ServiceReadWriteIP = serviceReadWriteIP
-	}
-	if c.ServiceNodePortRange.Size == 0 {
-		// TODO: Currently no way to specify an empty range (do we need to allow this?)
-		// We should probably allow this for clouds that don't require NodePort to do load-balancing (GCE)
-		// but then that breaks the strict nestedness of ServiceType.
-		// Review post-v1
-		c.ServiceNodePortRange = options.DefaultServiceNodePortRange
-		glog.Infof("Node port range unspecified. Defaulting to %v.", c.ServiceNodePortRange)
-	}
-	if len(c.ExternalHost) == 0 && c.PublicAddress != nil {
+	if len(c.ExternalAddress) == 0 && c.PublicAddress != nil {
 		hostAndPort := c.PublicAddress.String()
 		if c.ReadWritePort != 0 {
 			hostAndPort = net.JoinHostPort(hostAndPort, strconv.Itoa(c.ReadWritePort))
 		}
-		c.ExternalHost = hostAndPort
+		c.ExternalAddress = hostAndPort
 	}
 	// All APIs will have the same authentication for now.
 	if c.OpenAPIConfig != nil && c.OpenAPIConfig.SecurityDefinitions != nil {
@@ -395,6 +331,10 @@ func (c *Config) Complete() completedConfig {
 			}
 		}
 	}
+	if c.DiscoveryAddresses == nil {
+		c.DiscoveryAddresses = DefaultDiscoveryAddresses{DefaultAddress: c.ExternalAddress}
+	}
+
 	return completedConfig{c}
 }
 
@@ -431,7 +371,7 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 	}
 
 	s := &GenericAPIServer{
-		ServiceClusterIPRange:  c.ServiceClusterIPRange,
+		discoveryAddresses:     c.DiscoveryAddresses,
 		LoopbackClientConfig:   c.LoopbackClientConfig,
 		legacyAPIGroupPrefixes: c.LegacyAPIGroupPrefixes,
 		admissionControl:       c.AdmissionControl,
@@ -441,15 +381,11 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 		minRequestTimeout:    time.Duration(c.MinRequestTimeout) * time.Second,
 		enableSwaggerSupport: c.EnableSwaggerSupport,
 
-		MasterCount:          c.MasterCount,
-		SecureServingInfo:    c.SecureServingInfo,
-		InsecureServingInfo:  c.InsecureServingInfo,
-		ExternalAddress:      c.ExternalHost,
-		ServiceReadWriteIP:   c.ServiceReadWriteIP,
-		ServiceReadWritePort: c.ServiceReadWritePort,
+		SecureServingInfo:   c.SecureServingInfo,
+		InsecureServingInfo: c.InsecureServingInfo,
+		ExternalAddress:     c.ExternalAddress,
 
-		KubernetesServiceNodePort: c.KubernetesServiceNodePort,
-		apiGroupsForDiscovery:     map[string]unversioned.APIGroup{},
+		apiGroupsForDiscovery: map[string]unversioned.APIGroup{},
 
 		enableOpenAPISupport: c.EnableOpenAPISupport,
 		openAPIConfig:        c.OpenAPIConfig,
@@ -467,12 +403,11 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 }
 
 // MaybeGenerateServingCerts generates serving certificates if requested and needed.
-func (c completedConfig) MaybeGenerateServingCerts() error {
+func (c completedConfig) MaybeGenerateServingCerts(alternateIPs ...net.IP) error {
 	// It would be nice to set a fqdn subject alt name, but only the kubelets know, the apiserver is clueless
 	// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
 	if c.SecureServingInfo != nil && c.SecureServingInfo.ServerCert.Generate && !certutil.CanReadCertOrKey(c.SecureServingInfo.ServerCert.CertFile, c.SecureServingInfo.ServerCert.KeyFile) {
 		// TODO (cjcullen): Is ClusterIP the right address to sign a cert with?
-		alternateIPs := []net.IP{c.ServiceReadWriteIP}
 		alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes", "localhost"}
 
 		if cert, key, err := certutil.GenerateSelfSignedCertKey(c.PublicAddress.String(), alternateIPs, alternateDNS); err != nil {
@@ -555,7 +490,7 @@ func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
 	}
 	glog.Infof("Will report %v as public IP address.", options.AdvertiseAddress)
 
-	// Set default value for ExternalHost if not specified.
+	// Set default value for ExternalAddress if not specified.
 	if len(options.ExternalHost) == 0 {
 		// TODO: extend for other providers
 		if options.CloudProvider == "gce" {
