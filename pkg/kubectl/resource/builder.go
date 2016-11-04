@@ -301,6 +301,13 @@ func (b *Builder) AllNamespaces(allNamespace bool) *Builder {
 	return b
 }
 
+// AllowNamespacePrefix instruct the builder to accept namespace parameter also with namespace/
+// prefix.
+func (b *Builder) AllowNamespacePrefix() *Builder {
+	b.namespace = strings.TrimPrefix(b.namespace, "namespace/")
+	return b
+}
+
 // RequireNamespace instructs the builder to set the namespace value for any object found
 // to NamespaceParam() if empty, and if the value on the resource does not match
 // NamespaceParam() an error will be returned.
