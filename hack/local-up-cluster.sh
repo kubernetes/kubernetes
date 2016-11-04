@@ -475,9 +475,11 @@ function start_kubelet {
       # Docker won't run a container with a cidfile (container id file)
       # unless that file does not already exist; clean up an existing
       # dockerized kubelet that might be running.
+      test_docker
+
       cleanup_dockerized_kubelet
       cred_bind=""
-      # path to cloud credentails.
+      # path to cloud credentials.
       cloud_cred=""
       if [ "${CLOUD_PROVIDER}" == "aws" ]; then
           cloud_cred="${HOME}/.aws/credentials"
@@ -609,7 +611,9 @@ EOF
 fi
 }
 
-test_docker
+if [[ "${CONTAINER_RUNTIME}" == "docker" ]] || [[ -z "${CONTAINER_RUNTIME}" ]]; then
+  test_docker
+fi
 
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
   test_apiserver_off
