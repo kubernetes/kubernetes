@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"sort"
@@ -62,6 +63,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/rkt"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
+	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -527,8 +529,9 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 
 		switch kubeCfg.ContainerRuntime {
 		case "docker":
+			streamingConfig := getStreamingConfig(kubeCfg, kubeDeps)
 			// Use the new CRI shim for docker.
-			ds, err := dockershim.NewDockerService(klet.dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage, nil, &pluginSettings, kubeCfg.RuntimeCgroups)
+			ds, err := dockershim.NewDockerService(klet.dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage, streamingConfig, &pluginSettings, kubeCfg.RuntimeCgroups)
 			if err != nil {
 				return nil, err
 			}
@@ -538,6 +541,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 				return nil, err
 			}
 
+			klet.criHandler = ds
 			rs := ds.(internalApi.RuntimeService)
 			is := ds.(internalApi.ImageManagerService)
 			// This is an internal knob to switch between grpc and non-grpc
@@ -1074,6 +1078,9 @@ type Kubelet struct {
 
 	// The AppArmor validator for checking whether AppArmor is supported.
 	appArmorValidator apparmor.Validator
+
+	// The handler serving CRI streaming calls (exec/attach/port-forward).
+	criHandler http.Handler
 }
 
 // setupDataDirs creates:
@@ -2064,7 +2071,7 @@ func (kl *Kubelet) ResyncInterval() time.Duration {
 
 // ListenAndServe runs the kubelet HTTP server.
 func (kl *Kubelet) ListenAndServe(address net.IP, port uint, tlsOptions *server.TLSOptions, auth server.AuthInterface, enableDebuggingHandlers bool) {
-	server.ListenAndServeKubeletServer(kl, kl.resourceAnalyzer, address, port, tlsOptions, auth, enableDebuggingHandlers, kl.containerRuntime)
+	server.ListenAndServeKubeletServer(kl, kl.resourceAnalyzer, address, port, tlsOptions, auth, enableDebuggingHandlers, kl.containerRuntime, kl.criHandler)
 }
 
 // ListenAndServeReadOnly runs the kubelet HTTP server in read-only mode.
@@ -2129,4 +2136,21 @@ func ParseReservation(kubeReserved, systemReserved utilconfig.ConfigurationMap) 
 		reservation.System = rl
 	}
 	return reservation, nil
+}
+
+// Gets the streaming server configuration to use with in-process CRI shims.
+func getStreamingConfig(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *KubeletDeps) *streaming.Config {
+	config := &streaming.Config{
+		// Use a relative redirect (no scheme or host).
+		BaseURL: &url.URL{
+			Path: "/cri/",
+		},
+		StreamIdleTimeout:     kubeCfg.StreamingConnectionIdleTimeout.Duration,
+		StreamCreationTimeout: streaming.DefaultConfig.StreamCreationTimeout,
+		SupportedProtocols:    streaming.DefaultConfig.SupportedProtocols,
+	}
+	if kubeDeps.TLSOptions != nil {
+		config.TLSConfig = kubeDeps.TLSOptions.Config
+	}
+	return config
 }
