@@ -438,31 +438,35 @@ func (dc *DeploymentController) scale(deployment *extensions.Deployment, newRS *
 		// drives what happens in case we are trying to scale replica sets of the same size.
 		// In such a case when scaling up, we should scale up newer replica sets first, and
 		// when scaling down, we should scale down older replica sets first.
-		scalingOperation := "up"
+		var scalingOperation string
 		switch {
 		case deploymentReplicasToAdd > 0:
 			sort.Sort(controller.ReplicaSetsBySizeNewer(allRSs))
+			scalingOperation = "up"
 
 		case deploymentReplicasToAdd < 0:
 			sort.Sort(controller.ReplicaSetsBySizeOlder(allRSs))
 			scalingOperation = "down"
-
-		default: /* deploymentReplicasToAdd == 0 */
-			// Nothing to add.
-			return nil
 		}
 
 		// Iterate over all active replica sets and estimate proportions for each of them.
 		// The absolute value of deploymentReplicasAdded should never exceed the absolute
 		// value of deploymentReplicasToAdd.
 		deploymentReplicasAdded := int32(0)
+		nameToSize := make(map[string]int32)
 		for i := range allRSs {
 			rs := allRSs[i]
 
-			proportion := deploymentutil.GetProportion(rs, *deployment, deploymentReplicasToAdd, deploymentReplicasAdded)
+			// Estimate proportions if we have replicas to add, otherwise simply populate
+			// nameToSize with the current sizes for each replica set.
+			if deploymentReplicasToAdd != 0 {
+				proportion := deploymentutil.GetProportion(rs, *deployment, deploymentReplicasToAdd, deploymentReplicasAdded)
 
-			rs.Spec.Replicas += proportion
-			deploymentReplicasAdded += proportion
+				nameToSize[rs.Name] = rs.Spec.Replicas + proportion
+				deploymentReplicasAdded += proportion
+			} else {
+				nameToSize[rs.Name] = rs.Spec.Replicas
+			}
 		}
 
 		// Update all replica sets
@@ -470,15 +474,16 @@ func (dc *DeploymentController) scale(deployment *extensions.Deployment, newRS *
 			rs := allRSs[i]
 
 			// Add/remove any leftovers to the largest replica set.
-			if i == 0 {
+			if i == 0 && deploymentReplicasToAdd != 0 {
 				leftover := deploymentReplicasToAdd - deploymentReplicasAdded
-				rs.Spec.Replicas += leftover
-				if rs.Spec.Replicas < 0 {
-					rs.Spec.Replicas = 0
+				nameToSize[rs.Name] = nameToSize[rs.Name] + leftover
+				if nameToSize[rs.Name] < 0 {
+					nameToSize[rs.Name] = 0
 				}
 			}
 
-			if _, err := dc.scaleReplicaSet(rs, rs.Spec.Replicas, deployment, scalingOperation); err != nil {
+			// TODO: Use transactions when we have them.
+			if _, err := dc.scaleReplicaSet(rs, nameToSize[rs.Name], deployment, scalingOperation); err != nil {
 				// Return as soon as we fail, the deployment is requeued
 				return err
 			}
@@ -503,12 +508,21 @@ func (dc *DeploymentController) scaleReplicaSetAndRecordEvent(rs *extensions.Rep
 }
 
 func (dc *DeploymentController) scaleReplicaSet(rs *extensions.ReplicaSet, newScale int32, deployment *extensions.Deployment, scalingOperation string) (*extensions.ReplicaSet, error) {
-	// NOTE: This mutates the ReplicaSet passed in. Not sure if that's a good idea.
-	rs.Spec.Replicas = newScale
-	deploymentutil.SetReplicasAnnotations(rs, deployment.Spec.Replicas, deployment.Spec.Replicas+deploymentutil.MaxSurge(*deployment))
-	rs, err := dc.client.Extensions().ReplicaSets(rs.Namespace).Update(rs)
-	if err == nil {
-		dc.eventRecorder.Eventf(deployment, api.EventTypeNormal, "ScalingReplicaSet", "Scaled %s replica set %q to %d", scalingOperation, rs.Name, newScale)
+	objCopy, err := api.Scheme.Copy(rs)
+	if err != nil {
+		return nil, err
+	}
+	rsCopy := objCopy.(*extensions.ReplicaSet)
+
+	sizeNeedsUpdate := rsCopy.Spec.Replicas != newScale
+	annotationsNeedUpdate := deploymentutil.SetReplicasAnnotations(rsCopy, deployment.Spec.Replicas, deployment.Spec.Replicas+deploymentutil.MaxSurge(*deployment))
+
+	if sizeNeedsUpdate || annotationsNeedUpdate {
+		rsCopy.Spec.Replicas = newScale
+		rs, err = dc.client.Extensions().ReplicaSets(rsCopy.Namespace).Update(rsCopy)
+		if err == nil && sizeNeedsUpdate {
+			dc.eventRecorder.Eventf(deployment, api.EventTypeNormal, "ScalingReplicaSet", "Scaled %s replica set %q to %d", scalingOperation, rs.Name, newScale)
+		}
 	}
 	return rs, err
 }
