@@ -189,7 +189,7 @@ func TestApplyObject(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/version" && m == "GET":
-				resp, err := genServerVersionResponse(serverVersion_1_5_0)
+				resp, err := genResponseWithJsonEncodedBody(serverVersion_1_5_0)
 				if err != nil {
 					t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
 				}
@@ -238,7 +238,7 @@ func TestApplyRetry(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/version" && m == "GET":
-				resp, err := genServerVersionResponse(serverVersion_1_5_0)
+				resp, err := genResponseWithJsonEncodedBody(serverVersion_1_5_0)
 				if err != nil {
 					t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
 				}
@@ -297,7 +297,7 @@ func TestApplyNonExistObject(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/version" && m == "GET":
-				resp, err := genServerVersionResponse(serverVersion_1_5_0)
+				resp, err := genResponseWithJsonEncodedBody(serverVersion_1_5_0)
 				if err != nil {
 					t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
 				}
@@ -353,7 +353,7 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/version" && m == "GET":
-				resp, err := genServerVersionResponse(serverVersion_1_5_0)
+				resp, err := genResponseWithJsonEncodedBody(serverVersion_1_5_0)
 				if err != nil {
 					t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
 				}

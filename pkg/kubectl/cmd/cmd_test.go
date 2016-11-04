@@ -116,8 +116,8 @@ func objBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
 	return ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, obj))))
 }
 
-func jsonBody(bytesBody []byte) io.ReadCloser {
-	return ioutil.NopCloser(bytes.NewReader(bytesBody))
+func bytesBody(bodyBytes []byte) io.ReadCloser {
+	return ioutil.NopCloser(bytes.NewReader(bodyBytes))
 }
 
 func stringBody(body string) io.ReadCloser {
@@ -627,10 +627,10 @@ func TestNormalizationFuncGlobalExistence(t *testing.T) {
 	}
 }
 
-func genServerVersionResponse(serverVersion version.Info) (*http.Response, error) {
-	jsonBytes, err := json.Marshal(serverVersion)
+func genResponseWithJsonEncodedBody(bodyStruct interface{}) (*http.Response, error) {
+	jsonBytes, err := json.Marshal(bodyStruct)
 	if err != nil {
 		return nil, err
 	}
-	return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: jsonBody(jsonBytes)}, nil
+	return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bytesBody(jsonBytes)}, nil
 }

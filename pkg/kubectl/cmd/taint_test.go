@@ -262,7 +262,7 @@ func TestTaint(t *testing.T) {
 				m := &MyReq{req}
 				switch {
 				case m.isFor("GET", "/version"):
-					resp, err := genServerVersionResponse(serverVersion_1_5_0)
+					resp, err := genResponseWithJsonEncodedBody(serverVersion_1_5_0)
 					if err != nil {
 						t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
 					}
