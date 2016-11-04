@@ -66,22 +66,11 @@ const (
 // GCE Quota requirements: 3 pds, one per pet manifest declared above.
 // GCE Api requirements: nodes and master need storage r/w permissions.
 var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
-	options := framework.FrameworkOptions{
-		GroupVersion: &unversioned.GroupVersion{Group: apps.GroupName, Version: "v1beta1"},
-	}
-	f := framework.NewFramework("petset", options, nil)
+	f := framework.NewDefaultFramework("statefulset")
 	var ns string
 	var c clientset.Interface
 
 	BeforeEach(func() {
-		// StatefulSet is in alpha, so it's disabled on some platforms. We skip this
-		// test if a resource get fails on non-GCE platforms.
-		// In theory, tests that restart pets should pass on any platform with a
-		// dynamic volume provisioner.
-		if !framework.ProviderIs("gce") {
-			framework.SkipIfMissingResource(f.ClientPool, unversioned.GroupVersionResource{Group: apps.GroupName, Version: "v1beta1", Resource: "statefulsets"}, f.Namespace.Name)
-		}
-
 		c = f.ClientSet
 		ns = f.Namespace.Name
 	})
