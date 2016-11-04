@@ -178,7 +178,7 @@ KUBE_UP_AUTOMATIC_CLEANUP=${KUBE_UP_AUTOMATIC_CLEANUP:-false}
 TEST_CLUSTER="${TEST_CLUSTER:-true}"
 
 # Storage backend. 'etcd2' supported, 'etcd3' experimental.
-STORAGE_BACKEND=${STORAGE_BACKEND:-etcd2}
+STORAGE_BACKEND=${STORAGE_BACKEND:-}
 
 # OpenContrail networking plugin specific settings
 NETWORK_PROVIDER="${NETWORK_PROVIDER:-kubenet}" # none, opencontrail, kubenet
