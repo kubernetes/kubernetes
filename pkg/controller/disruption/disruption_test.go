@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"runtime/debug"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/util/workqueue"
 )
 
 type pdbStates map[string]policy.PodDisruptionBudget
@@ -518,4 +520,31 @@ func TestPDBNotExist(t *testing.T) {
 	if err := dc.sync("notExist"); err != nil {
 		t.Errorf("Unexpected error: %v, expect nil", err)
 	}
+}
+
+func TestUpdateDisruptedPods(t *testing.T) {
+	dc, ps := newFakeDisruptionController()
+	dc.recheckQueue = workqueue.NewNamedDelayingQueue("pdb-queue")
+	pdb, pdbName := newPodDisruptionBudget(t, intstr.FromInt(1))
+	currentTime := time.Now()
+	pdb.Status.DisruptedPods = map[string]unversioned.Time{
+		"p1":       unversioned.Time{Time: currentTime},                       // Should be removed, pod deletion started.
+		"p2":       unversioned.Time{Time: currentTime.Add(-5 * time.Minute)}, // Should be removed, expired.
+		"p3":       unversioned.Time{Time: currentTime},                       // Should remain, pod untouched.
+		"notthere": unversioned.Time{Time: currentTime},                       // Should be removed, pod deleted.
+	}
+	add(t, dc.pdbLister.Store, pdb)
+
+	pod1, _ := newPod(t, "p1")
+	pod1.DeletionTimestamp = &unversioned.Time{Time: time.Now()}
+	pod2, _ := newPod(t, "p2")
+	pod3, _ := newPod(t, "p3")
+
+	add(t, dc.podLister.Indexer, pod1)
+	add(t, dc.podLister.Indexer, pod2)
+	add(t, dc.podLister.Indexer, pod3)
+
+	dc.sync(pdbName)
+
+	ps.VerifyPdbStatus(t, pdbName, 0, 1, 1, 3, map[string]unversioned.Time{"p3": unversioned.Time{Time: currentTime}})
 }
