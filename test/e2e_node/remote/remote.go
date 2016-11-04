@@ -273,6 +273,7 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 		return "", false, fmt.Errorf("Issue detecting node's OS via node's /etc/os-release. Err: %v, Output:\n%s", err, output)
 	}
 	if strings.Contains(output, "ID=gci") {
+		glog.Infof("GCI node and GCI mounter both detected, modifying --experimental-mounter-path accordingly")
 		// Note this implicitly requires the script to be where we expect in the tarball, so if that location changes the error
 		// here will tell us to update the remote test runner.
 		mounterPath := filepath.Join(tmp, "cluster/gce/gci/mounter/mounter")
@@ -284,9 +285,6 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 		// Insert args at beginning of testArgs, so any values from command line take precedence
 		testArgs = fmt.Sprintf("--experimental-mounter-rootfs-path=%s ", mounterRootfsPath) + testArgs
 		testArgs = fmt.Sprintf("--experimental-mounter-path=%s ", mounterPath) + testArgs
-
-		// Temporarily disabled (associated Kubelet flags commented out in k8s.io/kubernetes/test/e2e_node/services/services.go):
-		// glog.Infof("GCI node and GCI mounter both detected, setting --experimental-mounter-path=%q and --experimental-mounter-rootfs-path=%q accordingly", mounterPath, mounterRootfsPath)
 	}
 
 	// Run the tests

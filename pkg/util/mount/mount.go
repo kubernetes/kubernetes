@@ -30,7 +30,7 @@ import (
 
 const (
 	// Default mount command if mounter path is not specified
-	mount = "mount"
+	defaultMountCommand = "mount"
 )
 
 type Interface interface {
@@ -94,25 +94,16 @@ func (mounter *SafeFormatAndMount) FormatAndMount(source string, target string, 
 }
 
 // New returns a mount.Interface for the current system.
-func New() Interface {
-	return &Mounter{}
-}
-
-// NewCustomMounter returns a mount.Interface for the current system.
 // It provides options to override the default mounter behavior.
 // mounterPath allows using an alternative to `/bin/mount` for mounting.
-// mounterRootfsPath allows specifying a custom root filesystem path for non default `mounterPath`.
-func NewCustomMounter(mounterPath, mounterRootfsPath string) Interface {
+func New(mounterPath string) Interface {
 	// If mounter-path flag is not set, use default mount path
 	if mounterPath == "" {
-		mounterPath = mount
+		mounterPath = defaultMountCommand
 	}
-	if mounterRootfsPath == "" {
-		mounterRootfsPath = "/"
-	}
+
 	return &Mounter{
-		mounterPath:       mounterPath,
-		mounterRootfsPath: mounterRootfsPath,
+		mounterPath: mounterPath,
 	}
 }
 
