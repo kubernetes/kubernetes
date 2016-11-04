@@ -68,8 +68,8 @@ func init() {
 	signalToNodeCondition[SignalMemoryAvailable] = api.NodeMemoryPressure
 	signalToNodeCondition[SignalImageFsAvailable] = api.NodeDiskPressure
 	signalToNodeCondition[SignalNodeFsAvailable] = api.NodeDiskPressure
-	signalToNodeCondition[SignalImageFsInodesFree] = api.NodeInodePressure
-	signalToNodeCondition[SignalNodeFsInodesFree] = api.NodeInodePressure
+	signalToNodeCondition[SignalImageFsInodesFree] = api.NodeDiskPressure
+	signalToNodeCondition[SignalNodeFsInodesFree] = api.NodeDiskPressure
 
 	// map signals to resources (and vice-versa)
 	signalToResource = map[Signal]api.ResourceName{}
