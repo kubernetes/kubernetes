@@ -75,8 +75,8 @@ func NewNamespaceController(
 		{Group: "", Version: "v1", Resource: "bindings"},
 	}
 	for _, ignoredGroupVersionResource := range ignoredGroupVersionResources {
-		opCache[operationKey{op: operationDeleteCollection, gvr: ignoredGroupVersionResource}] = true
-		opCache[operationKey{op: operationList, gvr: ignoredGroupVersionResource}] = true
+		opCache.setSupported(operationKey{op: operationDeleteCollection, gvr: ignoredGroupVersionResource})
+		opCache.setSupported(operationKey{op: operationList, gvr: ignoredGroupVersionResource})
 	}
 
 	// create the controller so we can inject the enqueue function
