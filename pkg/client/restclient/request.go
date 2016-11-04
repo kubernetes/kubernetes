@@ -33,11 +33,9 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	pathvalidation "k8s.io/kubernetes/pkg/api/validation/path"
-	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/client/metrics"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -553,32 +551,13 @@ func (r *Request) Body(obj interface{}) *Request {
 		if reflect.ValueOf(t).IsNil() {
 			return r
 		}
-		switch typedObj := t.(type) {
-		// hack for eviction
-		// TODO: remove this when we find a better way to encode eviction properly.
-		case *policy.Eviction:
-			codec, err := testapi.GetCodecForObject(typedObj)
-			if err != nil {
-				r.err = err
-				return r
-			}
-			var buffer bytes.Buffer
-			err = codec.Encode(typedObj, &buffer)
-			if err != nil {
-				r.err = err
-				return r
-			}
-			glog.V(8).Infof("Request Body: %#v", buffer.String())
-			r.body = &buffer
-		default:
-			data, err := runtime.Encode(r.serializers.Encoder, typedObj)
-			if err != nil {
-				r.err = err
-				return r
-			}
-			glog.V(8).Infof("Request Body: %#v", string(data))
-			r.body = bytes.NewReader(data)
+		data, err := runtime.Encode(r.serializers.Encoder, t)
+		if err != nil {
+			r.err = err
+			return r
 		}
+		glog.V(8).Infof("Request Body: %#v", string(data))
+		r.body = bytes.NewReader(data)
 		r.SetHeader("Content-Type", r.content.ContentType)
 	default:
 		r.err = fmt.Errorf("unknown type used for body: %+v", obj)
@@ -778,7 +757,7 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 // received. It handles retry behavior and up front validation of requests. It will invoke
 // fn at most once. It will return an error if a problem occurred prior to connecting to the
 // server - the provided function is responsible for handling server errors.
-func (r *Request) request(fn func(*http.Request, *http.Response)) error {
+func (r *Request) request(fn func(*http.Request, *http.Response), manipulateURLFn func(string) string) error {
 	//Metrics for total request latency
 	start := time.Now()
 	defer func() {
@@ -809,6 +788,9 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 	retries := 0
 	for {
 		url := r.URL().String()
+		if manipulateURLFn != nil {
+			url = manipulateURLFn(url)
+		}
 		req, err := http.NewRequest(r.verb, url, r.body)
 		if err != nil {
 			return err
@@ -878,16 +860,27 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 //  * If the server responds with a status: *errors.StatusError or *errors.UnexpectedObjectError
 //  * http.Client.Do errors are returned directly.
 func (r *Request) Do() Result {
+	return r.do(nil)
+}
+
+func (r *Request) do(manipulateURLFn func(string) string) Result {
 	r.tryThrottle()
 
 	var result Result
 	err := r.request(func(req *http.Request, resp *http.Response) {
 		result = r.transformResponse(resp, req)
-	})
+	},
+		manipulateURLFn)
 	if err != nil {
 		return Result{err: err}
 	}
 	return result
+}
+
+// DoWithManipulateURLFn is mostly same as Do. Only difference is it takes another
+// func to manipulate the URL before sending. This is a hack to make Eviction work.
+func (r *Request) DoWithManipulateURLFn(manipulateURLFn func(string) string) Result {
+	return r.do(manipulateURLFn)
 }
 
 // DoRaw executes the request but does not process the response body.
@@ -900,7 +893,8 @@ func (r *Request) DoRaw() ([]byte, error) {
 		if resp.StatusCode < http.StatusOK || resp.StatusCode > http.StatusPartialContent {
 			result.err = r.transformUnstructuredResponseError(resp, req, result.body)
 		}
-	})
+	},
+		nil)
 	if err != nil {
 		return nil, err
 	}

@@ -14,6 +14,8 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "fake_eviction.go",
+        "fake_eviction_expansion.go",
         "fake_poddisruptionbudget.go",
         "fake_policy_client.go",
     ],

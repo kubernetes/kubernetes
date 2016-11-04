@@ -26,11 +26,9 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/errors:go_default_library",
-        "//pkg/api/testapi:go_default_library",
         "//pkg/api/unversioned:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/api/validation/path:go_default_library",
-        "//pkg/apis/policy:go_default_library",
         "//pkg/client/metrics:go_default_library",
         "//pkg/client/transport:go_default_library",
         "//pkg/client/unversioned/clientcmd/api:go_default_library",
