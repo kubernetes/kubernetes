@@ -96,6 +96,7 @@ go_test(
         "//pkg/kubectl/resource:go_default_library",
         "//pkg/labels:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/runtime/serializer:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/flag:go_default_library",
         "//pkg/util/validation/field:go_default_library",

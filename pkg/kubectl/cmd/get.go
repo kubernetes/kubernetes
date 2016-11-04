@@ -39,7 +39,8 @@ import (
 type GetOptions struct {
 	resource.FilenameOptions
 
-	Raw string
+	Typer runtime.ObjectTyper
+	Raw   string
 }
 
 var (
@@ -84,7 +85,6 @@ var (
 // retrieves one or more resources from a server.
 func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
 	options := &GetOptions{}
-
 	// retrieve a list of handled resources from printer as valid args
 	validArgs, argAliases := []string{}, []string{}
 	p, err := f.Printer(nil, kubectl.PrintOptions{
@@ -150,6 +150,9 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	allNamespaces := cmdutil.GetFlagBool(cmd, "all-namespaces")
 	showKind := cmdutil.GetFlagBool(cmd, "show-kind")
 	mapper, typer := f.Object()
+	if options.Typer != nil {
+		typer = options.Typer
+	}
 	printAll := false
 	filterFuncs := f.DefaultResourceFilterFunc()
 	filterOpts := f.DefaultResourceFilterOptions(cmd, allNamespaces)
@@ -332,7 +335,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			res = infos[0].ResourceMapping().Resource
 		}
 
-		obj, err := resource.AsVersionedObject(infos, !singular, version, f.JSONEncoder())
+		obj, err := resource.AsVersionedObject(infos, !singular, version, typer, f.JSONEncoder())
 		if err != nil {
 			return err
 		}
