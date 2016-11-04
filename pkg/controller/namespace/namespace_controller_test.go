@@ -158,7 +158,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 		mockClient := fake.NewSimpleClientset(testInput.testNamespace)
 		clientPool := dynamic.NewClientPool(clientConfig, registered.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
 
-		err := syncNamespace(mockClient, clientPool, operationNotSupportedCache{}, groupVersionResources, testInput.testNamespace, api.FinalizerKubernetes)
+		err := syncNamespace(mockClient, clientPool, &operationNotSupportedCache{m: make(map[operationKey]bool)}, groupVersionResources, testInput.testNamespace, api.FinalizerKubernetes)
 		if err != nil {
 			t.Errorf("scenario %s - Unexpected error when synching namespace %v", scenario, err)
 		}
@@ -227,7 +227,7 @@ func TestSyncNamespaceThatIsActive(t *testing.T) {
 			Phase: api.NamespaceActive,
 		},
 	}
-	err := syncNamespace(mockClient, nil, operationNotSupportedCache{}, testGroupVersionResources(), testNamespace, api.FinalizerKubernetes)
+	err := syncNamespace(mockClient, nil, &operationNotSupportedCache{m: make(map[operationKey]bool)}, testGroupVersionResources(), testNamespace, api.FinalizerKubernetes)
 	if err != nil {
 		t.Errorf("Unexpected error when synching namespace %v", err)
 	}
