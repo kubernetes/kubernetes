@@ -18,6 +18,7 @@ package etcd
 
 import (
 	"fmt"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -72,7 +73,7 @@ func (r *EvictionREST) Create(ctx api.Context, obj runtime.Object) (runtime.Obje
 
 		// If it was false already, or if it becomes false during the course of our retries,
 		// raise an error marked as a 429.
-		ok, err := r.checkAndDecrement(pod.Namespace, pdb)
+		ok, err := r.checkAndDecrement(pod.Namespace, pod.Name, pdb)
 		if err != nil {
 			return nil, err
 		}
@@ -104,7 +105,7 @@ func (r *EvictionREST) Create(ctx api.Context, obj runtime.Object) (runtime.Obje
 	return &unversioned.Status{Status: unversioned.StatusSuccess}, nil
 }
 
-func (r *EvictionREST) checkAndDecrement(namespace string, pdb policy.PodDisruptionBudget) (ok bool, err error) {
+func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb policy.PodDisruptionBudget) (ok bool, err error) {
 	if pdb.Status.PodDisruptionsAllowed < 0 {
 		return false, fmt.Errorf("pdb disruptions allowed is negative")
 	}
@@ -112,6 +113,10 @@ func (r *EvictionREST) checkAndDecrement(namespace string, pdb policy.PodDisrupt
 		return false, nil
 	}
 	pdb.Status.PodDisruptionsAllowed--
+	if pdb.Status.DisruptedPods == nil {
+		pdb.Status.DisruptedPods = make(map[string]unversioned.Time)
+	}
+	pdb.Status.DisruptedPods[podName] = unversioned.Time{Time: time.Now()}
 	if _, err := r.podDisruptionBudgetClient.PodDisruptionBudgets(namespace).UpdateStatus(&pdb); err != nil {
 		return false, err
 	}
