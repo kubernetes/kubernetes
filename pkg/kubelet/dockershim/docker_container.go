@@ -120,34 +120,15 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 
 	// Fill the HostConfig.
 	hc := &dockercontainer.HostConfig{
-		Binds:          generateMountBindings(config.GetMounts()),
-		ReadonlyRootfs: config.GetReadonlyRootfs(),
-		Privileged:     config.GetPrivileged(),
+		Binds: generateMountBindings(config.GetMounts()),
 	}
 
-	// Apply options derived from the sandbox config.
+	// Apply cgroupsParent derived from the sandbox config.
 	if lc := sandboxConfig.GetLinux(); lc != nil {
 		// Apply Cgroup options.
 		// TODO: Check if this works with per-pod cgroups.
 		// TODO: we need to pass the cgroup in syntax expected by cgroup driver but shim does not use docker info yet...
 		hc.CgroupParent = lc.GetCgroupParent()
-
-		// Apply namespace options.
-		sandboxNSMode := fmt.Sprintf("container:%v", podSandboxID)
-		hc.NetworkMode = dockercontainer.NetworkMode(sandboxNSMode)
-		hc.IpcMode = dockercontainer.IpcMode(sandboxNSMode)
-		hc.UTSMode = ""
-		hc.PidMode = ""
-
-		nsOpts := lc.GetNamespaceOptions()
-		if nsOpts != nil {
-			if nsOpts.GetHostNetwork() {
-				hc.UTSMode = namespaceModeHost
-			}
-			if nsOpts.GetHostPid() {
-				hc.PidMode = namespaceModeHost
-			}
-		}
 	}
 
 	// Apply Linux-specific options if applicable.
@@ -167,6 +148,9 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 			hc.OomScoreAdj = int(rOpts.GetOomScoreAdj())
 		}
 		// Note: ShmSize is handled in kube_docker_client.go
+
+		// Apply security context.
+		applyContainerSecurityContext(lc, podSandboxID, createConfig.Config, hc)
 	}
 
 	// Set devices for container.
@@ -180,12 +164,12 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 	}
 	hc.Resources.Devices = devices
 
-	var err error
-	hc.SecurityOpt, err = getContainerSecurityOpts(config.Metadata.GetName(), sandboxConfig, ds.seccompProfileRoot)
+	// Apply appArmor and seccomp options.
+	securityOpts, err := getContainerSecurityOpts(config.Metadata.GetName(), sandboxConfig, ds.seccompProfileRoot)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate container security options for container %q: %v", config.Metadata.GetName(), err)
 	}
-	// TODO: Add or drop capabilities.
+	hc.SecurityOpt = append(hc.SecurityOpt, securityOpts...)
 
 	createConfig.HostConfig = hc
 	createResp, err := ds.client.CreateContainer(createConfig)
