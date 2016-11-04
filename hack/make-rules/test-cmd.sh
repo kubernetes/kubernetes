@@ -865,6 +865,7 @@ __EOF__
   [ "$(EDITOR=cat kubectl edit pod/valid-pod | grep 'name: valid-pod')" ]
   [ "$(EDITOR=cat kubectl edit --windows-line-endings pod/valid-pod | file - | grep CRLF)" ]
   [ ! "$(EDITOR=cat kubectl edit --windows-line-endings=false pod/valid-pod | file - | grep CRLF)" ]
+  [ "$(EDITOR=cat kubectl edit ns | grep 'kind: List')" ]
 
   ### Label POD YAML file locally without effecting the live pod.
   # Pre-condition: name is valid-pod
@@ -1377,8 +1378,10 @@ __EOF__
   echo -e '#!/bin/bash\nsed -i "s/image: busybox/image: prom\/busybox/g" $1' > /tmp/tmp-editor.sh
   chmod +x /tmp/tmp-editor.sh
   output_message=$(! EDITOR=/tmp/tmp-editor.sh kubectl edit -f hack/testdata/recursive/pod --recursive 2>&1 "${kube_flags[@]}")
-  # Post-condition: busybox0 & busybox1 PODs are edited, and since busybox2 is malformed, it should error
-  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'prom/busybox:prom/busybox:'
+  # Post-condition: busybox0 & busybox1 PODs are not edited, and since busybox2 is malformed, it should error
+  # The reason why busybox0 & busybox1 PODs are not edited is because the editor tries to load all objects in
+  # a list but since it contains invalid objects, it will never open.
+  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'busybox:busybox:'
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
   # cleaning
   rm /tmp/tmp-editor.sh
