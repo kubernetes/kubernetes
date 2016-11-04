@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -28,6 +29,8 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/types"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/node"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/version"
 
@@ -46,6 +49,8 @@ func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, n
 	selector := fields.OneTermEqualSelector(api.PodHostField, nodeName)
 	options := api.ListOptions{FieldSelector: selector}
 	pods, err := kubeClient.Core().Pods(api.NamespaceAll).List(options)
+	var updateErrList []error
+
 	if err != nil {
 		return remaining, err
 	}
@@ -58,6 +63,15 @@ func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, n
 		// Defensive check, also needed for tests.
 		if pod.Spec.NodeName != nodeName {
 			continue
+		}
+
+		// Set reason and message in the pod object.
+		if _, err = setPodTerminationReason(kubeClient, &pod, nodeName); err != nil {
+			if errors.IsConflict(err) {
+				updateErrList = append(updateErrList,
+					fmt.Errorf("update status failed for pod %q: %v", format.Pod(&pod), err))
+				continue
+			}
 		}
 		// if the pod has already been marked for deletion, we still return true that there are remaining pods.
 		if pod.DeletionGracePeriodSeconds != nil {
@@ -77,7 +91,29 @@ func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, n
 		}
 		remaining = true
 	}
+
+	if len(updateErrList) > 0 {
+		return false, utilerrors.NewAggregate(updateErrList)
+	}
 	return remaining, nil
+}
+
+// setPodTerminationReason attempts to set a reason and message in the pod status, updates it in the apiserver,
+// and returns an error if it encounters one.
+func setPodTerminationReason(kubeClient clientset.Interface, pod *api.Pod, nodeName string) (*api.Pod, error) {
+	if pod.Status.Reason == node.NodeUnreachablePodReason {
+		return pod, nil
+	}
+
+	pod.Status.Reason = node.NodeUnreachablePodReason
+	pod.Status.Message = fmt.Sprintf(node.NodeUnreachablePodMessage, nodeName, pod.Name)
+
+	var updatedPod *api.Pod
+	var err error
+	if updatedPod, err = kubeClient.Core().Pods(pod.Namespace).UpdateStatus(pod); err != nil {
+		return nil, err
+	}
+	return updatedPod, nil
 }
 
 func forcefullyDeletePod(c clientset.Interface, pod *api.Pod) error {

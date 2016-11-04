@@ -30,8 +30,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/ghodss/yaml"
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/events"
@@ -49,7 +47,11 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/jsonpath"
+	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/sets"
+
+	"github.com/ghodss/yaml"
+	"github.com/golang/glog"
 )
 
 const (
@@ -731,7 +733,10 @@ func printPodBase(pod *api.Pod, w io.Writer, options PrintOptions) error {
 			}
 		}
 	}
-	if pod.DeletionTimestamp != nil {
+
+	if pod.DeletionTimestamp != nil && pod.Status.Reason == node.NodeUnreachablePodReason {
+		reason = "Unknown"
+	} else if pod.DeletionTimestamp != nil {
 		reason = "Terminating"
 	}
 
