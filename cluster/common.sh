@@ -950,3 +950,41 @@ function parse-master-env() {
   KUBELET_CERT_BASE64=$(get-env-val "${master_env}" "KUBELET_CERT")
   KUBELET_KEY_BASE64=$(get-env-val "${master_env}" "KUBELET_KEY")
 }
+
+# Update or verify required gcloud components are installed
+# at minimum required version.
+# Assumed vars
+#   KUBE_PROMPT_FOR_UPDATE
+function update-or-verify-gcloud() {
+  local sudo_prefix=""
+  if [ ! -w $(dirname `which gcloud`) ]; then
+    sudo_prefix="sudo"
+  fi
+  # update and install components as needed
+  if [[ "${KUBE_PROMPT_FOR_UPDATE}" == "y" ]]; then
+    ${sudo_prefix} gcloud ${gcloud_prompt:-} components install alpha || true
+    ${sudo_prefix} gcloud ${gcloud_prompt:-} components install beta || true
+    ${sudo_prefix} gcloud ${gcloud_prompt:-} components update || true
+  else
+    local components=$(${sudo_prefix} gcloud components list --format=json)
+    python -c'
+import json,sys
+from distutils import version
+
+minversion = {
+  "alpha": version.LooseVersion("2016.05.11"),
+  "beta": version.LooseVersion("2016.05.11"),
+  "core": version.LooseVersion("2016.11.01"),
+}
+for c in json.loads(sys.argv[1]):
+  id = c.get("id")
+  if id not in minversion:
+    continue
+  v = c.get("current_version_string")
+  if not v or version.LooseVersion(v) < minversion[id]:
+    print("gcloud {0} missing or older than minimum version {1}".format(
+          id, minversion[id]))
+    exit(1)
+    ' """${components}"""
+  fi
+}
