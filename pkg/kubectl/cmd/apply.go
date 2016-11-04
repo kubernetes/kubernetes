@@ -251,12 +251,19 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *App
 		if !dryRun {
 			overwrite := cmdutil.GetFlagBool(cmd, "overwrite")
 			helper := resource.NewHelper(info.Client, info.Mapping)
-			patcher := NewPatcher(encoder, decoder, info.Mapping, helper, overwrite,
-				options.Force,
-				options.Cascade,
-				options.Timeout,
-				options.GracePeriod,
-				f.ClientSet)
+			patcher := &patcher{
+				encoder:       encoder,
+				decoder:       decoder,
+				mapping:       info.Mapping,
+				helper:        helper,
+				clientsetFunc: f.ClientSet,
+				overwrite:     overwrite,
+				backOff:       clockwork.NewRealClock(),
+				force:         options.Force,
+				cascade:       options.Cascade,
+				timeout:       options.Timeout,
+				gracePeriod:   options.GracePeriod,
+			}
 
 			patchBytes, err := patcher.patch(info.Object, modified, info.Source, info.Namespace, info.Name)
 			if err != nil {
@@ -498,22 +505,6 @@ type patcher struct {
 	cascade     bool
 	timeout     time.Duration
 	gracePeriod int
-}
-
-func NewPatcher(encoder runtime.Encoder, decoder runtime.Decoder, mapping *meta.RESTMapping, helper *resource.Helper, overwrite, force, cascade bool, timeout time.Duration, gracePeriod int, clientsetFunc func() (*internalclientset.Clientset, error)) *patcher {
-	return &patcher{
-		encoder:       encoder,
-		decoder:       decoder,
-		mapping:       mapping,
-		helper:        helper,
-		clientsetFunc: clientsetFunc,
-		overwrite:     overwrite,
-		backOff:       clockwork.NewRealClock(),
-		force:         force,
-		cascade:       cascade,
-		timeout:       timeout,
-		gracePeriod:   gracePeriod,
-	}
 }
 
 func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, namespace, name string) ([]byte, error) {
