@@ -148,6 +148,26 @@ message NamespaceOption {
     optional bool host_ipc = 3;
 }
 
+// LinuxSandboxSecurityContext holds linux security configuration that will be
+// applied to a sandbox. Note that:
+// 1) It does not apply to containers in the pods.
+// 2) It may not be applicable to a PodSandbox which does not contain any running
+//    process.
+message LinuxSandboxSecurityContext {
+    // The configurations for the sandbox's namespaces.
+    // This will be used only if the PodSandbox uses namespace for isolation.
+    optional NamespaceOption namespace_options = 1;
+    // Optional SELinux context to be applied.
+    optional SELinuxOption selinux_options = 2;
+    // The UID to run the entrypoint of the sandbox process.
+    optional int64 run_as_user = 3;
+    // If set, the root filesystem of the sandbox is read-only.
+    optional bool readonly_rootfs = 4;
+    // A list of groups applied to the first process run in the sandbox, in addition
+    // to the sandbox's primary GID.
+    repeated int64 supplemental_groups = 5;
+}
+
 // LinuxPodSandboxConfig holds platform-specific configurations for Linux
 // host platforms and Linux-based containers.
 message LinuxPodSandboxConfig {
@@ -155,9 +175,8 @@ message LinuxPodSandboxConfig {
     // The cgroupfs style syntax will be used, but the container runtime can
     // convert it to systemd semantics if needed.
     optional string cgroup_parent = 1;
-    // The configurations for the sandbox's namespaces.
-    // This will be used only if the PodSandbox uses namespace for isolation.
-    optional NamespaceOption namespace_options = 2;
+    // LinuxSandboxSecurityContext holds sandbox security attributes.
+    optional LinuxSandboxSecurityContext security_context = 2;
 }
 
 // PodSandboxMetadata holds all necessary information for building the sandbox name.
@@ -409,26 +428,34 @@ message Capability {
     repeated string drop_capabilities = 2;
 }
 
+// LinuxContainerSecurityContext holds linux security configuration that will be applied to a container.
+message LinuxContainerSecurityContext {
+    // Capabilities to add or drop.
+    optional Capability capabilities = 1;
+    // If set, run container in privileged mode.
+    optional bool privileged = 2;
+    // The configurations for the container's namespaces.
+    // This will be used only if the container uses namespace for isolation.
+    optional NamespaceOption namespace_options = 3;
+    // Optional SELinux context to be applied.
+    optional SELinuxOption selinux_options = 4;
+    // The UID to run the the container process as.
+    // Defaults to user specified in image metadata if unspecified.
+    optional int64 run_as_user = 5;
+    // If set, the root filesystem of the container is read-only.
+    optional bool readonly_rootfs = 6;
+    // A list of groups applied to the first process run in the container, in addition
+    // to the container's primary GID.
+    repeated int64 supplemental_groups = 7;
+}
+
 // LinuxContainerConfig contains platform-specific configuration for
 // Linux-based containers.
 message LinuxContainerConfig {
     // Resources specification for the container.
     optional LinuxContainerResources resources = 1;
-    // Capabilities to add or drop.
-    optional Capability capabilities = 2;
-    // Optional SELinux context to be applied.
-    optional SELinuxOption selinux_options = 3;
-    // User contains the user for the container process.
-    optional LinuxUser user = 4;
-}
-
-message LinuxUser {
-    // uid specifies the user ID the container process has.
-    optional int64 uid = 1;
-    // gid specifies the group ID the container process has.
-    optional int64 gid = 2;
-    // additional_gids specifies additional GIDs the container process has.
-    repeated int64 additional_gids = 3;
+    // LinuxContainerSecurityContext configuration for the container.
+    optional LinuxContainerSecurityContext security_context = 2;
 }
 
 // ContainerMetadata holds all necessary information for building the container
@@ -488,11 +515,6 @@ message ContainerConfig {
     // Annotations is an unstructured key value map that may be set by external
     // tools to store and retrieve arbitrary metadata.
     map<string, string> annotations = 10;
-    // If set, run container in privileged mode.
-    // Processes in privileged containers are essentially equivalent to root on the host.
-    optional bool privileged = 11;
-    // If set, the root filesystem of the container is read-only.
-    optional bool readonly_rootfs = 12;
     // Path relative to PodSandboxConfig.LogDirectory for container to store
     // the log (STDOUT and STDERR) on the host.
     // E.g.,
@@ -503,19 +525,18 @@ message ContainerConfig {
     // container logs are under active discussion in
     // https://issues.k8s.io/24677. There *may* be future change of direction
     // for logging as the discussion carries on.
-    optional string log_path = 13;
-    // The hash of container config
+    optional string log_path = 11;
 
     // Variables for interactive containers, these have very specialized
     // use-cases (e.g. debugging).
     // TODO: Determine if we need to continue supporting these fields that are
     // part of Kubernetes's Container Spec.
-    optional bool stdin = 14;
-    optional bool stdin_once = 15;
-    optional bool tty = 16;
+    optional bool stdin = 12;
+    optional bool stdin_once = 13;
+    optional bool tty = 14;
 
     // Linux contains configuration specific to Linux containers.
-    optional LinuxContainerConfig linux = 17;
+    optional LinuxContainerConfig linux = 15;
 }
 
 message CreateContainerRequest {
@@ -737,6 +758,8 @@ message Image {
     repeated string repo_digests = 3;
     // The size of the image in bytes.
     optional uint64 size = 4;
+    // The uid that will run the command(s).
+    optional int64 uid = 5;
 }
 
 message ListImagesResponse {
