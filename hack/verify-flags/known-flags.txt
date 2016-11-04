@@ -189,6 +189,7 @@ experimental-allowed-unsafe-sysctls
 experimental-bootstrap-kubeconfig
 experimental-keystone-url
 experimental-mounter-path
+experimental-mounter-rootfs-path
 experimental-nvidia-gpus
 experimental-prefix
 experimental-runtime-integration-type
