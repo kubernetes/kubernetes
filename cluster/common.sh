@@ -950,3 +950,42 @@ function parse-master-env() {
   KUBELET_CERT_BASE64=$(get-env-val "${master_env}" "KUBELET_CERT")
   KUBELET_KEY_BASE64=$(get-env-val "${master_env}" "KUBELET_KEY")
 }
+
+# Update or verify required gcloud components are installed
+# at minimum required version.
+# Assumed vars
+#   KUBE_PROMPT_FOR_UPDATE
+function update-or-verify-gcloud() {
+  local sudo_prefix=""
+  if [ ! -w $(dirname `which gcloud`) ]; then
+    sudo_prefix="sudo"
+  fi
+  # update and install components as needed
+  if [[ "${KUBE_PROMPT_FOR_UPDATE}" == "y" ]]; then
+    ${sudo_prefix} gcloud ${gcloud_prompt:-} components install alpha
+    ${sudo_prefix} gcloud ${gcloud_prompt:-} components install beta
+    ${sudo_prefix} gcloud ${gcloud_prompt:-} components update
+  else
+    local version=$(${sudo_prefix} gcloud version --format=json)
+    python -c'
+import json,sys
+from distutils import version
+
+minVersion = version.LooseVersion("1.3.0")
+required = [ "alpha", "beta", "core" ]
+data = json.loads(sys.argv[1])
+rel = data.get("Google Cloud SDK")
+if rel != "HEAD" and version.LooseVersion(rel) < minVersion:
+  print "gcloud version out of date ( < %s )" % minVersion
+  exit(1)
+missing = []
+for c in required:
+  if not data.get(c):
+    missing += [c]
+if missing:
+  for c in missing:
+    print ("missing required gcloud component \"{0}\"".format(c))
+  exit(1)
+    ' """${version}"""
+  fi
+}
