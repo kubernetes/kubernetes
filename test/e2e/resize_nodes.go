@@ -307,8 +307,9 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 			err = framework.WaitForClusterSize(c, int(replicas-1), 10*time.Minute)
 			Expect(err).NotTo(HaveOccurred())
 
-			By("waiting for podGC to remove/recreate any pods scheduled on the now non-existent node")
-			framework.WaitForPodAddition(c, ns, 2*time.Minute)
+			By("waiting 1 minute for the watch in the podGC to catch up, remove any pods scheduled on " +
+				"the now non-existent node and the RC to recreate it")
+			time.Sleep(time.Minute)
 
 			By("verifying whether the pods from the removed node are recreated")
 			err = framework.VerifyPods(c, ns, name, true, replicas)
