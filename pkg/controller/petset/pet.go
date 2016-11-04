@@ -96,7 +96,7 @@ func setReplicasAnnotation(p *api.Pod, replicas int32) {
 // mutation occurs. If the returned error is not nil, the returned bool is false.
 func update(set *apps.StatefulSet, id string, pod *api.Pod, desired *api.Pod) (bool, error) {
 	//preconditions
-	if set == nil || desired == nil || pod == nil  {
+	if set == nil || desired == nil || pod == nil {
 		return false, errors.New("nil parementer passed")
 	}
 
