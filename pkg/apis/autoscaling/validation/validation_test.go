@@ -101,9 +101,17 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					Kind: "ReplicationController",
 					Name: "myrc",
 				},
-				MinReplicas:                    newInt32(1),
-				MaxReplicas:                    5,
-				TargetCPUUtilizationPercentage: newInt32(70),
+				MinReplicas: newInt32(1),
+				MaxReplicas: 5,
+				Metrics: []autoscaling.MetricSpec{
+					{
+						Type: autoscaling.ResourceSourceType,
+						Resource: &autoscaling.ResourceMetricSource{
+							Name: api.ResourceCPU,
+							TargetPercentageOfRequest: newInt32(70),
+						},
+					},
+				},
 			},
 		},
 		{
@@ -152,10 +160,18 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 				ObjectMeta: api.ObjectMeta{Name: "myautoscaler", Namespace: api.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef:                 autoscaling.CrossVersionObjectReference{Name: "myrc"},
-					MinReplicas:                    newInt32(1),
-					MaxReplicas:                    5,
-					TargetCPUUtilizationPercentage: newInt32(70),
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc"},
+					MinReplicas:    newInt32(1),
+					MaxReplicas:    5,
+					Metrics: []autoscaling.MetricSpec{
+						{
+							Type: autoscaling.ResourceSourceType,
+							Resource: &autoscaling.ResourceMetricSource{
+								Name: api.ResourceCPU,
+								TargetPercentageOfRequest: newInt32(70),
+							},
+						},
+					},
 				},
 			},
 			msg: "scaleTargetRef.kind: Required",
@@ -164,10 +180,18 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 				ObjectMeta: api.ObjectMeta{Name: "myautoscaler", Namespace: api.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef:                 autoscaling.CrossVersionObjectReference{Kind: "..", Name: "myrc"},
-					MinReplicas:                    newInt32(1),
-					MaxReplicas:                    5,
-					TargetCPUUtilizationPercentage: newInt32(70),
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Kind: "..", Name: "myrc"},
+					MinReplicas:    newInt32(1),
+					MaxReplicas:    5,
+					Metrics: []autoscaling.MetricSpec{
+						{
+							Type: autoscaling.ResourceSourceType,
+							Resource: &autoscaling.ResourceMetricSource{
+								Name: api.ResourceCPU,
+								TargetPercentageOfRequest: newInt32(70),
+							},
+						},
+					},
 				},
 			},
 			msg: "scaleTargetRef.kind: Invalid",
@@ -176,10 +200,18 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 				ObjectMeta: api.ObjectMeta{Name: "myautoscaler", Namespace: api.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef:                 autoscaling.CrossVersionObjectReference{Kind: "ReplicationController"},
-					MinReplicas:                    newInt32(1),
-					MaxReplicas:                    5,
-					TargetCPUUtilizationPercentage: newInt32(70),
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Kind: "ReplicationController"},
+					MinReplicas:    newInt32(1),
+					MaxReplicas:    5,
+					Metrics: []autoscaling.MetricSpec{
+						{
+							Type: autoscaling.ResourceSourceType,
+							Resource: &autoscaling.ResourceMetricSource{
+								Name: api.ResourceCPU,
+								TargetPercentageOfRequest: newInt32(70),
+							},
+						},
+					},
 				},
 			},
 			msg: "scaleTargetRef.name: Required",
@@ -188,10 +220,18 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 				ObjectMeta: api.ObjectMeta{Name: "myautoscaler", Namespace: api.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef:                 autoscaling.CrossVersionObjectReference{Kind: "ReplicationController", Name: ".."},
-					MinReplicas:                    newInt32(1),
-					MaxReplicas:                    5,
-					TargetCPUUtilizationPercentage: newInt32(70),
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Kind: "ReplicationController", Name: ".."},
+					MinReplicas:    newInt32(1),
+					MaxReplicas:    5,
+					Metrics: []autoscaling.MetricSpec{
+						{
+							Type: autoscaling.ResourceSourceType,
+							Resource: &autoscaling.ResourceMetricSource{
+								Name: api.ResourceCPU,
+								TargetPercentageOfRequest: newInt32(70),
+							},
+						},
+					},
 				},
 			},
 			msg: "scaleTargetRef.name: Invalid",
@@ -231,10 +271,18 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					Namespace: api.NamespaceDefault,
 				},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef:                 autoscaling.CrossVersionObjectReference{},
-					MinReplicas:                    newInt32(1),
-					MaxReplicas:                    5,
-					TargetCPUUtilizationPercentage: newInt32(-70),
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{},
+					MinReplicas:    newInt32(1),
+					MaxReplicas:    5,
+					Metrics: []autoscaling.MetricSpec{
+						{
+							Type: autoscaling.ResourceSourceType,
+							Resource: &autoscaling.ResourceMetricSource{
+								Name: api.ResourceCPU,
+								TargetPercentageOfRequest: newInt32(-70),
+							},
+						},
+					},
 				},
 			},
 			msg: "must be greater than 0",

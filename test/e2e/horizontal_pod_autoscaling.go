@@ -186,9 +186,17 @@ func createCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, ma
 				Kind: rc.kind,
 				Name: rc.name,
 			},
-			MinReplicas:                    &minReplicas,
-			MaxReplicas:                    maxRepl,
-			TargetCPUUtilizationPercentage: &cpu,
+			MinReplicas: &minReplicas,
+			MaxReplicas: maxRepl,
+			Metrics: []autoscaling.MetricSpec{
+				{
+					Type: autoscaling.ResourceSourceType,
+					Resource: &autoscaling.ResourceMetricSource{
+						Name: api.ResourceCPU,
+						TargetPercentageOfRequest: &cpu,
+					},
+				},
+			},
 		},
 	}
 	_, errHPA := rc.framework.ClientSet.Autoscaling().HorizontalPodAutoscalers(rc.framework.Namespace.Name).Create(hpa)

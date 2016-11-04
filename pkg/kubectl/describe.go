@@ -1994,13 +1994,43 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, desc
 		fmt.Fprintf(out, "Reference:\t%s/%s\n",
 			hpa.Spec.ScaleTargetRef.Kind,
 			hpa.Spec.ScaleTargetRef.Name)
-		if hpa.Spec.TargetCPUUtilizationPercentage != nil {
-			fmt.Fprintf(out, "Target CPU utilization:\t%d%%\n", *hpa.Spec.TargetCPUUtilizationPercentage)
-			fmt.Fprintf(out, "Current CPU utilization:\t")
-			if hpa.Status.CurrentCPUUtilizationPercentage != nil {
-				fmt.Fprintf(out, "%d%%\n", *hpa.Status.CurrentCPUUtilizationPercentage)
-			} else {
-				fmt.Fprintf(out, "<unset>\n")
+		fmt.Fprintf(out, "Metrics:\t( current / target )\n")
+		for i, metric := range hpa.Spec.Metrics {
+			switch metric.Type {
+			case autoscaling.PodsSourceType:
+				current := "<unknown>"
+				if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Pods != nil {
+					current = hpa.Status.CurrentMetrics[i].Pods.CurrentValue.String()
+				}
+				fmt.Fprintf(out, " %q on pods:\t%s / %s\n", metric.Pods.MetricName, current, metric.Pods.TargetValue.String())
+			case autoscaling.ObjectSourceType:
+				current := "<unknown>"
+				if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Object != nil {
+					current = hpa.Status.CurrentMetrics[i].Object.CurrentValue.String()
+				}
+				fmt.Fprintf(out, " %q on %s/%s:\t%s / %s\n", metric.Object.MetricName, metric.Object.Target.Kind, metric.Object.Target.Name, current, metric.Object.TargetValue.String())
+			case autoscaling.ResourceSourceType:
+				fmt.Fprintf(out, " resource %s on pods", string(metric.Resource.Name))
+				if metric.Resource.TargetRawValue != nil {
+					current := "<unknown>"
+					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Resource != nil {
+						current = hpa.Status.CurrentMetrics[i].Resource.CurrentRawValue.String()
+					}
+					fmt.Fprintf(out, ":\t%s / %\n", current, metric.Resource.TargetRawValue.String())
+				} else {
+					current := "<unknown>"
+					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Resource != nil && hpa.Status.CurrentMetrics[i].Resource.CurrentPercentageOfRequest != nil {
+						current = fmt.Sprintf("%d%%", *hpa.Status.CurrentMetrics[i].Resource.CurrentPercentageOfRequest)
+					}
+
+					target := "<auto>"
+					if metric.Resource.TargetPercentageOfRequest != nil {
+						target = fmt.Sprintf("%d%%", *metric.Resource.TargetPercentageOfRequest)
+					}
+					fmt.Fprintf(out, " (as a percentage of request):\t%s / %s\n", current, target)
+				}
+			default:
+				fmt.Fprintf(out, " <unknown metric type %q>", string(metric.Type))
 			}
 		}
 		minReplicas := "<unset>"

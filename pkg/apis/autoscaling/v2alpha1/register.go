@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package v2alpha1
 
 import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -27,10 +27,10 @@ import (
 const GroupName = "autoscaling"
 
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: "v1"}
+var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: "v2alpha1"}
 
 var (
-	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes, addDefaultingFuncs, addConversionFuncs)
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes, addDefaultingFuncs)
 	AddToScheme   = SchemeBuilder.AddToScheme
 )
 
@@ -39,7 +39,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&HorizontalPodAutoscaler{},
 		&HorizontalPodAutoscalerList{},
-		&Scale{},
 		&v1.ListOptions{},
 		&v1.DeleteOptions{},
 	)

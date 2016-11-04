@@ -471,7 +471,15 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 			minReplicas := int32(c.Rand.Int31())
 			s.MinReplicas = &minReplicas
 			targetCpu := int32(c.RandUint64())
-			s.TargetCPUUtilizationPercentage = &targetCpu
+			s.Metrics = []autoscaling.MetricSpec{
+				{
+					Type: autoscaling.ResourceSourceType,
+					Resource: &autoscaling.ResourceMetricSource{
+						Name: api.ResourceCPU,
+						TargetPercentageOfRequest: &targetCpu,
+					},
+				},
+			}
 		},
 		func(psp *extensions.PodSecurityPolicySpec, c fuzz.Continue) {
 			c.FuzzNoCustom(psp) // fuzz self without calling this function again

@@ -50,8 +50,16 @@ func validNewHorizontalPodAutoscaler(name string) *autoscaling.HorizontalPodAuto
 				Kind: "ReplicationController",
 				Name: "myrc",
 			},
-			MaxReplicas:                    5,
-			TargetCPUUtilizationPercentage: &cpu,
+			MaxReplicas: 5,
+			Metrics: []autoscaling.MetricSpec{
+				{
+					Type: autoscaling.ResourceSourceType,
+					Resource: &autoscaling.ResourceMetricSource{
+						Name: api.ResourceCPU,
+						TargetPercentageOfRequest: &cpu,
+					},
+				},
+			},
 		},
 	}
 }

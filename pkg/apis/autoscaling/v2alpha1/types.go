@@ -14,51 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package autoscaling
+package v2alpha1
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
-// Scale represents a scaling request for a resource.
-type Scale struct {
-	unversioned.TypeMeta `json:",inline"`
-	// Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
-	// +optional
-	api.ObjectMeta `json:"metadata,omitempty"`
-
-	// defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
-	// +optional
-	Spec ScaleSpec `json:"spec,omitempty"`
-
-	// current status of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status. Read-only.
-	// +optional
-	Status ScaleStatus `json:"status,omitempty"`
-}
-
-// ScaleSpec describes the attributes of a scale subresource.
-type ScaleSpec struct {
-	// desired number of instances for the scaled object.
-	// +optional
-	Replicas int32 `json:"replicas,omitempty"`
-}
-
-// ScaleStatus represents the current status of a scale subresource.
-type ScaleStatus struct {
-	// actual number of observed instances of the scaled object.
-	Replicas int32 `json:"replicas"`
-
-	// label query over pods that should match the replicas count. This is same
-	// as the label selector but in the string format to avoid introspection
-	// by clients. The string will be in the same format as the query-param syntax.
-	// More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
-	// +optional
-	Selector string `json:"selector,omitempty"`
-}
-
-// CrossVersionObjectReference contains enough information to let you identify the referred resource.
+// TODO: do we want to change this to just refer to an API group, and not a version?
+// contains enough information to let you identify a resource in the current namespace
 type CrossVersionObjectReference struct {
 	// Kind of the referent; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
 	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`
@@ -72,20 +37,20 @@ type CrossVersionObjectReference struct {
 // specification of a horizontal pod autoscaler
 type HorizontalPodAutoscalerSpec struct {
 	// the target scalable object to autoscale
-	ScaleTargetRef CrossVersionObjectReference `json:"scaleTargetRef"`
+	ScaleTargetRef CrossVersionObjectReference `json:"scaleTargetRef" protobuf:"bytes,1,opt,name=scaleTargetRef"`
 
 	// the minimum number of replicas to which the autoscaler may scale
 	// +optional
-	MinReplicas *int32 `json:"minReplicas,omitempty"`
+	MinReplicas *int32 `json:"minReplicas,omitempty" protobuf:"varint,2,opt,name=minReplicas"`
 	// the maximum number of replicas to which the autoscaler may scale
-	MaxReplicas int32 `json:"maxReplicas"`
+	MaxReplicas int32 `json:"maxReplicas" protobuf:"varint,3,opt,name=maxReplicas"`
 
 	// the metrics to use to calculate the desired replica count (the
 	// maximum replica count across all metrics will be used).  It is
 	// expected that any metrics used will decrease as the replica count
 	// increases, and will eventually increase if we decrease the replica
 	// count.
-	Metrics []MetricSpec `json:"metrics,omitempty"`
+	Metrics []MetricSpec `json:"metrics,omitempty" protobuf:"bytes,4,rep,name=metrics"`
 }
 
 // a type of metric source
@@ -104,109 +69,113 @@ var (
 // (only `type` and one other matching field should be set at once)
 type MetricSpec struct {
 	// the type of metric source (should match one of the fields below)
-	Type MetricSourceType `json:"type"`
+	Type MetricSourceType `json:"type" protobuf:"bytes,1,opt,name=type"`
 
 	// metric describing a single Kubernetes object
-	Object *ObjectMetricSource `json:"object,omitempty"`
+	Object *ObjectMetricSource `json:"object,omitempty" protobuf:"bytes,2,opt,name=object"`
 	// metric describing pods in the scale target
-	Pods *PodsMetricSource `json:"pods,omitempty"`
+	Pods *PodsMetricSource `json:"pods,omitempty" protobuf:"bytes,3,opt,name=pods"`
 	// resource metric describing pods in the scale target
 	// (guaranteed to be available and have the same names across clusters)
-	Resource *ResourceMetricSource `json:"resource,omitempty"`
+	Resource *ResourceMetricSource `json:"resource,omitempty" protobuf:"bytes,4,opt,name=resource"`
 }
 
 // a metric describing a Kubernetes object
 type ObjectMetricSource struct {
 	// the described Kubernetes object
-	Target CrossVersionObjectReference `json:"target"`
+	Target CrossVersionObjectReference `json:"target" protobuf:"bytes,1,opt,name=target"`
 
 	// the name of the metric in question
-	MetricName string `json:"metricName"`
+	MetricName string `json:"metricName" protobuf:"bytes,2,opt,name=metricName"`
 	// the target value of the metric (as a quantity)
-	TargetValue resource.Quantity `json:"targetValue"`
+	TargetValue resource.Quantity `json:"targetValue" protobuf:"bytes,3,opt,name=targetValue"`
 }
 
 // metric describing pods in the scale target
 type PodsMetricSource struct {
 	// the name of the metric in question
-	MetricName string `json:"metricName"`
+	MetricName string `json:"metricName" protobuf:"bytes,1,opt,name=metricName"`
 	// the target value of the metric (as a quantity)
-	TargetValue resource.Quantity `json:"targetValue"`
+	TargetValue resource.Quantity `json:"targetValue" protobuf:"bytes,2,opt,name=targetValue"`
 }
 
 // resource metric describing pods in the scale target
 // (guaranteed to be available and have the same names across clusters)
 type ResourceMetricSource struct {
 	// the name of the resource in question
-	Name api.ResourceName `json:"name"`
+	Name v1.ResourceName `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// the target value of the resource metric as a percentage of the
 	// request on the pods
 	// +optional
-	TargetPercentageOfRequest *int32 `json:"targetPercentageOfRequest,omitempty"`
+	TargetPercentageOfRequest *int32 `json:"targetPercentageOfRequest,omitempty" protobuf:"bytes,2,opt,name=targetPercentageOfRequest"`
 	// the target value of the resource metric as a raw value
 	// +optional
-	TargetRawValue *resource.Quantity `json:"targetRawValue,omitempty"`
+	TargetRawValue *resource.Quantity `json:"targetRawValue,omitempty" protobuf:"bytes,3,opt,name=targetRawValue"`
 }
 
 // the status of a horizontal pod autoscaler
 type HorizontalPodAutoscalerStatus struct {
 	// most recent generation observed by this autoscaler.
-	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
-	// last time the autoscaler scaled the number of pods;
+	// +optional
+	ObservedGeneration *int64 `json:"observedGeneration,omitempty" protobuf:"varint,1,opt,name=observedGeneration"`
+	// last time the HorizontalPodAutoscaler scaled the number of pods;
 	// used by the autoscaler to control how often the number of pods is changed.
-	LastScaleTime *unversioned.Time `json:"lastScaleTime,omitempty"`
+	// +optional
+	LastScaleTime *unversioned.Time `json:"lastScaleTime,omitempty" protobuf:"bytes,2,opt,name=lastScaleTime"`
 
 	// the last observed number of replicas from the target object.
-	CurrentReplicas int32 `json:"currentReplicas"`
+	CurrentReplicas int32 `json:"currentReplicas" protobuf:"varint,3,opt,name=currentReplicas"`
 	// the desired number of replicas as last computed by the autoscaler
-	DesiredReplicas int32 `json:"desiredReplicas"`
+	DesiredReplicas int32 `json:"desiredReplicas" protobuf:"varint,4,opt,name=desiredReplicas"`
 
 	// the last read state of the metrics used by this autoscaler
-	CurrentMetrics []MetricStatus `json:"currentMetrics"`
+	CurrentMetrics []MetricStatus `json:"currentMetrics" protobuf:"bytes,5,rep,name=currentMetrics"`
 }
 
 // the status of a single metric
 type MetricStatus struct {
-	// the type of metric source
-	Type MetricSourceType `json:"type"`
+	// the type of metric source (should match one of the fields below)
+	Type MetricSourceType `json:"type" protobuf:"bytes,1,opt,name=type"`
 
 	// metric describing a single Kubernetes object
-	Object *ObjectMetricStatus `json:"object,omitemtpy"`
+	Object *ObjectMetricStatus `json:"object,omitempty" protobuf:"bytes,2,opt,name=object"`
 	// metric describing pods in the scale target
-	Pods *PodsMetricStatus `json:"pods,omitemtpy"`
+	Pods *PodsMetricStatus `json:"pods,omitempty" protobuf:"bytes,3,opt,name=pods"`
 	// resource metric describing pods in the scale target
-	Resource *ResourceMetricStatus `json:"resource,omitempty"`
+	// (guaranteed to be available and have the same names across clusters)
+	Resource *ResourceMetricStatus `json:"resource,omitempty" protobuf:"bytes,4,opt,name=resource"`
 }
 
 // a metric describing a Kubernetes object
 type ObjectMetricStatus struct {
 	// the described Kubernetes object
-	Target CrossVersionObjectReference `json:"target"`
+	Target CrossVersionObjectReference `json:"target" protobuf:"bytes,1,opt,name=target"`
 
 	// the name of the metric in question
-	MetricName string `json:"metricName"`
-	// the current value of the metric (as a quantity)
-	CurrentValue resource.Quantity `json:"targetValue"`
+	MetricName string `json:"metricName" protobuf:"bytes,2,opt,name=metricName"`
+	// the target value of the metric (as a quantity)
+	CurrentValue resource.Quantity `json:"currentValue" protobuf:"bytes,3,opt,name=currentValue"`
 }
 
 // metric describing pods in the scale target
 type PodsMetricStatus struct {
 	// the name of the metric in question
-	MetricName string `json:"metricName"`
+	MetricName string `json:"metricName" protobuf:"bytes,1,opt,name=metricName"`
 	// the current value of the metric (as a quantity)
-	CurrentValue resource.Quantity `json:"targetValue"`
+	CurrentValue resource.Quantity `json:"currentValue" protobuf:"bytes,2,opt,name=currentValue"`
 }
 
 // resource metric describing pods in the scale target
 type ResourceMetricStatus struct {
 	// the name of the resource in question
-	Name api.ResourceName `json:"name"`
-	// the target value of the resource metric as a percentage of the
+	Name v1.ResourceName `json:"name" protobuf:"bytes,1,opt,name=name"`
+	// the current value of the resource metric as a percentage of the
 	// request on the pods (only populated if request is available)
 	// +optional
-	CurrentPercentageOfRequest *int32 `json:"targetPercentageOfRequest,omitempty"`
+	CurrentPercentageOfRequest *int32 `json:"currentPercentageOfRequest,omitempty" protobuf:"bytes,2,opt,name=currentPercentageOfRequest"`
 	// the target value of the resource metric as a raw value
-	CurrentRawValue *resource.Quantity `json:"targetRawValue"`
+	// +optional
+	CurrentRawValue *resource.Quantity `json:"currentRawValue,omitempty" protobuf:"bytes,3,opt,name=currentRawValue"`
 }
 
 // +genclient=true
@@ -214,24 +183,26 @@ type ResourceMetricStatus struct {
 // configuration of a horizontal pod autoscaler.
 type HorizontalPodAutoscaler struct {
 	unversioned.TypeMeta `json:",inline"`
+	// Standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	// +optional
-	api.ObjectMeta `json:"metadata,omitempty"`
+	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
 	// +optional
-	Spec HorizontalPodAutoscalerSpec `json:"spec,omitempty"`
+	Spec HorizontalPodAutoscalerSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// current information about the autoscaler.
 	// +optional
-	Status HorizontalPodAutoscalerStatus `json:"status,omitempty"`
+	Status HorizontalPodAutoscalerStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
 // list of horizontal pod autoscaler objects.
 type HorizontalPodAutoscalerList struct {
 	unversioned.TypeMeta `json:",inline"`
+	// Standard list metadata.
 	// +optional
-	unversioned.ListMeta `json:"metadata,omitempty"`
+	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// list of horizontal pod autoscaler objects.
-	Items []HorizontalPodAutoscaler `json:"items"`
+	Items []HorizontalPodAutoscaler `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

@@ -48,6 +48,8 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_v1beta1_SubresourceReference_To_autoscaling_CrossVersionObjectReference,
 		Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v1beta1_HorizontalPodAutoscalerSpec,
 		Convert_v1beta1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec,
+		Convert_autoscaling_HorizontalPodAutoscalerStatus_To_v1beta1_HorizontalPodAutoscalerStatus,
+		Convert_v1beta1_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAutoscalerStatus,
 		// batch
 		Convert_batch_JobSpec_To_v1beta1_JobSpec,
 		Convert_v1beta1_JobSpec_To_batch_JobSpec,
@@ -338,8 +340,12 @@ func Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v1beta1_HorizontalPodAut
 		out.MinReplicas = nil
 	}
 	out.MaxReplicas = in.MaxReplicas
-	if in.TargetCPUUtilizationPercentage != nil {
-		out.CPUUtilization = &CPUTargetUtilization{TargetPercentage: *in.TargetCPUUtilizationPercentage}
+	for _, metric := range in.Metrics {
+		if metric.Type == autoscaling.ResourceSourceType && metric.Resource != nil && metric.Resource.Name == api.ResourceCPU {
+			if metric.Resource.TargetPercentageOfRequest != nil {
+				out.CPUUtilization = &CPUTargetUtilization{TargetPercentage: *metric.Resource.TargetPercentageOfRequest}
+			}
+		}
 	}
 	return nil
 }
@@ -355,9 +361,58 @@ func Convert_v1beta1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAut
 		out.MinReplicas = nil
 	}
 	out.MaxReplicas = int32(in.MaxReplicas)
+	out.Metrics = []autoscaling.MetricSpec{
+		{
+			Type: autoscaling.ResourceSourceType,
+			Resource: &autoscaling.ResourceMetricSource{
+				Name: api.ResourceCPU,
+			},
+		},
+	}
 	if in.CPUUtilization != nil {
-		out.TargetCPUUtilizationPercentage = new(int32)
-		*out.TargetCPUUtilizationPercentage = int32(in.CPUUtilization.TargetPercentage)
+		out.Metrics[0].Resource.TargetPercentageOfRequest = new(int32)
+		*out.Metrics[0].Resource.TargetPercentageOfRequest = int32(in.CPUUtilization.TargetPercentage)
+	}
+	return nil
+}
+
+func Convert_autoscaling_HorizontalPodAutoscalerStatus_To_v1beta1_HorizontalPodAutoscalerStatus(in *autoscaling.HorizontalPodAutoscalerStatus, out *HorizontalPodAutoscalerStatus, s conversion.Scope) error {
+	in.ObservedGeneration = out.ObservedGeneration
+	in.LastScaleTime = out.LastScaleTime
+
+	in.CurrentReplicas = out.CurrentReplicas
+	in.DesiredReplicas = out.DesiredReplicas
+
+	for _, metric := range in.CurrentMetrics {
+		if metric.Type == autoscaling.ResourceSourceType && metric.Resource != nil && metric.Resource.Name == api.ResourceCPU {
+			if metric.Resource.CurrentPercentageOfRequest != nil {
+
+				out.CurrentCPUUtilizationPercentage = new(int32)
+				*out.CurrentCPUUtilizationPercentage = *metric.Resource.CurrentPercentageOfRequest
+			}
+		}
+	}
+	return nil
+}
+
+func Convert_v1beta1_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAutoscalerStatus(in *HorizontalPodAutoscalerStatus, out *autoscaling.HorizontalPodAutoscalerStatus, s conversion.Scope) error {
+	in.ObservedGeneration = out.ObservedGeneration
+	in.LastScaleTime = out.LastScaleTime
+
+	in.CurrentReplicas = out.CurrentReplicas
+	in.DesiredReplicas = out.DesiredReplicas
+
+	out.CurrentMetrics = []autoscaling.MetricStatus{
+		{
+			Type: autoscaling.ResourceSourceType,
+			Resource: &autoscaling.ResourceMetricStatus{
+				Name: api.ResourceCPU,
+			},
+		},
+	}
+	if in.CurrentCPUUtilizationPercentage != nil {
+		out.CurrentMetrics[0].Resource.CurrentPercentageOfRequest = new(int32)
+		*out.CurrentMetrics[0].Resource.CurrentPercentageOfRequest = *in.CurrentCPUUtilizationPercentage
 	}
 	return nil
 }

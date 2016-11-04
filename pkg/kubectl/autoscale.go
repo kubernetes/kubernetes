@@ -124,7 +124,15 @@ func generateHPA(genericParams map[string]interface{}) (runtime.Object, error) {
 	}
 	if cpu >= 0 {
 		c := int32(cpu)
-		scaler.Spec.TargetCPUUtilizationPercentage = &c
+		scaler.Spec.Metrics = []autoscaling.MetricSpec{
+			{
+				Type: autoscaling.ResourceSourceType,
+				Resource: &autoscaling.ResourceMetricSource{
+					Name: api.ResourceCPU,
+					TargetPercentageOfRequest: &c,
+				},
+			},
+		}
 	}
 	return &scaler, nil
 }
