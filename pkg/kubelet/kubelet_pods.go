@@ -75,6 +75,23 @@ func (kl *Kubelet) getActivePods() []*api.Pod {
 	return activePods
 }
 
+// makeDevices determines the devices for the given container.
+// Experimental. For now, we hardcode /dev/nvidia0 no matter what the user asks for
+// (we only support one device per node).
+// TODO: add support for more than 1 GPU after #28216.
+func makeDevices(container *api.Container) []kubecontainer.DeviceInfo {
+	nvidiaGPULimit := container.Resources.Limits.NvidiaGPU()
+	if nvidiaGPULimit.Value() != 0 {
+		return []kubecontainer.DeviceInfo{
+			{PathOnHost: "/dev/nvidia0", PathInContainer: "/dev/nvidia0", Permissions: "mrw"},
+			{PathOnHost: "/dev/nvidiactl", PathInContainer: "/dev/nvidiactl", Permissions: "mrw"},
+			{PathOnHost: "/dev/nvidia-uvm", PathInContainer: "/dev/nvidia-uvm", Permissions: "mrw"},
+		}
+	}
+
+	return nil
+}
+
 // makeMounts determines the mount points for the given container.
 func makeMounts(pod *api.Pod, podDir string, container *api.Container, hostName, hostDomain, podIP string, podVolumes kubecontainer.VolumeMap) ([]kubecontainer.Mount, error) {
 	// Kubernetes only mounts on /etc/hosts if :
@@ -255,6 +272,7 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Cont
 	volumes := kl.volumeManager.GetMountedVolumesForPod(podName)
 
 	opts.PortMappings = makePortMappings(container)
+	opts.Devices = makeDevices(container)
 
 	opts.Mounts, err = makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIP, volumes)
 	if err != nil {

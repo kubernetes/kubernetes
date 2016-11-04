@@ -163,12 +163,22 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 				CPUShares:  rOpts.GetCpuShares(),
 				CPUQuota:   rOpts.GetCpuQuota(),
 				CPUPeriod:  rOpts.GetCpuPeriod(),
-				// TODO: Need to set devices.
 			}
 			hc.OomScoreAdj = int(rOpts.GetOomScoreAdj())
 		}
 		// Note: ShmSize is handled in kube_docker_client.go
 	}
+
+	// Set devices for container.
+	devices := make([]dockercontainer.DeviceMapping, len(config.Devices))
+	for i, device := range config.Devices {
+		devices[i] = dockercontainer.DeviceMapping{
+			PathOnHost:        device.GetHostPath(),
+			PathInContainer:   device.GetContainerPath(),
+			CgroupPermissions: device.GetPermissions(),
+		}
+	}
+	hc.Resources.Devices = devices
 
 	var err error
 	hc.SecurityOpt, err = getContainerSecurityOpts(config.Metadata.GetName(), sandboxConfig, ds.seccompProfileRoot)
