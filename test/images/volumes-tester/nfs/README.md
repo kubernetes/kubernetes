@@ -1,6 +1,6 @@
 # NFS server container for testing
 
-This container exports '/' directory with an index.html inside. NFSv4 only.
+This container exports '/exports' directory with an index.html inside. NFSv4 only.
 
 Accepts a -G option for specifying a group id to give exported directories.
 Clients in the specified group will have full rwx permissions, others none.
