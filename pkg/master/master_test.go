@@ -47,7 +47,6 @@ import (
 	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
-	ipallocator "k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
@@ -67,7 +66,9 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	server, storageConfig := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
 
 	config := &Config{
-		GenericConfig: genericapiserver.NewConfig(),
+		GenericConfig:        genericapiserver.NewConfig(),
+		APIServerServicePort: 443,
+		MasterCount:          1,
 	}
 
 	resourceEncoding := genericapiserver.NewDefaultResourceEncodingConfig()
@@ -141,19 +142,6 @@ func newLimitedMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Confi
 	}
 
 	return master, etcdserver, config, assert
-}
-
-// TestNew verifies that the New function returns a Master
-// using the configuration properly.
-func TestNew(t *testing.T) {
-	master, etcdserver, _, assert := newMaster(t)
-	defer etcdserver.Terminate(t)
-
-	// these values get defaulted
-	_, serviceClusterIPRange, _ := net.ParseCIDR("10.0.0.0/24")
-	serviceReadWriteIP, _ := ipallocator.GetIndexedIP(serviceClusterIPRange, 1)
-	assert.Equal(master.GenericAPIServer.MasterCount, 1)
-	assert.Equal(master.GenericAPIServer.ServiceReadWriteIP, serviceReadWriteIP)
 }
 
 // TestVersion tests /version

@@ -19,10 +19,8 @@ package genericapiserver
 import (
 	"fmt"
 	"mime"
-	"net"
 	"net/http"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -78,12 +76,8 @@ type APIGroupInfo struct {
 
 // GenericAPIServer contains state for a Kubernetes cluster api server.
 type GenericAPIServer struct {
-	// ServiceClusterIPRange is used to build cluster IPs for discovery.  It is exposed so that `master.go` can
-	// construct service storage.
-	// TODO refactor this so that `master.go` drives the value used for discovery and the value here isn't exposed.
-	// that structure will force usage in the correct direction where the "owner" of the value is the source of
-	// truth for its value.
-	ServiceClusterIPRange *net.IPNet
+	// discoveryAddresses is used to build cluster IPs for discovery.
+	discoveryAddresses DiscoveryAddresses
 
 	// LoopbackClientConfig is a config for a privileged loopback connection to the API server
 	LoopbackClientConfig *restclient.Config
@@ -152,13 +146,6 @@ type GenericAPIServer struct {
 	healthzLock    sync.Mutex
 	healthzChecks  []healthz.HealthzChecker
 	healthzCreated bool
-
-	// See Config.$name for documentation of these flags:
-
-	MasterCount               int
-	KubernetesServiceNodePort int // TODO(sttts): move into master
-	ServiceReadWriteIP        net.IP
-	ServiceReadWritePort      int
 }
 
 func init() {
@@ -260,8 +247,10 @@ func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo 
 	// Install the version handler.
 	// Add a handler at /<apiPrefix> to enumerate the supported api versions.
 	apiserver.AddApiWebService(s.Serializer, s.HandlerContainer.Container, apiPrefix, func(req *restful.Request) *unversioned.APIVersions {
+		clientIP := utilnet.GetClientIP(req.Request)
+
 		apiVersionsForDiscovery := unversioned.APIVersions{
-			ServerAddressByClientCIDRs: s.getServerAddressByClientCIDRs(req.Request),
+			ServerAddressByClientCIDRs: s.discoveryAddresses.ServerAddressByClientCIDRs(clientIP),
 			Versions:                   apiVersions,
 		}
 		return &apiVersionsForDiscovery
@@ -328,26 +317,6 @@ func (s *GenericAPIServer) RemoveAPIGroupForDiscovery(groupName string) {
 	delete(s.apiGroupsForDiscovery, groupName)
 }
 
-func (s *GenericAPIServer) getServerAddressByClientCIDRs(req *http.Request) []unversioned.ServerAddressByClientCIDR {
-	addressCIDRMap := []unversioned.ServerAddressByClientCIDR{
-		{
-			ClientCIDR:    "0.0.0.0/0",
-			ServerAddress: s.ExternalAddress,
-		},
-	}
-
-	// Add internal CIDR if the request came from internal IP.
-	clientIP := utilnet.GetClientIP(req)
-	clusterCIDR := s.ServiceClusterIPRange
-	if clusterCIDR.Contains(clientIP) {
-		addressCIDRMap = append(addressCIDRMap, unversioned.ServerAddressByClientCIDR{
-			ClientCIDR:    clusterCIDR.String(),
-			ServerAddress: net.JoinHostPort(s.ServiceReadWriteIP.String(), strconv.Itoa(s.ServiceReadWritePort)),
-		})
-	}
-	return addressCIDRMap
-}
-
 func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion unversioned.GroupVersion, apiPrefix string) (*apiserver.APIGroupVersion, error) {
 	storage := make(map[string]rest.Storage)
 	for k, v := range apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version] {
@@ -397,7 +366,8 @@ func (s *GenericAPIServer) DynamicApisDiscovery() *restful.WebService {
 			sortedGroups = append(sortedGroups, s.apiGroupsForDiscovery[groupName])
 		}
 
-		serverCIDR := s.getServerAddressByClientCIDRs(req.Request)
+		clientIP := utilnet.GetClientIP(req.Request)
+		serverCIDR := s.discoveryAddresses.ServerAddressByClientCIDRs(clientIP)
 		groups := make([]unversioned.APIGroup, len(sortedGroups))
 		for i := range sortedGroups {
 			groups[i] = sortedGroups[i]
