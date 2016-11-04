@@ -21,6 +21,7 @@ import (
 	"compress/gzip"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -33,25 +34,58 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"golang.org/x/net/websocket"
 
+	utilconfig "k8s.io/kubernetes/pkg/util/config"
+	"k8s.io/kubernetes/pkg/util/httpstream"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/proxy"
 )
 
+const fakeStatusCode = 567
+
 type fakeResponder struct {
+	t      *testing.T
 	called bool
 	err    error
+	// called chan error
+	w http.ResponseWriter
 }
 
 func (r *fakeResponder) Error(err error) {
 	if r.called {
-		panic("called twice")
+		r.t.Errorf("Error responder called again!\nprevious error: %v\nnew error: %v", r.err, err)
 	}
+
+	if r.w != nil {
+		r.w.WriteHeader(fakeStatusCode)
+		_, writeErr := r.w.Write([]byte(err.Error()))
+		assert.NoError(r.t, writeErr)
+	} else {
+		r.t.Logf("No ResponseWriter set")
+	}
+
 	r.called = true
 	r.err = err
 }
+
+type fakeConn struct {
+	err error // The error to return when io is performed over the connection.
+}
+
+func (f *fakeConn) Read([]byte) (int, error)        { return 0, f.err }
+func (f *fakeConn) Write([]byte) (int, error)       { return 0, f.err }
+func (f *fakeConn) Close() error                    { return nil }
+func (fakeConn) LocalAddr() net.Addr                { return nil }
+func (fakeConn) RemoteAddr() net.Addr               { return nil }
+func (fakeConn) SetDeadline(t time.Time) error      { return nil }
+func (fakeConn) SetReadDeadline(t time.Time) error  { return nil }
+func (fakeConn) SetWriteDeadline(t time.Time) error { return nil }
 
 type SimpleBackendHandler struct {
 	requestURL     url.URL
@@ -210,7 +244,7 @@ func TestServeHTTP(t *testing.T) {
 			backendServer := httptest.NewServer(backendHandler)
 			defer backendServer.Close()
 
-			responder := &fakeResponder{}
+			responder := &fakeResponder{t: t}
 			backendURL, _ := url.Parse(backendServer.URL)
 			backendURL.Path = test.requestPath
 			proxyHandler := &UpgradeAwareProxyHandler{
@@ -367,43 +401,101 @@ func TestProxyUpgrade(t *testing.T) {
 		},
 	}
 
+	// Enable StreamingProxyRedirects for test.
+	utilconfig.DefaultFeatureGate.Set("StreamingProxyRedirects=true")
+
 	for k, tc := range testcases {
+		for _, redirect := range []bool{false, true} {
+			tcName := k
+			backendPath := "/hello"
+			if redirect {
+				tcName += " with redirect"
+				backendPath = "/redirect"
+			}
+			func() { // Cleanup after each test case.
+				backend := http.NewServeMux()
+				backend.Handle("/hello", websocket.Handler(func(ws *websocket.Conn) {
+					defer ws.Close()
+					body := make([]byte, 5)
+					ws.Read(body)
+					ws.Write([]byte("hello " + string(body)))
+				}))
+				backend.Handle("/redirect", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					http.Redirect(w, r, "/hello", http.StatusFound)
+				}))
+				backendServer := tc.ServerFunc(backend)
+				defer backendServer.Close()
 
-		backendServer := tc.ServerFunc(websocket.Handler(func(ws *websocket.Conn) {
-			defer ws.Close()
-			body := make([]byte, 5)
-			ws.Read(body)
-			ws.Write([]byte("hello " + string(body)))
-		}))
-		defer backendServer.Close()
+				serverURL, _ := url.Parse(backendServer.URL)
+				serverURL.Path = backendPath
+				proxyHandler := &UpgradeAwareProxyHandler{
+					Location:           serverURL,
+					Transport:          tc.ProxyTransport,
+					InterceptRedirects: redirect,
+				}
+				proxy := httptest.NewServer(proxyHandler)
+				defer proxy.Close()
 
-		serverURL, _ := url.Parse(backendServer.URL)
-		proxyHandler := &UpgradeAwareProxyHandler{
-			Location:  serverURL,
-			Transport: tc.ProxyTransport,
-		}
-		proxy := httptest.NewServer(proxyHandler)
-		defer proxy.Close()
+				ws, err := websocket.Dial("ws://"+proxy.Listener.Addr().String()+"/some/path", "", "http://127.0.0.1/")
+				if err != nil {
+					t.Fatalf("%s: websocket dial err: %s", tcName, err)
+				}
+				defer ws.Close()
 
-		ws, err := websocket.Dial("ws://"+proxy.Listener.Addr().String()+"/some/path", "", "http://127.0.0.1/")
-		if err != nil {
-			t.Fatalf("%s: websocket dial err: %s", k, err)
-		}
-		defer ws.Close()
+				if _, err := ws.Write([]byte("world")); err != nil {
+					t.Fatalf("%s: write err: %s", tcName, err)
+				}
 
-		if _, err := ws.Write([]byte("world")); err != nil {
-			t.Fatalf("%s: write err: %s", k, err)
-		}
-
-		response := make([]byte, 20)
-		n, err := ws.Read(response)
-		if err != nil {
-			t.Fatalf("%s: read err: %s", k, err)
-		}
-		if e, a := "hello world", string(response[0:n]); e != a {
-			t.Fatalf("%s: expected '%#v', got '%#v'", k, e, a)
+				response := make([]byte, 20)
+				n, err := ws.Read(response)
+				if err != nil {
+					t.Fatalf("%s: read err: %s", tcName, err)
+				}
+				if e, a := "hello world", string(response[0:n]); e != a {
+					t.Fatalf("%s: expected '%#v', got '%#v'", tcName, e, a)
+				}
+			}()
 		}
 	}
+}
+
+func TestProxyUpgradeErrorResponse(t *testing.T) {
+	var (
+		responder   *fakeResponder
+		expectedErr = errors.New("EXPECTED")
+	)
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		transport := http.DefaultTransport.(*http.Transport)
+		transport.Dial = func(network, addr string) (net.Conn, error) {
+			return &fakeConn{err: expectedErr}, nil
+		}
+		responder = &fakeResponder{t: t, w: w}
+		proxyHandler := &UpgradeAwareProxyHandler{
+			Location: &url.URL{
+				Host: "fake-backend",
+			},
+			UpgradeRequired: true,
+			Responder:       responder,
+			Transport:       transport,
+		}
+		proxyHandler.ServeHTTP(w, r)
+	}))
+	defer proxy.Close()
+
+	// Send request to proxy server.
+	req, err := http.NewRequest("POST", "http://"+proxy.Listener.Addr().String()+"/some/path", nil)
+	require.NoError(t, err)
+	req.Header.Set(httpstream.HeaderConnection, httpstream.HeaderUpgrade)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	// Expect error response.
+	assert.True(t, responder.called)
+	assert.Equal(t, fakeStatusCode, resp.StatusCode)
+	msg, err := ioutil.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Contains(t, string(msg), expectedErr.Error())
 }
 
 func TestDefaultProxyTransport(t *testing.T) {
@@ -415,7 +507,6 @@ func TestDefaultProxyTransport(t *testing.T) {
 		expectedHost,
 		expectedPathPrepend string
 	}{
-
 		{
 			name:                "simple path",
 			url:                 "http://test.server:8080/a/test/location",
@@ -619,7 +710,7 @@ func TestProxyRequestContentLengthAndTransferEncoding(t *testing.T) {
 		}))
 		defer downstreamServer.Close()
 
-		responder := &fakeResponder{}
+		responder := &fakeResponder{t: t}
 		backendURL, _ := url.Parse(downstreamServer.URL)
 		proxyHandler := &UpgradeAwareProxyHandler{
 			Location:        backendURL,
