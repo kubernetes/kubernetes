@@ -64,6 +64,34 @@ set -o nounset
 set -o pipefail
 
 KUBERNETES_RELEASE_URL="${KUBERNETES_RELEASE_URL:-https://storage.googleapis.com/kubernetes-release/release}"
+KUBE_DEV_RELEASE_BUCKET_URL="${KUBE_DEV_RELEASE_BUCKET_URL:-https://storage.googleapis.com/kubernetes-release-dev}"
+
+KUBE_RELEASE_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-(beta|alpha)\\.(0|[1-9][0-9]*))?$"
+KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(beta|alpha)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[-0-9a-z]*)?$"
+
+# Sets KUBE_VERSION variable to the proper version number (e.g. "v1.0.6",
+# "v1.2.0-alpha.1.881+376438b69c7612") or a version' publication of the form
+# <path>/<version> (e.g. "release/stable",' "ci/latest-1").
+#
+# See the docs on getting builds for more information about version
+# publication.
+#
+# Args:
+#   $1 version string from command line
+# Vars set:
+#   KUBE_VERSION
+function set_binary_version() {
+  if [[ "${1}" =~ "/" ]]; then
+    IFS='/' read -a path <<< "${1}"
+    if [[ "${path[0]}" == "release" ]]; then
+      KUBE_VERSION=$(gsutil cat "gs://kubernetes-release/${1}.txt")
+    else
+      KUBE_VERSION=$(gsutil cat "gs://kubernetes-release-dev/${1}.txt")
+    fi
+  else
+    KUBE_VERSION=${1}
+  fi
+}
 
 # Use the script from inside the Kubernetes tarball to fetch the client and
 # server binaries (if not included in kubernetes.tar.gz).
@@ -110,18 +138,6 @@ if [[ -d "./kubernetes" ]]; then
   fi
 fi
 
-function get_latest_version_number {
-  local -r latest_url="https://storage.googleapis.com/kubernetes-release/release/stable.txt"
-  if [[ $(which wget) ]]; then
-    wget -qO- "${latest_url}"
-  elif [[ $(which curl) ]]; then
-    curl -sSfL --retry 3 --keepalive-time 2 "${latest_url}"
-  else
-    echo "Couldn't find curl or wget.  Bailing out." >&2
-    exit 4
-  fi
-}
-
 # TODO: remove client checks once kubernetes.tar.gz no longer includes client
 # binaries by default.
 kernel=$(uname -s)
@@ -162,8 +178,20 @@ case "${machine}" in
 esac
 
 file=kubernetes.tar.gz
-release=${KUBERNETES_RELEASE:-$(get_latest_version_number)}
-release_url="${KUBERNETES_RELEASE_URL}/${release}/${file}"
+release=${KUBERNETES_RELEASE:-"release/stable"}
+
+# Validate Kubernetes release version.
+# Translate a published version <bucket>/<version> (e.g. "release/stable") to version number.
+set_binary_version "${release}"
+if [[ ${KUBE_VERSION} =~ ${KUBE_RELEASE_VERSION_REGEX} ]]; then
+  release_url="${KUBERNETES_RELEASE_URL}/${KUBE_VERSION}/${file}"
+elif [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
+  release_url="${KUBE_DEV_RELEASE_BUCKET_URL}/ci/${KUBE_VERSION}/${file}"
+else
+  echo "Version doesn't match regexp" >&2
+  exit 1
+fi
+
 
 need_download=true
 if [[ -r "${PWD}/${file}" ]]; then
