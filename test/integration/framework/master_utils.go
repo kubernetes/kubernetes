@@ -348,19 +348,19 @@ func NewMasterConfig() *master.Config {
 	genericConfig := genericapiserver.NewConfig()
 	kubeVersion := version.Get()
 	genericConfig.Version = &kubeVersion
-	genericConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
 	genericConfig.Authorizer = authorizer.NewAlwaysAllowAuthorizer()
 	genericConfig.AdmissionControl = admit.NewAlwaysAdmit()
 	genericConfig.EnableMetrics = true
 
 	return &master.Config{
-		GenericConfig:         genericConfig,
-		StorageFactory:        storageFactory,
-		EnableCoreControllers: true,
-		EnableWatchCache:      true,
-		KubeletClientConfig:   kubeletclient.KubeletClientConfig{Port: 10250},
-		APIServerServicePort:  443,
-		MasterCount:           1,
+		GenericConfig:           genericConfig,
+		StorageFactory:          storageFactory,
+		APIResourceConfigSource: master.DefaultAPIResourceConfigSource(),
+		EnableCoreControllers:   true,
+		EnableWatchCache:        true,
+		KubeletClientConfig:     kubeletclient.KubeletClientConfig{Port: 10250},
+		APIServerServicePort:    443,
+		MasterCount:             1,
 	}
 }
 
@@ -368,8 +368,8 @@ func NewMasterConfig() *master.Config {
 func NewIntegrationTestMasterConfig() *master.Config {
 	masterConfig := NewMasterConfig()
 	masterConfig.EnableCoreControllers = true
-	masterConfig.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
-	masterConfig.GenericConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
+	masterConfig.PublicAddress = net.ParseIP("192.168.10.4")
+	masterConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
 	return masterConfig
 }
 

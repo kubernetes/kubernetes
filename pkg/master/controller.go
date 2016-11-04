@@ -19,6 +19,7 @@ package master
 import (
 	"fmt"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/golang/glog"
@@ -76,6 +77,15 @@ type Controller struct {
 
 // NewBootstrapController returns a controller for watching the core capabilities of the master
 func (c *Config) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTStorage) *Controller {
+	publicServicePort := 0
+	if c.GenericConfig.SecureServingInfo != nil {
+		if _, portStr, err := net.SplitHostPort(c.GenericConfig.SecureServingInfo.BindAddress); err == nil && len(portStr) > 0 {
+			if port, err := strconv.Atoi(portStr); err == nil {
+				publicServicePort = port
+			}
+		}
+	}
+
 	return &Controller{
 		NamespaceRegistry: legacyRESTStorage.NamespaceRegistry,
 		ServiceRegistry:   legacyRESTStorage.ServiceRegistry,
@@ -94,13 +104,13 @@ func (c *Config) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTSto
 		ServiceNodePortRange:    c.ServiceNodePortRange,
 		ServiceNodePortInterval: 3 * time.Minute,
 
-		PublicIP: c.GenericConfig.PublicAddress,
+		PublicIP: c.PublicAddress,
 
 		ServiceIP:                 c.APIServerServiceIP,
 		ServicePort:               c.APIServerServicePort,
 		ExtraServicePorts:         c.ExtraServicePorts,
 		ExtraEndpointPorts:        c.ExtraEndpointPorts,
-		PublicServicePort:         c.GenericConfig.ExternalSecurePort,
+		PublicServicePort:         publicServicePort,
 		KubernetesServiceNodePort: c.KubernetesServiceNodePort,
 	}
 }
