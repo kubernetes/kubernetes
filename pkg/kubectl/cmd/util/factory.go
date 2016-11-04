@@ -80,7 +80,7 @@ type Factory interface {
 	FlagSet() *pflag.FlagSet
 
 	// Returns a discovery client
-	DiscoveryClient() discovery.CachedDiscoveryInterface
+	DiscoveryClient() (discovery.CachedDiscoveryInterface, error)
 	// Returns interfaces for dealing with arbitrary runtime.Objects.
 	Object() (meta.RESTMapper, runtime.ObjectTyper)
 	// Returns interfaces for dealing with arbitrary
@@ -302,7 +302,6 @@ type factory struct {
 	clientConfig clientcmd.ClientConfig
 
 	clients         *ClientCache
-	discoveryClient discovery.CachedDiscoveryInterface
 }
 
 // NewFactory creates a factory with the default Kubernetes resources defined
@@ -325,14 +324,6 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) Factory {
 		clients:      clients,
 	}
 
-	cfg, err := f.clientConfig.ClientConfig()
-	checkErrWithPrefix("failed to get client config: ", err)
-	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
-	if err == nil {
-		cacheDir := computeDiscoverCacheDir(filepath.Join(homedir.HomeDir(), ".kube", "cache", "discovery"), cfg.Host)
-		f.discoveryClient = NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute))
-	}
-
 	return f
 }
 
@@ -340,14 +331,23 @@ func (f *factory) FlagSet() *pflag.FlagSet {
 	return f.flags
 }
 
-func (f *factory) DiscoveryClient() discovery.CachedDiscoveryInterface {
-	return f.discoveryClient
+func (f *factory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
+	cfg, err := f.clientConfig.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	cacheDir := computeDiscoverCacheDir(filepath.Join(homedir.HomeDir(), ".kube", "cache", "discovery"), cfg.Host)
+	return NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute)), nil
 }
 
 func (f *factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
 	mapper := registered.RESTMapper()
-	discoveryClient := f.DiscoveryClient()
-	if discoveryClient != nil {
+	discoveryClient, err := f.DiscoveryClient()
+	if err == nil {
 		mapper = meta.FirstHitRESTMapper{
 			MultiRESTMapper: meta.MultiRESTMapper{
 				discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, registered.InterfacesFor),
@@ -371,7 +371,10 @@ func (f *factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
 }
 
 func (f *factory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, error) {
-	discoveryClient := f.DiscoveryClient()
+	discoveryClient, err := f.DiscoveryClient()
+	if err != nil {
+		return nil, nil, err
+	}
 	groupResources, err := discovery.GetAPIGroupResources(discoveryClient)
 	if err != nil && !discoveryClient.Fresh() {
 		discoveryClient.Invalidate()

@@ -175,9 +175,12 @@ func NewTestFactory() (cmdutil.Factory, *TestFactory, runtime.Codec, runtime.Neg
 	}, t, codec, negotiatedSerializer
 }
 
-func (f *FakeFactory) DiscoveryClient() discovery.CachedDiscoveryInterface {
-	discoveryClient, _ := discovery.NewDiscoveryClientForConfig(f.tf.ClientConfig)
-	return &fakeCachedDiscoveryClient{DiscoveryInterface: discoveryClient}
+func (f *FakeFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(f.tf.ClientConfig)
+	if err != nil {
+		return err
+	}
+	return &fakeCachedDiscoveryClient{DiscoveryInterface: discoveryClient}, nil
 }
 
 func (f *FakeFactory) FlagSet() *pflag.FlagSet {
