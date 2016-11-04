@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -549,49 +548,6 @@ func ContainsChangeCause(info *resource.Info) bool {
 // ShouldRecord checks if we should record current change cause
 func ShouldRecord(cmd *cobra.Command, info *resource.Info) bool {
 	return GetRecordFlag(cmd) || (ContainsChangeCause(info) && !cmd.Flags().Changed("record"))
-}
-
-// GetThirdPartyGroupVersions returns the thirdparty "group/versions"s and
-// resources supported by the server. A user may delete a thirdparty resource
-// when this function is running, so this function may return a "NotFound" error
-// due to the race.
-func GetThirdPartyGroupVersions(discovery discovery.DiscoveryInterface) ([]unversioned.GroupVersion, []unversioned.GroupVersionKind, error) {
-	result := []unversioned.GroupVersion{}
-	gvks := []unversioned.GroupVersionKind{}
-
-	groupList, err := discovery.ServerGroups()
-	if err != nil {
-		// On forbidden or not found, just return empty lists.
-		if kerrors.IsForbidden(err) || kerrors.IsNotFound(err) {
-			return result, gvks, nil
-		}
-
-		return nil, nil, err
-	}
-
-	for ix := range groupList.Groups {
-		group := &groupList.Groups[ix]
-		for jx := range group.Versions {
-			gv, err2 := unversioned.ParseGroupVersion(group.Versions[jx].GroupVersion)
-			if err2 != nil {
-				return nil, nil, err
-			}
-			// Skip GroupVersionKinds that have been statically registered.
-			if registered.IsRegisteredVersion(gv) {
-				continue
-			}
-			result = append(result, gv)
-
-			resourceList, err := discovery.ServerResourcesForGroupVersion(group.Versions[jx].GroupVersion)
-			if err != nil {
-				return nil, nil, err
-			}
-			for kx := range resourceList.APIResources {
-				gvks = append(gvks, gv.WithKind(resourceList.APIResources[kx].Kind))
-			}
-		}
-	}
-	return result, gvks, nil
 }
 
 func AddInclude3rdPartyFlags(cmd *cobra.Command) {
