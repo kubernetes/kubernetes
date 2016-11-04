@@ -31,6 +31,10 @@ const (
 	// KubeconfigSecretDataKey is the key name used in the secret to
 	// stores a cluster's credentials.
 	KubeconfigSecretDataKey = "kubeconfig"
+
+	// DefaultFederationSystemNamespace is the namespace in which
+	// federation system components are hosted.
+	DefaultFederationSystemNamespace = "federation-system"
 )
 
 // AdminConfig provides a filesystem based kubeconfig (via
@@ -87,7 +91,7 @@ type SubcommandFlags struct {
 func AddSubcommandFlags(cmd *cobra.Command) {
 	cmd.Flags().String("kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
 	cmd.Flags().String("host-cluster-context", "", "Host cluster context")
-	cmd.Flags().String("federation-system-namespace", "federation-system", "Namespace in the host cluster where the federation system components are installed")
+	cmd.Flags().String("federation-system-namespace", DefaultFederationSystemNamespace, "Namespace in the host cluster where the federation system components are installed")
 }
 
 // GetSubcommandFlags retrieves the command line flag values for the
