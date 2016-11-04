@@ -19,6 +19,7 @@ package namespace
 import (
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -60,11 +61,22 @@ type operationKey struct {
 
 // operationNotSupportedCache is a simple cache to remember if an operation is not supported for a resource.
 // if the operationKey maps to true, it means the operation is not supported.
-type operationNotSupportedCache map[operationKey]bool
+type operationNotSupportedCache struct {
+	lock sync.RWMutex
+	m    map[operationKey]bool
+}
 
 // isSupported returns true if the operation is supported
-func (o operationNotSupportedCache) isSupported(key operationKey) bool {
-	return !o[key]
+func (o *operationNotSupportedCache) isSupported(key operationKey) bool {
+	o.lock.RLock()
+	defer o.lock.RUnlock()
+	return !o.m[key]
+}
+
+func (o *operationNotSupportedCache) setNotSupported(key operationKey) {
+	o.lock.Lock()
+	defer o.lock.Unlock()
+	o.m[key] = true
 }
 
 // updateNamespaceFunc is a function that makes an update to a namespace
@@ -148,7 +160,7 @@ func finalizeNamespace(kubeClient clientset.Interface, namespace *api.Namespace,
 // it returns an error if the operation was supported on the server but was unable to complete.
 func deleteCollection(
 	dynamicClient *dynamic.Client,
-	opCache operationNotSupportedCache,
+	opCache *operationNotSupportedCache,
 	gvr unversioned.GroupVersionResource,
 	namespace string,
 ) (bool, error) {
@@ -180,7 +192,7 @@ func deleteCollection(
 	// remember next time that this resource does not support delete collection...
 	if errors.IsMethodNotSupported(err) || errors.IsNotFound(err) {
 		glog.V(5).Infof("namespace controller - deleteCollection not supported - namespace: %s, gvr: %v", namespace, gvr)
-		opCache[key] = true
+		opCache.setNotSupported(key)
 		return false, nil
 	}
 
@@ -195,7 +207,7 @@ func deleteCollection(
 //  an error if the operation is supported but could not be completed.
 func listCollection(
 	dynamicClient *dynamic.Client,
-	opCache operationNotSupportedCache,
+	opCache *operationNotSupportedCache,
 	gvr unversioned.GroupVersionResource,
 	namespace string,
 ) (*runtime.UnstructuredList, bool, error) {
@@ -225,7 +237,7 @@ func listCollection(
 	// remember next time that this resource does not support delete collection...
 	if errors.IsMethodNotSupported(err) || errors.IsNotFound(err) {
 		glog.V(5).Infof("namespace controller - listCollection not supported - namespace: %s, gvr: %v", namespace, gvr)
-		opCache[key] = true
+		opCache.setNotSupported(key)
 		return nil, false, nil
 	}
 
@@ -235,7 +247,7 @@ func listCollection(
 // deleteEachItem is a helper function that will list the collection of resources and delete each item 1 by 1.
 func deleteEachItem(
 	dynamicClient *dynamic.Client,
-	opCache operationNotSupportedCache,
+	opCache *operationNotSupportedCache,
 	gvr unversioned.GroupVersionResource,
 	namespace string,
 ) error {
@@ -263,7 +275,7 @@ func deleteEachItem(
 func deleteAllContentForGroupVersionResource(
 	kubeClient clientset.Interface,
 	clientPool dynamic.ClientPool,
-	opCache operationNotSupportedCache,
+	opCache *operationNotSupportedCache,
 	gvr unversioned.GroupVersionResource,
 	namespace string,
 	namespaceDeletedAt unversioned.Time,
@@ -331,7 +343,7 @@ func deleteAllContentForGroupVersionResource(
 func deleteAllContent(
 	kubeClient clientset.Interface,
 	clientPool dynamic.ClientPool,
-	opCache operationNotSupportedCache,
+	opCache *operationNotSupportedCache,
 	groupVersionResources []unversioned.GroupVersionResource,
 	namespace string,
 	namespaceDeletedAt unversioned.Time,
@@ -358,7 +370,7 @@ func deleteAllContent(
 func syncNamespace(
 	kubeClient clientset.Interface,
 	clientPool dynamic.ClientPool,
-	opCache operationNotSupportedCache,
+	opCache *operationNotSupportedCache,
 	groupVersionResources []unversioned.GroupVersionResource,
 	namespace *api.Namespace,
 	finalizerToken api.FinalizerName,
