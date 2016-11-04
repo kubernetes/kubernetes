@@ -102,6 +102,37 @@ go_library(
 )
 
 go_library(
+    name = "github.com/Azure/azure-sdk-for-go/arm/storage",
+    srcs = [
+        "github.com/Azure/azure-sdk-for-go/arm/storage/accounts.go",
+        "github.com/Azure/azure-sdk-for-go/arm/storage/client.go",
+        "github.com/Azure/azure-sdk-for-go/arm/storage/models.go",
+        "github.com/Azure/azure-sdk-for-go/arm/storage/usageoperations.go",
+        "github.com/Azure/azure-sdk-for-go/arm/storage/version.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/Azure/go-autorest/autorest",
+        "//vendor:github.com/Azure/go-autorest/autorest/azure",
+        "//vendor:github.com/Azure/go-autorest/autorest/date",
+    ],
+)
+
+go_library(
+    name = "github.com/Azure/azure-sdk-for-go/storage",
+    srcs = [
+        "github.com/Azure/azure-sdk-for-go/storage/blob.go",
+        "github.com/Azure/azure-sdk-for-go/storage/client.go",
+        "github.com/Azure/azure-sdk-for-go/storage/file.go",
+        "github.com/Azure/azure-sdk-for-go/storage/queue.go",
+        "github.com/Azure/azure-sdk-for-go/storage/table.go",
+        "github.com/Azure/azure-sdk-for-go/storage/table_entities.go",
+        "github.com/Azure/azure-sdk-for-go/storage/util.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
     name = "github.com/Azure/go-ansiterm",
     srcs = [
         "github.com/Azure/go-ansiterm/constants.go",
@@ -5909,6 +5940,15 @@ go_library(
 )
 
 go_library(
+    name = "github.com/rubiojr/go-vhd/vhd",
+    srcs = [
+        "github.com/rubiojr/go-vhd/vhd/util.go",
+        "github.com/rubiojr/go-vhd/vhd/vhd.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
     name = "github.com/russross/blackfriday",
     srcs = [
         "github.com/russross/blackfriday/block.go",
@@ -7747,6 +7787,30 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = ["//vendor:github.com/docker/distribution/digest"],
+)
+
+go_library(
+    name = "k8s.io/client-go/_vendor/github.com/docker/spdystream",
+    srcs = [
+        "k8s.io/client-go/_vendor/github.com/docker/spdystream/connection.go",
+        "k8s.io/client-go/_vendor/github.com/docker/spdystream/handlers.go",
+        "k8s.io/client-go/_vendor/github.com/docker/spdystream/priority.go",
+        "k8s.io/client-go/_vendor/github.com/docker/spdystream/stream.go",
+        "k8s.io/client-go/_vendor/github.com/docker/spdystream/utils.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/docker/spdystream/spdy"],
+)
+
+go_library(
+    name = "k8s.io/client-go/_vendor/github.com/docker/spdystream/spdy",
+    srcs = [
+        "k8s.io/client-go/_vendor/github.com/docker/spdystream/spdy/dictionary.go",
+        "k8s.io/client-go/_vendor/github.com/docker/spdystream/spdy/read.go",
+        "k8s.io/client-go/_vendor/github.com/docker/spdystream/spdy/types.go",
+        "k8s.io/client-go/_vendor/github.com/docker/spdystream/spdy/write.go",
+    ],
+    tags = ["automanaged"],
 )
 
 go_library(
@@ -10601,6 +10665,12 @@ go_library(
 )
 
 go_library(
+    name = "k8s.io/client-go/pkg/third_party/forked/golang/netutil",
+    srcs = ["k8s.io/client-go/pkg/third_party/forked/golang/netutil/addr.go"],
+    tags = ["automanaged"],
+)
+
+go_library(
     name = "k8s.io/client-go/pkg/third_party/forked/golang/reflect",
     srcs = [
         "k8s.io/client-go/pkg/third_party/forked/golang/reflect/deep_equal.go",
@@ -10721,6 +10791,26 @@ go_library(
         "k8s.io/client-go/pkg/util/httpstream/httpstream.go",
     ],
     tags = ["automanaged"],
+)
+
+go_library(
+    name = "k8s.io/client-go/pkg/util/httpstream/spdy",
+    srcs = [
+        "k8s.io/client-go/pkg/util/httpstream/spdy/connection.go",
+        "k8s.io/client-go/pkg/util/httpstream/spdy/roundtripper.go",
+        "k8s.io/client-go/pkg/util/httpstream/spdy/upgrade.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/docker/spdystream",
+        "//vendor:github.com/golang/glog",
+        "//vendor:k8s.io/client-go/pkg/api",
+        "//vendor:k8s.io/client-go/pkg/api/errors",
+        "//vendor:k8s.io/client-go/pkg/api/unversioned",
+        "//vendor:k8s.io/client-go/pkg/third_party/forked/golang/netutil",
+        "//vendor:k8s.io/client-go/pkg/util/httpstream",
+        "//vendor:k8s.io/client-go/pkg/util/runtime",
+    ],
 )
 
 go_library(
@@ -11017,6 +11107,21 @@ go_library(
         "//vendor:k8s.io/client-go/tools/clientcmd/api",
         "//vendor:k8s.io/client-go/tools/metrics",
         "//vendor:k8s.io/client-go/transport",
+    ],
+)
+
+go_library(
+    name = "k8s.io/client-go/rest/fake",
+    srcs = ["k8s.io/client-go/rest/fake/fake.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:k8s.io/client-go/pkg/api",
+        "//vendor:k8s.io/client-go/pkg/api/testapi",
+        "//vendor:k8s.io/client-go/pkg/api/unversioned",
+        "//vendor:k8s.io/client-go/pkg/apimachinery/registered",
+        "//vendor:k8s.io/client-go/pkg/runtime",
+        "//vendor:k8s.io/client-go/pkg/util/flowcontrol",
+        "//vendor:k8s.io/client-go/rest",
     ],
 )
 
@@ -11408,109 +11513,4 @@ go_library(
         "//pkg/api/unversioned:go_default_library",
         "//pkg/api/v1:go_default_library",
     ],
-)
-
-go_library(
-    name = "k8s.io/client-go/_vendor/github.com/docker/spdystream",
-    srcs = [
-        "k8s.io/client-go/_vendor/github.com/docker/spdystream/connection.go",
-        "k8s.io/client-go/_vendor/github.com/docker/spdystream/handlers.go",
-        "k8s.io/client-go/_vendor/github.com/docker/spdystream/priority.go",
-        "k8s.io/client-go/_vendor/github.com/docker/spdystream/stream.go",
-        "k8s.io/client-go/_vendor/github.com/docker/spdystream/utils.go",
-    ],
-    tags = ["automanaged"],
-    deps = ["//vendor:github.com/docker/spdystream/spdy"],
-)
-
-go_library(
-    name = "k8s.io/client-go/_vendor/github.com/docker/spdystream/spdy",
-    srcs = [
-        "k8s.io/client-go/_vendor/github.com/docker/spdystream/spdy/dictionary.go",
-        "k8s.io/client-go/_vendor/github.com/docker/spdystream/spdy/read.go",
-        "k8s.io/client-go/_vendor/github.com/docker/spdystream/spdy/types.go",
-        "k8s.io/client-go/_vendor/github.com/docker/spdystream/spdy/write.go",
-    ],
-    tags = ["automanaged"],
-)
-
-go_library(
-    name = "k8s.io/client-go/pkg/third_party/forked/golang/netutil",
-    srcs = ["k8s.io/client-go/pkg/third_party/forked/golang/netutil/addr.go"],
-    tags = ["automanaged"],
-)
-
-go_library(
-    name = "k8s.io/client-go/pkg/util/httpstream/spdy",
-    srcs = [
-        "k8s.io/client-go/pkg/util/httpstream/spdy/connection.go",
-        "k8s.io/client-go/pkg/util/httpstream/spdy/roundtripper.go",
-        "k8s.io/client-go/pkg/util/httpstream/spdy/upgrade.go",
-    ],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/docker/spdystream",
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/client-go/pkg/api",
-        "//vendor:k8s.io/client-go/pkg/api/errors",
-        "//vendor:k8s.io/client-go/pkg/api/unversioned",
-        "//vendor:k8s.io/client-go/pkg/third_party/forked/golang/netutil",
-        "//vendor:k8s.io/client-go/pkg/util/httpstream",
-        "//vendor:k8s.io/client-go/pkg/util/runtime",
-    ],
-)
-
-go_library(
-    name = "k8s.io/client-go/rest/fake",
-    srcs = ["k8s.io/client-go/rest/fake/fake.go"],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:k8s.io/client-go/pkg/api",
-        "//vendor:k8s.io/client-go/pkg/api/testapi",
-        "//vendor:k8s.io/client-go/pkg/api/unversioned",
-        "//vendor:k8s.io/client-go/pkg/apimachinery/registered",
-        "//vendor:k8s.io/client-go/pkg/runtime",
-        "//vendor:k8s.io/client-go/pkg/util/flowcontrol",
-        "//vendor:k8s.io/client-go/rest",
-    ],
-)
-
-go_library(
-    name = "github.com/Azure/azure-sdk-for-go/arm/storage",
-    srcs = [
-        "github.com/Azure/azure-sdk-for-go/arm/storage/accounts.go",
-        "github.com/Azure/azure-sdk-for-go/arm/storage/client.go",
-        "github.com/Azure/azure-sdk-for-go/arm/storage/models.go",
-        "github.com/Azure/azure-sdk-for-go/arm/storage/usageoperations.go",
-        "github.com/Azure/azure-sdk-for-go/arm/storage/version.go",
-    ],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/Azure/go-autorest/autorest",
-        "//vendor:github.com/Azure/go-autorest/autorest/azure",
-        "//vendor:github.com/Azure/go-autorest/autorest/date",
-    ],
-)
-
-go_library(
-    name = "github.com/Azure/azure-sdk-for-go/storage",
-    srcs = [
-        "github.com/Azure/azure-sdk-for-go/storage/blob.go",
-        "github.com/Azure/azure-sdk-for-go/storage/client.go",
-        "github.com/Azure/azure-sdk-for-go/storage/file.go",
-        "github.com/Azure/azure-sdk-for-go/storage/queue.go",
-        "github.com/Azure/azure-sdk-for-go/storage/table.go",
-        "github.com/Azure/azure-sdk-for-go/storage/table_entities.go",
-        "github.com/Azure/azure-sdk-for-go/storage/util.go",
-    ],
-    tags = ["automanaged"],
-)
-
-go_library(
-    name = "github.com/rubiojr/go-vhd/vhd",
-    srcs = [
-        "github.com/rubiojr/go-vhd/vhd/util.go",
-        "github.com/rubiojr/go-vhd/vhd/vhd.go",
-    ],
-    tags = ["automanaged"],
 )
