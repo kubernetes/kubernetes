@@ -334,7 +334,8 @@ func Run(s *options.ServerRunOptions) error {
 		ServiceNodePortRange:      s.GenericServerRunOptions.ServiceNodePortRange,
 		KubernetesServiceNodePort: s.GenericServerRunOptions.KubernetesServiceNodePort,
 
-		MasterCount: s.GenericServerRunOptions.MasterCount,
+		MasterCount:   s.GenericServerRunOptions.MasterCount,
+		RBACSuperUser: s.GenericServerRunOptions.AuthorizationRBACSuperUser,
 	}
 
 	if s.GenericServerRunOptions.EnableWatchCache {

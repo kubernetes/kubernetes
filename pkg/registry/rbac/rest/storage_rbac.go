@@ -46,7 +46,7 @@ import (
 )
 
 type RESTStorageProvider struct {
-	AuthorizerRBACSuperUser string
+	RBACSuperUser string
 }
 
 var _ genericapiserver.RESTStorageProvider = RESTStorageProvider{}
@@ -83,19 +83,19 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapis
 	storage := map[string]rest.Storage{}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("roles")) {
 		rolesStorage := roleetcd.NewREST(restOptionsGetter(rbac.Resource("roles")))
-		storage["roles"] = rolepolicybased.NewStorage(rolesStorage, newRuleValidator(), p.AuthorizerRBACSuperUser)
+		storage["roles"] = rolepolicybased.NewStorage(rolesStorage, newRuleValidator(), p.RBACSuperUser)
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("rolebindings")) {
 		roleBindingsStorage := rolebindingetcd.NewREST(restOptionsGetter(rbac.Resource("rolebindings")))
-		storage["rolebindings"] = rolebindingpolicybased.NewStorage(roleBindingsStorage, newRuleValidator(), p.AuthorizerRBACSuperUser)
+		storage["rolebindings"] = rolebindingpolicybased.NewStorage(roleBindingsStorage, newRuleValidator(), p.RBACSuperUser)
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("clusterroles")) {
 		clusterRolesStorage := clusterroleetcd.NewREST(restOptionsGetter(rbac.Resource("clusterroles")))
-		storage["clusterroles"] = clusterrolepolicybased.NewStorage(clusterRolesStorage, newRuleValidator(), p.AuthorizerRBACSuperUser)
+		storage["clusterroles"] = clusterrolepolicybased.NewStorage(clusterRolesStorage, newRuleValidator(), p.RBACSuperUser)
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("clusterrolebindings")) {
 		clusterRoleBindingsStorage := clusterrolebindingetcd.NewREST(restOptionsGetter(rbac.Resource("clusterrolebindings")))
-		storage["clusterrolebindings"] = clusterrolebindingpolicybased.NewStorage(clusterRoleBindingsStorage, newRuleValidator(), p.AuthorizerRBACSuperUser)
+		storage["clusterrolebindings"] = clusterrolebindingpolicybased.NewStorage(clusterRoleBindingsStorage, newRuleValidator(), p.RBACSuperUser)
 	}
 	return storage
 }

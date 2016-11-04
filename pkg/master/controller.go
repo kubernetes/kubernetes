@@ -100,7 +100,7 @@ func (c *Config) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTSto
 		ServicePort:               c.APIServerServicePort,
 		ExtraServicePorts:         c.ExtraServicePorts,
 		ExtraEndpointPorts:        c.ExtraEndpointPorts,
-		PublicServicePort:         c.GenericConfig.ReadWritePort,
+		PublicServicePort:         c.GenericConfig.ExternalSecurePort,
 		KubernetesServiceNodePort: c.KubernetesServiceNodePort,
 	}
 }
