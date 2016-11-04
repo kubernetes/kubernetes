@@ -8439,28 +8439,6 @@ go_library(
 )
 
 go_library(
-    name = "k8s.io/client-go/kubernetes/typed/apps/v1alpha1",
-    srcs = [
-        "k8s.io/client-go/kubernetes/typed/apps/v1alpha1/apps_client.go",
-        "k8s.io/client-go/kubernetes/typed/apps/v1alpha1/doc.go",
-        "k8s.io/client-go/kubernetes/typed/apps/v1alpha1/generated_expansion.go",
-        "k8s.io/client-go/kubernetes/typed/apps/v1alpha1/statefulset.go",
-    ],
-    tags = ["automanaged"],
-)
-
-go_library(
-    name = "k8s.io/client-go/kubernetes/typed/apps/v1alpha1/fake",
-    srcs = [
-        "k8s.io/client-go/kubernetes/typed/apps/v1alpha1/fake/doc.go",
-        "k8s.io/client-go/kubernetes/typed/apps/v1alpha1/fake/fake_apps_client.go",
-        "k8s.io/client-go/kubernetes/typed/apps/v1alpha1/fake/fake_statefulset.go",
-    ],
-    tags = ["automanaged"],
-)
-
-go_library(
->>>>>>> updating bazel files
     name = "k8s.io/client-go/kubernetes/typed/authentication/v1beta1",
     srcs = [
         "k8s.io/client-go/kubernetes/typed/authentication/v1beta1/authentication_client.go",
@@ -9637,7 +9615,6 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//vendor:github.com/ugorji/go/codec",
         "//vendor:k8s.io/client-go/pkg/api/unversioned",
         "//vendor:k8s.io/client-go/pkg/conversion",
         "//vendor:k8s.io/client-go/pkg/runtime",
@@ -10426,7 +10403,6 @@ go_library(
         "//vendor:k8s.io/client-go/pkg/util/clock",
         "//vendor:k8s.io/client-go/pkg/util/integer",
         "//vendor:k8s.io/client-go/pkg/util/ratelimit",
-        "//vendor:github.com/juju/ratelimit",
     ],
 )
 
@@ -10829,10 +10805,13 @@ go_library(
         "//vendor:k8s.io/client-go/pkg/api/meta",
         "//vendor:k8s.io/client-go/pkg/api/unversioned",
         "//vendor:k8s.io/client-go/pkg/api/v1",
+        "//vendor:k8s.io/client-go/pkg/apis/apps",
         "//vendor:k8s.io/client-go/pkg/apis/apps/v1beta1",
+        "//vendor:k8s.io/client-go/pkg/apis/batch",
         "//vendor:k8s.io/client-go/pkg/apis/certificates/v1alpha1",
         "//vendor:k8s.io/client-go/pkg/apis/extensions",
         "//vendor:k8s.io/client-go/pkg/apis/extensions/v1beta1",
+        "//vendor:k8s.io/client-go/pkg/apis/policy",
         "//vendor:k8s.io/client-go/pkg/apis/policy/v1beta1",
         "//vendor:k8s.io/client-go/pkg/apis/rbac",
         "//vendor:k8s.io/client-go/pkg/apis/storage",
@@ -11195,10 +11174,14 @@ go_library(
     deps = [
         "//vendor:k8s.io/client-go/kubernetes/typed/apps/v1beta1",
         "//vendor:k8s.io/client-go/pkg/api",
+        "//vendor:k8s.io/client-go/pkg/api/testapi",
         "//vendor:k8s.io/client-go/pkg/api/v1",
+        "//vendor:k8s.io/client-go/pkg/apimachinery/registered",
         "//vendor:k8s.io/client-go/pkg/apis/apps/v1beta1",
         "//vendor:k8s.io/client-go/pkg/labels",
+        "//vendor:k8s.io/client-go/pkg/runtime",
         "//vendor:k8s.io/client-go/pkg/runtime/schema",
+        "//vendor:k8s.io/client-go/pkg/util/flowcontrol",
         "//vendor:k8s.io/client-go/pkg/watch",
         "//vendor:k8s.io/client-go/rest",
         "//vendor:k8s.io/client-go/testing",
