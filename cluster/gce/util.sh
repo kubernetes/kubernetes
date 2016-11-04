@@ -776,7 +776,11 @@ function create-master() {
   create-static-ip "${MASTER_NAME}-ip" "${REGION}"
   MASTER_RESERVED_IP=$(gcloud compute addresses describe "${MASTER_NAME}-ip" \
     --project "${PROJECT}" --region "${REGION}" -q --format='value(address)')
-  KUBELET_APISERVER="${MASTER_RESERVED_IP}"
+
+  if [[ "${REGISTER_MASTER_KUBELET:-}" == "true" ]]; then
+    KUBELET_APISERVER="${MASTER_RESERVED_IP}"
+  fi
+
   KUBERNETES_MASTER_NAME="${MASTER_RESERVED_IP}"
 
   create-certs "${MASTER_RESERVED_IP}"
