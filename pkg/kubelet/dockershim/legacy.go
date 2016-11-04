@@ -19,9 +19,7 @@ package dockershim
 import (
 	"io"
 
-	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/util/term"
 )
 
@@ -32,14 +30,6 @@ import (
 // TODO: implement the methods in this file.
 func (ds *dockerService) LegacyAttach(id kubecontainer.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) (err error) {
 	return ds.streamingRuntime.Attach(id.ID, stdin, stdout, stderr, resize)
-}
-
-func (ds *dockerService) GetContainerLogs(pod *api.Pod, containerID kubecontainer.ContainerID, logOptions *api.PodLogOptions, stdout, stderr io.Writer) (err error) {
-	container, err := ds.client.InspectContainer(containerID.ID)
-	if err != nil {
-		return err
-	}
-	return dockertools.GetContainerLogs(ds.client, pod, containerID, logOptions, stdout, stderr, container.Config.Tty)
 }
 
 func (ds *dockerService) LegacyPortForward(sandboxID string, port uint16, stream io.ReadWriteCloser) error {
