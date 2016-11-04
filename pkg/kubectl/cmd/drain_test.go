@@ -476,7 +476,6 @@ func TestDrain(t *testing.T) {
 				NegotiatedSerializer: ns,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					m := &MyReq{req}
-					t.Logf("req: %+v", req)
 					switch {
 					case req.Method == "GET" && req.URL.Path == "/api/v1":
 						resourceList := unversioned.APIResourceList{

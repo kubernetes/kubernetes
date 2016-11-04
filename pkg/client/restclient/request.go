@@ -555,7 +555,7 @@ func (r *Request) Body(obj interface{}) *Request {
 		}
 		switch typedObj := t.(type) {
 		// hack for eviction
-		// TODO: remove this when we found a better way to encode eviction properly.
+		// TODO: remove this when we find a better way to encode eviction properly.
 		case *policy.Eviction:
 			codec, err := testapi.GetCodecForObject(typedObj)
 			if err != nil {
