@@ -170,6 +170,10 @@ const (
 
 	// TODO(justinsb): Avoid hardcoding this.
 	awsMasterIP = "172.20.0.9"
+
+	// Default time to wait for nodes to become schedulable.
+	// Set so high for scale tests.
+	NodeSchedulableTimeout = 4 * time.Hour
 )
 
 var (
@@ -2437,11 +2441,11 @@ func GetReadySchedulableNodesOrDie(c clientset.Interface) (nodes *api.NodeList) 
 	return nodes
 }
 
-func WaitForAllNodesSchedulable(c clientset.Interface) error {
-	Logf("Waiting up to %v for all (but %d) nodes to be schedulable", 4*time.Hour, TestContext.AllowedNotReadyNodes)
+func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) error {
+	Logf("Waiting up to %v for all (but %d) nodes to be schedulable", timeout, TestContext.AllowedNotReadyNodes)
 
 	var notSchedulable []*api.Node
-	return wait.PollImmediate(30*time.Second, 4*time.Hour, func() (bool, error) {
+	return wait.PollImmediate(30*time.Second, timeout, func() (bool, error) {
 		notSchedulable = nil
 		opts := api.ListOptions{
 			ResourceVersion: "0",
