@@ -368,7 +368,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			for _, item := range items {
 				list.Items = append(list.Items, item.(*runtime.Unstructured))
 			}
-			if err := printer.PrintObj(obj, out); err != nil {
+			if err := printer.PrintObj(list, out); err != nil {
 				errs = append(errs, err)
 			}
 

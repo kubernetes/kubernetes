@@ -43,7 +43,7 @@ func GetItemsPtr(list runtime.Object) (interface{}, error) {
 	// if we're a runtime.Unstructured, check to see if we have an `items` key
 	if unstructured, ok := list.(*runtime.Unstructured); ok {
 		if items, ok := unstructured.Object["items"]; ok {
-			return items, nil
+			return &items, nil
 		}
 	}
 
