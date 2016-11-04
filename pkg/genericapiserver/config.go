@@ -67,83 +67,87 @@ const (
 
 // Config is a structure used to configure a GenericAPIServer.
 type Config struct {
-	// Destination for audit logs
-	AuditWriter io.Writer
-	// Allow downstream consumers to disable swagger.
-	// This includes returning the generated swagger spec at /swaggerapi and swagger ui at /swagger-ui.
-	EnableSwaggerSupport bool
-	// Allow downstream consumers to disable swagger ui.
-	// Note that this is ignored if EnableSwaggerSupport is false
-	EnableSwaggerUI bool
-	// Allows api group versions or specific resources to be conditionally enabled/disabled.
-	APIResourceConfigSource APIResourceConfigSource
-	// allow downstream consumers to disable the index route
-	EnableIndex             bool
-	EnableProfiling         bool
-	EnableMetrics           bool
-	EnableGarbageCollection bool
-
-	Version               *version.Info
-	CorsAllowedOriginList []string
-	Authenticator         authenticator.Request
-	// TODO(roberthbailey): Remove once the server no longer supports http basic auth.
-	SupportsBasicAuth bool
-	Authorizer        authorizer.Authorizer
-	AdmissionControl  admission.Interface
-	// TODO(ericchiang): Determine if policy escalation checks should be an admission controller.
-	AuthorizerRBACSuperUser string
-
+	// SecureServingInfo is required to serve https
+	SecureServingInfo *SecureServingInfo
 	// LoopbackClientConfig is a config for a privileged loopback connection to the API server
+	// This is required for proper functioning of the PostStartHooks on a GenericAPIServer
 	LoopbackClientConfig *restclient.Config
 
-	// Map requests to contexts. Exported so downstream consumers can provider their own mappers
-	RequestContextMapper api.RequestContextMapper
+	//===========================================================================
+	// Fields you probably want to control
+	//===========================================================================
 
-	// Required, the interface for serializing and converting objects to and from the wire
-	Serializer runtime.NegotiatedSerializer
+	CorsAllowedOriginList []string
 
-	// If specified, requests will be allocated a random timeout between this value, and twice this value.
-	// Note that it is up to the request handlers to ignore or honor this timeout. In seconds.
-	MinRequestTimeout int
+	Authenticator    authenticator.Request
+	Authorizer       authorizer.Authorizer
+	AdmissionControl admission.Interface
 
-	SecureServingInfo   *SecureServingInfo
-	InsecureServingInfo *ServingInfo
-
-	// DiscoveryAddresses is used to build the IPs pass to discovery.  If nil, the ExternalAddress is
-	// always reported
-	DiscoveryAddresses DiscoveryAddresses
-
-	// The port on PublicAddress where a read-write server will be installed.
+	// ExternalSecurePort is the secure API port
 	// Defaults to 6443 if not set.
-	ReadWritePort int
-
+	ExternalSecurePort int
 	// ExternalAddress is the host name to use for external (public internet) facing URLs (e.g. Swagger)
 	ExternalAddress string
-
 	// PublicAddress is the IP address where members of the cluster (kubelet,
 	// kube-proxy, services, etc.) can reach the GenericAPIServer.
 	// If nil or 0.0.0.0, the host's default interface will be used.
 	PublicAddress net.IP
 
-	// EnableOpenAPISupport enables OpenAPI support. Allow downstream customers to disable OpenAPI spec.
-	EnableOpenAPISupport bool
+	//===========================================================================
+	// Simple enablement flags
+	//===========================================================================
 
-	// OpenAPIConfig will be used in generating OpenAPI spec.
+	EnableSwaggerSupport    bool
+	EnableSwaggerUI         bool
+	EnableIndex             bool
+	EnableProfiling         bool
+	EnableMetrics           bool
+	EnableGarbageCollection bool
+	EnableOpenAPISupport    bool
+
+	// Version will enable the /version endpoint if non-nil
+	Version *version.Info
+	// AuditWriter is the destination for audit logs.  If nil, they will not be written.
+	AuditWriter io.Writer
+	// SupportsBasicAuth indicates that's at least one Authenticator supports basic auth
+	// If this is true, a basic auth challenge is returned on authentication failure
+	// TODO(roberthbailey): Remove once the server no longer supports http basic auth.
+	SupportsBasicAuth bool
+
+	//===========================================================================
+	// Fields you probably don't care about changing
+	//===========================================================================
+
+	// DiscoveryAddresses is used to build the IPs pass to discovery.  If nil, the ExternalAddress is
+	// always reported
+	DiscoveryAddresses DiscoveryAddresses
+	// LegacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
+	// to InstallLegacyAPIGroup.  New API servers don't generally have legacy groups at all.
+	LegacyAPIGroupPrefixes sets.String
+	// RequestContextMapper maps requests to contexts. Exported so downstream consumers can provider their own mappers
+	// TODO confirm that anyone downstream actually uses this and doesn't just need an accessor
+	RequestContextMapper api.RequestContextMapper
+	// Serializer is required and provides the interface for serializing and converting objects to and from the wire
+	// The default (api.Codecs) usually works fine.
+	Serializer runtime.NegotiatedSerializer
+	// OpenAPIConfig will be used in generating OpenAPI spec.  This has "working" defaults.
 	OpenAPIConfig *common.Config
-
+	// BuildHandlerChainsFunc allows you to build custom handler chains by decorating the apiHandler.
+	BuildHandlerChainsFunc func(apiHandler http.Handler, c *Config) (secure, insecure http.Handler)
+	// If specified, requests will be allocated a random timeout between this value, and twice this value.
+	// Note that it is up to the request handlers to ignore or honor this timeout. In seconds.
+	MinRequestTimeout int
 	// MaxRequestsInFlight is the maximum number of parallel non-long-running requests. Every further
 	// request has to wait.
 	MaxRequestsInFlight int
-
 	// Predicate which is true for paths of long-running http requests
 	LongRunningFunc genericfilters.LongRunningRequestCheck
-
-	// Build the handler chains by decorating the apiHandler.
-	BuildHandlerChainsFunc func(apiHandler http.Handler, c *Config) (secure, insecure http.Handler)
-
-	// LegacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
-	// to InstallLegacyAPIGroup
-	LegacyAPIGroupPrefixes sets.String
+	// InsecureServingInfo is required to serve http.  HTTP does NOT include
+	// authentication or authorization.  You shouldn't be using this.  It makes sig-auth sad.
+	InsecureServingInfo *ServingInfo
+	// APIResourceConfigSource controls which API GroupVersionResources should be enabled on this server.APIGroupPrefix.
+	// Most composers just always start everything and the default allows that.
+	APIResourceConfigSource APIResourceConfigSource
 }
 
 type ServingInfo struct {
@@ -192,7 +196,7 @@ func NewConfig() *Config {
 
 	config := &Config{
 		Serializer:             api.Codecs,
-		ReadWritePort:          6443,
+		ExternalSecurePort:     6443,
 		RequestContextMapper:   api.NewRequestContextMapper(),
 		BuildHandlerChainsFunc: DefaultBuildHandlerChain,
 		LegacyAPIGroupPrefixes: sets.NewString(DefaultLegacyAPIPrefix),
@@ -215,7 +219,10 @@ func NewConfig() *Config {
 			},
 			GetOperationIDAndTags: apiserveropenapi.GetOperationIDAndTags,
 		},
-		LongRunningFunc: genericfilters.BasicLongRunningRequestCheck(longRunningRE, map[string]string{"watch": "true"}),
+
+		MaxRequestsInFlight: 400,
+		MinRequestTimeout:   1800,
+		LongRunningFunc:     genericfilters.BasicLongRunningRequestCheck(longRunningRE, map[string]string{"watch": "true"}),
 	}
 
 	// this keeps the defaults in sync
@@ -271,7 +278,7 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 		}
 
 		c.SecureServingInfo = secureServingInfo
-		c.ReadWritePort = options.SecurePort
+		c.ExternalSecurePort = options.SecurePort
 	}
 
 	if options.InsecurePort > 0 {
@@ -281,7 +288,6 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 		c.InsecureServingInfo = insecureServingInfo
 	}
 
-	c.AuthorizerRBACSuperUser = options.AuthorizationRBACSuperUser
 	c.CorsAllowedOriginList = options.CorsAllowedOriginList
 	c.EnableGarbageCollection = options.EnableGarbageCollection
 	c.EnableProfiling = options.EnableProfiling
@@ -304,8 +310,8 @@ type completedConfig struct {
 func (c *Config) Complete() completedConfig {
 	if len(c.ExternalAddress) == 0 && c.PublicAddress != nil {
 		hostAndPort := c.PublicAddress.String()
-		if c.ReadWritePort != 0 {
-			hostAndPort = net.JoinHostPort(hostAndPort, strconv.Itoa(c.ReadWritePort))
+		if c.ExternalSecurePort != 0 {
+			hostAndPort = net.JoinHostPort(hostAndPort, strconv.Itoa(c.ExternalSecurePort))
 		}
 		c.ExternalAddress = hostAndPort
 	}
@@ -349,7 +355,7 @@ func (c *Config) SkipComplete() completedConfig {
 //   ServiceClusterIPRange
 //   ServiceNodePortRange
 //   MasterCount
-//   ReadWritePort
+//   ExternalSecurePort
 //   PublicAddress
 // Public fields:
 //   Handler -- The returned GenericAPIServer has a field TopHandler which is an

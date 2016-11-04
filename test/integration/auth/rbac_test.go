@@ -341,7 +341,7 @@ func TestRBAC(t *testing.T) {
 		masterConfig := framework.NewIntegrationTestMasterConfig()
 		masterConfig.GenericConfig.Authorizer = newRBACAuthorizer(t, superUser, masterConfig)
 		masterConfig.GenericConfig.Authenticator = newFakeAuthenticator()
-		masterConfig.GenericConfig.AuthorizerRBACSuperUser = superUser
+		masterConfig.GenericConfig.RBACSuperUser = superUser
 		_, s := framework.RunAMaster(masterConfig)
 		defer s.Close()
 
@@ -440,7 +440,7 @@ func TestBootstrapping(t *testing.T) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.GenericConfig.Authorizer = newRBACAuthorizer(t, superUser, masterConfig)
 	masterConfig.GenericConfig.Authenticator = newFakeAuthenticator()
-	masterConfig.GenericConfig.AuthorizerRBACSuperUser = superUser
+	masterConfig.GenericConfig.RBACSuperUser = superUser
 	_, s := framework.RunAMaster(masterConfig)
 	defer s.Close()
 
