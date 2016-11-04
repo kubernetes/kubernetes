@@ -37,7 +37,6 @@ go_library(
         "//pkg/util/runtime:go_default_library",
         "//pkg/util/wait:go_default_library",
         "//vendor:github.com/golang/glog",
-        "//vendor:github.com/robfig/cron",
     ],
 )
 

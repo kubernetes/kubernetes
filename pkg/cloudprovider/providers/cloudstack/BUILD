@@ -21,7 +21,6 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//vendor:github.com/golang/glog",
-        "//vendor:github.com/xanzy/go-cloudstack/cloudstack",
         "//vendor:gopkg.in/gcfg.v1",
     ],
 )

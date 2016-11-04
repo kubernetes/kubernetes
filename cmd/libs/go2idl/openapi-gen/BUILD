@@ -17,6 +17,5 @@ go_binary(
     deps = [
         "//cmd/libs/go2idl/openapi-gen/generators:go_default_library",
         "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/gengo/args",
     ],
 )

@@ -22,6 +22,5 @@ go_library(
         "//pkg/api/unversioned:go_default_library",
         "//pkg/genericapiserver/openapi/common:go_default_library",
         "//pkg/util/intstr:go_default_library",
-        "//vendor:github.com/go-openapi/spec",
     ],
 )

@@ -70,9 +70,7 @@ go_library(
         "//pkg/version:go_default_library",
         "//vendor:github.com/coreos/go-systemd/daemon",
         "//vendor:github.com/emicklei/go-restful",
-        "//vendor:github.com/go-openapi/spec",
         "//vendor:github.com/golang/glog",
-        "//vendor:github.com/pkg/errors",
         "//vendor:github.com/prometheus/client_golang/prometheus",
         "//vendor:gopkg.in/natefinch/lumberjack.v2",
     ],
@@ -112,7 +110,6 @@ go_test(
         "//pkg/util/net:go_default_library",
         "//pkg/util/sets:go_default_library",
         "//pkg/version:go_default_library",
-        "//vendor:github.com/go-openapi/spec",
         "//vendor:github.com/stretchr/testify/assert",
     ],
 )

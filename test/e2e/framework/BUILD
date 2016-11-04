@@ -94,12 +94,8 @@ go_library(
         "//vendor:github.com/onsi/gomega/types",
         "//vendor:github.com/prometheus/common/expfmt",
         "//vendor:github.com/prometheus/common/model",
-        "//vendor:github.com/spf13/viper",
         "//vendor:golang.org/x/crypto/ssh",
         "//vendor:golang.org/x/net/websocket",
         "//vendor:gopkg.in/yaml.v2",
-        "//vendor:k8s.io/client-go/kubernetes",
-        "//vendor:k8s.io/client-go/pkg/util/sets",
-        "//vendor:k8s.io/client-go/rest",
     ],
 )

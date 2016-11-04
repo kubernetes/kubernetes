@@ -43,6 +43,5 @@ go_test(
         "//test/integration/framework:go_default_library",
         "//test/utils:go_default_library",
         "//vendor:github.com/golang/glog",
-        "//vendor:github.com/renstrom/dedent",
     ],
 )

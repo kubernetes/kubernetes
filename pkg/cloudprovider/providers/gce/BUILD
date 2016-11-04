@@ -30,7 +30,6 @@ go_library(
         "//pkg/util/sets:go_default_library",
         "//pkg/util/wait:go_default_library",
         "//pkg/volume:go_default_library",
-        "//vendor:cloud.google.com/go/compute/metadata",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/prometheus/client_golang/prometheus",
         "//vendor:golang.org/x/oauth2",

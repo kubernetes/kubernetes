@@ -125,10 +125,6 @@ go_test(
         "//pkg/util/net:go_default_library",
         "//pkg/util/sets:go_default_library",
         "//pkg/version:go_default_library",
-        "//vendor:github.com/go-openapi/loads",
-        "//vendor:github.com/go-openapi/spec",
-        "//vendor:github.com/go-openapi/strfmt",
-        "//vendor:github.com/go-openapi/validate",
         "//vendor:github.com/stretchr/testify/assert",
     ],
 )
