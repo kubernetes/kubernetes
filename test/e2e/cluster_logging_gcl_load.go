@@ -35,9 +35,9 @@ var _ = framework.KubeDescribe("Cluster level logging using GCL [Slow] [Flaky]",
 
 		podCount := 30
 		loggingDuration := 1 * time.Hour
-		linesPerSecond := 3000
+		linesPerSecond := 1000
 		linesPerPod := linesPerSecond * int(loggingDuration.Seconds()) / podCount
-		ingestionTimeout := 1 * time.Hour
+		ingestionTimeout := 10 * time.Minute
 
 		By("Running logs generator pods")
 		pods := []*loggingPod{}

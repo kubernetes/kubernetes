@@ -67,7 +67,7 @@ func newGclLogsProvider(f *framework.Framework) (*gclLogsProvider, error) {
 // Since GCL API is not easily available from the outside of cluster
 // we use gcloud command to perform search with filter
 func (gclLogsProvider *gclLogsProvider) ReadEntries(pod *loggingPod) []*logEntry {
-	filter := fmt.Sprintf("resource.labels.pod_id:%s AND resource.labels.namespace_id:%s AND timestamp>=\"%v\"",
+	filter := fmt.Sprintf("resource.labels.pod_id=%s AND resource.labels.namespace_id=%s AND timestamp>=\"%v\"",
 		pod.Name, gclLogsProvider.Framework.Namespace.Name, pod.LastTimestamp.Format(time.RFC3339))
 	framework.Logf("Reading entries from GCL with filter '%v'", filter)
 
