@@ -17,6 +17,7 @@ limitations under the License.
 package eviction
 
 import (
+	"fmt"
 	"sort"
 	"sync"
 	"time"
