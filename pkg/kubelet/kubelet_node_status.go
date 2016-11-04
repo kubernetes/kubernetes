@@ -392,8 +392,10 @@ func (kl *Kubelet) setNodeAddress(node *api.Node) error {
 			}
 			return fmt.Errorf("failed to get node address from cloud provider that matches ip: %v", kl.nodeIP)
 		}
-		hostnameAddress := api.NodeAddress{Type: api.NodeHostName, Address: kl.GetHostname()}
-		node.Status.Addresses = append(nodeAddresses, hostnameAddress)
+
+		// We don't add a hostname if the cloudprovider didn't set it.
+		// The cloudprovider could easily add one if needed,
+		// and if we add it the cloudprovider has no way to say "don't add it"
 	} else {
 		var ipAddr net.IP
 		var err error
