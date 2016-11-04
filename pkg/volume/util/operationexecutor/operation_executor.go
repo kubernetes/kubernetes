@@ -1058,15 +1058,26 @@ func (oe *operationExecutor) generateUnmountDeviceFunc(
 				unmountDeviceErr)
 		}
 		// Before logging that UnmountDevice succeeded and moving on,
-		// use mounter.DeviceOpened to check if the device is in use anywhere
+		// use mounter.PathIsDevice to check if the path is a device,
+		// if so use mounter.DeviceOpened to check if the device is in use anywhere
 		// else on the system. Retry if it returns true.
-		deviceOpened, deviceOpenedErr := mounter.DeviceOpened(deviceToDetach.DevicePath)
-		if deviceOpenedErr != nil {
-			return fmt.Errorf(
-				"UnmountDevice.DeviceOpened failed for volume %q (spec.Name: %q) with: %v",
-				deviceToDetach.VolumeName,
-				deviceToDetach.VolumeSpec.Name(),
-				deviceOpenedErr)
+		isDevicePath, devicePathErr := mounter.PathIsDevice(deviceToDetach.DevicePath)
+		var deviceOpened bool
+		var deviceOpenedErr error
+		if !isDevicePath && devicePathErr == nil {
+			// not a device path or path doesn't exist
+			//TODO: refer to #36092
+			glog.V(3).Infof("Not checking device path %s", deviceToDetach.DevicePath)
+			deviceOpened = false
+		} else {
+			deviceOpened, deviceOpenedErr = mounter.DeviceOpened(deviceToDetach.DevicePath)
+			if deviceOpenedErr != nil {
+				return fmt.Errorf(
+					"UnmountDevice.DeviceOpened failed for volume %q (spec.Name: %q) with: %v",
+					deviceToDetach.VolumeName,
+					deviceToDetach.VolumeSpec.Name(),
+					deviceOpenedErr)
+			}
 		}
 		// The device is still in use elsewhere. Caller will log and retry.
 		if deviceOpened {
