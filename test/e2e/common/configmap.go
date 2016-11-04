@@ -180,6 +180,11 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 								},
 							},
 						},
+						EnvFrom: []api.EnvFromSource{
+							{
+								ConfigMap: &api.LocalObjectReference{Name: name},
+							},
+						},
 					},
 				},
 				RestartPolicy: api.RestartPolicyNever,
@@ -187,7 +192,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 		}
 
 		f.TestContainerOutput("consume configMaps", pod, 0, []string{
-			"CONFIG_DATA_1=value-1",
+			"CONFIG_DATA_1=value-1", "data-1=value-1", "data-2=value-2", "data-3=value-3",
 		})
 	})
 

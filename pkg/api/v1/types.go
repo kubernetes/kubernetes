@@ -1233,6 +1233,12 @@ type SecretKeySelector struct {
 	Key string `json:"key" protobuf:"bytes,2,opt,name=key"`
 }
 
+// EnvFromSource represents the source of a set of EnvVars
+type EnvFromSource struct {
+	// The ConfigMap to select from
+	ConfigMap *LocalObjectReference `json:"configMap,omitempty" protobuf:"bytes,1,opt,name=configMap"`
+}
+
 // HTTPHeader describes a custom header to be used in HTTP probes
 type HTTPHeader struct {
 	// The header field name
@@ -1478,6 +1484,10 @@ type Container struct {
 	// Default is false.
 	// +optional
 	TTY bool `json:"tty,omitempty" protobuf:"varint,18,opt,name=tty"`
+	// List of environment variables to set in the container.
+	// Cannot be updated.
+	// +optional
+	EnvFrom []EnvFromSource `json:"envFrom,omitempty" protobuf:"bytes,19,rep,name=envFrom"`
 }
 
 // Handler defines a specific action that should be taken
