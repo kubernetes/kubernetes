@@ -24,4 +24,7 @@ container:
 push: 
 	gcloud docker -- push ${REGISTRY}/${IMAGE}:${TAG}
 
+upload:
+	./stage-upload.sh ${TAG} ${REGISTRY}/${IMAGE}:${TAG}
+
 .PHONY: all container push
