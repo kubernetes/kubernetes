@@ -101,6 +101,9 @@ func SetDefaults_KubeProxyConfiguration(obj *KubeProxyConfiguration) {
 	if obj.ConntrackTCPEstablishedTimeout == zero {
 		obj.ConntrackTCPEstablishedTimeout = unversioned.Duration{Duration: 24 * time.Hour} // 1 day (1/5 default)
 	}
+	if obj.ConntrackTCPCloseWaitTimeout == zero {
+		obj.ConntrackTCPCloseWaitTimeout = unversioned.Duration{Duration: 1 * time.Hour}
+	}
 }
 
 func SetDefaults_KubeSchedulerConfiguration(obj *KubeSchedulerConfiguration) {
