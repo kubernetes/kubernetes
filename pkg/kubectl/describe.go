@@ -937,10 +937,14 @@ func describeContainers(label string, containers []api.Container, containerStatu
 		}
 
 		none = ""
-		if len(container.Env) == 0 {
+		if len(container.Env) == 0 && len(container.EnvFrom) == 0 {
 			none = "\t<none>"
 		}
 		fmt.Fprintf(out, "    Environment Variables:%s\n", none)
+		for _, e := range container.EnvFrom {
+			fmt.Fprintf(out, "      %s\tConfigMap\n", e.ConfigMap.Name)
+		}
+
 		for _, e := range container.Env {
 			if e.ValueFrom == nil {
 				fmt.Fprintf(out, "      %s:\t%s\n", e.Name, e.Value)

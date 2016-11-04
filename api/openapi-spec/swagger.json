@@ -30139,6 +30139,13 @@
        "$ref": "#/definitions/v1.EnvVar"
       }
      },
+     "envFrom": {
+      "description": "List of environment variables to set in the container. Cannot be updated.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1.EnvFromSource"
+      }
+     },
      "image": {
       "description": "Docker image name. More info: http://kubernetes.io/docs/user-guide/images",
       "type": "string"
@@ -30537,6 +30544,18 @@
      "metadata": {
       "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
       "$ref": "#/definitions/unversioned.ListMeta"
+     }
+    }
+   },
+   "v1.EnvFromSource": {
+    "description": "EnvFromSource represents the source of a set of EnvVars",
+    "required": [
+     "configMap"
+    ],
+    "properties": {
+     "configMap": {
+      "description": "The ConfigMap to select from",
+      "$ref": "#/definitions/v1.LocalObjectReference"
      }
     }
    },

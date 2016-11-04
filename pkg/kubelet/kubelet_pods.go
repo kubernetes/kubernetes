@@ -392,6 +392,35 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 		return result, err
 	}
 
+	var (
+		configMaps = make(map[string]*api.ConfigMap)
+	)
+	for _, envFrom := range container.EnvFrom {
+		if envFrom.ConfigMap != nil {
+			name := envFrom.ConfigMap.Name
+			configMap, ok := configMaps[name]
+			if !ok {
+				if kl.kubeClient == nil {
+					return result, fmt.Errorf("Couldn't get configMap %v/%v, no kubeClient defined", pod.Namespace, name)
+				}
+				configMap, err = kl.kubeClient.Core().ConfigMaps(pod.Namespace).Get(name)
+				if err != nil {
+					return result, err
+				}
+				configMaps[name] = configMap
+			}
+			for k, v := range configMap.Data {
+				// Accesses apiserver+Pods.
+				// So, the master may set service env vars, or kubelet may.  In case both are doing
+				// it, we delete the key from the kubelet-generated ones so we don't have duplicate
+				// env vars.
+				// TODO: remove this next line once all platforms use apiserver+Pods.
+				delete(serviceEnv, k)
+				result = append(result, kubecontainer.EnvVar{Name: k, Value: v})
+			}
+		}
+	}
+
 	// Determine the final values of variables:
 	//
 	// 1.  Determine the final value of each variable:
@@ -403,7 +432,6 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 	// 3.  Add remaining service environment vars
 	var (
 		tmpEnv      = make(map[string]string)
-		configMaps  = make(map[string]*api.ConfigMap)
 		secrets     = make(map[string]*api.Secret)
 		mappingFunc = expansion.MappingFuncFor(tmpEnv, serviceEnv)
 	)
@@ -412,7 +440,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 		// So, the master may set service env vars, or kubelet may.  In case both are doing
 		// it, we delete the key from the kubelet-generated ones so we don't have duplicate
 		// env vars.
-		// TODO: remove this net line once all platforms use apiserver+Pods.
+		// TODO: remove this next line once all platforms use apiserver+Pods.
 		delete(serviceEnv, envVar.Name)
 
 		runtimeVal := envVar.Value

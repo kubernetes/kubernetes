@@ -7302,12 +7302,25 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "",
 						},
 					},
+					"envFrom": {
+						SchemaProps: spec.SchemaProps{
+							Description: "List of environment variables to set in the container. Cannot be updated.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/v1.EnvFromSource"),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"name"},
 			},
 		},
 		Dependencies: []string{
-			"v1.ContainerPort", "v1.EnvVar", "v1.Lifecycle", "v1.Probe", "v1.ResourceRequirements", "v1.SecurityContext", "v1.VolumeMount"},
+			"v1.ContainerPort", "v1.EnvFromSource", "v1.EnvVar", "v1.Lifecycle", "v1.Probe", "v1.ResourceRequirements", "v1.SecurityContext", "v1.VolumeMount"},
 	},
 	"v1.ContainerImage": {
 		Schema: spec.Schema{
@@ -7931,6 +7944,24 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{
 			"unversioned.ListMeta", "v1.Endpoints"},
+	},
+	"v1.EnvFromSource": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "EnvFromSource represents the source of a set of EnvVars",
+				Properties: map[string]spec.Schema{
+					"configMap": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The ConfigMap to select from",
+							Ref:         spec.MustCreateRef("#/definitions/v1.LocalObjectReference"),
+						},
+					},
+				},
+				Required: []string{"configMap"},
+			},
+		},
+		Dependencies: []string{
+			"v1.LocalObjectReference"},
 	},
 	"v1.EnvVar": {
 		Schema: spec.Schema{
