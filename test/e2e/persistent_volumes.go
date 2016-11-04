@@ -466,7 +466,7 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 	NFSconfig = VolumeTestConfig{
 		namespace:   api.NamespaceDefault,
 		prefix:      "nfs",
-		serverImage: "gcr.io/google_containers/volume-nfs:0.7",
+		serverImage: "eatnumber1/nfs",
 		serverPorts: []int{2049},
 		serverArgs:  []string{"-G", "777", "/exports"},
 	}
