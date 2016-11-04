@@ -359,10 +359,14 @@ func syncNamespace(
 	kubeClient clientset.Interface,
 	clientPool dynamic.ClientPool,
 	opCache operationNotSupportedCache,
-	groupVersionResources []unversioned.GroupVersionResource,
+	groupVersionResourcesFn func() ([]unversioned.GroupVersionResource, error),
 	namespace *api.Namespace,
 	finalizerToken api.FinalizerName,
 ) error {
+	groupVersionResources, err := groupVersionResourcesFn()
+	if err != nil {
+		return err
+	}
 	if namespace.DeletionTimestamp == nil {
 		return nil
 	}
@@ -370,7 +374,7 @@ func syncNamespace(
 	// multiple controllers may edit a namespace during termination
 	// first get the latest state of the namespace before proceeding
 	// if the namespace was deleted already, don't do anything
-	namespace, err := kubeClient.Core().Namespaces().Get(namespace.Name)
+	namespace, err = kubeClient.Core().Namespaces().Get(namespace.Name)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil

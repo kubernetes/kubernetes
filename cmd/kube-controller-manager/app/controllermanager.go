@@ -369,14 +369,8 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 	// Find the list of namespaced resources via discovery that the namespace controller must manage
 	namespaceKubeClient := client("namespace-controller")
 	namespaceClientPool := dynamic.NewClientPool(restclient.AddUserAgent(kubeconfig, "namespace-controller"), restMapper, dynamic.LegacyAPIPathResolverFunc)
-	gvrFn := func() []unversioned.GroupVersionResource {
-		groupVersionResources, err := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources()
-		if err != nil {
-			glog.Warningf("Failed to get supported resources from server: %v", err)
-			return []unversioned.GroupVersionResource{}
-		}
-		return groupVersionResources
-	}
+	// TODO: consider using a list-watch + cache here rather than polling
+	gvrFn := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources
 	namespaceController := namespacecontroller.NewNamespaceController(namespaceKubeClient, namespaceClientPool, gvrFn, s.NamespaceSyncPeriod.Duration, api.FinalizerKubernetes)
 	go namespaceController.Run(int(s.ConcurrentNamespaceSyncs), wait.NeverStop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
