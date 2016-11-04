@@ -196,7 +196,7 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	}
 
 	// 7. Create federation controller manager
-	_, err = createControllerManager(hostClientset, initFlags.FederationSystemNamespace, cmName, cmKubeconfigName, dnsZoneName)
+	_, err = createControllerManager(hostClientset, initFlags.FederationSystemNamespace, initFlags.Name, cmName, cmKubeconfigName, dnsZoneName)
 	if err != nil {
 		return err
 	}
@@ -456,10 +456,10 @@ func createAPIServer(clientset *client.Clientset, namespace, name, credentialsNa
 	return clientset.Extensions().Deployments(namespace).Create(dep)
 }
 
-func createControllerManager(clientset *client.Clientset, namespace, name, kubeconfigName, dnsZoneName string) (*extensions.Deployment, error) {
+func createControllerManager(clientset *client.Clientset, namespace, name, cmName, kubeconfigName, dnsZoneName string) (*extensions.Deployment, error) {
 	dep := &extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{
-			Name:      name,
+			Name:      cmName,
 			Namespace: namespace,
 			Labels:    componentLabel,
 		},
@@ -467,7 +467,7 @@ func createControllerManager(clientset *client.Clientset, namespace, name, kubec
 			Replicas: 1,
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
-					Name:   name,
+					Name:   cmName,
 					Labels: controllerManagerPodLabels,
 				},
 				Spec: api.PodSpec{
