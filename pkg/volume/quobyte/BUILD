@@ -29,6 +29,7 @@ go_library(
         "//pkg/volume/util:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/pborman/uuid",
+        "//vendor:github.com/quobyte/api",
     ],
 )
 

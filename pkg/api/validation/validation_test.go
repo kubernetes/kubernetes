@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -661,6 +662,21 @@ func testVolumeClaim(name string, namespace string, spec api.PersistentVolumeCla
 	}
 }
 
+func testVolumeClaimStorageClass(name string, namespace string, annval string, spec api.PersistentVolumeClaimSpec) *api.PersistentVolumeClaim {
+	annotations := map[string]string{
+		storageutil.StorageClassAnnotation: annval,
+	}
+
+	return &api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{
+			Name:        name,
+			Namespace:   namespace,
+			Annotations: annotations,
+		},
+		Spec: spec,
+	}
+}
+
 func TestValidatePersistentVolumeClaim(t *testing.T) {
 	scenarios := map[string]struct {
 		isExpectedFailure bool
@@ -814,6 +830,16 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			},
 		},
 	})
+	validClaimStorageClass := testVolumeClaimStorageClass("foo", "ns", "fast", api.PersistentVolumeClaimSpec{
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadOnlyMany,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	})
 	validUpdateClaim := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
 		AccessModes: []api.PersistentVolumeAccessMode{
 			api.ReadWriteOnce,
@@ -849,6 +875,17 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		},
 		VolumeName: "volume",
 	})
+	invalidUpdateClaimStorageClass := testVolumeClaimStorageClass("foo", "ns", "fast2", api.PersistentVolumeClaimSpec{
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadOnlyMany,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+		VolumeName: "volume",
+	})
 	scenarios := map[string]struct {
 		isExpectedFailure bool
 		oldClaim          *api.PersistentVolumeClaim
@@ -873,6 +910,11 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			isExpectedFailure: true,
 			oldClaim:          validUpdateClaim,
 			newClaim:          invalidUpdateClaimAccessModes,
+		},
+		"invalid-update-change-storage-class-annotation-after-creation": {
+			isExpectedFailure: true,
+			oldClaim:          validClaimStorageClass,
+			newClaim:          invalidUpdateClaimStorageClass,
 		},
 	}
 

@@ -28,6 +28,7 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/client/unversioned/clientcmd:go_default_library",
+        "//vendor:cloud.google.com/go/compute/metadata",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/hawkular/hawkular-client-go/metrics",
         "//vendor:github.com/influxdata/influxdb/client",

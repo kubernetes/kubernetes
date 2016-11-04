@@ -24,6 +24,7 @@ go_library(
         "//pkg/client/unversioned/clientcmd:go_default_library",
         "//pkg/client/unversioned/clientcmd/api:go_default_library",
         "//vendor:github.com/golang/glog",
+        "//vendor:github.com/renstrom/dedent",
     ],
 )
 
