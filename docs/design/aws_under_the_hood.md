@@ -31,7 +31,7 @@ you manually created or configured your cluster.
 
 Kubernetes is a cluster of several machines that consists of a Kubernetes
 master and a set number of nodes (previously known as 'nodes') for which the
-master which is responsible. See the [Architecture](architecture.md) topic for
+master is responsible. See the [Architecture](architecture.md) topic for
 more details.
 
 By default on AWS:
