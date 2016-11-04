@@ -68,7 +68,7 @@ func Run(serverOptions *genericoptions.ServerRunOptions, stopCh <-chan struct{})
 	genericvalidation.ValidateRunOptions(serverOptions)
 	genericvalidation.VerifyEtcdServersList(serverOptions)
 	config := genericapiserver.NewConfig().ApplyOptions(serverOptions).Complete()
-	if err := config.MaybeGenerateServingCerts(); err != nil {
+	if err := config.MaybeGenerateServingCerts(serverOptions.AdvertiseAddress.String()); err != nil {
 		// this wasn't treated as fatal for this process before
 		fmt.Printf("Error creating cert: %v", err)
 	}

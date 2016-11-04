@@ -73,7 +73,7 @@ func Run(s *options.ServerRunOptions) error {
 							ApplyOptions(s.GenericServerRunOptions). // apply the options selected
 							Complete()                               // set default values based on the known values
 
-	if err := genericConfig.MaybeGenerateServingCerts(); err != nil {
+	if err := genericConfig.MaybeGenerateServingCerts(s.GenericServerRunOptions.AdvertiseAddress.String()); err != nil {
 		glog.Fatalf("Failed to generate service certificate: %v", err)
 	}
 
@@ -191,7 +191,6 @@ func Run(s *options.ServerRunOptions) error {
 	genericConfig.Authenticator = apiAuthenticator
 	genericConfig.Authorizer = apiAuthorizer
 	genericConfig.AdmissionControl = admissionController
-	genericConfig.APIResourceConfigSource = storageFactory.APIResourceConfigSource
 	genericConfig.OpenAPIConfig.Definitions = openapi.OpenAPIDefinitions
 	genericConfig.EnableOpenAPISupport = true
 	genericConfig.OpenAPIConfig.SecurityDefinitions = securityDefinitions
