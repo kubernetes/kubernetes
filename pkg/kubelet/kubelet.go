@@ -567,13 +567,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			// functions in CRI.
 			// TODO: Remove this hack after CRI is fully implemented.
 			// TODO: Move the instrumented interface wrapping into kuberuntime.
-			runtimeService = &struct {
-				internalApi.RuntimeService
-				dockershim.DockerLegacyService
-			}{
-				RuntimeService:      kuberuntime.NewInstrumentedRuntimeService(rs),
-				DockerLegacyService: ds,
-			}
+			runtimeService = kuberuntime.NewInstrumentedRuntimeService(rs)
 			imageService = is
 		case "remote":
 			runtimeService, imageService, err = getRuntimeAndImageServices(kubeCfg)
