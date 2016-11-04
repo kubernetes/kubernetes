@@ -19,6 +19,7 @@ package namespace
 import (
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -60,11 +61,22 @@ type operationKey struct {
 
 // operationNotSupportedCache is a simple cache to remember if an operation is not supported for a resource.
 // if the operationKey maps to true, it means the operation is not supported.
-type operationNotSupportedCache map[operationKey]bool
+type operationNotSupportedCache struct {
+	lock sync.Mutex
+	m    map[operationKey]bool
+}
 
 // isSupported returns true if the operation is supported
 func (o operationNotSupportedCache) isSupported(key operationKey) bool {
-	return !o[key]
+	o.lock.Lock()
+	defer o.lock.Unlock()
+	return !o.m[key]
+}
+
+func (o operationNotSupportedCache) setSupported(key operationKey) {
+	o.lock.Lock()
+	defer o.lock.Unlock()
+	o.m[key] = true
 }
 
 // updateNamespaceFunc is a function that makes an update to a namespace
@@ -180,7 +192,7 @@ func deleteCollection(
 	// remember next time that this resource does not support delete collection...
 	if errors.IsMethodNotSupported(err) || errors.IsNotFound(err) {
 		glog.V(5).Infof("namespace controller - deleteCollection not supported - namespace: %s, gvr: %v", namespace, gvr)
-		opCache[key] = true
+		opCache.setSupported(key)
 		return false, nil
 	}
 
@@ -225,7 +237,7 @@ func listCollection(
 	// remember next time that this resource does not support delete collection...
 	if errors.IsMethodNotSupported(err) || errors.IsNotFound(err) {
 		glog.V(5).Infof("namespace controller - listCollection not supported - namespace: %s, gvr: %v", namespace, gvr)
-		opCache[key] = true
+		opCache.setSupported(key)
 		return nil, false, nil
 	}
 
