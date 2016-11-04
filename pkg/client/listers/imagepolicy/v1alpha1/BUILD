@@ -12,7 +12,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["zz_generated.imagereview.go"],
+    srcs = [
+        "expansion_generated.go",
+        "imagereview.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//pkg/api/errors:go_default_library",

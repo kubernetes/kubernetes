@@ -13,9 +13,10 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "zz_generated.localsubjectaccessreview.go",
-        "zz_generated.selfsubjectaccessreview.go",
-        "zz_generated.subjectaccessreview.go",
+        "expansion_generated.go",
+        "localsubjectaccessreview.go",
+        "selfsubjectaccessreview.go",
+        "subjectaccessreview.go",
     ],
     tags = ["automanaged"],
     deps = [
