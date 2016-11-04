@@ -744,6 +744,9 @@ type KubeControllerManagerConfiguration struct {
 	// Zone is treated as unhealthy in nodeEvictionRate and secondaryNodeEvictionRate when at least
 	// unhealthyZoneThreshold (no less than 3) of Nodes in the zone are NotReady
 	UnhealthyZoneThreshold float32 `json:"unhealthyZoneThreshold"`
+	// enable enforcement of NoExecute taint effect, and use it for evicting pods on nodes
+	// that are unreachable or not ready. WARNING: taint-based evictions is an alpha feature.
+	UseTaintBasedEvictions bool `json:"useTaintBasedEvictions"`
 }
 
 // VolumeConfiguration contains *all* enumerated flags meant to configure all volume

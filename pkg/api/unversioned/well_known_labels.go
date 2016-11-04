@@ -27,4 +27,15 @@ const (
 
 	LabelOS   = "beta.kubernetes.io/os"
 	LabelArch = "beta.kubernetes.io/arch"
+
+	// When the --use-taint-based-evictions flag is enabled,
+	// TaintNodeNotReady would be automatically added by node controller
+	// when node is not ready, and removed when node becomes ready.
+	TaintNodeNotReady = "node.alpha.kubernetes.io/notReady"
+
+	// When the --use-taint-based-evictions flag is enabled,
+	// TaintNodeUnreachable would be automatically added by node controller
+	// when node becomes unreachable (corresponding to NodeReady status ConditionUnknown)
+	// and removed when node becomes reachable (NodeReady status ConditionTrue).
+	TaintNodeUnreachable = "node.alpha.kubernetes.io/unreachable"
 )

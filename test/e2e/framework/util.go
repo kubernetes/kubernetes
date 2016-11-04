@@ -2561,21 +2561,17 @@ func ExpectNodeHasTaint(c clientset.Interface, nodeName string, taint api.Taint)
 	}
 }
 
-func deleteTaint(oldTaints []api.Taint, taintToDelete api.Taint) ([]api.Taint, error) {
-	newTaints := []api.Taint{}
-	found := false
-	for _, oldTaint := range oldTaints {
-		if oldTaint.MatchTaint(taintToDelete) {
-			found = true
-			continue
-		}
-		newTaints = append(newTaints, taintToDelete)
-	}
+func ExpectNodeDoesNotHaveTaint(c clientset.Interface, nodeName string, taint api.Taint) {
+	By("verifying the node doesn't have the taint " + taint.ToString())
+	node, err := c.Core().Nodes().Get(nodeName)
+	ExpectNoError(err)
 
-	if !found {
-		return nil, fmt.Errorf("taint %s not found.", taintToDelete.ToString())
+	nodeTaints, err := api.GetTaintsFromNodeAnnotations(node.Annotations)
+	ExpectNoError(err)
+
+	if len(nodeTaints) != 0 && taintExists(nodeTaints, taint) {
+		Failf("taint %s exists on node %s", taint.ToString(), nodeName)
 	}
-	return newTaints, nil
 }
 
 // RemoveTaintOffNode is for cleaning up taints temporarily added to node,
@@ -2596,8 +2592,8 @@ func RemoveTaintOffNode(c clientset.Interface, nodeName string, taint api.Taint)
 			return
 		}
 
-		newTaints, err := deleteTaint(nodeTaints, taint)
-		ExpectNoError(err)
+		newTaints, deleted := api.DeleteTaint(nodeTaints, &taint)
+		Expect(deleted, fmt.Sprintf("taint %q not found.", taint.ToString())).To(BeTrue())
 
 		taintsData, err := json.Marshal(newTaints)
 		ExpectNoError(err)
