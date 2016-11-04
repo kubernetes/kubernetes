@@ -86,7 +86,11 @@ func Run(s *options.ServerRunOptions) error {
 							ApplyOptions(s.GenericServerRunOptions). // apply the options selected
 							Complete()                               // set default values based on the known values
 
-	if err := genericConfig.MaybeGenerateServingCerts(); err != nil {
+	serviceIPRange, apiServerServiceIP, err := genericapiserver.DefaultServiceIPRange(s.GenericServerRunOptions.ServiceClusterIPRange)
+	if err != nil {
+		glog.Fatalf("Error determining service IP ranges: %v", err)
+	}
+	if err := genericConfig.MaybeGenerateServingCerts(apiServerServiceIP); err != nil {
 		glog.Fatalf("Failed to generate service certificate: %v", err)
 	}
 
@@ -305,6 +309,7 @@ func Run(s *options.ServerRunOptions) error {
 	genericConfig.OpenAPIConfig.Info.Title = "Kubernetes"
 	genericConfig.OpenAPIConfig.Definitions = generatedopenapi.OpenAPIDefinitions
 	genericConfig.EnableOpenAPISupport = true
+	genericConfig.EnableMetrics = true
 	genericConfig.OpenAPIConfig.SecurityDefinitions = securityDefinitions
 
 	config := &master.Config{
@@ -321,6 +326,15 @@ func Run(s *options.ServerRunOptions) error {
 		ProxyTransport:          proxyTransport,
 
 		Tunneler: tunneler,
+
+		ServiceIPRange:       serviceIPRange,
+		APIServerServiceIP:   apiServerServiceIP,
+		APIServerServicePort: 443,
+
+		ServiceNodePortRange:      s.GenericServerRunOptions.ServiceNodePortRange,
+		KubernetesServiceNodePort: s.GenericServerRunOptions.KubernetesServiceNodePort,
+
+		MasterCount: s.GenericServerRunOptions.MasterCount,
 	}
 
 	if s.GenericServerRunOptions.EnableWatchCache {

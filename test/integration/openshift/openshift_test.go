@@ -29,6 +29,7 @@ func TestMasterExportsSymbols(t *testing.T) {
 	_ = &master.Config{
 		GenericConfig: &genericapiserver.Config{
 			EnableSwaggerSupport: false,
+			EnableMetrics:        true,
 		},
 		EnableCoreControllers: false,
 		EnableUISupport:       false,

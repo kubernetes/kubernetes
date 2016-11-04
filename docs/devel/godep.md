@@ -86,7 +86,7 @@ godep get $DEP/...
 rm -rf Godeps
 rm -rf vendor
 ./hack/godep-save.sh
-git co -- $(git st -s | grep "^ D" | awk '{print $2}' | grep ^Godeps)
+git checkout -- $(git status -s | grep "^ D" | awk '{print $2}' | grep ^Godeps)
 ```
 
 _If `go get -u path/to/dependency` fails with compilation errors, instead try

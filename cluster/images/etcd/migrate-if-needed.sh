@@ -102,6 +102,13 @@ start_etcd() {
   # Use random ports, so that apiserver cannot connect to etcd.
   ETCD_PORT=18629
   ETCD_PEER_PORT=18630
+  # Avoid collisions between etcd and event-etcd.
+  case "${DATA_DIRECTORY}" in
+    *event*)
+      ETCD_PORT=18631
+      ETCD_PEER_PORT=18632
+      ;;
+  esac
   local ETCD_CMD="${ETCD:-/usr/local/bin/etcd-${START_VERSION}}"
   local ETCDCTL_CMD="${ETCDCTL:-/usr/local/bin/etcdctl-${START_VERSION}}"
   local API_VERSION="$(echo ${START_STORAGE} | cut -c5-5)"
@@ -114,17 +121,16 @@ start_etcd() {
     --listen-client-urls http://127.0.0.1:${ETCD_PORT} \
     --advertise-client-urls http://127.0.0.1:${ETCD_PORT} \
     --listen-peer-urls http://127.0.0.1:${ETCD_PEER_PORT} \
-    --initial-advertise-peer-urls http://127.0.0.1:${ETCD_PEER_PORT} \
-    1>>/dev/null 2>&1 &
+    --initial-advertise-peer-urls http://127.0.0.1:${ETCD_PEER_PORT} &
   ETCD_PID=$!
   # Wait until we can write to etcd.
   for i in $(seq 240); do
+    sleep 0.5
     ETCDCTL_API="${API_VERSION}" ${ETCDCTL_CMD} 'etcd_version' ${START_VERSION}
     if [ "$?" -eq "0" ]; then
       echo "Etcd on port ${ETCD_PORT} is up."
       return 0
     fi
-    sleep 0.5
   done
   echo "Timeout while waiting for etcd on port ${ETCD_PORT}"
   return 1

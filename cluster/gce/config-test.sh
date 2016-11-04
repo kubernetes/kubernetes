@@ -45,7 +45,7 @@ NODE_OS_DISTRIBUTION=${KUBE_NODE_OS_DISTRIBUTION:-${KUBE_OS_DISTRIBUTION:-gci}}
 # variable. Also please update corresponding image for node e2e at:
 # https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/jenkins/image-config.yaml
 CVM_VERSION=container-vm-v20161025
-GCI_VERSION="gci-dev-55-8872-18-0"
+GCI_VERSION="gci-dev-56-8938-0-0"
 MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
 NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${CVM_VERSION}}
@@ -94,7 +94,9 @@ ENABLE_L7_LOADBALANCING="${KUBE_ENABLE_L7_LOADBALANCING:-glbc}"
 #   standalone     - Heapster only. Metrics available via Heapster REST API.
 ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
 
-# Set etcd version (e.g. 3.0.4-migration.1) if you need non-default version.
+# Set etcd image (e.g. 3.0.13-experimental.1) version (e.g. 3.0.13) if you need
+# non-default version.
+ETCD_IMAGE="${TEST_ETCD_IMAGE:-}"
 ETCD_VERSION="${TEST_ETCD_VERSION:-}"
 
 # Default Log level for all components in test clusters and variables to override it in specific components.
@@ -176,7 +178,7 @@ KUBE_UP_AUTOMATIC_CLEANUP=${KUBE_UP_AUTOMATIC_CLEANUP:-false}
 TEST_CLUSTER="${TEST_CLUSTER:-true}"
 
 # Storage backend. 'etcd2' supported, 'etcd3' experimental.
-STORAGE_BACKEND=${STORAGE_BACKEND:-etcd2}
+STORAGE_BACKEND=${STORAGE_BACKEND:-}
 
 # OpenContrail networking plugin specific settings
 NETWORK_PROVIDER="${NETWORK_PROVIDER:-kubenet}" # none, opencontrail, kubenet

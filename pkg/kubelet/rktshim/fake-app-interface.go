@@ -88,13 +88,13 @@ type fakeContainer struct {
 }
 
 func (c *fakeContainer) Start() {
-	c.State = runtimeApi.ContainerState_RUNNING
+	c.State = runtimeApi.ContainerState_CONTAINER_RUNNING
 
 	c.Status.State = &c.State
 }
 
 func (c *fakeContainer) Stop() {
-	c.State = runtimeApi.ContainerState_EXITED
+	c.State = runtimeApi.ContainerState_CONTAINER_EXITED
 
 	c.Status.State = &c.State
 
@@ -135,11 +135,11 @@ func (r *FakeRuntime) StartContainer(id string) error {
 		return ErrContainerNotFound
 	}
 	switch c.State {
-	case runtimeApi.ContainerState_EXITED:
+	case runtimeApi.ContainerState_CONTAINER_EXITED:
 		fallthrough
-	case runtimeApi.ContainerState_CREATED:
+	case runtimeApi.ContainerState_CONTAINER_CREATED:
 		c.Start()
-	case runtimeApi.ContainerState_UNKNOWN:
+	case runtimeApi.ContainerState_CONTAINER_UNKNOWN:
 		// TODO(tmrts): add timeout to Start API or generalize timeout somehow
 		//<-time.After(time.Duration(timeout) * time.Second)
 		fallthrough
@@ -157,9 +157,9 @@ func (r *FakeRuntime) StopContainer(id string, timeout int64) error {
 	}
 
 	switch c.State {
-	case runtimeApi.ContainerState_RUNNING:
-		c.State = runtimeApi.ContainerState_EXITED // This state might not be the best one
-	case runtimeApi.ContainerState_UNKNOWN:
+	case runtimeApi.ContainerState_CONTAINER_RUNNING:
+		c.State = runtimeApi.ContainerState_CONTAINER_EXITED // This state might not be the best one
+	case runtimeApi.ContainerState_CONTAINER_UNKNOWN:
 		<-time.After(time.Duration(timeout) * time.Second)
 		fallthrough
 	default:
@@ -214,7 +214,7 @@ func (r *FakeRuntime) ExecSync(containerID string, cmd []string, timeout time.Du
 	}
 
 	// TODO(tmrts): Validate the assumption that container has to be running for exec to work.
-	if c.State != runtimeApi.ContainerState_RUNNING {
+	if c.State != runtimeApi.ContainerState_CONTAINER_RUNNING {
 		return nil, nil, ErrInvalidContainerStateTransition
 	}
 

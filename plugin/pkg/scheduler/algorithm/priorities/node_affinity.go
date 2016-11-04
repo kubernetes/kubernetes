@@ -78,7 +78,7 @@ func CalculateNodeAffinityPriorityMap(pod *api.Pod, meta interface{}, nodeInfo *
 	}, nil
 }
 
-func CalculateNodeAffinityPriorityReduce(pod *api.Pod, result schedulerapi.HostPriorityList) error {
+func CalculateNodeAffinityPriorityReduce(pod *api.Pod, meta interface{}, nodeNameToInfo map[string]*schedulercache.NodeInfo, result schedulerapi.HostPriorityList) error {
 	var maxCount int
 	for i := range result {
 		if result[i].Score > maxCount {

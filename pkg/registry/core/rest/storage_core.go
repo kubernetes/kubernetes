@@ -75,9 +75,9 @@ type LegacyRESTStorageProvider struct {
 	KubeletClientConfig kubeletclient.KubeletClientConfig
 	EventTTL            time.Duration
 
-	// ServiceClusterIPRange is used to build cluster IPs for discovery.
-	ServiceClusterIPRange *net.IPNet
-	ServiceNodePortRange  utilnet.PortRange
+	// ServiceIPRange is used to build cluster IPs for discovery.
+	ServiceIPRange       net.IPNet
+	ServiceNodePortRange utilnet.PortRange
 
 	LoopbackClientConfig *restclient.Config
 }
@@ -108,7 +108,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	}
 
 	var podDisruptionClient policyclient.PodDisruptionBudgetsGetter
-	if policyGroupVersion := (unversioned.GroupVersion{Group: "policy", Version: "v1alpha1"}); registered.IsEnabledVersion(policyGroupVersion) {
+	if policyGroupVersion := (unversioned.GroupVersion{Group: "policy", Version: "v1beta1"}); registered.IsEnabledVersion(policyGroupVersion) {
 		apiGroupInfo.SubresourceGroupVersionKind["pods/eviction"] = policyGroupVersion.WithKind("Eviction")
 
 		var err error
@@ -154,9 +154,9 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	restStorage.ServiceRegistry = service.NewRegistry(serviceRESTStorage)
 
 	var serviceClusterIPRegistry rangeallocation.RangeRegistry
-	serviceClusterIPRange := c.ServiceClusterIPRange
-	if serviceClusterIPRange == nil {
-		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, fmt.Errorf("service clusterIPRange is nil")
+	serviceClusterIPRange := c.ServiceIPRange
+	if serviceClusterIPRange.IP == nil {
+		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, fmt.Errorf("service clusterIPRange is missing")
 	}
 
 	serviceStorageConfig, err := c.StorageFactory.NewConfig(api.Resource("services"))
@@ -164,7 +164,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
 	}
 
-	ServiceClusterIPAllocator := ipallocator.NewAllocatorCIDRRange(serviceClusterIPRange, func(max int, rangeSpec string) allocator.Interface {
+	ServiceClusterIPAllocator := ipallocator.NewAllocatorCIDRRange(&serviceClusterIPRange, func(max int, rangeSpec string) allocator.Interface {
 		mem := allocator.NewAllocationMap(max, rangeSpec)
 		// TODO etcdallocator package to return a storage interface via the storageFactory
 		etcd := etcdallocator.NewEtcd(mem, "/ranges/serviceips", api.Resource("serviceipallocations"), serviceStorageConfig)
@@ -234,7 +234,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	if registered.IsEnabledVersion(unversioned.GroupVersion{Group: "autoscaling", Version: "v1"}) {
 		restStorageMap["replicationControllers/scale"] = controllerStorage.Scale
 	}
-	if registered.IsEnabledVersion(unversioned.GroupVersion{Group: "policy", Version: "v1alpha1"}) {
+	if registered.IsEnabledVersion(unversioned.GroupVersion{Group: "policy", Version: "v1beta1"}) {
 		restStorageMap["pods/eviction"] = podStorage.Eviction
 	}
 	apiGroupInfo.VersionedResourcesStorageMap["v1"] = restStorageMap

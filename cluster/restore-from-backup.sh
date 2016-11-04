@@ -30,9 +30,8 @@
 # - in case of etcd2 - *.snap and *.wal files are in current directory
 # - in case of etcd3 - *.db file is in the current directory
 # - the script is run as root
-#
-# The script doesn't support restoring event etcd.
-
+# - for event etcd, we only support clearing it - to do it, you need to
+#   set RESET_EVENT_ETCD=true env var.
 
 set -o errexit
 set -o nounset
@@ -45,6 +44,12 @@ set -o pipefail
 # the current one and create a file with such configuration.
 # The restore procedure is chosen based on this information.
 VERSION_FILE="version.txt"
+
+# Make it possible to overwrite version file (or default version)
+# with VERSION_CONTENTS env var.
+if [ -n "${VERSION_CONTENTS:-}" ]; then
+  echo "${VERSION_CONTENTS}" > "${VERSION_FILE}"
+fi
 if [ ! -f "${VERSION_FILE}" ]; then
   echo "2.2.1/etcd2" > "${VERSION_FILE}"
 fi
@@ -204,6 +209,14 @@ mv /var/etcd/data "${MNT_DISK}/var/etcd-corrupted"
 
 # Replace the corrupted data dir with the resotred data.
 mv "${BACKUP_DIR}" /var/etcd/data
+
+if [ "${RESET_EVENT_ETCD:-}" == "true" ]; then
+  EVENTS_CORRUPTED_DIR="${MNT_DISK}/var/etcd-events-corrupted"
+  # Save the corrupted data (clean directory if it is already non-empty).
+  rm -rf "${EVENTS_CORRUPTED_DIR}"
+  mkdir -p "${EVENTS_CORRUPTED_DIR}"
+  mv /var/etcd/data-events "${EVENTS_CORRUPTED_DIR}"
+fi
 
 # Start etcd and kube-apiserver again.
 echo "Restarting etcd and apiserver from restored snapshot"

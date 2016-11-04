@@ -25,6 +25,7 @@ import (
 	"github.com/spf13/cobra"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubenode "k8s.io/kubernetes/cmd/kubeadm/app/node"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -45,25 +46,30 @@ var (
 
 // NewCmdJoin returns "kubeadm join" command.
 func NewCmdJoin(out io.Writer) *cobra.Command {
-	cfg := &kubeadmapi.NodeConfiguration{}
+	versioned := &kubeadmapiext.NodeConfiguration{}
+	api.Scheme.Default(versioned)
+	cfg := kubeadmapi.NodeConfiguration{}
+	api.Scheme.Convert(versioned, &cfg, nil)
+
 	var skipPreFlight bool
 	var cfgPath string
+
 	cmd := &cobra.Command{
 		Use:   "join",
-		Short: "Run this on any machine you wish to join an existing cluster.",
+		Short: "Run this on any machine you wish to join an existing cluster",
 		Run: func(cmd *cobra.Command, args []string) {
-			j, err := NewJoin(cfgPath, args, cfg, skipPreFlight)
+			j, err := NewJoin(cfgPath, args, &cfg, skipPreFlight)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(j.Run(out))
 		},
 	}
 
 	cmd.PersistentFlags().StringVar(
-		&cfg.Secrets.GivenToken, "token", "",
+		&cfg.Secrets.GivenToken, "token", cfg.Secrets.GivenToken,
 		"(required) Shared secret used to secure bootstrap. Must match the output of 'kubeadm init'",
 	)
 
-	cmd.PersistentFlags().StringVar(&cfgPath, "config", "", "Path to kubeadm config file")
+	cmd.PersistentFlags().StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file")
 
 	cmd.PersistentFlags().BoolVar(
 		&skipPreFlight, "skip-preflight-checks", false,
@@ -71,12 +77,12 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 	)
 
 	cmd.PersistentFlags().Int32Var(
-		&cfg.APIPort, "api-port", kubeadmapi.DefaultAPIBindPort,
+		&cfg.APIPort, "api-port", cfg.APIPort,
 		"(optional) API server port on the master",
 	)
 
 	cmd.PersistentFlags().Int32Var(
-		&cfg.DiscoveryPort, "discovery-port", kubeadmapi.DefaultDiscoveryBindPort,
+		&cfg.DiscoveryPort, "discovery-port", cfg.DiscoveryPort,
 		"(optional) Discovery port on the master",
 	)
 
@@ -98,21 +104,21 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 		}
 	}
 
+	// TODO(phase1+) this we are missing args from the help text, there should be a way to tell cobra about it
+	if len(args) == 0 && len(cfg.MasterAddresses) == 0 {
+		return nil, fmt.Errorf("must specify master IP address (see --help)")
+	}
+	cfg.MasterAddresses = append(cfg.MasterAddresses, args...)
+
 	if !skipPreFlight {
 		fmt.Println("Running pre-flight checks")
-		err := preflight.RunJoinNodeChecks()
+		err := preflight.RunJoinNodeChecks(cfg)
 		if err != nil {
 			return nil, &preflight.PreFlightError{Msg: err.Error()}
 		}
 	} else {
 		fmt.Println("Skipping pre-flight checks")
 	}
-
-	// TODO(phase1+) this we are missing args from the help text, there should be a way to tell cobra about it
-	if len(args) == 0 && len(cfg.MasterAddresses) == 0 {
-		return nil, fmt.Errorf("must specify master IP address (see --help)")
-	}
-	cfg.MasterAddresses = append(cfg.MasterAddresses, args...)
 
 	ok, err := kubeadmutil.UseGivenTokenIfValid(&cfg.Secrets)
 	if !ok {

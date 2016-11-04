@@ -22,8 +22,8 @@
     "description": "get available API versions"
    },
    {
-    "path": "/apis/apps/v1alpha1",
-    "description": "API at /apis/apps/v1alpha1"
+    "path": "/apis/apps/v1beta1",
+    "description": "API at /apis/apps/v1beta1"
    },
    {
     "path": "/apis/apps",
@@ -82,8 +82,8 @@
     "description": "get information of a group"
    },
    {
-    "path": "/apis/policy/v1alpha1",
-    "description": "API at /apis/policy/v1alpha1"
+    "path": "/apis/policy/v1beta1",
+    "description": "API at /apis/policy/v1beta1"
    },
    {
     "path": "/apis/policy",

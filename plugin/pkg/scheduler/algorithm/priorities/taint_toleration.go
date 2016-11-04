@@ -88,7 +88,7 @@ func ComputeTaintTolerationPriorityMap(pod *api.Pod, meta interface{}, nodeInfo 
 	}, nil
 }
 
-func ComputeTaintTolerationPriorityReduce(pod *api.Pod, result schedulerapi.HostPriorityList) error {
+func ComputeTaintTolerationPriorityReduce(pod *api.Pod, meta interface{}, nodeNameToInfo map[string]*schedulercache.NodeInfo, result schedulerapi.HostPriorityList) error {
 	var maxCount int
 	for i := range result {
 		if result[i].Score > maxCount {

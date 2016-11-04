@@ -30,10 +30,10 @@ func TestConvertDockerStatusToRuntimeAPIState(t *testing.T) {
 		input    string
 		expected runtimeApi.ContainerState
 	}{
-		{input: "Up 5 hours", expected: runtimeApi.ContainerState_RUNNING},
-		{input: "Exited (0) 2 hours ago", expected: runtimeApi.ContainerState_EXITED},
-		{input: "Created", expected: runtimeApi.ContainerState_CREATED},
-		{input: "Random string", expected: runtimeApi.ContainerState_UNKNOWN},
+		{input: "Up 5 hours", expected: runtimeApi.ContainerState_CONTAINER_RUNNING},
+		{input: "Exited (0) 2 hours ago", expected: runtimeApi.ContainerState_CONTAINER_EXITED},
+		{input: "Created", expected: runtimeApi.ContainerState_CONTAINER_CREATED},
+		{input: "Random string", expected: runtimeApi.ContainerState_CONTAINER_UNKNOWN},
 	}
 
 	for _, test := range testCases {

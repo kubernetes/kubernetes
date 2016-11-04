@@ -151,6 +151,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 		Labels:      newContainerLabels(container, pod),
 		Annotations: newContainerAnnotations(container, pod, restartCount),
 		Mounts:      m.makeMounts(opts, container, podHasSELinuxLabel),
+		Devices:     makeDevices(opts),
 		LogPath:     &containerLogsPath,
 		Stdin:       &container.Stdin,
 		StdinOnce:   &container.StdinOnce,
@@ -251,6 +252,22 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *api.
 	return linuxConfig
 }
 
+// makeDevices generates container devices for kubelet runtime api.
+func makeDevices(opts *kubecontainer.RunContainerOptions) []*runtimeApi.Device {
+	devices := make([]*runtimeApi.Device, len(opts.Devices))
+
+	for idx := range opts.Devices {
+		device := opts.Devices[idx]
+		devices[idx] = &runtimeApi.Device{
+			HostPath:      &device.PathOnHost,
+			ContainerPath: &device.PathInContainer,
+			Permissions:   &device.Permissions,
+		}
+	}
+
+	return devices
+}
+
 // makeMounts generates container volume mounts for kubelet runtime api.
 func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerOptions, container *api.Container, podHasSELinuxLabel bool) []*runtimeApi.Mount {
 	volumeMounts := []*runtimeApi.Mount{}
@@ -301,7 +318,7 @@ func (m *kubeGenericRuntimeManager) getKubeletContainers(allContainers bool) ([]
 		LabelSelector: map[string]string{kubernetesManagedLabel: "true"},
 	}
 	if !allContainers {
-		runningState := runtimeApi.ContainerState_RUNNING
+		runningState := runtimeApi.ContainerState_CONTAINER_RUNNING
 		filter.State = &runningState
 	}
 
@@ -390,7 +407,7 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 			CreatedAt:    time.Unix(0, status.GetCreatedAt()),
 		}
 
-		if c.GetState() == runtimeApi.ContainerState_RUNNING {
+		if c.GetState() == runtimeApi.ContainerState_CONTAINER_RUNNING {
 			cStatus.StartedAt = time.Unix(0, status.GetStartedAt())
 		} else {
 			cStatus.Reason = status.GetReason()
@@ -674,14 +691,14 @@ func (m *kubeGenericRuntimeManager) AttachContainer(id kubecontainer.ContainerID
 
 // GetContainerLogs returns logs of a specific container.
 func (m *kubeGenericRuntimeManager) GetContainerLogs(pod *api.Pod, containerID kubecontainer.ContainerID, logOptions *api.PodLogOptions, stdout, stderr io.Writer) (err error) {
-	// Get logs directly from docker for in-process docker integration for
-	// now to unblock other tests.
-	// TODO: remove this hack after setting down on how to implement log
-	// retrieval/management.
-	if ds, ok := m.runtimeService.(dockershim.DockerLegacyService); ok {
-		return ds.GetContainerLogs(pod, containerID, logOptions, stdout, stderr)
+	status, err := m.runtimeService.ContainerStatus(containerID.ID)
+	if err != nil {
+		return fmt.Errorf("failed to get container status %q: %v", containerID, err)
 	}
-	return fmt.Errorf("not implemented")
+	labeledInfo := getContainerInfoFromLabels(status.Labels)
+	annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
+	path := buildFullContainerLogsPath(pod.UID, labeledInfo.ContainerName, annotatedInfo.RestartCount)
+	return ReadLogs(path, logOptions, stdout, stderr)
 }
 
 // Runs the command in the container of the specified pod using nsenter.
@@ -707,6 +724,7 @@ func (m *kubeGenericRuntimeManager) ExecInContainer(containerID kubecontainer.Co
 func (m *kubeGenericRuntimeManager) removeContainer(containerID string) error {
 	glog.V(4).Infof("Removing container %q", containerID)
 	// Remove the container log.
+	// TODO: Separate log and container lifecycle management.
 	if err := m.removeContainerLog(containerID); err != nil {
 		return err
 	}
@@ -719,16 +737,13 @@ func (m *kubeGenericRuntimeManager) removeContainerLog(containerID string) error
 	// Remove the container log.
 	status, err := m.runtimeService.ContainerStatus(containerID)
 	if err != nil {
-		glog.Errorf("ContainerStatus for %q error: %v", containerID, err)
-		return err
+		return fmt.Errorf("failed to get container status %q: %v", containerID, err)
 	}
 	labeledInfo := getContainerInfoFromLabels(status.Labels)
 	annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
-	path := filepath.Join(buildPodLogsDirectory(labeledInfo.PodUID),
-		buildContainerLogsPath(labeledInfo.ContainerName, annotatedInfo.RestartCount))
+	path := buildFullContainerLogsPath(labeledInfo.PodUID, labeledInfo.ContainerName, annotatedInfo.RestartCount)
 	if err := m.osInterface.Remove(path); err != nil && !os.IsNotExist(err) {
-		glog.Errorf("Failed to remove container %q log %q: %v", containerID, path, err)
-		return err
+		return fmt.Errorf("failed to remove container %q log %q: %v", containerID, path, err)
 	}
 
 	// Remove the legacy container log symlink.
@@ -736,9 +751,8 @@ func (m *kubeGenericRuntimeManager) removeContainerLog(containerID string) error
 	legacySymlink := legacyLogSymlink(containerID, labeledInfo.ContainerName, labeledInfo.PodName,
 		labeledInfo.PodNamespace)
 	if err := m.osInterface.Remove(legacySymlink); err != nil && !os.IsNotExist(err) {
-		glog.Errorf("Failed to remove container %q log legacy symbolic link %q: %v",
+		return fmt.Errorf("failed to remove container %q log legacy symbolic link %q: %v",
 			containerID, legacySymlink, err)
-		return err
 	}
 	return nil
 }

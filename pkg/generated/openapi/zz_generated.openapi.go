@@ -32,7 +32,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 	"apps.StatefulSet": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity. StatefulSet is currently in alpha and and subject to change without notice.",
+				Description: "StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.",
 				Properties: map[string]spec.Schema{
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
@@ -1989,12 +1989,18 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					},
 					"conntrackTCPEstablishedTimeout": {
 						SchemaProps: spec.SchemaProps{
-							Description: "conntrackTCPEstablishedTimeout is how long an idle TCP connection will be kept open (e.g. '250ms', '2s').  Must be greater than 0.",
+							Description: "conntrackTCPEstablishedTimeout is how long an idle TCP connection will be kept open (e.g. '2s').  Must be greater than 0.",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.Duration"),
+						},
+					},
+					"conntrackTCPCloseWaitTimeout": {
+						SchemaProps: spec.SchemaProps{
+							Description: "conntrackTCPCloseWaitTimeout is how long an idle conntrack entry in CLOSE_WAIT state will remain in the conntrack table. (e.g. '60s'). Must be greater than 0 to set.",
 							Ref:         spec.MustCreateRef("#/definitions/unversioned.Duration"),
 						},
 					},
 				},
-				Required: []string{"TypeMeta", "bindAddress", "clusterCIDR", "healthzBindAddress", "healthzPort", "hostnameOverride", "iptablesMasqueradeBit", "iptablesSyncPeriodSeconds", "kubeconfigPath", "masqueradeAll", "master", "oomScoreAdj", "mode", "portRange", "resourceContainer", "udpTimeoutMilliseconds", "conntrackMax", "conntrackMaxPerCore", "conntrackMin", "conntrackTCPEstablishedTimeout"},
+				Required: []string{"TypeMeta", "bindAddress", "clusterCIDR", "healthzBindAddress", "healthzPort", "hostnameOverride", "iptablesMasqueradeBit", "iptablesSyncPeriodSeconds", "kubeconfigPath", "masqueradeAll", "master", "oomScoreAdj", "mode", "portRange", "resourceContainer", "udpTimeoutMilliseconds", "conntrackMax", "conntrackMaxPerCore", "conntrackMin", "conntrackTCPEstablishedTimeout", "conntrackTCPCloseWaitTimeout"},
 			},
 		},
 		Dependencies: []string{
@@ -2970,6 +2976,13 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							},
 						},
 					},
+					"featureGates": {
+						SchemaProps: spec.SchemaProps{
+							Description: "featureGates is a string of comma-separated key=value pairs that describe feature gates for alpha/experimental features.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"experimentalRuntimeIntegrationType": {
 						SchemaProps: spec.SchemaProps{
 							Description: "How to integrate with runtime. If set to cri, kubelet will switch to using the new Container Runtine Interface.",
@@ -2978,7 +2991,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 						},
 					},
 				},
-				Required: []string{"TypeMeta", "podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "authentication", "authorization", "hostnameOverride", "podInfraContainerImage", "dockerEndpoint", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "networkPluginName", "networkPluginMTU", "networkPluginDir", "cniConfDir", "cniBinDir", "volumePluginDir", "containerRuntime", "remoteRuntimeEndpoint", "remoteImageEndpoint", "experimentalMounterPath", "experimentalMounterRootfsPath", "lockFilePath", "exitOnLockContention", "hairpinMode", "babysitDaemons", "maxPods", "nvidiaGPUs", "dockerExecHandlerName", "podCIDR", "resolvConf", "cpuCFSQuota", "containerized", "maxOpenFiles", "reconcileCIDR", "registerSchedulable", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "podsPerCore", "enableControllerAttachDetach", "systemReserved", "kubeReserved", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit"},
+				Required: []string{"TypeMeta", "podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "authentication", "authorization", "hostnameOverride", "podInfraContainerImage", "dockerEndpoint", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "networkPluginName", "networkPluginMTU", "networkPluginDir", "cniConfDir", "cniBinDir", "volumePluginDir", "containerRuntime", "remoteRuntimeEndpoint", "remoteImageEndpoint", "experimentalMounterPath", "experimentalMounterRootfsPath", "lockFilePath", "exitOnLockContention", "hairpinMode", "babysitDaemons", "maxPods", "nvidiaGPUs", "dockerExecHandlerName", "podCIDR", "resolvConf", "cpuCFSQuota", "containerized", "maxOpenFiles", "reconcileCIDR", "registerSchedulable", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "podsPerCore", "enableControllerAttachDetach", "systemReserved", "kubeReserved", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit", "featureGates"},
 			},
 		},
 		Dependencies: []string{
@@ -5186,11 +5199,11 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 			SchemaProps: spec.SchemaProps{
 				Description: "PodDisruptionBudgetStatus represents information about the status of a PodDisruptionBudget. Status may trail the actual state of a system.",
 				Properties: map[string]spec.Schema{
-					"disruptionAllowed": {
+					"disruptionsAllowed": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Whether or not a disruption is currently allowed.",
-							Type:        []string{"boolean"},
-							Format:      "",
+							Description: "Number of pod disruptions that are currently allowed.",
+							Type:        []string{"integer"},
+							Format:      "int32",
 						},
 					},
 					"currentHealthy": {
@@ -5215,7 +5228,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 						},
 					},
 				},
-				Required: []string{"disruptionAllowed", "currentHealthy", "desiredHealthy", "expectedPods"},
+				Required: []string{"disruptionsAllowed", "currentHealthy", "desiredHealthy", "expectedPods"},
 			},
 		},
 		Dependencies: []string{},
@@ -13459,29 +13472,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		Dependencies: []string{
 			"unversioned.ListMeta", "v1alpha1.ClusterRole"},
 	},
-	"v1alpha1.Eviction": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "Eviction evicts a pod from its node subject to certain policies and safety constraints. This is a subresource of Pod.  A request to cause such an eviction is created by POSTing to .../pods/<pod name>/eviction.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "ObjectMeta describes the pod that is being evicted.",
-							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
-						},
-					},
-					"deleteOptions": {
-						SchemaProps: spec.SchemaProps{
-							Description: "DeleteOptions may be provided",
-							Ref:         spec.MustCreateRef("#/definitions/v1.DeleteOptions"),
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.DeleteOptions", "v1.ObjectMeta"},
-	},
 	"v1alpha1.ImageReview": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -13733,12 +13723,18 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					},
 					"conntrackTCPEstablishedTimeout": {
 						SchemaProps: spec.SchemaProps{
-							Description: "conntrackTCPEstablishedTimeout is how long an idle TCP connection will be kept open (e.g. '250ms', '2s').  Must be greater than 0.",
+							Description: "conntrackTCPEstablishedTimeout is how long an idle TCP connection will be kept open (e.g. '2s').  Must be greater than 0.",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.Duration"),
+						},
+					},
+					"conntrackTCPCloseWaitTimeout": {
+						SchemaProps: spec.SchemaProps{
+							Description: "conntrackTCPCloseWaitTimeout is how long an idle conntrack entry in CLOSE_WAIT state will remain in the conntrack table. (e.g. '60s'). Must be greater than 0 to set.",
 							Ref:         spec.MustCreateRef("#/definitions/unversioned.Duration"),
 						},
 					},
 				},
-				Required: []string{"TypeMeta", "bindAddress", "clusterCIDR", "healthzBindAddress", "healthzPort", "hostnameOverride", "iptablesMasqueradeBit", "iptablesSyncPeriodSeconds", "kubeconfigPath", "masqueradeAll", "master", "oomScoreAdj", "mode", "portRange", "resourceContainer", "udpTimeoutMilliseconds", "conntrackMax", "conntrackMaxPerCore", "conntrackMin", "conntrackTCPEstablishedTimeout"},
+				Required: []string{"TypeMeta", "bindAddress", "clusterCIDR", "healthzBindAddress", "healthzPort", "hostnameOverride", "iptablesMasqueradeBit", "iptablesSyncPeriodSeconds", "kubeconfigPath", "masqueradeAll", "master", "oomScoreAdj", "mode", "portRange", "resourceContainer", "udpTimeoutMilliseconds", "conntrackMax", "conntrackMaxPerCore", "conntrackMin", "conntrackTCPEstablishedTimeout", "conntrackTCPCloseWaitTimeout"},
 			},
 		},
 		Dependencies: []string{
@@ -14714,6 +14710,13 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							},
 						},
 					},
+					"featureGates": {
+						SchemaProps: spec.SchemaProps{
+							Description: "featureGates is a string of comma-separated key=value pairs that describe feature gates for alpha/experimental features.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"experimentalRuntimeIntegrationType": {
 						SchemaProps: spec.SchemaProps{
 							Description: "How to integrate with runtime. If set to CRI, kubelet will switch to using the new Container Runtine Interface.",
@@ -14722,7 +14725,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 						},
 					},
 				},
-				Required: []string{"TypeMeta", "podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "authentication", "authorization", "hostnameOverride", "podInfraContainerImage", "dockerEndpoint", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "networkPluginName", "networkPluginDir", "cniConfDir", "cniBinDir", "networkPluginMTU", "volumePluginDir", "cloudProvider", "cloudConfigFile", "kubeletCgroups", "runtimeCgroups", "systemCgroups", "cgroupRoot", "containerRuntime", "remoteRuntimeEndpoint", "remoteImageEndpoint", "runtimeRequestTimeout", "rktPath", "experimentalMounterPath", "experimentalMounterRootfsPath", "rktAPIEndpoint", "rktStage1Image", "lockFilePath", "exitOnLockContention", "hairpinMode", "babysitDaemons", "maxPods", "nvidiaGPUs", "dockerExecHandlerName", "podCIDR", "resolvConf", "cpuCFSQuota", "containerized", "maxOpenFiles", "reconcileCIDR", "registerSchedulable", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "outOfDiskTransitionFrequency", "nodeIP", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "evictionHard", "evictionSoft", "evictionSoftGracePeriod", "evictionPressureTransitionPeriod", "evictionMaxPodGracePeriod", "evictionMinimumReclaim", "podsPerCore", "enableControllerAttachDetach", "systemReserved", "kubeReserved", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit"},
+				Required: []string{"TypeMeta", "podManifestPath", "syncFrequency", "fileCheckFrequency", "httpCheckFrequency", "manifestURL", "manifestURLHeader", "enableServer", "address", "port", "readOnlyPort", "tlsCertFile", "tlsPrivateKeyFile", "certDirectory", "authentication", "authorization", "hostnameOverride", "podInfraContainerImage", "dockerEndpoint", "rootDirectory", "seccompProfileRoot", "allowPrivileged", "hostNetworkSources", "hostPIDSources", "hostIPCSources", "registryPullQPS", "registryBurst", "eventRecordQPS", "eventBurst", "enableDebuggingHandlers", "minimumGCAge", "maxPerPodContainerCount", "maxContainerCount", "cAdvisorPort", "healthzPort", "healthzBindAddress", "oomScoreAdj", "registerNode", "clusterDomain", "masterServiceNamespace", "clusterDNS", "streamingConnectionIdleTimeout", "nodeStatusUpdateFrequency", "imageMinimumGCAge", "imageGCHighThresholdPercent", "imageGCLowThresholdPercent", "lowDiskSpaceThresholdMB", "volumeStatsAggPeriod", "networkPluginName", "networkPluginDir", "cniConfDir", "cniBinDir", "networkPluginMTU", "volumePluginDir", "cloudProvider", "cloudConfigFile", "kubeletCgroups", "runtimeCgroups", "systemCgroups", "cgroupRoot", "containerRuntime", "remoteRuntimeEndpoint", "remoteImageEndpoint", "runtimeRequestTimeout", "rktPath", "experimentalMounterPath", "experimentalMounterRootfsPath", "rktAPIEndpoint", "rktStage1Image", "lockFilePath", "exitOnLockContention", "hairpinMode", "babysitDaemons", "maxPods", "nvidiaGPUs", "dockerExecHandlerName", "podCIDR", "resolvConf", "cpuCFSQuota", "containerized", "maxOpenFiles", "reconcileCIDR", "registerSchedulable", "contentType", "kubeAPIQPS", "kubeAPIBurst", "serializeImagePulls", "outOfDiskTransitionFrequency", "nodeIP", "nodeLabels", "nonMasqueradeCIDR", "enableCustomMetrics", "evictionHard", "evictionSoft", "evictionSoftGracePeriod", "evictionPressureTransitionPeriod", "evictionMaxPodGracePeriod", "evictionMinimumReclaim", "podsPerCore", "enableControllerAttachDetach", "systemReserved", "kubeReserved", "protectKernelDefaults", "makeIPTablesUtilChains", "iptablesMasqueradeBit", "iptablesDropBit", "featureGates"},
 			},
 		},
 		Dependencies: []string{
@@ -14828,125 +14831,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{
 			"unversioned.Duration"},
-	},
-	"v1alpha1.PodDisruptionBudget": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Ref: spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
-						},
-					},
-					"spec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Specification of the desired behavior of the PodDisruptionBudget.",
-							Ref:         spec.MustCreateRef("#/definitions/v1alpha1.PodDisruptionBudgetSpec"),
-						},
-					},
-					"status": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Most recently observed status of the PodDisruptionBudget.",
-							Ref:         spec.MustCreateRef("#/definitions/v1alpha1.PodDisruptionBudgetStatus"),
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.ObjectMeta", "v1alpha1.PodDisruptionBudgetSpec", "v1alpha1.PodDisruptionBudgetStatus"},
-	},
-	"v1alpha1.PodDisruptionBudgetList": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "PodDisruptionBudgetList is a collection of PodDisruptionBudgets.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Ref: spec.MustCreateRef("#/definitions/unversioned.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Type: []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1alpha1.PodDisruptionBudget"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-		},
-		Dependencies: []string{
-			"unversioned.ListMeta", "v1alpha1.PodDisruptionBudget"},
-	},
-	"v1alpha1.PodDisruptionBudgetSpec": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "PodDisruptionBudgetSpec is a description of a PodDisruptionBudget.",
-				Properties: map[string]spec.Schema{
-					"minAvailable": {
-						SchemaProps: spec.SchemaProps{
-							Description: "An eviction is allowed if at least \"minAvailable\" pods selected by \"selector\" will still be available after the eviction, i.e. even in the absence of the evicted pod.  So for example you can prevent all voluntary evictions by specifying \"100%\".",
-							Ref:         spec.MustCreateRef("#/definitions/intstr.IntOrString"),
-						},
-					},
-					"selector": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Label query over pods whose evictions are managed by the disruption budget.",
-							Ref:         spec.MustCreateRef("#/definitions/unversioned.LabelSelector"),
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"intstr.IntOrString", "unversioned.LabelSelector"},
-	},
-	"v1alpha1.PodDisruptionBudgetStatus": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "PodDisruptionBudgetStatus represents information about the status of a PodDisruptionBudget. Status may trail the actual state of a system.",
-				Properties: map[string]spec.Schema{
-					"disruptionAllowed": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Whether or not a disruption is currently allowed.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"currentHealthy": {
-						SchemaProps: spec.SchemaProps{
-							Description: "current number of healthy pods",
-							Type:        []string{"integer"},
-							Format:      "int32",
-						},
-					},
-					"desiredHealthy": {
-						SchemaProps: spec.SchemaProps{
-							Description: "minimum desired number of healthy pods",
-							Type:        []string{"integer"},
-							Format:      "int32",
-						},
-					},
-					"expectedPods": {
-						SchemaProps: spec.SchemaProps{
-							Description: "total number of pods counted by this disruption budget",
-							Type:        []string{"integer"},
-							Format:      "int32",
-						},
-					},
-				},
-				Required: []string{"disruptionAllowed", "currentHealthy", "desiredHealthy", "expectedPods"},
-			},
-		},
-		Dependencies: []string{},
 	},
 	"v1alpha1.PolicyRule": {
 		Schema: spec.Schema{
@@ -15194,139 +15078,6 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					},
 				},
 				Required: []string{"apiGroup", "kind", "name"},
-			},
-		},
-		Dependencies: []string{},
-	},
-	"v1alpha1.StatefulSet": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity. StatefulSet is currently in alpha and subject to change without notice.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Ref: spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
-						},
-					},
-					"spec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Spec defines the desired identities of pods in this set.",
-							Ref:         spec.MustCreateRef("#/definitions/v1alpha1.StatefulSetSpec"),
-						},
-					},
-					"status": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Status is the current status of Pods in this StatefulSet. This data may be out of date by some window of time.",
-							Ref:         spec.MustCreateRef("#/definitions/v1alpha1.StatefulSetStatus"),
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"v1.ObjectMeta", "v1alpha1.StatefulSetSpec", "v1alpha1.StatefulSetStatus"},
-	},
-	"v1alpha1.StatefulSetList": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "StatefulSetList is a collection of StatefulSets.",
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Ref: spec.MustCreateRef("#/definitions/unversioned.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Type: []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1alpha1.StatefulSet"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-		},
-		Dependencies: []string{
-			"unversioned.ListMeta", "v1alpha1.StatefulSet"},
-	},
-	"v1alpha1.StatefulSetSpec": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "A StatefulSetSpec is the specification of a StatefulSet.",
-				Properties: map[string]spec.Schema{
-					"replicas": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Replicas is the desired number of replicas of the given Template. These are replicas in the sense that they are instantiations of the same Template, but individual replicas also have a consistent identity. If unspecified, defaults to 1.",
-							Type:        []string{"integer"},
-							Format:      "int32",
-						},
-					},
-					"selector": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Selector is a label query over pods that should match the replica count. If empty, defaulted to labels on the pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
-							Ref:         spec.MustCreateRef("#/definitions/unversioned.LabelSelector"),
-						},
-					},
-					"template": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Template is the object that describes the pod that will be created if insufficient replicas are detected. Each pod stamped out by the StatefulSet will fulfill this Template, but have a unique identity from the rest of the StatefulSet.",
-							Ref:         spec.MustCreateRef("#/definitions/v1.PodTemplateSpec"),
-						},
-					},
-					"volumeClaimTemplates": {
-						SchemaProps: spec.SchemaProps{
-							Description: "VolumeClaimTemplates is a list of claims that pods are allowed to reference. The StatefulSet controller is responsible for mapping network identities to claims in a way that maintains the identity of a pod. Every claim in this list must have at least one matching (by name) volumeMount in one container in the template. A claim in this list takes precedence over any volumes in the template, with the same name.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: spec.MustCreateRef("#/definitions/v1.PersistentVolumeClaim"),
-									},
-								},
-							},
-						},
-					},
-					"serviceName": {
-						SchemaProps: spec.SchemaProps{
-							Description: "ServiceName is the name of the service that governs this StatefulSet. This service must exist before the StatefulSet, and is responsible for the network identity of the set. Pods get DNS/hostnames that follow the pattern: pod-specific-string.serviceName.default.svc.cluster.local where \"pod-specific-string\" is managed by the StatefulSet controller.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-				},
-				Required: []string{"template", "serviceName"},
-			},
-		},
-		Dependencies: []string{
-			"unversioned.LabelSelector", "v1.PersistentVolumeClaim", "v1.PodTemplateSpec"},
-	},
-	"v1alpha1.StatefulSetStatus": {
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "StatefulSetStatus represents the current state of a StatefulSet.",
-				Properties: map[string]spec.Schema{
-					"observedGeneration": {
-						SchemaProps: spec.SchemaProps{
-							Description: "most recent generation observed by this autoscaler.",
-							Type:        []string{"integer"},
-							Format:      "int64",
-						},
-					},
-					"replicas": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Replicas is the number of actual replicas.",
-							Type:        []string{"integer"},
-							Format:      "int32",
-						},
-					},
-				},
-				Required: []string{"replicas"},
 			},
 		},
 		Dependencies: []string{},
@@ -16115,6 +15866,30 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{
 			"v1beta1.RollingUpdateDeployment"},
+	},
+	"v1beta1.Eviction": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Eviction evicts a pod from its node subject to certain policies and safety constraints. This is a subresource of Pod.  A request to cause such an eviction is created by POSTing to .../pods/<pod name>/evictions.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ObjectMeta describes the pod that is being evicted.",
+							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
+						},
+					},
+					"deleteOptions": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DeleteOptions may be provided",
+							Ref:         spec.MustCreateRef("#/definitions/v1.DeleteOptions"),
+						},
+					},
+				},
+				Required: []string{"metadata", "deleteOptions"},
+			},
+		},
+		Dependencies: []string{
+			"v1.DeleteOptions", "v1.ObjectMeta"},
 	},
 	"v1beta1.ExportOptions": {
 		Schema: spec.Schema{
@@ -17064,6 +16839,127 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{},
 	},
+	"v1beta1.PodDisruptionBudget": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Ref: spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Specification of the desired behavior of the PodDisruptionBudget.",
+							Ref:         spec.MustCreateRef("#/definitions/v1beta1.PodDisruptionBudgetSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Most recently observed status of the PodDisruptionBudget.",
+							Ref:         spec.MustCreateRef("#/definitions/v1beta1.PodDisruptionBudgetStatus"),
+						},
+					},
+				},
+				Required: []string{"metadata", "spec", "status"},
+			},
+		},
+		Dependencies: []string{
+			"v1.ObjectMeta", "v1beta1.PodDisruptionBudgetSpec", "v1beta1.PodDisruptionBudgetStatus"},
+	},
+	"v1beta1.PodDisruptionBudgetList": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodDisruptionBudgetList is a collection of PodDisruptionBudgets.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Ref: spec.MustCreateRef("#/definitions/unversioned.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/v1beta1.PodDisruptionBudget"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"metadata", "items"},
+			},
+		},
+		Dependencies: []string{
+			"unversioned.ListMeta", "v1beta1.PodDisruptionBudget"},
+	},
+	"v1beta1.PodDisruptionBudgetSpec": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodDisruptionBudgetSpec is a description of a PodDisruptionBudget.",
+				Properties: map[string]spec.Schema{
+					"minAvailable": {
+						SchemaProps: spec.SchemaProps{
+							Description: "An eviction is allowed if at least \"minAvailable\" pods selected by \"selector\" will still be available after the eviction, i.e. even in the absence of the evicted pod.  So for example you can prevent all voluntary evictions by specifying \"100%\".",
+							Ref:         spec.MustCreateRef("#/definitions/intstr.IntOrString"),
+						},
+					},
+					"selector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Label query over pods whose evictions are managed by the disruption budget.",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.LabelSelector"),
+						},
+					},
+				},
+				Required: []string{"minAvailable", "selector"},
+			},
+		},
+		Dependencies: []string{
+			"intstr.IntOrString", "unversioned.LabelSelector"},
+	},
+	"v1beta1.PodDisruptionBudgetStatus": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodDisruptionBudgetStatus represents information about the status of a PodDisruptionBudget. Status may trail the actual state of a system.",
+				Properties: map[string]spec.Schema{
+					"disruptionsAllowed": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Number of pod disruptions that are currently allowed.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"currentHealthy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "current number of healthy pods",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"desiredHealthy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "minimum desired number of healthy pods",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"expectedPods": {
+						SchemaProps: spec.SchemaProps{
+							Description: "total number of pods counted by this disruption budget",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+				Required: []string{"disruptionsAllowed", "currentHealthy", "desiredHealthy", "expectedPods"},
+			},
+		},
+		Dependencies: []string{},
+	},
 	"v1beta1.PodSecurityPolicy": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -17783,6 +17679,139 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					},
 				},
 				Required: []string{"clientCIDR", "serverAddress"},
+			},
+		},
+		Dependencies: []string{},
+	},
+	"v1beta1.StatefulSet": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Ref: spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Spec defines the desired identities of pods in this set.",
+							Ref:         spec.MustCreateRef("#/definitions/v1beta1.StatefulSetSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status is the current status of Pods in this StatefulSet. This data may be out of date by some window of time.",
+							Ref:         spec.MustCreateRef("#/definitions/v1beta1.StatefulSetStatus"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"v1.ObjectMeta", "v1beta1.StatefulSetSpec", "v1beta1.StatefulSetStatus"},
+	},
+	"v1beta1.StatefulSetList": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "StatefulSetList is a collection of StatefulSets.",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Ref: spec.MustCreateRef("#/definitions/unversioned.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/v1beta1.StatefulSet"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"unversioned.ListMeta", "v1beta1.StatefulSet"},
+	},
+	"v1beta1.StatefulSetSpec": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "A StatefulSetSpec is the specification of a StatefulSet.",
+				Properties: map[string]spec.Schema{
+					"replicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Replicas is the desired number of replicas of the given Template. These are replicas in the sense that they are instantiations of the same Template, but individual replicas also have a consistent identity. If unspecified, defaults to 1.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"selector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Selector is a label query over pods that should match the replica count. If empty, defaulted to labels on the pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.LabelSelector"),
+						},
+					},
+					"template": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Template is the object that describes the pod that will be created if insufficient replicas are detected. Each pod stamped out by the StatefulSet will fulfill this Template, but have a unique identity from the rest of the StatefulSet.",
+							Ref:         spec.MustCreateRef("#/definitions/v1.PodTemplateSpec"),
+						},
+					},
+					"volumeClaimTemplates": {
+						SchemaProps: spec.SchemaProps{
+							Description: "VolumeClaimTemplates is a list of claims that pods are allowed to reference. The StatefulSet controller is responsible for mapping network identities to claims in a way that maintains the identity of a pod. Every claim in this list must have at least one matching (by name) volumeMount in one container in the template. A claim in this list takes precedence over any volumes in the template, with the same name.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/v1.PersistentVolumeClaim"),
+									},
+								},
+							},
+						},
+					},
+					"serviceName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ServiceName is the name of the service that governs this StatefulSet. This service must exist before the StatefulSet, and is responsible for the network identity of the set. Pods get DNS/hostnames that follow the pattern: pod-specific-string.serviceName.default.svc.cluster.local where \"pod-specific-string\" is managed by the StatefulSet controller.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"template", "serviceName"},
+			},
+		},
+		Dependencies: []string{
+			"unversioned.LabelSelector", "v1.PersistentVolumeClaim", "v1.PodTemplateSpec"},
+	},
+	"v1beta1.StatefulSetStatus": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "StatefulSetStatus represents the current state of a StatefulSet.",
+				Properties: map[string]spec.Schema{
+					"observedGeneration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "most recent generation observed by this autoscaler.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"replicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Replicas is the number of actual replicas.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+				Required: []string{"replicas"},
 			},
 		},
 		Dependencies: []string{},

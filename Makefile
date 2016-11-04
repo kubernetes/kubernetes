@@ -99,6 +99,14 @@ verify:
 	KUBE_VERIFY_GIT_BRANCH=$(BRANCH) hack/make-rules/verify.sh -v
 	hack/make-rules/vet.sh
 
+# Runs all the generated updates.
+#
+# Example:
+# make update
+.PHONY: update
+update:
+	hack/update-all.sh
+
 # Build and run tests.
 #
 # Args:

@@ -1743,7 +1743,7 @@ func (c *Cloud) GetDiskPath(volumeName string) (string, error) {
 		return "", err
 	}
 	if len(info.Attachments) == 0 {
-		return "", fmt.Errorf("No attachement to volume %s", volumeName)
+		return "", fmt.Errorf("No attachment to volume %s", volumeName)
 	}
 	return aws.StringValue(info.Attachments[0].Device), nil
 }

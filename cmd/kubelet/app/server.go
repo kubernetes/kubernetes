@@ -321,6 +321,12 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		}
 	}
 
+	// Set feature gates based on the value in KubeletConfiguration
+	err = utilconfig.DefaultFeatureGate.Set(s.KubeletConfiguration.FeatureGates)
+	if err != nil {
+		return err
+	}
+
 	// Register current configuration with /configz endpoint
 	cfgz, cfgzErr := initConfigz(&s.KubeletConfiguration)
 	if utilconfig.DefaultFeatureGate.DynamicKubeletConfig() {
@@ -338,6 +344,11 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 					glog.Errorf("was unable to register configz before due to %s, will not be able to set now", cfgzErr)
 				} else {
 					setConfigz(cfgz, &s.KubeletConfiguration)
+				}
+				// Update feature gates from the new config
+				err = utilconfig.DefaultFeatureGate.Set(s.KubeletConfiguration.FeatureGates)
+				if err != nil {
+					return err
 				}
 			}
 		}
@@ -424,13 +435,15 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 			return fmt.Errorf("invalid configuration: system container was specified and cgroup root was not specified")
 		}
 		kubeDeps.ContainerManager, err = cm.NewContainerManager(kubeDeps.Mounter, kubeDeps.CAdvisorInterface, cm.NodeConfig{
-			RuntimeCgroupsName:    s.RuntimeCgroups,
-			SystemCgroupsName:     s.SystemCgroups,
-			KubeletCgroupsName:    s.KubeletCgroups,
-			ContainerRuntime:      s.ContainerRuntime,
-			CgroupsPerQOS:         s.CgroupsPerQOS,
-			CgroupRoot:            s.CgroupRoot,
-			ProtectKernelDefaults: s.ProtectKernelDefaults,
+			RuntimeCgroupsName:     s.RuntimeCgroups,
+			SystemCgroupsName:      s.SystemCgroups,
+			KubeletCgroupsName:     s.KubeletCgroups,
+			ContainerRuntime:       s.ContainerRuntime,
+			CgroupsPerQOS:          s.CgroupsPerQOS,
+			CgroupRoot:             s.CgroupRoot,
+			CgroupDriver:           s.CgroupDriver,
+			ProtectKernelDefaults:  s.ProtectKernelDefaults,
+			RuntimeIntegrationType: s.ExperimentalRuntimeIntegrationType,
 		})
 		if err != nil {
 			return err

@@ -102,7 +102,7 @@ The first is accomplished in this PR, while a timeline for 2. and 3. is TDB. To 
 	- Put: This is a request for a lease. If the nodecontroller is allocating CIDRs we can probably just no-op.
 * `/network/reservations`: TDB, we can probably use this to accommodate node controller allocating CIDR instead of flannel requesting it
 
-The ick-iest part of this implementation is going to the `GET /network/leases`, i.e the watch proxy. We can side-step by waiting for a more generic Kubernetes resource. However, we can also implement it as follows:
+The ick-iest part of this implementation is going to the `GET /network/leases`, i.e. the watch proxy. We can side-step by waiting for a more generic Kubernetes resource. However, we can also implement it as follows:
 * Watch all nodes, ignore heartbeats
 * On each change, figure out the lease for the node, construct a [lease watch result](https://github.com/coreos/flannel/blob/0bf263826eab1707be5262703a8092c7d15e0be4/subnet/subnet.go#L72), and send it down the watch with the RV from the node
 * Implement a lease list that does a similar translation

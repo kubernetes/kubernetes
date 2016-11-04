@@ -167,6 +167,13 @@ const (
 	// Number of objects that gc can delete in a second.
 	// GC issues 2 requestes for single delete.
 	gcThroughput = 10
+
+	// TODO(justinsb): Avoid hardcoding this.
+	awsMasterIP = "172.20.0.9"
+
+	// Default time to wait for nodes to become schedulable.
+	// Set so high for scale tests.
+	NodeSchedulableTimeout = 4 * time.Hour
 )
 
 var (
@@ -184,6 +191,12 @@ var (
 		regexp.MustCompile(".*node-problem-detector.*"),
 	}
 )
+
+type Address struct {
+	internalIP string
+	externalIP string
+	hostname   string
+}
 
 // GetServerArchitecture fetches the architecture of the cluster's apiserver.
 func GetServerArchitecture(c clientset.Interface) string {
@@ -1423,9 +1436,9 @@ func WaitForPodToDisappear(c clientset.Interface, ns, podName string, label labe
 // In case of failure or too long waiting time, an error is returned.
 func WaitForRCPodToDisappear(c clientset.Interface, ns, rcName, podName string) error {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
-	// NodeController evicts pod after 5 minutes, so we need timeout greater than that.
-	// Additionally, there can be non-zero grace period, so we are setting 10 minutes
-	// to be on the safe size.
+	// NodeController evicts pod after 5 minutes, so we need timeout greater than that to observe effects.
+	// The grace period must be set to 0 on the pod for it to be deleted during the partition.
+	// Otherwise, it goes to the 'Terminating' state till the kubelet confirms deletion.
 	return WaitForPodToDisappear(c, ns, podName, label, 20*time.Second, 10*time.Minute)
 }
 
@@ -1656,11 +1669,16 @@ func PodsResponding(c clientset.Interface, ns, name string, wantName bool, pods 
 }
 
 func PodsCreated(c clientset.Interface, ns, name string, replicas int32) (*api.PodList, error) {
-	timeout := 2 * time.Minute
-	// List the pods, making sure we observe all the replicas.
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
+	return PodsCreatedByLabel(c, ns, name, replicas, label)
+}
+
+func PodsCreatedByLabel(c clientset.Interface, ns, name string, replicas int32, label labels.Selector) (*api.PodList, error) {
+	timeout := 2 * time.Minute
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
 		options := api.ListOptions{LabelSelector: label}
+
+		// List the pods, making sure we observe all the replicas.
 		pods, err := c.Core().Pods(ns).List(options)
 		if err != nil {
 			return nil, err
@@ -2402,11 +2420,11 @@ func GetReadySchedulableNodesOrDie(c clientset.Interface) (nodes *api.NodeList) 
 	return nodes
 }
 
-func WaitForAllNodesSchedulable(c clientset.Interface) error {
-	Logf("Waiting up to %v for all (but %d) nodes to be schedulable", 4*time.Hour, TestContext.AllowedNotReadyNodes)
+func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) error {
+	Logf("Waiting up to %v for all (but %d) nodes to be schedulable", timeout, TestContext.AllowedNotReadyNodes)
 
 	var notSchedulable []*api.Node
-	return wait.PollImmediate(30*time.Second, 4*time.Hour, func() (bool, error) {
+	return wait.PollImmediate(30*time.Second, timeout, func() (bool, error) {
 		notSchedulable = nil
 		opts := api.ListOptions{
 			ResourceVersion: "0",
@@ -3218,7 +3236,8 @@ type updateDeploymentFunc func(d *extensions.Deployment)
 
 func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateDeploymentFunc) (deployment *extensions.Deployment, err error) {
 	deployments := c.Extensions().Deployments(namespace)
-	err = wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
+	var updateErr error
+	pollErr := wait.Poll(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
 		if deployment, err = deployments.Get(name); err != nil {
 			return false, err
 		}
@@ -3228,9 +3247,63 @@ func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, 
 			Logf("Updating deployment %s", name)
 			return true, nil
 		}
+		updateErr = err
 		return false, nil
 	})
-	return deployment, err
+	if pollErr == wait.ErrWaitTimeout {
+		pollErr = fmt.Errorf("couldn't apply the provided updated to deployment %q: %v", name, updateErr)
+	}
+	return deployment, pollErr
+}
+
+type updateRsFunc func(d *extensions.ReplicaSet)
+
+func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateRsFunc) (*extensions.ReplicaSet, error) {
+	var rs *extensions.ReplicaSet
+	var updateErr error
+	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
+		var err error
+		if rs, err = c.Extensions().ReplicaSets(namespace).Get(name); err != nil {
+			return false, err
+		}
+		// Apply the update, then attempt to push it to the apiserver.
+		applyUpdate(rs)
+		if rs, err = c.Extensions().ReplicaSets(namespace).Update(rs); err == nil {
+			Logf("Updating replica set %q", name)
+			return true, nil
+		}
+		updateErr = err
+		return false, nil
+	})
+	if pollErr == wait.ErrWaitTimeout {
+		pollErr = fmt.Errorf("couldn't apply the provided updated to replicaset %q: %v", name, updateErr)
+	}
+	return rs, pollErr
+}
+
+type updateRcFunc func(d *api.ReplicationController)
+
+func UpdateReplicationControllerWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateRcFunc) (*api.ReplicationController, error) {
+	var rc *api.ReplicationController
+	var updateErr error
+	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
+		var err error
+		if rc, err = c.Core().ReplicationControllers(namespace).Get(name); err != nil {
+			return false, err
+		}
+		// Apply the update, then attempt to push it to the apiserver.
+		applyUpdate(rc)
+		if rc, err = c.Core().ReplicationControllers(namespace).Update(rc); err == nil {
+			Logf("Updating replication controller %q", name)
+			return true, nil
+		}
+		updateErr = err
+		return false, nil
+	})
+	if pollErr == wait.ErrWaitTimeout {
+		pollErr = fmt.Errorf("couldn't apply the provided updated to rc %q: %v", name, updateErr)
+	}
+	return rc, pollErr
 }
 
 // NodeAddresses returns the first address of the given type of each node.
@@ -3318,7 +3391,7 @@ func LogSSHResult(result SSHResult) {
 	Logf("ssh %s: exit code: %d", remote, result.Code)
 }
 
-func IssueSSHCommand(cmd, provider string, node *api.Node) error {
+func IssueSSHCommandWithResult(cmd, provider string, node *api.Node) (*SSHResult, error) {
 	Logf("Getting external IP address for %s", node.Name)
 	host := ""
 	for _, a := range node.Status.Addresses {
@@ -3327,15 +3400,34 @@ func IssueSSHCommand(cmd, provider string, node *api.Node) error {
 			break
 		}
 	}
+
 	if host == "" {
-		return fmt.Errorf("couldn't find external IP address for node %s", node.Name)
+		return nil, fmt.Errorf("couldn't find external IP address for node %s", node.Name)
 	}
-	Logf("Calling %s on %s(%s)", cmd, node.Name, host)
+
+	Logf("SSH %q on %s(%s)", cmd, node.Name, host)
 	result, err := SSH(cmd, host, provider)
 	LogSSHResult(result)
+
 	if result.Code != 0 || err != nil {
-		return fmt.Errorf("failed running %q: %v (exit code %d)", cmd, err, result.Code)
+		return nil, fmt.Errorf("failed running %q: %v (exit code %d)",
+			cmd, err, result.Code)
 	}
+
+	return &result, nil
+}
+
+func IssueSSHCommand(cmd, provider string, node *api.Node) error {
+	result, err := IssueSSHCommandWithResult(cmd, provider, node)
+	if result != nil {
+		LogSSHResult(*result)
+	}
+
+	if result.Code != 0 || err != nil {
+		return fmt.Errorf("failed running %q: %v (exit code %d)",
+			cmd, err, result.Code)
+	}
+
 	return nil
 }
 
@@ -4586,4 +4678,66 @@ func CleanupGCEResources(loadBalancerName string) (err error) {
 	hc, _ := gceCloud.GetHttpHealthCheck(loadBalancerName)
 	gceCloud.DeleteTargetPool(loadBalancerName, hc)
 	return nil
+}
+
+// getMaster populates the externalIP, internalIP and hostname fields of the master.
+// If any of these is unavailable, it is set to "".
+func getMaster(c clientset.Interface) Address {
+	master := Address{}
+
+	// Populate the internal IP.
+	eps, err := c.Core().Endpoints(api.NamespaceDefault).Get("kubernetes")
+	if err != nil {
+		Failf("Failed to get kubernetes endpoints: %v", err)
+	}
+	if len(eps.Subsets) != 1 || len(eps.Subsets[0].Addresses) != 1 {
+		Failf("There are more than 1 endpoints for kubernetes service: %+v", eps)
+	}
+	master.internalIP = eps.Subsets[0].Addresses[0].IP
+
+	// Populate the external IP/hostname.
+	url, err := url.Parse(TestContext.Host)
+	if err != nil {
+		Failf("Failed to parse hostname: %v", err)
+	}
+	if net.ParseIP(url.Host) != nil {
+		// TODO: Check that it is external IP (not having a reserved IP address as per RFC1918).
+		master.externalIP = url.Host
+	} else {
+		master.hostname = url.Host
+	}
+
+	return master
+}
+
+// GetMasterAddress returns the hostname/external IP/internal IP as appropriate for e2e tests on a particular provider
+// which is the address of the interface used for communication with the kubelet.
+func GetMasterAddress(c clientset.Interface) string {
+	master := getMaster(c)
+	switch TestContext.Provider {
+	case "gce", "gke":
+		return master.externalIP
+	case "aws":
+		return awsMasterIP
+	default:
+		Failf("This test is not supported for provider %s and should be disabled", TestContext.Provider)
+	}
+	return ""
+}
+
+// GetNodeExternalIP returns node external IP concatenated with port 22 for ssh
+// e.g. 1.2.3.4:22
+func GetNodeExternalIP(node *api.Node) string {
+	Logf("Getting external IP address for %s", node.Name)
+	host := ""
+	for _, a := range node.Status.Addresses {
+		if a.Type == api.NodeExternalIP {
+			host = a.Address + ":22"
+			break
+		}
+	}
+	if host == "" {
+		Failf("Couldn't get the external IP of host %s with addresses %v", node.Name, node.Status.Addresses)
+	}
+	return host
 }

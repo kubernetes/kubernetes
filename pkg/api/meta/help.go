@@ -26,6 +26,14 @@ import (
 
 // IsListType returns true if the provided Object has a slice called Items
 func IsListType(obj runtime.Object) bool {
+	// if we're a runtime.Unstructured, check to see if we have an `items` key
+	// This is a list type for recognition, but other Items type methods will fail on it
+	// and give you errors.
+	if unstructured, ok := obj.(*runtime.Unstructured); ok {
+		_, ok := unstructured.Object["items"]
+		return ok
+	}
+
 	_, err := GetItemsPtr(obj)
 	return err == nil
 }
@@ -39,6 +47,7 @@ func GetItemsPtr(list runtime.Object) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	items := v.FieldByName("Items")
 	if !items.IsValid() {
 		return nil, fmt.Errorf("no Items field in %#v", list)
@@ -117,6 +126,13 @@ func SetList(list runtime.Object, objects []runtime.Object) error {
 	slice := reflect.MakeSlice(items.Type(), len(objects), len(objects))
 	for i := range objects {
 		dest := slice.Index(i)
+
+		// check to see if you're directly assignable
+		if reflect.TypeOf(objects[i]).AssignableTo(dest.Type()) {
+			dest.Set(reflect.ValueOf(objects[i]))
+			continue
+		}
+
 		src, err := conversion.EnforcePtr(objects[i])
 		if err != nil {
 			return err

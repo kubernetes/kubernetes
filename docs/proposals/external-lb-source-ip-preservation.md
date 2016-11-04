@@ -37,7 +37,7 @@ the pods matching the service pod-selector.
 
 ## Motivation
 
-The current implemention requires that the cloud loadbalancer balances traffic across all
+The current implementation requires that the cloud loadbalancer balances traffic across all
 Kubernetes worker nodes, and this traffic is then equally distributed to all the backend
 pods for that service.
 Due to the DNAT required to redirect the traffic to its ultimate destination, the return

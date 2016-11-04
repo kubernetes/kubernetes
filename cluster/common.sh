@@ -147,15 +147,15 @@ function clear-kubeconfig() {
   fi
 
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
-  "${kubectl}" config unset "clusters.${CONTEXT}"
-  "${kubectl}" config unset "users.${CONTEXT}"
-  "${kubectl}" config unset "users.${CONTEXT}-basic-auth"
-  "${kubectl}" config unset "contexts.${CONTEXT}"
-
+  # Unset the current-context before we delete it, as otherwise kubectl errors.
   local cc=$("${kubectl}" config view -o jsonpath='{.current-context}')
   if [[ "${cc}" == "${CONTEXT}" ]]; then
     "${kubectl}" config unset current-context
   fi
+  "${kubectl}" config unset "clusters.${CONTEXT}"
+  "${kubectl}" config unset "users.${CONTEXT}"
+  "${kubectl}" config unset "users.${CONTEXT}-basic-auth"
+  "${kubectl}" config unset "contexts.${CONTEXT}"
 
   echo "Cleared config for ${CONTEXT} from ${KUBECONFIG}"
 }
@@ -702,6 +702,15 @@ NUM_NODES: $(yaml-quote ${NUM_NODES})
 STORAGE_BACKEND: $(yaml-quote ${STORAGE_BACKEND:-})
 ENABLE_GARBAGE_COLLECTOR: $(yaml-quote ${ENABLE_GARBAGE_COLLECTOR:-})
 EOF
+    # ETCD_IMAGE (if set) allows to use a custom etcd image.
+    if [ -n "${ETCD_IMAGE:-}" ]; then
+      cat >>$file <<EOF
+ETCD_IMAGE: $(yaml-quote ${ETCD_IMAGE})
+EOF
+    fi
+    # ETCD_VERSION (if set) allows you to use custom version of etcd.
+    # The main purpose of using it may be rollback of etcd v3 API,
+    # where we need 3.0.* image, but are rolling back to 2.3.7.
     if [ -n "${ETCD_VERSION:-}" ]; then
       cat >>$file <<EOF
 ETCD_VERSION: $(yaml-quote ${ETCD_VERSION})

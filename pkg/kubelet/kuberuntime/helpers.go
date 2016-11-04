@@ -72,13 +72,13 @@ func (c containerStatusByCreated) Less(i, j int) bool { return c[i].CreatedAt.Af
 // toKubeContainerState converts runtimeApi.ContainerState to kubecontainer.ContainerState.
 func toKubeContainerState(state runtimeApi.ContainerState) kubecontainer.ContainerState {
 	switch state {
-	case runtimeApi.ContainerState_CREATED:
+	case runtimeApi.ContainerState_CONTAINER_CREATED:
 		return kubecontainer.ContainerStateCreated
-	case runtimeApi.ContainerState_RUNNING:
+	case runtimeApi.ContainerState_CONTAINER_RUNNING:
 		return kubecontainer.ContainerStateRunning
-	case runtimeApi.ContainerState_EXITED:
+	case runtimeApi.ContainerState_CONTAINER_EXITED:
 		return kubecontainer.ContainerStateExited
-	case runtimeApi.ContainerState_UNKNOWN:
+	case runtimeApi.ContainerState_CONTAINER_UNKNOWN:
 		return kubecontainer.ContainerStateUnknown
 	}
 
@@ -205,6 +205,11 @@ func getStableKey(pod *api.Pod, container *api.Container) string {
 // buildContainerLogsPath builds log path for container relative to pod logs directory.
 func buildContainerLogsPath(containerName string, restartCount int) string {
 	return fmt.Sprintf("%s_%d.log", containerName, restartCount)
+}
+
+// buildFullContainerLogsPath builds absolute log path for container.
+func buildFullContainerLogsPath(podUID types.UID, containerName string, restartCount int) string {
+	return filepath.Join(buildPodLogsDirectory(podUID), buildContainerLogsPath(containerName, restartCount))
 }
 
 // buildPodLogsDirectory builds absolute log directory path for a pod sandbox.

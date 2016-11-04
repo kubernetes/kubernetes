@@ -3373,7 +3373,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.Eviction"
+        "$ref": "#/definitions/v1beta1.Eviction"
        }
       },
       "401": {
@@ -3387,7 +3387,7 @@
       "in": "body",
       "required": true,
       "schema": {
-       "$ref": "#/definitions/v1alpha1.Eviction"
+       "$ref": "#/definitions/v1beta1.Eviction"
       }
      },
      {
@@ -14447,7 +14447,7 @@
      }
     }
    },
-   "/apis/apps/v1alpha1/": {
+   "/apis/apps/v1beta1/": {
     "get": {
      "description": "get available resources",
      "consumes": [
@@ -14464,9 +14464,9 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "getAppsV1alpha1APIResources",
+     "operationId": "getAppsV1beta1APIResources",
      "responses": {
       "200": {
        "description": "OK",
@@ -14480,7 +14480,7 @@
      }
     }
    },
-   "/apis/apps/v1alpha1/namespaces/{namespace}/statefulsets": {
+   "/apis/apps/v1beta1/namespaces/{namespace}/statefulsets": {
     "get": {
      "description": "list or watch objects of kind StatefulSet",
      "consumes": [
@@ -14497,9 +14497,9 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "listAppsV1alpha1NamespacedStatefulSet",
+     "operationId": "listAppsV1beta1NamespacedStatefulSet",
      "parameters": [
       {
        "uniqueItems": true,
@@ -14541,7 +14541,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.StatefulSetList"
+        "$ref": "#/definitions/v1beta1.StatefulSetList"
        }
       },
       "401": {
@@ -14563,16 +14563,16 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "createAppsV1alpha1NamespacedStatefulSet",
+     "operationId": "createAppsV1beta1NamespacedStatefulSet",
      "parameters": [
       {
        "name": "body",
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/v1alpha1.StatefulSet"
+        "$ref": "#/definitions/v1beta1.StatefulSet"
        }
       }
      ],
@@ -14580,7 +14580,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.StatefulSet"
+        "$ref": "#/definitions/v1beta1.StatefulSet"
        }
       },
       "401": {
@@ -14602,9 +14602,9 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "deleteAppsV1alpha1CollectionNamespacedStatefulSet",
+     "operationId": "deleteAppsV1beta1CollectionNamespacedStatefulSet",
      "parameters": [
       {
        "uniqueItems": true,
@@ -14672,7 +14672,7 @@
      }
     ]
    },
-   "/apis/apps/v1alpha1/namespaces/{namespace}/statefulsets/{name}": {
+   "/apis/apps/v1beta1/namespaces/{namespace}/statefulsets/{name}": {
     "get": {
      "description": "read the specified StatefulSet",
      "consumes": [
@@ -14687,9 +14687,9 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "readAppsV1alpha1NamespacedStatefulSet",
+     "operationId": "readAppsV1beta1NamespacedStatefulSet",
      "parameters": [
       {
        "uniqueItems": true,
@@ -14710,7 +14710,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.StatefulSet"
+        "$ref": "#/definitions/v1beta1.StatefulSet"
        }
       },
       "401": {
@@ -14732,16 +14732,16 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "replaceAppsV1alpha1NamespacedStatefulSet",
+     "operationId": "replaceAppsV1beta1NamespacedStatefulSet",
      "parameters": [
       {
        "name": "body",
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/v1alpha1.StatefulSet"
+        "$ref": "#/definitions/v1beta1.StatefulSet"
        }
       }
      ],
@@ -14749,7 +14749,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.StatefulSet"
+        "$ref": "#/definitions/v1beta1.StatefulSet"
        }
       },
       "401": {
@@ -14771,9 +14771,9 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "deleteAppsV1alpha1NamespacedStatefulSet",
+     "operationId": "deleteAppsV1beta1NamespacedStatefulSet",
      "parameters": [
       {
        "name": "body",
@@ -14812,9 +14812,9 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "patchAppsV1alpha1NamespacedStatefulSet",
+     "operationId": "patchAppsV1beta1NamespacedStatefulSet",
      "parameters": [
       {
        "name": "body",
@@ -14829,7 +14829,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.StatefulSet"
+        "$ref": "#/definitions/v1beta1.StatefulSet"
        }
       },
       "401": {
@@ -14863,7 +14863,7 @@
      }
     ]
    },
-   "/apis/apps/v1alpha1/namespaces/{namespace}/statefulsets/{name}/status": {
+   "/apis/apps/v1beta1/namespaces/{namespace}/statefulsets/{name}/status": {
     "get": {
      "description": "read status of the specified StatefulSet",
      "consumes": [
@@ -14878,14 +14878,14 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "readAppsV1alpha1NamespacedStatefulSetStatus",
+     "operationId": "readAppsV1beta1NamespacedStatefulSetStatus",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.StatefulSet"
+        "$ref": "#/definitions/v1beta1.StatefulSet"
        }
       },
       "401": {
@@ -14907,16 +14907,16 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "replaceAppsV1alpha1NamespacedStatefulSetStatus",
+     "operationId": "replaceAppsV1beta1NamespacedStatefulSetStatus",
      "parameters": [
       {
        "name": "body",
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/v1alpha1.StatefulSet"
+        "$ref": "#/definitions/v1beta1.StatefulSet"
        }
       }
      ],
@@ -14924,7 +14924,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.StatefulSet"
+        "$ref": "#/definitions/v1beta1.StatefulSet"
        }
       },
       "401": {
@@ -14948,9 +14948,9 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "patchAppsV1alpha1NamespacedStatefulSetStatus",
+     "operationId": "patchAppsV1beta1NamespacedStatefulSetStatus",
      "parameters": [
       {
        "name": "body",
@@ -14965,7 +14965,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.StatefulSet"
+        "$ref": "#/definitions/v1beta1.StatefulSet"
        }
       },
       "401": {
@@ -14999,7 +14999,7 @@
      }
     ]
    },
-   "/apis/apps/v1alpha1/statefulsets": {
+   "/apis/apps/v1beta1/statefulsets": {
     "get": {
      "description": "list or watch objects of kind StatefulSet",
      "consumes": [
@@ -15016,14 +15016,14 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "listAppsV1alpha1StatefulSetForAllNamespaces",
+     "operationId": "listAppsV1beta1StatefulSetForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.StatefulSetList"
+        "$ref": "#/definitions/v1beta1.StatefulSetList"
        }
       },
       "401": {
@@ -15076,7 +15076,7 @@
      }
     ]
    },
-   "/apis/apps/v1alpha1/watch/namespaces/{namespace}/statefulsets": {
+   "/apis/apps/v1beta1/watch/namespaces/{namespace}/statefulsets": {
     "get": {
      "description": "watch individual changes to a list of StatefulSet",
      "consumes": [
@@ -15093,9 +15093,9 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "watchAppsV1alpha1NamespacedStatefulSetList",
+     "operationId": "watchAppsV1beta1NamespacedStatefulSetList",
      "responses": {
       "200": {
        "description": "OK",
@@ -15161,7 +15161,7 @@
      }
     ]
    },
-   "/apis/apps/v1alpha1/watch/namespaces/{namespace}/statefulsets/{name}": {
+   "/apis/apps/v1beta1/watch/namespaces/{namespace}/statefulsets/{name}": {
     "get": {
      "description": "watch changes to an object of kind StatefulSet",
      "consumes": [
@@ -15178,9 +15178,9 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "watchAppsV1alpha1NamespacedStatefulSet",
+     "operationId": "watchAppsV1beta1NamespacedStatefulSet",
      "responses": {
       "200": {
        "description": "OK",
@@ -15254,7 +15254,7 @@
      }
     ]
    },
-   "/apis/apps/v1alpha1/watch/statefulsets": {
+   "/apis/apps/v1beta1/watch/statefulsets": {
     "get": {
      "description": "watch individual changes to a list of StatefulSet",
      "consumes": [
@@ -15271,9 +15271,9 @@
       "https"
      ],
      "tags": [
-      "apps_v1alpha1"
+      "apps_v1beta1"
      ],
-     "operationId": "watchAppsV1alpha1StatefulSetListForAllNamespaces",
+     "operationId": "watchAppsV1beta1StatefulSetListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -25158,7 +25158,7 @@
      }
     }
    },
-   "/apis/policy/v1alpha1/": {
+   "/apis/policy/v1beta1/": {
     "get": {
      "description": "get available resources",
      "consumes": [
@@ -25175,9 +25175,9 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "getPolicyV1alpha1APIResources",
+     "operationId": "getPolicyV1beta1APIResources",
      "responses": {
       "200": {
        "description": "OK",
@@ -25191,7 +25191,7 @@
      }
     }
    },
-   "/apis/policy/v1alpha1/namespaces/{namespace}/poddisruptionbudgets": {
+   "/apis/policy/v1beta1/namespaces/{namespace}/poddisruptionbudgets": {
     "get": {
      "description": "list or watch objects of kind PodDisruptionBudget",
      "consumes": [
@@ -25208,9 +25208,9 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "listPolicyV1alpha1NamespacedPodDisruptionBudget",
+     "operationId": "listPolicyV1beta1NamespacedPodDisruptionBudget",
      "parameters": [
       {
        "uniqueItems": true,
@@ -25252,7 +25252,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PodDisruptionBudgetList"
+        "$ref": "#/definitions/v1beta1.PodDisruptionBudgetList"
        }
       },
       "401": {
@@ -25274,16 +25274,16 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "createPolicyV1alpha1NamespacedPodDisruptionBudget",
+     "operationId": "createPolicyV1beta1NamespacedPodDisruptionBudget",
      "parameters": [
       {
        "name": "body",
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PodDisruptionBudget"
+        "$ref": "#/definitions/v1beta1.PodDisruptionBudget"
        }
       }
      ],
@@ -25291,7 +25291,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PodDisruptionBudget"
+        "$ref": "#/definitions/v1beta1.PodDisruptionBudget"
        }
       },
       "401": {
@@ -25313,9 +25313,9 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "deletePolicyV1alpha1CollectionNamespacedPodDisruptionBudget",
+     "operationId": "deletePolicyV1beta1CollectionNamespacedPodDisruptionBudget",
      "parameters": [
       {
        "uniqueItems": true,
@@ -25383,7 +25383,7 @@
      }
     ]
    },
-   "/apis/policy/v1alpha1/namespaces/{namespace}/poddisruptionbudgets/{name}": {
+   "/apis/policy/v1beta1/namespaces/{namespace}/poddisruptionbudgets/{name}": {
     "get": {
      "description": "read the specified PodDisruptionBudget",
      "consumes": [
@@ -25398,9 +25398,9 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "readPolicyV1alpha1NamespacedPodDisruptionBudget",
+     "operationId": "readPolicyV1beta1NamespacedPodDisruptionBudget",
      "parameters": [
       {
        "uniqueItems": true,
@@ -25421,7 +25421,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PodDisruptionBudget"
+        "$ref": "#/definitions/v1beta1.PodDisruptionBudget"
        }
       },
       "401": {
@@ -25443,16 +25443,16 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "replacePolicyV1alpha1NamespacedPodDisruptionBudget",
+     "operationId": "replacePolicyV1beta1NamespacedPodDisruptionBudget",
      "parameters": [
       {
        "name": "body",
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PodDisruptionBudget"
+        "$ref": "#/definitions/v1beta1.PodDisruptionBudget"
        }
       }
      ],
@@ -25460,7 +25460,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PodDisruptionBudget"
+        "$ref": "#/definitions/v1beta1.PodDisruptionBudget"
        }
       },
       "401": {
@@ -25482,9 +25482,9 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "deletePolicyV1alpha1NamespacedPodDisruptionBudget",
+     "operationId": "deletePolicyV1beta1NamespacedPodDisruptionBudget",
      "parameters": [
       {
        "name": "body",
@@ -25523,9 +25523,9 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "patchPolicyV1alpha1NamespacedPodDisruptionBudget",
+     "operationId": "patchPolicyV1beta1NamespacedPodDisruptionBudget",
      "parameters": [
       {
        "name": "body",
@@ -25540,7 +25540,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PodDisruptionBudget"
+        "$ref": "#/definitions/v1beta1.PodDisruptionBudget"
        }
       },
       "401": {
@@ -25574,7 +25574,7 @@
      }
     ]
    },
-   "/apis/policy/v1alpha1/namespaces/{namespace}/poddisruptionbudgets/{name}/status": {
+   "/apis/policy/v1beta1/namespaces/{namespace}/poddisruptionbudgets/{name}/status": {
     "get": {
      "description": "read status of the specified PodDisruptionBudget",
      "consumes": [
@@ -25589,14 +25589,14 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "readPolicyV1alpha1NamespacedPodDisruptionBudgetStatus",
+     "operationId": "readPolicyV1beta1NamespacedPodDisruptionBudgetStatus",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PodDisruptionBudget"
+        "$ref": "#/definitions/v1beta1.PodDisruptionBudget"
        }
       },
       "401": {
@@ -25618,16 +25618,16 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "replacePolicyV1alpha1NamespacedPodDisruptionBudgetStatus",
+     "operationId": "replacePolicyV1beta1NamespacedPodDisruptionBudgetStatus",
      "parameters": [
       {
        "name": "body",
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PodDisruptionBudget"
+        "$ref": "#/definitions/v1beta1.PodDisruptionBudget"
        }
       }
      ],
@@ -25635,7 +25635,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PodDisruptionBudget"
+        "$ref": "#/definitions/v1beta1.PodDisruptionBudget"
        }
       },
       "401": {
@@ -25659,9 +25659,9 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "patchPolicyV1alpha1NamespacedPodDisruptionBudgetStatus",
+     "operationId": "patchPolicyV1beta1NamespacedPodDisruptionBudgetStatus",
      "parameters": [
       {
        "name": "body",
@@ -25676,7 +25676,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PodDisruptionBudget"
+        "$ref": "#/definitions/v1beta1.PodDisruptionBudget"
        }
       },
       "401": {
@@ -25710,7 +25710,7 @@
      }
     ]
    },
-   "/apis/policy/v1alpha1/poddisruptionbudgets": {
+   "/apis/policy/v1beta1/poddisruptionbudgets": {
     "get": {
      "description": "list or watch objects of kind PodDisruptionBudget",
      "consumes": [
@@ -25727,14 +25727,14 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "listPolicyV1alpha1PodDisruptionBudgetForAllNamespaces",
+     "operationId": "listPolicyV1beta1PodDisruptionBudgetForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/v1alpha1.PodDisruptionBudgetList"
+        "$ref": "#/definitions/v1beta1.PodDisruptionBudgetList"
        }
       },
       "401": {
@@ -25787,7 +25787,7 @@
      }
     ]
    },
-   "/apis/policy/v1alpha1/watch/namespaces/{namespace}/poddisruptionbudgets": {
+   "/apis/policy/v1beta1/watch/namespaces/{namespace}/poddisruptionbudgets": {
     "get": {
      "description": "watch individual changes to a list of PodDisruptionBudget",
      "consumes": [
@@ -25804,9 +25804,9 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "watchPolicyV1alpha1NamespacedPodDisruptionBudgetList",
+     "operationId": "watchPolicyV1beta1NamespacedPodDisruptionBudgetList",
      "responses": {
       "200": {
        "description": "OK",
@@ -25872,7 +25872,7 @@
      }
     ]
    },
-   "/apis/policy/v1alpha1/watch/namespaces/{namespace}/poddisruptionbudgets/{name}": {
+   "/apis/policy/v1beta1/watch/namespaces/{namespace}/poddisruptionbudgets/{name}": {
     "get": {
      "description": "watch changes to an object of kind PodDisruptionBudget",
      "consumes": [
@@ -25889,9 +25889,9 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "watchPolicyV1alpha1NamespacedPodDisruptionBudget",
+     "operationId": "watchPolicyV1beta1NamespacedPodDisruptionBudget",
      "responses": {
       "200": {
        "description": "OK",
@@ -25965,7 +25965,7 @@
      }
     ]
    },
-   "/apis/policy/v1alpha1/watch/poddisruptionbudgets": {
+   "/apis/policy/v1beta1/watch/poddisruptionbudgets": {
     "get": {
      "description": "watch individual changes to a list of PodDisruptionBudget",
      "consumes": [
@@ -25982,9 +25982,9 @@
       "https"
      ],
      "tags": [
-      "policy_v1alpha1"
+      "policy_v1beta1"
      ],
-     "operationId": "watchPolicyV1alpha1PodDisruptionBudgetListForAllNamespaces",
+     "operationId": "watchPolicyV1beta1PodDisruptionBudgetListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -32405,95 +32405,6 @@
      }
     }
    },
-   "v1alpha1.Eviction": {
-    "description": "Eviction evicts a pod from its node subject to certain policies and safety constraints. This is a subresource of Pod.  A request to cause such an eviction is created by POSTing to .../pods/\u003cpod name\u003e/eviction.",
-    "properties": {
-     "deleteOptions": {
-      "description": "DeleteOptions may be provided",
-      "$ref": "#/definitions/v1.DeleteOptions"
-     },
-     "metadata": {
-      "description": "ObjectMeta describes the pod that is being evicted.",
-      "$ref": "#/definitions/v1.ObjectMeta"
-     }
-    }
-   },
-   "v1alpha1.PodDisruptionBudget": {
-    "description": "PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods",
-    "properties": {
-     "metadata": {
-      "$ref": "#/definitions/v1.ObjectMeta"
-     },
-     "spec": {
-      "description": "Specification of the desired behavior of the PodDisruptionBudget.",
-      "$ref": "#/definitions/v1alpha1.PodDisruptionBudgetSpec"
-     },
-     "status": {
-      "description": "Most recently observed status of the PodDisruptionBudget.",
-      "$ref": "#/definitions/v1alpha1.PodDisruptionBudgetStatus"
-     }
-    }
-   },
-   "v1alpha1.PodDisruptionBudgetList": {
-    "description": "PodDisruptionBudgetList is a collection of PodDisruptionBudgets.",
-    "required": [
-     "items"
-    ],
-    "properties": {
-     "items": {
-      "type": "array",
-      "items": {
-       "$ref": "#/definitions/v1alpha1.PodDisruptionBudget"
-      }
-     },
-     "metadata": {
-      "$ref": "#/definitions/unversioned.ListMeta"
-     }
-    }
-   },
-   "v1alpha1.PodDisruptionBudgetSpec": {
-    "description": "PodDisruptionBudgetSpec is a description of a PodDisruptionBudget.",
-    "properties": {
-     "minAvailable": {
-      "description": "An eviction is allowed if at least \"minAvailable\" pods selected by \"selector\" will still be available after the eviction, i.e. even in the absence of the evicted pod.  So for example you can prevent all voluntary evictions by specifying \"100%\".",
-      "$ref": "#/definitions/intstr.IntOrString"
-     },
-     "selector": {
-      "description": "Label query over pods whose evictions are managed by the disruption budget.",
-      "$ref": "#/definitions/unversioned.LabelSelector"
-     }
-    }
-   },
-   "v1alpha1.PodDisruptionBudgetStatus": {
-    "description": "PodDisruptionBudgetStatus represents information about the status of a PodDisruptionBudget. Status may trail the actual state of a system.",
-    "required": [
-     "disruptionAllowed",
-     "currentHealthy",
-     "desiredHealthy",
-     "expectedPods"
-    ],
-    "properties": {
-     "currentHealthy": {
-      "description": "current number of healthy pods",
-      "type": "integer",
-      "format": "int32"
-     },
-     "desiredHealthy": {
-      "description": "minimum desired number of healthy pods",
-      "type": "integer",
-      "format": "int32"
-     },
-     "disruptionAllowed": {
-      "description": "Whether or not a disruption is currently allowed.",
-      "type": "boolean"
-     },
-     "expectedPods": {
-      "description": "total number of pods counted by this disruption budget",
-      "type": "integer",
-      "format": "int32"
-     }
-    }
-   },
    "v1alpha1.PolicyRule": {
     "description": "PolicyRule holds information that describes a policy rule, but does not contain information about who the rule applies to or which namespace the rule applies to.",
     "required": [
@@ -32641,90 +32552,6 @@
      "name": {
       "description": "Name is the name of resource being referenced",
       "type": "string"
-     }
-    }
-   },
-   "v1alpha1.StatefulSet": {
-    "description": "StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity. StatefulSet is currently in alpha and subject to change without notice.",
-    "properties": {
-     "metadata": {
-      "$ref": "#/definitions/v1.ObjectMeta"
-     },
-     "spec": {
-      "description": "Spec defines the desired identities of pods in this set.",
-      "$ref": "#/definitions/v1alpha1.StatefulSetSpec"
-     },
-     "status": {
-      "description": "Status is the current status of Pods in this StatefulSet. This data may be out of date by some window of time.",
-      "$ref": "#/definitions/v1alpha1.StatefulSetStatus"
-     }
-    }
-   },
-   "v1alpha1.StatefulSetList": {
-    "description": "StatefulSetList is a collection of StatefulSets.",
-    "required": [
-     "items"
-    ],
-    "properties": {
-     "items": {
-      "type": "array",
-      "items": {
-       "$ref": "#/definitions/v1alpha1.StatefulSet"
-      }
-     },
-     "metadata": {
-      "$ref": "#/definitions/unversioned.ListMeta"
-     }
-    }
-   },
-   "v1alpha1.StatefulSetSpec": {
-    "description": "A StatefulSetSpec is the specification of a StatefulSet.",
-    "required": [
-     "template",
-     "serviceName"
-    ],
-    "properties": {
-     "replicas": {
-      "description": "Replicas is the desired number of replicas of the given Template. These are replicas in the sense that they are instantiations of the same Template, but individual replicas also have a consistent identity. If unspecified, defaults to 1.",
-      "type": "integer",
-      "format": "int32"
-     },
-     "selector": {
-      "description": "Selector is a label query over pods that should match the replica count. If empty, defaulted to labels on the pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
-      "$ref": "#/definitions/unversioned.LabelSelector"
-     },
-     "serviceName": {
-      "description": "ServiceName is the name of the service that governs this StatefulSet. This service must exist before the StatefulSet, and is responsible for the network identity of the set. Pods get DNS/hostnames that follow the pattern: pod-specific-string.serviceName.default.svc.cluster.local where \"pod-specific-string\" is managed by the StatefulSet controller.",
-      "type": "string"
-     },
-     "template": {
-      "description": "Template is the object that describes the pod that will be created if insufficient replicas are detected. Each pod stamped out by the StatefulSet will fulfill this Template, but have a unique identity from the rest of the StatefulSet.",
-      "$ref": "#/definitions/v1.PodTemplateSpec"
-     },
-     "volumeClaimTemplates": {
-      "description": "VolumeClaimTemplates is a list of claims that pods are allowed to reference. The StatefulSet controller is responsible for mapping network identities to claims in a way that maintains the identity of a pod. Every claim in this list must have at least one matching (by name) volumeMount in one container in the template. A claim in this list takes precedence over any volumes in the template, with the same name.",
-      "type": "array",
-      "items": {
-       "$ref": "#/definitions/v1.PersistentVolumeClaim"
-      }
-     }
-    }
-   },
-   "v1alpha1.StatefulSetStatus": {
-    "description": "StatefulSetStatus represents the current state of a StatefulSet.",
-    "required": [
-     "replicas"
-    ],
-    "properties": {
-     "observedGeneration": {
-      "description": "most recent generation observed by this autoscaler.",
-      "type": "integer",
-      "format": "int64"
-     },
-     "replicas": {
-      "description": "Replicas is the number of actual replicas.",
-      "type": "integer",
-      "format": "int32"
      }
     }
    },
@@ -33053,6 +32880,23 @@
      "type": {
       "description": "Type of deployment. Can be \"Recreate\" or \"RollingUpdate\". Default is RollingUpdate.",
       "type": "string"
+     }
+    }
+   },
+   "v1beta1.Eviction": {
+    "description": "Eviction evicts a pod from its node subject to certain policies and safety constraints. This is a subresource of Pod.  A request to cause such an eviction is created by POSTing to .../pods/\u003cpod name\u003e/evictions.",
+    "required": [
+     "metadata",
+     "deleteOptions"
+    ],
+    "properties": {
+     "deleteOptions": {
+      "description": "DeleteOptions may be provided",
+      "$ref": "#/definitions/v1.DeleteOptions"
+     },
+     "metadata": {
+      "description": "ObjectMeta describes the pod that is being evicted.",
+      "$ref": "#/definitions/v1.ObjectMeta"
      }
     }
    },
@@ -33525,6 +33369,93 @@
      }
     }
    },
+   "v1beta1.PodDisruptionBudget": {
+    "description": "PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods",
+    "required": [
+     "metadata",
+     "spec",
+     "status"
+    ],
+    "properties": {
+     "metadata": {
+      "$ref": "#/definitions/v1.ObjectMeta"
+     },
+     "spec": {
+      "description": "Specification of the desired behavior of the PodDisruptionBudget.",
+      "$ref": "#/definitions/v1beta1.PodDisruptionBudgetSpec"
+     },
+     "status": {
+      "description": "Most recently observed status of the PodDisruptionBudget.",
+      "$ref": "#/definitions/v1beta1.PodDisruptionBudgetStatus"
+     }
+    }
+   },
+   "v1beta1.PodDisruptionBudgetList": {
+    "description": "PodDisruptionBudgetList is a collection of PodDisruptionBudgets.",
+    "required": [
+     "metadata",
+     "items"
+    ],
+    "properties": {
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1beta1.PodDisruptionBudget"
+      }
+     },
+     "metadata": {
+      "$ref": "#/definitions/unversioned.ListMeta"
+     }
+    }
+   },
+   "v1beta1.PodDisruptionBudgetSpec": {
+    "description": "PodDisruptionBudgetSpec is a description of a PodDisruptionBudget.",
+    "required": [
+     "minAvailable",
+     "selector"
+    ],
+    "properties": {
+     "minAvailable": {
+      "description": "An eviction is allowed if at least \"minAvailable\" pods selected by \"selector\" will still be available after the eviction, i.e. even in the absence of the evicted pod.  So for example you can prevent all voluntary evictions by specifying \"100%\".",
+      "$ref": "#/definitions/intstr.IntOrString"
+     },
+     "selector": {
+      "description": "Label query over pods whose evictions are managed by the disruption budget.",
+      "$ref": "#/definitions/unversioned.LabelSelector"
+     }
+    }
+   },
+   "v1beta1.PodDisruptionBudgetStatus": {
+    "description": "PodDisruptionBudgetStatus represents information about the status of a PodDisruptionBudget. Status may trail the actual state of a system.",
+    "required": [
+     "disruptionsAllowed",
+     "currentHealthy",
+     "desiredHealthy",
+     "expectedPods"
+    ],
+    "properties": {
+     "currentHealthy": {
+      "description": "current number of healthy pods",
+      "type": "integer",
+      "format": "int32"
+     },
+     "desiredHealthy": {
+      "description": "minimum desired number of healthy pods",
+      "type": "integer",
+      "format": "int32"
+     },
+     "disruptionsAllowed": {
+      "description": "Number of pod disruptions that are currently allowed.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "expectedPods": {
+      "description": "total number of pods counted by this disruption budget",
+      "type": "integer",
+      "format": "int32"
+     }
+    }
+   },
    "v1beta1.ReplicaSet": {
     "description": "ReplicaSet represents the configuration of a ReplicaSet.",
     "properties": {
@@ -33788,6 +33719,90 @@
      "resourceAttributes": {
       "description": "ResourceAuthorizationAttributes describes information for a resource access request",
       "$ref": "#/definitions/v1beta1.ResourceAttributes"
+     }
+    }
+   },
+   "v1beta1.StatefulSet": {
+    "description": "StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.",
+    "properties": {
+     "metadata": {
+      "$ref": "#/definitions/v1.ObjectMeta"
+     },
+     "spec": {
+      "description": "Spec defines the desired identities of pods in this set.",
+      "$ref": "#/definitions/v1beta1.StatefulSetSpec"
+     },
+     "status": {
+      "description": "Status is the current status of Pods in this StatefulSet. This data may be out of date by some window of time.",
+      "$ref": "#/definitions/v1beta1.StatefulSetStatus"
+     }
+    }
+   },
+   "v1beta1.StatefulSetList": {
+    "description": "StatefulSetList is a collection of StatefulSets.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1beta1.StatefulSet"
+      }
+     },
+     "metadata": {
+      "$ref": "#/definitions/unversioned.ListMeta"
+     }
+    }
+   },
+   "v1beta1.StatefulSetSpec": {
+    "description": "A StatefulSetSpec is the specification of a StatefulSet.",
+    "required": [
+     "template",
+     "serviceName"
+    ],
+    "properties": {
+     "replicas": {
+      "description": "Replicas is the desired number of replicas of the given Template. These are replicas in the sense that they are instantiations of the same Template, but individual replicas also have a consistent identity. If unspecified, defaults to 1.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "selector": {
+      "description": "Selector is a label query over pods that should match the replica count. If empty, defaulted to labels on the pod template. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
+      "$ref": "#/definitions/unversioned.LabelSelector"
+     },
+     "serviceName": {
+      "description": "ServiceName is the name of the service that governs this StatefulSet. This service must exist before the StatefulSet, and is responsible for the network identity of the set. Pods get DNS/hostnames that follow the pattern: pod-specific-string.serviceName.default.svc.cluster.local where \"pod-specific-string\" is managed by the StatefulSet controller.",
+      "type": "string"
+     },
+     "template": {
+      "description": "Template is the object that describes the pod that will be created if insufficient replicas are detected. Each pod stamped out by the StatefulSet will fulfill this Template, but have a unique identity from the rest of the StatefulSet.",
+      "$ref": "#/definitions/v1.PodTemplateSpec"
+     },
+     "volumeClaimTemplates": {
+      "description": "VolumeClaimTemplates is a list of claims that pods are allowed to reference. The StatefulSet controller is responsible for mapping network identities to claims in a way that maintains the identity of a pod. Every claim in this list must have at least one matching (by name) volumeMount in one container in the template. A claim in this list takes precedence over any volumes in the template, with the same name.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1.PersistentVolumeClaim"
+      }
+     }
+    }
+   },
+   "v1beta1.StatefulSetStatus": {
+    "description": "StatefulSetStatus represents the current state of a StatefulSet.",
+    "required": [
+     "replicas"
+    ],
+    "properties": {
+     "observedGeneration": {
+      "description": "most recent generation observed by this autoscaler.",
+      "type": "integer",
+      "format": "int64"
+     },
+     "replicas": {
+      "description": "Replicas is the number of actual replicas.",
+      "type": "integer",
+      "format": "int32"
      }
     }
    },

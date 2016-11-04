@@ -154,7 +154,7 @@ func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByE
 	newestGCTime := time.Now().Add(-minAge)
 	for _, container := range containers {
 		// Prune out running containers.
-		if container.GetState() == runtimeApi.ContainerState_RUNNING {
+		if container.GetState() == runtimeApi.ContainerState_CONTAINER_RUNNING {
 			continue
 		}
 
@@ -249,7 +249,7 @@ func (cgc *containerGC) evictSandboxes(minAge time.Duration) error {
 	newestGCTime := time.Now().Add(-minAge)
 	for _, sandbox := range sandboxes {
 		// Prune out ready sandboxes.
-		if sandbox.GetState() == runtimeApi.PodSandBoxState_READY {
+		if sandbox.GetState() == runtimeApi.PodSandboxState_SANDBOX_READY {
 			continue
 		}
 

@@ -443,7 +443,6 @@ dns_replicas: '$(echo "$DNS_REPLICAS" | sed -e "s/'/''/g")'
 dns_server: '$(echo "$DNS_SERVER_IP" | sed -e "s/'/''/g")'
 dns_domain: '$(echo "$DNS_DOMAIN" | sed -e "s/'/''/g")'
 admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
-storage_backend: '$(echo "$STORAGE_BACKEND" | sed -e "s/'/''/g")'
 network_provider: '$(echo "$NETWORK_PROVIDER" | sed -e "s/'/''/g")'
 prepull_e2e_images: '$(echo "$PREPULL_E2E_IMAGES" | sed -e "s/'/''/g")'
 hairpin_mode: '$(echo "$HAIRPIN_MODE" | sed -e "s/'/''/g")'
@@ -460,6 +459,11 @@ kube_uid: '$(echo "${KUBE_UID}" | sed -e "s/'/''/g")'
 initial_etcd_cluster: '$(echo "${INITIAL_ETCD_CLUSTER:-}" | sed -e "s/'/''/g")'
 hostname: $(hostname -s)
 EOF
+    if [ -n "${STORAGE_BACKEND:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+storage_backend: '$(echo "$STORAGE_BACKEND" | sed -e "s/'/''/g")'
+EOF
+    fi
     if [ -n "${ADMISSION_CONTROL:-}" ] && [ ${ADMISSION_CONTROL} == *"ImagePolicyWebhook"* ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 admission-control-config-file: /etc/admission_controller.config
@@ -470,12 +474,17 @@ EOF
 kubelet_port: '$(echo "$KUBELET_PORT" | sed -e "s/'/''/g")'
 EOF
     fi
-    # Configuration changes for test clusters
-    if [ -n "${ETCD_VERSION:-}" ]; then
+    if [ -n "${ETCD_IMAGE:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-etcd_docker_tag: '$(echo "$ETCD_VERSION" | sed -e "s/'/''/g")'
+etcd_docker_tag: '$(echo "$ETCD_IMAGE" | sed -e "s/'/''/g")'
 EOF
     fi
+    if [ -n "${ETCD_VERSION:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+etcd_version: '$(echo "$ETCD_VERSION" | sed -e "s/'/''/g")'
+EOF
+    fi
+    # Configuration changes for test clusters
     if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 apiserver_test_args: '$(echo "$APISERVER_TEST_ARGS" | sed -e "s/'/''/g")'

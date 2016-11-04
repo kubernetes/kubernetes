@@ -8613,7 +8613,7 @@
     "description": "API at /api/v1",
     "operations": [
      {
-      "type": "v1alpha1.Eviction",
+      "type": "v1beta1.Eviction",
       "method": "POST",
       "summary": "create eviction of an Eviction",
       "nickname": "createNamespacedEvictionEviction",
@@ -8627,7 +8627,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1alpha1.Eviction",
+        "type": "v1beta1.Eviction",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -8655,7 +8655,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.Eviction"
+        "responseModel": "v1beta1.Eviction"
        }
       ],
       "produces": [
@@ -19038,9 +19038,9 @@
      }
     }
    },
-   "v1alpha1.Eviction": {
-    "id": "v1alpha1.Eviction",
-    "description": "Eviction evicts a pod from its node subject to certain policies and safety constraints. This is a subresource of Pod.  A request to cause such an eviction is created by POSTing to .../pods/\u003cpod name\u003e/eviction.",
+   "v1beta1.Eviction": {
+    "id": "v1beta1.Eviction",
+    "description": "Eviction evicts a pod from its node subject to certain policies and safety constraints. This is a subresource of Pod.  A request to cause such an eviction is created by POSTing to .../pods/\u003cpod name\u003e/evictions.",
     "properties": {
      "kind": {
       "type": "string",

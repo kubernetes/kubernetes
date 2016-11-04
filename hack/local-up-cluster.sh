@@ -29,6 +29,14 @@ NET_PLUGIN=${NET_PLUGIN:-""}
 NET_PLUGIN_DIR=${NET_PLUGIN_DIR:-""}
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/24}
+# if enabled, must set CGROUP_ROOT
+CGROUPS_PER_QOS=${CGROUPS_PER_QOS:-false}
+# this is not defaulted to preserve backward compatibility.
+# if CGROUPS_PER_QOS is enabled, recommend setting to /
+CGROUP_ROOT=${CGROUP_ROOT:""}
+# name of the cgroup driver, i.e. cgroupfs or systemd
+CGROUP_DRIVER=${CGROUP_DRIVER:-""}
+
 # We disable cluster DNS by default because this script uses docker0 (or whatever
 # container bridge docker is currently using) and we don't know the IP of the
 # DNS pod to pass in as --cluster-dns. To set this up by hand, set this flag
@@ -464,6 +472,9 @@ function start_kubelet {
         --feature-gates="${FEATURE_GATES}" \
         --cpu-cfs-quota=${CPU_CFS_QUOTA} \
         --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" \
+        --cgroups-per-qos=${CGROUPS_PER_QOS} \
+        --cgroup-driver=${CGROUP_DRIVER} \
+        --cgroup-root=${CGROUP_ROOT} \
         ${dns_args} \
         ${net_plugin_dir_args} \
         ${net_plugin_args} \
@@ -552,7 +563,7 @@ kind: Namespace
 metadata:
   name: kube-system
 EOF
-        ${KUBECTL} config set-cluster local --server=https://${API_HOST}:${API_SECURE_PORT} --certificate-authority=$(ROOT_CA_FILE)
+        ${KUBECTL} config set-cluster local --server=https://${API_HOST}:${API_SECURE_PORT} --certificate-authority=${ROOT_CA_FILE}
         ${KUBECTL} config set-context local --cluster=local
         ${KUBECTL} config use-context local
 

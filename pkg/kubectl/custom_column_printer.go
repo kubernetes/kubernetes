@@ -206,9 +206,18 @@ func (s *CustomColumnsPrinter) printOneObject(obj runtime.Object, parsers []*jso
 			}
 		}
 	}
+
 	for ix := range parsers {
 		parser := parsers[ix]
-		values, err := parser.FindResults(reflect.ValueOf(obj).Elem().Interface())
+
+		var values [][]reflect.Value
+		var err error
+		if unstructured, ok := obj.(*runtime.Unstructured); ok {
+			values, err = parser.FindResults(unstructured.Object)
+		} else {
+			values, err = parser.FindResults(reflect.ValueOf(obj).Elem().Interface())
+		}
+
 		if err != nil {
 			return err
 		}

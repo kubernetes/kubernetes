@@ -63,7 +63,7 @@ func TestListSandboxes(t *testing.T) {
 	}
 
 	expected := []*runtimeApi.PodSandbox{}
-	state := runtimeApi.PodSandBoxState_READY
+	state := runtimeApi.PodSandboxState_SANDBOX_READY
 	var createdAt int64 = 0
 	for i := range configs {
 		id, err := ds.RunPodSandbox(configs[i])
@@ -98,7 +98,7 @@ func TestSandboxStatus(t *testing.T) {
 	fakeIP := "2.3.4.5"
 	fakeNS := fmt.Sprintf("/proc/%d/ns/net", os.Getpid())
 
-	state := runtimeApi.PodSandBoxState_READY
+	state := runtimeApi.PodSandboxState_SANDBOX_READY
 	ct := int64(0)
 	hostNetwork := false
 	expected := &runtimeApi.PodSandboxStatus{
@@ -128,7 +128,7 @@ func TestSandboxStatus(t *testing.T) {
 	assert.Equal(t, expected, status)
 
 	// Stop the sandbox.
-	*expected.State = runtimeApi.PodSandBoxState_NOTREADY
+	*expected.State = runtimeApi.PodSandboxState_SANDBOX_NOTREADY
 	err = ds.StopPodSandbox(id)
 	assert.NoError(t, err)
 	status, err = ds.PodSandboxStatus(id)

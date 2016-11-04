@@ -149,7 +149,10 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	selector := cmdutil.GetFlagString(cmd, "selector")
 	allNamespaces := cmdutil.GetFlagBool(cmd, "all-namespaces")
 	showKind := cmdutil.GetFlagBool(cmd, "show-kind")
-	mapper, typer := f.Object()
+	mapper, typer, err := f.UnstructuredObject()
+	if err != nil {
+		return err
+	}
 	printAll := false
 	filterFuncs := f.DefaultResourceFilterFunc()
 	filterOpts := f.DefaultResourceFilterOptions(cmd, allNamespaces)
@@ -196,7 +199,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	// handle watch separately since we cannot watch multiple resource types
 	isWatch, isWatchOnly := cmdutil.GetFlagBool(cmd, "watch"), cmdutil.GetFlagBool(cmd, "watch-only")
 	if isWatch || isWatchOnly {
-		r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+		r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), runtime.UnstructuredJSONScheme).
 			NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
 			FilenameParam(enforceNamespace, &options.FilenameOptions).
 			SelectorParam(selector).
@@ -281,7 +284,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		return nil
 	}
 
-	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), runtime.UnstructuredJSONScheme).
 		NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
 		FilenameParam(enforceNamespace, &options.FilenameOptions).
 		SelectorParam(selector).
@@ -302,18 +305,10 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	}
 
 	if generic {
-		clientConfig, err := f.ClientConfig()
-		if err != nil {
-			return err
-		}
-
-		// the outermost object will be converted to the output-version, but inner
-		// objects can use their mappings
-		version, err := cmdutil.OutputVersion(cmd, clientConfig.GroupVersion)
-		if err != nil {
-			return err
-		}
-
+		// we flattened the data from the builder, so we have individual items, but now we'd like to either:
+		// 1. if there is more than one item, combine them all into a single list
+		// 2. if there is a single item and that item is a list, leave it as its specific list
+		// 3. if there is a single item and it is not a a list, leave it as a single item
 		var errs []error
 		singular := false
 		infos, err := r.IntoSingular(&singular).Infos()
@@ -332,9 +327,22 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			res = infos[0].ResourceMapping().Resource
 		}
 
-		obj, err := resource.AsVersionedObject(infos, !singular, version, f.JSONEncoder())
-		if err != nil {
-			return err
+		var obj runtime.Object
+		if singular {
+			obj = infos[0].Object
+		} else {
+			// we have more than one item, so coerce all items into a list
+			list := &runtime.UnstructuredList{
+				Object: map[string]interface{}{
+					"kind":       "List",
+					"apiVersion": "v1",
+					"metadata":   map[string]interface{}{},
+				},
+			}
+			for _, info := range infos {
+				list.Items = append(list.Items, info.Object.(*runtime.Unstructured))
+			}
+			obj = list
 		}
 
 		isList := meta.IsListType(obj)
@@ -343,11 +351,24 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			if err != nil {
 				return err
 			}
-			filteredObj, err := cmdutil.ObjectListToVersionedObject(items, version)
-			if err != nil {
-				return err
+
+			// take the filtered items and create a new list for display
+			list := &runtime.UnstructuredList{
+				Object: map[string]interface{}{
+					"kind":       "List",
+					"apiVersion": "v1",
+					"metadata":   map[string]interface{}{},
+				},
 			}
-			if err := printer.PrintObj(filteredObj, out); err != nil {
+			if listMeta, err := meta.ListAccessor(obj); err == nil {
+				list.Object["selfLink"] = listMeta.GetSelfLink()
+				list.Object["resourceVersion"] = listMeta.GetResourceVersion()
+			}
+
+			for _, item := range items {
+				list.Items = append(list.Items, item.(*runtime.Unstructured))
+			}
+			if err := printer.PrintObj(list, out); err != nil {
 				errs = append(errs, err)
 			}
 
@@ -390,24 +411,6 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	}
 	var sorter *kubectl.RuntimeSort
 	if len(sorting) > 0 && len(objs) > 1 {
-		clientConfig, err := f.ClientConfig()
-		if err != nil {
-			return err
-		}
-
-		version, err := cmdutil.OutputVersion(cmd, clientConfig.GroupVersion)
-		if err != nil {
-			return err
-		}
-
-		for ix := range infos {
-			objs[ix], err = infos[ix].Mapping.ConvertToVersion(infos[ix].Object, version)
-			if err != nil {
-				allErrs = append(allErrs, err)
-				continue
-			}
-		}
-
 		// TODO: questionable
 		if sorter, err = kubectl.SortObjects(f.Decoder(true), objs, sorting); err != nil {
 			return err

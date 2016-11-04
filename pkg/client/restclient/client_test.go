@@ -47,6 +47,26 @@ type TestParam struct {
 	testBodyErrorIsNotNil bool
 }
 
+// TestSerializer makes sure that you're always able to decode an unversioned API object
+func TestSerializer(t *testing.T) {
+	contentConfig := ContentConfig{
+		ContentType:          "application/json",
+		GroupVersion:         &unversioned.GroupVersion{Group: "other", Version: runtime.APIVersionInternal},
+		NegotiatedSerializer: api.Codecs,
+	}
+
+	serializer, err := createSerializers(contentConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// bytes based on actual return from API server when encoding an "unversioned" object
+	obj, err := runtime.Decode(serializer.Decoder, []byte(`{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Success"}`))
+	t.Log(obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestDoRequestSuccess(t *testing.T) {
 	testServer, fakeHandler, status := testServerEnv(t, 200)
 	defer testServer.Close()
@@ -83,9 +103,48 @@ func TestDoRequestFailed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	err = c.Get().Do().Error()
+	if err == nil {
+		t.Errorf("unexpected non-error")
+	}
+	ss, ok := err.(errors.APIStatus)
+	if !ok {
+		t.Errorf("unexpected error type %v", err)
+	}
+	actual := ss.Status()
+	if !reflect.DeepEqual(status, &actual) {
+		t.Errorf("Unexpected mis-match: %s", diff.ObjectReflectDiff(status, &actual))
+	}
+}
+
+func TestDoRawRequestFailed(t *testing.T) {
+	status := &unversioned.Status{
+		Code:    http.StatusNotFound,
+		Status:  unversioned.StatusFailure,
+		Reason:  unversioned.StatusReasonNotFound,
+		Message: "the server could not find the requested resource",
+		Details: &unversioned.StatusDetails{
+			Causes: []unversioned.StatusCause{
+				{Type: unversioned.CauseTypeUnexpectedServerResponse, Message: "unknown"},
+			},
+		},
+	}
+	expectedBody, _ := runtime.Encode(testapi.Default.Codec(), status)
+	fakeHandler := utiltesting.FakeHandler{
+		StatusCode:   404,
+		ResponseBody: string(expectedBody),
+		T:            t,
+	}
+	testServer := httptest.NewServer(&fakeHandler)
+	defer testServer.Close()
+
+	c, err := restClient(testServer)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	body, err := c.Get().Do().Raw()
 
-	if err == nil || body != nil {
+	if err == nil || body == nil {
 		t.Errorf("unexpected non-error: %#v", body)
 	}
 	ss, ok := err.(errors.APIStatus)
@@ -93,12 +152,8 @@ func TestDoRequestFailed(t *testing.T) {
 		t.Errorf("unexpected error type %v", err)
 	}
 	actual := ss.Status()
-	expected := *status
-	// The decoder will apply the default Version and Kind to the Status.
-	expected.APIVersion = "v1"
-	expected.Kind = "Status"
-	if !reflect.DeepEqual(&expected, &actual) {
-		t.Errorf("Unexpected mis-match: %s", diff.ObjectDiff(status, &actual))
+	if !reflect.DeepEqual(status, &actual) {
+		t.Errorf("Unexpected mis-match: %s", diff.ObjectReflectDiff(status, &actual))
 	}
 }
 
@@ -162,10 +217,11 @@ func TestBadRequest(t *testing.T) {
 }
 
 func validate(testParam TestParam, t *testing.T, body []byte, fakeHandler *utiltesting.FakeHandler) {
-	if testParam.expectingError {
-		if testParam.actualError == nil {
-			t.Errorf("Expected error")
-		}
+	switch {
+	case testParam.expectingError && testParam.actualError == nil:
+		t.Errorf("Expected error")
+	case !testParam.expectingError && testParam.actualError != nil:
+		t.Error(testParam.actualError)
 	}
 	if !testParam.expCreated {
 		if testParam.actualCreated {

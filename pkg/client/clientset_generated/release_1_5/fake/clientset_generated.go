@@ -20,8 +20,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
-	v1alpha1apps "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/apps/v1alpha1"
-	fakev1alpha1apps "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/apps/v1alpha1/fake"
+	v1beta1apps "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/apps/v1beta1"
+	fakev1beta1apps "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/apps/v1beta1/fake"
 	v1beta1authentication "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/authentication/v1beta1"
 	fakev1beta1authentication "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/authentication/v1beta1/fake"
 	v1beta1authorization "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/authorization/v1beta1"
@@ -38,8 +38,8 @@ import (
 	fakev1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/core/v1/fake"
 	v1beta1extensions "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/extensions/v1beta1"
 	fakev1beta1extensions "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/extensions/v1beta1/fake"
-	v1alpha1policy "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/policy/v1alpha1"
-	fakev1alpha1policy "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/policy/v1alpha1/fake"
+	v1beta1policy "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/policy/v1beta1"
+	fakev1beta1policy "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/policy/v1beta1/fake"
 	v1alpha1rbac "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/rbac/v1alpha1"
 	fakev1alpha1rbac "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/rbac/v1alpha1/fake"
 	v1beta1storage "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/storage/v1beta1"
@@ -94,14 +94,14 @@ func (c *Clientset) Core() v1core.CoreV1Interface {
 	return &fakev1core.FakeCoreV1{Fake: &c.Fake}
 }
 
-// AppsV1alpha1 retrieves the AppsV1alpha1Client
-func (c *Clientset) AppsV1alpha1() v1alpha1apps.AppsV1alpha1Interface {
-	return &fakev1alpha1apps.FakeAppsV1alpha1{Fake: &c.Fake}
+// AppsV1beta1 retrieves the AppsV1beta1Client
+func (c *Clientset) AppsV1beta1() v1beta1apps.AppsV1beta1Interface {
+	return &fakev1beta1apps.FakeAppsV1beta1{Fake: &c.Fake}
 }
 
-// Apps retrieves the AppsV1alpha1Client
-func (c *Clientset) Apps() v1alpha1apps.AppsV1alpha1Interface {
-	return &fakev1alpha1apps.FakeAppsV1alpha1{Fake: &c.Fake}
+// Apps retrieves the AppsV1beta1Client
+func (c *Clientset) Apps() v1beta1apps.AppsV1beta1Interface {
+	return &fakev1beta1apps.FakeAppsV1beta1{Fake: &c.Fake}
 }
 
 // AuthenticationV1beta1 retrieves the AuthenticationV1beta1Client
@@ -169,14 +169,14 @@ func (c *Clientset) Extensions() v1beta1extensions.ExtensionsV1beta1Interface {
 	return &fakev1beta1extensions.FakeExtensionsV1beta1{Fake: &c.Fake}
 }
 
-// PolicyV1alpha1 retrieves the PolicyV1alpha1Client
-func (c *Clientset) PolicyV1alpha1() v1alpha1policy.PolicyV1alpha1Interface {
-	return &fakev1alpha1policy.FakePolicyV1alpha1{Fake: &c.Fake}
+// PolicyV1beta1 retrieves the PolicyV1beta1Client
+func (c *Clientset) PolicyV1beta1() v1beta1policy.PolicyV1beta1Interface {
+	return &fakev1beta1policy.FakePolicyV1beta1{Fake: &c.Fake}
 }
 
-// Policy retrieves the PolicyV1alpha1Client
-func (c *Clientset) Policy() v1alpha1policy.PolicyV1alpha1Interface {
-	return &fakev1alpha1policy.FakePolicyV1alpha1{Fake: &c.Fake}
+// Policy retrieves the PolicyV1beta1Client
+func (c *Clientset) Policy() v1beta1policy.PolicyV1beta1Interface {
+	return &fakev1beta1policy.FakePolicyV1beta1{Fake: &c.Fake}
 }
 
 // RbacV1alpha1 retrieves the RbacV1alpha1Client

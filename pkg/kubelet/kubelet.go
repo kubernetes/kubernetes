@@ -509,7 +509,10 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		case "cri":
 			// Use the new CRI shim for docker. This is needed for testing the
 			// docker integration through CRI, and may be removed in the future.
-			dockerService, err := dockershim.NewDockerService(klet.dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage, nil, &pluginSettings)
+			dockerService, err := dockershim.NewDockerService(klet.dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage, nil, &pluginSettings, kubeCfg.RuntimeCgroups)
+			if err != nil {
+				return nil, err
+			}
 			runtimeService := dockerService.(internalApi.RuntimeService)
 			imageService := dockerService.(internalApi.ImageManagerService)
 
@@ -536,6 +539,10 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 				if err != nil {
 					return nil, err
 				}
+			}
+			// TODO: Find a better place to start the service.
+			if err := dockerService.Start(); err != nil {
+				return nil, err
 			}
 
 			// kubelet defers to the runtime shim to setup networking. Setting
@@ -1384,6 +1391,45 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 		}
 		// there was no error killing the pod, but the pod cannot be run, so we return that err (if any)
 		return errOuter
+	}
+
+	// Create Cgroups for the pod and apply resource parameters
+	// to them if cgroup-per-qos flag is enabled.
+	pcm := kl.containerManager.NewPodContainerManager()
+	// If pod has already been terminated then we need not create
+	// or update the pod's cgroup
+	if !kl.podIsTerminated(pod) {
+		// When the kubelet is restarted with the cgroup-per-qos
+		// flag enabled, all the pod's running containers
+		// should be killed intermittently and brought back up
+		// under the qos cgroup hierarchy.
+		// Check if this is the pod's first sync
+		firstSync := true
+		for _, containerStatus := range apiPodStatus.ContainerStatuses {
+			if containerStatus.State.Running != nil {
+				firstSync = false
+				break
+			}
+		}
+		// Don't kill containers in pod if pod's cgroups already
+		// exists or the pod is running for the first time
+		podKilled := false
+		if !pcm.Exists(pod) && !firstSync {
+			kl.killPod(pod, nil, podStatus, nil)
+			podKilled = true
+		}
+		// Create and Update pod's Cgroups
+		// Don't create cgroups for run once pod if it was killed above
+		// The current policy is not to restart the run once pods when
+		// the kubelet is restarted with the new flag as run once pods are
+		// expected to run only once and if the kubelet is restarted then
+		// they are not expected to run again.
+		// We don't create and apply updates to cgroup if its a run once pod and was killed above
+		if !(podKilled && pod.Spec.RestartPolicy == api.RestartPolicyNever) {
+			if err := pcm.EnsureExists(pod); err != nil {
+				return fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %v", pod.UID, err)
+			}
+		}
 	}
 
 	// Create Mirror Pod for Static Pod if it doesn't already exist

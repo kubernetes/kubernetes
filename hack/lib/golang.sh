@@ -95,6 +95,7 @@ fi
 # The set of client targets that we are building for all platforms
 readonly KUBE_CLIENT_TARGETS=(
   cmd/kubectl
+  federation/cmd/kubefed
 )
 readonly KUBE_CLIENT_BINARIES=("${KUBE_CLIENT_TARGETS[@]##*/}")
 readonly KUBE_CLIENT_BINARIES_WIN=("${KUBE_CLIENT_BINARIES[@]/%/.exe}")

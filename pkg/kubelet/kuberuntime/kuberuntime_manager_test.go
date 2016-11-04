@@ -66,7 +66,7 @@ type sandboxTemplate struct {
 	pod       *api.Pod
 	attempt   uint32
 	createdAt int64
-	state     runtimeApi.PodSandBoxState
+	state     runtimeApi.PodSandboxState
 }
 
 // containerTemplate is a container template to create fake container.
@@ -86,7 +86,7 @@ func makeAndSetFakePod(t *testing.T, m *kubeGenericRuntimeManager, fakeRuntime *
 	sandbox := makeFakePodSandbox(t, m, sandboxTemplate{
 		pod:       pod,
 		createdAt: fakeCreatedAt,
-		state:     runtimeApi.PodSandBoxState_READY,
+		state:     runtimeApi.PodSandboxState_SANDBOX_READY,
 	})
 
 	var containers []*apitest.FakeContainer
@@ -95,7 +95,7 @@ func makeAndSetFakePod(t *testing.T, m *kubeGenericRuntimeManager, fakeRuntime *
 			pod:       pod,
 			container: c,
 			createdAt: fakeCreatedAt,
-			state:     runtimeApi.ContainerState_RUNNING,
+			state:     runtimeApi.ContainerState_CONTAINER_RUNNING,
 		}
 	}
 	for i := range pod.Spec.Containers {
@@ -509,10 +509,10 @@ func TestKillPod(t *testing.T) {
 	assert.Equal(t, 2, len(fakeRuntime.Containers))
 	assert.Equal(t, 1, len(fakeRuntime.Sandboxes))
 	for _, sandbox := range fakeRuntime.Sandboxes {
-		assert.Equal(t, runtimeApi.PodSandBoxState_NOTREADY, sandbox.GetState())
+		assert.Equal(t, runtimeApi.PodSandboxState_SANDBOX_NOTREADY, sandbox.GetState())
 	}
 	for _, c := range fakeRuntime.Containers {
-		assert.Equal(t, runtimeApi.ContainerState_EXITED, c.GetState())
+		assert.Equal(t, runtimeApi.ContainerState_CONTAINER_EXITED, c.GetState())
 	}
 }
 
@@ -550,10 +550,10 @@ func TestSyncPod(t *testing.T) {
 	assert.Equal(t, 2, len(fakeImage.Images))
 	assert.Equal(t, 1, len(fakeRuntime.Sandboxes))
 	for _, sandbox := range fakeRuntime.Sandboxes {
-		assert.Equal(t, runtimeApi.PodSandBoxState_READY, sandbox.GetState())
+		assert.Equal(t, runtimeApi.PodSandboxState_SANDBOX_READY, sandbox.GetState())
 	}
 	for _, c := range fakeRuntime.Containers {
-		assert.Equal(t, runtimeApi.ContainerState_RUNNING, c.GetState())
+		assert.Equal(t, runtimeApi.ContainerState_CONTAINER_RUNNING, c.GetState())
 	}
 }
 
@@ -575,11 +575,11 @@ func TestPruneInitContainers(t *testing.T) {
 	}
 
 	templates := []containerTemplate{
-		{pod: pod, container: &init1, attempt: 2, createdAt: 2, state: runtimeApi.ContainerState_EXITED},
-		{pod: pod, container: &init1, attempt: 1, createdAt: 1, state: runtimeApi.ContainerState_EXITED},
-		{pod: pod, container: &init2, attempt: 1, createdAt: 1, state: runtimeApi.ContainerState_EXITED},
-		{pod: pod, container: &init2, attempt: 0, createdAt: 0, state: runtimeApi.ContainerState_EXITED},
-		{pod: pod, container: &init1, attempt: 0, createdAt: 0, state: runtimeApi.ContainerState_EXITED},
+		{pod: pod, container: &init1, attempt: 2, createdAt: 2, state: runtimeApi.ContainerState_CONTAINER_EXITED},
+		{pod: pod, container: &init1, attempt: 1, createdAt: 1, state: runtimeApi.ContainerState_CONTAINER_EXITED},
+		{pod: pod, container: &init2, attempt: 1, createdAt: 1, state: runtimeApi.ContainerState_CONTAINER_EXITED},
+		{pod: pod, container: &init2, attempt: 0, createdAt: 0, state: runtimeApi.ContainerState_CONTAINER_EXITED},
+		{pod: pod, container: &init1, attempt: 0, createdAt: 0, state: runtimeApi.ContainerState_CONTAINER_EXITED},
 	}
 	fakes := makeFakeContainers(t, m, templates)
 	fakeRuntime.SetFakeContainers(fakes)

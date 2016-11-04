@@ -180,6 +180,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	if masterConfig == nil {
 		masterConfig = NewMasterConfig()
 		masterConfig.GenericConfig.EnableProfiling = true
+		masterConfig.GenericConfig.EnableMetrics = true
 		masterConfig.GenericConfig.EnableSwaggerSupport = true
 		masterConfig.GenericConfig.EnableOpenAPISupport = true
 		masterConfig.GenericConfig.OpenAPIConfig.Info = &spec.Info{
@@ -235,6 +236,12 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 		masterReceiver.SetMaster(m)
 	}
 
+	// TODO have this start method actually use the normal start sequence for the API server
+	// this method never actually calls the `Run` method for the API server
+	// fire the post hooks ourselves
+	m.GenericAPIServer.PrepareRun()
+	m.GenericAPIServer.RunPostStartHooks()
+
 	cfg := *masterConfig.GenericConfig.LoopbackClientConfig
 	cfg.ContentConfig.GroupVersion = &unversioned.GroupVersion{}
 	privilegedClient, err := restclient.RESTClientFor(&cfg)
@@ -253,12 +260,6 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	if err != nil {
 		glog.Fatal(err)
 	}
-
-	// TODO have this start method actually use the normal start sequence for the API server
-	// this method never actually calls the `Run` method for the API server
-	// fire the post hooks ourselves
-	m.GenericAPIServer.PrepareRun()
-	m.GenericAPIServer.RunPostStartHooks()
 
 	// wait for services to be ready
 	if masterConfig.EnableCoreControllers {
@@ -350,6 +351,7 @@ func NewMasterConfig() *master.Config {
 	genericConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
 	genericConfig.Authorizer = authorizer.NewAlwaysAllowAuthorizer()
 	genericConfig.AdmissionControl = admit.NewAlwaysAdmit()
+	genericConfig.EnableMetrics = true
 
 	return &master.Config{
 		GenericConfig:         genericConfig,
@@ -357,6 +359,8 @@ func NewMasterConfig() *master.Config {
 		EnableCoreControllers: true,
 		EnableWatchCache:      true,
 		KubeletClientConfig:   kubeletclient.KubeletClientConfig{Port: 10250},
+		APIServerServicePort:  443,
+		MasterCount:           1,
 	}
 }
 
@@ -450,6 +454,7 @@ func RunAMaster(masterConfig *master.Config) (*master.Master, *httptest.Server) 
 	if masterConfig == nil {
 		masterConfig = NewMasterConfig()
 		masterConfig.GenericConfig.EnableProfiling = true
+		masterConfig.GenericConfig.EnableMetrics = true
 	}
 	return startMasterOrDie(masterConfig, nil, nil)
 }

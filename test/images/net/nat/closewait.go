@@ -36,7 +36,8 @@ import (
 	"k8s.io/kubernetes/test/images/net/common"
 )
 
-// leakedConnection is a
+// leakedConnection is a global variable that should leak the active
+// connection assigned here.
 var leakedConnection *net.TCPConn
 
 // Server JSON options.
@@ -156,7 +157,9 @@ func (client *closeWaitClient) Run(logger *log.Logger, rawOptions interface{}) e
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	if !client.options.LeakConnection {
+		defer conn.Close()
+	}
 
 	logger.Printf("Connected to server")
 

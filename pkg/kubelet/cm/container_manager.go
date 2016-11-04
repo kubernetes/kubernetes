@@ -49,13 +49,15 @@ type ContainerManager interface {
 }
 
 type NodeConfig struct {
-	RuntimeCgroupsName    string
-	SystemCgroupsName     string
-	KubeletCgroupsName    string
-	ContainerRuntime      string
-	CgroupsPerQOS         bool
-	CgroupRoot            string
-	ProtectKernelDefaults bool
+	RuntimeCgroupsName     string
+	SystemCgroupsName      string
+	KubeletCgroupsName     string
+	ContainerRuntime       string
+	CgroupsPerQOS          bool
+	CgroupRoot             string
+	CgroupDriver           string
+	ProtectKernelDefaults  bool
+	RuntimeIntegrationType string
 }
 
 type Status struct {

@@ -67,9 +67,6 @@ Deployment overlapping deployment should not fight with each other,kargakis,1
 Deployment paused deployment should be able to scale,kargakis,1
 Deployment paused deployment should be ignored by the controller,kargakis,0
 Deployment scaled rollout deployment should not block on annotation check,kargakis,1
-DisruptionController evictions: * => *,jszczepkowski,1
-DisruptionController should create a PodDisruptionBudget,quinton-hoole,1
-DisruptionController should update PodDisruptionBudget status,bgrant0607,1
 Docker Containers should be able to override the image's default arguments (docker cmd),maisem,0
 Docker Containers should be able to override the image's default command and arguments,maisem,0
 Docker Containers should be able to override the image's default commmand (docker entrypoint),maisem,0
@@ -184,7 +181,7 @@ Kubectl alpha client Kubectl run ScheduledJob should create a ScheduledJob,karga
 Kubectl client Guestbook application should create and stop a working application,pwittrock,0
 Kubectl client Kubectl api-versions should check if v1 is in available api versions,pwittrock,0
 Kubectl client Kubectl apply should apply a new configuration to an existing RC,pwittrock,0
-Kubectl client Kubectl apply should reuse nodePort when apply to an existing SVC,pwittrock,0
+Kubectl client Kubectl apply should reuse port when apply to an existing SVC,deads2k,0
 Kubectl client Kubectl cluster-info should check if Kubernetes master services is included in cluster-info,pwittrock,0
 Kubectl client Kubectl create quota should create a quota with scopes,jdef,1
 Kubectl client Kubectl create quota should create a quota without scopes,xiang90,1
@@ -215,6 +212,9 @@ Kubectl client Simple pod should support port-forward,ncdc,0
 Kubectl client Update Demo should create and stop a replication controller,sttts,0
 Kubectl client Update Demo should do a rolling update of a replication controller,sttts,0
 Kubectl client Update Demo should scale a replication controller,sttts,0
+Kubelet Cgroup Manager Pod containers On scheduling a BestEffort Pod Pod containers should have been created under the BestEffort cgroup,derekwaynecarr,0
+Kubelet Cgroup Manager Pod containers On scheduling a Burstable Pod Pod containers should have been created under the Burstable cgroup,derekwaynecarr,0
+Kubelet Cgroup Manager Pod containers On scheduling a Guaranteed Pod Pod containers should have been created under the cgroup-root,derekwaynecarr,0
 Kubelet Cgroup Manager QOS containers On enabling QOS cgroup hierarchy Top level QoS containers should have been created,davidopp,1
 Kubelet Container Manager Validate OOM score adjustments once the node is setup Kubelet's oom-score-adj should be -999,kargakis,1
 "Kubelet Container Manager Validate OOM score adjustments once the node is setup burstable container's oom-score-adj should be between [2, 1000)",derekwaynecarr,1
@@ -255,6 +255,13 @@ Namespaces should always delete fast (ALL of 100 namespaces in 150 seconds),rmmh
 Namespaces should delete fast enough (90 percent of 100 namespaces in 150 seconds),kevin-wangzefeng,1
 Namespaces should ensure that all pods are removed when a namespace is deleted.,xiang90,1
 Namespaces should ensure that all services are removed when a namespace is deleted.,pmorie,1
+Network Partition *,foxish,0
+Network Partition Pods should return to running and ready state after network partition is healed *,foxish,0
+Network Partition should come back up if node goes down,foxish,0
+Network Partition should create new pods when node is partitioned,foxish,0
+Network Partition should eagerly create replacement pod during network partition when termination grace is non-zero,foxish,0
+Network Partition should not reschedule pets if there is a network partition,foxish,0
+Network should set TCP CLOSE_WAIT timeout,bowei,0
 Networking Granular Checks: Pods should function for intra-pod communication: http,stts,0
 Networking Granular Checks: Pods should function for intra-pod communication: udp,freehan,0
 Networking Granular Checks: Pods should function for node-pod communication: http,spxtr,1
@@ -275,7 +282,6 @@ Networking should provide Internet connection for containers,sttts,0
 "Networking should provide unchanging, static URL paths for kubernetes api services",freehan,0
 NodeOutOfDisk runs out of disk space,vishh,0
 NodeProblemDetector KernelMonitor should generate node condition and events for corresponding errors,Random-Liu,0
-Nodes Network when a node becomes unreachable *,alex-mohr,1
 Nodes Resize should be able to add nodes,piosz,1
 Nodes Resize should be able to delete nodes,zmerlynn,1
 Opaque resources should account opaque integer resources in pods with multiple containers.,ConnorDoyle,0
@@ -335,8 +341,10 @@ Reboot each node by triggering kernel panic and ensure they function upon restar
 Redis should create and stop redis servers,timstclair,1
 ReplicaSet should serve a basic image on each replica with a private image,pmorie,1
 ReplicaSet should serve a basic image on each replica with a public image,krousey,0
+ReplicaSet should surface a failure condition on a common issue like exceeded quota,kargakis,0
 ReplicationController should serve a basic image on each replica with a private image,jbeda,1
 ReplicationController should serve a basic image on each replica with a public image,krousey,1
+ReplicationController should surface a failure condition on a common issue like exceeded quota,kargakis,0
 Rescheduler should ensure that critical pod is scheduled in case there is no resources available,mtaufen,1
 Resource-usage regular resource usage tracking resource tracking for * pods per node,janetkuo,1
 ResourceQuota should create a ResourceQuota and capture the life of a configMap.,timstclair,1
@@ -469,6 +477,7 @@ k8s.io/kubernetes/federation/pkg/dnsprovider,sttts,1
 k8s.io/kubernetes/federation/pkg/dnsprovider/providers/aws/route53,cjcullen,1
 k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns,jsafrane,1
 k8s.io/kubernetes/federation/pkg/federation-controller/cluster,nikhiljindal,0
+k8s.io/kubernetes/federation/pkg/federation-controller/configmap,mwielgus,0
 k8s.io/kubernetes/federation/pkg/federation-controller/daemonset,childsb,1
 k8s.io/kubernetes/federation/pkg/federation-controller/deployment,zmerlynn,1
 k8s.io/kubernetes/federation/pkg/federation-controller/ingress,vishh,1
@@ -480,6 +489,8 @@ k8s.io/kubernetes/federation/pkg/federation-controller/util,bgrant0607,1
 k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink,luxas,1
 k8s.io/kubernetes/federation/pkg/federation-controller/util/planner,Q-Lee,1
 k8s.io/kubernetes/federation/pkg/federation-controller/util/podanalyzer,caesarxuchao,1
+k8s.io/kubernetes/federation/pkg/kubefed,madhusudancs,0
+k8s.io/kubernetes/federation/pkg/kubefed/init,madhusudancs,0
 k8s.io/kubernetes/federation/registry/cluster,nikhiljindal,0
 k8s.io/kubernetes/federation/registry/cluster/etcd,nikhiljindal,0
 k8s.io/kubernetes/hack/cmd/teststale,thockin,1
@@ -790,6 +801,7 @@ k8s.io/kubernetes/pkg/util/sets,quinton-hoole,0
 k8s.io/kubernetes/pkg/util/slice,quinton-hoole,0
 k8s.io/kubernetes/pkg/util/strategicpatch,brendandburns,1
 k8s.io/kubernetes/pkg/util/strings,quinton-hoole,0
+k8s.io/kubernetes/pkg/util/system,mwielgus,0
 k8s.io/kubernetes/pkg/util/term,davidopp,1
 k8s.io/kubernetes/pkg/util/testing,jlowdermilk,1
 k8s.io/kubernetes/pkg/util/threading,roberthbailey,1
