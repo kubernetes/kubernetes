@@ -68,6 +68,7 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_componentconfig_KubeProxyCon
 	out.HostnameOverride = in.HostnameOverride
 	out.IPTablesMasqueradeBit = (*int32)(unsafe.Pointer(in.IPTablesMasqueradeBit))
 	out.IPTablesSyncPeriod = in.IPTablesSyncPeriod
+	out.IPTablesMinSyncPeriod = in.IPTablesMinSyncPeriod
 	out.KubeconfigPath = in.KubeconfigPath
 	out.MasqueradeAll = in.MasqueradeAll
 	out.Master = in.Master
@@ -96,6 +97,7 @@ func autoConvert_componentconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyCon
 	out.HostnameOverride = in.HostnameOverride
 	out.IPTablesMasqueradeBit = (*int32)(unsafe.Pointer(in.IPTablesMasqueradeBit))
 	out.IPTablesSyncPeriod = in.IPTablesSyncPeriod
+	out.IPTablesMinSyncPeriod = in.IPTablesMinSyncPeriod
 	out.KubeconfigPath = in.KubeconfigPath
 	out.MasqueradeAll = in.MasqueradeAll
 	out.Master = in.Master

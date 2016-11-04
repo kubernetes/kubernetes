@@ -87,6 +87,7 @@ type Proxier struct {
 	mu             sync.Mutex // protects serviceMap
 	serviceMap     map[proxy.ServicePortName]*serviceInfo
 	syncPeriod     time.Duration
+	minSyncPeriod  time.Duration // unused atm, but plumbed through
 	udpIdleTimeout time.Duration
 	portMapMutex   sync.Mutex
 	portMap        map[portMapKey]*portMapValue
@@ -139,7 +140,7 @@ func IsProxyLocked(err error) bool {
 // if iptables fails to update or acquire the initial lock. Once a proxier is
 // created, it will keep iptables up to date in the background and will not
 // terminate if a particular iptables call fails.
-func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, pr utilnet.PortRange, syncPeriod, udpIdleTimeout time.Duration) (*Proxier, error) {
+func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, pr utilnet.PortRange, syncPeriod, minSyncPeriod, udpIdleTimeout time.Duration) (*Proxier, error) {
 	if listenIP.Equal(localhostIPv4) || listenIP.Equal(localhostIPv6) {
 		return nil, ErrProxyOnLocalhost
 	}
@@ -157,10 +158,10 @@ func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.In
 	proxyPorts := newPortAllocator(pr)
 
 	glog.V(2).Infof("Setting proxy IP to %v and initializing iptables", hostIP)
-	return createProxier(loadBalancer, listenIP, iptables, hostIP, proxyPorts, syncPeriod, udpIdleTimeout)
+	return createProxier(loadBalancer, listenIP, iptables, hostIP, proxyPorts, syncPeriod, minSyncPeriod, udpIdleTimeout)
 }
 
-func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, hostIP net.IP, proxyPorts PortAllocator, syncPeriod, udpIdleTimeout time.Duration) (*Proxier, error) {
+func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, hostIP net.IP, proxyPorts PortAllocator, syncPeriod, minSyncPeriod, udpIdleTimeout time.Duration) (*Proxier, error) {
 	// convenient to pass nil for tests..
 	if proxyPorts == nil {
 		proxyPorts = newPortAllocator(utilnet.PortRange{})
@@ -175,10 +176,12 @@ func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables
 		return nil, fmt.Errorf("failed to flush iptables: %v", err)
 	}
 	return &Proxier{
-		loadBalancer:   loadBalancer,
-		serviceMap:     make(map[proxy.ServicePortName]*serviceInfo),
-		portMap:        make(map[portMapKey]*portMapValue),
-		syncPeriod:     syncPeriod,
+		loadBalancer: loadBalancer,
+		serviceMap:   make(map[proxy.ServicePortName]*serviceInfo),
+		portMap:      make(map[portMapKey]*portMapValue),
+		syncPeriod:   syncPeriod,
+		// plumbed through if needed, not used atm.
+		minSyncPeriod:  minSyncPeriod,
 		udpIdleTimeout: udpIdleTimeout,
 		listenIP:       listenIP,
 		iptables:       iptables,
