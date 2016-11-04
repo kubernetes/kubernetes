@@ -162,7 +162,7 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 
 	containsError := false
 	for {
-		originalObj, err := resource.AsVersionedObject(infos, false, defaultVersion, encoder)
+		originalObj, err := resource.AsVersionedObject(infos, false, defaultVersion, resourceMapper.ObjectTyper, encoder)
 		if err != nil {
 			return err
 		}

@@ -211,8 +211,8 @@ func (r *Result) Watch(resourceVersion string) (watch.Interface, error) {
 // the objects as children, or if only a single Object is present, as that object. The provided
 // version will be preferred as the conversion target, but the Object's mapping version will be
 // used if that version is not present.
-func AsVersionedObject(infos []*Info, forceList bool, version unversioned.GroupVersion, encoder runtime.Encoder) (runtime.Object, error) {
-	objects, err := AsVersionedObjects(infos, version, encoder)
+func AsVersionedObject(infos []*Info, forceList bool, version unversioned.GroupVersion, typer runtime.ObjectTyper, encoder runtime.Encoder) (runtime.Object, error) {
+	objects, err := AsVersionedObjects(infos, version, typer, encoder)
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +234,7 @@ func AsVersionedObject(infos []*Info, forceList bool, version unversioned.GroupV
 // AsVersionedObjects converts a list of infos into versioned objects. The provided
 // version will be preferred as the conversion target, but the Object's mapping version will be
 // used if that version is not present.
-func AsVersionedObjects(infos []*Info, version unversioned.GroupVersion, encoder runtime.Encoder) ([]runtime.Object, error) {
+func AsVersionedObjects(infos []*Info, version unversioned.GroupVersion, typer runtime.ObjectTyper, encoder runtime.Encoder) ([]runtime.Object, error) {
 	objects := []runtime.Object{}
 	for _, info := range infos {
 		if info.Object == nil {
@@ -251,7 +251,7 @@ func AsVersionedObjects(infos []*Info, version unversioned.GroupVersion, encoder
 		// objects that are not part of api.Scheme must be converted to JSON
 		// TODO: convert to map[string]interface{}, attach to runtime.Unknown?
 		if !version.Empty() {
-			if _, _, err := api.Scheme.ObjectKinds(info.Object); runtime.IsNotRegisteredError(err) {
+			if _, _, err := typer.ObjectKinds(info.Object); runtime.IsNotRegisteredError(err) {
 				// TODO: ideally this would encode to version, but we don't expose multiple codecs here.
 				data, err := runtime.Encode(encoder, info.Object)
 				if err != nil {
