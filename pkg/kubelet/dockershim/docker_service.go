@@ -18,7 +18,6 @@ package dockershim
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
@@ -33,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network/cni"
 	"k8s.io/kubernetes/pkg/kubelet/network/kubenet"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
-	"k8s.io/kubernetes/pkg/util/term"
 )
 
 const (
@@ -132,23 +130,12 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 	return ds, nil
 }
 
-// DockerService is an interface that embeds both the new RuntimeService and
-// ImageService interfaces, while including DockerLegacyService for backward
-// compatibility.
+// DockerService is an interface that embeds the new RuntimeService and
+// ImageService interfaces.
 type DockerService interface {
 	internalApi.RuntimeService
 	internalApi.ImageManagerService
-	DockerLegacyService
 	Start() error
-}
-
-// DockerLegacyService is an interface that embeds all legacy methods for
-// backward compatibility.
-type DockerLegacyService interface {
-	// Supporting legacy methods for docker.
-	LegacyExec(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error
-	LegacyAttach(id kubecontainer.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error
-	LegacyPortForward(sandboxID string, port uint16, stream io.ReadWriteCloser) error
 }
 
 type dockerService struct {
