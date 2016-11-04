@@ -16,6 +16,7 @@ go_library(
         "doc.go",
         "helpers.go",
         "register.go",
+        "types.generated.go",
         "types.go",
         "zz_generated.deepcopy.go",
     ],
@@ -26,6 +27,7 @@ go_library(
         "//pkg/runtime:go_default_library",
         "//pkg/util/config:go_default_library",
         "//pkg/util/net:go_default_library",
+        "//vendor:github.com/ugorji/go/codec",
     ],
 )
 
