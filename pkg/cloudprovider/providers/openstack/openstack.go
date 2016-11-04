@@ -403,7 +403,7 @@ func (os *OpenStack) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 
 	glog.V(1).Info("Claiming to support LoadBalancer")
 
-	if os.lbOpts.LBVersion == "v2" {
+	if lbversion == "v2" {
 		return &LbaasV2{LoadBalancer{network, compute, os.lbOpts}}, true
 	} else if lbversion == "v1" {
 		return &LbaasV1{LoadBalancer{network, compute, os.lbOpts}}, true
