@@ -1054,6 +1054,48 @@ func TestPrivilegedContainerDisallowed(t *testing.T) {
 	assert.Error(t, err, "expected pod infra creation to fail")
 }
 
+func TestNetworkErrorsWithoutHostNetwork(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet.fakeCadvisor.On("VersionInfo").Return(&cadvisorapi.VersionInfo{}, nil)
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
+	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+	kubelet := testKubelet.kubelet
+
+	kubelet.runtimeState.setNetworkState(fmt.Errorf("simulated network error"))
+	capabilities.SetForTests(capabilities.Capabilities{
+		PrivilegedSources: capabilities.PrivilegedSources{
+			HostNetworkSources: []string{kubetypes.ApiserverSource, kubetypes.FileSource},
+		},
+	})
+
+	pod := podWithUidNameNsSpec("12345678", "hostnetwork", "new", api.PodSpec{
+		SecurityContext: &api.PodSecurityContext{
+			HostNetwork: false,
+		},
+		Containers: []api.Container{
+			{Name: "foo"},
+		},
+	})
+
+	kubelet.podManager.SetPods([]*api.Pod{pod})
+	err := kubelet.syncPod(syncPodOptions{
+		pod:        pod,
+		podStatus:  &kubecontainer.PodStatus{},
+		updateType: kubetypes.SyncPodUpdate,
+	})
+	assert.Error(t, err, "expected pod with hostNetwork=false to fail when network in error")
+
+	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = kubetypes.FileSource
+	pod.Spec.SecurityContext.HostNetwork = true
+	err = kubelet.syncPod(syncPodOptions{
+		pod:        pod,
+		podStatus:  &kubecontainer.PodStatus{},
+		updateType: kubetypes.SyncPodUpdate,
+	})
+	assert.NoError(t, err, "expected pod with hostNetwork=true to succeed when network in error")
+}
+
 func TestFilterOutTerminatedPods(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kubelet := testKubelet.kubelet
