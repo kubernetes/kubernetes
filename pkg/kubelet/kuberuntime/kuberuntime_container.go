@@ -21,6 +21,7 @@ import (
 	"io"
 	"io/ioutil"
 	"math/rand"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -679,10 +680,10 @@ func findNextInitContainerToRun(pod *api.Pod, podStatus *kubecontainer.PodStatus
 }
 
 // AttachContainer attaches to the container's console
+// TODO: Remove this method once the indirect streaming path is fully functional.
 func (m *kubeGenericRuntimeManager) AttachContainer(id kubecontainer.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) (err error) {
 	// Use `docker attach` directly for in-process docker integration for
 	// now to unblock other tests.
-	// TODO: remove this hack after attach is defined in CRI.
 	if ds, ok := m.runtimeService.(dockershim.DockerLegacyService); ok {
 		return ds.LegacyAttach(id, stdin, stdout, stderr, tty, resize)
 	}
@@ -701,14 +702,51 @@ func (m *kubeGenericRuntimeManager) GetContainerLogs(pod *api.Pod, containerID k
 	return ReadLogs(path, logOptions, stdout, stderr)
 }
 
+// GetExec gets the endpoint the runtime will serve the exec request from.
+func (m *kubeGenericRuntimeManager) GetExec(id kubecontainer.ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error) {
+	req := &runtimeApi.ExecRequest{
+		ContainerId: &id.ID,
+		Cmd:         cmd,
+		Tty:         &tty,
+		Stdin:       &stdin,
+	}
+	resp, err := m.runtimeService.Exec(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return url.Parse(resp.GetUrl())
+}
+
+// GetAttach gets the endpoint the runtime will serve the attach request from.
+func (m *kubeGenericRuntimeManager) GetAttach(id kubecontainer.ContainerID, stdin, stdout, stderr bool) (*url.URL, error) {
+	req := &runtimeApi.AttachRequest{
+		ContainerId: &id.ID,
+		Stdin:       &stdin,
+	}
+	resp, err := m.runtimeService.Attach(req)
+	if err != nil {
+		return nil, err
+	}
+	return url.Parse(resp.GetUrl())
+}
+
+// RunInContainer synchronously executes the command in the container, and returns the output.
+func (m *kubeGenericRuntimeManager) RunInContainer(id kubecontainer.ContainerID, cmd []string) ([]byte, error) {
+	stdout, stderr, err := m.runtimeService.ExecSync(id.ID, cmd, 0)
+	// NOTE(timstclair): This does not correctly interleave stdout & stderr, but should be sufficient
+	// for logging purposes. A combined output option will need to be added to the ExecSyncRequest
+	// if more precise output ordering is ever required.
+	return append(stdout, stderr...), err
+}
+
 // Runs the command in the container of the specified pod using nsenter.
 // Attaches the processes stdin, stdout, and stderr. Optionally uses a
 // tty.
-// TODO: handle terminal resizing, refer https://github.com/kubernetes/kubernetes/issues/29579
+// TODO: Remove this method once the indirect streaming path is fully functional.
 func (m *kubeGenericRuntimeManager) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
 	// Use `docker exec` directly for in-process docker integration for
 	// now to unblock other tests.
-	// TODO: remove this hack after exec is defined in CRI.
 	if ds, ok := m.runtimeService.(dockershim.DockerLegacyService); ok {
 		return ds.LegacyExec(containerID, cmd, stdin, stdout, stderr, tty, resize)
 	}
