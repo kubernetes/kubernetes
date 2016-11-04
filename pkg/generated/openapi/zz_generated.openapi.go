@@ -1989,12 +1989,18 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					},
 					"conntrackTCPEstablishedTimeout": {
 						SchemaProps: spec.SchemaProps{
-							Description: "conntrackTCPEstablishedTimeout is how long an idle TCP connection will be kept open (e.g. '250ms', '2s').  Must be greater than 0.",
+							Description: "conntrackTCPEstablishedTimeout is how long an idle TCP connection will be kept open (e.g. '2s').  Must be greater than 0.",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.Duration"),
+						},
+					},
+					"conntrackTCPCloseWaitTimeout": {
+						SchemaProps: spec.SchemaProps{
+							Description: "conntrackTCPCloseWaitTimeout is how long an idle conntrack entry in CLOSE_WAIT state will remain in the conntrack table. (e.g. '60s'). Must be greater than 0 to set.",
 							Ref:         spec.MustCreateRef("#/definitions/unversioned.Duration"),
 						},
 					},
 				},
-				Required: []string{"TypeMeta", "bindAddress", "clusterCIDR", "healthzBindAddress", "healthzPort", "hostnameOverride", "iptablesMasqueradeBit", "iptablesSyncPeriodSeconds", "kubeconfigPath", "masqueradeAll", "master", "oomScoreAdj", "mode", "portRange", "resourceContainer", "udpTimeoutMilliseconds", "conntrackMax", "conntrackMaxPerCore", "conntrackMin", "conntrackTCPEstablishedTimeout"},
+				Required: []string{"TypeMeta", "bindAddress", "clusterCIDR", "healthzBindAddress", "healthzPort", "hostnameOverride", "iptablesMasqueradeBit", "iptablesSyncPeriodSeconds", "kubeconfigPath", "masqueradeAll", "master", "oomScoreAdj", "mode", "portRange", "resourceContainer", "udpTimeoutMilliseconds", "conntrackMax", "conntrackMaxPerCore", "conntrackMin", "conntrackTCPEstablishedTimeout", "conntrackTCPCloseWaitTimeout"},
 			},
 		},
 		Dependencies: []string{
@@ -13717,12 +13723,18 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					},
 					"conntrackTCPEstablishedTimeout": {
 						SchemaProps: spec.SchemaProps{
-							Description: "conntrackTCPEstablishedTimeout is how long an idle TCP connection will be kept open (e.g. '250ms', '2s').  Must be greater than 0.",
+							Description: "conntrackTCPEstablishedTimeout is how long an idle TCP connection will be kept open (e.g. '2s').  Must be greater than 0.",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.Duration"),
+						},
+					},
+					"conntrackTCPCloseWaitTimeout": {
+						SchemaProps: spec.SchemaProps{
+							Description: "conntrackTCPCloseWaitTimeout is how long an idle conntrack entry in CLOSE_WAIT state will remain in the conntrack table. (e.g. '60s'). Must be greater than 0 to set.",
 							Ref:         spec.MustCreateRef("#/definitions/unversioned.Duration"),
 						},
 					},
 				},
-				Required: []string{"TypeMeta", "bindAddress", "clusterCIDR", "healthzBindAddress", "healthzPort", "hostnameOverride", "iptablesMasqueradeBit", "iptablesSyncPeriodSeconds", "kubeconfigPath", "masqueradeAll", "master", "oomScoreAdj", "mode", "portRange", "resourceContainer", "udpTimeoutMilliseconds", "conntrackMax", "conntrackMaxPerCore", "conntrackMin", "conntrackTCPEstablishedTimeout"},
+				Required: []string{"TypeMeta", "bindAddress", "clusterCIDR", "healthzBindAddress", "healthzPort", "hostnameOverride", "iptablesMasqueradeBit", "iptablesSyncPeriodSeconds", "kubeconfigPath", "masqueradeAll", "master", "oomScoreAdj", "mode", "portRange", "resourceContainer", "udpTimeoutMilliseconds", "conntrackMax", "conntrackMaxPerCore", "conntrackMin", "conntrackTCPEstablishedTimeout", "conntrackTCPCloseWaitTimeout"},
 			},
 		},
 		Dependencies: []string{
