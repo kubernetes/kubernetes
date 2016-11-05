@@ -34,9 +34,10 @@ import (
 )
 
 func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
+
 	tokenCmd := &cobra.Command{
 		Use:   "token",
-		Short: "Manage bootstrap tokens",
+		Short: "Manage bootstrap tokens.",
 	}
 
 	var tokenDuration time.Duration
