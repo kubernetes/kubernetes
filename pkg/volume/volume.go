@@ -170,7 +170,7 @@ type Attacher interface {
 // Detacher can detach a volume from a node.
 type Detacher interface {
 	// Detach the given device from the node with the given Name.
-	Detach(deviceName string, nodeName types.NodeName) error
+	Detach(spec *Spec, deviceName string, nodeName types.NodeName) error
 
 	// WaitForDetach blocks until the device is detached from this
 	// node. If the device does not detach within the given timeout

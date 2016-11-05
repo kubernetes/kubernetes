@@ -33,11 +33,10 @@ import (
 
 // Abstract interface to disk operations.
 type diskManager interface {
-	MakeGlobalPDName(disk rbd) string
 	// Attaches the disk to the kubelet's host machine.
-	AttachDisk(disk rbdMounter) error
+	AttachDisk(disk rbdMounter) (string, error)
 	// Detaches the disk from the kubelet's host machine.
-	DetachDisk(disk rbdUnmounter, mntPath string) error
+	DetachDisk(plugin *rbdPlugin, device string) error
 	// Creates a rbd image
 	CreateImage(provisioner *rbdVolumeProvisioner) (r *api.RBDVolumeSource, volumeSizeGB int, err error)
 	// Deletes a rbd image
@@ -46,7 +45,6 @@ type diskManager interface {
 
 // utility to mount a disk based filesystem
 func diskSetUp(manager diskManager, b rbdMounter, volPath string, mounter mount.Interface, fsGroup *int64) error {
-	globalPDPath := manager.MakeGlobalPDName(*b.rbd)
 	// TODO: handle failed mounts here.
 	notMnt, err := mounter.IsLikelyNotMountPoint(volPath)
 
@@ -57,18 +55,16 @@ func diskSetUp(manager diskManager, b rbdMounter, volPath string, mounter mount.
 	if !notMnt {
 		return nil
 	}
-	if err := manager.AttachDisk(b); err != nil {
-		glog.Errorf("failed to attach disk")
-		return err
-	}
 
 	if err := os.MkdirAll(volPath, 0750); err != nil {
 		glog.Errorf("failed to mkdir:%s", volPath)
 		return err
 	}
+
+	globalPDPath := makePDNameInternal(b.plugin.host, b.Pool, b.Image)
 	// Perform a bind mount to the full path to allow duplicate mounts of the same disk.
 	options := []string{"bind"}
-	if (&b).GetAttributes().ReadOnly {
+	if b.ReadOnly {
 		options = append(options, "ro")
 	}
 	err = mounter.Mount(globalPDPath, volPath, "", options)
@@ -88,32 +84,19 @@ func diskSetUp(manager diskManager, b rbdMounter, volPath string, mounter mount.
 func diskTearDown(manager diskManager, c rbdUnmounter, volPath string, mounter mount.Interface) error {
 	notMnt, err := mounter.IsLikelyNotMountPoint(volPath)
 	if err != nil {
-		glog.Errorf("cannot validate mountpoint %s", volPath)
+		glog.V(2).Info("Error checking if mountpoint ", volPath, ": ", err)
 		return err
 	}
 	if notMnt {
+		glog.V(2).Info("Not mountpoint, deleting")
 		return os.Remove(volPath)
 	}
 
-	refs, err := mount.GetMountRefs(mounter, volPath)
-	if err != nil {
-		glog.Errorf("failed to get reference count %s", volPath)
-		return err
-	}
+	// Unmount the bind-mount inside this pod
 	if err := mounter.Unmount(volPath); err != nil {
-		glog.Errorf("failed to umount %s", volPath)
+		glog.V(2).Info("Error unmounting ", volPath, ": ", err)
 		return err
 	}
-	// If len(refs) is 1, then all bind mounts have been removed, and the
-	// remaining reference is the global mount. It is safe to detach.
-	if len(refs) == 1 {
-		mntPath := refs[0]
-		if err := manager.DetachDisk(c, mntPath); err != nil {
-			glog.Errorf("failed to detach disk from %s", mntPath)
-			return err
-		}
-	}
-
 	notMnt, mntErr := mounter.IsLikelyNotMountPoint(volPath)
 	if mntErr != nil {
 		glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
@@ -121,9 +104,9 @@ func diskTearDown(manager diskManager, c rbdUnmounter, volPath string, mounter m
 	}
 	if notMnt {
 		if err := os.Remove(volPath); err != nil {
+			glog.V(2).Info("Error removing mountpoint ", volPath, ": ", err)
 			return err
 		}
 	}
 	return nil
-
 }
