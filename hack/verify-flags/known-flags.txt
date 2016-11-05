@@ -87,6 +87,7 @@ configure-cloud-routes
 conntrack-max
 conntrack-max-per-core
 conntrack-min
+conntrack-tcp-timeout-close-wait
 conntrack-tcp-timeout-established
 consumer-port
 consumer-service-name

@@ -20,28 +20,18 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
-	v1alpha1apps "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/apps/v1alpha1"
-	fakev1alpha1apps "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/apps/v1alpha1/fake"
-	v1beta1authentication "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/authentication/v1beta1"
-	fakev1beta1authentication "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/authentication/v1beta1/fake"
 	v1beta1authorization "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/authorization/v1beta1"
 	fakev1beta1authorization "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/authorization/v1beta1/fake"
 	v1autoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/autoscaling/v1"
 	fakev1autoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/autoscaling/v1/fake"
 	v1batch "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/batch/v1"
 	fakev1batch "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/batch/v1/fake"
-	v1alpha1certificates "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/certificates/v1alpha1"
-	fakev1alpha1certificates "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/certificates/v1alpha1/fake"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/core/v1"
 	fakev1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/core/v1/fake"
 	v1beta1extensions "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/extensions/v1beta1"
 	fakev1beta1extensions "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/extensions/v1beta1/fake"
 	v1alpha1policy "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/policy/v1alpha1"
 	fakev1alpha1policy "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/policy/v1alpha1/fake"
-	v1alpha1rbac "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/rbac/v1alpha1"
-	fakev1alpha1rbac "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/rbac/v1alpha1/fake"
-	v1beta1storage "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/storage/v1beta1"
-	fakev1beta1storage "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/storage/v1beta1/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	fakediscovery "k8s.io/kubernetes/pkg/client/typed/discovery/fake"
@@ -87,16 +77,6 @@ func (c *Clientset) Core() v1core.CoreInterface {
 	return &fakev1core.FakeCore{Fake: &c.Fake}
 }
 
-// Apps retrieves the AppsClient
-func (c *Clientset) Apps() v1alpha1apps.AppsInterface {
-	return &fakev1alpha1apps.FakeApps{Fake: &c.Fake}
-}
-
-// Authentication retrieves the AuthenticationClient
-func (c *Clientset) Authentication() v1beta1authentication.AuthenticationInterface {
-	return &fakev1beta1authentication.FakeAuthentication{Fake: &c.Fake}
-}
-
 // Authorization retrieves the AuthorizationClient
 func (c *Clientset) Authorization() v1beta1authorization.AuthorizationInterface {
 	return &fakev1beta1authorization.FakeAuthorization{Fake: &c.Fake}
@@ -112,11 +92,6 @@ func (c *Clientset) Batch() v1batch.BatchInterface {
 	return &fakev1batch.FakeBatch{Fake: &c.Fake}
 }
 
-// Certificates retrieves the CertificatesClient
-func (c *Clientset) Certificates() v1alpha1certificates.CertificatesInterface {
-	return &fakev1alpha1certificates.FakeCertificates{Fake: &c.Fake}
-}
-
 // Extensions retrieves the ExtensionsClient
 func (c *Clientset) Extensions() v1beta1extensions.ExtensionsInterface {
 	return &fakev1beta1extensions.FakeExtensions{Fake: &c.Fake}
@@ -125,14 +100,4 @@ func (c *Clientset) Extensions() v1beta1extensions.ExtensionsInterface {
 // Policy retrieves the PolicyClient
 func (c *Clientset) Policy() v1alpha1policy.PolicyInterface {
 	return &fakev1alpha1policy.FakePolicy{Fake: &c.Fake}
-}
-
-// Rbac retrieves the RbacClient
-func (c *Clientset) Rbac() v1alpha1rbac.RbacInterface {
-	return &fakev1alpha1rbac.FakeRbac{Fake: &c.Fake}
-}
-
-// Storage retrieves the StorageClient
-func (c *Clientset) Storage() v1beta1storage.StorageInterface {
-	return &fakev1beta1storage.FakeStorage{Fake: &c.Fake}
 }
