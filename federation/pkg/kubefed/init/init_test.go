@@ -76,6 +76,7 @@ func TestInitFederation(t *testing.T) {
 		dnsZoneName        string
 		lbIP               string
 		image              string
+		etcdPVCapacity     string
 		expectedErr        string
 		dnsProvider        string
 	}{
@@ -86,6 +87,7 @@ func TestInitFederation(t *testing.T) {
 			dnsZoneName:        "example.test.",
 			lbIP:               "10.20.30.40",
 			image:              "example.test/foo:bar",
+			etcdPVCapacity:     "5Gi",
 			expectedErr:        "",
 			dnsProvider:        "test-dns-provider",
 		},
@@ -96,6 +98,7 @@ func TestInitFederation(t *testing.T) {
 			dnsZoneName:        "example.test.",
 			lbIP:               "10.20.30.40",
 			image:              "example.test/foo:bar",
+			etcdPVCapacity:     "", //test for default value of pvc-size
 			expectedErr:        "",
 			dnsProvider:        "", //test for default value of dns provider
 		},
@@ -111,7 +114,7 @@ func TestInitFederation(t *testing.T) {
 		} else {
 			dnsProvider = "google-clouddns" //default value of dns-provider
 		}
-		hostFactory, err := fakeInitHostFactory(tc.federation, util.DefaultFederationSystemNamespace, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider)
+		hostFactory, err := fakeInitHostFactory(tc.federation, util.DefaultFederationSystemNamespace, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.etcdPVCapacity)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -129,6 +132,9 @@ func TestInitFederation(t *testing.T) {
 		cmd.Flags().Set("image", tc.image)
 		if "" != tc.dnsProvider {
 			cmd.Flags().Set("dns-provider", tc.dnsProvider)
+		}
+		if "" != tc.etcdPVCapacity {
+			cmd.Flags().Set("etcd-pv-capacity", tc.etcdPVCapacity)
 		}
 		cmd.Run(cmd, []string{tc.federation})
 
@@ -392,12 +398,20 @@ func TestCertsHTTPS(t *testing.T) {
 	}
 }
 
-func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, dnsProvider string) (cmdutil.Factory, error) {
+func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, dnsProvider, etcdPVCapacity string) (cmdutil.Factory, error) {
 	svcName := federationName + "-apiserver"
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
 	cmKubeconfigSecretName := federationName + "-controller-manager-kubeconfig"
-	capacity, err := resource.ParseQuantity("10Gi")
+	pvCap := ""
+
+	if "" != etcdPVCapacity {
+		pvCap = etcdPVCapacity
+	} else {
+		pvCap = "10Gi" //test for default value
+	}
+
+	capacity, err := resource.ParseQuantity(pvCap)
 	if err != nil {
 		return nil, err
 	}
