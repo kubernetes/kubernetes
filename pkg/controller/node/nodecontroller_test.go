@@ -1230,7 +1230,7 @@ func TestCloudProviderNoRateLimit(t *testing.T) {
 			},
 		},
 		Clientset:      fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0"), *newPod("pod1", "node0")}}),
-		deleteWaitChan: make(chan struct{}),
+		DeleteWaitChan: make(chan struct{}),
 	}
 	nodeController, _ := NewNodeControllerFromClient(nil, fnh, 10*time.Minute,
 		testRateLimiterQPS, testRateLimiterQPS, testLargeClusterThreshold, testUnhealtyThreshold,
@@ -1246,7 +1246,7 @@ func TestCloudProviderNoRateLimit(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	select {
-	case <-fnh.deleteWaitChan:
+	case <-fnh.DeleteWaitChan:
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Errorf("Timed out waiting %v for node to be deleted", wait.ForeverTestTimeout)
 	}

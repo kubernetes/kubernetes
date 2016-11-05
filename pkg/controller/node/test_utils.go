@@ -55,7 +55,7 @@ type FakeNodeHandler struct {
 
 	// Synchronization
 	lock           sync.Mutex
-	deleteWaitChan chan struct{}
+	DeleteWaitChan chan struct{}
 }
 
 type FakeLegacyHandler struct {
@@ -155,8 +155,8 @@ func (m *FakeNodeHandler) Delete(id string, opt *api.DeleteOptions) error {
 	m.lock.Lock()
 	defer func() {
 		m.RequestCount++
-		if m.deleteWaitChan != nil {
-			m.deleteWaitChan <- struct{}{}
+		if m.DeleteWaitChan != nil {
+			m.DeleteWaitChan <- struct{}{}
 		}
 		m.lock.Unlock()
 	}()
