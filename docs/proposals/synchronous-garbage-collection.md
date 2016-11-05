@@ -98,7 +98,12 @@ The conversion rules are described in the following table:
 
 ## API Server
 
-`Delete()` function checks `DeleteOptions.PropagationPolicy`. If the policy is `DeletePropagationForeground`, the API server will update the object instead of deleting it, add the "DeletingDependents" finalizer, remove the "OrphanDependents" finalizer if it's present, and set the `ObjectMeta.DeletionTimestamp`.
+`Delete()` function checks `DeleteOptions.PropagationPolicy`.
+
+* If the policy is `DeletePropagationForeground`, the API server will update the object instead of deleting it, add the "DeletingDependents" finalizer, remove the "OrphanDependents" finalizer if it's present, and set the `ObjectMeta.DeletionTimestamp`
+* If the policy is `DeletePropagationBackground`, the API server deletes the object from the key-value store
+* If the policy is `DeletePropagationOrphan`, the API server will add the "OrphanDependents" finalizer, remove the "DeletingDependents" finalizer if it's present, and set the `ObjectMeta.DeletionTimestamp`
+* If the policy is `DeletePropagationDefault`, then the behavior of the API server depends on the existing finalizers and the default policy of the resource.
 
 When validating the ownerReference, API server needs to query the `Authorizer` to check if the user has "delete" permission of the owner object. It returns 422 if the user does not have the permissions but intends to set `OwnerReference.BlockOwnerDeletion` to true.
 
