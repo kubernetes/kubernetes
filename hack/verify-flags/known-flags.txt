@@ -302,6 +302,7 @@ kube-master
 kube-master
 kube-master-url
 kube-reserved
+kubeadm-path
 kubecfg-file
 kubectl-path
 kubelet-address

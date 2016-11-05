@@ -193,6 +193,7 @@ test-e2e-node: ginkgo generated_files
 #   make test-cmd
 .PHONY: test-cmd
 test-cmd: generated_files
+	hack/make-rules/test-kubeadm-cmd.sh
 	hack/make-rules/test-cmd.sh
 
 # Remove all build artifacts.
