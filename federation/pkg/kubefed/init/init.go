@@ -118,6 +118,7 @@ func NewCmdInit(cmdOut io.Writer, config util.AdminConfig) *cobra.Command {
 	util.AddSubcommandFlags(cmd)
 	cmd.Flags().String("dns-zone-name", "", "DNS suffix for this federation. Federated Service DNS names are published with this suffix.")
 	cmd.Flags().String("image", defaultImage, "Image to use for federation API server and controller manager binaries.")
+	cmd.Flags().String("etcd-pv-capacity", "10Gi", "Size of persistent volume claim to be used for etcd.")
 	return cmd
 }
 
@@ -138,6 +139,7 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	}
 	dnsZoneName := cmdutil.GetFlagString(cmd, "dns-zone-name")
 	image := cmdutil.GetFlagString(cmd, "image")
+	etcdPVCapacity := cmdutil.GetFlagString(cmd, "etcd-pv-capacity")
 
 	hostFactory := config.HostFactory(initFlags.Host, initFlags.Kubeconfig)
 	hostClientset, err := hostFactory.ClientSet()
@@ -186,7 +188,7 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	// 5. Create a persistent volume and a claim to store the federation
 	// API server's state. This is where federation API server's etcd
 	// stores its data.
-	pvc, err := createPVC(hostClientset, initFlags.FederationSystemNamespace, svc.Name)
+	pvc, err := createPVC(hostClientset, initFlags.FederationSystemNamespace, svc.Name, etcdPVCapacity)
 	if err != nil {
 		return err
 	}
@@ -351,8 +353,9 @@ func createControllerManagerKubeconfigSecret(clientset *client.Clientset, namesp
 	return util.CreateKubeconfigSecret(clientset, config, namespace, kubeconfigName, false)
 }
 
-func createPVC(clientset *client.Clientset, namespace, svcName string) (*api.PersistentVolumeClaim, error) {
-	capacity, err := resource.ParseQuantity("10Gi")
+func createPVC(clientset *client.Clientset, namespace, svcName, etcdPVCapacity string) (*api.PersistentVolumeClaim, error) {
+
+	capacity, err := resource.ParseQuantity(etcdPVCapacity)
 	if err != nil {
 		return nil, err
 	}
