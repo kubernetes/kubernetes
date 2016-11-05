@@ -9039,12 +9039,18 @@ go_library(
         "k8s.io/client-go/pkg/apis/componentconfig/doc.go",
         "k8s.io/client-go/pkg/apis/componentconfig/helpers.go",
         "k8s.io/client-go/pkg/apis/componentconfig/register.go",
-        "k8s.io/client-go/pkg/apis/componentconfig/types.generated.go",
         "k8s.io/client-go/pkg/apis/componentconfig/types.go",
         "k8s.io/client-go/pkg/apis/componentconfig/zz_generated.deepcopy.go",
     ],
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/ugorji/go/codec"],
+    deps = [
+        "//vendor:github.com/ugorji/go/codec",
+        "//vendor:k8s.io/client-go/pkg/api/unversioned",
+        "//vendor:k8s.io/client-go/pkg/conversion",
+        "//vendor:k8s.io/client-go/pkg/runtime",
+        "//vendor:k8s.io/client-go/pkg/util/config",
+        "//vendor:k8s.io/client-go/pkg/util/net",
+    ],
 )
 
 go_library(

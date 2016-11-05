@@ -75,6 +75,7 @@ func DeepCopy_componentconfig_KubeControllerManagerConfiguration(in interface{},
 		out.TypeMeta = in.TypeMeta
 		out.Port = in.Port
 		out.Address = in.Address
+		out.UseServiceAccountCredentials = in.UseServiceAccountCredentials
 		out.CloudProvider = in.CloudProvider
 		out.CloudConfigFile = in.CloudConfigFile
 		out.ConcurrentEndpointSyncs = in.ConcurrentEndpointSyncs
@@ -153,6 +154,7 @@ func DeepCopy_componentconfig_KubeProxyConfiguration(in interface{}, out interfa
 			out.IPTablesMasqueradeBit = nil
 		}
 		out.IPTablesSyncPeriod = in.IPTablesSyncPeriod
+		out.IPTablesMinSyncPeriod = in.IPTablesMinSyncPeriod
 		out.KubeconfigPath = in.KubeconfigPath
 		out.MasqueradeAll = in.MasqueradeAll
 		out.Master = in.Master

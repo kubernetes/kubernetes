@@ -21,6 +21,7 @@ go_library(
         "//pkg/kubelet/api:go_default_library",
         "//pkg/kubelet/api/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/dockershim:go_default_library",
+        "//pkg/util/exec:go_default_library",
         "//pkg/util/interrupt:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:golang.org/x/net/context",

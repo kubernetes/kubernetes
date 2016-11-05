@@ -25,10 +25,11 @@ import (
 
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 // NewCmdConfig creates a command object for the "config" action, and adds all child commands to it.
-func NewCmdConfig(pathOptions *clientcmd.PathOptions, out io.Writer) *cobra.Command {
+func NewCmdConfig(pathOptions *clientcmd.PathOptions, out, errOut io.Writer) *cobra.Command {
 	if len(pathOptions.ExplicitFileFlag) == 0 {
 		pathOptions.ExplicitFileFlag = clientcmd.RecommendedConfigPathFlag
 	}
@@ -44,9 +45,7 @@ func NewCmdConfig(pathOptions *clientcmd.PathOptions, out io.Writer) *cobra.Comm
 			1. If the --` + pathOptions.ExplicitFileFlag + ` flag is set, then only that file is loaded.  The flag may only be set once and no merging takes place.
 			2. If $` + pathOptions.EnvVar + ` environment variable is set, then it is used a list of paths (normal path delimitting rules for your system).  These paths are merged.  When a value is modified, it is modified in the file that defines the stanza.  When a value is created, it is created in the first file that exists.  If no files in the chain exist, then it creates the last file in the list.
 			3. Otherwise, ` + path.Join("${HOME}", pathOptions.GlobalFileSubpath) + ` is used and no merging takes place.`),
-		Run: func(cmd *cobra.Command, args []string) {
-			cmd.Help()
-		},
+		Run: cmdutil.DefaultSubCommandRun(errOut),
 	}
 
 	// file paths are common to all sub commands

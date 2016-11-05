@@ -110,6 +110,14 @@ type kubeGenericRuntimeManager struct {
 	versionCache *cache.ObjectCache
 }
 
+type KubeGenericRuntime interface {
+	kubecontainer.Runtime
+	kubecontainer.IndirectStreamingRuntime
+	kubecontainer.ContainerCommandRunner
+	// TODO(timstclair): Remove this once the indirect path is fully functional.
+	kubecontainer.DirectStreamingRuntime
+}
+
 // NewKubeGenericRuntimeManager creates a new kubeGenericRuntimeManager
 func NewKubeGenericRuntimeManager(
 	recorder record.EventRecorder,
@@ -128,7 +136,7 @@ func NewKubeGenericRuntimeManager(
 	cpuCFSQuota bool,
 	runtimeService internalApi.RuntimeService,
 	imageService internalApi.ImageManagerService,
-) (kubecontainer.Runtime, error) {
+) (KubeGenericRuntime, error) {
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:            recorder,
 		cpuCFSQuota:         cpuCFSQuota,
@@ -840,7 +848,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 	// Anyhow, we only promised "best-effort" restart count reporting, we can just ignore
 	// these limitations now.
 	// TODO: move this comment to SyncPod.
-	podSandboxIDs, err := m.getSandboxIDByPodUID(string(uid), nil)
+	podSandboxIDs, err := m.getSandboxIDByPodUID(uid, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -938,6 +946,7 @@ func (m *kubeGenericRuntimeManager) GetPodContainerID(pod *kubecontainer.Pod) (k
 }
 
 // Forward the specified port from the specified pod to the stream.
+// TODO: Remove this method once the indirect streaming path is fully functional.
 func (m *kubeGenericRuntimeManager) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
 	formattedPod := kubecontainer.FormatPod(pod)
 	if len(pod.Sandboxes) == 0 {
@@ -947,7 +956,6 @@ func (m *kubeGenericRuntimeManager) PortForward(pod *kubecontainer.Pod, port uin
 
 	// Use docker portforward directly for in-process docker integration
 	// now to unblock other tests.
-	// TODO: remove this hack after portforward is defined in CRI.
 	if ds, ok := m.runtimeService.(dockershim.DockerLegacyService); ok {
 		return ds.LegacyPortForward(pod.Sandboxes[0].ID.ID, port, stream)
 	}

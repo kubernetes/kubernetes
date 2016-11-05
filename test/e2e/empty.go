@@ -32,7 +32,7 @@ var _ = framework.KubeDescribe("Empty [Feature:Empty]", func() {
 		ns := f.Namespace.Name
 
 		// TODO: respect --allow-notready-nodes flag in those functions.
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c))
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.NodeSchedulableTimeout))
 		framework.WaitForAllNodesHealthy(c, time.Minute)
 
 		err := framework.CheckTestingNSDeletedExcept(c, ns)

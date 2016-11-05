@@ -66,22 +66,11 @@ const (
 // GCE Quota requirements: 3 pds, one per pet manifest declared above.
 // GCE Api requirements: nodes and master need storage r/w permissions.
 var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
-	options := framework.FrameworkOptions{
-		GroupVersion: &unversioned.GroupVersion{Group: apps.GroupName, Version: "v1beta1"},
-	}
-	f := framework.NewFramework("petset", options, nil)
+	f := framework.NewDefaultFramework("statefulset")
 	var ns string
 	var c clientset.Interface
 
 	BeforeEach(func() {
-		// StatefulSet is in alpha, so it's disabled on some platforms. We skip this
-		// test if a resource get fails on non-GCE platforms.
-		// In theory, tests that restart pets should pass on any platform with a
-		// dynamic volume provisioner.
-		if !framework.ProviderIs("gce") {
-			framework.SkipIfMissingResource(f.ClientPool, unversioned.GroupVersionResource{Group: apps.GroupName, Version: "v1beta1", Resource: "statefulsets"}, f.Namespace.Name)
-		}
-
 		c = f.ClientSet
 		ns = f.Namespace.Name
 	})
@@ -114,6 +103,8 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 			petMounts := []api.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
 			podMounts := []api.VolumeMount{{Name: "home", MountPath: "/home"}}
 			ps := newStatefulSet(psName, ns, headlessSvcName, 3, petMounts, podMounts, labels)
+			setInitializedAnnotation(ps, "false")
+
 			_, err := c.Apps().StatefulSets(ns).Create(ps)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -150,6 +141,7 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 			petMounts := []api.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
 			podMounts := []api.VolumeMount{{Name: "home", MountPath: "/home"}}
 			ps := newStatefulSet(psName, ns, headlessSvcName, 2, petMounts, podMounts, labels)
+			setInitializedAnnotation(ps, "false")
 			_, err := c.Apps().StatefulSets(ns).Create(ps)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -914,10 +906,8 @@ func newStatefulSet(name, ns, governingSvcName string, replicas int32, petMounts
 			Replicas: replicas,
 			Template: api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
-					Labels: labels,
-					Annotations: map[string]string{
-						"pod.alpha.kubernetes.io/initialized": "false",
-					},
+					Labels:      labels,
+					Annotations: map[string]string{},
 				},
 				Spec: api.PodSpec{
 					Containers: []api.Container{
@@ -934,4 +924,8 @@ func newStatefulSet(name, ns, governingSvcName string, replicas int32, petMounts
 			ServiceName:          governingSvcName,
 		},
 	}
+}
+
+func setInitializedAnnotation(ss *apps.StatefulSet, value string) {
+	ss.Spec.Template.ObjectMeta.Annotations["pod.alpha.kubernetes.io/initialized"] = value
 }

@@ -78,6 +78,7 @@ go_library(
         "persistent_volumes.go",
         "petset.go",
         "pod_gc.go",
+        "pods.go",
         "portforward.go",
         "pre_stop.go",
         "proxy.go",

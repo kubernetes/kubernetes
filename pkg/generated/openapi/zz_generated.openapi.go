@@ -1471,6 +1471,13 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "",
 						},
 					},
+					"useServiceAccountCredentials": {
+						SchemaProps: spec.SchemaProps{
+							Description: "useServiceAccountCredentials indicates whether controllers should be run with individual service account credentials.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 					"cloudProvider": {
 						SchemaProps: spec.SchemaProps{
 							Description: "cloudProvider is the provider for cloud services.",
@@ -1848,7 +1855,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 						},
 					},
 				},
-				Required: []string{"TypeMeta", "port", "address", "cloudProvider", "cloudConfigFile", "concurrentEndpointSyncs", "concurrentRSSyncs", "concurrentRCSyncs", "concurrentServiceSyncs", "concurrentResourceQuotaSyncs", "concurrentDeploymentSyncs", "concurrentDaemonSetSyncs", "concurrentJobSyncs", "concurrentNamespaceSyncs", "concurrentSATokenSyncs", "lookupCacheSizeForRC", "lookupCacheSizeForRS", "lookupCacheSizeForDaemonSet", "serviceSyncPeriod", "nodeSyncPeriod", "routeReconciliationPeriod", "resourceQuotaSyncPeriod", "namespaceSyncPeriod", "pvClaimBinderSyncPeriod", "minResyncPeriod", "terminatedPodGCThreshold", "horizontalPodAutoscalerSyncPeriod", "deploymentControllerSyncPeriod", "podEvictionTimeout", "deletingPodsQps", "deletingPodsBurst", "nodeMonitorGracePeriod", "registerRetryCount", "nodeStartupGracePeriod", "nodeMonitorPeriod", "serviceAccountKeyFile", "clusterSigningCertFile", "clusterSigningKeyFile", "approveAllKubeletCSRsForGroup", "enableProfiling", "clusterName", "clusterCIDR", "serviceCIDR", "nodeCIDRMaskSize", "allocateNodeCIDRs", "configureCloudRoutes", "rootCAFile", "contentType", "kubeAPIQPS", "kubeAPIBurst", "leaderElection", "volumeConfiguration", "controllerStartInterval", "enableGarbageCollector", "concurrentGCSyncs", "nodeEvictionRate", "secondaryNodeEvictionRate", "largeClusterSizeThreshold", "unhealthyZoneThreshold"},
+				Required: []string{"TypeMeta", "port", "address", "useServiceAccountCredentials", "cloudProvider", "cloudConfigFile", "concurrentEndpointSyncs", "concurrentRSSyncs", "concurrentRCSyncs", "concurrentServiceSyncs", "concurrentResourceQuotaSyncs", "concurrentDeploymentSyncs", "concurrentDaemonSetSyncs", "concurrentJobSyncs", "concurrentNamespaceSyncs", "concurrentSATokenSyncs", "lookupCacheSizeForRC", "lookupCacheSizeForRS", "lookupCacheSizeForDaemonSet", "serviceSyncPeriod", "nodeSyncPeriod", "routeReconciliationPeriod", "resourceQuotaSyncPeriod", "namespaceSyncPeriod", "pvClaimBinderSyncPeriod", "minResyncPeriod", "terminatedPodGCThreshold", "horizontalPodAutoscalerSyncPeriod", "deploymentControllerSyncPeriod", "podEvictionTimeout", "deletingPodsQps", "deletingPodsBurst", "nodeMonitorGracePeriod", "registerRetryCount", "nodeStartupGracePeriod", "nodeMonitorPeriod", "serviceAccountKeyFile", "clusterSigningCertFile", "clusterSigningKeyFile", "approveAllKubeletCSRsForGroup", "enableProfiling", "clusterName", "clusterCIDR", "serviceCIDR", "nodeCIDRMaskSize", "allocateNodeCIDRs", "configureCloudRoutes", "rootCAFile", "contentType", "kubeAPIQPS", "kubeAPIBurst", "leaderElection", "volumeConfiguration", "controllerStartInterval", "enableGarbageCollector", "concurrentGCSyncs", "nodeEvictionRate", "secondaryNodeEvictionRate", "largeClusterSizeThreshold", "unhealthyZoneThreshold"},
 			},
 		},
 		Dependencies: []string{
@@ -1908,6 +1915,12 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					"iptablesSyncPeriodSeconds": {
 						SchemaProps: spec.SchemaProps{
 							Description: "iptablesSyncPeriod is the period that iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.Duration"),
+						},
+					},
+					"iptablesMinSyncPeriodSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "iptablesMinSyncPeriod is the minimum period that iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.",
 							Ref:         spec.MustCreateRef("#/definitions/unversioned.Duration"),
 						},
 					},
@@ -2000,7 +2013,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 						},
 					},
 				},
-				Required: []string{"TypeMeta", "bindAddress", "clusterCIDR", "healthzBindAddress", "healthzPort", "hostnameOverride", "iptablesMasqueradeBit", "iptablesSyncPeriodSeconds", "kubeconfigPath", "masqueradeAll", "master", "oomScoreAdj", "mode", "portRange", "resourceContainer", "udpTimeoutMilliseconds", "conntrackMax", "conntrackMaxPerCore", "conntrackMin", "conntrackTCPEstablishedTimeout", "conntrackTCPCloseWaitTimeout"},
+				Required: []string{"TypeMeta", "bindAddress", "clusterCIDR", "healthzBindAddress", "healthzPort", "hostnameOverride", "iptablesMasqueradeBit", "iptablesSyncPeriodSeconds", "iptablesMinSyncPeriodSeconds", "kubeconfigPath", "masqueradeAll", "master", "oomScoreAdj", "mode", "portRange", "resourceContainer", "udpTimeoutMilliseconds", "conntrackMax", "conntrackMaxPerCore", "conntrackMin", "conntrackTCPEstablishedTimeout", "conntrackTCPCloseWaitTimeout"},
 			},
 		},
 		Dependencies: []string{
@@ -13645,6 +13658,12 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Ref:         spec.MustCreateRef("#/definitions/unversioned.Duration"),
 						},
 					},
+					"iptablesMinSyncPeriodSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "iptablesMinSyncPeriod is the minimum period that iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.",
+							Ref:         spec.MustCreateRef("#/definitions/unversioned.Duration"),
+						},
+					},
 					"kubeconfigPath": {
 						SchemaProps: spec.SchemaProps{
 							Description: "kubeconfigPath is the path to the kubeconfig file with authorization information (the master location is set by the master flag).",
@@ -13734,7 +13753,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 						},
 					},
 				},
-				Required: []string{"TypeMeta", "bindAddress", "clusterCIDR", "healthzBindAddress", "healthzPort", "hostnameOverride", "iptablesMasqueradeBit", "iptablesSyncPeriodSeconds", "kubeconfigPath", "masqueradeAll", "master", "oomScoreAdj", "mode", "portRange", "resourceContainer", "udpTimeoutMilliseconds", "conntrackMax", "conntrackMaxPerCore", "conntrackMin", "conntrackTCPEstablishedTimeout", "conntrackTCPCloseWaitTimeout"},
+				Required: []string{"TypeMeta", "bindAddress", "clusterCIDR", "healthzBindAddress", "healthzPort", "hostnameOverride", "iptablesMasqueradeBit", "iptablesSyncPeriodSeconds", "iptablesMinSyncPeriodSeconds", "kubeconfigPath", "masqueradeAll", "master", "oomScoreAdj", "mode", "portRange", "resourceContainer", "udpTimeoutMilliseconds", "conntrackMax", "conntrackMaxPerCore", "conntrackMin", "conntrackTCPEstablishedTimeout", "conntrackTCPCloseWaitTimeout"},
 			},
 		},
 		Dependencies: []string{

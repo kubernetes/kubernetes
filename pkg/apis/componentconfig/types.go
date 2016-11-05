@@ -44,6 +44,9 @@ type KubeProxyConfiguration struct {
 	// iptablesSyncPeriod is the period that iptables rules are refreshed (e.g. '5s', '1m',
 	// '2h22m').  Must be greater than 0.
 	IPTablesSyncPeriod unversioned.Duration `json:"iptablesSyncPeriodSeconds"`
+	// iptablesMinSyncPeriod is the minimum period that iptables rules are refreshed (e.g. '5s', '1m',
+	// '2h22m').  Must be greater than 0.
+	IPTablesMinSyncPeriod unversioned.Duration `json:"iptablesMinSyncPeriodSeconds"`
 	// kubeconfigPath is the path to the kubeconfig file with authorization information (the
 	// master location is set by the master flag).
 	KubeconfigPath string `json:"kubeconfigPath"`
@@ -586,6 +589,9 @@ type KubeControllerManagerConfiguration struct {
 	Port int32 `json:"port"`
 	// address is the IP address to serve on (set to 0.0.0.0 for all interfaces).
 	Address string `json:"address"`
+	// useServiceAccountCredentials indicates whether controllers should be run with
+	// individual service account credentials.
+	UseServiceAccountCredentials bool `json:"useServiceAccountCredentials"`
 	// cloudProvider is the provider for cloud services.
 	CloudProvider string `json:"cloudProvider"`
 	// cloudConfigFile is the path to the cloud provider configuration file.

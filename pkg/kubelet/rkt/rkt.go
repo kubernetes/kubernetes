@@ -181,6 +181,7 @@ type Runtime struct {
 }
 
 var _ kubecontainer.Runtime = &Runtime{}
+var _ kubecontainer.DirectStreamingRuntime = &Runtime{}
 
 // TODO(yifan): This duplicates the podGetter in dockertools.
 type podGetter interface {
@@ -276,7 +277,8 @@ func New(
 		return nil, fmt.Errorf("rkt: cannot get config from rkt api service: %v", err)
 	}
 
-	rkt.runner = lifecycle.NewHandlerRunner(httpClient, rkt, rkt)
+	cmdRunner := kubecontainer.DirectStreamingRunner(rkt)
+	rkt.runner = lifecycle.NewHandlerRunner(httpClient, cmdRunner, rkt)
 
 	rkt.imagePuller = images.NewImageManager(recorder, rkt, imageBackOff, serializeImagePulls, imagePullQPS, imagePullBurst)
 

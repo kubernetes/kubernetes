@@ -34,35 +34,35 @@ type mockVolumes struct {
 
 var _ aws.Volumes = &mockVolumes{}
 
-func (v *mockVolumes) AttachDisk(diskName string, nodeName types.NodeName, readOnly bool) (string, error) {
+func (v *mockVolumes) AttachDisk(diskName aws.KubernetesVolumeID, nodeName types.NodeName, readOnly bool) (string, error) {
 	return "", fmt.Errorf("not implemented")
 }
 
-func (v *mockVolumes) DetachDisk(diskName string, nodeName types.NodeName) (string, error) {
+func (v *mockVolumes) DetachDisk(diskName aws.KubernetesVolumeID, nodeName types.NodeName) (string, error) {
 	return "", fmt.Errorf("not implemented")
 }
 
-func (v *mockVolumes) CreateDisk(volumeOptions *aws.VolumeOptions) (volumeName string, err error) {
+func (v *mockVolumes) CreateDisk(volumeOptions *aws.VolumeOptions) (volumeName aws.KubernetesVolumeID, err error) {
 	return "", fmt.Errorf("not implemented")
 }
 
-func (v *mockVolumes) DeleteDisk(volumeName string) (bool, error) {
+func (v *mockVolumes) DeleteDisk(volumeName aws.KubernetesVolumeID) (bool, error) {
 	return false, fmt.Errorf("not implemented")
 }
 
-func (v *mockVolumes) GetVolumeLabels(volumeName string) (map[string]string, error) {
+func (v *mockVolumes) GetVolumeLabels(volumeName aws.KubernetesVolumeID) (map[string]string, error) {
 	return v.volumeLabels, v.volumeLabelsError
 }
 
-func (c *mockVolumes) GetDiskPath(volumeName string) (string, error) {
+func (c *mockVolumes) GetDiskPath(volumeName aws.KubernetesVolumeID) (string, error) {
 	return "", fmt.Errorf("not implemented")
 }
 
-func (c *mockVolumes) DiskIsAttached(volumeName string, nodeName types.NodeName) (bool, error) {
+func (c *mockVolumes) DiskIsAttached(volumeName aws.KubernetesVolumeID, nodeName types.NodeName) (bool, error) {
 	return false, fmt.Errorf("not implemented")
 }
 
-func (c *mockVolumes) DisksAreAttached(diskNames []string, nodeName types.NodeName) (map[string]bool, error) {
+func (c *mockVolumes) DisksAreAttached(diskNames []aws.KubernetesVolumeID, nodeName types.NodeName) (map[aws.KubernetesVolumeID]bool, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 

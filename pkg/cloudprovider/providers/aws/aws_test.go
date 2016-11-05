@@ -1163,16 +1163,16 @@ func TestGetVolumeLabels(t *testing.T) {
 	awsServices := NewFakeAWSServices()
 	c, err := newAWSCloud(strings.NewReader("[global]"), awsServices)
 	assert.Nil(t, err, "Error building aws cloud: %v", err)
-	volumeId := aws.String("vol-VolumeId")
-	expectedVolumeRequest := &ec2.DescribeVolumesInput{VolumeIds: []*string{volumeId}}
+	volumeId := awsVolumeID("vol-VolumeId")
+	expectedVolumeRequest := &ec2.DescribeVolumesInput{VolumeIds: []*string{volumeId.awsString()}}
 	awsServices.ec2.On("DescribeVolumes", expectedVolumeRequest).Return([]*ec2.Volume{
 		{
-			VolumeId:         volumeId,
+			VolumeId:         volumeId.awsString(),
 			AvailabilityZone: aws.String("us-east-1a"),
 		},
 	})
 
-	labels, err := c.GetVolumeLabels(*volumeId)
+	labels, err := c.GetVolumeLabels(KubernetesVolumeID("aws:///" + string(volumeId)))
 
 	assert.Nil(t, err, "Error creating Volume %v", err)
 	assert.Equal(t, map[string]string{

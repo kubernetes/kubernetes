@@ -34,6 +34,7 @@ go_library(
         "//pkg/kubelet/server/portforward:go_default_library",
         "//pkg/kubelet/server/remotecommand:go_default_library",
         "//pkg/kubelet/server/stats:go_default_library",
+        "//pkg/kubelet/server/streaming:go_default_library",
         "//pkg/runtime:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util/configz:go_default_library",
@@ -65,6 +66,7 @@ go_test(
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",
+        "//pkg/kubelet/server/remotecommand:go_default_library",
         "//pkg/kubelet/server/stats:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/types:go_default_library",
@@ -75,5 +77,7 @@ go_test(
         "//pkg/volume:go_default_library",
         "//vendor:github.com/google/cadvisor/info/v1",
         "//vendor:github.com/google/cadvisor/info/v2",
+        "//vendor:github.com/stretchr/testify/assert",
+        "//vendor:github.com/stretchr/testify/require",
     ],
 )

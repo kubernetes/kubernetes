@@ -14,6 +14,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "deployment_controller.go",
+        "progress.go",
         "recreate.go",
         "rollback.go",
         "rolling.go",
