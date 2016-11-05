@@ -20,6 +20,13 @@ import (
 	"strings"
 
 	policy "k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/client/restclient"
+)
+
+const (
+	PolicyAPIVersion    = "policy/v1beta1"
+	EvictionKind        = "Eviction"
+	EvictionSubresource = "pods/eviction"
 )
 
 // The EvictionExpansion interface allows manually adding extra methods to the ScaleInterface.
@@ -28,16 +35,18 @@ type EvictionExpansion interface {
 }
 
 func (c *evictions) Evict(eviction *policy.Eviction) error {
-	return c.client.Post().
+	return c.client.(*restclient.RESTClient).
+		ManipulateVersionedAPIPath(manipulateURLforEvict).
+		Post().
 		Namespace(eviction.Namespace).
 		Resource("pods").
 		Name(eviction.Name).
 		SubResource("eviction").
 		Body(eviction).
-		DoWithManipulateURLFn(manipulateURLforEvict).
+		Do().
 		Error()
 }
 
 func manipulateURLforEvict(originalURL string) string {
-	return strings.Replace(originalURL, "/apis/policy/v1beta1", "/api/v1", 1)
+	return strings.Replace(originalURL, "/apis/"+PolicyAPIVersion, "/api/v1", 1)
 }

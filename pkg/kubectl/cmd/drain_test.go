@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	"k8s.io/kubernetes/pkg/conversion"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
@@ -47,6 +48,11 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/wait"
+)
+
+const (
+	EvictionMethod = "Eviction"
+	DeleteMethod   = "Delete"
 )
 
 var node *api.Node
@@ -467,9 +473,16 @@ func TestDrain(t *testing.T) {
 	testEviction := false
 	for i := 0; i < 2; i++ {
 		testEviction = !testEviction
+		var currMethod string
+		if testEviction {
+			currMethod = EvictionMethod
+		} else {
+			currMethod = DeleteMethod
+		}
 		for _, test := range tests {
 			new_node := &api.Node{}
 			deleted := false
+			evicted := false
 			f, tf, codec, ns := cmdtesting.NewAPIFactory()
 			tf.Client = &fake.RESTClient{
 				NegotiatedSerializer: ns,
@@ -483,8 +496,8 @@ func TestDrain(t *testing.T) {
 						if testEviction {
 							resourceList.APIResources = []unversioned.APIResource{
 								{
-									Name: "pods/eviction",
-									Kind: "Eviction",
+									Name: internalversion.EvictionSubresource,
+									Kind: internalversion.EvictionKind,
 								},
 							}
 						}
@@ -535,7 +548,7 @@ func TestDrain(t *testing.T) {
 						deleted = true
 						return &http.Response{StatusCode: 204, Header: defaultHeader(), Body: objBody(codec, &test.pods[0])}, nil
 					case m.isFor("POST", "/namespaces/default/pods/bar/eviction"):
-						deleted = true
+						evicted = true
 						return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: policyObjBody(&policy.Eviction{})}, nil
 					default:
 						t.Fatalf("%s: unexpected request: %v %#v\n%#v", test.description, req.Method, req.URL, req)
@@ -546,7 +559,8 @@ func TestDrain(t *testing.T) {
 			tf.ClientConfig = defaultClientConfig()
 
 			buf := bytes.NewBuffer([]byte{})
-			cmd := NewCmdDrain(f, buf)
+			errBuf := bytes.NewBuffer([]byte{})
+			cmd := NewCmdDrain(f, buf, errBuf)
 
 			saw_fatal := false
 			func() {
@@ -563,18 +577,23 @@ func TestDrain(t *testing.T) {
 
 			if test.expectFatal {
 				if !saw_fatal {
-					t.Fatalf("%s: unexpected non-error", test.description)
+					t.Fatalf("%s: unexpected non-error when using %s", test.description, currMethod)
 				}
 			}
 
 			if test.expectDelete {
-				if !deleted {
+				// Test Delete
+				if !testEviction && !deleted {
 					t.Fatalf("%s: pod never deleted", test.description)
+				}
+				// Test Eviction
+				if testEviction && !evicted {
+					t.Fatalf("%s: pod never evicted", test.description)
 				}
 			}
 			if !test.expectDelete {
 				if deleted {
-					t.Fatalf("%s: unexpected delete", test.description)
+					t.Fatalf("%s: unexpected delete when using %s", test.description, currMethod)
 				}
 			}
 		}

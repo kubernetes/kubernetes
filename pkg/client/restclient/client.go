@@ -205,6 +205,16 @@ func createSerializers(config ContentConfig) (*Serializers, error) {
 	return s, nil
 }
 
+func (c *RESTClient) ManipulateVersionedAPIPath(fn func(string) string) *RESTClient {
+	originalPath := c.versionedAPIPath
+	modifiedPath := fn(c.versionedAPIPath)
+	if modifiedPath == originalPath {
+		panic(fmt.Sprintf("ManipulateVersionedAPIPath failed to modify the versioned API path: %v", originalPath))
+	}
+	c.versionedAPIPath = modifiedPath
+	return c
+}
+
 // Verb begins a request with a verb (GET, POST, PUT, DELETE).
 //
 // Example usage of RESTClient's request building interface:
