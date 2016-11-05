@@ -158,22 +158,17 @@ func verifyNsCascadingDeletion(nsClient clientset.NamespaceInterface,
 	deleteAllTestNamespaces(orphanDependents, nsClient.List, nsClient.Delete)
 
 	By(fmt.Sprintf("Verifying namespaces %s in underlying clusters", nsName))
-	fail := false
+	errMessages := []string{}
 	for clusterName, clusterClientset := range clusters {
 		_, err := clusterClientset.Core().Namespaces().Get(nsName)
 		if orphanDependents && errors.IsNotFound(err) {
-			fail = true
-			//			framework.Failf("unexpected NotFound error for namespace %s in cluster %s, expected namespace to exist", nsName, clusterName)
-			By(fmt.Sprintf("unexpected NotFound error for namespace %s in cluster %s, expected namespace to exist", nsName, clusterName))
+			errMessages = append(errMessages, fmt.Sprintf("unexpected NotFound error for namespace %s in cluster %s, expected namespace to exist", nsName, clusterName))
 		} else if !orphanDependents && (err == nil || !errors.IsNotFound(err)) {
-			fail = true
-			By(fmt.Sprintf("expected NotFound error for namespace %s in cluster %s, got error: %v", nsName, clusterName, err))
-		} else {
-			By(fmt.Sprintf("Woohoo!! Succeeded for cluster %s", clusterName))
+			errMessages = append(errMessages, fmt.Sprintf("expected NotFound error for namespace %s in cluster %s, got error: %v", nsName, clusterName, err))
 		}
 	}
-	if fail == true {
-		framework.Failf("Failed")
+	if len(errMessages) != 0 {
+		framework.Failf("%s", strings.Join(errMessages, "; "))
 	}
 }
 
