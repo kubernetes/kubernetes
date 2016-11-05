@@ -47,7 +47,9 @@ const (
 	testPodName           = "test-container-pod"
 	hostTestPodName       = "host-test-container-pod"
 	nodePortServiceName   = "node-port-service"
-	hitEndpointRetryDelay = 1 * time.Second
+	// wait time between poll attempts of a Service vip and/or nodePort.
+	// coupled with testTries to produce a net timeout value.
+	hitEndpointRetryDelay = 2 * time.Second
 	// Number of retries to hit a given set of endpoints. Needs to be high
 	// because we verify iptables statistical rr loadbalancing.
 	testTries = 30
@@ -200,6 +202,8 @@ func (config *NetworkingTestConfig) DialFromContainer(protocol, containerIP, tar
 		if (eps.Equal(expectedEps) || eps.Len() == 0 && expectedEps.Len() == 0) && i+1 >= minTries {
 			return
 		}
+		// TODO: get rid of this delay #36281
+		time.Sleep(hitEndpointRetryDelay)
 	}
 
 	config.diagnoseMissingEndpoints(eps)
@@ -223,7 +227,7 @@ func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targ
 		// busybox timeout doesn't support non-integer values.
 		cmd = fmt.Sprintf("echo 'hostName' | timeout -t 2 nc -w 1 -u %s %d", targetIP, targetPort)
 	} else {
-		cmd = fmt.Sprintf("timeout -t 15 curl -q -s --connect-timeout 1 --max-time 10 http://%s:%d/hostName", targetIP, targetPort)
+		cmd = fmt.Sprintf("timeout -t 15 curl -q -s --connect-timeout 1 http://%s:%d/hostName", targetIP, targetPort)
 	}
 
 	// TODO: This simply tells us that we can reach the endpoints. Check that
@@ -251,6 +255,8 @@ func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targ
 		if (eps.Equal(expectedEps) || eps.Len() == 0 && expectedEps.Len() == 0) && i+1 >= minTries {
 			return
 		}
+		// TODO: get rid of this delay #36281
+		time.Sleep(hitEndpointRetryDelay)
 	}
 
 	config.diagnoseMissingEndpoints(eps)
