@@ -17,7 +17,11 @@ limitations under the License.
 package rest
 
 import (
+	"bufio"
+	"bytes"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -26,9 +30,11 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/errors"
+	utilconfig "k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/pkg/util/httpstream"
-	"k8s.io/kubernetes/pkg/util/net"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/proxy"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 
 	"github.com/golang/glog"
 	"github.com/mxk/go-flowrate/flowrate"
@@ -41,10 +47,13 @@ type UpgradeAwareProxyHandler struct {
 	// Transport provides an optional round tripper to use to proxy. If nil, the default proxy transport is used
 	Transport http.RoundTripper
 	// WrapTransport indicates whether the provided Transport should be wrapped with default proxy transport behavior (URL rewriting, X-Forwarded-* header setting)
-	WrapTransport  bool
-	FlushInterval  time.Duration
-	MaxBytesPerSec int64
-	Responder      ErrorResponder
+	WrapTransport bool
+	// InterceptRedirects determines whether the proxy should sniff backend responses for redirects,
+	// following them as necessary.
+	InterceptRedirects bool
+	FlushInterval      time.Duration
+	MaxBytesPerSec     int64
+	Responder          ErrorResponder
 }
 
 const defaultFlushInterval = 200 * time.Millisecond
@@ -131,32 +140,44 @@ func (h *UpgradeAwareProxyHandler) tryUpgrade(w http.ResponseWriter, req *http.R
 		return false
 	}
 
-	backendConn, err := proxy.DialURL(h.Location, h.Transport)
+	var (
+		backendConn net.Conn
+		rawResponse []byte
+		err         error
+	)
+	if h.InterceptRedirects && utilconfig.DefaultFeatureGate.StreamingProxyRedirects() {
+		backendConn, rawResponse, err = h.connectBackendWithRedirects(req)
+	} else {
+		backendConn, err = h.connectBackend(req.Method, h.Location, req.Header, req.Body)
+	}
 	if err != nil {
 		h.Responder.Error(err)
 		return true
 	}
 	defer backendConn.Close()
 
-	requestHijackedConn, _, err := w.(http.Hijacker).Hijack()
+	// Once the connection is hijacked, the ErrorResponder will no longer work, so
+	// hijacking should be the last step in the upgrade.
+	requestHijacker, ok := w.(http.Hijacker)
+	if !ok {
+		h.Responder.Error(fmt.Errorf("request connection cannot be hijacked: %T", w))
+		return true
+	}
+	requestHijackedConn, _, err := requestHijacker.Hijack()
 	if err != nil {
-		h.Responder.Error(err)
+		h.Responder.Error(fmt.Errorf("error hijacking request connection: %v", err))
 		return true
 	}
 	defer requestHijackedConn.Close()
 
-	newReq, err := http.NewRequest(req.Method, h.Location.String(), req.Body)
-	if err != nil {
-		h.Responder.Error(err)
-		return true
-	}
-	newReq.Header = req.Header
-
-	if err = newReq.Write(backendConn); err != nil {
-		h.Responder.Error(err)
-		return true
+	// Forward raw response bytes back to client.
+	if len(rawResponse) > 0 {
+		if _, err = requestHijackedConn.Write(rawResponse); err != nil {
+			utilruntime.HandleError(fmt.Errorf("Error proxying response from backend to client: %v", err))
+		}
 	}
 
+	// Proxy the connection.
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
 
@@ -192,6 +213,113 @@ func (h *UpgradeAwareProxyHandler) tryUpgrade(w http.ResponseWriter, req *http.R
 	return true
 }
 
+// connectBackend dials the backend at location and forwards a copy of the client request.
+func (h *UpgradeAwareProxyHandler) connectBackend(method string, location *url.URL, header http.Header, body io.Reader) (conn net.Conn, err error) {
+	defer func() {
+		if err != nil && conn != nil {
+			conn.Close()
+			conn = nil
+		}
+	}()
+
+	beReq, err := http.NewRequest(method, location.String(), body)
+	if err != nil {
+		return nil, err
+	}
+	beReq.Header = header
+
+	conn, err = proxy.DialURL(location, h.Transport)
+	if err != nil {
+		return conn, fmt.Errorf("error dialing backend: %v", err)
+	}
+
+	if err = beReq.Write(conn); err != nil {
+		return conn, fmt.Errorf("error sending request: %v", err)
+	}
+
+	return conn, err
+}
+
+// connectBackendWithRedirects dials the backend and forwards a copy of the client request. If the
+// client responds with a redirect, it is followed. The raw response bytes are returned, and should
+// be forwarded back to the client.
+func (h *UpgradeAwareProxyHandler) connectBackendWithRedirects(req *http.Request) (net.Conn, []byte, error) {
+	const (
+		maxRedirects    = 10
+		maxResponseSize = 4096
+	)
+	var (
+		initialReq       = req
+		rawResponse      = bytes.NewBuffer(make([]byte, 0, 256))
+		location         = h.Location
+		intermediateConn net.Conn
+		err              error
+	)
+	defer func() {
+		if intermediateConn != nil {
+			intermediateConn.Close()
+		}
+	}()
+
+redirectLoop:
+	for redirects := 0; ; redirects++ {
+		if redirects > maxRedirects {
+			return nil, nil, fmt.Errorf("too many redirects (%d)", redirects)
+		}
+
+		if redirects == 0 {
+			intermediateConn, err = h.connectBackend(req.Method, location, req.Header, req.Body)
+		} else {
+			// Redirected requests switch to "GET" according to the HTTP spec:
+			// https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.3
+			intermediateConn, err = h.connectBackend("GET", location, initialReq.Header, nil)
+		}
+
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// Peek at the backend response.
+		rawResponse.Reset()
+		respReader := bufio.NewReader(io.TeeReader(
+			io.LimitReader(intermediateConn, maxResponseSize), // Don't read more than maxResponseSize bytes.
+			rawResponse)) // Save the raw response.
+		resp, err := http.ReadResponse(respReader, req)
+		if err != nil {
+			// Unable to read the backend response; let the client handle it.
+			glog.Warningf("Error reading backend response: %v", err)
+			break redirectLoop
+		}
+		resp.Body.Close() // Unused.
+
+		switch resp.StatusCode {
+		case http.StatusFound:
+			// Redirect, continue.
+		default:
+			// Don't redirect.
+			break redirectLoop
+		}
+
+		// Reset the connection.
+		intermediateConn.Close()
+		intermediateConn = nil
+
+		// Prepare to follow the redirect.
+		redirectStr := resp.Header.Get("Location")
+		if redirectStr == "" {
+			return nil, nil, fmt.Errorf("%d response missing Location header", resp.StatusCode)
+		}
+		location, err = h.Location.Parse(redirectStr)
+		if err != nil {
+			return nil, nil, fmt.Errorf("malformed Location header: %v", err)
+		}
+	}
+
+	backendConn := intermediateConn
+	intermediateConn = nil // Don't close the connection when we return it.
+	return backendConn, rawResponse.Bytes(), nil
+}
+
 func (h *UpgradeAwareProxyHandler) defaultProxyTransport(url *url.URL, internalTransport http.RoundTripper) http.RoundTripper {
 	scheme := url.Scheme
 	host := url.Host
@@ -213,20 +341,21 @@ func (h *UpgradeAwareProxyHandler) defaultProxyTransport(url *url.URL, internalT
 
 // corsRemovingTransport is a wrapper for an internal transport. It removes CORS headers
 // from the internal response.
+// Implements pkg/util/net.RoundTripperWrapper
 type corsRemovingTransport struct {
 	http.RoundTripper
 }
 
-func (p *corsRemovingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	resp, err := p.RoundTripper.RoundTrip(req)
+var _ = utilnet.RoundTripperWrapper(&corsRemovingTransport{})
+
+func (rt *corsRemovingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := rt.RoundTripper.RoundTrip(req)
 	if err != nil {
 		return nil, err
 	}
 	removeCORSHeaders(resp)
 	return resp, nil
 }
-
-var _ = net.RoundTripperWrapper(&corsRemovingTransport{})
 
 func (rt *corsRemovingTransport) WrappedRoundTripper() http.RoundTripper {
 	return rt.RoundTripper
