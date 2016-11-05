@@ -153,6 +153,19 @@ func (r *REST) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 				if existingNamespace.Status.Phase != api.NamespaceTerminating {
 					existingNamespace.Status.Phase = api.NamespaceTerminating
 				}
+
+				// Remove orphan finalizer if options.OrphanDependents = false.
+				if options.OrphanDependents != nil && *options.OrphanDependents == false {
+					// remove Orphan finalizer.
+					newFinalizers := []string{}
+					for i := range existingNamespace.ObjectMeta.Finalizers {
+						finalizer := existingNamespace.ObjectMeta.Finalizers[i]
+						if string(finalizer) != api.FinalizerOrphan {
+							newFinalizers = append(newFinalizers, finalizer)
+						}
+					}
+					existingNamespace.ObjectMeta.Finalizers = newFinalizers
+				}
 				return existingNamespace, nil
 			}),
 		)
