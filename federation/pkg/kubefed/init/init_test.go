@@ -75,6 +75,7 @@ func TestInitFederation(t *testing.T) {
 		dnsZoneName        string
 		lbIP               string
 		image              string
+		etcdPVCapacity     string
 		expectedErr        string
 	}{
 		{
@@ -84,6 +85,7 @@ func TestInitFederation(t *testing.T) {
 			dnsZoneName:        "example.test.",
 			lbIP:               "10.20.30.40",
 			image:              "example.test/foo:bar",
+			etcdPVCapacity:     "10Gi",
 			expectedErr:        "",
 		},
 	}
@@ -92,7 +94,7 @@ func TestInitFederation(t *testing.T) {
 		cmdErrMsg = ""
 		buf := bytes.NewBuffer([]byte{})
 
-		hostFactory, err := fakeInitHostFactory(tc.federation, util.DefaultFederationSystemNamespace, tc.lbIP, tc.dnsZoneName, tc.image)
+		hostFactory, err := fakeInitHostFactory(tc.federation, util.DefaultFederationSystemNamespace, tc.lbIP, tc.dnsZoneName, tc.image, tc.etcdPVCapacity)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -108,6 +110,7 @@ func TestInitFederation(t *testing.T) {
 		cmd.Flags().Set("host-cluster-context", "substrate")
 		cmd.Flags().Set("dns-zone-name", tc.dnsZoneName)
 		cmd.Flags().Set("image", tc.image)
+		cmd.Flags().Set("etcd-pv-capacity", tc.etcdPVCapacity)
 		cmd.Run(cmd, []string{tc.federation})
 
 		if tc.expectedErr == "" {
@@ -370,12 +373,12 @@ func TestCertsHTTPS(t *testing.T) {
 	}
 }
 
-func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image string) (cmdutil.Factory, error) {
+func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, etcdPVCapacity string) (cmdutil.Factory, error) {
 	svcName := federationName + "-apiserver"
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
 	cmKubeconfigSecretName := federationName + "-controller-manager-kubeconfig"
-	capacity, err := resource.ParseQuantity("10Gi")
+	capacity, err := resource.ParseQuantity(etcdPVCapacity)
 	if err != nil {
 		return nil, err
 	}
