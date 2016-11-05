@@ -708,3 +708,20 @@ func IsSiblingCommandExists(cmd *cobra.Command, targetCmdName string) bool {
 
 	return false
 }
+
+// DefaultSubCommandRun prints a command's help string to the specified output if no
+// arguments (sub-commands) are provided, or a usage error otherwise.
+func DefaultSubCommandRun(out io.Writer) func(c *cobra.Command, args []string) {
+	return func(c *cobra.Command, args []string) {
+		c.SetOutput(out)
+		RequireNoArguments(c, args)
+		c.Help()
+	}
+}
+
+// RequireNoArguments exits with a usage error if extra arguments are provided.
+func RequireNoArguments(c *cobra.Command, args []string) {
+	if len(args) > 0 {
+		CheckErr(UsageError(c, fmt.Sprintf(`unknown command %q`, strings.Join(args, " "))))
+	}
+}
