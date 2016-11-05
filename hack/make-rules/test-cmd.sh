@@ -473,7 +473,7 @@ runTests() {
   # Pre-condition: valid-pod POD exists
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
   # Command
-  kubectl delete pod valid-pod "${kube_flags[@]}" --grace-period=0
+  kubectl delete pod valid-pod "${kube_flags[@]}" --grace-period=0 --force
   # Post-condition: valid-pod POD doesn't exist
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
@@ -483,6 +483,17 @@ runTests() {
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
   # Command
   kubectl delete pod valid-pod "${kube_flags[@]}" --now
+  # Post-condition: valid-pod POD doesn't exist
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  ### Delete POD valid-pod by id with --grace-period=0
+  # Pre-condition: valid-pod POD exists
+  kubectl create "${kube_flags[@]}" -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
+  # Command fails without --force
+  ! kubectl delete pod valid-pod "${kube_flags[@]}" --grace-period=0
+  # Command succeds with --force
+  kubectl delete pod valid-pod "${kube_flags[@]}" --grace-period=0 --force
   # Post-condition: valid-pod POD doesn't exist
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
@@ -499,7 +510,7 @@ runTests() {
   # Pre-condition: valid-pod POD exists
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
   # Command
-  kubectl delete -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml "${kube_flags[@]}" --grace-period=0
+  kubectl delete -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml "${kube_flags[@]}" --grace-period=0 --force
   # Post-condition: valid-pod POD doesn't exist
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
@@ -516,7 +527,7 @@ runTests() {
   # Pre-condition: valid-pod POD exists
   kube::test::get_object_assert "pods -l'name in (valid-pod)'" '{{range.items}}{{$id_field}}:{{end}}' 'valid-pod:'
   # Command
-  kubectl delete pods -l'name in (valid-pod)' "${kube_flags[@]}" --grace-period=0
+  kubectl delete pods -l'name in (valid-pod)' "${kube_flags[@]}" --grace-period=0 --force
   # Post-condition: valid-pod POD doesn't exist
   kube::test::get_object_assert "pods -l'name in (valid-pod)'" '{{range.items}}{{$id_field}}:{{end}}' ''
 
@@ -549,7 +560,7 @@ runTests() {
   # Pre-condition: valid-pod POD exists
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
   # Command
-  kubectl delete --all pods "${kube_flags[@]}" --grace-period=0 # --all remove all the pods
+  kubectl delete --all pods "${kube_flags[@]}" --grace-period=0 --force # --all remove all the pods
   # Post-condition: no POD exists
   kube::test::get_object_assert "pods -l'name in (valid-pod)'" '{{range.items}}{{$id_field}}:{{end}}' ''
 
@@ -607,7 +618,7 @@ runTests() {
   # Pre-condition: valid-pod and redis-proxy PODs exist
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'redis-proxy:valid-pod:'
   # Command
-  kubectl delete pods valid-pod redis-proxy "${kube_flags[@]}" --grace-period=0 # delete multiple pods at once
+  kubectl delete pods valid-pod redis-proxy "${kube_flags[@]}" --grace-period=0 --force # delete multiple pods at once
   # Post-condition: no POD exists
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
@@ -669,7 +680,7 @@ runTests() {
   # Pre-condition: valid-pod POD exists
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
   # Command
-  kubectl delete pods -lnew-name=new-valid-pod --grace-period=0 "${kube_flags[@]}"
+  kubectl delete pods -lnew-name=new-valid-pod --grace-period=0 --force "${kube_flags[@]}"
   # Post-condition: valid-pod POD doesn't exist
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
@@ -897,7 +908,7 @@ __EOF__
   # Pre-condition: valid-pod POD exists
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
   # Command
-  kubectl delete pods -l'name in (valid-pod-super-sayan)' --grace-period=0 "${kube_flags[@]}"
+  kubectl delete pods -l'name in (valid-pod-super-sayan)' --grace-period=0 --force "${kube_flags[@]}"
   # Post-condition: valid-pod POD doesn't exist
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
@@ -1483,7 +1494,7 @@ __EOF__
   # Pre-condition: busybox0 & busybox1 PODs exist
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'busybox0:busybox1:'
   # Command
-  output_message=$(! kubectl delete -f hack/testdata/recursive/pod --recursive --grace-period=0 2>&1 "${kube_flags[@]}")
+  output_message=$(! kubectl delete -f hack/testdata/recursive/pod --recursive --grace-period=0 --force 2>&1 "${kube_flags[@]}")
   # Post-condition: busybox0 & busybox1 PODs are deleted, and since busybox2 is malformed, it should error
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
@@ -1542,7 +1553,7 @@ __EOF__
   # Pre-condition: busybox0 & busybox1 PODs exist
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'busybox0:busybox1:'
   # Command
-  output_message=$(! kubectl delete -f hack/testdata/recursive/rc --recursive --grace-period=0 2>&1 "${kube_flags[@]}")
+  output_message=$(! kubectl delete -f hack/testdata/recursive/rc --recursive --grace-period=0 --force 2>&1 "${kube_flags[@]}")
   # Post-condition: busybox0 & busybox1 replication controllers are deleted, and since busybox2 is malformed, it should error
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
@@ -1582,7 +1593,7 @@ __EOF__
   # Clean up
   unset PRESERVE_ERR_FILE
   rm "${ERROR_FILE}"
-  ! kubectl delete -f hack/testdata/recursive/deployment --recursive "${kube_flags[@]}" --grace-period=0
+  ! kubectl delete -f hack/testdata/recursive/deployment --recursive "${kube_flags[@]}" --grace-period=0 --force
   sleep 1
 
   ### Rollout on multiple replication controllers recursively - these tests ensure that rollouts cannot be performed on resources that don't support it
@@ -1611,7 +1622,7 @@ __EOF__
   kube::test::if_has_string "${output_message}" 'replicationcontrollers "busybox0" resuming is not supported'
   kube::test::if_has_string "${output_message}" 'replicationcontrollers "busybox0" resuming is not supported'
   # Clean up
-  ! kubectl delete -f hack/testdata/recursive/rc --recursive "${kube_flags[@]}" --grace-period=0
+  ! kubectl delete -f hack/testdata/recursive/rc --recursive "${kube_flags[@]}" --grace-period=0 --force
   sleep 1
 
   ##############
@@ -1658,7 +1669,7 @@ __EOF__
   # Pre-condition: valid-pod POD exists
   kube::test::get_object_assert 'pods --namespace=other' "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
   # Command
-  kubectl delete "${kube_flags[@]}" pod --namespace=other valid-pod --grace-period=0
+  kubectl delete "${kube_flags[@]}" pod --namespace=other valid-pod --grace-period=0 --force
   # Post-condition: valid-pod POD doesn't exist
   kube::test::get_object_assert 'pods --namespace=other' "{{range.items}}{{$id_field}}:{{end}}" ''
   # Clean up
@@ -2869,7 +2880,7 @@ __EOF__
   # Pre-condition: valid-pod exists
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
   # Command
-  kubectl delete "${kube_flags[@]}" pod valid-pod --grace-period=0
+  kubectl delete "${kube_flags[@]}" pod valid-pod --grace-period=0 --force
   # Post-condition: valid-pod doesn't exist
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
