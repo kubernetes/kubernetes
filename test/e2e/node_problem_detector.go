@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -39,12 +40,13 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 		pollInterval   = 1 * time.Second
 		pollConsistent = 5 * time.Second
 		pollTimeout    = 1 * time.Minute
-		image          = "gcr.io/google_containers/node-problem-detector:v0.1"
+		image          = "gcr.io/google_containers/node-problem-detector:v0.2"
 	)
 	f := framework.NewDefaultFramework("node-problem-detector")
 	var c clientset.Interface
 	var uid string
 	var ns, name, configName, eventNamespace string
+	var nodeTime time.Time
 	BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
@@ -61,27 +63,38 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			// Use test condition to avoid conflict with real node problem detector
 			// TODO(random-liu): Now node condition could be arbitrary string, consider wether we need to
 			// add TestCondition when switching to predefined condition list.
-			condition      = api.NodeConditionType("TestCondition")
+			condition    = api.NodeConditionType("TestCondition")
+			lookback     = time.Hour // Assume the test won't take more than 1 hour, in fact it usually only takes 90 seconds.
+			startPattern = "test reboot"
+
+			// File paths used in the test.
+			logDir       = "/log"
+			logFile      = "test.log"
+			configDir    = "/config"
+			configFile   = "testconfig.json"
+			etcLocaltime = "/etc/localtime"
+
+			// Volumes used in the test.
+			configVolume    = "config"
+			logVolume       = "log"
+			localtimeVolume = "localtime"
+
+			// Reasons and messages used in the test.
 			defaultReason  = "Default"
 			defaultMessage = "default message"
-			logDir         = "/log"
-			logFile        = "test.log"
-			configDir      = "/config"
-			configFile     = "testconfig.json"
 			tempReason     = "Temporary"
 			tempMessage    = "temporary error"
 			permReason     = "Permanent"
 			permMessage    = "permanent error"
-			configVolume   = "config"
-			logVolume      = "log"
 		)
 		var source, config, tmpDir string
 		var node *api.Node
 		var eventListOptions api.ListOptions
-		injectCommand := func(err string, num int) string {
+		injectCommand := func(timestamp time.Time, log string, num int) string {
 			var commands []string
 			for i := 0; i < num; i++ {
-				commands = append(commands, fmt.Sprintf("echo kernel: [%d.000000] %s >> %s/%s", i, err, tmpDir, logFile))
+				commands = append(commands, fmt.Sprintf("echo \"%s kernel: [0.000000] %s\" >> %s/%s",
+					timestamp.Format(time.Stamp), log, tmpDir, logFile))
 			}
 			return strings.Join(commands, ";")
 		}
@@ -92,7 +105,9 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			source = "kernel-monitor-" + uid
 			config = `
 			{
-				"logPath": "` + logDir + "/" + logFile + `",
+				"logPath": "` + filepath.Join(logDir, logFile) + `",
+				"lookback": "` + lookback.String() + `",
+				"startPattern": "` + startPattern + `",
 				"bufferSize": 10,
 				"source": "` + source + `",
 				"conditions": [
@@ -170,16 +185,38 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 								HostPath: &api.HostPathVolumeSource{Path: tmpDir},
 							},
 						},
+						{
+							Name: localtimeVolume,
+							VolumeSource: api.VolumeSource{
+								HostPath: &api.HostPathVolumeSource{Path: etcLocaltime},
+							},
+						},
 					},
 					Containers: []api.Container{
 						{
-							Name:    name,
-							Image:   image,
-							Command: []string{"/node-problem-detector", "--kernel-monitor=" + configDir + "/" + configFile},
+							Name:            name,
+							Image:           image,
+							Command:         []string{"/node-problem-detector", "--kernel-monitor=" + filepath.Join(configDir, configFile)},
+							ImagePullPolicy: api.PullAlways,
+							Env: []api.EnvVar{
+								{
+									Name: "NODE_NAME",
+									ValueFrom: &api.EnvVarSource{
+										FieldRef: &api.ObjectFieldSelector{
+											APIVersion: "v1",
+											FieldPath:  "spec.nodeName",
+										},
+									},
+								},
+							},
 							VolumeMounts: []api.VolumeMount{
 								{
 									Name:      logVolume,
 									MountPath: logDir,
+								},
+								{
+									Name:      localtimeVolume,
+									MountPath: etcLocaltime,
 								},
 								{
 									Name:      configVolume,
@@ -193,45 +230,135 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			Expect(err).NotTo(HaveOccurred())
 			By("Wait for node problem detector running")
 			Expect(f.WaitForPodRunning(name)).To(Succeed())
+			// Get the node time
+			nodeIP := framework.GetNodeExternalIP(node)
+			result, err := framework.SSH("date '+%FT%T.%N%:z'", nodeIP, framework.TestContext.Provider)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(result.Code).Should(BeZero())
+			nodeTime, err = time.Parse(time.RFC3339, strings.TrimSpace(result.Stdout))
+			Expect(err).ShouldNot(HaveOccurred())
 		})
 
 		It("should generate node condition and events for corresponding errors", func() {
-			By("Make sure no events are generated")
-			Consistently(func() error {
-				return verifyNoEvents(c.Core().Events(eventNamespace), eventListOptions)
-			}, pollConsistent, pollInterval).Should(Succeed())
-			By("Make sure the default node condition is generated")
-			Eventually(func() error {
-				return verifyCondition(c.Core().Nodes(), node.Name, condition, api.ConditionFalse, defaultReason, defaultMessage)
-			}, pollTimeout, pollInterval).Should(Succeed())
+			for _, test := range []struct {
+				description      string
+				timestamp        time.Time
+				message          string
+				messageNum       int
+				events           int
+				conditionReason  string
+				conditionMessage string
+				conditionType    api.ConditionStatus
+			}{
+				{
+					description:      "should generate default node condition",
+					conditionReason:  defaultReason,
+					conditionMessage: defaultMessage,
+					conditionType:    api.ConditionFalse,
+				},
+				{
+					description:      "should not generate events for too old log",
+					timestamp:        nodeTime.Add(-3 * lookback), // Assume 3*lookback is old enough
+					message:          tempMessage,
+					messageNum:       3,
+					conditionReason:  defaultReason,
+					conditionMessage: defaultMessage,
+					conditionType:    api.ConditionFalse,
+				},
+				{
+					description:      "should not change node condition for too old log",
+					timestamp:        nodeTime.Add(-3 * lookback), // Assume 3*lookback is old enough
+					message:          permMessage,
+					messageNum:       1,
+					conditionReason:  defaultReason,
+					conditionMessage: defaultMessage,
+					conditionType:    api.ConditionFalse,
+				},
+				{
+					description:      "should generate event for old log within lookback duration",
+					timestamp:        nodeTime.Add(-1 * time.Minute),
+					message:          tempMessage,
+					messageNum:       3,
+					events:           3,
+					conditionReason:  defaultReason,
+					conditionMessage: defaultMessage,
+					conditionType:    api.ConditionFalse,
+				},
+				{
+					description:      "should change node condition for old log within lookback duration",
+					timestamp:        nodeTime.Add(-1 * time.Minute),
+					message:          permMessage,
+					messageNum:       1,
+					events:           3, // event number should not change
+					conditionReason:  permReason,
+					conditionMessage: permMessage,
+					conditionType:    api.ConditionTrue,
+				},
+				{
+					description:      "should reset node condition if the node is reboot",
+					timestamp:        nodeTime,
+					message:          startPattern,
+					messageNum:       1,
+					events:           3, // event number should not change
+					conditionReason:  defaultReason,
+					conditionMessage: defaultMessage,
+					conditionType:    api.ConditionFalse,
+				},
+				{
+					description:      "should generate event for new log",
+					timestamp:        nodeTime.Add(5 * time.Minute),
+					message:          tempMessage,
+					messageNum:       3,
+					events:           6,
+					conditionReason:  defaultReason,
+					conditionMessage: defaultMessage,
+					conditionType:    api.ConditionFalse,
+				},
+				{
+					description:      "should change node condition for new log",
+					timestamp:        nodeTime.Add(5 * time.Minute),
+					message:          permMessage,
+					messageNum:       1,
+					events:           6, // event number should not change
+					conditionReason:  permReason,
+					conditionMessage: permMessage,
+					conditionType:    api.ConditionTrue,
+				},
+			} {
+				By(test.description)
+				if test.messageNum > 0 {
+					By(fmt.Sprintf("Inject %d logs: %q", test.messageNum, test.message))
+					cmd := injectCommand(test.timestamp, test.message, test.messageNum)
+					Expect(framework.IssueSSHCommand(cmd, framework.TestContext.Provider, node)).To(Succeed())
+				}
 
-			num := 3
-			By(fmt.Sprintf("Inject %d temporary errors", num))
-			Expect(framework.IssueSSHCommand(injectCommand(tempMessage, num), framework.TestContext.Provider, node)).To(Succeed())
-			By(fmt.Sprintf("Wait for %d events generated", num))
-			Eventually(func() error {
-				return verifyEvents(c.Core().Events(eventNamespace), eventListOptions, num, tempReason, tempMessage)
-			}, pollTimeout, pollInterval).Should(Succeed())
-			By(fmt.Sprintf("Make sure only %d events generated", num))
-			Consistently(func() error {
-				return verifyEvents(c.Core().Events(eventNamespace), eventListOptions, num, tempReason, tempMessage)
-			}, pollConsistent, pollInterval).Should(Succeed())
-			By("Make sure the node condition is still false")
-			Expect(verifyCondition(c.Core().Nodes(), node.Name, condition, api.ConditionFalse, defaultReason, defaultMessage)).To(Succeed())
+				By(fmt.Sprintf("Wait for %d events generated", test.events))
+				Eventually(func() error {
+					return verifyEvents(c.Core().Events(eventNamespace), eventListOptions, test.events, tempReason, tempMessage)
+				}, pollTimeout, pollInterval).Should(Succeed())
+				By(fmt.Sprintf("Make sure only %d events generated", test.events))
+				Consistently(func() error {
+					return verifyEvents(c.Core().Events(eventNamespace), eventListOptions, test.events, tempReason, tempMessage)
+				}, pollConsistent, pollInterval).Should(Succeed())
 
-			By("Inject 1 permanent error")
-			Expect(framework.IssueSSHCommand(injectCommand(permMessage, 1), framework.TestContext.Provider, node)).To(Succeed())
-			By("Make sure the corresponding node condition is generated")
-			Eventually(func() error {
-				return verifyCondition(c.Core().Nodes(), node.Name, condition, api.ConditionTrue, permReason, permMessage)
-			}, pollTimeout, pollInterval).Should(Succeed())
-			By("Make sure no new events are generated")
-			Consistently(func() error {
-				return verifyEvents(c.Core().Events(eventNamespace), eventListOptions, num, tempReason, tempMessage)
-			}, pollConsistent, pollInterval).Should(Succeed())
+				By(fmt.Sprintf("Make sure node condition %q is set", condition))
+				Eventually(func() error {
+					return verifyCondition(c.Core().Nodes(), node.Name, condition, test.conditionType, test.conditionReason, test.conditionMessage)
+				}, pollTimeout, pollInterval).Should(Succeed())
+				By(fmt.Sprintf("Make sure node condition %q is stable", condition))
+				Consistently(func() error {
+					return verifyCondition(c.Core().Nodes(), node.Name, condition, test.conditionType, test.conditionReason, test.conditionMessage)
+				}, pollConsistent, pollInterval).Should(Succeed())
+			}
 		})
 
 		AfterEach(func() {
+			if CurrentGinkgoTestDescription().Failed && framework.TestContext.DumpLogsOnFailure {
+				By("Get node problem detector log")
+				log, err := framework.GetPodLogs(c, ns, name, name)
+				Expect(err).ShouldNot(HaveOccurred())
+				framework.Logf("Node Problem Detector logs:\n %s", log)
+			}
 			By("Delete the node problem detector")
 			c.Core().Pods(ns).Delete(name, api.NewDeleteOptions(0))
 			By("Wait for the node problem detector to disappear")
