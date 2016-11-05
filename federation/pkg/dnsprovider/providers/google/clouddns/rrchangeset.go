@@ -19,6 +19,7 @@ package clouddns
 import (
 	"fmt"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/internal/interfaces"
 )
@@ -54,6 +55,11 @@ func (c *ResourceRecordChangeset) Apply() error {
 	var deletions []interfaces.ResourceRecordSet
 	for _, r := range c.removals {
 		deletions = append(deletions, r.(ResourceRecordSet).impl)
+	}
+
+	if len(additions) == 0 && len(deletions) == 0 {
+		glog.V(4).Infof("No changes in changeset; skipping apply")
+		return nil
 	}
 
 	change := service.NewChange(additions, deletions)

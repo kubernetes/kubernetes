@@ -103,7 +103,11 @@ type ServiceController struct {
 	dns              dnsprovider.Interface
 	federationClient fedclientset.Interface
 	federationName   string
-	zoneName         string
+	// federationDnsSuffix is the DNS suffix we use when publishing service DNS names
+	federationDnsSuffix string
+	// zoneName and zoneID are used to identify the zone in which to put records
+	zoneName string
+	zoneID   string
 	// each federation should be configured with a single zone (e.g. "mycompany.com")
 	dnsZones     dnsprovider.Zones
 	serviceCache *serviceCache
@@ -136,18 +140,22 @@ type ServiceController struct {
 // New returns a new service controller to keep DNS provider service resources
 // (like Kubernetes Services and DNS server records for service discovery) in sync with the registry.
 
-func New(federationClient fedclientset.Interface, dns dnsprovider.Interface, federationName, zoneName string) *ServiceController {
+func New(federationClient fedclientset.Interface, dns dnsprovider.Interface, federationName,
+	federationDnsSuffix string,
+	zoneName string, zoneID string) *ServiceController {
 	broadcaster := record.NewBroadcaster()
 	// federationClient event is not supported yet
 	// broadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
 	recorder := broadcaster.NewRecorder(api.EventSource{Component: UserAgentName})
 
 	s := &ServiceController{
-		dns:              dns,
-		federationClient: federationClient,
-		federationName:   federationName,
-		zoneName:         zoneName,
-		serviceCache:     &serviceCache{fedServiceMap: make(map[string]*cachedService)},
+		dns:                 dns,
+		federationClient:    federationClient,
+		federationName:      federationName,
+		federationDnsSuffix: federationDnsSuffix,
+		zoneName:            zoneName,
+		zoneID:              zoneID,
+		serviceCache:        &serviceCache{fedServiceMap: make(map[string]*cachedService)},
 		clusterCache: &clusterClientCache{
 			rwlock:    sync.Mutex{},
 			clientMap: make(map[string]*clusterCache),
@@ -274,8 +282,15 @@ func (s *ServiceController) init() error {
 	if s.federationName == "" {
 		return fmt.Errorf("ServiceController should not be run without federationName.")
 	}
-	if s.zoneName == "" {
-		return fmt.Errorf("ServiceController should not be run without zoneName.")
+	if s.zoneName == "" && s.zoneID == "" {
+		return fmt.Errorf("ServiceController must be run with either zoneName or zoneID.")
+	}
+	if s.federationDnsSuffix == "" {
+		// TODO: Is this the right place to do defaulting?
+		if s.zoneName == "" {
+			return fmt.Errorf("ServiceController must be run with zoneName, if federationDnsSuffix is not set.")
+		}
+		s.federationDnsSuffix = s.zoneName
 	}
 	if s.dns == nil {
 		return fmt.Errorf("ServiceController should not be run without a dnsprovider.")
@@ -285,7 +300,10 @@ func (s *ServiceController) init() error {
 		return fmt.Errorf("the dns provider does not support zone enumeration, which is required for creating dns records.")
 	}
 	s.dnsZones = zones
-	if _, err := getDnsZone(s.zoneName, s.dnsZones); err != nil {
+	if _, err := s.getDnsZone(); err != nil {
+		if s.zoneName == "" {
+			return fmt.Errorf("ServiceController must be run with zoneName to create zone automatically.")
+		}
 		glog.Infof("DNS zone %q not found.  Creating DNS zone %q.", s.zoneName, s.zoneName)
 		managedZone, err := s.dnsZones.New(s.zoneName)
 		if err != nil {

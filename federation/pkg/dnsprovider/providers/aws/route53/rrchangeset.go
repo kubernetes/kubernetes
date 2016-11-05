@@ -19,6 +19,7 @@ package route53
 import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/route53"
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 )
 
@@ -79,6 +80,7 @@ func (c *ResourceRecordChangeset) Apply() error {
 	}
 
 	if len(changes) == 0 {
+		glog.V(4).Infof("No changes in changeset; skipping apply")
 		return nil
 	}
 

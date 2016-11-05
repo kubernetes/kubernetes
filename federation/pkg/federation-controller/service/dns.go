@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
+	"strings"
 )
 
 const (
@@ -89,23 +90,40 @@ func (s *ServiceController) getClusterZoneNames(clusterName string) (zones []str
 	return client.cluster.Status.Zones, client.cluster.Status.Region, nil
 }
 
-// getFederationDNSZoneName returns the name of the managed DNS Zone configured for this federation
-func (s *ServiceController) getFederationDNSZoneName() (string, error) {
-	return s.zoneName, nil
+// getFederationDnsSuffix returns the DNS suffix to use for records for this federation
+func (s *ServiceController) getFederationDnsSuffix() (string, error) {
+	return s.federationDnsSuffix, nil
 }
 
-// getDnsZone is a hack around the fact that dnsprovider does not yet support a Get() method, only a List() method.  TODO:  Fix that.
-func getDnsZone(dnsZoneName string, dnsZonesInterface dnsprovider.Zones) (dnsprovider.Zone, error) {
-	dnsZones, err := dnsZonesInterface.List()
+// getDnsZone returns the zone, as identified by zoneName and/or zoneID
+func (s *ServiceController) getDnsZone() (dnsprovider.Zone, error) {
+	// TODO: We need query-by-name and query-by-id functions
+	dnsZones, err := s.dnsZones.List()
 	if err != nil {
 		return nil, err
 	}
-	for _, dnsZone := range dnsZones {
-		if dnsZone.Name() == dnsZoneName {
-			return dnsZone, nil
+
+	// Prefer to match by ID if set
+	if s.zoneID != "" {
+		for _, dnsZone := range dnsZones {
+			if s.zoneID == dnsZone.ID() {
+				return dnsZone, nil
+			}
 		}
 	}
-	return nil, fmt.Errorf("DNS zone %s not found.", dnsZoneName)
+
+	if s.zoneName != "" {
+		findName := strings.TrimSuffix(s.zoneName, ".")
+		for _, dnsZone := range dnsZones {
+			if findName != "" {
+				if strings.TrimSuffix(dnsZone.Name(), ".") == findName {
+					return dnsZone, nil
+				}
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("DNS zone %s/%s not found.", s.zoneName, s.zoneID)
 }
 
 /* getRrset is a hack around the fact that dnsprovider.ResourceRecordSets interface does not yet include a Get() method, only a List() method.  TODO:  Fix that.
@@ -117,8 +135,9 @@ func getRrset(dnsName string, rrsetsInterface dnsprovider.ResourceRecordSets) (d
 	if err != nil {
 		return nil, err
 	}
+	findName := strings.TrimSuffix(dnsName, ".")
 	for _, rrset := range rrsets {
-		if rrset.Name() == dnsName {
+		if strings.TrimSuffix(rrset.Name(), ".") == findName {
 			returnVal = rrset
 			break
 		}
@@ -152,15 +171,7 @@ func getResolvedEndpoints(endpoints []string) ([]string, error) {
 /* ensureDnsRrsets ensures (idempotently, and with minimum mutations) that all of the DNS resource record sets for dnsName are consistent with endpoints.
    if endpoints is nil or empty, a CNAME record to uplevelCname is ensured.
 */
-func (s *ServiceController) ensureDnsRrsets(dnsZoneName, dnsName string, endpoints []string, uplevelCname string) error {
-	dnsZone, err := getDnsZone(dnsZoneName, s.dnsZones)
-	if err != nil {
-		return err
-	}
-	rrsets, supported := dnsZone.ResourceRecordSets()
-	if !supported {
-		return fmt.Errorf("Failed to ensure DNS records for %s. DNS provider does not support the ResourceRecordSets interface.", dnsName)
-	}
+func (s *ServiceController) ensureDnsRrsets(changeset dnsprovider.ResourceRecordChangeset, rrsets dnsprovider.ResourceRecordSets, dnsName string, endpoints []string, uplevelCname string) error {
 	rrset, err := getRrset(dnsName, rrsets) // TODO: rrsets.Get(dnsName)
 	if err != nil {
 		return err
@@ -173,11 +184,8 @@ func (s *ServiceController) ensureDnsRrsets(dnsZoneName, dnsName string, endpoin
 				glog.V(4).Infof("Creating CNAME to %q for %q", uplevelCname, dnsName)
 				newRrset := rrsets.New(dnsName, []string{uplevelCname}, minDnsTtl, rrstype.CNAME)
 				glog.V(4).Infof("Adding recordset %v", newRrset)
-				err = rrsets.StartChangeset().Add(newRrset).Apply()
-				if err != nil {
-					return err
-				}
-				glog.V(4).Infof("Successfully created CNAME to %q for %q", uplevelCname, dnsName)
+				changeset.Add(newRrset)
+				glog.V(4).Infof("Changeset: added CNAME to %q for %q", uplevelCname, dnsName)
 			} else {
 				glog.V(4).Infof("We want no record for %q, and we have no record, so we're all good.", dnsName)
 			}
@@ -192,11 +200,8 @@ func (s *ServiceController) ensureDnsRrsets(dnsZoneName, dnsName string, endpoin
 			}
 			newRrset := rrsets.New(dnsName, resolvedEndpoints, minDnsTtl, rrstype.A)
 			glog.V(4).Infof("Adding recordset %v", newRrset)
-			err = rrsets.StartChangeset().Add(newRrset).Apply()
-			if err != nil {
-				return err
-			}
-			glog.V(4).Infof("Successfully added recordset %v", newRrset)
+			changeset.Add(newRrset)
+			glog.V(4).Infof("Changeset: added recordset %v", newRrset)
 		}
 	} else {
 		// the rrset already exists, so make it right.
@@ -212,19 +217,12 @@ func (s *ServiceController) ensureDnsRrsets(dnsZoneName, dnsName string, endpoin
 			} else {
 				// Need to replace the existing one with a better one (or just remove it if we have no healthy endpoints).
 				glog.V(4).Infof("Existing recordset %v not equivalent to needed recordset %v removing existing and adding needed.", rrset, newRrset)
-				changeSet := rrsets.StartChangeset()
-				changeSet.Remove(rrset)
+				changeset.Remove(rrset)
 				if uplevelCname != "" {
-					changeSet.Add(newRrset)
-					if err := changeSet.Apply(); err != nil {
-						return err
-					}
-					glog.V(4).Infof("Successfully replaced needed recordset %v -> %v", rrset, newRrset)
+					changeset.Add(newRrset)
+					glog.V(4).Infof("Changeset: replaced needed recordset %v -> %v", rrset, newRrset)
 				} else {
-					if err := changeSet.Apply(); err != nil {
-						return err
-					}
-					glog.V(4).Infof("Successfully removed existing recordset %v", rrset)
+					glog.V(4).Infof("Changset: removed existing recordset %v", rrset)
 					glog.V(4).Infof("Uplevel CNAME is empty string. Not adding recordset %v", newRrset)
 				}
 			}
@@ -246,10 +244,8 @@ func (s *ServiceController) ensureDnsRrsets(dnsZoneName, dnsName string, endpoin
 			} else {
 				// Need to replace the existing one with a better one
 				glog.V(4).Infof("Existing recordset %v is not equivalent to needed recordset %v, removing existing and adding needed.", rrset, newRrset)
-				if err = rrsets.StartChangeset().Remove(rrset).Add(newRrset).Apply(); err != nil {
-					return err
-				}
-				glog.V(4).Infof("Successfully replaced recordset %v -> %v", rrset, newRrset)
+				changeset.Remove(rrset).Add(newRrset)
+				glog.V(4).Infof("Changeset: replaced recordset %v -> %v", rrset, newRrset)
 			}
 		}
 	}
@@ -298,7 +294,7 @@ func (s *ServiceController) ensureDnsRecords(clusterName string, cachedService *
 	if zoneNames == nil {
 		return fmt.Errorf("failed to get cluster zone names")
 	}
-	dnsZoneName, err := s.getFederationDNSZoneName()
+	federationDnsSuffix, err := s.getFederationDnsSuffix()
 	if err != nil {
 		return err
 	}
@@ -309,18 +305,36 @@ func (s *ServiceController) ensureDnsRecords(clusterName string, cachedService *
 	commonPrefix := serviceName + "." + namespaceName + "." + s.federationName + ".svc"
 	// dnsNames is the path up the DNS search tree, starting at the leaf
 	dnsNames := []string{
-		commonPrefix + "." + zoneNames[0] + "." + regionName + "." + dnsZoneName, // zone level - TODO might need other zone names for multi-zone clusters
-		commonPrefix + "." + regionName + "." + dnsZoneName,                      // region level, one up from zone level
-		commonPrefix + "." + dnsZoneName,                                         // global level, one up from region level
+		commonPrefix + "." + zoneNames[0] + "." + regionName + "." + federationDnsSuffix, // zone level - TODO might need other zone names for multi-zone clusters
+		commonPrefix + "." + regionName + "." + federationDnsSuffix,                      // region level, one up from zone level
+		commonPrefix + "." + federationDnsSuffix,                                         // global level, one up from region level
 		"", // nowhere to go up from global level
 	}
 
 	endpoints := [][]string{zoneEndpoints, regionEndpoints, globalEndpoints}
 
+	dnsZone, err := s.getDnsZone()
+	if err != nil {
+		return err
+	}
+
+	rrsets, supported := dnsZone.ResourceRecordSets()
+	if !supported {
+		return fmt.Errorf("Failed to ensure DNS records for %s. DNS provider does not support the ResourceRecordSets interface.", dnsZone.Name())
+	}
+
+	changeset := rrsets.StartChangeset()
+
 	for i, endpoint := range endpoints {
-		if err = s.ensureDnsRrsets(dnsZoneName, dnsNames[i], endpoint, dnsNames[i+1]); err != nil {
+		if err = s.ensureDnsRrsets(changeset, rrsets, dnsNames[i], endpoint, dnsNames[i+1]); err != nil {
 			return err
 		}
 	}
+
+	glog.V(4).Infof("Applying changeset for %q", dnsZone.Name())
+	if err := changeset.Apply(); err != nil {
+		return fmt.Errorf("Failed to apply DNS changeset for %s: %v", dnsZone.Name(), err)
+	}
+
 	return nil
 }
