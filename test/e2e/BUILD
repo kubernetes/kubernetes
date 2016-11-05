@@ -105,6 +105,7 @@ go_library(
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/client/clientset_generated/federation_release_1_5:go_default_library",
+        "//federation/client/clientset_generated/federation_release_1_5/typed/core/v1:go_default_library",
         "//federation/pkg/federation-controller/util:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/annotations:go_default_library",
