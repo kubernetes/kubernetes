@@ -123,7 +123,7 @@ func RunListTokens(out io.Writer, errW io.Writer, cmd *cobra.Command) error {
 	}
 
 	w := tabwriter.NewWriter(out, 10, 4, 3, ' ', 0)
-	fmt.Fprintln(w, "ID\tTOKEN\tEXPIRATION")
+	fmt.Fprintln(w, "ID\tTOKEN\tTTL")
 	for _, secret := range results.Items {
 		tokenId, ok := secret.Data["token-id"]
 		if !ok {
