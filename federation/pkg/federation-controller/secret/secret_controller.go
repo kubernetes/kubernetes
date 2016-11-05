@@ -17,7 +17,6 @@ limitations under the License.
 package secret
 
 import (
-	"fmt"
 	"time"
 
 	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
@@ -31,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -173,8 +173,8 @@ func (secretcontroller *SecretController) Run(stopChan <-chan struct{}) {
 		secretcontroller.secretFederatedInformer.Stop()
 	}()
 	secretcontroller.secretDeliverer.StartWithHandler(func(item *util.DelayingDelivererItem) {
-		secret := item.Value.(*secretItem)
-		secretcontroller.reconcileSecret(secret.namespace, secret.name)
+		secret := item.Value.(*types.NamespacedName)
+		secretcontroller.reconcileSecret(*secret)
 	})
 	secretcontroller.clusterDeliverer.StartWithHandler(func(_ *util.DelayingDelivererItem) {
 		secretcontroller.reconcileSecretsOnClusterChange()
@@ -182,32 +182,21 @@ func (secretcontroller *SecretController) Run(stopChan <-chan struct{}) {
 	util.StartBackoffGC(secretcontroller.secretBackoff, stopChan)
 }
 
-func getSecretKey(namespace, name string) string {
-	return fmt.Sprintf("%s/%s", namespace, name)
-}
-
-// Internal structure for data in delaying deliverer.
-type secretItem struct {
-	namespace string
-	name      string
-}
-
 func (secretcontroller *SecretController) deliverSecretObj(obj interface{}, delay time.Duration, failed bool) {
 	secret := obj.(*api_v1.Secret)
-	secretcontroller.deliverSecret(secret.Namespace, secret.Name, delay, failed)
+	secretcontroller.deliverSecret(types.NamespacedName{Namespace: secret.Namespace, Name: secret.Name}, delay, failed)
 }
 
 // Adds backoff to delay if this delivery is related to some failure. Resets backoff if there was no failure.
-func (secretcontroller *SecretController) deliverSecret(namespace string, name string, delay time.Duration, failed bool) {
-	key := getSecretKey(namespace, name)
+func (secretcontroller *SecretController) deliverSecret(secret types.NamespacedName, delay time.Duration, failed bool) {
+	key := secret.String()
 	if failed {
 		secretcontroller.secretBackoff.Next(key, time.Now())
 		delay = delay + secretcontroller.secretBackoff.Get(key)
 	} else {
 		secretcontroller.secretBackoff.Reset(key)
 	}
-	secretcontroller.secretDeliverer.DeliverAfter(key,
-		&secretItem{namespace: namespace, name: name}, delay)
+	secretcontroller.secretDeliverer.DeliverAfter(key, &secret, delay)
 }
 
 // Check whether all data stores are in sync. False is returned if any of the informer/stores is not yet
@@ -235,22 +224,22 @@ func (secretcontroller *SecretController) reconcileSecretsOnClusterChange() {
 	}
 	for _, obj := range secretcontroller.secretInformerStore.List() {
 		secret := obj.(*api_v1.Secret)
-		secretcontroller.deliverSecret(secret.Namespace, secret.Name, secretcontroller.smallDelay, false)
+		secretcontroller.deliverSecret(types.NamespacedName{Namespace: secret.Namespace, Name: secret.Name}, secretcontroller.smallDelay, false)
 	}
 }
 
-func (secretcontroller *SecretController) reconcileSecret(namespace string, secretName string) {
+func (secretcontroller *SecretController) reconcileSecret(secret types.NamespacedName) {
 
 	if !secretcontroller.isSynced() {
-		secretcontroller.deliverSecret(namespace, secretName, secretcontroller.clusterAvailableDelay, false)
+		secretcontroller.deliverSecret(secret, secretcontroller.clusterAvailableDelay, false)
 		return
 	}
 
-	key := getSecretKey(namespace, secretName)
+	key := secret.String()
 	baseSecretObj, exist, err := secretcontroller.secretInformerStore.GetByKey(key)
 	if err != nil {
 		glog.Errorf("Failed to query main secret store for %v: %v", key, err)
-		secretcontroller.deliverSecret(namespace, secretName, 0, true)
+		secretcontroller.deliverSecret(secret, 0, true)
 		return
 	}
 
@@ -263,7 +252,7 @@ func (secretcontroller *SecretController) reconcileSecret(namespace string, secr
 	clusters, err := secretcontroller.secretFederatedInformer.GetReadyClusters()
 	if err != nil {
 		glog.Errorf("Failed to get cluster list: %v", err)
-		secretcontroller.deliverSecret(namespace, secretName, secretcontroller.clusterAvailableDelay, false)
+		secretcontroller.deliverSecret(secret, secretcontroller.clusterAvailableDelay, false)
 		return
 	}
 
@@ -272,7 +261,7 @@ func (secretcontroller *SecretController) reconcileSecret(namespace string, secr
 		clusterSecretObj, found, err := secretcontroller.secretFederatedInformer.GetTargetStore().GetByKey(cluster.Name, key)
 		if err != nil {
 			glog.Errorf("Failed to get %s from %s: %v", key, cluster.Name, err)
-			secretcontroller.deliverSecret(namespace, secretName, 0, true)
+			secretcontroller.deliverSecret(secret, 0, true)
 			return
 		}
 
@@ -320,10 +309,10 @@ func (secretcontroller *SecretController) reconcileSecret(namespace string, secr
 
 	if err != nil {
 		glog.Errorf("Failed to execute updates for %s: %v", key, err)
-		secretcontroller.deliverSecret(namespace, secretName, 0, true)
+		secretcontroller.deliverSecret(secret, 0, true)
 		return
 	}
 
 	// Evertyhing is in order but lets be double sure
-	secretcontroller.deliverSecret(namespace, secretName, secretcontroller.secretReviewDelay, false)
+	secretcontroller.deliverSecret(secret, secretcontroller.secretReviewDelay, false)
 }
