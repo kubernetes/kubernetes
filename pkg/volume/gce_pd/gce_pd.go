@@ -21,13 +21,14 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
+	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -50,7 +51,7 @@ const (
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, strings.EscapeQualifiedNameForDisk(gcePersistentDiskPluginName), volName)
+	return host.GetPodVolumeDir(uid, kstrings.EscapeQualifiedNameForDisk(gcePersistentDiskPluginName), volName)
 }
 
 func (plugin *gcePersistentDiskPlugin) Init(host volume.VolumeHost) error {
@@ -240,7 +241,7 @@ func (b *gcePersistentDiskMounter) GetAttributes() volume.Attributes {
 
 // SetUp bind mounts the disk global mount to the volume path.
 func (b *gcePersistentDiskMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+	return GcePdMountErrorHint(b.SetUpAt(b.GetPath(), fsGroup))
 }
 
 // SetUp bind mounts the disk global mount to the give volume path.
@@ -304,6 +305,31 @@ func (b *gcePersistentDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 	glog.V(4).Infof("Successfully mounted %s", dir)
 	return nil
+}
+
+// GcePdMountErrorHint performs some basic analysis
+// on the current mount error returned from the plugin
+// and will add a user hint or resolution tip for enhanced UXP
+// If no matches then original error is returned
+func GcePdMountErrorHint (inErr error) error {
+	if inErr == nil {
+		return nil
+	}
+	if strings.Contains(inErr.Error(), "lstat") && strings.Contains(inErr.Error(), "permission denied") {
+		return fmt.Errorf("%v\nAdditional Info: The pod is running, and the mount succeeded, however the mount is not accessible due to permissions.\nCheck the permissions on your mounted directory.\nIf needed, containers and pods can utilize and pass in a securityContext specifying runAsUser (uid/owner), or additional linux groups such as fsGroup (for block).\nWork with the storage adminstrator to ensure correct volume access.\n", inErr)
+	}
+
+	if strings.Contains(inErr.Error(), "NoDiskConflict") || strings.Contains(inErr.Error(), "fit failure on node") {
+		return fmt.Errorf("%v\n\nAdditional Info: The pod is trying to attach a pdDisk volume that is already attached and being used by another pod.\nMultiple pods can attach to the same pdDisk as long as they are accessed in ReadOnly mode.\n", inErr)
+	}
+	if strings.Contains(inErr.Error(), "failed to fetch PVC") || (strings.Contains(inErr.Error(), "persistentvolumeclaims") && (strings.Contains(inErr.Error(), "not found"))) {
+		return fmt.Errorf("%v\n\nAdditional Info: Check the pod spec to make sure the persistentVolumeClaim.name correctly matches the actual PVC name.\n", inErr)
+	}
+	if strings.Contains(inErr.Error(), "already formatted with") {
+		return fmt.Errorf("%v\n\nAdditional Info: The volume is already formatted, and can not be reformatted or all data will be lost.\n", inErr)
+	}
+
+	return inErr
 }
 
 func makeGlobalPDName(host volume.VolumeHost, devName string) string {

@@ -101,7 +101,7 @@ func (plugin *rbdPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.Vo
 	if source.SecretRef != nil {
 		if secret, err = parsePodSecret(pod, source.SecretRef.Name, plugin.host.GetKubeClient()); err != nil {
 			glog.Errorf("Couldn't get secret from %v/%v", pod.Namespace, source.SecretRef)
-			return nil, err
+			return nil, RbdMountErrorHint(err)
 		}
 	}
 
@@ -382,7 +382,7 @@ func (b *rbd) GetAttributes() volume.Attributes {
 }
 
 func (b *rbdMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+	return RbdMountErrorHint(b.SetUpAt(b.GetPath(), fsGroup))
 }
 
 func (b *rbdMounter) SetUpAt(dir string, fsGroup *int64) error {
@@ -393,6 +393,30 @@ func (b *rbdMounter) SetUpAt(dir string, fsGroup *int64) error {
 		glog.Errorf("rbd: failed to setup mount %s %v", dir, err)
 	}
 	return err
+}
+
+// RbdMountErrorHint performs some basic analysis
+// on the current mount error returned from the plugin
+// and will add a user hint or resolution tip for enhanced UXP
+// If no matches then original error is returned
+func RbdMountErrorHint (inErr error) error {
+	if inErr == nil {
+		return nil
+	}
+	if dstrings.Contains(inErr.Error(), "lstat") && dstrings.Contains(inErr.Error(), "permission denied") {
+		return fmt.Errorf("%v\nAdditional Info: The pod is running, and the mount succeeded, however the mount is not accessible due to permissions.\nCheck the permissions on your mounted directory.\nIf needed, containers and pods can utilize and pass in a securityContext specifying runAsUser (uid/owner), or additional linux groups such as fsGroup (for block).\nWork with the storage adminstrator to ensure correct volume access.\n", inErr)
+	}
+	if dstrings.Contains(inErr.Error(), "failed to fetch PVC") || (dstrings.Contains(inErr.Error(), "persistentvolumeclaims") && (dstrings.Contains(inErr.Error(), "not found"))) {
+		return fmt.Errorf("%v\n\nAdditional Info: Check the pod spec to make sure the persistentVolumeClaim.name correctly matches the actual PVC name.\n", inErr)
+	}
+	if dstrings.Contains(inErr.Error(), "secrets") && dstrings.Contains(inErr.Error(), "missing") {
+		return fmt.Errorf("%v\n\nAdditional Info: Make sure the above secret exists.  Secret is needed for rbd mount and access.\n", inErr)
+	}
+	if dstrings.Contains(inErr.Error(), "already formatted with") {
+		return fmt.Errorf("%v\n\nAdditional Info: The volume is already formatted, and can not be reformatted or all data will be lost.\n", inErr)
+	}
+
+	return inErr
 }
 
 type rbdUnmounter struct {

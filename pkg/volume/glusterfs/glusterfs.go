@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
+	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -118,7 +118,7 @@ func (plugin *glusterfsPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ vol
 	ep, err := plugin.host.GetKubeClient().Core().Endpoints(ns).Get(ep_name)
 	if err != nil {
 		glog.Errorf("glusterfs: failed to get endpoints %s[%v]", ep_name, err)
-		return nil, err
+		return nil, GlusterFsMountErrorHint(err)
 	}
 	glog.V(1).Infof("glusterfs: endpoints %v", ep)
 	return plugin.newMounterInternal(spec, ep, pod, plugin.host.GetMounter(), exec.New())
@@ -209,7 +209,7 @@ func (b *glusterfsMounter) GetAttributes() volume.Attributes {
 
 // SetUp attaches the disk and bind mounts to the volume path.
 func (b *glusterfsMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+	return GlusterFsMountErrorHint(b.SetUpAt(b.GetPath(), fsGroup))
 }
 
 func (b *glusterfsMounter) SetUpAt(dir string, fsGroup *int64) error {
@@ -234,9 +234,41 @@ func (b *glusterfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	return err
 }
 
+// GlusterFsMountErrorHint performs some basic analysis
+// on the current mount error returned from the plugin
+// and will add a user hint or resolution tip for enhanced UXP
+// If no matches then original error is returned
+func GlusterFsMountErrorHint (inErr error) error {
+	if inErr == nil {
+		return nil
+	}
+	if dstrings.Contains(inErr.Error(), "lstat") && dstrings.Contains(inErr.Error(), "permission denied") {
+		return fmt.Errorf("%v\n\nAdditional Info: The pod is running, and the mount succeeded, however the mount is not accessible due to permissions.\nCheck the POSIX based permissions (owner, groups and others) on your mounted directory.\nIf needed, containers and pods can utilize and pass in a securityContext specifying runAsUser (uid/owner), or additional linux groups such as fsGroup (for block) or SupplementalGroups (for shared).\nWork with the storage adminstrator to ensure correct volume access.\n", inErr)
+	}
+	if dstrings.Contains(inErr.Error(), "endpoints") && dstrings.Contains(inErr.Error(), "not found") {
+		return fmt.Errorf("%v\n\nAdditional Info: Make sure the above endpoint exists, as they are needed for the node to communicate with the Gluster cluster.\nTo persist endpoints, they should be created as a service.\n", inErr)
+	}
+	if dstrings.Contains(inErr.Error(), "Connection timed out") || dstrings.Contains(inErr.Error(), "Transport endpoint is not connected") {
+		return fmt.Errorf("%v\n\nAdditional Info: Check and make sure the Gluster Server exists (ensure that correct IPAddress/Hostname was given in the endpoints) and is available/reachable.\n", inErr)
+	}
+	if dstrings.Contains(inErr.Error(), "failed to fetch PVC") || (dstrings.Contains(inErr.Error(), "persistentvolumeclaims") && (dstrings.Contains(inErr.Error(), "not found"))) {
+		return fmt.Errorf("%v\n\nAdditional Info: Check the pod spec to make sure the persistentVolumeClaim.name correctly matches the actual PVC name.\n", inErr)
+	}
+	if dstrings.Contains(inErr.Error(), "mount: unknown filesystem type") {
+		return fmt.Errorf("%v\n\nAdditional Info: Check and make sure the glusterfs-client package is installed (rpm -qa 'gluster*') on your nodes.\nIf not, install the client package on your nodes (i.e. yum install glusterfs-client -y).\nAfter installation to enable the gluster fuse client run 'modprobe fuse' on the node.\n", inErr)
+	}
+	// this should only get hit if an undefined error occurs or
+	// the gluster log file is not able to be read for some reason
+	if dstrings.Contains(inErr.Error(), "Mount failed. Please check the log") {
+		return fmt.Errorf("%v\n\nAdditional Info: Open the gluster log file, you can see this above in the mount arguments from the error (i.e. --log-file=<path>.\n", inErr)
+	}
+
+	return inErr
+}
+
 func (glusterfsVolume *glusterfs) GetPath() string {
 	name := glusterfsPluginName
-	return glusterfsVolume.plugin.host.GetPodVolumeDir(glusterfsVolume.pod.UID, strings.EscapeQualifiedNameForDisk(name), glusterfsVolume.volName)
+	return glusterfsVolume.plugin.host.GetPodVolumeDir(glusterfsVolume.pod.UID, kstrings.EscapeQualifiedNameForDisk(name), glusterfsVolume.volName)
 }
 
 type glusterfsUnmounter struct {
@@ -405,7 +437,7 @@ type glusterfsVolumeDeleter struct {
 
 func (d *glusterfsVolumeDeleter) GetPath() string {
 	name := glusterfsPluginName
-	return d.plugin.host.GetPodVolumeDir(d.glusterfsMounter.glusterfs.pod.UID, strings.EscapeQualifiedNameForDisk(name), d.glusterfsMounter.glusterfs.volName)
+	return d.plugin.host.GetPodVolumeDir(d.glusterfsMounter.glusterfs.pod.UID, kstrings.EscapeQualifiedNameForDisk(name), d.glusterfsMounter.glusterfs.volName)
 }
 
 func (d *glusterfsVolumeDeleter) Delete() error {
