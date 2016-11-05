@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -58,6 +59,7 @@ type DrainOptions struct {
 	mapper             meta.RESTMapper
 	nodeInfo           *resource.Info
 	out                io.Writer
+	errOut             io.Writer
 	typer              runtime.ObjectTyper
 }
 
@@ -157,8 +159,8 @@ var (
 		$ kubectl drain foo --grace-period=900`)
 )
 
-func NewCmdDrain(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &DrainOptions{factory: f, out: out, backOff: clockwork.NewRealClock()}
+func NewCmdDrain(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
+	options := &DrainOptions{factory: f, out: out, errOut: errOut, backOff: clockwork.NewRealClock()}
 
 	cmd := &cobra.Command{
 		Use:     "drain NODE",
@@ -226,16 +228,16 @@ func (o *DrainOptions) RunDrain() error {
 		return err
 	}
 
-	err := o.deletePodsSimple()
+	err := o.deleteOrEvictPodsSimple()
 	// TODO: update IsTooManyRequests() when the TooManyRequests(429) error returned from the API server has a non-empty Reason field
 	for i := 1; i <= maxPatchRetry && apierrors.IsTooManyRequests(err); i++ {
 		if i > triesBeforeBackOff {
 			currBackOffPeriod := time.Duration(math.Exp2(float64(i-triesBeforeBackOff))) * backOffPeriod
-			fmt.Fprintf(o.out, "Retry in %v\n", currBackOffPeriod)
+			fmt.Fprintf(o.errOut, "Retry in %v\n", currBackOffPeriod)
 			o.backOff.Sleep(currBackOffPeriod)
 		}
-		fmt.Fprintf(o.out, "Retrying\n")
-		err = o.deletePodsSimple()
+		fmt.Fprintf(o.errOut, "Retrying\n")
+		err = o.deleteOrEvictPodsSimple()
 	}
 	if err == nil {
 		cmdutil.PrintSuccess(o.mapper, false, o.out, "node", o.nodeInfo.Name, false, "drained")
@@ -243,7 +245,7 @@ func (o *DrainOptions) RunDrain() error {
 	return err
 }
 
-func (o *DrainOptions) deletePodsSimple() error {
+func (o *DrainOptions) deleteOrEvictPodsSimple() error {
 	pods, err := o.getPodsForDeletion()
 	if err != nil {
 		return err
@@ -251,15 +253,15 @@ func (o *DrainOptions) deletePodsSimple() error {
 	if o.Timeout == 0 {
 		o.Timeout = kubectl.Timeout + time.Duration(10*len(pods))*time.Second
 	}
-	err = o.deletePods(pods)
+	err = o.deleteOrEvictPods(pods)
 	if err != nil {
 		pendingPods, newErr := o.getPodsForDeletion()
 		if newErr != nil {
 			return newErr
 		}
-		fmt.Fprintf(o.out, "There are pending pods when an error occured: %v\n", err)
-		for _, pendindPod := range pendingPods {
-			cmdutil.PrintSuccess(o.mapper, true, o.out, "pod", pendindPod.Name, false, "")
+		fmt.Fprintf(o.errOut, "There are pending pods when an error occurred: %v\n", err)
+		for _, pendingPod := range pendingPods {
+			fmt.Fprintf(o.errOut, "%s/%s\n", "pod", pendingPod.Name)
 		}
 	}
 	return err
@@ -413,7 +415,7 @@ func (o *DrainOptions) getPodsForDeletion() (pods []api.Pod, err error) {
 		return []api.Pod{}, errors.New(fs.Message())
 	}
 	if len(ws) > 0 {
-		fmt.Fprintf(o.out, "WARNING: %s\n", ws.Message())
+		fmt.Fprintf(o.errOut, "WARNING: %s\n", ws.Message())
 	}
 	return pods, nil
 }
@@ -435,8 +437,8 @@ func (o *DrainOptions) evictPod(pod api.Pod) error {
 	}
 	eviction := &policy.Eviction{
 		TypeMeta: unversioned.TypeMeta{
-			APIVersion: "policy/v1alpha1",
-			Kind:       "Eviction",
+			APIVersion: internalversion.PolicyAPIVersion,
+			Kind:       internalversion.EvictionKind,
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name:      pod.Name,
@@ -448,40 +450,25 @@ func (o *DrainOptions) evictPod(pod api.Pod) error {
 	return o.client.Policy().Evictions(eviction.Namespace).Evict(eviction)
 }
 
-// deletePods deletes the pods on the api server
-func (o *DrainOptions) deletePods(pods []api.Pod) error {
+// deleteOrEvictPods deletes or evicts the pods on the api server
+func (o *DrainOptions) deleteOrEvictPods(pods []api.Pod) error {
 	if len(pods) == 0 {
 		return nil
 	}
 
-	supportEviction, err := doesSupportEviction(o.client)
+	supportEviction, err := SupportEviction(o.client)
 	if err != nil {
 		return err
 	}
 
-	if supportEviction {
-		ifTooManyRequests := false
-		var e error
-		for _, pod := range pods {
-			err := o.evictPod(pod)
-			if apierrors.IsTooManyRequests(err) {
-				e = err
-				ifTooManyRequests = true
-				continue
-			}
-			if err != nil {
-				return err
-			}
+	for _, pod := range pods {
+		if supportEviction {
+			err = o.evictPod(pod)
+		} else {
+			err = o.deletePod(pod)
 		}
-		if ifTooManyRequests {
-			return e
-		}
-	} else {
-		for _, pod := range pods {
-			err := o.deletePod(pod)
-			if err != nil {
-				return err
-			}
+		if err != nil {
+			return err
 		}
 	}
 
@@ -515,14 +502,14 @@ func (o *DrainOptions) waitForDelete(pods []api.Pod, interval, timeout time.Dura
 	return pods, err
 }
 
-// Use Discovery API to find out if the server support eviction subresource
-func doesSupportEviction(clientset *internalclientset.Clientset) (bool, error) {
+// SupportEviction uses Discovery API to find out if the server support eviction subresource
+func SupportEviction(clientset *internalclientset.Clientset) (bool, error) {
 	resourceList, err := clientset.Discovery().ServerResourcesForGroupVersion("v1")
 	if err != nil {
 		return false, err
 	}
 	for _, resource := range resourceList.APIResources {
-		if resource.Name == "pods/eviction" && resource.Kind == "Eviction" {
+		if resource.Name == internalversion.EvictionSubresource && resource.Kind == internalversion.EvictionKind {
 			return true, nil
 		}
 	}

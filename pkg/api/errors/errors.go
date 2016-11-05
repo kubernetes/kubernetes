@@ -415,6 +415,7 @@ func IsInternalError(err error) bool {
 
 // IsTooManyRequests determines if err is an error which indicates that there are too many requests
 // that the server cannot handle.
+// TODO: update IsTooManyRequests() when the TooManyRequests(429) error returned from the API server has a non-empty Reason field
 func IsTooManyRequests(err error) bool {
 	switch t := err.(type) {
 	case APIStatus:
