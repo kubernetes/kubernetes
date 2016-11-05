@@ -220,7 +220,7 @@ func (fdc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
 	// Wait until the cluster is synced to prevent the update storm at the very beginning.
 	for !fdc.isSynced() {
 		time.Sleep(5 * time.Millisecond)
-		glog.Infof("Waiting for controller to sync up")
+		glog.V(3).Infof("Waiting for controller to sync up")
 	}
 
 	for i := 0; i < workers; i++ {
