@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 )
 
-func NewCmdToken(out io.Writer) *cobra.Command {
+func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	tokenCmd := &cobra.Command{
 		Use:   "token",
 		Short: "Manage bootstrap tokens",
@@ -61,7 +61,7 @@ func NewCmdToken(out io.Writer) *cobra.Command {
 		Use:   "list",
 		Short: "List bootstrap tokens on the server.",
 		Run: func(tokenCmd *cobra.Command, args []string) {
-			err := RunListTokens(out, tokenCmd)
+			err := RunListTokens(out, errW, tokenCmd)
 			kubeadmutil.CheckErr(err)
 		},
 	}
@@ -102,7 +102,7 @@ func RunCreateToken(out io.Writer, cmd *cobra.Command, tokenDuration time.Durati
 }
 
 // RunListTokens lists details on all existing bootstrap tokens on the server.
-func RunListTokens(out io.Writer, cmd *cobra.Command) error {
+func RunListTokens(out io.Writer, errW io.Writer, cmd *cobra.Command) error {
 	client, err := kubemaster.CreateClientFromFile(path.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "admin.conf"))
 	if err != nil {
 		return err
@@ -125,13 +125,30 @@ func RunListTokens(out io.Writer, cmd *cobra.Command) error {
 	w := tabwriter.NewWriter(out, 10, 4, 3, ' ', 0)
 	fmt.Fprintln(w, "ID\tTOKEN\tEXPIRATION")
 	for _, secret := range results.Items {
-		tokenId := secret.Data["token-id"]
-		token := fmt.Sprintf("%s.%s", tokenId, secret.Data["token-secret"])
-		expireTime, err := time.Parse(time.RFC3339, string(secret.Data["expiration"]))
-		if err != nil {
-			return fmt.Errorf("<cmd/token> error parsing expiry time [%v]", err)
+		tokenId, ok := secret.Data["token-id"]
+		if !ok {
+			fmt.Fprintf(errW, "<cmd/token> bootstrap token has no token-id data: %s\n", secret.Name)
+			continue
 		}
-		expires := kubectl.ShortHumanDuration(expireTime.Sub(time.Now()))
+
+		tokenSecret, ok := secret.Data["token-secret"]
+		if !ok {
+			fmt.Fprintf(errW, "<cmd/token> bootstrap token has no token-secret data: %s\n", secret.Name)
+			continue
+		}
+		token := fmt.Sprintf("%s.%s", tokenId, tokenSecret)
+
+		// Expiration time is optional, if not specified this implies the token
+		// never expires.
+		expires := "<never>"
+		secretExpiration, ok := secret.Data["expiration"]
+		if ok {
+			expireTime, err := time.Parse(time.RFC3339, string(secretExpiration))
+			if err != nil {
+				return fmt.Errorf("<cmd/token> error parsing expiry time [%v]", err)
+			}
+			expires = kubectl.ShortHumanDuration(expireTime.Sub(time.Now()))
+		}
 		fmt.Fprintf(w, "%s\t%s\t%s\n", tokenId, token, expires)
 	}
 	w.Flush()
