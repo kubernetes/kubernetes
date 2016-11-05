@@ -53,18 +53,13 @@ import (
 )
 
 const (
-	// TODO(madhusudancs): Consider making this configurable via a flag.
-	// "federation-apiserver-kubeconfig" is a reserved secret name which
-	// stores the kubeconfig for federation-apiserver.
-	KubeconfigSecretName = "federation-apiserver-kubeconfig"
-	// "federation-apiserver-secret" was the old name we used to store
-	// Federation API server kubeconfig secret. Unfortunately, this name
-	// is very close to "federation-apiserver-secrets" and causes a lot
-	// of confusion, particularly while debugging. So deprecating it in
-	// favor of the new name but giving people time to migrate.
-	// TODO(madhusudancs): this name is deprecated in 1.4 and should be
-	// removed in 1.5. Remove it in 1.5.
-	DeprecatedKubeconfigSecretName = "federation-apiserver-secret"
+	// "federation-apiserver-kubeconfig" was the old name we used to
+	// store Federation API server kubeconfig secret. We are
+	// deprecating it in favor of `--kubeconfig` flag but giving people
+	// time to migrate.
+	// TODO(madhusudancs): this name is deprecated in 1.5 and should be
+	// removed in 1.6. Remove it in 1.6.
+	DeprecatedKubeconfigSecretName = "federation-apiserver-kubeconfig"
 )
 
 // NewControllerManagerCommand creates a *cobra.Command object with default parameters
@@ -95,17 +90,28 @@ func Run(s *options.CMServer) error {
 	} else {
 		glog.Errorf("unable to register configz: %s", err)
 	}
-	// Create the config to talk to federation-apiserver.
-	kubeconfigGetter := util.KubeconfigGetterForSecret(KubeconfigSecretName)
-	restClientCfg, err := clientcmd.BuildConfigFromKubeconfigGetter(s.Master, kubeconfigGetter)
-	if err != nil || restClientCfg == nil {
-		// Retry with the deprecated name in 1.4.
-		// TODO(madhusudancs): Remove this in 1.5.
-		var depErr error
-		kubeconfigGetter := util.KubeconfigGetterForSecret(DeprecatedKubeconfigSecretName)
-		restClientCfg, depErr = clientcmd.BuildConfigFromKubeconfigGetter(s.Master, kubeconfigGetter)
-		if depErr != nil {
-			return fmt.Errorf("failed to find the secret containing Federation API server kubeconfig, tried the secret name %s and the deprecated name %s: %v, %v", KubeconfigSecretName, DeprecatedKubeconfigSecretName, err, depErr)
+
+	// If s.Kubeconfig flag is empty, try with the deprecated name in 1.5.
+	// TODO(madhusudancs): Remove this in 1.6.
+	var restClientCfg *restclient.Config
+	var err error
+	if len(s.Kubeconfig) <= 0 {
+		restClientCfg, err = restClientConfigFromSecret(s.Master)
+		if err != nil {
+			return err
+		}
+	} else {
+		// Create the config to talk to federation-apiserver.
+		restClientCfg, err = clientcmd.BuildConfigFromFlags(s.Master, s.Kubeconfig)
+		if err != nil || restClientCfg == nil {
+			// Retry with the deprecated name in 1.5.
+			// TODO(madhusudancs): Remove this in 1.6.
+			glog.V(2).Infof("Couldn't build the rest client config from flags: %v", err)
+			glog.V(2).Infof("Trying with deprecated secret: %s", DeprecatedKubeconfigSecretName)
+			restClientCfg, err = restClientConfigFromSecret(s.Master)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -191,4 +197,15 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 	}
 
 	select {}
+}
+
+// TODO(madhusudancs): Remove this in 1.6. This is only temporary to give an
+// upgrade path in 1.4/1.5.
+func restClientConfigFromSecret(master string) (*restclient.Config, error) {
+	kubeconfigGetter := util.KubeconfigGetterForSecret(DeprecatedKubeconfigSecretName)
+	restClientCfg, err := clientcmd.BuildConfigFromKubeconfigGetter(master, kubeconfigGetter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find the Federation API server kubeconfig, tried the --kubeconfig flag and the deprecated secret %s: %v", DeprecatedKubeconfigSecretName, err)
+	}
+	return restClientCfg, nil
 }
