@@ -468,6 +468,7 @@ k8s.io/kubernetes/cmd/kubeadm/app/cmd,caesarxuchao,1
 k8s.io/kubernetes/cmd/kubeadm/app/images,davidopp,1
 k8s.io/kubernetes/cmd/kubeadm/app/preflight,apprenda,0
 k8s.io/kubernetes/cmd/kubeadm/app/util,krousey,1
+k8s.io/kubernetes/cmd/kubeadm/test,pipejakob,0
 k8s.io/kubernetes/cmd/kubelet/app,hurf,1
 k8s.io/kubernetes/cmd/libs/go2idl/client-gen/types,caesarxuchao,0
 k8s.io/kubernetes/cmd/libs/go2idl/go-to-protobuf/protobuf,smarterclayton,0

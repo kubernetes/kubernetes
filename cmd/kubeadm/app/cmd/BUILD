@@ -17,6 +17,7 @@ go_library(
         "init.go",
         "join.go",
         "reset.go",
+        "token.go",
         "version.go",
     ],
     tags = ["automanaged"],
@@ -43,7 +44,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["reset_test.go"],
+    srcs = [
+        "reset_test.go",
+        "token_test.go",
+    ],
     library = "go_default_library",
     tags = ["automanaged"],
     deps = ["//cmd/kubeadm/app/preflight:go_default_library"],
