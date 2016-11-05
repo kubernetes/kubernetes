@@ -144,7 +144,7 @@ func cleanupKubectlInputs(fileContents string, ns string, selectors ...string) {
 	}
 	// support backward compatibility : file paths or raw json - since we are removing file path
 	// dependencies from this test.
-	framework.RunKubectlOrDieInput(fileContents, "delete", "--grace-period=0", "-f", "-", nsArg)
+	framework.RunKubectlOrDieInput(fileContents, "delete", "--grace-period=0", "--force", "-f", "-", nsArg)
 	framework.AssertCleanup(ns, selectors...)
 }
 
