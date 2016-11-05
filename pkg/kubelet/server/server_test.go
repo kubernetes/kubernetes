@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/term"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -196,6 +197,7 @@ type serverTestFramework struct {
 	fakeKubelet     *fakeKubelet
 	fakeAuth        *fakeAuth
 	testHTTPServer  *httptest.Server
+	criHandler      *utiltesting.FakeHandler
 }
 
 func newServerTest() *serverTestFramework {
@@ -225,13 +227,16 @@ func newServerTest() *serverTestFramework {
 			return true, "", nil
 		},
 	}
+	fw.criHandler = &utiltesting.FakeHandler{
+		StatusCode: http.StatusOK,
+	}
 	server := NewServer(
 		fw.fakeKubelet,
 		stats.NewResourceAnalyzer(fw.fakeKubelet, time.Minute, &kubecontainertesting.FakeRuntime{}),
 		fw.fakeAuth,
 		true,
 		&kubecontainertesting.Mock{},
-		nil)
+		fw.criHandler)
 	fw.serverUnderTest = &server
 	fw.testHTTPServer = httptest.NewServer(fw.serverUnderTest)
 	return fw
@@ -646,7 +651,8 @@ func TestAuthFilters(t *testing.T) {
 			isSubpath(path, "/pods"),
 			isSubpath(path, "/portForward"),
 			isSubpath(path, "/run"),
-			isSubpath(path, "/runningpods"):
+			isSubpath(path, "/runningpods"),
+			isSubpath(path, "/cri"):
 			return "proxy"
 
 		default:
@@ -1629,4 +1635,20 @@ func TestServePortForward(t *testing.T) {
 
 		<-portForwardFuncDone
 	}
+}
+
+func TestCRIHandler(t *testing.T) {
+	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
+
+	const (
+		path  = "/cri/exec/123456abcdef"
+		query = "cmd=echo+foo"
+	)
+	resp, err := http.Get(fw.testHTTPServer.URL + path + "?" + query)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "GET", fw.criHandler.RequestReceived.Method)
+	assert.Equal(t, path, fw.criHandler.RequestReceived.URL.Path)
+	assert.Equal(t, query, fw.criHandler.RequestReceived.URL.RawQuery)
 }
