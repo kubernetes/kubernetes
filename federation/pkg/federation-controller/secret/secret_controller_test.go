@@ -24,6 +24,8 @@ import (
 
 	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fake_fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/fake"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -43,6 +45,7 @@ func TestSecretController(t *testing.T) {
 	RegisterFakeList("clusters", &fakeClient.Fake, &federation_api.ClusterList{Items: []federation_api.Cluster{*cluster1}})
 	RegisterFakeList("secrets", &fakeClient.Fake, &api_v1.SecretList{Items: []api_v1.Secret{}})
 	secretWatch := RegisterFakeWatch("secrets", &fakeClient.Fake)
+	secretUpdateChan := RegisterFakeCopyOnUpdate("secrets", &fakeClient.Fake, secretWatch)
 	clusterWatch := RegisterFakeWatch("clusters", &fakeClient.Fake)
 
 	cluster1Client := &fake_kubeclientset.Clientset{}
@@ -57,8 +60,7 @@ func TestSecretController(t *testing.T) {
 	cluster2CreateChan := RegisterFakeCopyOnCreate("secrets", &cluster2Client.Fake, cluster2Watch)
 
 	secretController := NewSecretController(fakeClient)
-	informer := ToFederatedInformerForTestOnly(secretController.secretFederatedInformer)
-	informer.SetClientFactory(func(cluster *federation_api.Cluster) (kubeclientset.Interface, error) {
+	informerClientFactory := func(cluster *federation_api.Cluster) (kubeclientset.Interface, error) {
 		switch cluster.Name {
 		case cluster1.Name:
 			return cluster1Client, nil
@@ -67,7 +69,8 @@ func TestSecretController(t *testing.T) {
 		default:
 			return nil, fmt.Errorf("Unknown cluster")
 		}
-	})
+	}
+	setClientFactory(secretController.secretFederatedInformer, informerClientFactory)
 
 	secretController.clusterAvailableDelay = time.Second
 	secretController.secretReviewDelay = 50 * time.Millisecond
@@ -92,6 +95,11 @@ func TestSecretController(t *testing.T) {
 
 	// Test add federated secret.
 	secretWatch.Add(&secret1)
+	updatedSecret := GetSecretFromChan(secretUpdateChan)
+	assert.True(t, secretController.hasFinalizerFunc(updatedSecret, deletionhelper.FinalizerDeleteFromUnderlyingClusters))
+	secret1 = *updatedSecret
+
+	// Verify that the secret is created in underlying cluster1.
 	createdSecret := GetSecretFromChan(cluster1CreateChan)
 	assert.NotNil(t, createdSecret)
 	assert.Equal(t, secret1.Namespace, createdSecret.Namespace)
@@ -109,7 +117,7 @@ func TestSecretController(t *testing.T) {
 		"A": "B",
 	}
 	secretWatch.Modify(&secret1)
-	updatedSecret := GetSecretFromChan(cluster1UpdateChan)
+	updatedSecret = GetSecretFromChan(cluster1UpdateChan)
 	assert.NotNil(t, updatedSecret)
 	assert.Equal(t, secret1.Name, updatedSecret.Name)
 	assert.Equal(t, secret1.Namespace, updatedSecret.Namespace)
@@ -137,9 +145,18 @@ func TestSecretController(t *testing.T) {
 	close(stop)
 }
 
+func setClientFactory(informer util.FederatedInformer, informerClientFactory func(*federation_api.Cluster) (kubeclientset.Interface, error)) {
+	testInformer := ToFederatedInformerForTestOnly(informer)
+	testInformer.SetClientFactory(informerClientFactory)
+}
+
 func secretsEqual(a, b api_v1.Secret) bool {
+	// Clear the SelfLink and ObjectMeta.Finalizers since they will be different
+	// in resoure in federation control plane and resource in underlying cluster.
 	a.SelfLink = ""
 	b.SelfLink = ""
+	a.ObjectMeta.Finalizers = []string{}
+	b.ObjectMeta.Finalizers = []string{}
 	return reflect.DeepEqual(a, b)
 }
 

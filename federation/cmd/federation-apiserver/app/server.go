@@ -210,8 +210,10 @@ func Run(s *options.ServerRunOptions) error {
 	routes.UIRedirect{}.Install(m.HandlerContainer)
 	routes.Logs{}.Install(m.HandlerContainer)
 
+	// TODO: Refactor this code to share it with kube-apiserver rather than duplicating it here.
 	restOptionsFactory := restOptionsFactory{
 		storageFactory:          storageFactory,
+		enableGarbageCollection: s.GenericServerRunOptions.EnableGarbageCollection,
 		deleteCollectionWorkers: s.GenericServerRunOptions.DeleteCollectionWorkers,
 	}
 	if s.GenericServerRunOptions.EnableWatchCache {
@@ -233,6 +235,7 @@ type restOptionsFactory struct {
 	storageFactory          genericapiserver.StorageFactory
 	storageDecorator        generic.StorageDecorator
 	deleteCollectionWorkers int
+	enableGarbageCollection bool
 }
 
 func (f restOptionsFactory) NewFor(resource unversioned.GroupResource) generic.RESTOptions {
@@ -245,5 +248,6 @@ func (f restOptionsFactory) NewFor(resource unversioned.GroupResource) generic.R
 		Decorator:               f.storageDecorator,
 		DeleteCollectionWorkers: f.deleteCollectionWorkers,
 		ResourcePrefix:          f.storageFactory.ResourcePrefix(resource),
+		EnableGarbageCollection: f.enableGarbageCollection,
 	}
 }

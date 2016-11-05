@@ -356,7 +356,7 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 	// underlying clusters.
 	// This ensures that the dependent namespaces are deleted in underlying
 	// clusters when the federated namespace is deleted.
-	updatedNamespaceObj, err := nc.deletionHelper.EnsureDeleteFromUnderlyingClustersFinalizer(baseNamespace)
+	updatedNamespaceObj, err := nc.deletionHelper.EnsureFinalizers(baseNamespace)
 	if err != nil {
 		glog.Errorf("Failed to ensure delete object from underlying clusters finalizer in namespace %s: %v",
 			baseNamespace.Name, err)

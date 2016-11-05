@@ -17,13 +17,16 @@ limitations under the License.
 package secret
 
 import (
+	"fmt"
 	"time"
 
 	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -68,6 +71,8 @@ type SecretController struct {
 
 	// For events
 	eventRecorder record.EventRecorder
+
+	deletionHelper *deletionhelper.DeletionHelper
 
 	secretReviewDelay     time.Duration
 	clusterAvailableDelay time.Duration
@@ -162,7 +167,71 @@ func NewSecretController(client federationclientset.Interface) *SecretController
 			err := client.Core().Secrets(secret.Namespace).Delete(secret.Name, &api_v1.DeleteOptions{})
 			return err
 		})
+
+	secretcontroller.deletionHelper = deletionhelper.NewDeletionHelper(
+		secretcontroller.hasFinalizerFunc,
+		secretcontroller.removeFinalizerFunc,
+		secretcontroller.addFinalizerFunc,
+		// objNameFunc
+		func(obj pkg_runtime.Object) string {
+			secret := obj.(*api_v1.Secret)
+			return secret.Name
+		},
+		secretcontroller.updateTimeout,
+		secretcontroller.eventRecorder,
+		secretcontroller.secretFederatedInformer,
+		secretcontroller.federatedUpdater,
+	)
+
 	return secretcontroller
+}
+
+// Returns true if the given object has the given finalizer in its ObjectMeta.
+func (secretcontroller *SecretController) hasFinalizerFunc(obj pkg_runtime.Object, finalizer string) bool {
+	secret := obj.(*api_v1.Secret)
+	for i := range secret.ObjectMeta.Finalizers {
+		if string(secret.ObjectMeta.Finalizers[i]) == finalizer {
+			return true
+		}
+	}
+	return false
+}
+
+// Removes the finalizer from the given objects ObjectMeta.
+// Assumes that the given object is a secret.
+func (secretcontroller *SecretController) removeFinalizerFunc(obj pkg_runtime.Object, finalizer string) (pkg_runtime.Object, error) {
+	secret := obj.(*api_v1.Secret)
+	newFinalizers := []string{}
+	hasFinalizer := false
+	for i := range secret.ObjectMeta.Finalizers {
+		if string(secret.ObjectMeta.Finalizers[i]) != finalizer {
+			newFinalizers = append(newFinalizers, secret.ObjectMeta.Finalizers[i])
+		} else {
+			hasFinalizer = true
+		}
+	}
+	if !hasFinalizer {
+		// Nothing to do.
+		return obj, nil
+	}
+	secret.ObjectMeta.Finalizers = newFinalizers
+	secret, err := secretcontroller.federatedApiClient.Core().Secrets(secret.Namespace).Update(secret)
+	if err != nil {
+		return nil, fmt.Errorf("failed to remove finalizer %s from secret %s: %v", finalizer, secret.Name, err)
+	}
+	return secret, nil
+}
+
+// Adds the given finalizer to the given objects ObjectMeta.
+// Assumes that the given object is a secret.
+func (secretcontroller *SecretController) addFinalizerFunc(obj pkg_runtime.Object, finalizer string) (pkg_runtime.Object, error) {
+	secret := obj.(*api_v1.Secret)
+	secret.ObjectMeta.Finalizers = append(secret.ObjectMeta.Finalizers, finalizer)
+	secret, err := secretcontroller.federatedApiClient.Core().Secrets(secret.Namespace).Update(secret)
+	if err != nil {
+		return nil, fmt.Errorf("failed to add finalizer %s to secret %s: %v", finalizer, secret.Name, err)
+	}
+	return secret, nil
 }
 
 func (secretcontroller *SecretController) Run(stopChan <-chan struct{}) {
@@ -229,7 +298,6 @@ func (secretcontroller *SecretController) reconcileSecretsOnClusterChange() {
 }
 
 func (secretcontroller *SecretController) reconcileSecret(secret types.NamespacedName) {
-
 	if !secretcontroller.isSynced() {
 		secretcontroller.deliverSecret(secret, secretcontroller.clusterAvailableDelay, false)
 		return
@@ -248,6 +316,32 @@ func (secretcontroller *SecretController) reconcileSecret(secret types.Namespace
 		return
 	}
 	baseSecret := baseSecretObj.(*api_v1.Secret)
+	if baseSecret.DeletionTimestamp != nil {
+		if err := secretcontroller.delete(baseSecret); err != nil {
+			glog.Errorf("Failed to delete %s: %v", secret, err)
+			secretcontroller.eventRecorder.Eventf(baseSecret, api.EventTypeNormal, "DeleteFailed",
+				"Secret delete failed: %v", err)
+			secretcontroller.deliverSecret(secret, 0, true)
+		}
+		return
+	}
+
+	glog.V(3).Infof("Ensuring delete object from underlying clusters finalizer for secret: %s",
+		baseSecret.Name)
+	// Add the required finalizers before creating a secret in
+	// underlying clusters.
+	// This ensures that the dependent secrets are deleted in underlying
+	// clusters when the federated secret is deleted.
+	updatedSecretObj, err := secretcontroller.deletionHelper.EnsureFinalizers(baseSecret)
+	if err != nil {
+		glog.Errorf("Failed to ensure delete object from underlying clusters finalizer in secret %s: %v",
+			baseSecret.Name, err)
+		secretcontroller.deliverSecret(secret, 0, false)
+		return
+	}
+	baseSecret = updatedSecretObj.(*api_v1.Secret)
+
+	glog.V(3).Infof("Syncing secret %s in underlying clusters", baseSecret.Name)
 
 	clusters, err := secretcontroller.secretFederatedInformer.GetReadyClusters()
 	if err != nil {
@@ -315,4 +409,25 @@ func (secretcontroller *SecretController) reconcileSecret(secret types.Namespace
 
 	// Evertyhing is in order but lets be double sure
 	secretcontroller.deliverSecret(secret, secretcontroller.secretReviewDelay, false)
+}
+
+// delete deletes the given secret or returns error if the deletion was not complete.
+func (secretcontroller *SecretController) delete(secret *api_v1.Secret) error {
+	glog.V(3).Infof("Handling deletion of secret: %v", *secret)
+	// Delete the secret from all underlying clusters.
+	_, err := secretcontroller.deletionHelper.HandleObjectInUnderlyingClusters(secret)
+	if err != nil {
+		return err
+	}
+
+	err = secretcontroller.federatedApiClient.Core().Secrets(secret.Namespace).Delete(secret.Name, nil)
+	if err != nil {
+		// Its all good if the error is not found error. That means it is deleted already and we do not have to do anything.
+		// This is expected when we are processing an update as a result of secret finalizer deletion.
+		// The process that deleted the last finalizer is also going to delete the secret and we do not have to do anything.
+		if !errors.IsNotFound(err) {
+			return fmt.Errorf("failed to delete secret: %v", err)
+		}
+	}
+	return nil
 }
