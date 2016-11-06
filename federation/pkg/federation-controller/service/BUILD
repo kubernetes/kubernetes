@@ -50,6 +50,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "dns_test.go",
         "endpoint_helper_test.go",
         "service_helper_test.go",
         "servicecontroller_test.go",

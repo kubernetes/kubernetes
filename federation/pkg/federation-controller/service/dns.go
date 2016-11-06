@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
+	"strings"
 )
 
 const (
@@ -89,22 +90,28 @@ func (s *ServiceController) getClusterZoneNames(clusterName string) (zones []str
 	return client.cluster.Status.Zones, client.cluster.Status.Region, nil
 }
 
-// getFederationDNSZoneName returns the name of the managed DNS Zone configured for this federation
-func (s *ServiceController) getFederationDNSZoneName() (string, error) {
-	return s.zoneName, nil
+// getServiceDnsSuffix returns the DNS suffix to use when creating federated-service DNS records
+func (s *ServiceController) getServiceDnsSuffix() (string, error) {
+	return s.serviceDnsSuffix, nil
 }
 
-// getDnsZone is a hack around the fact that dnsprovider does not yet support a Get() method, only a List() method.  TODO:  Fix that.
+// getDnsZone returns the zone, as identified by zoneName
 func getDnsZone(dnsZoneName string, dnsZonesInterface dnsprovider.Zones) (dnsprovider.Zone, error) {
+	// TODO: We need query-by-name and query-by-id functions
 	dnsZones, err := dnsZonesInterface.List()
 	if err != nil {
 		return nil, err
 	}
+
+	findName := strings.TrimSuffix(dnsZoneName, ".")
 	for _, dnsZone := range dnsZones {
-		if dnsZone.Name() == dnsZoneName {
-			return dnsZone, nil
+		if findName != "" {
+			if strings.TrimSuffix(dnsZone.Name(), ".") == findName {
+				return dnsZone, nil
+			}
 		}
 	}
+
 	return nil, fmt.Errorf("DNS zone %s not found.", dnsZoneName)
 }
 
@@ -152,11 +159,7 @@ func getResolvedEndpoints(endpoints []string) ([]string, error) {
 /* ensureDnsRrsets ensures (idempotently, and with minimum mutations) that all of the DNS resource record sets for dnsName are consistent with endpoints.
    if endpoints is nil or empty, a CNAME record to uplevelCname is ensured.
 */
-func (s *ServiceController) ensureDnsRrsets(dnsZoneName, dnsName string, endpoints []string, uplevelCname string) error {
-	dnsZone, err := getDnsZone(dnsZoneName, s.dnsZones)
-	if err != nil {
-		return err
-	}
+func (s *ServiceController) ensureDnsRrsets(dnsZone dnsprovider.Zone, dnsName string, endpoints []string, uplevelCname string) error {
 	rrsets, supported := dnsZone.ResourceRecordSets()
 	if !supported {
 		return fmt.Errorf("Failed to ensure DNS records for %s. DNS provider does not support the ResourceRecordSets interface.", dnsName)
@@ -258,7 +261,7 @@ func (s *ServiceController) ensureDnsRrsets(dnsZoneName, dnsName string, endpoin
 
 /* ensureDnsRecords ensures (idempotently, and with minimum mutations) that all of the DNS records for a service in a given cluster are correct,
 given the current state of that service in that cluster.  This should be called every time the state of a service might have changed
-(either w.r.t. it's loadblancer address, or if the number of healthy backend endpoints for that service transitioned from zero to non-zero
+(either w.r.t. it's loadbalancer address, or if the number of healthy backend endpoints for that service transitioned from zero to non-zero
 (or vice verse).  Only shards of the service which have both a loadbalancer ingress IP address or hostname AND at least one healthy backend endpoint
 are included in DNS records for that service (at all of zone, region and global levels). All other addresses are removed.  Also, if no shards exist
 in the zone or region of the cluster, a CNAME reference to the next higher level is ensured to exist. */
@@ -298,7 +301,7 @@ func (s *ServiceController) ensureDnsRecords(clusterName string, cachedService *
 	if zoneNames == nil {
 		return fmt.Errorf("failed to get cluster zone names")
 	}
-	dnsZoneName, err := s.getFederationDNSZoneName()
+	serviceDnsSuffix, err := s.getServiceDnsSuffix()
 	if err != nil {
 		return err
 	}
@@ -309,16 +312,21 @@ func (s *ServiceController) ensureDnsRecords(clusterName string, cachedService *
 	commonPrefix := serviceName + "." + namespaceName + "." + s.federationName + ".svc"
 	// dnsNames is the path up the DNS search tree, starting at the leaf
 	dnsNames := []string{
-		commonPrefix + "." + zoneNames[0] + "." + regionName + "." + dnsZoneName, // zone level - TODO might need other zone names for multi-zone clusters
-		commonPrefix + "." + regionName + "." + dnsZoneName,                      // region level, one up from zone level
-		commonPrefix + "." + dnsZoneName,                                         // global level, one up from region level
+		commonPrefix + "." + zoneNames[0] + "." + regionName + "." + serviceDnsSuffix, // zone level - TODO might need other zone names for multi-zone clusters
+		commonPrefix + "." + regionName + "." + serviceDnsSuffix,                      // region level, one up from zone level
+		commonPrefix + "." + serviceDnsSuffix,                                         // global level, one up from region level
 		"", // nowhere to go up from global level
 	}
 
 	endpoints := [][]string{zoneEndpoints, regionEndpoints, globalEndpoints}
 
+	dnsZone, err := getDnsZone(s.zoneName, s.dnsZones)
+	if err != nil {
+		return err
+	}
+
 	for i, endpoint := range endpoints {
-		if err = s.ensureDnsRrsets(dnsZoneName, dnsNames[i], endpoint, dnsNames[i+1]); err != nil {
+		if err = s.ensureDnsRrsets(dnsZone, dnsNames[i], endpoint, dnsNames[i+1]); err != nil {
 			return err
 		}
 	}

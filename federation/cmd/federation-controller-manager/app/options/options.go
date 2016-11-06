@@ -39,6 +39,8 @@ type ControllerManagerConfiguration struct {
 	FederationName string `json:"federationName"`
 	// zone name, like example.com.
 	ZoneName string `json:"zoneName"`
+	// ServiceDnsSuffix is the dns suffix to use when publishing federated services.
+	ServiceDnsSuffix string `json:"serviceDnsSuffix"`
 	// dnsProvider is the provider for dns services.
 	DnsProvider string `json:"dnsProvider"`
 	// dnsConfigFile is the path to the dns provider configuration file.
@@ -101,6 +103,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(componentconfig.IPVar{Val: &s.Address}, "address", "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
 	fs.StringVar(&s.FederationName, "federation-name", s.FederationName, "Federation name.")
 	fs.StringVar(&s.ZoneName, "zone-name", s.ZoneName, "Zone name, like example.com.")
+	fs.StringVar(&s.ServiceDnsSuffix, "service-dns-suffix", s.ServiceDnsSuffix, "DNS Suffix to use when publishing federated service names.  Defaults to zone-name")
 	fs.IntVar(&s.ConcurrentServiceSyncs, "concurrent-service-syncs", s.ConcurrentServiceSyncs, "The number of service syncing operations that will be done concurrently. Larger number = faster endpoint updating, but more CPU (and network) load")
 	fs.IntVar(&s.ConcurrentReplicaSetSyncs, "concurrent-replicaset-syncs", s.ConcurrentReplicaSetSyncs, "The number of ReplicaSets syncing operations that will be done concurrently. Larger number = faster endpoint updating, but more CPU (and network) load")
 	fs.DurationVar(&s.ClusterMonitorPeriod.Duration, "cluster-monitor-period", s.ClusterMonitorPeriod.Duration, "The period for syncing ClusterStatus in ClusterController.")
