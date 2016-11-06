@@ -392,8 +392,22 @@ func (kl *Kubelet) setNodeAddress(node *api.Node) error {
 			}
 			return fmt.Errorf("failed to get node address from cloud provider that matches ip: %v", kl.nodeIP)
 		}
-		hostnameAddress := api.NodeAddress{Type: api.NodeHostName, Address: kl.GetHostname()}
-		node.Status.Addresses = append(nodeAddresses, hostnameAddress)
+
+		// Only add a NodeHostName address if the cloudprovider did not specify one
+		// (we assume the cloudprovider knows best)
+		var addressNodeHostName *api.NodeAddress
+		for i := range nodeAddresses {
+			if nodeAddresses[i].Type == api.NodeHostName {
+				addressNodeHostName = &nodeAddresses[i]
+				break
+			}
+		}
+		if addressNodeHostName == nil {
+			hostnameAddress := api.NodeAddress{Type: api.NodeHostName, Address: kl.GetHostname()}
+			node.Status.Addresses = append(nodeAddresses, hostnameAddress)
+		} else {
+			glog.V(2).Infof("Using Node Hostname from cloudprovider: %q", addressNodeHostName.Address)
+		}
 	} else {
 		var ipAddr net.IP
 		var err error
