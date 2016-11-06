@@ -26,8 +26,17 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-# This sets up a clean GOPATH and makes sure we are currently in it.
-kube::golang::setup_env
+CWD=$(pwd -P)
+IN_GOPATH=false
+for gp in ${GOPATH//:/ }; do
+    if [[ "${CWD#${gp}}" != "${CWD}" ]]; then
+        IN_GOPATH=true
+        break
+    fi
+done
+if [[ "${IN_GOPATH}" != "true" ]]; then
+    echo "Current directory must be under GOPATH" >/dev/stderr
+    exit 1
+fi
 
-# Run the user-provided command.
-"${@}"
+exit 0

@@ -32,6 +32,13 @@ set -o xtrace
 export HOME=${WORKSPACE} # Nothing should want Jenkins $HOME
 export PATH=$PATH:/usr/local/go/bin
 
+# Configure a real GOPATH.  The various go tools require this.  GOPATH is
+# already defined and other env vars have derived from it, so we can't really
+# change it.
+mkdir -p "${GOPATH}/src/k8s.io/kubernetes"
+mv $(ls -A | grep -v $(basename "${GOPATH}")) "${GOPATH}/src/k8s.io/kubernetes"
+cd "${GOPATH}/src/k8s.io/kubernetes"
+
 # Skip gcloud update checking
 export CLOUDSDK_COMPONENT_MANAGER_DISABLE_UPDATE_CHECK=true
 
