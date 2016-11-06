@@ -127,7 +127,7 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 	})
 
 	kubeClient := fake.NewSimpleClientset()
-	evaluator := NewPersistentVolumeClaimEvaluator(kubeClient)
+	evaluator := NewPersistentVolumeClaimEvaluator(kubeClient, nil)
 	testCases := map[string]struct {
 		pvc   *api.PersistentVolumeClaim
 		usage api.ResourceList
