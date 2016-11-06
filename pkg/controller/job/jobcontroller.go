@@ -24,21 +24,20 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	batchinternallisters "k8s.io/kubernetes/pkg/client/listers/batch/internalversion"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/informers"
-	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
-	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
 )
@@ -47,27 +46,21 @@ type JobController struct {
 	kubeClient clientset.Interface
 	podControl controller.PodControlInterface
 
-	// internalPodInformer is used to hold a personal informer.  If we're using
-	// a normal shared informer, then the informer will be started for us.  If
-	// we have a personal informer, we must start it ourselves.   If you start
-	// the controller using NewJobController(passing SharedInformer), this
-	// will be null
-	internalPodInformer cache.SharedInformer
-
 	// To allow injection of updateJobStatus for testing.
 	updateHandler func(job *batch.Job) error
 	syncHandler   func(jobKey string) error
 	// podStoreSynced returns true if the pod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
-	podStoreSynced func() bool
+	podStoreSynced cache.InformerSynced
+	// jobStoreSynced returns true if the job store has been synced at least once.
+	// Added as a member to the struct to allow injection for testing.
+	jobStoreSynced cache.InformerSynced
 
 	// A TTLCache of pod creates/deletes each rc expects to see
 	expectations controller.ControllerExpectationsInterface
 
-	// A store of job, populated by the jobController
-	jobStore cache.StoreToJobLister
-	// Watches changes to all jobs
-	jobController *cache.Controller
+	// A store of jobs
+	jobLister batchinternallisters.JobLister
 
 	// A store of pods, populated by the podController
 	podStore cache.StoreToPodLister
@@ -78,7 +71,7 @@ type JobController struct {
 	recorder record.EventRecorder
 }
 
-func NewJobController(podInformer cache.SharedIndexInformer, kubeClient clientset.Interface) *JobController {
+func NewJobController(podInformer cache.SharedIndexInformer, jobInformer informers.JobInformer, kubeClient clientset.Interface) *JobController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
@@ -99,28 +92,17 @@ func NewJobController(podInformer cache.SharedIndexInformer, kubeClient clientse
 		recorder:     eventBroadcaster.NewRecorder(api.EventSource{Component: "job-controller"}),
 	}
 
-	jm.jobStore.Store, jm.jobController = cache.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return jm.kubeClient.Batch().Jobs(api.NamespaceAll).List(options)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return jm.kubeClient.Batch().Jobs(api.NamespaceAll).Watch(options)
-			},
+	jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: jm.enqueueController,
+		UpdateFunc: func(old, cur interface{}) {
+			if job := cur.(*batch.Job); !IsJobFinished(job) {
+				jm.enqueueController(job)
+			}
 		},
-		&batch.Job{},
-		// TODO: Can we have much longer period here?
-		replicationcontroller.FullControllerResyncPeriod,
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: jm.enqueueController,
-			UpdateFunc: func(old, cur interface{}) {
-				if job := cur.(*batch.Job); !IsJobFinished(job) {
-					jm.enqueueController(job)
-				}
-			},
-			DeleteFunc: jm.enqueueController,
-		},
-	)
+		DeleteFunc: jm.enqueueController,
+	})
+	jm.jobLister = jobInformer.Lister()
+	jm.jobStoreSynced = jobInformer.Informer().HasSynced
 
 	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    jm.addPod,
@@ -135,30 +117,17 @@ func NewJobController(podInformer cache.SharedIndexInformer, kubeClient clientse
 	return jm
 }
 
-func NewJobControllerFromClient(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc) *JobController {
-	podInformer := informers.NewPodInformer(kubeClient, resyncPeriod())
-	jm := NewJobController(podInformer, kubeClient)
-	jm.internalPodInformer = podInformer
-
-	return jm
-}
-
 // Run the main goroutine responsible for watching and syncing jobs.
 func (jm *JobController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer jm.queue.ShutDown()
 
-	if !cache.WaitForCacheSync(stopCh, jm.podStoreSynced) {
+	if !cache.WaitForCacheSync(stopCh, jm.podStoreSynced, jm.jobStoreSynced) {
 		return
 	}
 
-	go jm.jobController.Run(stopCh)
 	for i := 0; i < workers; i++ {
 		go wait.Until(jm.worker, time.Second, stopCh)
-	}
-
-	if jm.internalPodInformer != nil {
-		go jm.internalPodInformer.Run(stopCh)
 	}
 
 	<-stopCh
@@ -167,7 +136,7 @@ func (jm *JobController) Run(workers int, stopCh <-chan struct{}) {
 
 // getPodJob returns the job managing the given pod.
 func (jm *JobController) getPodJob(pod *api.Pod) *batch.Job {
-	jobs, err := jm.jobStore.GetPodJobs(pod)
+	jobs, err := jm.jobLister.GetPodJobs(pod)
 	if err != nil {
 		glog.V(4).Infof("No jobs found for pod %v, job controller will avoid syncing", pod.Name)
 		return nil
@@ -315,16 +284,23 @@ func (jm *JobController) syncJob(key string) error {
 		glog.V(4).Infof("Finished syncing job %q (%v)", key, time.Now().Sub(startTime))
 	}()
 
-	obj, exists, err := jm.jobStore.Store.GetByKey(key)
-	if !exists {
-		glog.V(4).Infof("Job has been deleted: %v", key)
-		jm.expectations.DeleteExpectations(key)
-		return nil
-	}
+	ns, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		return err
 	}
-	job := *obj.(*batch.Job)
+	if len(ns) == 0 || len(name) == 0 {
+		return fmt.Errorf("invalid job key %q: either namespace or name is missing", key)
+	}
+	sharedJob, err := jm.jobLister.Jobs(ns).Get(name)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			glog.V(4).Infof("Job has been deleted: %v", key)
+			jm.expectations.DeleteExpectations(key)
+			return nil
+		}
+		return err
+	}
+	job := *sharedJob
 
 	// Check the expectations of the job before counting active pods, otherwise a new pod can sneak in
 	// and update the expectations after we've retrieved active pods from the store. If a new pod enters

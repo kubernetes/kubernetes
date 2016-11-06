@@ -406,7 +406,7 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 
 		if containsResource(resources, "jobs") {
 			glog.Infof("Starting job controller")
-			go job.NewJobController(sharedInformers.Pods().Informer(), client("job-controller")).
+			go job.NewJobController(sharedInformers.Pods().Informer(), sharedInformers.Jobs(), client("job-controller")).
 				Run(int(s.ConcurrentJobSyncs), wait.NeverStop)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
