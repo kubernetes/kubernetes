@@ -220,9 +220,9 @@ func newTestKubeletWithImageList(
 	require.NoError(t, err, "Failed to initialize eviction manager")
 
 	kubelet.evictionManager = evictionManager
-	kubelet.AddPodAdmitHandler(evictionAdmitHandler)
+	kubelet.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)
 	// Add this as cleanup predicate pod admitter
-	kubelet.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(kubelet.getNodeAnyWay))
+	kubelet.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(kubelet.getNodeAnyWay))
 
 	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
 	kubelet.volumePluginMgr, err =
@@ -1823,7 +1823,7 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 	podToAdmit := pods[1]
 	podsToReject := []*api.Pod{podToReject}
 
-	kl.AddPodAdmitHandler(&testPodAdmitHandler{podsToReject: podsToReject})
+	kl.admitHandlers.AddPodAdmitHandler(&testPodAdmitHandler{podsToReject: podsToReject})
 
 	kl.HandlePodAdditions(pods)
 	// Check pod status stored in the status map.
