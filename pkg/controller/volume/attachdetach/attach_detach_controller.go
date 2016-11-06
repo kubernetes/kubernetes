@@ -593,10 +593,6 @@ func (adc *attachDetachController) GetHostIP() (net.IP, error) {
 	return nil, fmt.Errorf("GetHostIP() not supported by Attach/Detach controller's VolumeHost implementation")
 }
 
-func (adc *attachDetachController) GetRootContext() string {
-	return ""
-}
-
 func (adc *attachDetachController) GetNodeAllocatable() (api.ResourceList, error) {
 	return api.ResourceList{}, nil
 }
