@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dns
+package treecache
 
 import (
 	"encoding/json"
@@ -23,19 +23,48 @@ import (
 	skymsg "github.com/skynetservices/skydns/msg"
 )
 
-type TreeCache struct {
-	ChildNodes map[string]*TreeCache
+type TreeCache interface {
+	// GetEntry with the given key for the given path.
+	GetEntry(key string, path ...string) (interface{}, bool)
+
+	// Get a list of values including wildcards labels (e.g. "*").
+	GetValuesForPathWithWildcards(path ...string) []*skymsg.Service
+
+	// SetEntry creates the entire path if it doesn't already exist in
+	// the cache, then sets the given service record under the given
+	// key. The path this entry would have occupied in an etcd datastore
+	// is computed from the given fqdn and stored as the "Key" of the
+	// skydns service; this is only required because skydns expects the
+	// service record to contain a key in a specific format (presumably
+	// for legacy compatibility). Note that the fqnd string typically
+	// contains both the key and all elements in the path.
+	SetEntry(key string, val *skymsg.Service, fqdn string, path ...string)
+
+	// SetSubCache inserts the given subtree under the given
+	// path:key. Usually the key is the name of a Kubernetes Service,
+	// and the path maps to the cluster subdomains matching the Service.
+	SetSubCache(key string, subCache TreeCache, path ...string)
+
+	// DeletePath removes all entries associated with a given path.
+	DeletePath(path ...string) bool
+
+	// Serialize dumps a JSON representation of the cache.
+	Serialize() (string, error)
+}
+
+type treeCache struct {
+	ChildNodes map[string]*treeCache
 	Entries    map[string]interface{}
 }
 
-func NewTreeCache() *TreeCache {
-	return &TreeCache{
-		ChildNodes: make(map[string]*TreeCache),
+func NewTreeCache() TreeCache {
+	return &treeCache{
+		ChildNodes: make(map[string]*treeCache),
 		Entries:    make(map[string]interface{}),
 	}
 }
 
-func (cache *TreeCache) Serialize() (string, error) {
+func (cache *treeCache) Serialize() (string, error) {
 	prettyJSON, err := json.MarshalIndent(cache, "", "\t")
 	if err != nil {
 		return "", err
@@ -43,14 +72,7 @@ func (cache *TreeCache) Serialize() (string, error) {
 	return string(prettyJSON), nil
 }
 
-// setEntry creates the entire path if it doesn't already exist in the cache,
-// then sets the given service record under the given key. The path this entry
-// would have occupied in an etcd datastore is computed from the given fqdn and
-// stored as the "Key" of the skydns service; this is only required because
-// skydns expects the service record to contain a key in a specific format
-// (presumably for legacy compatibility). Note that the fqnd string typically
-// contains both the key and all elements in the path.
-func (cache *TreeCache) setEntry(key string, val *skymsg.Service, fqdn string, path ...string) {
+func (cache *treeCache) SetEntry(key string, val *skymsg.Service, fqdn string, path ...string) {
 	// TODO: Consolidate setEntry and setSubCache into a single method with a
 	// type switch.
 	// TODO: Instead of passing the fqdn as an argument, we can reconstruct
@@ -70,7 +92,7 @@ func (cache *TreeCache) setEntry(key string, val *skymsg.Service, fqdn string, p
 	node.Entries[key] = val
 }
 
-func (cache *TreeCache) getSubCache(path ...string) *TreeCache {
+func (cache *treeCache) getSubCache(path ...string) *treeCache {
 	childCache := cache
 	for _, subpath := range path {
 		childCache = childCache.ChildNodes[subpath]
@@ -81,15 +103,12 @@ func (cache *TreeCache) getSubCache(path ...string) *TreeCache {
 	return childCache
 }
 
-// setSubCache inserts the given subtree under the given path:key. Usually the
-// key is the name of a Kubernetes Service, and the path maps to the cluster
-// subdomains matching the Service.
-func (cache *TreeCache) setSubCache(key string, subCache *TreeCache, path ...string) {
+func (cache *treeCache) SetSubCache(key string, subCache TreeCache, path ...string) {
 	node := cache.ensureChildNode(path...)
-	node.ChildNodes[key] = subCache
+	node.ChildNodes[key] = subCache.(*treeCache)
 }
 
-func (cache *TreeCache) getEntry(key string, path ...string) (interface{}, bool) {
+func (cache *treeCache) GetEntry(key string, path ...string) (interface{}, bool) {
 	childNode := cache.getSubCache(path...)
 	if childNode == nil {
 		return nil, false
@@ -98,11 +117,11 @@ func (cache *TreeCache) getEntry(key string, path ...string) (interface{}, bool)
 	return val, ok
 }
 
-func (cache *TreeCache) getValuesForPathWithWildcards(path ...string) []*skymsg.Service {
+func (cache *treeCache) GetValuesForPathWithWildcards(path ...string) []*skymsg.Service {
 	retval := []*skymsg.Service{}
-	nodesToExplore := []*TreeCache{cache}
+	nodesToExplore := []*treeCache{cache}
 	for idx, subpath := range path {
-		nextNodesToExplore := []*TreeCache{}
+		nextNodesToExplore := []*treeCache{}
 		if idx == len(path)-1 {
 			// if path ends on an entry, instead of a child node, add the entry
 			for _, node := range nodesToExplore {
@@ -150,7 +169,7 @@ func (cache *TreeCache) getValuesForPathWithWildcards(path ...string) []*skymsg.
 	return retval
 }
 
-func (cache *TreeCache) deletePath(path ...string) bool {
+func (cache *treeCache) DeletePath(path ...string) bool {
 	if len(path) == 0 {
 		return false
 	}
@@ -169,19 +188,7 @@ func (cache *TreeCache) deletePath(path ...string) bool {
 	return false
 }
 
-func (cache *TreeCache) deleteEntry(key string, path ...string) bool {
-	childNode := cache.getSubCache(path...)
-	if childNode == nil {
-		return false
-	}
-	if _, ok := childNode.Entries[key]; ok {
-		delete(childNode.Entries, key)
-		return true
-	}
-	return false
-}
-
-func (cache *TreeCache) appendValues(recursive bool, ref [][]interface{}) {
+func (cache *treeCache) appendValues(recursive bool, ref [][]interface{}) {
 	for _, value := range cache.Entries {
 		ref[0] = append(ref[0], value)
 	}
@@ -192,83 +199,15 @@ func (cache *TreeCache) appendValues(recursive bool, ref [][]interface{}) {
 	}
 }
 
-func (cache *TreeCache) ensureChildNode(path ...string) *TreeCache {
+func (cache *treeCache) ensureChildNode(path ...string) *treeCache {
 	childNode := cache
 	for _, subpath := range path {
 		newNode, ok := childNode.ChildNodes[subpath]
 		if !ok {
-			newNode = NewTreeCache()
+			newNode = NewTreeCache().(*treeCache)
 			childNode.ChildNodes[subpath] = newNode
 		}
 		childNode = newNode
 	}
 	return childNode
 }
-
-// unused function. keeping it around in commented-fashion
-// in the future, we might need some form of this function so that
-// we can serialize to a file in a mounted empty dir..
-//const (
-//	dataFile = "data.dat"
-//	crcFile  = "data.crc"
-//)
-//func (cache *TreeCache) Serialize(dir string) (string, error) {
-//	cache.m.RLock()
-//	defer cache.m.RUnlock()
-//	b, err := json.Marshal(cache)
-//	if err != nil {
-//		return "", err
-//	}
-//
-//	if err := ensureDir(dir, os.FileMode(0755)); err != nil {
-//		return "", err
-//	}
-//	if err := ioutil.WriteFile(path.Join(dir, dataFile), b, 0644); err != nil {
-//		return "", err
-//	}
-//	if err := ioutil.WriteFile(path.Join(dir, crcFile), getMD5(b), 0644); err != nil {
-//		return "", err
-//	}
-//	return string(b), nil
-//}
-
-//func ensureDir(path string, perm os.FileMode) error {
-//	s, err := os.Stat(path)
-//	if err != nil || !s.IsDir() {
-//		return os.Mkdir(path, perm)
-//	}
-//	return nil
-//}
-
-//func getMD5(b []byte) []byte {
-//	h := md5.New()
-//	h.Write(b)
-//	return []byte(fmt.Sprintf("%x", h.Sum(nil)))
-//}
-
-// unused function. keeping it around in commented-fashion
-// in the future, we might need some form of this function so that
-// we can restart kube-dns, deserialize the tree and have a cache
-// without having to wait for kube-dns to reach out to API server.
-//func Deserialize(dir string) (*TreeCache, error) {
-//	b, err := ioutil.ReadFile(path.Join(dir, dataFile))
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	hash, err := ioutil.ReadFile(path.Join(dir, crcFile))
-//	if err != nil {
-//		return nil, err
-//	}
-//	if !reflect.DeepEqual(hash, getMD5(b)) {
-//		return nil, fmt.Errorf("Checksum failed")
-//	}
-//
-//	var cache TreeCache
-//	err = json.Unmarshal(b, &cache)
-//	if err != nil {
-//		return nil, err
-//	}
-//	cache.m = &sync.RWMutex{}
-//	return &cache, nil
-//}
