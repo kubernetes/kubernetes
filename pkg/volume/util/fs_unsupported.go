@@ -26,10 +26,14 @@ import (
 )
 
 // FSInfo unsupported returns 0 values for available and capacity and an error.
-func FsInfo(path string) (int64, int64, int64, error) {
-	return 0, 0, 0, errors.New("FsInfo not supported for this build.")
+func FsInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
+	return 0, 0, 0, 0, 0, 0, errors.New("FsInfo not supported for this build.")
 }
 
 func Du(path string) (*resource.Quantity, error) {
 	return nil, fmt.Errorf("Du not support for this build.")
+}
+
+func Find(path string) (int64, error) {
+	return 0, errors.New("Find not supported for this build.")
 }
