@@ -18,11 +18,13 @@ package etcd
 
 import (
 	"fmt"
+	"net/http"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	storeerr "k8s.io/kubernetes/pkg/api/errors/storage"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
@@ -142,10 +144,10 @@ func (r *RollbackREST) New() runtime.Object {
 
 var _ = rest.Creater(&RollbackREST{})
 
-func (r *RollbackREST) Create(ctx api.Context, obj runtime.Object) (out runtime.Object, err error) {
+func (r *RollbackREST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
 	rollback, ok := obj.(*extensions.DeploymentRollback)
 	if !ok {
-		return nil, fmt.Errorf("expected input object type to be DeploymentRollback, but %T", obj)
+		return nil, errors.NewBadRequest(fmt.Sprintf("not a DeploymentRollback: %#v", obj))
 	}
 
 	if errs := extvalidation.ValidateDeploymentRollback(rollback); len(errs) != 0 {
@@ -153,26 +155,34 @@ func (r *RollbackREST) Create(ctx api.Context, obj runtime.Object) (out runtime.
 	}
 
 	// Update the Deployment with information in DeploymentRollback to trigger rollback
-	err = r.rollbackDeployment(ctx, rollback.Name, &rollback.RollbackTo, rollback.UpdatedAnnotations)
-	return
+	err := r.rollbackDeployment(ctx, rollback.Name, &rollback.RollbackTo, rollback.UpdatedAnnotations)
+	if err != nil {
+		return nil, err
+	}
+	return &unversioned.Status{
+		Message: fmt.Sprintf("rollback request for deployment %q succeeded", rollback.Name),
+		Code:    http.StatusOK,
+	}, nil
 }
 
-func (r *RollbackREST) rollbackDeployment(ctx api.Context, deploymentID string, config *extensions.RollbackConfig, annotations map[string]string) (err error) {
-	if _, err = r.setDeploymentRollback(ctx, deploymentID, config, annotations); err != nil {
+func (r *RollbackREST) rollbackDeployment(ctx api.Context, deploymentID string, config *extensions.RollbackConfig, annotations map[string]string) error {
+	if _, err := r.setDeploymentRollback(ctx, deploymentID, config, annotations); err != nil {
 		err = storeerr.InterpretGetError(err, extensions.Resource("deployments"), deploymentID)
 		err = storeerr.InterpretUpdateError(err, extensions.Resource("deployments"), deploymentID)
 		if _, ok := err.(*errors.StatusError); !ok {
-			err = errors.NewConflict(extensions.Resource("deployments/rollback"), deploymentID, err)
+			err = errors.NewInternalError(err)
 		}
+		return err
 	}
-	return
+	return nil
 }
 
-func (r *RollbackREST) setDeploymentRollback(ctx api.Context, deploymentID string, config *extensions.RollbackConfig, annotations map[string]string) (finalDeployment *extensions.Deployment, err error) {
+func (r *RollbackREST) setDeploymentRollback(ctx api.Context, deploymentID string, config *extensions.RollbackConfig, annotations map[string]string) (*extensions.Deployment, error) {
 	dKey, err := r.store.KeyFunc(ctx, deploymentID)
 	if err != nil {
 		return nil, err
 	}
+	var finalDeployment *extensions.Deployment
 	err = r.store.Storage.GuaranteedUpdate(ctx, dKey, &extensions.Deployment{}, false, nil, storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
 		d, ok := obj.(*extensions.Deployment)
 		if !ok {
