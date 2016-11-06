@@ -61,8 +61,9 @@ type Interface interface {
 type RESTClient struct {
 	// base is the root URL for all invocations of the client
 	base *url.URL
-	// versionedAPIPath is a path segment connecting the base URL to the resource root
-	versionedAPIPath string
+	// VersionedAPIPath is a path segment connecting the base URL to the resource root
+	// TODO: Change it back to private when we make clientset work for eviction subresource
+	VersionedAPIPath string
 
 	// contentConfig is the information used to communicate with the server.
 	contentConfig ContentConfig
@@ -118,7 +119,7 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ContentConf
 	}
 	return &RESTClient{
 		base:             &base,
-		versionedAPIPath: versionedAPIPath,
+		VersionedAPIPath: versionedAPIPath,
 		contentConfig:    config,
 		serializers:      *serializers,
 		createBackoffMgr: readExpBackoffConfig,
@@ -205,16 +206,6 @@ func createSerializers(config ContentConfig) (*Serializers, error) {
 	return s, nil
 }
 
-func (c *RESTClient) ManipulateVersionedAPIPath(fn func(string) string) *RESTClient {
-	originalPath := c.versionedAPIPath
-	modifiedPath := fn(c.versionedAPIPath)
-	if modifiedPath == originalPath {
-		panic(fmt.Sprintf("ManipulateVersionedAPIPath failed to modify the versioned API path: %v", originalPath))
-	}
-	c.versionedAPIPath = modifiedPath
-	return c
-}
-
 // Verb begins a request with a verb (GET, POST, PUT, DELETE).
 //
 // Example usage of RESTClient's request building interface:
@@ -232,9 +223,9 @@ func (c *RESTClient) Verb(verb string) *Request {
 	backoff := c.createBackoffMgr()
 
 	if c.Client == nil {
-		return NewRequest(nil, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle)
+		return NewRequest(nil, verb, c.base, c.VersionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle)
 	}
-	return NewRequest(c.Client, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle)
+	return NewRequest(c.Client, verb, c.base, c.VersionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle)
 }
 
 // Post begins a POST request. Short for c.Verb("POST").

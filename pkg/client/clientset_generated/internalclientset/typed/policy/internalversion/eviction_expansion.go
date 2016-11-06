@@ -35,9 +35,10 @@ type EvictionExpansion interface {
 }
 
 func (c *evictions) Evict(eviction *policy.Eviction) error {
-	return c.client.(*restclient.RESTClient).
-		ManipulateVersionedAPIPath(manipulateURLforEvict).
-		Post().
+	client := c.client.(*restclient.RESTClient)
+	originalVersionedAPIPath := client.VersionedAPIPath
+	client.VersionedAPIPath = strings.Replace(originalVersionedAPIPath, "/apis/"+PolicyAPIVersion, "/api/v1", 1)
+	err := client.Post().
 		Namespace(eviction.Namespace).
 		Resource("pods").
 		Name(eviction.Name).
@@ -45,8 +46,6 @@ func (c *evictions) Evict(eviction *policy.Eviction) error {
 		Body(eviction).
 		Do().
 		Error()
-}
-
-func manipulateURLforEvict(originalURL string) string {
-	return strings.Replace(originalURL, "/apis/"+PolicyAPIVersion, "/api/v1", 1)
+	client.VersionedAPIPath = originalVersionedAPIPath
+	return err
 }
