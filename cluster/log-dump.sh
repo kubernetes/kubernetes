@@ -33,7 +33,7 @@ readonly use_kubectl="${LOG_DUMP_USE_KUBECTL:-}"
 readonly master_ssh_supported_providers="gce aws kubemark"
 readonly node_ssh_supported_providers="gce gke aws"
 
-readonly master_logfiles="kube-apiserver kube-scheduler kube-controller-manager etcd glbc cluster-autoscaler"
+readonly master_logfiles="kube-apiserver kube-scheduler rescheduler kube-controller-manager etcd glbc cluster-autoscaler"
 readonly node_logfiles="kube-proxy"
 readonly aws_logfiles="cloud-init-output"
 readonly gce_logfiles="startupscript"
