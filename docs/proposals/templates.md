@@ -11,7 +11,7 @@ There are two main motivators for Template functionality in Kubernetes:  Control
 Today the replication controller defines a PodTemplate which allows it to instantiate multiple pods with identical characteristics.
 This is useful but limited.  Stateful applications have a need to instantiate multiple instances of a more sophisticated topology
 than just a single pod (e.g. they also need Volume definitions).  A Template concept would allow a Controller to stamp out multiple
-instances of a given Template definition.  This capability would be immediately useful to the [PetSet](https://github.com/kubernetes/kubernetes/pull/18016) proposal.
+instances of a given Template definition.  This capability would be immediately useful to the [StatefulSet](https://github.com/kubernetes/kubernetes/pull/18016) proposal.
 
 Similarly the [Service Catalog proposal](https://github.com/kubernetes/kubernetes/pull/17543) could leverage template instantiation as a mechanism for claiming service instances.
 
@@ -47,7 +47,7 @@ values are appropriate for a deployer to tune or what the parameters control.
 * Providing a library of predefined application definitions that users can select from
 * Enabling the creation of user interfaces that can guide an application deployer through the deployment process with descriptive help about the configuration value decisions they are making, and useful default values where appropriate
 * Exporting a set of objects in a namespace as a template so the topology can be inspected/visualized or recreated in another environment
-* Controllers that need to instantiate multiple instances of identical objects (e.g. PetSets).
+* Controllers that need to instantiate multiple instances of identical objects (e.g. StatefulSets).
 
 
 ### Use cases for parameters within templates
@@ -65,7 +65,7 @@ values are appropriate for a deployer to tune or what the parameters control.
   a pod as a TLS cert).
 * Provide guidance to users for parameters such as default values, descriptions, and whether or not a particular parameter value
   is required or can be left blank.
-* Parameterize the replica count of a deployment or [PetSet](https://github.com/kubernetes/kubernetes/pull/18016)
+* Parameterize the replica count of a deployment or [StatefulSet](https://github.com/kubernetes/kubernetes/pull/18016)
 * Parameterize part of the labels and selector for a DaemonSet
 * Parameterize quota/limit values for a pod
 * Parameterize a secret value so a user can provide a custom password or other secret at deployment time

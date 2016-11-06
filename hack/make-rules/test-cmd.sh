@@ -2464,7 +2464,7 @@ __EOF__
   # Pre-condition: no statefulset exists
   kube::test::get_object_assert statefulset "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command: create statefulset
-  kubectl create -f hack/testdata/nginx-petset.yaml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/nginx-statefulset.yaml "${kube_flags[@]}"
 
   ### Scale statefulset test with current-replicas and replicas
   # Pre-condition: 0 replicas
@@ -2476,12 +2476,12 @@ __EOF__
   # Typically we'd wait and confirm that N>1 replicas are up, but this framework
   # doesn't start  the scheduler, so pet-0 will block all others.
   # TODO: test robust scaling in an e2e.
-  wait-for-pods-with-label "app=nginx-petset" "nginx-0"
+  wait-for-pods-with-label "app=nginx-statefulset" "nginx-0"
 
   ### Clean up
-  kubectl delete -f hack/testdata/nginx-petset.yaml "${kube_flags[@]}"
+  kubectl delete -f hack/testdata/nginx-statefulset.yaml "${kube_flags[@]}"
   # Post-condition: no pods from statefulset controller
-  wait-for-pods-with-label "app=nginx-petset" ""
+  wait-for-pods-with-label "app=nginx-statefulset" ""
 
 
   ######################
