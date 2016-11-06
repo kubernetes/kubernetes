@@ -51,6 +51,14 @@ func (d *dockerService) Version(ctx context.Context, r *runtimeApi.VersionReques
 	return d.runtimeService.Version(r.GetVersion())
 }
 
+func (d *dockerService) Status(ctx context.Context, r *runtimeApi.StatusRequest) (*runtimeApi.StatusResponse, error) {
+	status, err := d.runtimeService.Status()
+	if err != nil {
+		return nil, err
+	}
+	return &runtimeApi.StatusResponse{Status: status}, nil
+}
+
 func (d *dockerService) RunPodSandbox(ctx context.Context, r *runtimeApi.RunPodSandboxRequest) (*runtimeApi.RunPodSandboxResponse, error) {
 	podSandboxId, err := d.runtimeService.RunPodSandbox(r.GetConfig())
 	if err != nil {
