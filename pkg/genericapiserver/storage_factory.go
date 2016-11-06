@@ -57,6 +57,8 @@ type DefaultStorageFactory struct {
 
 	Overrides map[unversioned.GroupResource]groupResourceOverrides
 
+	DefaultResourcePrefixes map[unversioned.GroupResource]string
+
 	// DefaultMediaType is the media type used to store resources. If it is not set, "application/json" is used.
 	DefaultMediaType string
 
@@ -99,6 +101,17 @@ var _ StorageFactory = &DefaultStorageFactory{}
 
 const AllResources = "*"
 
+// specialDefaultResourcePrefixes are prefixes compiled into Kubernetes.
+// TODO: move out of this package, it is not generic
+var specialDefaultResourcePrefixes = map[unversioned.GroupResource]string{
+	unversioned.GroupResource{Group: "", Resource: "replicationControllers"}: "controllers",
+	unversioned.GroupResource{Group: "", Resource: "replicationcontrollers"}: "controllers",
+	unversioned.GroupResource{Group: "", Resource: "endpoints"}:              "services/endpoints",
+	unversioned.GroupResource{Group: "", Resource: "nodes"}:                  "minions",
+	unversioned.GroupResource{Group: "", Resource: "services"}:               "services/specs",
+	unversioned.GroupResource{Group: "extensions", Resource: "ingresses"}:    "ingress",
+}
+
 func NewDefaultStorageFactory(config storagebackend.Config, defaultMediaType string, defaultSerializer runtime.StorageSerializer, resourceEncodingConfig ResourceEncodingConfig, resourceConfig APIResourceConfigSource) *DefaultStorageFactory {
 	if len(defaultMediaType) == 0 {
 		defaultMediaType = runtime.ContentTypeJSON
@@ -110,6 +123,7 @@ func NewDefaultStorageFactory(config storagebackend.Config, defaultMediaType str
 		DefaultSerializer:       defaultSerializer,
 		ResourceEncodingConfig:  resourceEncodingConfig,
 		APIResourceConfigSource: resourceConfig,
+		DefaultResourcePrefixes: specialDefaultResourcePrefixes,
 
 		newStorageCodecFn: NewStorageCodec,
 	}
@@ -283,21 +297,12 @@ func NewStorageCodec(storageMediaType string, ns runtime.StorageSerializer, stor
 	return runtime.NewCodec(encoder, decoder), nil
 }
 
-var specialDefaultResourcePrefixes = map[unversioned.GroupResource]string{
-	unversioned.GroupResource{Group: "", Resource: "replicationControllers"}: "controllers",
-	unversioned.GroupResource{Group: "", Resource: "replicationcontrollers"}: "controllers",
-	unversioned.GroupResource{Group: "", Resource: "endpoints"}:              "services/endpoints",
-	unversioned.GroupResource{Group: "", Resource: "nodes"}:                  "minions",
-	unversioned.GroupResource{Group: "", Resource: "services"}:               "services/specs",
-	unversioned.GroupResource{Group: "extensions", Resource: "ingresses"}:    "ingress",
-}
-
 func (s *DefaultStorageFactory) ResourcePrefix(groupResource unversioned.GroupResource) string {
 	chosenStorageResource := s.getStorageGroupResource(groupResource)
 	groupOverride := s.Overrides[getAllResourcesAlias(chosenStorageResource)]
 	exactResourceOverride := s.Overrides[chosenStorageResource]
 
-	etcdResourcePrefix := specialDefaultResourcePrefixes[chosenStorageResource]
+	etcdResourcePrefix := s.DefaultResourcePrefixes[chosenStorageResource]
 	if len(groupOverride.etcdResourcePrefix) > 0 {
 		etcdResourcePrefix = groupOverride.etcdResourcePrefix
 	}
