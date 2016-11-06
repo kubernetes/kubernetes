@@ -134,13 +134,13 @@ func (p *testNamer) SetSelfLink(obj runtime.Object, url string) error {
 }
 
 // GenerateLink creates a path and query for a given runtime object that represents the canonical path.
-func (p *testNamer) GenerateLink(req *restful.Request, obj runtime.Object) (path, query string, err error) {
-	return "", "", errors.New("not implemented")
+func (p *testNamer) GenerateLink(req *restful.Request, obj runtime.Object) (uri string, err error) {
+	return "", errors.New("not implemented")
 }
 
 // GenerateLink creates a path and query for a list that represents the canonical path.
-func (p *testNamer) GenerateListLink(req *restful.Request) (path, query string, err error) {
-	return "", "", errors.New("not implemented")
+func (p *testNamer) GenerateListLink(req *restful.Request) (uri string, err error) {
+	return "", errors.New("not implemented")
 }
 
 type patchTestCase struct {
