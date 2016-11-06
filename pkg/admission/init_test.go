@@ -40,9 +40,9 @@ type WantAuthorizerAdmission struct {
 func (self *WantAuthorizerAdmission) SetAuthorizer(a authorizer.Authorizer) {
 	self.auth = a
 }
-func (self *WantAuthorizerAdmission) Admit(a Attributes) error { return nil }
-func (self *WantAuthorizerAdmission) Handles(o Operation) bool { return false }
-func (self *WantAuthorizerAdmission) Validate() error          { return nil }
+func (self *WantAuthorizerAdmission) Admit(a Attributes) (Warning, error) { return nil, nil }
+func (self *WantAuthorizerAdmission) Handles(o Operation) bool            { return false }
+func (self *WantAuthorizerAdmission) Validate() error                     { return nil }
 
 var _ Interface = &WantAuthorizerAdmission{}
 var _ WantsAuthorizer = &WantAuthorizerAdmission{}

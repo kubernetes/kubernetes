@@ -69,11 +69,11 @@ func NewResourceQuota(client clientset.Interface, registry quota.Registry, numEv
 }
 
 // Admit makes admission decisions while enforcing quota
-func (q *quotaAdmission) Admit(a admission.Attributes) (err error) {
+func (q *quotaAdmission) Admit(a admission.Attributes) (warn admission.Warning, err error) {
 	// ignore all operations that correspond to sub-resource actions
 	if a.GetSubresource() != "" {
-		return nil
+		return nil, nil
 	}
 
-	return q.evaluator.Evaluate(a)
+	return nil, q.evaluator.Evaluate(a)
 }

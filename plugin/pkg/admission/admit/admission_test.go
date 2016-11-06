@@ -22,7 +22,7 @@ import (
 
 func TestAdmission(t *testing.T) {
 	handler := NewAlwaysAdmit()
-	err := handler.Admit(nil)
+	_, err := handler.Admit(nil)
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler")
 	}

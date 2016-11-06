@@ -111,7 +111,7 @@ func expectNoAnnotation(t *testing.T, pod *api.Pod) {
 func admit(t *testing.T, ir admission.Interface, pods []*api.Pod) {
 	for i := range pods {
 		p := pods[i]
-		if err := ir.Admit(admission.NewAttributesRecord(p, nil, api.Kind("Pod").WithVersion("version"), "test", p.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil)); err != nil {
+		if _, err := ir.Admit(admission.NewAttributesRecord(p, nil, api.Kind("Pod").WithVersion("version"), "test", p.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil)); err != nil {
 			t.Error(err)
 		}
 	}

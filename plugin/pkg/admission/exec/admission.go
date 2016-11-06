@@ -77,33 +77,33 @@ func NewDenyExecOnPrivileged(client clientset.Interface) admission.Interface {
 	}
 }
 
-func (d *denyExec) Admit(a admission.Attributes) (err error) {
+func (d *denyExec) Admit(a admission.Attributes) (warn admission.Warning, err error) {
 	connectRequest, ok := a.GetObject().(*rest.ConnectRequest)
 	if !ok {
-		return errors.NewBadRequest("a connect request was received, but could not convert the request object.")
+		return nil, errors.NewBadRequest("a connect request was received, but could not convert the request object.")
 	}
 	// Only handle exec or attach requests on pods
 	if connectRequest.ResourcePath != "pods/exec" && connectRequest.ResourcePath != "pods/attach" {
-		return nil
+		return nil, nil
 	}
 	pod, err := d.client.Core().Pods(a.GetNamespace()).Get(connectRequest.Name)
 	if err != nil {
-		return admission.NewForbidden(a, err)
+		return nil, admission.NewForbidden(a, err)
 	}
 
 	if d.hostPID && pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostPID {
-		return admission.NewForbidden(a, fmt.Errorf("cannot exec into or attach to a container using host pid"))
+		return nil, admission.NewForbidden(a, fmt.Errorf("cannot exec into or attach to a container using host pid"))
 	}
 
 	if d.hostIPC && pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostIPC {
-		return admission.NewForbidden(a, fmt.Errorf("cannot exec into or attach to a container using host ipc"))
+		return nil, admission.NewForbidden(a, fmt.Errorf("cannot exec into or attach to a container using host ipc"))
 	}
 
 	if d.privileged && isPrivileged(pod) {
-		return admission.NewForbidden(a, fmt.Errorf("cannot exec into or attach to a privileged container"))
+		return nil, admission.NewForbidden(a, fmt.Errorf("cannot exec into or attach to a privileged container"))
 	}
 
-	return nil
+	return nil, nil
 }
 
 // isPrivileged will return true a pod has any privileged containers

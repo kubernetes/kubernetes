@@ -81,9 +81,9 @@ func (l *limitRanger) Validate() error {
 }
 
 // Admit admits resources into cluster that do not violate any defined LimitRange in the namespace
-func (l *limitRanger) Admit(a admission.Attributes) (err error) {
+func (l *limitRanger) Admit(a admission.Attributes) (warn admission.Warning, err error) {
 	if !l.actions.SupportsAttributes(a) {
-		return nil
+		return nil, nil
 	}
 
 	obj := a.GetObject()
@@ -97,7 +97,7 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 
 	items, err := l.lister.LimitRanges(a.GetNamespace()).List(labels.Everything())
 	if err != nil {
-		return admission.NewForbidden(a, fmt.Errorf("unable to %s %v at this time because there was an error enforcing limit ranges", a.GetOperation(), a.GetResource()))
+		return nil, admission.NewForbidden(a, fmt.Errorf("unable to %s %v at this time because there was an error enforcing limit ranges", a.GetOperation(), a.GetResource()))
 	}
 
 	// if there are no items held in our indexer, check our live-lookup LRU, if that misses, do the live lookup to prime it.
@@ -111,7 +111,7 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 			// throttling - see #22422 for details.
 			liveList, err := l.client.Core().LimitRanges(a.GetNamespace()).List(api.ListOptions{})
 			if err != nil {
-				return admission.NewForbidden(a, err)
+				return nil, admission.NewForbidden(a, err)
 			}
 			newEntry := liveLookupEntry{expiry: time.Now().Add(l.liveTTL)}
 			for i := range liveList.Items {
@@ -125,7 +125,6 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 		for i := range lruEntry.items {
 			items = append(items, lruEntry.items[i])
 		}
-
 	}
 
 	// ensure it meets each prescribed min/max
@@ -138,10 +137,10 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 
 		err = l.actions.Limit(limitRange, a.GetResource().Resource, a.GetObject())
 		if err != nil {
-			return admission.NewForbidden(a, err)
+			return nil, admission.NewForbidden(a, err)
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 // NewLimitRanger returns an object that enforces limits based on the supplied limit function

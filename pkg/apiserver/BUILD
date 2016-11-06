@@ -101,6 +101,7 @@ go_test(
         "//pkg/runtime/serializer/streaming:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util/diff:go_default_library",
+        "//pkg/util/errors:go_default_library",
         "//pkg/util/net:go_default_library",
         "//pkg/util/sets:go_default_library",
         "//pkg/util/strategicpatch:go_default_library",

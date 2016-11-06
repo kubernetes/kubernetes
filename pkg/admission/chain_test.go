@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/util/errors"
 )
 
 type FakeHandler struct {
@@ -28,14 +29,15 @@ type FakeHandler struct {
 	name        string
 	admit       bool
 	admitCalled bool
+	warning     Warning
 }
 
-func (h *FakeHandler) Admit(a Attributes) (err error) {
+func (h *FakeHandler) Admit(a Attributes) (warn Warning, err error) {
 	h.admitCalled = true
 	if h.admit {
-		return nil
+		return h.warning, nil
 	}
-	return fmt.Errorf("Don't admit")
+	return h.warning, fmt.Errorf("Don't admit")
 }
 
 func makeHandler(name string, admit bool, ops ...Operation) Interface {
@@ -46,12 +48,31 @@ func makeHandler(name string, admit bool, ops ...Operation) Interface {
 	}
 }
 
+func makeHandlerWithWarning(name string, admit bool, warn Warning, ops ...Operation) Interface {
+	return &FakeHandler{
+		name:    name,
+		admit:   admit,
+		Handler: NewHandler(ops...),
+		warning: warn,
+	}
+}
+
+func containsWarning(warning Warning, warnings []error) bool {
+	for ix := range warnings {
+		if warning.Error() == warnings[ix].Error() {
+			return true
+		}
+	}
+	return false
+}
+
 func TestAdmit(t *testing.T) {
 	tests := []struct {
 		name      string
 		operation Operation
 		chain     chainAdmissionHandler
 		accept    bool
+		warnings  bool
 		calls     map[string]bool
 	}{
 		{
@@ -98,19 +119,47 @@ func TestAdmit(t *testing.T) {
 			calls:  map[string]bool{"a": true, "b": true},
 			accept: false,
 		},
+		{
+			name:      "warnings one",
+			operation: Create,
+			chain: []Interface{
+				makeHandlerWithWarning("a", true, Warning(fmt.Errorf("fake warning")), Update, Delete, Create),
+				makeHandler("b", true, Create),
+				makeHandlerWithWarning("c", true, Warning(fmt.Errorf("fake warning 2")), Create),
+			},
+			calls:    map[string]bool{"a": true, "b": true, "c": true},
+			accept:   true,
+			warnings: true,
+		},
 	}
 	for _, test := range tests {
-		err := test.chain.Admit(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", test.operation, nil))
+		warn, err := test.chain.Admit(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", test.operation, nil))
 		accepted := (err == nil)
 		if accepted != test.accept {
 			t.Errorf("%s: unexpected result of admit call: %v\n", test.name, accepted)
 		}
+		if test.warnings && warn == nil {
+			t.Errorf("unexpected non-warning")
+		}
+		var warnings []error
+		if warn != nil {
+			aggregate, ok := warn.(errors.Aggregate)
+			if !ok {
+				t.Errorf("unexpected warning: %v", warn)
+			} else {
+				warnings = aggregate.Errors()
+			}
+		}
+
 		for _, h := range test.chain {
 			fake := h.(*FakeHandler)
 			_, shouldBeCalled := test.calls[fake.name]
 			if shouldBeCalled != fake.admitCalled {
 				t.Errorf("%s: handler %s not called as expected: %v", test.name, fake.name, fake.admitCalled)
 				continue
+			}
+			if fake.warning != nil && !containsWarning(fake.warning, warnings) {
+				t.Errorf("%s: failed to find expected warning: %v (%v)", test.name, fake.warning, warnings)
 			}
 		}
 	}

@@ -16,7 +16,10 @@ limitations under the License.
 
 package admission
 
-import clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+import (
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/util/errors"
+)
 
 // chainAdmissionHandler is an instance of admission.Interface that performs admission control using a chain of admission handlers
 type chainAdmissionHandler []Interface
@@ -45,17 +48,27 @@ func NewChainHandler(handlers ...Interface) Interface {
 }
 
 // Admit performs an admission control check using a chain of handlers, and returns immediately on first error
-func (admissionHandler chainAdmissionHandler) Admit(a Attributes) error {
+func (admissionHandler chainAdmissionHandler) Admit(a Attributes) (Warning, error) {
+	var errs []error
 	for _, handler := range admissionHandler {
 		if !handler.Handles(a.GetOperation()) {
 			continue
 		}
-		err := handler.Admit(a)
+		warning, err := handler.Admit(a)
+		if warning != nil {
+			aggregate, ok := warning.(errors.Aggregate)
+			if ok {
+				errs = append(errs, aggregate.Errors()...)
+			} else {
+				errs = append(errs, warning)
+			}
+		}
 		if err != nil {
-			return err
+			return errors.NewAggregate(errs), err
 		}
 	}
-	return nil
+
+	return errors.NewAggregate(errs), nil
 }
 
 // Handles will return true if any of the handlers handles the given operation

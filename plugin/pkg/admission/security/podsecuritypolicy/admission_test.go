@@ -1351,7 +1351,7 @@ func testPSPAdmit(testCaseName string, psps []*extensions.PodSecurityPolicy, pod
 	plugin := NewTestAdmission(store, tc)
 
 	attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), "namespace", "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, &user.DefaultInfo{})
-	err := plugin.Admit(attrs)
+	_, err := plugin.Admit(attrs)
 
 	if shouldPass && err != nil {
 		t.Errorf("%s: expected no errors but received %v", testCaseName, err)
