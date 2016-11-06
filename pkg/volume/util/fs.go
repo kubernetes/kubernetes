@@ -19,23 +19,25 @@ limitations under the License.
 package util
 
 import (
+	"bytes"
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 	"syscall"
 
 	"k8s.io/kubernetes/pkg/api/resource"
 )
 
-// FSInfo linux returns (available bytes, byte capacity, byte usage, error) for the filesystem that
-// path resides upon.
-func FsInfo(path string) (int64, int64, int64, error) {
+// FSInfo linux returns (available bytes, byte capacity, byte usage, total inodes, inodes free, inode usage, error)
+// for the filesystem that path resides upon.
+func FsInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
 	statfs := &syscall.Statfs_t{}
 	err := syscall.Statfs(path, statfs)
 	if err != nil {
-		return 0, 0, 0, err
+		return 0, 0, 0, 0, 0, 0, err
 	}
-	// TODO(vishh): Include inodes space
+
 	// Available is blocks available * fragment size
 	available := int64(statfs.Bavail) * int64(statfs.Bsize)
 
@@ -45,7 +47,11 @@ func FsInfo(path string) (int64, int64, int64, error) {
 	// Usage is block being used * fragment size (aka block size).
 	usage := (int64(statfs.Blocks) - int64(statfs.Bfree)) * int64(statfs.Bsize)
 
-	return available, capacity, usage, nil
+	inodes := int64(statfs.Files)
+	inodesFree := int64(statfs.Ffree)
+	inodesUsed := inodes - inodesFree
+
+	return available, capacity, usage, inodes, inodesFree, inodesUsed, nil
 }
 
 func Du(path string) (*resource.Quantity, error) {
@@ -61,4 +67,37 @@ func Du(path string) (*resource.Quantity, error) {
 	}
 	used.Format = resource.BinarySI
 	return &used, nil
+}
+
+// Find uses the command `find <path> -dev -printf '.' | wc -c` to count files and directories.
+// While this is not an exact measure of inodes used, it is a very good approximation.
+func Find(path string) (int64, error) {
+	var stdout, stdwcerr, stdfinderr bytes.Buffer
+	var err error
+	findCmd := exec.Command("find", path, "-xdev", "-printf", ".")
+	wcCmd := exec.Command("wc", "-c")
+	if wcCmd.Stdin, err = findCmd.StdoutPipe(); err != nil {
+		return 0, fmt.Errorf("failed to setup stdout for cmd %v - %v", findCmd.Args, err)
+	}
+	wcCmd.Stdout, wcCmd.Stderr, findCmd.Stderr = &stdout, &stdwcerr, &stdfinderr
+	if err = findCmd.Start(); err != nil {
+		return 0, fmt.Errorf("failed to exec cmd %v - %v; stderr: %v", findCmd.Args, err, stdfinderr.String())
+	}
+
+	if err = wcCmd.Start(); err != nil {
+		return 0, fmt.Errorf("failed to exec cmd %v - %v; stderr %v", wcCmd.Args, err, stdwcerr.String())
+	}
+	err = findCmd.Wait()
+	if err != nil {
+		return 0, fmt.Errorf("cmd %v failed. stderr: %s; err: %v", findCmd.Args, stdfinderr.String(), err)
+	}
+	err = wcCmd.Wait()
+	if err != nil {
+		return 0, fmt.Errorf("cmd %v failed. stderr: %s; err: %v", wcCmd.Args, stdwcerr.String(), err)
+	}
+	inodeUsage, err := strconv.ParseInt(strings.TrimSpace(stdout.String()), 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("cannot parse cmds: %v, %v output %s - %s", findCmd.Args, wcCmd.Args, stdout.String(), err)
+	}
+	return inodeUsage, nil
 }
