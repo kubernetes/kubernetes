@@ -63,7 +63,7 @@ func init() {
 	// It seems that someone is using flag.Parse() after init() and TestMain().
 	// TODO(random-liu): Find who is using flag.Parse() and cause errors and move the following logic
 	// into TestContext.
-	pflag.CommandLine.MarkHidden("runtime-integration-type")
+	pflag.CommandLine.MarkHidden("enable-cri")
 }
 
 func TestMain(m *testing.M) {

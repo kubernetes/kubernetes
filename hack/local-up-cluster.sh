@@ -173,8 +173,7 @@ CLAIM_BINDER_SYNC_PERIOD=${CLAIM_BINDER_SYNC_PERIOD:-"15s"} # current k8s defaul
 ENABLE_CONTROLLER_ATTACH_DETACH=${ENABLE_CONTROLLER_ATTACH_DETACH:-"true"} # current default
 CERT_DIR=${CERT_DIR:-"/var/run/kubernetes"}
 ROOT_CA_FILE=$CERT_DIR/apiserver.crt
-# How the kubelet interacts with the runtime, eg: "cri"
-EXPERIMENTAL_RUNTIME_INTEGRATION_TYPE=${EXPERIMENTAL_RUNTIME_INTEGRATION_TYPE:-""}
+EXPERIMENTAL_CRI=${EXPERIMENTAL_CRI:-"false"}
 
 
 function test_apiserver_off {
@@ -485,7 +484,7 @@ function start_kubelet {
         --v=${LOG_LEVEL} \
         --chaos-chance="${CHAOS_CHANCE}" \
         --container-runtime="${CONTAINER_RUNTIME}" \
-        --experimental-runtime-integration-type="${EXPERIMENTAL_RUNTIME_INTEGRATION_TYPE}" \
+        --experimental-cri=${EXPERIMENTAL_CRI} \
         --rkt-path="${RKT_PATH}" \
         --rkt-stage1-image="${RKT_STAGE1_IMAGE}" \
         --hostname-override="${HOSTNAME_OVERRIDE}" \

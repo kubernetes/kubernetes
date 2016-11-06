@@ -435,15 +435,15 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 			return fmt.Errorf("invalid configuration: system container was specified and cgroup root was not specified")
 		}
 		kubeDeps.ContainerManager, err = cm.NewContainerManager(kubeDeps.Mounter, kubeDeps.CAdvisorInterface, cm.NodeConfig{
-			RuntimeCgroupsName:     s.RuntimeCgroups,
-			SystemCgroupsName:      s.SystemCgroups,
-			KubeletCgroupsName:     s.KubeletCgroups,
-			ContainerRuntime:       s.ContainerRuntime,
-			CgroupsPerQOS:          s.CgroupsPerQOS,
-			CgroupRoot:             s.CgroupRoot,
-			CgroupDriver:           s.CgroupDriver,
-			ProtectKernelDefaults:  s.ProtectKernelDefaults,
-			RuntimeIntegrationType: s.ExperimentalRuntimeIntegrationType,
+			RuntimeCgroupsName:    s.RuntimeCgroups,
+			SystemCgroupsName:     s.SystemCgroups,
+			KubeletCgroupsName:    s.KubeletCgroups,
+			ContainerRuntime:      s.ContainerRuntime,
+			CgroupsPerQOS:         s.CgroupsPerQOS,
+			CgroupRoot:            s.CgroupRoot,
+			CgroupDriver:          s.CgroupDriver,
+			ProtectKernelDefaults: s.ProtectKernelDefaults,
+			EnableCRI:             s.EnableCRI,
 		})
 		if err != nil {
 			return err
