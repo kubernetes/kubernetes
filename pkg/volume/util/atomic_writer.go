@@ -23,6 +23,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -183,7 +184,14 @@ func (w *AtomicWriter) Write(payload map[string]FileProjection) error {
 	}
 
 	// (9)
-	if err = os.Rename(newDataDirPath, dataDirPath); err != nil {
+	if runtime.GOOS == "windows" {
+		os.Remove(dataDirPath)
+		err = os.Symlink(tsDirName, dataDirPath)
+		os.Remove(newDataDirPath)
+	} else {
+		err = os.Rename(newDataDirPath, dataDirPath)
+	}
+	if err != nil {
 		os.Remove(newDataDirPath)
 		os.RemoveAll(tsDir)
 		glog.Errorf("%s: error renaming symbolic link for data directory %s: %v", w.logContext, newDataDirPath, err)
@@ -303,7 +311,11 @@ func (w *AtomicWriter) pathsToRemove(payload map[string]FileProjection) (sets.St
 		}
 
 		relativePath := strings.TrimPrefix(path, w.targetDir)
-		relativePath = strings.TrimPrefix(relativePath, "/")
+		if runtime.GOOS == "windows" {
+			relativePath = strings.TrimPrefix(relativePath, "\\")
+		} else {
+			relativePath = strings.TrimPrefix(relativePath, "/")
+		}
 		if strings.HasPrefix(relativePath, "..") {
 			return nil
 		}

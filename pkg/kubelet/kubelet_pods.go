@@ -26,6 +26,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -100,7 +101,8 @@ func makeMounts(pod *api.Pod, podDir string, container *api.Container, hostName,
 	// - container is not an infrastructure(pause) container
 	// - container is not already mounting on /etc/hosts
 	// When the pause container is being created, its IP is still unknown. Hence, PodIP will not have been set.
-	mountEtcHostsFile := (pod.Spec.SecurityContext == nil || !pod.Spec.SecurityContext.HostNetwork) && len(podIP) > 0
+	// OS is not Windows
+	mountEtcHostsFile := (pod.Spec.SecurityContext == nil || !pod.Spec.SecurityContext.HostNetwork) && len(podIP) > 0 && runtime.GOOS != "windows"
 	glog.V(3).Infof("container: %v/%v/%v podIP: %q creating hosts mount: %v", pod.Namespace, pod.Name, container.Name, podIP, mountEtcHostsFile)
 	mounts := []kubecontainer.Mount{}
 	for _, mount := range container.VolumeMounts {
@@ -126,9 +128,21 @@ func makeMounts(pod *api.Pod, podDir string, container *api.Container, hostName,
 		if mount.SubPath != "" {
 			hostPath = filepath.Join(hostPath, mount.SubPath)
 		}
+
+		// Docker Volume Mounts fail on Windows if it is not of the form C:/
+		containerPath := mount.MountPath
+		if runtime.GOOS == "windows" {
+			if strings.HasPrefix(hostPath, "/") && !strings.Contains(hostPath, ":") {
+				hostPath = "c:" + hostPath
+			}
+			if strings.HasPrefix(containerPath, "/") && !strings.Contains(containerPath, ":") {
+				containerPath = "c:" + containerPath
+			}
+		}
+
 		mounts = append(mounts, kubecontainer.Mount{
 			Name:           mount.Name,
-			ContainerPath:  mount.MountPath,
+			ContainerPath:  containerPath,
 			HostPath:       hostPath,
 			ReadOnly:       mount.ReadOnly,
 			SELinuxRelabel: relabelVolume,
@@ -284,7 +298,9 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Cont
 		return nil, err
 	}
 
-	if len(container.TerminationMessagePath) != 0 {
+	// Disabling adding TerminationMessagePath on Windows as these files would be mounted as docker volume and
+	// Docker for Windows has a bug where only directories can be mounted
+	if len(container.TerminationMessagePath) != 0 && runtime.GOOS != "windows" {
 		p := kl.getPodContainerDir(pod.UID, container.Name)
 		if err := os.MkdirAll(p, 0750); err != nil {
 			glog.Errorf("Error on creating %q: %v", p, err)

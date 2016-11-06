@@ -17,11 +17,14 @@ limitations under the License.
 package volume
 
 import (
+	"io"
 	"io/ioutil"
 	"os"
-	"path"
+	filepath "path/filepath"
+	"runtime"
 	"time"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/types"
@@ -223,13 +226,94 @@ func (err deletedVolumeInUseError) Error() string {
 }
 
 func RenameDirectory(oldPath, newName string) (string, error) {
-	newPath, err := ioutil.TempDir(path.Dir(oldPath), newName)
+	newPath, err := ioutil.TempDir(filepath.Dir(oldPath), newName)
 	if err != nil {
 		return "", err
 	}
+
+	// os.Rename call fails on windows (https://github.com/golang/go/issues/14527)
+	// Replacing with copyFolder to the newPath and deleting the oldPath directory
+	if runtime.GOOS == "windows" {
+		err = copyFolder(oldPath, newPath)
+		if err != nil {
+			glog.Errorf("Error copying folder from: %s to: %s with error: %v", oldPath, newPath, err)
+			return "", err
+		}
+		os.RemoveAll(oldPath)
+		return newPath, nil
+	}
+
 	err = os.Rename(oldPath, newPath)
 	if err != nil {
 		return "", err
 	}
 	return newPath, nil
+}
+
+func copyFolder(source string, dest string) (err error) {
+	fi, err := os.Lstat(source)
+	if err != nil {
+		glog.Errorf("Error getting stats for %s. %v", source, err)
+		return err
+	}
+
+	err = os.MkdirAll(dest, fi.Mode())
+	if err != nil {
+		glog.Errorf("Unable to create %s directory %v", dest, err)
+	}
+
+	directory, _ := os.Open(source)
+
+	defer directory.Close()
+
+	objects, err := directory.Readdir(-1)
+
+	for _, obj := range objects {
+		if obj.Mode()&os.ModeSymlink != 0 {
+			continue
+		}
+
+		sourcefilepointer := source + "\\" + obj.Name()
+		destinationfilepointer := dest + "\\" + obj.Name()
+
+		if obj.IsDir() {
+			err = copyFolder(sourcefilepointer, destinationfilepointer)
+			if err != nil {
+				return err
+			}
+		} else {
+			err = copyFile(sourcefilepointer, destinationfilepointer)
+			if err != nil {
+				return err
+			}
+		}
+
+	}
+	return
+}
+
+func copyFile(source string, dest string) (err error) {
+	sourcefile, err := os.Open(source)
+	if err != nil {
+		return err
+	}
+
+	defer sourcefile.Close()
+
+	destfile, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+
+	defer destfile.Close()
+
+	_, err = io.Copy(destfile, sourcefile)
+	if err == nil {
+		sourceinfo, err := os.Stat(source)
+		if err != nil {
+			err = os.Chmod(dest, sourceinfo.Mode())
+		}
+
+	}
+	return
 }
