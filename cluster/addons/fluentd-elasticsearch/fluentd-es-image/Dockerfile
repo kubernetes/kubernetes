@@ -38,5 +38,7 @@ COPY td-agent.conf /etc/td-agent/td-agent.conf
 COPY build.sh /tmp/build.sh
 RUN /tmp/build.sh
 
+ENV LD_PRELOAD /opt/td-agent/embedded/lib/libjemalloc.so
+
 # Run the Fluentd service.
 ENTRYPOINT ["td-agent"]
