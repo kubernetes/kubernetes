@@ -514,6 +514,7 @@ service-address
 service-cidr
 service-cluster-ip-range
 service-dns-domain
+service-dns-suffix
 service-generator
 service-node-port-range
 service-node-ports
