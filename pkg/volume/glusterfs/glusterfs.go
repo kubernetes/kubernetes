@@ -18,10 +18,6 @@ package glusterfs
 
 import (
 	"fmt"
-	"os"
-	"path"
-	dstrings "strings"
-
 	"github.com/golang/glog"
 	gcli "github.com/heketi/heketi/client/api/go-client"
 	gapi "github.com/heketi/heketi/pkg/glusterfs/api"
@@ -35,6 +31,13 @@ import (
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"math/rand"
+	"os"
+	"path"
+	"strconv"
+	dstrings "strings"
+	"time"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -59,6 +62,7 @@ const (
 	volPrefix                 = "vol_"
 	dynamicEpSvcPrefix        = "gluster-dynamic-"
 	replicaCount              = 3
+	gidMax                    = 600000
 	durabilityType            = "replicate"
 	secretKeyName             = "key" // key name used in secret
 	annGlusterURL             = "glusterfs.kubernetes.io/url"
@@ -465,6 +469,8 @@ func (d *glusterfsVolumeDeleter) Delete() error {
 
 func (r *glusterfsVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 	var err error
+	var reqGid int64
+	gidRandomizer := rand.New(rand.NewSource(time.Now().UnixNano()))
 	if r.options.PVC.Spec.Selector != nil {
 		glog.V(4).Infof("glusterfs: not able to parse your claim Selector")
 		return nil, fmt.Errorf("glusterfs: not able to parse your claim Selector")
@@ -476,9 +482,9 @@ func (r *glusterfsVolumeProvisioner) Provision() (*api.PersistentVolume, error) 
 		return nil, err
 	}
 	r.provisioningConfig = *cfg
-
 	glog.V(4).Infof("glusterfs: creating volume with configuration %+v", r.provisioningConfig)
-	glusterfs, sizeGB, err := r.CreateVolume()
+	reqGid = gidRandomizer.Int63n(gidMax)
+	glusterfs, sizeGB, err := r.CreateVolume(reqGid)
 	if err != nil {
 		glog.Errorf("glusterfs: create volume err: %v.", err)
 		return nil, fmt.Errorf("glusterfs: create volume err: %v.", err)
@@ -490,13 +496,15 @@ func (r *glusterfsVolumeProvisioner) Provision() (*api.PersistentVolume, error) 
 	if len(pv.Spec.AccessModes) == 0 {
 		pv.Spec.AccessModes = r.plugin.GetAccessModes()
 	}
+	sGid := strconv.FormatInt(reqGid, 10)
+	pv.Annotations = map[string]string{volumehelper.VolumeGidAnnotationKey: sGid}
 	pv.Spec.Capacity = api.ResourceList{
 		api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
 	}
 	return pv, nil
 }
 
-func (p *glusterfsVolumeProvisioner) CreateVolume() (r *api.GlusterfsVolumeSource, size int, err error) {
+func (p *glusterfsVolumeProvisioner) CreateVolume(reqGid int64) (r *api.GlusterfsVolumeSource, size int, err error) {
 	capacity := p.options.PVC.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
 	volSizeBytes := capacity.Value()
 	sz := int(volume.RoundUpSize(volSizeBytes, 1024*1024*1024))
@@ -510,7 +518,7 @@ func (p *glusterfsVolumeProvisioner) CreateVolume() (r *api.GlusterfsVolumeSourc
 		glog.Errorf("glusterfs: failed to create gluster rest client")
 		return nil, 0, fmt.Errorf("failed to create gluster REST client, REST server authentication failed")
 	}
-	volumeReq := &gapi.VolumeCreateRequest{Size: sz, Durability: gapi.VolumeDurabilityInfo{Type: durabilityType, Replicate: gapi.ReplicaDurability{Replica: replicaCount}}}
+	volumeReq := &gapi.VolumeCreateRequest{Size: sz, Gid: reqGid, Durability: gapi.VolumeDurabilityInfo{Type: durabilityType, Replicate: gapi.ReplicaDurability{Replica: replicaCount}}}
 	volume, err := cli.VolumeCreate(volumeReq)
 	if err != nil {
 		glog.Errorf("glusterfs: error creating volume %v ", err)
