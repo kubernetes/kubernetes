@@ -1,0 +1,112 @@
+/*
+Copyright 2016 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package factory
+
+import (
+	"fmt"
+	"github.com/golang/glog"
+	"google.golang.org/grpc"
+	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/storage/native"
+	"k8s.io/kubernetes/pkg/storage/storagebackend"
+	"net/url"
+	"sync"
+	"time"
+)
+
+var initMutex sync.Mutex
+var clients map[string]native.StorageServiceClient
+var embeddedServer *native.Server
+
+func newNativeStorage(c storagebackend.Config, embedded bool) (storage.Interface, DestroyFunc, error) {
+	destroyFunc := func() {
+		// TODO: what is the behaviour of this currently?
+		glog.Infof("native destroy function called")
+	}
+
+	// TODO: yuk
+	initMutex.Lock()
+	defer initMutex.Unlock()
+	var grpcServerURLString string
+	if embedded {
+		glog.Infof("Using embedded StateServer")
+		options := &native.ServerOptions{}
+		options.InitDefaults()
+
+		if embeddedServer == nil {
+			embeddedServer = native.NewServer(options)
+			go func() {
+				err := embeddedServer.Run()
+				if err != nil {
+					glog.Fatalf("embedded state server exited unexpectedly: %v", err)
+				}
+			}()
+
+			for {
+				if embeddedServer.IsStarted() && embeddedServer.IsLeader() {
+					break
+				}
+				time.Sleep(100 * time.Millisecond)
+			}
+		}
+
+		grpcServerURLString = "http://" + options.ClientBind
+	} else {
+		if len(c.ServerList) == 0 {
+			return nil, nil, fmt.Errorf("no servers provided")
+		}
+
+		if len(c.ServerList) > 1 {
+			glog.Warningf("ignoring additional state servers: %s", c.ServerList)
+		}
+		grpcServerURLString = c.ServerList[0]
+
+		glog.Infof("Using native StateServer: %q", grpcServerURLString)
+	}
+
+	// TODO: Do we want to reuse clients?
+	client := clients[grpcServerURLString]
+	if client == nil {
+		grpcServerURL, err := url.Parse(grpcServerURLString)
+		if err != nil {
+			return nil, nil, fmt.Errorf("cannot parse server url: %q", grpcServerURLString)
+		}
+		var opts []grpc.DialOption
+		if grpcServerURL.Scheme == "http" {
+			opts = append(opts, grpc.WithInsecure())
+		} else {
+			return nil, nil, fmt.Errorf("unhandled scheme: %q", grpcServerURLString)
+		}
+
+		host := grpcServerURL.Host
+
+		conn, err := grpc.Dial(host, opts...)
+		if err != nil {
+			return nil, nil, fmt.Errorf("unable to connect to grpc server %q: %v", host, err)
+		}
+
+		// TODO: Close conn
+
+		client = native.NewStorageServiceClient(conn)
+		if clients == nil {
+			clients = make(map[string]native.StorageServiceClient)
+		}
+		clients[grpcServerURLString] = client
+	}
+	nativeStore := native.NewStore(c.Prefix, c.Codec, client)
+	return nativeStore, destroyFunc, nil
+}
