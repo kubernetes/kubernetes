@@ -19,6 +19,7 @@ go_library(
         "//pkg/api/errors:go_default_library",
         "//pkg/api/errors/storage:go_default_library",
         "//pkg/api/rest:go_default_library",
+        "//pkg/api/unversioned:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/validation:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
