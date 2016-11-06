@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"bytes"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -36,8 +37,8 @@ func TestScopeNamingGenerateLink(t *testing.T) {
 	s := scopeNaming{
 		meta.RESTScopeNamespace,
 		selfLinker,
-		func(name, namespace string) string {
-			return "/api/v1/namespaces/" + namespace + "/services/" + name
+		func(name, namespace string) bytes.Buffer {
+			return *bytes.NewBufferString("/api/v1/namespaces/" + namespace + "/services/" + name)
 		},
 		true,
 	}
@@ -50,7 +51,7 @@ func TestScopeNamingGenerateLink(t *testing.T) {
 			Kind: "Service",
 		},
 	}
-	_, _, err := s.GenerateLink(&restful.Request{}, service)
+	_, err := s.GenerateLink(&restful.Request{}, service)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}

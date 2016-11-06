@@ -46,94 +46,185 @@ func TestIsList(t *testing.T) {
 }
 
 func TestExtractList(t *testing.T) {
-	pl := &api.PodList{
-		Items: []api.Pod{
-			{ObjectMeta: api.ObjectMeta{Name: "1"}},
-			{ObjectMeta: api.ObjectMeta{Name: "2"}},
-			{ObjectMeta: api.ObjectMeta{Name: "3"}},
-		},
+	list1 := []runtime.Object{
+		&api.Pod{ObjectMeta: api.ObjectMeta{Name: "1"}},
+		&api.Service{ObjectMeta: api.ObjectMeta{Name: "2"}},
 	}
-	list, err := meta.ExtractList(pl)
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
-	}
-	if e, a := len(list), len(pl.Items); e != a {
-		t.Fatalf("Expected %v, got %v", e, a)
-	}
-	for i := range list {
-		if e, a := list[i].(*api.Pod).Name, pl.Items[i].Name; e != a {
-			t.Fatalf("Expected %v, got %v", e, a)
-		}
-	}
-}
-
-func TestExtractListV1(t *testing.T) {
-	pl := &v1.PodList{
-		Items: []v1.Pod{
-			{ObjectMeta: v1.ObjectMeta{Name: "1"}},
-			{ObjectMeta: v1.ObjectMeta{Name: "2"}},
-			{ObjectMeta: v1.ObjectMeta{Name: "3"}},
-		},
-	}
-	list, err := meta.ExtractList(pl)
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
-	}
-	if e, a := len(list), len(pl.Items); e != a {
-		t.Fatalf("Expected %v, got %v", e, a)
-	}
-	for i := range list {
-		if e, a := list[i].(*v1.Pod).Name, pl.Items[i].Name; e != a {
-			t.Fatalf("Expected %v, got %v", e, a)
-		}
-	}
-}
-
-func TestExtractListGeneric(t *testing.T) {
-	pl := &api.List{
-		Items: []runtime.Object{
-			&api.Pod{ObjectMeta: api.ObjectMeta{Name: "1"}},
-			&api.Service{ObjectMeta: api.ObjectMeta{Name: "2"}},
-		},
-	}
-	list, err := meta.ExtractList(pl)
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
-	}
-	if e, a := len(list), len(pl.Items); e != a {
-		t.Fatalf("Expected %v, got %v", e, a)
-	}
-	if obj, ok := list[0].(*api.Pod); !ok {
-		t.Fatalf("Expected list[0] to be *api.Pod, it is %#v", obj)
-	}
-	if obj, ok := list[1].(*api.Service); !ok {
-		t.Fatalf("Expected list[1] to be *api.Service, it is %#v", obj)
-	}
-}
-
-func TestExtractListGenericV1(t *testing.T) {
-	pl := &v1.List{
+	list2 := &v1.List{
 		Items: []runtime.RawExtension{
 			{Raw: []byte("foo")},
 			{Raw: []byte("bar")},
 			{Object: &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "other"}}},
 		},
 	}
-	list, err := meta.ExtractList(pl)
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
+	list3 := &fakePtrValueList{
+		Items: []*api.Pod{
+			{ObjectMeta: api.ObjectMeta{Name: "1"}},
+			{ObjectMeta: api.ObjectMeta{Name: "2"}},
+		},
 	}
-	if e, a := len(list), len(pl.Items); e != a {
-		t.Fatalf("Expected %v, got %v", e, a)
+	list4 := &api.PodList{
+		Items: []api.Pod{
+			{ObjectMeta: api.ObjectMeta{Name: "1"}},
+			{ObjectMeta: api.ObjectMeta{Name: "2"}},
+			{ObjectMeta: api.ObjectMeta{Name: "3"}},
+		},
 	}
-	if obj, ok := list[0].(*runtime.Unknown); !ok {
-		t.Fatalf("Expected list[0] to be *runtime.Unknown, it is %#v", obj)
+	list5 := &v1.PodList{
+		Items: []v1.Pod{
+			{ObjectMeta: v1.ObjectMeta{Name: "1"}},
+			{ObjectMeta: v1.ObjectMeta{Name: "2"}},
+			{ObjectMeta: v1.ObjectMeta{Name: "3"}},
+		},
 	}
-	if obj, ok := list[1].(*runtime.Unknown); !ok {
-		t.Fatalf("Expected list[1] to be *runtime.Unknown, it is %#v", obj)
+
+	testCases := []struct {
+		in    runtime.Object
+		out   []interface{}
+		equal bool
+	}{
+		{
+			in:  &api.List{},
+			out: []interface{}{},
+		},
+		{
+			in:  &v1.List{},
+			out: []interface{}{},
+		},
+		{
+			in:  &v1.PodList{},
+			out: []interface{}{},
+		},
+		{
+			in:  &api.List{Items: list1},
+			out: []interface{}{list1[0], list1[1]},
+		},
+		{
+			in:    list2,
+			out:   []interface{}{&runtime.Unknown{Raw: list2.Items[0].Raw}, &runtime.Unknown{Raw: list2.Items[1].Raw}, list2.Items[2].Object},
+			equal: true,
+		},
+		{
+			in:  list3,
+			out: []interface{}{list3.Items[0], list3.Items[1]},
+		},
+		{
+			in:  list4,
+			out: []interface{}{&list4.Items[0], &list4.Items[1], &list4.Items[2]},
+		},
+		{
+			in:  list5,
+			out: []interface{}{&list5.Items[0], &list5.Items[1], &list5.Items[2]},
+		},
 	}
-	if obj, ok := list[2].(*v1.Pod); !ok {
-		t.Fatalf("Expected list[2] to be *runtime.Unknown, it is %#v", obj)
+	for i, test := range testCases {
+		list, err := meta.ExtractList(test.in)
+		if err != nil {
+			t.Fatalf("%d: extract: Unexpected error %v", i, err)
+		}
+		if e, a := len(test.out), len(list); e != a {
+			t.Fatalf("%d: extract: Expected %v, got %v", i, e, a)
+		}
+		for j, e := range test.out {
+			if e != list[j] {
+				if !test.equal {
+					t.Fatalf("%d: extract: Expected list[%d] to be %#v, but found %#v", i, j, e, list[j])
+				}
+				if !reflect.DeepEqual(e, list[j]) {
+					t.Fatalf("%d: extract: Expected list[%d] to be %#v, but found %#v", i, j, e, list[j])
+				}
+			}
+		}
+	}
+}
+
+func TestEachListItem(t *testing.T) {
+	list1 := []runtime.Object{
+		&api.Pod{ObjectMeta: api.ObjectMeta{Name: "1"}},
+		&api.Service{ObjectMeta: api.ObjectMeta{Name: "2"}},
+	}
+	list2 := &v1.List{
+		Items: []runtime.RawExtension{
+			{Raw: []byte("foo")},
+			{Raw: []byte("bar")},
+			{Object: &v1.Pod{ObjectMeta: v1.ObjectMeta{Name: "other"}}},
+		},
+	}
+	list3 := &fakePtrValueList{
+		Items: []*api.Pod{
+			{ObjectMeta: api.ObjectMeta{Name: "1"}},
+			{ObjectMeta: api.ObjectMeta{Name: "2"}},
+		},
+	}
+	list4 := &api.PodList{
+		Items: []api.Pod{
+			{ObjectMeta: api.ObjectMeta{Name: "1"}},
+			{ObjectMeta: api.ObjectMeta{Name: "2"}},
+			{ObjectMeta: api.ObjectMeta{Name: "3"}},
+		},
+	}
+	list5 := &v1.PodList{
+		Items: []v1.Pod{
+			{ObjectMeta: v1.ObjectMeta{Name: "1"}},
+			{ObjectMeta: v1.ObjectMeta{Name: "2"}},
+			{ObjectMeta: v1.ObjectMeta{Name: "3"}},
+		},
+	}
+
+	testCases := []struct {
+		in  runtime.Object
+		out []interface{}
+	}{
+		{
+			in:  &api.List{},
+			out: []interface{}{},
+		},
+		{
+			in:  &v1.List{},
+			out: []interface{}{},
+		},
+		{
+			in:  &v1.PodList{},
+			out: []interface{}{},
+		},
+		{
+			in:  &api.List{Items: list1},
+			out: []interface{}{list1[0], list1[1]},
+		},
+		{
+			in:  list2,
+			out: []interface{}{nil, nil, list2.Items[2].Object},
+		},
+		{
+			in:  list3,
+			out: []interface{}{list3.Items[0], list3.Items[1]},
+		},
+		{
+			in:  list4,
+			out: []interface{}{&list4.Items[0], &list4.Items[1], &list4.Items[2]},
+		},
+		{
+			in:  list5,
+			out: []interface{}{&list5.Items[0], &list5.Items[1], &list5.Items[2]},
+		},
+	}
+	for i, test := range testCases {
+		list := []runtime.Object{}
+		err := meta.EachListItem(test.in, func(obj runtime.Object) error {
+			list = append(list, obj)
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("%d: each: Unexpected error %v", i, err)
+		}
+		if e, a := len(test.out), len(list); e != a {
+			t.Fatalf("%d: each: Expected %v, got %v", i, e, a)
+		}
+		for j, e := range test.out {
+			if e != list[j] {
+				t.Fatalf("%d: each: Expected list[%d] to be %#v, but found %#v", i, j, e, list[j])
+			}
+		}
 	}
 }
 
@@ -164,27 +255,6 @@ type fakePtrValueList struct {
 
 func (obj fakePtrValueList) GetObjectKind() unversioned.ObjectKind {
 	return unversioned.EmptyObjectKind
-}
-
-func TestExtractListOfValuePtrs(t *testing.T) {
-	pl := &fakePtrValueList{
-		Items: []*api.Pod{
-			{ObjectMeta: api.ObjectMeta{Name: "1"}},
-			{ObjectMeta: api.ObjectMeta{Name: "2"}},
-		},
-	}
-	list, err := meta.ExtractList(pl)
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
-	}
-	if e, a := len(list), len(pl.Items); e != a {
-		t.Fatalf("Expected %v, got %v", e, a)
-	}
-	for i := range list {
-		if obj, ok := list[i].(*api.Pod); !ok {
-			t.Fatalf("Expected list[%d] to be *api.Pod, it is %#v", i, obj)
-		}
-	}
 }
 
 func TestSetList(t *testing.T) {
