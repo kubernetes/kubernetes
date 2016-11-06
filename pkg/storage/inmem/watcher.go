@@ -3,14 +3,19 @@ package inmem
 import (
 	"k8s.io/kubernetes/pkg/storage"
 
+	"fmt"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 	"strings"
 	"sync/atomic"
 )
 
 type watcher struct {
+	versioner storage.Versioner
+	codec     runtime.Codec
+
 	log        *changeLog
 	resultChan chan watch.Event
 
@@ -62,7 +67,22 @@ func (w *watcher) run() {
 				continue
 			}
 
-			match, err := w.pred.Matches(i.object)
+			obj, err := w.decode(i.data, entry.lsn)
+			if err != nil {
+				glog.Warningf("error decoding change event: %v", err)
+				w.resultChan <- watch.Event{
+					Type: watch.Error,
+					Object: &unversioned.Status{
+						Status:  unversioned.StatusFailure,
+						Message: err.Error(),
+						Reason:  unversioned.StatusReasonInternalError,
+					},
+				}
+				return
+			}
+
+			// TODO: Expose these fields without a full parse?
+			match, err := w.pred.Matches(obj)
 			if err != nil {
 				glog.Warningf("predicate returned error: %v", err)
 			}
@@ -70,13 +90,25 @@ func (w *watcher) run() {
 				continue
 			}
 
-			glog.V(4).Infof("Sending %s for %v", i.eventType, i.object)
+			glog.V(4).Infof("Sending %s for %v", i.eventType, obj)
 
 			w.resultChan <- watch.Event{
 				Type:   i.eventType,
-				Object: i.object,
+				Object: obj,
 			}
 		}
 		w.position++
 	}
+}
+
+func (w *watcher) decode(data []byte, lsn LSN) (runtime.Object, error) {
+	obj, err := runtime.Decode(w.codec, []byte(data))
+	if err != nil {
+		return nil, err
+	}
+	// ensure resource version is set on the object we load from etcd
+	if err := w.versioner.UpdateObject(obj, uint64(lsn)); err != nil {
+		return nil, fmt.Errorf("failure to version api object (%d) %#v: %v", lsn, obj, err)
+	}
+	return obj, nil
 }

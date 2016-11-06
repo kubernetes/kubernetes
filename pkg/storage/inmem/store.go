@@ -18,12 +18,12 @@ import (
 	"k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/watch"
-	"sync"
 	"time"
 )
 
 var errorLSNMismatch = errors.New("LSN mismatch")
 var errorItemNotFound = errors.New("Item not found")
+var errorAlreadyExists = errors.New("Item already exists")
 
 type LSN uint64
 
@@ -31,33 +31,17 @@ type store struct {
 	versioner storage.Versioner
 	codec     runtime.Codec
 
-	log           *changeLog
-	expiryManager *expiryManager
-
-	mutex   sync.RWMutex
-	root    *bucket
-	lastLSN LSN
+	backend *Backend
 }
 
 func NewStore(prefix string, codec runtime.Codec, backend *Backend) *store {
 	glog.Infof("building inmem store prefix=%q", prefix)
 	versioner := etcd.APIObjectVersioner{}
 	s := &store{
-		root:      backend.root,
+		backend:   backend,
 		versioner: versioner,
 		codec:     codec,
 	}
-
-	s.log = newChangeLog()
-
-	{
-		init := &logEntry{lsn: 1}
-		s.log.append(init)
-		s.lastLSN = 1
-	}
-	s.expiryManager = newExpiryManager(s)
-	go s.expiryManager.Run()
-
 	return s
 }
 
@@ -94,40 +78,16 @@ func (s *store) Create(ctx context.Context, path string, obj, out runtime.Object
 	glog.Infof("3")
 
 	bucket, k := splitPath(path)
-
-	expiry := uint64(0)
+	item := itemData{objMeta.UID, data, 0, 0}
 	if ttl != 0 {
-		expiry = uint64(time.Now().Unix()) + ttl
+		item.expiry = uint64(time.Now().Unix()) + ttl
 	}
 
-	lsn, err := func() (LSN, error) {
-		s.mutex.Lock()
-		defer s.mutex.Unlock()
-
-		b := s.root.resolveBucket(bucket, true)
-		_, found := b.items[k]
-		if found {
-			return 0, storage.NewKeyExistsError(path, 0)
-		}
-
-		s.lastLSN++
-		lsn := s.lastLSN
-
-		log := &logEntry{lsn: lsn}
-		log.addItem(s, b.path+k, watch.Added, data)
-
-		b.items[k] = itemData{objMeta.UID, data, expiry, lsn}
-
-		// Note we send the notifications before returning ... should be interesting :-)
-		s.log.append(log)
-
-		if ttl != 0 {
-			s.expiryManager.add(b, k, expiry)
-		}
-
-		return lsn, nil
-	}()
+	lsn, err := s.backend.Create(bucket, k, item)
 	if err != nil {
+		if err == errorAlreadyExists {
+			return storage.NewKeyExistsError(path, 0)
+		}
 		return err
 	}
 
@@ -148,40 +108,11 @@ func (s *store) Delete(ctx context.Context, path string, out runtime.Object, pre
 
 	bucket, k := splitPath(path)
 
-	oldItem, err := func() (itemData, error) {
-		s.mutex.Lock()
-		defer s.mutex.Unlock()
-
-		b := s.root.resolveBucket(bucket, false)
-		if b == nil {
-			return itemData{}, storage.NewKeyNotFoundError(path, 0)
-		}
-		item, found := b.items[k]
-		if !found {
-			return itemData{}, storage.NewKeyNotFoundError(path, 0)
-		}
-
-		if preconditions != nil {
-			if err := checkPreconditions(path, preconditions, item.uid); err != nil {
-				return itemData{}, err
-			}
-		}
-
-		oldItem := item
-
-		s.lastLSN++
-		lsn := s.lastLSN
-		log := &logEntry{lsn: lsn}
-		log.addItem(s, b.path+k, watch.Deleted, oldItem.data)
-
-		// Note we send the notifications before returning ... should be interesting :-)
-		s.log.append(log)
-
-		delete(b.items, k)
-
-		return oldItem, nil
-	}()
+	oldItem, err := s.backend.Delete(bucket, k, preconditions)
 	if err != nil {
+		if err == errorItemNotFound {
+			return storage.NewKeyNotFoundError(path, 0)
+		}
 		return err
 	}
 
@@ -200,7 +131,7 @@ func (s *store) Watch(ctx context.Context, path string, resourceVersion string, 
 		return nil, err
 	}
 
-	return s.log.newWatcher(LSN(rev), p, path, false)
+	return s.backend.log.newWatcher(s, LSN(rev), p, path, false)
 }
 
 // WatchList begins watching the specified key's items. Items are decoded into API
@@ -215,7 +146,7 @@ func (s *store) WatchList(ctx context.Context, path string, resourceVersion stri
 		return nil, err
 	}
 
-	return s.log.newWatcher(LSN(rev), p, path, true)
+	return s.backend.log.newWatcher(s, LSN(rev), p, path, true)
 }
 
 // Get implements storage.Interface.Get.
@@ -223,7 +154,7 @@ func (s *store) Get(ctx context.Context, path string, out runtime.Object, ignore
 	glog.V(4).Infof("Get %s", path)
 	bucket, k := splitPath(path)
 
-	item, _, err := s.get(bucket, k)
+	item, _, err := s.backend.Get(bucket, k)
 	if err != nil {
 		if err == errorItemNotFound {
 			if ignoreNotFound {
@@ -248,7 +179,7 @@ func (s *store) GetToList(ctx context.Context, path string, resourceVersion stri
 
 	bucket, k := splitPath(path)
 
-	item, systemLSN, err := s.get(bucket, k)
+	item, systemLSN, err := s.backend.Get(bucket, k)
 	if err != nil {
 		if err == errorItemNotFound {
 			return nil
@@ -277,27 +208,7 @@ func (s *store) List(ctx context.Context, path, resourceVersion string, pred sto
 		return err
 	}
 
-	var items []itemData
-
-	lsn, err := func() (LSN, error) {
-		s.mutex.Lock()
-		defer s.mutex.Unlock()
-
-		b := s.root.resolveBucket(path, false)
-		if b == nil {
-			// We return an empty list
-			return s.lastLSN, nil
-		}
-
-		if len(b.items) != 0 {
-			items = make([]itemData, 0, len(b.items))
-			for _, v := range b.items {
-				items = append(items, v)
-			}
-		}
-
-		return s.lastLSN, nil
-	}()
+	items, lsn, err := s.backend.List(path)
 	if err != nil {
 		return err
 	}
@@ -390,7 +301,7 @@ func (s *store) GuaranteedUpdate(
 
 		uid = objMeta.UID
 	} else {
-		item, _, err := s.get(bucket, k)
+		item, _, err := s.backend.Get(bucket, k)
 		if err != nil {
 			if err == errorItemNotFound {
 				if ignoreNotFound {
@@ -433,40 +344,9 @@ func (s *store) GuaranteedUpdate(
 			newItem.expiry = uint64(time.Now().Unix()) + ttl
 		}
 
-		var watchers []*watcher
-
 		// response will be the new item if we swapped,
 		// or the existing item if err==errorLSNMismatch
-		response, err := func() (itemData, error) {
-			s.mutex.Lock()
-			defer s.mutex.Unlock()
-
-			b := s.root.resolveBucket(bucket, true)
-			item, found := b.items[k]
-			if !found {
-				return itemData{}, errorItemNotFound
-			}
-			if item.lsn != origState.rev {
-				return item, errorLSNMismatch
-			}
-
-			s.lastLSN++
-			lsn := s.lastLSN
-			log := &logEntry{lsn: lsn}
-			log.addItem(s, b.path+k, watch.Modified, newItem.data)
-
-			newItem.lsn = lsn
-			b.items[k] = newItem
-
-			// Note we send the notifications before returning ... should be interesting :-)
-			s.log.append(log)
-
-			if ttl != 0 {
-				s.expiryManager.add(b, k, newItem.expiry)
-			}
-
-			return newItem, nil
-		}()
+		response, err := s.backend.Update(bucket, k, origState.rev, newItem)
 		if err != nil {
 			if err == errorLSNMismatch {
 				glog.V(4).Infof("GuaranteedUpdate of %s failed because of a conflict, going to retry", path)
@@ -492,25 +372,6 @@ func (s *store) GuaranteedUpdate(
 				return storage.NewKeyNotFoundError(path, 0)
 			} else {
 				return err
-			}
-		}
-
-		if len(watchers) != 0 {
-			// Note we send the notifications before returning ... should be interesting :-)
-
-			// TODO: Is it safe to reuse the event object?
-			// TODO: Could we also return this object (is it the same type?)
-			// TODO: Could we use obj?
-			watchObj, err := s.decodeForWatch(data, response.lsn)
-			if err != nil {
-				panic(fmt.Errorf("error decoding object: %v", err))
-			}
-			event := watch.Event{
-				Type:   watch.Modified,
-				Object: watchObj,
-			}
-			for _, w := range watchers {
-				w.resultChan <- event
 			}
 		}
 
@@ -603,18 +464,6 @@ func decode(codec runtime.Codec, versioner storage.Versioner, value []byte, objP
 	return nil
 }
 
-func (s *store) decodeForWatch(data []byte, lsn LSN) (runtime.Object, error) {
-	obj, err := runtime.Decode(s.codec, []byte(data))
-	if err != nil {
-		return nil, err
-	}
-	// ensure resource version is set on the object we load from etcd
-	if err := s.versioner.UpdateObject(obj, uint64(lsn)); err != nil {
-		return nil, fmt.Errorf("failure to version api object (%d) %#v: %v", lsn, obj, err)
-	}
-	return obj, nil
-}
-
 func checkPreconditions(path string, preconditions *storage.Preconditions, objectUID types.UID) error {
 	if preconditions == nil {
 		return nil
@@ -624,82 +473,4 @@ func checkPreconditions(path string, preconditions *storage.Preconditions, objec
 		return storage.NewInvalidObjError(path, errMsg)
 	}
 	return nil
-}
-
-func (s *store) checkExpiration(candidates []expiringItem) error {
-	if len(candidates) == 0 {
-		return nil
-	}
-
-	type notification struct {
-		w     *watcher
-		event *watch.Event
-	}
-
-	// Because channels have limited capacity, we buffer everything and send the notifications outside of the mutex
-	// This will also let us be more atomic when we have things that can fail
-	var notifications []notification
-
-	err := func() error {
-		s.mutex.Lock()
-		defer s.mutex.Unlock()
-
-		var log *logEntry
-
-		now := uint64(time.Now().Unix())
-
-		for i := range candidates {
-			candidate := &candidates[i]
-			k := candidate.key
-			b := candidate.bucket
-
-			item, found := b.items[k]
-			if !found {
-				continue
-			}
-			if item.expiry > now {
-				continue
-			}
-
-			if log == nil {
-				s.lastLSN++
-				log = &logEntry{lsn: s.lastLSN}
-			}
-			log.addItem(s, b.path+k, watch.Deleted, item.data)
-
-			delete(b.items, candidate.key)
-
-		}
-
-		if log != nil {
-			s.log.append(log)
-		}
-
-		return nil
-	}()
-	if err != nil {
-		return err
-	}
-
-	for i := range notifications {
-		notifications[i].w.resultChan <- *notifications[i].event
-	}
-
-	return nil
-}
-
-func (s *store) get(bucket, k string) (itemData, LSN, error) {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
-	b := s.root.resolveBucket(bucket, false)
-	if b == nil {
-		return itemData{}, s.lastLSN, errorItemNotFound
-	}
-	item, found := b.items[k]
-	if !found {
-		return itemData{}, s.lastLSN, errorItemNotFound
-	}
-
-	return item, s.lastLSN, nil
 }

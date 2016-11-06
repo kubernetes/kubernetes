@@ -12,9 +12,9 @@ import (
 // An interesting part of the design is that once scheduled items are never removed;
 // instead once we see an expired key, we then trigger a check to see if it has actually expired.
 type expiryManager struct {
-	mutex sync.Mutex
-	queue expiryQueue
-	store *store
+	mutex   sync.Mutex
+	queue   expiryQueue
+	backend *Backend
 
 	minChanged     bool
 	minChangedChan chan bool
@@ -26,9 +26,9 @@ type expiringItem struct {
 	expiry uint64
 }
 
-func newExpiryManager(store *store) *expiryManager {
+func newExpiryManager(backend *Backend) *expiryManager {
 	m := &expiryManager{
-		store: store,
+		backend: backend,
 	}
 	return m
 }
@@ -100,7 +100,7 @@ func (m *expiryManager) runOnce() {
 	m.mutex.Unlock()
 
 	if len(paths) != 0 {
-		err := m.store.checkExpiration(paths)
+		err := m.backend.checkExpiration(paths)
 		if err != nil {
 			// TODO: log, sleep, reattempt current batch?
 			panic(fmt.Errorf("error processing expiration: %v", err))

@@ -3,7 +3,6 @@ package inmem
 import (
 	"fmt"
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/watch"
 	"sync"
@@ -26,8 +25,6 @@ type logItem struct {
 	path      string
 	eventType watch.EventType
 	data      []byte
-
-	object runtime.Object
 }
 
 func (i logItem) String() string {
@@ -81,24 +78,7 @@ func (l *changeLog) read(pos LSN) (*logEntry, error) {
 	}
 }
 
-func (e *logEntry) addItem(s *store, path string, eventType watch.EventType, data []byte) {
-	// TODO: Is it safe to reuse the event object across events?
-	// TODO: Could we also return this object (is it the same type?)
-	// TODO: Could we use obj?
-	obj, err := s.decodeForWatch(data, e.lsn)
-	if err != nil {
-		panic(fmt.Errorf("error decoding object: %v", err))
-	}
-
-	e.items = append(e.items, logItem{
-		path:      path,
-		data:      data,
-		object:    obj,
-		eventType: eventType,
-	})
-}
-
-func (l *changeLog) newWatcher(startPosition LSN, predicate storage.SelectionPredicate, path string, recursive bool) (watch.Interface, error) {
+func (l *changeLog) newWatcher(s *store, startPosition LSN, predicate storage.SelectionPredicate, path string, recursive bool) (watch.Interface, error) {
 	// TODO: etc3 code has this
 	//if pred.Label.Empty() && pred.Field.Empty() {
 	//	// The filter doesn't filter out any object.
@@ -114,6 +94,9 @@ func (l *changeLog) newWatcher(startPosition LSN, predicate storage.SelectionPre
 	bufferSize := 16
 
 	w := &watcher{
+		versioner: s.versioner,
+		codec:     s.codec,
+
 		log:        l,
 		resultChan: make(chan watch.Event, bufferSize),
 		position:   startPosition,
