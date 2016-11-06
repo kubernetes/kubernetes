@@ -67,22 +67,23 @@ func TestRunOnce(t *testing.T) {
 	}
 	defer os.RemoveAll(basePath)
 	kb := &Kubelet{
-		rootDirectory:       basePath,
-		recorder:            &record.FakeRecorder{},
-		cadvisor:            cadvisor,
-		nodeLister:          testNodeLister{},
-		nodeInfo:            testNodeInfo{},
-		statusManager:       status.NewManager(nil, podManager),
-		containerRefManager: kubecontainer.NewRefManager(),
-		podManager:          podManager,
-		os:                  &containertest.FakeOS{},
-		diskSpaceManager:    diskSpaceManager,
-		containerRuntime:    fakeRuntime,
-		reasonCache:         NewReasonCache(),
-		clock:               clock.RealClock{},
-		kubeClient:          &fake.Clientset{},
-		hostname:            testKubeletHostname,
-		nodeName:            testKubeletHostname,
+		rootDirectory:          basePath,
+		recorder:               &record.FakeRecorder{},
+		cadvisor:               cadvisor,
+		nodeLister:             testNodeLister{},
+		nodeInfo:               testNodeInfo{},
+		statusManager:          status.NewManager(nil, podManager),
+		containerRefManager:    kubecontainer.NewRefManager(),
+		podManager:             podManager,
+		os:                     &containertest.FakeOS{},
+		diskSpaceManager:       diskSpaceManager,
+		containerRuntime:       fakeRuntime,
+		reasonCache:            NewReasonCache(),
+		clock:                  clock.RealClock{},
+		kubeClient:             &fake.Clientset{},
+		hostname:               testKubeletHostname,
+		nodeName:               testKubeletHostname,
+		updatePodStatusChannel: make(chan PodUpdateRequest),
 	}
 	kb.containerManager = cm.NewStubContainerManager()
 
@@ -155,6 +156,8 @@ func TestRunOnce(t *testing.T) {
 			},
 		},
 	}
+	// start the pod status update loop
+	kb.startPodStatusUpdateLoop()
 	results, err := kb.runOnce(pods, time.Millisecond)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)

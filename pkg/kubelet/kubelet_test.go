@@ -223,6 +223,9 @@ func newTestKubeletWithImageList(
 	kubelet.AddPodAdmitHandler(evictionAdmitHandler)
 	// Add this as cleanup predicate pod admitter
 	kubelet.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(kubelet.getNodeAnyWay))
+	// make the pod status update channel and start update loop
+	kubelet.updatePodStatusChannel = make(chan PodUpdateRequest)
+	kubelet.startPodStatusUpdateLoop()
 
 	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
 	kubelet.volumePluginMgr, err =
