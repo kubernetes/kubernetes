@@ -501,10 +501,9 @@ type KubeletConfiguration struct {
 	// featureGates is a string of comma-separated key=value pairs that describe feature
 	// gates for alpha/experimental features.
 	FeatureGates string `json:"featureGates,omitempty"`
-	// How to integrate with runtime. If set to CRI, kubelet will switch to
-	// using the new Container Runtine Interface.
+	// Enable Container Runtime Interface (CRI) integration.
 	// +optional
-	ExperimentalRuntimeIntegrationType string `json:"experimentalRuntimeIntegrationType,omitempty"`
+	EnableCRI bool `json:"enableCRI,omitempty"`
 }
 
 type KubeletAuthorizationMode string
