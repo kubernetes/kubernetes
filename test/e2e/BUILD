@@ -42,6 +42,7 @@ go_library(
         "federated-service.go",
         "federation-apiserver.go",
         "federation-authn.go",
+        "federation-daemonset.go",
         "federation-event.go",
         "federation-replicaset.go",
         "federation-util.go",
