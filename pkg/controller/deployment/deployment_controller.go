@@ -397,17 +397,17 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 // the newer overlapping ones (only sync the oldest one). New/old is determined by when the
 // deployment's selector is last updated.
 func (dc *DeploymentController) handleOverlap(d *extensions.Deployment) error {
-	selector, err := unversioned.LabelSelectorAsSelector(d.Spec.Selector)
-	if err != nil {
-		return fmt.Errorf("deployment %s/%s has invalid label selector: %v", d.Namespace, d.Name, err)
-	}
 	deployments, err := dc.dLister.Deployments(d.Namespace).List(labels.Everything())
 	if err != nil {
 		return fmt.Errorf("error listing deployments in namespace %s: %v", d.Namespace, err)
 	}
 	overlapping := false
 	for _, other := range deployments {
-		if !selector.Empty() && selector.Matches(labels.Set(other.Spec.Template.Labels)) && d.UID != other.UID {
+		foundOverlaps, err := util.OverlapsWith(d, other)
+		if err != nil {
+			return err
+		}
+		if foundOverlaps {
 			deploymentCopy, err := util.DeploymentDeepCopy(other)
 			if err != nil {
 				return err
