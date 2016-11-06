@@ -1,20 +1,20 @@
 package inmem
 
 import (
-	"fmt"
-	"time"
-	"sync"
 	"container/heap"
+	"fmt"
 	"math"
+	"sync"
+	"time"
 )
 
 // expiryManager manages time based expirations.
 // An interesting part of the design is that once scheduled items are never removed;
 // instead once we see an expired key, we then trigger a check to see if it has actually expired.
 type expiryManager struct {
-	mutex          sync.Mutex
-	queue          expiryQueue
-	store          *store
+	mutex sync.Mutex
+	queue expiryQueue
+	store *store
 
 	minChanged     bool
 	minChangedChan chan bool
@@ -59,8 +59,8 @@ func (q *expiryQueue) Push(x interface{}) {
 func (q *expiryQueue) Pop() interface{} {
 	old := *q
 	n := len(old)
-	item := old[n - 1]
-	*q = old[0 : n - 1]
+	item := old[n-1]
+	*q = old[0 : n-1]
 	return item
 }
 
@@ -72,7 +72,7 @@ func (m *expiryManager) add(bucket *bucket, key string, expiry uint64) {
 	if len(m.queue) != 0 {
 		oldMin = m.queue[0].expiry
 	}
-	heap.Push(&m.queue, expiringItem{ bucket,  key,  expiry})
+	heap.Push(&m.queue, expiringItem{bucket, key, expiry})
 	newMin := m.queue[0].expiry
 	if !m.minChanged && oldMin != newMin {
 		m.minChanged = true
@@ -108,7 +108,7 @@ func (m *expiryManager) runOnce() {
 	}
 }
 
-func (m*expiryManager) wait() {
+func (m *expiryManager) wait() {
 	var delaySeconds uint64
 
 	m.mutex.Lock()
@@ -131,7 +131,7 @@ func (m*expiryManager) wait() {
 	}
 }
 
-func (m*expiryManager) Run() {
+func (m *expiryManager) Run() {
 	for {
 		m.wait()
 		m.runOnce()

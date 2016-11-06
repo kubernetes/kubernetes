@@ -19,10 +19,14 @@ package factory
 import (
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
+	"sync"
 
-	"k8s.io/kubernetes/pkg/storage/inmem"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/storage/inmem"
 )
+
+var mutex sync.Mutex
+var inmemStore storage.Interface
 
 func newInmemStorage(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
 	//store, err := inmem.NewStore(c.Codec)
@@ -35,5 +39,12 @@ func newInmemStorage(c storagebackend.Config) (storage.Interface, DestroyFunc, e
 		// TODO: what is the behaviour of this currently?
 		glog.Infof("inmem destroy function called")
 	}
-	return inmem.NewStore(c.Codec), destroyFunc, nil
+
+	// TODO: hack.  We seem to create multiple storage instances?
+	mutex.Lock()
+	defer mutex.Unlock()
+	if inmemStore == nil {
+		inmemStore = inmem.NewStore(c.Codec)
+	}
+	return inmemStore, destroyFunc, nil
 }

@@ -1,24 +1,21 @@
 package inmem
 
 import (
-
 	"fmt"
-
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/runtime"
-
-	"sync"
-	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/watch"
+	"sync"
 )
 
 type changeLog struct {
-	mutex sync.RWMutex
-	cond  *sync.Cond
+	mutex  sync.Mutex
+	cond   *sync.Cond
 	minLsn LSN
 	maxLsn LSN
 	log    map[LSN]*logEntry
 }
-
 
 type logEntry struct {
 	lsn   LSN
@@ -26,15 +23,18 @@ type logEntry struct {
 }
 
 type logItem struct {
-	path string
+	path      string
 	eventType watch.EventType
-	data []byte
+	data      []byte
 
 	object runtime.Object
 }
 
+func (i logItem) String() string {
+	return fmt.Sprintf("logItem [path=%s, eventType=%s]", i.path, i.eventType)
+}
 
-func newChangeLog() (*changeLog) {
+func newChangeLog() *changeLog {
 	l := &changeLog{
 		log: make(map[LSN]*logEntry),
 	}
@@ -44,7 +44,8 @@ func newChangeLog() (*changeLog) {
 	return l
 }
 
-func (l*changeLog) append(e *logEntry) {
+func (l *changeLog) append(e *logEntry) {
+	glog.Infof("appending logentry at %d: %v", e.lsn, e.items)
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
@@ -61,26 +62,26 @@ func (l*changeLog) append(e *logEntry) {
 	l.cond.Broadcast()
 }
 
-func (l*changeLog) read(pos LSN) (*logEntry, error) {
-	l.mutex.RLock()
+func (l *changeLog) read(pos LSN) (*logEntry, error) {
+	l.mutex.Lock()
 
 	for {
 		e := l.log[pos]
 		if e != nil {
-			l.mutex.RUnlock()
+			l.mutex.Unlock()
 			return e, nil
 		}
 
 		if l.minLsn > pos {
-			l.mutex.RUnlock()
-			return nil, fmt.Errorf("out of range read at position %d", pos)
+			l.mutex.Unlock()
+			return nil, fmt.Errorf("out of range read at position=%d min=%d", pos, l.minLsn)
 		}
 
 		l.cond.Wait()
 	}
 }
 
-func (e*logEntry) addItem(s* store, path string, eventType watch.EventType,  data []byte) {
+func (e *logEntry) addItem(s *store, path string, eventType watch.EventType, data []byte) {
 	// TODO: Is it safe to reuse the event object across events?
 	// TODO: Could we also return this object (is it the same type?)
 	// TODO: Could we use obj?
@@ -90,13 +91,12 @@ func (e*logEntry) addItem(s* store, path string, eventType watch.EventType,  dat
 	}
 
 	e.items = append(e.items, logItem{
-		path: path,
-		data: data,
-		object: obj,
+		path:      path,
+		data:      data,
+		object:    obj,
 		eventType: eventType,
 	})
 }
-
 
 func (l *changeLog) newWatcher(startPosition LSN, predicate storage.SelectionPredicate, path string, recursive bool) (watch.Interface, error) {
 	// TODO: etc3 code has this
@@ -104,7 +104,6 @@ func (l *changeLog) newWatcher(startPosition LSN, predicate storage.SelectionPre
 	//	// The filter doesn't filter out any object.
 	//	wc.internalFilter = nil
 	//}
-
 
 	pathPrefix := normalizePath(path)
 	if recursive {
@@ -115,10 +114,10 @@ func (l *changeLog) newWatcher(startPosition LSN, predicate storage.SelectionPre
 	bufferSize := 16
 
 	w := &watcher{
-		log: l,
-		resultChan : make(chan watch.Event, bufferSize),
-		position: startPosition,
-		pred: predicate,
+		log:        l,
+		resultChan: make(chan watch.Event, bufferSize),
+		position:   startPosition,
+		pred:       predicate,
 		pathPrefix: pathPrefix,
 	}
 	w.run()

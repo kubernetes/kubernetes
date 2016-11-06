@@ -70,6 +70,8 @@ func (w *watcher) run() {
 				continue
 			}
 
+			glog.V(4).Infof("Sending %s for %v", i.eventType, i.object)
+
 			w.resultChan <- watch.Event{
 				Type:   i.eventType,
 				Object: i.object,

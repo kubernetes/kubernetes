@@ -22,7 +22,11 @@ import (
 )
 
 func VerifyEtcdServersList(options *options.ServerRunOptions) {
-	if len(options.StorageConfig.ServerList) == 0 {
-		glog.Fatalf("--etcd-servers must be specified")
-	}
+	// HACK
+	/*
+		if len(options.StorageConfig.ServerList) == 0 {
+			glog.Fatalf("--etcd-servers must be specified")
+		}
+	*/
+	glog.Warningf("skipping etcd-servers validation")
 }

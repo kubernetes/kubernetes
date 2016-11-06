@@ -12,15 +12,15 @@ import (
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 
-	"golang.org/x/net/context"
-	"time"
-	"sync"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/watch"
 	"bytes"
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/storage/etcd"
+	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/storage/etcd"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/watch"
+	"sync"
+	"time"
 )
 
 var errorLSNMismatch = errors.New("LSN mismatch")
@@ -29,29 +29,35 @@ var errorItemNotFound = errors.New("Item not found")
 type LSN uint64
 
 type store struct {
-	versioner     storage.Versioner
-	codec         runtime.Codec
+	versioner storage.Versioner
+	codec     runtime.Codec
 
 	log           *changeLog
 	expiryManager *expiryManager
 
-	mutex         sync.RWMutex
-	root          *bucket
-	lastLSN       LSN
+	mutex   sync.RWMutex
+	root    *bucket
+	lastLSN LSN
 }
 
-func NewStore(codec runtime.Codec) (*store) {
+func NewStore(codec runtime.Codec) *store {
+	glog.Infof("building inmem store")
 	versioner := etcd.APIObjectVersioner{}
 	s := &store{
-		versioner:  versioner,
-		codec:      codec,
-		root: newBucket(nil, ""),
+		versioner: versioner,
+		codec:     codec,
+		root:      newBucket(nil, ""),
 	}
 
 	s.log = newChangeLog()
 
+	{
+		init := &logEntry{lsn: 1}
+		s.log.append(init)
+		s.lastLSN = 1
+	}
 	s.expiryManager = newExpiryManager(s)
-	s.expiryManager.Run()
+	go s.expiryManager.Run()
 
 	return s
 }
@@ -70,14 +76,14 @@ type bucket struct {
 	path     string
 	children map[string]*bucket
 
-	items    map[string]itemData
+	items map[string]itemData
 }
 
 func newBucket(parent *bucket, key string) *bucket {
 	b := &bucket{
-		parent: parent,
+		parent:   parent,
 		children: make(map[string]*bucket),
-		items: make(map[string]itemData),
+		items:    make(map[string]itemData),
 	}
 	if parent != nil {
 		b.path = parent.path + key + "/"
@@ -94,7 +100,7 @@ func (s *store) Versioner() storage.Versioner {
 }
 
 // We assume lock is held!
-func (s*store) resolveBucket(path string, create bool) (*bucket) {
+func (s *store) resolveBucket(path string, create bool) *bucket {
 	// TODO: Easy to optimize (a lot!)
 	path = strings.Trim(path, "/")
 	if path == "" {
@@ -129,12 +135,12 @@ func splitPath(path string) (string, string) {
 	if lastSlash == -1 {
 		return "", path
 	}
-	item := path[lastSlash + 1:]
+	item := path[lastSlash+1:]
 	bucket := path[:lastSlash]
 	return bucket, item
 }
 
-func normalizePath(path string) (string) {
+func normalizePath(path string) string {
 	// TODO: Easy to optimize (a lot)
 	path = strings.Trim(path, "/")
 
@@ -156,19 +162,26 @@ func normalizePath(path string) (string) {
 // in seconds (0 means forever). If no error is returned and out is not nil, out will be
 // set to the read value from database.
 func (s *store) Create(ctx context.Context, path string, obj, out runtime.Object, ttl uint64) error {
+	glog.Infof("Create %s", path)
 	if version, err := s.versioner.ObjectResourceVersion(obj); err == nil && version != 0 {
 		return errors.New("resourceVersion should not be set on objects to be created")
 	}
+
+	glog.Infof("1")
+
+	data, err := runtime.Encode(s.codec, obj)
+	if err != nil {
+		return err
+	}
+
+	glog.Infof("2")
 
 	objMeta, err := api.ObjectMetaFor(obj)
 	if err != nil {
 		return storage.NewInternalErrorf("can't get meta on un-introspectable object %v, got error: %v", obj, err)
 	}
 
-	data, err := runtime.Encode(s.codec, obj)
-	if err != nil {
-		return err
-	}
+	glog.Infof("3")
 
 	bucket, k := splitPath(path)
 
@@ -191,7 +204,7 @@ func (s *store) Create(ctx context.Context, path string, obj, out runtime.Object
 		lsn := s.lastLSN
 
 		log := &logEntry{lsn: lsn}
-		log.addItem(s, bucket.path + k, watch.Added, data)
+		log.addItem(s, bucket.path+k, watch.Added, data)
 
 		bucket.items[k] = itemData{objMeta.UID, data, expiry, lsn}
 
@@ -216,7 +229,7 @@ func (s *store) Create(ctx context.Context, path string, obj, out runtime.Object
 
 // Delete removes the specified key and returns the value that existed at that spot.
 // If key didn't exist, it will return NotFound storage error.
-func (s *store) Delete(ctx context.Context, path string, out runtime.Object, preconditions *storage.Preconditions) (error) {
+func (s *store) Delete(ctx context.Context, path string, out runtime.Object, preconditions *storage.Preconditions) error {
 	// TODO: Needed?
 	_, err := conversion.EnforcePtr(out)
 	if err != nil {
@@ -248,8 +261,8 @@ func (s *store) Delete(ctx context.Context, path string, out runtime.Object, pre
 
 		s.lastLSN++
 		lsn := s.lastLSN
-		log := &logEntry{lsn:lsn}
-		log.addItem(s, bucket.path + k, watch.Deleted, oldItem.data)
+		log := &logEntry{lsn: lsn}
+		log.addItem(s, bucket.path+k, watch.Deleted, oldItem.data)
 
 		// Note we send the notifications before returning ... should be interesting :-)
 		s.log.append(log)
@@ -265,13 +278,13 @@ func (s *store) Delete(ctx context.Context, path string, out runtime.Object, pre
 	return decode(s.codec, s.versioner, oldItem.data, out, oldItem.lsn)
 }
 
-
 // Watch begins watching the specified key. Events are decoded into API objects,
 // and any items selected by 'p' are sent down to returned watch.Interface.
 // resourceVersion may be used to specify what version to begin watching,
 // which should be the current resourceVersion, and no longer rv+1
 // (e.g. reconnecting without missing any updates).
-func (s*store) Watch(ctx context.Context, path string, resourceVersion string, p storage.SelectionPredicate) (watch.Interface, error) {
+func (s *store) Watch(ctx context.Context, path string, resourceVersion string, p storage.SelectionPredicate) (watch.Interface, error) {
+	glog.V(4).Infof("Watch %s from %s", path, resourceVersion)
 	rev, err := storage.ParseWatchResourceVersion(resourceVersion)
 	if err != nil {
 		return nil, err
@@ -285,7 +298,8 @@ func (s*store) Watch(ctx context.Context, path string, resourceVersion string, p
 // resourceVersion may be used to specify what version to begin watching,
 // which should be the current resourceVersion, and no longer rv+1
 // (e.g. reconnecting without missing any updates).
-func (s*store) WatchList(ctx context.Context, path string, resourceVersion string, p storage.SelectionPredicate) (watch.Interface, error) {
+func (s *store) WatchList(ctx context.Context, path string, resourceVersion string, p storage.SelectionPredicate) (watch.Interface, error) {
+	glog.V(4).Infof("WatchList %s from %s", path, resourceVersion)
 	rev, err := storage.ParseWatchResourceVersion(resourceVersion)
 	if err != nil {
 		return nil, err
@@ -294,9 +308,9 @@ func (s*store) WatchList(ctx context.Context, path string, resourceVersion strin
 	return s.log.newWatcher(LSN(rev), p, path, true)
 }
 
-
 // Get implements storage.Interface.Get.
 func (s *store) Get(ctx context.Context, path string, out runtime.Object, ignoreNotFound bool) error {
+	glog.V(4).Infof("Get %s", path)
 	bucket, k := splitPath(path)
 
 	item, _, err := s.get(bucket, k)
@@ -314,10 +328,9 @@ func (s *store) Get(ctx context.Context, path string, out runtime.Object, ignore
 	return decode(s.codec, s.versioner, item.data, out, item.lsn)
 }
 
-
-
 // GetToList implements storage.Interface.GetToList.
 func (s *store) GetToList(ctx context.Context, path string, resourceVersion string, pred storage.SelectionPredicate, listObj runtime.Object) error {
+	glog.V(4).Infof("GetToList %s", path)
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
 		return err
@@ -347,6 +360,8 @@ func (s *store) GetToList(ctx context.Context, path string, resourceVersion stri
 
 // List implements storage.Interface.List.
 func (s *store) List(ctx context.Context, path, resourceVersion string, pred storage.SelectionPredicate, listObj runtime.Object) error {
+	glog.V(4).Infof("List %s", path)
+
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
 		return err
@@ -360,12 +375,12 @@ func (s *store) List(ctx context.Context, path, resourceVersion string, pred sto
 
 		bucket := s.resolveBucket(path, false)
 		if bucket == nil {
-			// TODO: not clear what we should return here?
-			return 0, storage.NewKeyNotFoundError(path, 0)
+			// We return an empty list
+			return s.lastLSN, nil
 		}
 
 		if len(bucket.items) != 0 {
-			items = make([]itemData, len(bucket.items))
+			items = make([]itemData, 0, len(bucket.items))
 			for _, v := range bucket.items {
 				items = append(items, v)
 			}
@@ -384,7 +399,6 @@ func (s *store) List(ctx context.Context, path, resourceVersion string, pred sto
 	// update version with cluster level revision
 	return s.versioner.UpdateList(listObj, uint64(lsn))
 }
-
 
 // decodeList decodes a list of values into a list of objects, with resource version set to corresponding rev.
 // On success, ListPtr would be set to the list of objects.
@@ -406,7 +420,6 @@ func decodeList(elems []itemData, filter storage.FilterFunc, ListPtr interface{}
 	}
 	return nil
 }
-
 
 // GuaranteedUpdate keeps calling 'tryUpdate()' to update key 'key' (of type 'ptrToType')
 // retrying the update until success if there is index conflict.
@@ -441,8 +454,10 @@ func decodeList(elems []itemData, filter storage.FilterFunc, ListPtr interface{}
 // })
 // GuaranteedUpdate implements storage.Interface.GuaranteedUpdate.
 func (s *store) GuaranteedUpdate(
-ctx context.Context, path string, out runtime.Object, ignoreNotFound bool,
-precondtions *storage.Preconditions, tryUpdate storage.UpdateFunc, suggestion ...runtime.Object) error {
+	ctx context.Context, path string, out runtime.Object, ignoreNotFound bool,
+	precondtions *storage.Preconditions, tryUpdate storage.UpdateFunc, suggestion ...runtime.Object) error {
+	glog.Infof("GuaranteedUpdate %s", path)
+
 	v, err := conversion.EnforcePtr(out)
 	if err != nil {
 		panic("unable to convert output object to pointer")
@@ -457,7 +472,6 @@ precondtions *storage.Preconditions, tryUpdate storage.UpdateFunc, suggestion ..
 		if err != nil {
 			return err
 		}
-
 
 		objMeta, err := api.ObjectMetaFor(origState.obj)
 		if err != nil {
@@ -486,7 +500,6 @@ precondtions *storage.Preconditions, tryUpdate storage.UpdateFunc, suggestion ..
 		uid = item.uid
 	}
 
-
 	for {
 		if err := checkPreconditions(path, precondtions, uid); err != nil {
 			return err
@@ -505,7 +518,7 @@ precondtions *storage.Preconditions, tryUpdate storage.UpdateFunc, suggestion ..
 			return decode(s.codec, s.versioner, origState.data, out, origState.rev)
 		}
 
-		newItem := itemData{uid,data,0,0}
+		newItem := itemData{uid, data, 0, 0}
 		if ttl != 0 {
 			newItem.expiry = uint64(time.Now().Unix()) + ttl
 		}
@@ -530,7 +543,7 @@ precondtions *storage.Preconditions, tryUpdate storage.UpdateFunc, suggestion ..
 			s.lastLSN++
 			lsn := s.lastLSN
 			log := &logEntry{lsn: lsn}
-			log.addItem(s, bucket.path + k, watch.Modified, newItem.data)
+			log.addItem(s, bucket.path+k, watch.Modified, newItem.data)
 
 			newItem.lsn = lsn
 			bucket.items[k] = newItem
@@ -583,7 +596,7 @@ precondtions *storage.Preconditions, tryUpdate storage.UpdateFunc, suggestion ..
 				panic(fmt.Errorf("error decoding object: %v", err))
 			}
 			event := watch.Event{
-				Type: watch.Modified,
+				Type:   watch.Modified,
 				Object: watchObj,
 			}
 			for _, w := range watchers {
@@ -680,7 +693,7 @@ func decode(codec runtime.Codec, versioner storage.Versioner, value []byte, objP
 	return nil
 }
 
-func (s*store) decodeForWatch(data []byte, lsn LSN) (runtime.Object, error) {
+func (s *store) decodeForWatch(data []byte, lsn LSN) (runtime.Object, error) {
 	obj, err := runtime.Decode(s.codec, []byte(data))
 	if err != nil {
 		return nil, err
@@ -691,7 +704,6 @@ func (s*store) decodeForWatch(data []byte, lsn LSN) (runtime.Object, error) {
 	}
 	return obj, nil
 }
-
 
 func checkPreconditions(path string, preconditions *storage.Preconditions, objectUID types.UID) error {
 	if preconditions == nil {
@@ -704,7 +716,7 @@ func checkPreconditions(path string, preconditions *storage.Preconditions, objec
 	return nil
 }
 
-func (s*store) get(bucket, k string) (itemData, LSN, error) {
+func (s *store) get(bucket, k string) (itemData, LSN, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
@@ -713,7 +725,7 @@ func (s*store) get(bucket, k string) (itemData, LSN, error) {
 		return itemData{}, s.lastLSN, errorItemNotFound
 	}
 	item, found := b.items[k]
-	if !found{
+	if !found {
 		return itemData{}, s.lastLSN, errorItemNotFound
 	}
 
@@ -747,7 +759,7 @@ func (s *store) checkExpiration(candidates []expiringItem) error {
 			k := candidate.key
 			b := candidate.bucket
 
-			item, found:= b.items[k]
+			item, found := b.items[k]
 			if !found {
 				continue
 			}
@@ -757,9 +769,9 @@ func (s *store) checkExpiration(candidates []expiringItem) error {
 
 			if log == nil {
 				s.lastLSN++
-				log = &logEntry{lsn:s.lastLSN}
+				log = &logEntry{lsn: s.lastLSN}
 			}
-			log.addItem(s, b.path + k, watch.Deleted, item.data)
+			log.addItem(s, b.path+k, watch.Deleted, item.data)
 
 			delete(b.items, candidate.key)
 
