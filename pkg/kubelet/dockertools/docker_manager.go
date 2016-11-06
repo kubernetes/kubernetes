@@ -1105,8 +1105,8 @@ func (dm *DockerManager) APIVersion() (kubecontainer.Version, error) {
 // Now we do this by checking whether:
 // 1) `docker version` works
 // 2) docker version is compatible with minimum requirement
-func (dm *DockerManager) Status() error {
-	return dm.checkVersionCompatibility()
+func (dm *DockerManager) Status() (*kubecontainer.RuntimeStatus, error) {
+	return nil, dm.checkVersionCompatibility()
 }
 
 func (dm *DockerManager) checkVersionCompatibility() error {

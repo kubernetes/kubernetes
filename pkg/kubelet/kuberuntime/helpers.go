@@ -216,3 +216,17 @@ func buildFullContainerLogsPath(podUID types.UID, containerName string, restartC
 func buildPodLogsDirectory(podUID types.UID) string {
 	return filepath.Join(podLogsRootDirectory, string(podUID))
 }
+
+// toKubeRuntimeStatus converts the runtimeApi.RuntimeStatus to kubecontainer.RuntimeStatus.
+func toKubeRuntimeStatus(status *runtimeApi.RuntimeStatus) *kubecontainer.RuntimeStatus {
+	conditions := []kubecontainer.RuntimeCondition{}
+	for _, c := range status.GetConditions() {
+		conditions = append(conditions, kubecontainer.RuntimeCondition{
+			Type:    kubecontainer.RuntimeConditionType(c.GetType()),
+			Status:  c.GetStatus(),
+			Reason:  c.GetReason(),
+			Message: c.GetMessage(),
+		})
+	}
+	return &kubecontainer.RuntimeStatus{Conditions: conditions}
+}

@@ -17,10 +17,14 @@ limitations under the License.
 package dockershim
 
 import (
-	"github.com/golang/mock/gomock"
+	"errors"
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/assert"
+
+	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -38,4 +42,50 @@ func newTestDockerService() (*dockerService, *dockertools.FakeDockerClient, *clo
 	fakeClock := clock.NewFakeClock(time.Time{})
 	c := dockertools.NewFakeDockerClientWithClock(fakeClock)
 	return &dockerService{client: c, os: &containertest.FakeOS{}, networkPlugin: &network.NoopNetworkPlugin{}}, c, fakeClock
+}
+
+// TestStatus tests the runtime status logic.
+func TestStatus(t *testing.T) {
+	ds, fDocker, _ := newTestDockerService()
+
+	assertStatus := func(expected map[string]bool, status *runtimeApi.RuntimeStatus) {
+		conditions := status.GetConditions()
+		assert.Equal(t, len(expected), len(conditions))
+		for k, v := range expected {
+			for _, c := range conditions {
+				if k == c.GetType() {
+					assert.Equal(t, v, c.GetStatus())
+				}
+			}
+		}
+	}
+
+	// Should report ready status if version returns no error.
+	status, err := ds.Status()
+	assert.NoError(t, err)
+	assertStatus(map[string]bool{
+		runtimeApi.RuntimeReady: true,
+		runtimeApi.NetworkReady: true,
+	}, status)
+
+	// Should not report ready status if version returns error.
+	fDocker.InjectError("version", errors.New("test error"))
+	status, err = ds.Status()
+	assert.NoError(t, err)
+	assertStatus(map[string]bool{
+		runtimeApi.RuntimeReady: false,
+		runtimeApi.NetworkReady: true,
+	}, status)
+
+	// Should not report ready status is network plugin returns error.
+	mockPlugin := newTestNetworkPlugin(t)
+	ds.networkPlugin = mockPlugin
+	defer mockPlugin.Finish()
+	mockPlugin.EXPECT().Status().Return(errors.New("network error"))
+	status, err = ds.Status()
+	assert.NoError(t, err)
+	assertStatus(map[string]bool{
+		runtimeApi.RuntimeReady: true,
+		runtimeApi.NetworkReady: false,
+	}, status)
 }

@@ -268,15 +268,14 @@ func (m *kubeGenericRuntimeManager) APIVersion() (kubecontainer.Version, error) 
 	return newRuntimeVersion(typedVersion.GetRuntimeApiVersion())
 }
 
-// Status returns error if the runtime is unhealthy; nil otherwise.
-func (m *kubeGenericRuntimeManager) Status() error {
-	_, err := m.runtimeService.Version(kubeRuntimeAPIVersion)
+// Status returns the status of the runtime. An error is returned if the Status
+// function itself fails, nil otherwise.
+func (m *kubeGenericRuntimeManager) Status() (*kubecontainer.RuntimeStatus, error) {
+	status, err := m.runtimeService.Status()
 	if err != nil {
-		glog.Errorf("Checkout remote runtime status failed: %v", err)
-		return err
+		return nil, err
 	}
-
-	return nil
+	return toKubeRuntimeStatus(status), nil
 }
 
 // GetPods returns a list of containers grouped by pods. The boolean parameter

@@ -1701,8 +1701,8 @@ func (r *Runtime) APIVersion() (kubecontainer.Version, error) {
 }
 
 // Status returns error if rkt is unhealthy, nil otherwise.
-func (r *Runtime) Status() error {
-	return r.checkVersion(minimumRktBinVersion, minimumRktApiVersion, minimumSystemdVersion)
+func (r *Runtime) Status() (*kubecontainer.RuntimeStatus, error) {
+	return nil, r.checkVersion(minimumRktBinVersion, minimumRktApiVersion, minimumSystemdVersion)
 }
 
 // SyncPod syncs the running pod to match the specified desired pod.
