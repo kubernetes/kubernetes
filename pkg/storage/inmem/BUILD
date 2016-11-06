@@ -13,6 +13,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "backend.go",
         "log.go",
         "store.go",
         "ttl_queue.go",

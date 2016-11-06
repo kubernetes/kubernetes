@@ -25,8 +25,8 @@ import (
 	"k8s.io/kubernetes/pkg/storage/inmem"
 )
 
-var mutex sync.Mutex
-var inmemStore storage.Interface
+var backend *inmem.Backend
+var backendMutex sync.Mutex
 
 func newInmemStorage(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
 	//store, err := inmem.NewStore(c.Codec)
@@ -40,11 +40,12 @@ func newInmemStorage(c storagebackend.Config) (storage.Interface, DestroyFunc, e
 		glog.Infof("inmem destroy function called")
 	}
 
-	// TODO: hack.  We seem to create multiple storage instances?
-	mutex.Lock()
-	defer mutex.Unlock()
-	if inmemStore == nil {
-		inmemStore = inmem.NewStore(c.Codec)
+	// TODO: yuk
+	backendMutex.Lock()
+	defer backendMutex.Unlock()
+	if backend == nil {
+		backend = inmem.NewBackend()
 	}
+	inmemStore := inmem.NewStore(c.Prefix, c.Codec, backend)
 	return inmemStore, destroyFunc, nil
 }

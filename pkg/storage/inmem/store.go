@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strings"
 
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/conversion"
@@ -40,13 +39,13 @@ type store struct {
 	lastLSN LSN
 }
 
-func NewStore(codec runtime.Codec) *store {
-	glog.Infof("building inmem store")
+func NewStore(prefix string, codec runtime.Codec, backend *Backend) *store {
+	glog.Infof("building inmem store prefix=%q", prefix)
 	versioner := etcd.APIObjectVersioner{}
 	s := &store{
+		root:      backend.root,
 		versioner: versioner,
 		codec:     codec,
-		root:      newBucket(nil, ""),
 	}
 
 	s.log = newChangeLog()
@@ -64,98 +63,9 @@ func NewStore(codec runtime.Codec) *store {
 
 var _ storage.Interface = &store{}
 
-type itemData struct {
-	uid    types.UID
-	data   []byte
-	expiry uint64
-	lsn    LSN
-}
-
-type bucket struct {
-	parent   *bucket
-	path     string
-	children map[string]*bucket
-
-	items map[string]itemData
-}
-
-func newBucket(parent *bucket, key string) *bucket {
-	b := &bucket{
-		parent:   parent,
-		children: make(map[string]*bucket),
-		items:    make(map[string]itemData),
-	}
-	if parent != nil {
-		b.path = parent.path + key + "/"
-	} else {
-		b.path = key + "/"
-	}
-	return b
-
-}
-
 // Versioner implements storage.Interface.Versioner.
 func (s *store) Versioner() storage.Versioner {
 	return s.versioner
-}
-
-// We assume lock is held!
-func (s *store) resolveBucket(path string, create bool) *bucket {
-	// TODO: Easy to optimize (a lot!)
-	path = strings.Trim(path, "/")
-	if path == "" {
-		return s.root
-	}
-
-	tokens := strings.Split(path, "/")
-	b := s.root
-	for _, t := range tokens {
-		if t == "" {
-			continue
-		}
-		child := b.children[t]
-		if child == nil {
-			if create {
-				child = newBucket(b, t)
-				b.children[t] = child
-			} else {
-				return nil
-			}
-		}
-		b = child
-	}
-	return b
-}
-
-func splitPath(path string) (string, string) {
-	// TODO: Easy to optimize (a lot!)
-	path = strings.Trim(path, "/")
-
-	lastSlash := strings.LastIndexByte(path, '/')
-	if lastSlash == -1 {
-		return "", path
-	}
-	item := path[lastSlash+1:]
-	bucket := path[:lastSlash]
-	return bucket, item
-}
-
-func normalizePath(path string) string {
-	// TODO: Easy to optimize (a lot)
-	path = strings.Trim(path, "/")
-
-	var b bytes.Buffer
-
-	for _, t := range strings.Split(path, "/") {
-		if t == "" {
-			continue
-		}
-		if b.Len() != 0 {
-			b.WriteString("/")
-		}
-		b.WriteString(t)
-	}
-	return b.String()
 }
 
 // Create adds a new object at a key unless it already exists. 'ttl' is time-to-live
@@ -194,8 +104,8 @@ func (s *store) Create(ctx context.Context, path string, obj, out runtime.Object
 		s.mutex.Lock()
 		defer s.mutex.Unlock()
 
-		bucket := s.resolveBucket(bucket, true)
-		_, found := bucket.items[k]
+		b := s.root.resolveBucket(bucket, true)
+		_, found := b.items[k]
 		if found {
 			return 0, storage.NewKeyExistsError(path, 0)
 		}
@@ -204,15 +114,15 @@ func (s *store) Create(ctx context.Context, path string, obj, out runtime.Object
 		lsn := s.lastLSN
 
 		log := &logEntry{lsn: lsn}
-		log.addItem(s, bucket.path+k, watch.Added, data)
+		log.addItem(s, b.path+k, watch.Added, data)
 
-		bucket.items[k] = itemData{objMeta.UID, data, expiry, lsn}
+		b.items[k] = itemData{objMeta.UID, data, expiry, lsn}
 
 		// Note we send the notifications before returning ... should be interesting :-)
 		s.log.append(log)
 
 		if ttl != 0 {
-			s.expiryManager.add(bucket, k, expiry)
+			s.expiryManager.add(b, k, expiry)
 		}
 
 		return lsn, nil
@@ -242,11 +152,11 @@ func (s *store) Delete(ctx context.Context, path string, out runtime.Object, pre
 		s.mutex.Lock()
 		defer s.mutex.Unlock()
 
-		bucket := s.resolveBucket(bucket, false)
-		if bucket == nil {
+		b := s.root.resolveBucket(bucket, false)
+		if b == nil {
 			return itemData{}, storage.NewKeyNotFoundError(path, 0)
 		}
-		item, found := bucket.items[k]
+		item, found := b.items[k]
 		if !found {
 			return itemData{}, storage.NewKeyNotFoundError(path, 0)
 		}
@@ -262,12 +172,12 @@ func (s *store) Delete(ctx context.Context, path string, out runtime.Object, pre
 		s.lastLSN++
 		lsn := s.lastLSN
 		log := &logEntry{lsn: lsn}
-		log.addItem(s, bucket.path+k, watch.Deleted, oldItem.data)
+		log.addItem(s, b.path+k, watch.Deleted, oldItem.data)
 
 		// Note we send the notifications before returning ... should be interesting :-)
 		s.log.append(log)
 
-		delete(bucket.items, k)
+		delete(b.items, k)
 
 		return oldItem, nil
 	}()
@@ -373,15 +283,15 @@ func (s *store) List(ctx context.Context, path, resourceVersion string, pred sto
 		s.mutex.Lock()
 		defer s.mutex.Unlock()
 
-		bucket := s.resolveBucket(path, false)
-		if bucket == nil {
+		b := s.root.resolveBucket(path, false)
+		if b == nil {
 			// We return an empty list
 			return s.lastLSN, nil
 		}
 
-		if len(bucket.items) != 0 {
-			items = make([]itemData, 0, len(bucket.items))
-			for _, v := range bucket.items {
+		if len(b.items) != 0 {
+			items = make([]itemData, 0, len(b.items))
+			for _, v := range b.items {
 				items = append(items, v)
 			}
 		}
@@ -531,8 +441,8 @@ func (s *store) GuaranteedUpdate(
 			s.mutex.Lock()
 			defer s.mutex.Unlock()
 
-			bucket := s.resolveBucket(bucket, true)
-			item, found := bucket.items[k]
+			b := s.root.resolveBucket(bucket, true)
+			item, found := b.items[k]
 			if !found {
 				return itemData{}, errorItemNotFound
 			}
@@ -543,16 +453,16 @@ func (s *store) GuaranteedUpdate(
 			s.lastLSN++
 			lsn := s.lastLSN
 			log := &logEntry{lsn: lsn}
-			log.addItem(s, bucket.path+k, watch.Modified, newItem.data)
+			log.addItem(s, b.path+k, watch.Modified, newItem.data)
 
 			newItem.lsn = lsn
-			bucket.items[k] = newItem
+			b.items[k] = newItem
 
 			// Note we send the notifications before returning ... should be interesting :-)
 			s.log.append(log)
 
 			if ttl != 0 {
-				s.expiryManager.add(bucket, k, newItem.expiry)
+				s.expiryManager.add(b, k, newItem.expiry)
 			}
 
 			return newItem, nil
@@ -716,22 +626,6 @@ func checkPreconditions(path string, preconditions *storage.Preconditions, objec
 	return nil
 }
 
-func (s *store) get(bucket, k string) (itemData, LSN, error) {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
-	b := s.resolveBucket(bucket, false)
-	if b == nil {
-		return itemData{}, s.lastLSN, errorItemNotFound
-	}
-	item, found := b.items[k]
-	if !found {
-		return itemData{}, s.lastLSN, errorItemNotFound
-	}
-
-	return item, s.lastLSN, nil
-}
-
 func (s *store) checkExpiration(candidates []expiringItem) error {
 	if len(candidates) == 0 {
 		return nil
@@ -792,4 +686,20 @@ func (s *store) checkExpiration(candidates []expiringItem) error {
 	}
 
 	return nil
+}
+
+func (s *store) get(bucket, k string) (itemData, LSN, error) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	b := s.root.resolveBucket(bucket, false)
+	if b == nil {
+		return itemData{}, s.lastLSN, errorItemNotFound
+	}
+	item, found := b.items[k]
+	if !found {
+		return itemData{}, s.lastLSN, errorItemNotFound
+	}
+
+	return item, s.lastLSN, nil
 }
