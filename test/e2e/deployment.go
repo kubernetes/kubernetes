@@ -1444,7 +1444,10 @@ func testIterativeDeployments(f *framework.Framework) {
 				}
 				name := podList.Items[p].Name
 				framework.Logf("%02d: deleting deployment pod %q", i, name)
-				Expect(c.Core().Pods(ns).Delete(name, nil)).NotTo(HaveOccurred())
+				err := c.Core().Pods(ns).Delete(name, nil)
+				if err != nil && !errors.IsNotFound(err) {
+					Expect(err).NotTo(HaveOccurred())
+				}
 			}
 		}
 	}
