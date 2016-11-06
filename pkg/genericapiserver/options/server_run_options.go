@@ -160,6 +160,8 @@ func (o *ServerRunOptions) WithEtcdOptions() *ServerRunOptions {
 		// memory usage.
 		DeserializationCacheSize: 0,
 	}
+	// Temporary hack to force native
+	o.StorageConfig.Type = storagebackend.StorageTypeInmem
 	return o
 }
 
@@ -464,7 +466,7 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 	fs.MarkDeprecated("service-node-ports", "see --service-node-port-range instead")
 
 	fs.StringVar(&s.StorageConfig.Type, "storage-backend", s.StorageConfig.Type,
-		"The storage backend for persistence. Options: 'etcd2' (default), 'etcd3'.")
+		"The storage backend for persistence. Options: 'etcd2' (default), 'etcd3', 'native'.")
 
 	fs.IntVar(&s.StorageConfig.DeserializationCacheSize, "deserialization-cache-size", s.StorageConfig.DeserializationCacheSize,
 		"Number of deserialized json objects to cache in memory.")

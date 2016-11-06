@@ -22,6 +22,7 @@ const (
 	StorageTypeUnset = ""
 	StorageTypeETCD2 = "etcd2"
 	StorageTypeETCD3 = "etcd3"
+	StorageTypeInmem = "inmem"
 )
 
 // Config is configuration for creating a storage backend.
