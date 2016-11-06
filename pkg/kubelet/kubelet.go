@@ -1422,6 +1422,11 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 		return syncErr
 	}
 
+	// If the network plugin is not ready, only start the pod if it uses the host network
+	if rs := kl.runtimeState.networkErrors(); len(rs) != 0 && !podUsesHostNetwork(pod) {
+		return fmt.Errorf("network is not ready: %v", rs)
+	}
+
 	// Create Cgroups for the pod and apply resource parameters
 	// to them if cgroup-per-qos flag is enabled.
 	pcm := kl.containerManager.NewPodContainerManager()
@@ -1696,7 +1701,7 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 	defer housekeepingTicker.Stop()
 	plegCh := kl.pleg.Watch()
 	for {
-		if rs := kl.runtimeState.errors(); len(rs) != 0 {
+		if rs := kl.runtimeState.runtimeErrors(); len(rs) != 0 {
 			glog.Infof("skipping pod synchronization - %v", rs)
 			time.Sleep(5 * time.Second)
 			continue
