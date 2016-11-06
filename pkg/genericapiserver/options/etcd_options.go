@@ -32,7 +32,7 @@ func (s *ServerRunOptions) AddEtcdStorageFlags(fs *pflag.FlagSet) {
 		"format: group/resource#servers, where servers are http://ip:port, semicolon separated.")
 
 	fs.StringSliceVar(&s.StorageConfig.ServerList, "etcd-servers", s.StorageConfig.ServerList,
-		"List of etcd servers to connect with (http://ip:port), comma separated.")
+		"List of etcd servers to connect with (scheme://ip:port), comma separated.")
 
 	fs.StringVar(&s.StorageConfig.Prefix, "etcd-prefix", s.StorageConfig.Prefix,
 		"The prefix for all resource paths in etcd.")
