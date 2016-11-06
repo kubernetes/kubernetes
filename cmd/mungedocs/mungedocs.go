@@ -29,7 +29,7 @@ import (
 )
 
 // This needs to be updated when we cut a new release series.
-const latestReleaseBranch = "release-1.4"
+const latestReleaseBranch = "release-1.5"
 
 var (
 	verbose   = flag.Bool("verbose", false, "On verification failure, emit pre-munge and post-munge versions.")
