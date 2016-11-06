@@ -1,12 +1,16 @@
 package inmem
 
 import (
+	"fmt"
 	"time"
 	"sync"
 	"container/heap"
 	"math"
 )
 
+// expiryManager manages time based expirations.
+// An interesting part of the design is that once scheduled items are never removed;
+// instead once we see an expired key, we then trigger a check to see if it has actually expired.
 type expiryManager struct {
 	mutex          sync.Mutex
 	queue          expiryQueue
@@ -19,7 +23,7 @@ type expiryManager struct {
 type expiringItem struct {
 	bucket *bucket
 	key    string
-	expiry int64
+	expiry uint64
 }
 
 func newExpiryManager(store *store) *expiryManager {
@@ -60,19 +64,19 @@ func (q *expiryQueue) Pop() interface{} {
 	return item
 }
 
-func (m *expiryManager) add(path string, expiry int64) {
+func (m *expiryManager) add(bucket *bucket, key string, expiry uint64) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	oldMin := math.MinInt64
+	var oldMin uint64
 	if len(m.queue) != 0 {
 		oldMin = m.queue[0].expiry
 	}
-	heap.Push(m.queue, expiringItem{path, expiry})
-	newMin := m.queue[0]
+	heap.Push(&m.queue, expiringItem{ bucket,  key,  expiry})
+	newMin := m.queue[0].expiry
 	if !m.minChanged && oldMin != newMin {
 		m.minChanged = true
-		m.minChanged <- true
+		m.minChangedChan <- true
 	}
 }
 
@@ -80,7 +84,7 @@ func (m *expiryManager) runOnce() {
 	var paths []expiringItem
 
 	m.mutex.Lock()
-	now := time.Now().Unix()
+	now := uint64(time.Now().Unix())
 	for {
 		if len(m.queue) == 0 {
 			break
@@ -90,24 +94,28 @@ func (m *expiryManager) runOnce() {
 			break
 		}
 		paths = append(paths, m.queue[0])
-		heap.Pop(m.queue)
+		heap.Pop(&m.queue)
 	}
 	m.minChanged = false
 	m.mutex.Unlock()
 
 	if len(paths) != 0 {
-		m.store.checkExpiration(paths)
+		err := m.store.checkExpiration(paths)
+		if err != nil {
+			// TODO: log, sleep, reattempt current batch?
+			panic(fmt.Errorf("error processing expiration: %v", err))
+		}
 	}
 }
 
 func (m*expiryManager) wait() {
-	var delaySeconds int32
+	var delaySeconds uint64
 
 	m.mutex.Lock()
-	now := time.Now().Unix()
+	now := uint64(time.Now().Unix())
 	if len(m.queue) == 0 {
 		delaySeconds = math.MaxInt32
-	} else {
+	} else if now > m.queue[0].expiry {
 		delaySeconds = now - m.queue[0].expiry
 	}
 	m.mutex.Unlock()
@@ -116,7 +124,7 @@ func (m*expiryManager) wait() {
 		return
 	}
 
-	timerChan := time.NewTimer(time.Second * delaySeconds).C
+	timerChan := time.NewTimer(time.Second * time.Duration(delaySeconds)).C
 	select {
 	case <-timerChan:
 	case <-m.minChangedChan:

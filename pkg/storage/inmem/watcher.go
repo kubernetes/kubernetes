@@ -3,18 +3,18 @@ package inmem
 import (
 	"k8s.io/kubernetes/pkg/storage"
 
-	"k8s.io/kubernetes/pkg/watch"
 	"github.com/golang/glog"
-	"strings"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/watch"
+	"strings"
 	"sync/atomic"
 )
 
 type watcher struct {
 	log        *changeLog
-	resultChan <-chan watch.Event
+	resultChan chan watch.Event
 
-	stop       int32
+	stop int32
 
 	position   LSN
 	pathPrefix string
@@ -33,11 +33,11 @@ func (w *watcher) Stop() {
 // Returns a chan which will receive all the events. If an error occurs
 // or Stop() is called, this channel will be closed, in which case the
 // watch should be completely cleaned up.
-func (w*watcher) ResultChan() <-chan watch.Event {
+func (w *watcher) ResultChan() <-chan watch.Event {
 	return w.resultChan
 }
 
-func (w*watcher) run() {
+func (w *watcher) run() {
 	for {
 		entry, err := w.log.read(w.position)
 
@@ -62,12 +62,16 @@ func (w*watcher) run() {
 				continue
 			}
 
-			if !w.pred.Matches(i.object) {
+			match, err := w.pred.Matches(i.object)
+			if err != nil {
+				glog.Warningf("predicate returned error: %v", err)
+			}
+			if !match {
 				continue
 			}
 
 			w.resultChan <- watch.Event{
-				Type: i.eventType,
+				Type:   i.eventType,
 				Object: i.object,
 			}
 		}

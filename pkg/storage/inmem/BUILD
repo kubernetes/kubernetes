@@ -13,9 +13,9 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "compact.go",
-        "event.go",
+        "log.go",
         "store.go",
+        "ttl_queue.go",
         "watcher.go",
     ],
     tags = ["automanaged"],
@@ -27,37 +27,9 @@ go_library(
         "//pkg/runtime:go_default_library",
         "//pkg/storage:go_default_library",
         "//pkg/storage/etcd:go_default_library",
+        "//pkg/types:go_default_library",
         "//pkg/watch:go_default_library",
-        "//vendor:github.com/coreos/etcd/clientv3",
-        "//vendor:github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes",
-        "//vendor:github.com/coreos/etcd/mvcc/mvccpb",
         "//vendor:github.com/golang/glog",
-        "//vendor:golang.org/x/net/context",
-    ],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = [
-        "compact_test.go",
-        "store_test.go",
-        "watcher_test.go",
-    ],
-    library = "go_default_library",
-    tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/testapi:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/fields:go_default_library",
-        "//pkg/labels:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/storage:go_default_library",
-        "//pkg/util/wait:go_default_library",
-        "//pkg/watch:go_default_library",
-        "//vendor:github.com/coreos/etcd/clientv3",
-        "//vendor:github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes",
-        "//vendor:github.com/coreos/etcd/integration",
         "//vendor:golang.org/x/net/context",
     ],
 )

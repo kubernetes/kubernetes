@@ -8,11 +8,12 @@ import (
 
 	"sync"
 	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/storage"
 )
 
 type changeLog struct {
 	mutex sync.RWMutex
-	cond  sync.Cond
+	cond  *sync.Cond
 	minLsn LSN
 	maxLsn LSN
 	log    map[LSN]*logEntry
@@ -96,3 +97,31 @@ func (e*logEntry) addItem(s* store, path string, eventType watch.EventType,  dat
 	})
 }
 
+
+func (l *changeLog) newWatcher(startPosition LSN, predicate storage.SelectionPredicate, path string, recursive bool) (watch.Interface, error) {
+	// TODO: etc3 code has this
+	//if pred.Label.Empty() && pred.Field.Empty() {
+	//	// The filter doesn't filter out any object.
+	//	wc.internalFilter = nil
+	//}
+
+
+	pathPrefix := normalizePath(path)
+	if recursive {
+		pathPrefix += "/"
+	}
+
+	// Prevent goroutine thrashing
+	bufferSize := 16
+
+	w := &watcher{
+		log: l,
+		resultChan : make(chan watch.Event, bufferSize),
+		position: startPosition,
+		pred: predicate,
+		pathPrefix: pathPrefix,
+	}
+	w.run()
+
+	return w, nil
+}
