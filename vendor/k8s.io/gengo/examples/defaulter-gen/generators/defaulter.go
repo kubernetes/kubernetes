@@ -323,7 +323,6 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 		if len(newDefaulters) == 0 {
 			glog.V(5).Infof("no defaulters in package %s", pkg.Name)
-			continue
 		}
 
 		packages = append(packages,
