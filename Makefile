@@ -95,7 +95,7 @@ ginkgo:
 #   make verify
 #   make verify BRANCH=branch_x
 .PHONY: verify
-verify:
+verify: verify_generated_files
 	KUBE_VERIFY_GIT_BRANCH=$(BRANCH) hack/make-rules/verify.sh -v
 	hack/make-rules/vet.sh
 
@@ -293,4 +293,12 @@ $(notdir $(abspath $(wildcard federation/cmd/*/))): generated_files
 #   make generated_files
 .PHONY: generated_files
 generated_files:
-	$(MAKE) -f Makefile.$@ $@ CALLED_FROM_MAIN_MAKEFILE=1
+	$(MAKE) -f Makefile.generated_files $@ CALLED_FROM_MAIN_MAKEFILE=1
+
+# Verify auto-generated files needed for the build.
+#
+# Example:
+#   make verify_generated_files
+.PHONY: verify_generated_files
+verify_generated_files:
+	$(MAKE) -f Makefile.generated_files $@ CALLED_FROM_MAIN_MAKEFILE=1

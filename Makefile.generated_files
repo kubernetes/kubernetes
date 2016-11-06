@@ -37,6 +37,12 @@ SHELL := /bin/bash
 .PHONY: generated_files
 generated_files: gen_deepcopy gen_defaulter gen_conversion gen_openapi
 
+.PHONY: verify_generated_files
+verify_generated_files: verify_gen_deepcopy    \
+                        verify_gen_defaulter   \
+                        verify_gen_conversion  \
+                        verify_gen_openapi
+
 # Code-generation logic.
 #
 # This stuff can be pretty tricky, and there's probably some corner cases that
@@ -209,18 +215,30 @@ DEEPCOPY_DIRS := $(shell                                             \
 )
 DEEPCOPY_FILES := $(addsuffix /$(DEEPCOPY_FILENAME), $(DEEPCOPY_DIRS))
 
+# Shell function for reuse in rules.
+RUN_GEN_DEEPCOPY =                                                          \
+    function run_gen_deepcopy() {                                           \
+        if [[ -f $(META_DIR)/$(DEEPCOPY_GEN).todo ]]; then                  \
+            ./hack/run-in-gopath.sh $(DEEPCOPY_GEN)                         \
+                --v $(KUBE_VERBOSE)                                         \
+                --logtostderr                                               \
+                -i $$(cat $(META_DIR)/$(DEEPCOPY_GEN).todo | paste -sd, -)  \
+                --bounding-dirs $(PRJ_SRC_PATH)                             \
+                -O $(DEEPCOPY_BASENAME)                                     \
+                "$$@";                                                      \
+        fi                                                                  \
+    };                                                                      \
+    run_gen_deepcopy
+
 # This rule aggregates the set of files to generate and then generates them all
 # in a single run of the tool.
 .PHONY: gen_deepcopy
-gen_deepcopy: $(DEEPCOPY_FILES)
-	if [[ -f $(META_DIR)/$(DEEPCOPY_GEN).todo ]]; then                  \
-	    ./hack/run-in-gopath.sh $(DEEPCOPY_GEN)                         \
-	        --v $(KUBE_VERBOSE)                                         \
-	        --logtostderr                                               \
-	        -i $$(cat $(META_DIR)/$(DEEPCOPY_GEN).todo | paste -sd, -)  \
-	        --bounding-dirs $(PRJ_SRC_PATH)                             \
-	        -O $(DEEPCOPY_BASENAME);                                    \
-	fi
+gen_deepcopy: $(DEEPCOPY_FILES) $(DEEPCOPY_GEN)
+	$(RUN_GEN_DEEPCOPY)
+
+.PHONY: verify_gen_deepcopy
+verify_gen_deepcopy: $(DEEPCOPY_GEN)
+	$(RUN_GEN_DEEPCOPY) --verify-only
 
 # For each dir in DEEPCOPY_DIRS, this establishes a dependency between the
 # output file and the input files that should trigger a rebuild.
@@ -323,18 +341,29 @@ DEFAULTER_DIRS := $(shell                                            \
 
 DEFAULTER_FILES := $(addsuffix /$(DEFAULTER_FILENAME), $(DEFAULTER_DIRS))
 
+RUN_GEN_DEFAULTER :=                                                         \
+    function run_gen_defaulter() {                                           \
+        if [[ -f $(META_DIR)/$(DEFAULTER_GEN).todo ]]; then                  \
+            ./hack/run-in-gopath.sh $(DEFAULTER_GEN)                         \
+                --v $(KUBE_VERBOSE)                                          \
+                --logtostderr                                                \
+                -i $$(cat $(META_DIR)/$(DEFAULTER_GEN).todo | paste -sd, -)  \
+                --extra-peer-dirs $$(echo $(addprefix $(PRJ_SRC_PATH)/, $(DEFAULTER_DIRS)) | sed 's/ /,/g') \
+                -O $(DEFAULTER_BASENAME)                                     \
+                "$$@";                                                       \
+        fi                                                                   \
+    };                                                                       \
+    run_gen_defaulter
+
 # This rule aggregates the set of files to generate and then generates them all
 # in a single run of the tool.
 .PHONY: gen_defaulter
-gen_defaulter: $(DEFAULTER_FILES)
-	if [[ -f $(META_DIR)/$(DEFAULTER_GEN).todo ]]; then                  \
-	    ./hack/run-in-gopath.sh $(DEFAULTER_GEN)                         \
-	        --v $(KUBE_VERBOSE)                                          \
-	        --logtostderr                                                \
-	        -i $$(cat $(META_DIR)/$(DEFAULTER_GEN).todo | paste -sd, -)  \
-	        --extra-peer-dirs $$(echo $(addprefix $(PRJ_SRC_PATH)/, $(DEFAULTER_DIRS)) | sed 's/ /,/g') \
-	        -O $(DEFAULTER_BASENAME);                                    \
-	fi
+gen_defaulter: $(DEFAULTER_FILES) $(DEFAULTER_GEN)
+	$(RUN_GEN_DEFAULTER)
+
+.PHONY: verify_gen_deepcopy
+verify_gen_defaulter: $(DEFAULTER_GEN)
+	$(RUN_GEN_DEFAULTER) --verify-only
 
 # For each dir in DEFAULTER_DIRS, this establishes a dependency between the
 # output file and the input files that should trigger a rebuild.
@@ -453,9 +482,26 @@ OPENAPI_DIRS := $(shell                                             \
 
 OPENAPI_OUTFILE := $(OPENAPI_OUTPUT_PKG)/$(OPENAPI_FILENAME)
 
+# Shell function for reuse in rules.
+RUN_GEN_OPENAPI =                                                                       \
+    function run_gen_openapi() {                                                        \
+        ./hack/run-in-gopath.sh $(OPENAPI_GEN)                                          \
+            --v $(KUBE_VERBOSE)                                                         \
+            --logtostderr                                                               \
+            -i $$(echo $(addprefix $(PRJ_SRC_PATH)/, $(OPENAPI_DIRS)) | sed 's/ /,/g')  \
+            -p $(PRJ_SRC_PATH)/$(OPENAPI_OUTPUT_PKG)                                    \
+            -O $(OPENAPI_BASENAME)                                                      \
+            "$$@";                                                                      \
+    };                                                                                  \
+    run_gen_openapi
+
 # This rule is the user-friendly entrypoint for openapi generation.
 .PHONY: gen_openapi
-gen_openapi: $(OPENAPI_OUTFILE)
+gen_openapi: $(OPENAPI_OUTFILE) $(OPENAPI_GEN)
+
+.PHONY: verify_gen_openapi
+verify_gen_openapi: $(OPENAPI_GEN)
+	$(RUN_GEN_OPENAPI) --verify-only
 
 # For each dir in OPENAPI_DIRS, this establishes a dependency between the
 # output file and the input files that should trigger a rebuild.
@@ -475,13 +521,8 @@ $(foreach dir, $(OPENAPI_DIRS), $(eval                                     \
 ))
 
 # How to regenerate open-api code.  This emits a single file for all results.
-$(OPENAPI_OUTFILE): $(OPENAPI_GEN)
-	./hack/run-in-gopath.sh $(OPENAPI_GEN)                                          \
-	    --v $(KUBE_VERBOSE)                                                         \
-	    --logtostderr                                                               \
-	    -i $$(echo $(addprefix $(PRJ_SRC_PATH)/, $(OPENAPI_DIRS)) | sed 's/ /,/g')  \
-	    -p $(PRJ_SRC_PATH)/$(OPENAPI_OUTPUT_PKG)                                    \
-	    -O $(OPENAPI_BASENAME)
+$(OPENAPI_OUTFILE): $(OPENAPI_GEN) $(OPENAPI_GEN)
+	$(RUN_GEN_OPENAPI)
 
 # This calculates the dependencies for the generator tool, so we only rebuild
 # it when needed.  It is PHONY so that it always runs, but it only updates the
@@ -560,17 +601,29 @@ CONVERSION_DIRS := $(shell                                              \
 
 CONVERSION_FILES := $(addsuffix /$(CONVERSION_FILENAME), $(CONVERSION_DIRS))
 
+# Shell function for reuse in rules.
+RUN_GEN_CONVERSION =                                                          \
+    function run_gen_conversion() {                                           \
+        if [[ -f $(META_DIR)/$(CONVERSION_GEN).todo ]]; then                  \
+            ./hack/run-in-gopath.sh $(CONVERSION_GEN)                         \
+                --v $(KUBE_VERBOSE)                                           \
+                --logtostderr                                                 \
+                -i $$(cat $(META_DIR)/$(CONVERSION_GEN).todo | paste -sd, -)  \
+                -O $(CONVERSION_BASENAME)                                     \
+                "$$@";                                                        \
+        fi                                                                    \
+    };                                                                        \
+    run_gen_conversion
+
 # This rule aggregates the set of files to generate and then generates them all
 # in a single run of the tool.
 .PHONY: gen_conversion
-gen_conversion: $(CONVERSION_FILES)
-	if [[ -f $(META_DIR)/$(CONVERSION_GEN).todo ]]; then                  \
-	    ./hack/run-in-gopath.sh $(CONVERSION_GEN)                         \
-	        --v $(KUBE_VERBOSE)                                           \
-	        --logtostderr                                                 \
-	        -i $$(cat $(META_DIR)/$(CONVERSION_GEN).todo | paste -sd, -)  \
-	        -O $(CONVERSION_BASENAME);                                    \
-	fi
+gen_conversion: $(CONVERSION_FILES) $(CONVERSION_GEN)
+	$(RUN_GEN_CONVERSION)
+
+.PHONY: verify_gen_conversion
+verify_gen_conversion: $(CONVERSION_GEN)
+	$(RUN_GEN_CONVERSION) --verify-only
 
 # Establish a dependency between the deps file and the dir.  Whenever a dir
 # changes (files added or removed) the deps file will be considered stale.
