@@ -15,6 +15,7 @@ go_library(
     srcs = [
         "certificates_client.go",
         "certificatesigningrequest.go",
+        "certificatesigningrequest_expansion.go",
         "doc.go",
         "generated_expansion.go",
     ],

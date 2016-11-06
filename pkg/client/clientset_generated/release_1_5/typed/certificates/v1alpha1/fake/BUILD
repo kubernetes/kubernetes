@@ -16,6 +16,7 @@ go_library(
         "doc.go",
         "fake_certificates_client.go",
         "fake_certificatesigningrequest.go",
+        "fake_certificatesigningrequest_expansion.go",
     ],
     tags = ["automanaged"],
     deps = [

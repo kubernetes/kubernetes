@@ -14,14 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fake
+package v1beta1
 
 import (
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
-	"k8s.io/kubernetes/pkg/client/testing/core"
 )
 
-func (c *FakeSubjectAccessReviews) Create(sar *authorizationapi.SubjectAccessReview) (result *authorizationapi.SubjectAccessReview, err error) {
-	obj, err := c.Fake.Invokes(core.NewRootCreateAction(authorizationapi.SchemeGroupVersion.WithResource("subjectaccessreviews"), sar), &authorizationapi.SubjectAccessReview{})
-	return obj.(*authorizationapi.SubjectAccessReview), err
+type SelfSubjectAccessReviewExpansion interface {
+	Create(sar *authorizationapi.SelfSubjectAccessReview) (result *authorizationapi.SelfSubjectAccessReview, err error)
+}
+
+func (c *selfSubjectAccessReviews) Create(sar *authorizationapi.SelfSubjectAccessReview) (result *authorizationapi.SelfSubjectAccessReview, err error) {
+	result = &authorizationapi.SelfSubjectAccessReview{}
+	err = c.client.Post().
+		Resource("selfsubjectaccessreviews").
+		Body(sar).
+		Do().
+		Into(result)
+	return
 }

@@ -14,26 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package fake
 
-type ComponentStatusExpansion interface{}
+import (
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/testing/core"
+)
 
-type ConfigMapExpansion interface{}
+func (c *FakeNodes) PatchStatus(nodeName string, data []byte) (*v1.Node, error) {
+	obj, err := c.Fake.Invokes(
+		core.NewRootPatchSubresourceAction(nodesResource, nodeName, data, "status"), &v1.Node{})
+	if obj == nil {
+		return nil, err
+	}
 
-type EndpointsExpansion interface{}
-
-type LimitRangeExpansion interface{}
-
-type PersistentVolumeExpansion interface{}
-
-type PersistentVolumeClaimExpansion interface{}
-
-type PodTemplateExpansion interface{}
-
-type ReplicationControllerExpansion interface{}
-
-type ResourceQuotaExpansion interface{}
-
-type SecretExpansion interface{}
-
-type ServiceAccountExpansion interface{}
+	return obj.(*v1.Node), err
+}

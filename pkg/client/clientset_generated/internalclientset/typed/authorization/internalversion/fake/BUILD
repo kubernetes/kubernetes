@@ -17,8 +17,11 @@ go_library(
         "fake_authorization_client.go",
         "fake_generated_expansion.go",
         "fake_localsubjectaccessreview.go",
+        "fake_localsubjectaccessreview_expansion.go",
         "fake_selfsubjectaccessreview.go",
+        "fake_selfsubjectaccessreview_expansion.go",
         "fake_subjectaccessreview.go",
+        "fake_subjectaccessreview_expansion.go",
     ],
     tags = ["automanaged"],
     deps = [

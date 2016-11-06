@@ -14,26 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package fake
 
-type ComponentStatusExpansion interface{}
+import (
+	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
+	"k8s.io/kubernetes/pkg/client/testing/core"
+)
 
-type ConfigMapExpansion interface{}
-
-type EndpointsExpansion interface{}
-
-type LimitRangeExpansion interface{}
-
-type PersistentVolumeExpansion interface{}
-
-type PersistentVolumeClaimExpansion interface{}
-
-type PodTemplateExpansion interface{}
-
-type ReplicationControllerExpansion interface{}
-
-type ResourceQuotaExpansion interface{}
-
-type SecretExpansion interface{}
-
-type ServiceAccountExpansion interface{}
+func (c *FakeSelfSubjectAccessReviews) Create(sar *authorizationapi.SelfSubjectAccessReview) (result *authorizationapi.SelfSubjectAccessReview, err error) {
+	obj, err := c.Fake.Invokes(core.NewRootCreateAction(authorizationapi.SchemeGroupVersion.WithResource("selfsubjectaccessreviews"), sar), &authorizationapi.SelfSubjectAccessReview{})
+	return obj.(*authorizationapi.SelfSubjectAccessReview), err
+}

@@ -25,6 +25,7 @@ go_library(
         "namespace.go",
         "namespace_expansion.go",
         "node.go",
+        "node_expansion.go",
         "persistentvolume.go",
         "persistentvolumeclaim.go",
         "pod.go",

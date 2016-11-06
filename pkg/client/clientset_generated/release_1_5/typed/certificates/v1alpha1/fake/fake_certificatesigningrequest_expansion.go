@@ -17,11 +17,15 @@ limitations under the License.
 package fake
 
 import (
-	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
+	certificates "k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 )
 
-func (c *FakeSubjectAccessReviews) Create(sar *authorizationapi.SubjectAccessReview) (result *authorizationapi.SubjectAccessReview, err error) {
-	obj, err := c.Fake.Invokes(core.NewRootCreateAction(authorizationapi.SchemeGroupVersion.WithResource("subjectaccessreviews"), sar), &authorizationapi.SubjectAccessReview{})
-	return obj.(*authorizationapi.SubjectAccessReview), err
+func (c *FakeCertificateSigningRequests) UpdateApproval(certificateSigningRequest *certificates.CertificateSigningRequest) (result *certificates.CertificateSigningRequest, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewRootUpdateSubresourceAction(certificatesigningrequestsResource, "approval", certificateSigningRequest), &certificates.CertificateSigningRequest{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*certificates.CertificateSigningRequest), err
 }
