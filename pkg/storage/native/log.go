@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,19 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package validation
+package native
 
-import (
-	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/genericapiserver/options"
-)
-
-func VerifyEtcdServersList(options *options.ServerRunOptions) {
-	// HACK
-	/*
-		if len(options.StorageConfig.ServerList) == 0 {
-			glog.Fatalf("--etcd-servers must be specified")
-		}
-	*/
-	glog.Warningf("skipping etcd-servers validation")
+type ReadableLog interface {
+	WaitLog(lsn LSN, dest *RaftLogEntry) (wasApplied bool, err error)
 }

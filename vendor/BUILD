@@ -11785,3 +11785,94 @@ go_library(
     tags = ["automanaged"],
     deps = ["//vendor:github.com/gogo/protobuf/proto"],
 )
+
+go_library(
+    name = "github.com/armon/go-metrics",
+    srcs = [
+        "github.com/armon/go-metrics/const_unix.go",
+        "github.com/armon/go-metrics/inmem.go",
+        "github.com/armon/go-metrics/inmem_signal.go",
+        "github.com/armon/go-metrics/metrics.go",
+        "github.com/armon/go-metrics/sink.go",
+        "github.com/armon/go-metrics/start.go",
+        "github.com/armon/go-metrics/statsd.go",
+        "github.com/armon/go-metrics/statsite.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/gogo/protobuf/io",
+    srcs = [
+        "github.com/gogo/protobuf/io/full.go",
+        "github.com/gogo/protobuf/io/io.go",
+        "github.com/gogo/protobuf/io/uint32.go",
+        "github.com/gogo/protobuf/io/varint.go",
+    ],
+    tags = ["automanaged"],
+    deps = ["//vendor:github.com/gogo/protobuf/proto"],
+)
+
+go_library(
+    name = "github.com/hashicorp/go-msgpack/codec",
+    srcs = [
+        "github.com/hashicorp/go-msgpack/codec/0doc.go",
+        "github.com/hashicorp/go-msgpack/codec/binc.go",
+        "github.com/hashicorp/go-msgpack/codec/decode.go",
+        "github.com/hashicorp/go-msgpack/codec/encode.go",
+        "github.com/hashicorp/go-msgpack/codec/helper.go",
+        "github.com/hashicorp/go-msgpack/codec/helper_internal.go",
+        "github.com/hashicorp/go-msgpack/codec/msgpack.go",
+        "github.com/hashicorp/go-msgpack/codec/rpc.go",
+        "github.com/hashicorp/go-msgpack/codec/simple.go",
+        "github.com/hashicorp/go-msgpack/codec/time.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/hashicorp/raft",
+    srcs = [
+        "github.com/hashicorp/raft/commands.go",
+        "github.com/hashicorp/raft/config.go",
+        "github.com/hashicorp/raft/discard_snapshot.go",
+        "github.com/hashicorp/raft/file_snapshot.go",
+        "github.com/hashicorp/raft/fsm.go",
+        "github.com/hashicorp/raft/future.go",
+        "github.com/hashicorp/raft/inflight.go",
+        "github.com/hashicorp/raft/inmem_store.go",
+        "github.com/hashicorp/raft/inmem_transport.go",
+        "github.com/hashicorp/raft/log.go",
+        "github.com/hashicorp/raft/log_cache.go",
+        "github.com/hashicorp/raft/net_transport.go",
+        "github.com/hashicorp/raft/observer.go",
+        "github.com/hashicorp/raft/peer.go",
+        "github.com/hashicorp/raft/raft.go",
+        "github.com/hashicorp/raft/replication.go",
+        "github.com/hashicorp/raft/snapshot.go",
+        "github.com/hashicorp/raft/stable.go",
+        "github.com/hashicorp/raft/state.go",
+        "github.com/hashicorp/raft/tcp_transport.go",
+        "github.com/hashicorp/raft/transport.go",
+        "github.com/hashicorp/raft/util.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/armon/go-metrics",
+        "//vendor:github.com/hashicorp/go-msgpack/codec",
+    ],
+)
+
+go_library(
+    name = "github.com/hashicorp/raft-boltdb",
+    srcs = [
+        "github.com/hashicorp/raft-boltdb/bolt_store.go",
+        "github.com/hashicorp/raft-boltdb/util.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/boltdb/bolt",
+        "//vendor:github.com/hashicorp/go-msgpack/codec",
+        "//vendor:github.com/hashicorp/raft",
+    ],
+)

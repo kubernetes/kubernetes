@@ -1,0 +1,96 @@
+// To regenerate native.pb.go run hack/update-generated-runtime.sh
+
+syntax = 'proto3';
+
+package native;
+
+// StorageService is the API that storage services (local or remote) implement
+service StorageService {
+    // DoOperation performs a StorageOperation
+    rpc DoOperation (StorageOperation) returns (StorageOperationResult) {}
+
+    rpc Watch(WatchRequest) returns (stream WatchEvent) {}
+}
+
+message WatchRequest {
+    string path = 1;
+    bool recursive = 2;
+    uint64 start_position = 3;
+}
+
+message WatchEvent {
+    StorageOperation op = 1;
+    ErrorInfo error = 2;
+}
+
+message ErrorInfo {
+    string message = 1;
+}
+
+message RaftLogEntry {
+    StorageOperation op = 1;
+}
+
+message RaftLogEntryResult {
+    StorageOperationResult result = 1;
+}
+
+message StorageOperation {
+    StorageOperationType op_type = 1;
+    string path = 2;
+    ItemData item_data = 3;
+    uint64 precondition_lsn = 10;
+    string precondition_uid = 11;
+}
+
+message StorageOperationResult {
+    ItemData item_data = 1;
+    ErrorCode error_code = 2;
+    uint64 current_lsn = 3;
+
+    // For the case of a list
+    // TODO: Stream instead
+    repeated ItemData item_list = 4;
+}
+
+message ItemData {
+    bytes data = 1;
+    string uid = 2;
+    uint64 lsn = 3;
+    uint64 ttl = 4;
+
+    // path will often not be populated if unambiguous
+    string path = 5;
+}
+
+enum StorageOperationType {
+    UNKNOWN = 0;
+    GET = 1;
+    LIST = 2;
+    CREATE = 3;
+    DELETE = 4;
+    UPDATE = 5;
+}
+
+
+enum ErrorCode {
+    NONE = 0;
+    ALREADY_EXISTS = 1;
+    NOT_FOUND = 2;
+
+    PRECONDITION_NOT_MET_LSN = 10;
+    PRECONDITION_NOT_MET_UID = 11;
+}
+
+message SnapshotInfo {
+    uint64 item_count = 1;
+}
+
+message BitSetInfo {
+    uint32 chunk_count = 1;
+}
+
+message BitSetChunkInfo {
+    uint64 min = 1;
+    bytes bits = 2;
+}
