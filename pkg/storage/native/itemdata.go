@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,18 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package validation
+package native
 
 import (
-	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/genericapiserver/options"
-	"k8s.io/kubernetes/pkg/storage/storagebackend"
+	"k8s.io/kubernetes/pkg/types"
 )
 
-func VerifyEtcdServersList(options *options.ServerRunOptions) {
-	if options.StorageConfig.Type != storagebackend.StorageTypeNativeEmbedded {
-		if len(options.StorageConfig.ServerList) == 0 {
-			glog.Fatalf("--etcd-servers must be specified")
-		}
-	}
+type itemData struct {
+	uid    types.UID
+	data   []byte
+	expiry uint64
+	lsn    LSN
 }
+
+// ByName allows sorting of ItemData by the Path field
+type ByPath []*ItemData
+
+func (a ByPath) Len() int           { return len(a) }
+func (a ByPath) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByPath) Less(i, j int) bool { return a[i].Path < a[j].Path }

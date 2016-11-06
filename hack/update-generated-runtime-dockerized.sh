@@ -20,6 +20,7 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 KUBE_REMOTE_RUNTIME_ROOT="${KUBE_ROOT}/pkg/kubelet/api/v1alpha1/runtime"
+KUBE_NATIVE_STORAGE_ROOT="${KUBE_ROOT}/pkg/storage/native"
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
@@ -41,13 +42,19 @@ fi
 
 function cleanup {
 	rm -f ${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go.bak
+	rm -f ${KUBE_NATIVE_STORAGE_ROOT}/native.pb.go.bak
 }
 
 trap cleanup EXIT
 
 gogopath=$(dirname $(kube::util::find-binary "protoc-gen-gogo"))
 export PATH=$gogopath:$PATH
+
 protoc -I${KUBE_REMOTE_RUNTIME_ROOT} --gogo_out=plugins=grpc:${KUBE_REMOTE_RUNTIME_ROOT} ${KUBE_REMOTE_RUNTIME_ROOT}/api.proto
 echo "$(cat hack/boilerplate/boilerplate.go.txt ${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go)" > ${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go
 sed -i".bak" "s/Copyright YEAR/Copyright $(date '+%Y')/g" ${KUBE_REMOTE_RUNTIME_ROOT}/api.pb.go
+
+protoc -I${KUBE_NATIVE_STORAGE_ROOT} --gogo_out=plugins=grpc:${KUBE_NATIVE_STORAGE_ROOT} ${KUBE_NATIVE_STORAGE_ROOT}/native.proto
+echo "$(cat hack/boilerplate/boilerplate.go.txt ${KUBE_NATIVE_STORAGE_ROOT}/native.pb.go)" > ${KUBE_NATIVE_STORAGE_ROOT}/native.pb.go
+sed -i".bak" "s/Copyright YEAR/Copyright $(date '+%Y')/g" ${KUBE_NATIVE_STORAGE_ROOT}/native.pb.go
 
