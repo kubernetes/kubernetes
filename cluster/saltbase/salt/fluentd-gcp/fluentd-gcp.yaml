@@ -1,5 +1,5 @@
 # This config should be kept as similar as possible to the one at
-# cluster/addons/gci/fluentd-gcp.yaml
+# cluster/saltbase/salt/fluentd-gcp-gci/fluentd-gcp-gci.yaml
 apiVersion: v1
 kind: Pod
 metadata:

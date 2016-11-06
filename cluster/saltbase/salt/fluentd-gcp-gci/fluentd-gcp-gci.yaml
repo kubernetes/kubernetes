@@ -11,7 +11,7 @@ spec:
   dnsPolicy: Default
   containers:
   - name: fluentd-cloud-logging
-    image: gcr.io/google_containers/fluentd-gcp:1.21
+    image: gcr.io/google_containers/fluentd-gcp:1.25
     command:
       - '/bin/sh'
       - '-c'
@@ -25,7 +25,7 @@ spec:
       requests:
         # Any change here should be accompanied by a proportional change in CPU
         # requests of other per-node add-ons (e.g. kube-proxy).
-        cpu: 80m
+        cpu: 100m
         memory: 200Mi
     volumeMounts:
     - name: varlog
