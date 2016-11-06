@@ -1023,8 +1023,8 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 	// synchronize
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 
-	// we should not have inode pressure
-	if manager.IsUnderInodePressure() {
+	// we should not have disk pressure
+	if manager.IsUnderDiskPressure() {
 		t.Errorf("Manager should not report inode pressure")
 	}
 
@@ -1038,8 +1038,8 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 	summaryProvider.result = summaryStatsMaker("1.5Mi", "4Mi", podStats)
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 
-	// we should have inode pressure
-	if !manager.IsUnderInodePressure() {
+	// we should have disk pressure
+	if !manager.IsUnderDiskPressure() {
 		t.Errorf("Manager should report inode pressure since soft threshold was met")
 	}
 
@@ -1053,8 +1053,8 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 	summaryProvider.result = summaryStatsMaker("1.5Mi", "4Mi", podStats)
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 
-	// we should have inode pressure
-	if !manager.IsUnderInodePressure() {
+	// we should have disk pressure
+	if !manager.IsUnderDiskPressure() {
 		t.Errorf("Manager should report inode pressure since soft threshold was met")
 	}
 
@@ -1078,8 +1078,8 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 	summaryProvider.result = summaryStatsMaker("3Mi", "4Mi", podStats)
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 
-	// we should not have inode pressure
-	if manager.IsUnderInodePressure() {
+	// we should not have disk pressure
+	if manager.IsUnderDiskPressure() {
 		t.Errorf("Manager should not report inode pressure")
 	}
 
@@ -1088,8 +1088,8 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 	summaryProvider.result = summaryStatsMaker("0.5Mi", "4Mi", podStats)
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 
-	// we should have inode pressure
-	if !manager.IsUnderInodePressure() {
+	// we should have disk pressure
+	if !manager.IsUnderDiskPressure() {
 		t.Errorf("Manager should report inode pressure")
 	}
 
@@ -1113,8 +1113,8 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 	podKiller.pod = nil // reset state
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 
-	// we should have inode pressure (because transition period not yet met)
-	if !manager.IsUnderInodePressure() {
+	// we should have disk pressure (because transition period not yet met)
+	if !manager.IsUnderDiskPressure() {
 		t.Errorf("Manager should report inode pressure")
 	}
 
@@ -1134,8 +1134,8 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 	podKiller.pod = nil // reset state
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 
-	// we should not have inode pressure (because transition period met)
-	if manager.IsUnderInodePressure() {
+	// we should not have disk pressure (because transition period met)
+	if manager.IsUnderDiskPressure() {
 		t.Errorf("Manager should not report inode pressure")
 	}
 

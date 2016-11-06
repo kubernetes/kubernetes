@@ -38,7 +38,7 @@ const (
 	// the reason reported back in status.
 	reason = "Evicted"
 	// the message associated with the reason.
-	message = "The node was low on compute resources."
+	message = "The node was low on resource: %v."
 	// disk, in bytes.  internal to this module, used to account for local disk usage.
 	resourceDisk api.ResourceName = "disk"
 	// inodes, number. internal to this module, used to account for local disk inode consumption.
@@ -68,8 +68,8 @@ func init() {
 	signalToNodeCondition[SignalMemoryAvailable] = api.NodeMemoryPressure
 	signalToNodeCondition[SignalImageFsAvailable] = api.NodeDiskPressure
 	signalToNodeCondition[SignalNodeFsAvailable] = api.NodeDiskPressure
-	signalToNodeCondition[SignalImageFsInodesFree] = api.NodeInodePressure
-	signalToNodeCondition[SignalNodeFsInodesFree] = api.NodeInodePressure
+	signalToNodeCondition[SignalImageFsInodesFree] = api.NodeDiskPressure
+	signalToNodeCondition[SignalNodeFsInodesFree] = api.NodeDiskPressure
 
 	// map signals to resources (and vice-versa)
 	signalToResource = map[Signal]api.ResourceName{}
