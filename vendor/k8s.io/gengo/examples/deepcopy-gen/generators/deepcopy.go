@@ -203,7 +203,6 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 const (
 	apiPackagePath        = "k8s.io/kubernetes/pkg/api"
-	conversionPackagePath = "k8s.io/kubernetes/pkg/conversion"
 	runtimePackagePath    = "k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -277,7 +276,7 @@ func (g *genDeepCopy) copyableAndInBounds(t *types.Type) bool {
 // for a type T is:
 //    func (t T) DeepCopy() T
 // or:
-//    func (t *T) DeepCopyt() T
+//    func (t *T) DeepCopy() T
 func hasDeepCopyMethod(t *types.Type) bool {
 	for mn, mt := range t.Methods {
 		if mn != "DeepCopy" {
@@ -365,8 +364,6 @@ func (n *dcFnNamer) Name(t *types.Type) string {
 }
 
 func (g *genDeepCopy) Init(c *generator.Context, w io.Writer) error {
-	cloner := c.Universe.Type(types.Name{Package: conversionPackagePath, Name: "Cloner"})
-	g.imports.AddType(cloner)
 	if !g.registerTypes {
 		// TODO: We should come up with a solution to register all generated
 		// deep-copy functions. However, for now, to avoid import cycles
@@ -374,29 +371,7 @@ func (g *genDeepCopy) Init(c *generator.Context, w io.Writer) error {
 		return nil
 	}
 	glog.V(5).Infof("registering types in pkg %q", g.targetPackage)
-
-	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	sw.Do("func init() {\n", nil)
-	sw.Do("SchemeBuilder.Register(RegisterDeepCopies)\n", nil)
-	sw.Do("}\n\n", nil)
-
-	scheme := c.Universe.Type(types.Name{Package: runtimePackagePath, Name: "Scheme"})
-	schemePtr := &types.Type{
-		Kind: types.Pointer,
-		Elem: scheme,
-	}
-	sw.Do("// RegisterDeepCopies adds deep-copy functions to the given scheme. Public\n", nil)
-	sw.Do("// to allow building arbitrary schemes.\n", nil)
-	sw.Do("func RegisterDeepCopies(scheme $.|raw$) error {\n", schemePtr)
-	sw.Do("return scheme.AddGeneratedDeepCopyFuncs(\n", nil)
-	for _, t := range g.typesForInit {
-		args := argsFromType(t).
-			With("typeof", c.Universe.Package("reflect").Function("TypeOf"))
-		sw.Do("conversion.GeneratedDeepCopyFunc{Fn: $.type|dcFnName$, InType: $.typeof|raw$(&$.type|raw${})},\n", args)
-	}
-	sw.Do(")\n", nil)
-	sw.Do("}\n\n", nil)
-	return sw.Error()
+	return nil
 }
 
 func (g *genDeepCopy) needsGeneration(t *types.Type) bool {
@@ -428,21 +403,25 @@ func (g *genDeepCopy) GenerateType(c *generator.Context, t *types.Type, w io.Wri
 	glog.V(5).Infof("generating for type %v", t)
 
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	args := argsFromType(t).
-		With("clonerType", types.Ref(conversionPackagePath, "Cloner"))
+	args := argsFromType(t)
 	sw.Do("// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.\n", nil)
-	sw.Do("func (in *$.type|raw$) DeepCopyInto(out *$.type|raw$) {{\n", args)
+	sw.Do("func (in *$.type|raw$) DeepCopyInto(out *$.type|raw$) {\n", args)
 	g.generateFor(t, sw)
 	sw.Do("return\n", nil)
-	sw.Do("}}\n\n", nil)
+	sw.Do("}\n\n", nil)
 
-	sw.Do("// DeepCopy will perform a deep copy of the receiver, creating a new object.\n", nil)
-	sw.Do("func (x *$.type|raw$) DeepCopy(c *Cloner) *$.type|raw$ {{\n", args)
+	sw.Do("// DeepCopy will perform a deep copy of the receiver, creating a new $.type|raw$.\n", args)
+	sw.Do("func (x *$.type|raw$) DeepCopy() *$.type|raw$ {\n", args)
 	sw.Do("if x == nil { return nil }\n", nil)
 	sw.Do("out := new($.type|raw$)\n", args)
 	sw.Do("x.DeepCopyInto(out)\n", nil)
 	sw.Do("return out\n", nil)
-	sw.Do("}}\n\n", nil)
+	sw.Do("}\n\n", nil)
+
+	sw.Do("// DeepCopyObject will perform a deep copy of the receiver, creating a new object.\n", nil)
+	sw.Do("func (x *$.type|raw$) DeepCopyObject() runtime.Object {\n", args)
+	sw.Do("return x.DeepCopy()\n", nil)
+	sw.Do("}\n\n", nil)
 
 	return sw.Error()
 }
@@ -493,6 +472,8 @@ func (g *genDeepCopy) doMap(t *types.Type, sw *generator.SnippetWriter) {
 			sw.Do("for key, val := range *in {\n", nil)
 			sw.Do("(*out)[key] = val\n", nil)
 			sw.Do("}\n", nil)
+		case t.Elem.Kind == types.Interface:
+			sw.Do(fmt.Sprintf("(*out)[key] = in.DeepCopy%s()\n", t.Elem.Name.Name), t)
 		default:
 			sw.Do("for key, val := range *in {\n", nil)
 			if g.copyableAndInBounds(t.Elem) {
@@ -500,11 +481,8 @@ func (g *genDeepCopy) doMap(t *types.Type, sw *generator.SnippetWriter) {
 				sw.Do("val.DeepCopyInto(newVal)\n", nil)
 				sw.Do("(*out)[key] = *newVal\n", nil)
 			} else {
-				sw.Do("if newVal, err := c.DeepCopy(&val); err != nil {\n", nil)
-				sw.Do("return err\n", nil)
-				sw.Do("} else {\n", nil)
+				sw.Do("newVal := c.DeepCopy(&val)\n", nil)
 				sw.Do("(*out)[key] = *newVal.(*$.|raw$)\n", t.Elem)
-				sw.Do("}\n", nil)
 			}
 			sw.Do("}\n", nil)
 		}
@@ -577,20 +555,12 @@ func (g *genDeepCopy) doStruct(t *types.Type, sw *generator.SnippetWriter) {
 				sw.Do("return err\n", nil)
 				sw.Do("}\n", nil)
 			} else {
-				sw.Do("if newVal, err := c.DeepCopy(&in.$.name$); err != nil {\n", args)
-				sw.Do("return err\n", nil)
-				sw.Do("} else {\n", nil)
-				sw.Do("out.$.name$ = *newVal.(*$.type|raw$)\n", args)
-				sw.Do("}\n", nil)
+				sw.Do("in.$.name$.DeepCopyInto(&out.$.name$)\n", args)
 			}
+		case types.Interface:
+			sw.Do(fmt.Sprintf("out.$.name$ = in.$.name$.DeepCopy%s()\n", t.Name.Name), args)
 		default:
-			sw.Do("if in.$.name$ == nil {\n", args)
-			sw.Do("out.$.name$ = nil\n", args)
-			sw.Do("} else if newVal, err := c.DeepCopy(&in.$.name$); err != nil {\n", args)
-			sw.Do("return err\n", nil)
-			sw.Do("} else {\n", nil)
-			sw.Do("out.$.name$ = *newVal.(*$.type|raw$)\n", args)
-			sw.Do("}\n", nil)
+			sw.Do("out.$.name$ = in.$.name$.DeepCopy()\n", args)
 		}
 	}
 }
@@ -613,11 +583,7 @@ func (g *genDeepCopy) doPointer(t *types.Type, sw *generator.SnippetWriter) {
 		sw.Do("return err\n", nil)
 		sw.Do("}\n", nil)
 	} else {
-		sw.Do("if newVal, err := c.DeepCopy(*in); err != nil {\n", nil)
-		sw.Do("return err\n", nil)
-		sw.Do("} else {\n", nil)
-		sw.Do("*out = newVal.(*$.|raw$)\n", t.Elem)
-		sw.Do("}\n", nil)
+		sw.Do("*out = (*in).DeepCopy()\n", t)
 	}
 }
 
