@@ -202,7 +202,7 @@ func GetObjectFromChan(c chan runtime.Object) runtime.Object {
 	select {
 	case obj := <-c:
 		return obj
-	case <-time.After(20 * time.Second):
+	case <-time.After(wait.ForeverTestTimeout):
 		pprof.Lookup("goroutine").WriteTo(os.Stderr, 1)
 		return nil
 	}

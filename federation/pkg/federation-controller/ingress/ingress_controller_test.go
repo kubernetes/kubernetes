@@ -25,12 +25,15 @@ import (
 	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fake_fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/fake"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	extensions_v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	fake_kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -121,6 +124,13 @@ func TestIngressController(t *testing.T) {
 	// Test add federated ingress.
 	t.Log("Adding Federated Ingress")
 	fedIngressWatch.Add(&ing1)
+	t.Logf("Checking that approproate finalizers are added")
+	// There should be 2 updates to add both the finalizers.
+	updatedIngress := GetIngressFromChan(t, fedIngressUpdateChan)
+	assert.True(t, ingressController.hasFinalizerFunc(updatedIngress, deletionhelper.FinalizerDeleteFromUnderlyingClusters))
+	updatedIngress = GetIngressFromChan(t, fedIngressUpdateChan)
+	assert.True(t, ingressController.hasFinalizerFunc(updatedIngress, api_v1.FinalizerOrphan), fmt.Sprintf("ingress does not have the orphan finalizer: %v", updatedIngress))
+	ing1 = *updatedIngress
 	t.Log("Checking that Ingress was correctly created in cluster 1")
 	createdIngress := GetIngressFromChan(t, cluster1IngressCreateChan)
 	assert.NotNil(t, createdIngress)
@@ -131,10 +141,14 @@ func TestIngressController(t *testing.T) {
 	t.Log("Checking that IP address gets transferred from cluster ingress to federated ingress")
 	createdIngress.Status.LoadBalancer.Ingress = append(createdIngress.Status.LoadBalancer.Ingress, api_v1.LoadBalancerIngress{IP: "1.2.3.4"})
 	cluster1IngressWatch.Modify(createdIngress)
-	updatedIngress := GetIngressFromChan(t, fedIngressUpdateChan)
+	// Wait for store to see the updated cluster ingress.
+	assert.NoError(t, WaitForStatusUpdate(ingressController.ingressFederatedInformer.GetTargetStore(),
+		cluster1.Name, types.NamespacedName{Namespace: createdIngress.Namespace, Name: createdIngress.Name}.String(), createdIngress.Status.LoadBalancer, wait.ForeverTestTimeout))
+	updatedIngress = GetIngressFromChan(t, fedIngressUpdateChan)
 	assert.NotNil(t, updatedIngress, "Cluster's ingress load balancer status was not correctly transferred to the federated ingress")
 	if updatedIngress != nil {
 		assert.True(t, reflect.DeepEqual(createdIngress.Status.LoadBalancer.Ingress, updatedIngress.Status.LoadBalancer.Ingress), fmt.Sprintf("Ingress IP was not transferred from cluster ingress to federated ingress.  %v is not equal to %v", createdIngress.Status.LoadBalancer.Ingress, updatedIngress.Status.LoadBalancer.Ingress))
+		t.Logf("expected: %v, actual: %v", createdIngress, updatedIngress)
 	}
 
 	// Test update federated ingress.
@@ -206,4 +220,17 @@ func NewConfigMap(uid string) *api_v1.ConfigMap {
 			uidKey: uid,
 		},
 	}
+}
+
+func WaitForStatusUpdate(store util.FederatedReadOnlyStore, clusterName, key string, desiredStatus api_v1.LoadBalancerStatus, timeout time.Duration) error {
+	retryInterval := 100 * time.Millisecond
+	err := wait.PollImmediate(retryInterval, timeout, func() (bool, error) {
+		obj, found, err := store.GetByKey(clusterName, key)
+		if !found || err != nil {
+			return false, err
+		}
+		ingress := obj.(*extensions_v1beta1.Ingress)
+		return reflect.DeepEqual(ingress.Status.LoadBalancer, desiredStatus), err
+	})
+	return err
 }
