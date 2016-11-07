@@ -54,24 +54,37 @@ const (
 // WriteStaticPodManifests builds manifest objects based on user provided configuration and then dumps it to disk
 // where kubelet will pick and schedule them.
 func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
+	volumes := []api.Volume{k8sVolume(cfg)}
+	volumeMounts := []api.VolumeMount{k8sVolumeMount()}
+
+	if isCertsVolumeMountNeeded() {
+		volumes = append(volumes, certsVolume(cfg))
+		volumeMounts = append(volumeMounts, certsVolumeMount())
+	}
+
+	if isPkiVolumeMountNeeded() {
+		volumes = append(volumes, pkiVolume(cfg))
+		volumeMounts = append(volumeMounts, pkiVolumeMount())
+	}
+
 	// Prepare static pod specs
 	staticPodSpecs := map[string]api.Pod{
 		kubeAPIServer: componentPod(api.Container{
 			Name:          kubeAPIServer,
 			Image:         images.GetCoreImage(images.KubeAPIServerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
 			Command:       getAPIServerCommand(cfg),
-			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), k8sVolumeMount()},
+			VolumeMounts:  volumeMounts,
 			LivenessProbe: componentProbe(8080, "/healthz"),
 			Resources:     componentResources("250m"),
-		}, certsVolume(cfg), k8sVolume(cfg)),
+		}, volumes...),
 		kubeControllerManager: componentPod(api.Container{
 			Name:          kubeControllerManager,
 			Image:         images.GetCoreImage(images.KubeControllerManagerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
 			Command:       getControllerManagerCommand(cfg),
-			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), k8sVolumeMount()},
+			VolumeMounts:  volumeMounts,
 			LivenessProbe: componentProbe(10252, "/healthz"),
 			Resources:     componentResources("200m"),
-		}, certsVolume(cfg), k8sVolume(cfg)),
+		}, volumes...),
 		kubeScheduler: componentPod(api.Container{
 			Name:          kubeScheduler,
 			Image:         images.GetCoreImage(images.KubeSchedulerImage, cfg, kubeadmapi.GlobalEnvParams.HyperkubeImage),
@@ -141,6 +154,12 @@ func etcdVolumeMount() api.VolumeMount {
 	}
 }
 
+func isCertsVolumeMountNeeded() bool {
+	// Always return true for now. We may add conditional logic here for images which do not require host mounting /etc/ssl
+	// hyperkube for example already has valid ca-certificates installed
+	return true
+}
+
 // certsVolume exposes host SSL certificates to pod containers.
 func certsVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
 	return api.Volume{
@@ -159,9 +178,35 @@ func certsVolumeMount() api.VolumeMount {
 	}
 }
 
-func k8sVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
+func isPkiVolumeMountNeeded() bool {
+	// On some systems were we host-mount /etc/ssl/certs, it is also required to mount /etc/pki. This is needed
+	// due to symlinks pointing from files in /etc/ssl/certs into /etc/pki/
+	if _, err := os.Stat("/etc/pki"); err == nil {
+		return true
+	}
+	return false
+}
+
+func pkiVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
 	return api.Volume{
 		Name: "pki",
+		VolumeSource: api.VolumeSource{
+			// TODO(phase1+) make path configurable
+			HostPath: &api.HostPathVolumeSource{Path: "/etc/pki"},
+		},
+	}
+}
+
+func pkiVolumeMount() api.VolumeMount {
+	return api.VolumeMount{
+		Name:      "pki",
+		MountPath: "/etc/pki",
+	}
+}
+
+func k8sVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
+	return api.Volume{
+		Name: "k8s",
 		VolumeSource: api.VolumeSource{
 			HostPath: &api.HostPathVolumeSource{Path: kubeadmapi.GlobalEnvParams.KubernetesDir},
 		},
@@ -170,7 +215,7 @@ func k8sVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
 
 func k8sVolumeMount() api.VolumeMount {
 	return api.VolumeMount{
-		Name:      "pki",
+		Name:      "k8s",
 		MountPath: "/etc/kubernetes/",
 		ReadOnly:  true,
 	}
