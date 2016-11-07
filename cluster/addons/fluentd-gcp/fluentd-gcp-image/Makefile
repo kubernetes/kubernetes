@@ -26,25 +26,14 @@
 # 6. When PR is approved make the gcr.io version of the image: make build push
 # 7. Revert the referendes to kubernetes/fluentd-gcp:$(TAG) to gcr.io/google_containers/fluentd-gcp:$(TAG)
 
-.PHONY:	kbuild kpush
+.PHONY:	build push
 
-TAG = 1.25
-
-# Rules for building the test image for deployment to Dockerhub with user kubernetes.
-
-kbuild:
-	docker build -t kubernetes/fluentd-gcp:$(TAG) .
-
-
-kpush:
-	docker push kubernetes/fluentd-gcp:$(TAG)
-
-
-# Rules for building the real image for deployment to gcr.io
+PREFIX=gcr.io/google_containers
+TAG = 1.26
 
 build:
-	docker build -t gcr.io/google_containers/fluentd-gcp:$(TAG) .
+	docker build -t $(PREFIX)/fluentd-gcp:$(TAG) .
 
 
 push:
-	gcloud docker -- push gcr.io/google_containers/fluentd-gcp:$(TAG)
+	gcloud docker -- push $(PREFIX)/fluentd-gcp:$(TAG)
