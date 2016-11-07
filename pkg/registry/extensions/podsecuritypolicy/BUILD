@@ -40,7 +40,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/registry/extensions/podsecuritypolicy/etcd:all-srcs",
+        "//pkg/registry/extensions/podsecuritypolicy/storage:all-srcs",
     ],
     tags = ["automanaged"],
 )

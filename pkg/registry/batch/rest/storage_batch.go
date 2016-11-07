@@ -23,8 +23,8 @@ import (
 	batchapiv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	batchapiv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/genericapiserver"
-	cronjobetcd "k8s.io/kubernetes/pkg/registry/batch/cronjob/etcd"
-	jobetcd "k8s.io/kubernetes/pkg/registry/batch/job/etcd"
+	cronjobstore "k8s.io/kubernetes/pkg/registry/batch/cronjob/storage"
+	jobstore "k8s.io/kubernetes/pkg/registry/batch/job/storage"
 	"k8s.io/kubernetes/pkg/registry/generic"
 )
 
@@ -54,7 +54,7 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource genericapiserver.
 
 	storage := map[string]rest.Storage{}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("jobs")) {
-		jobsStorage, jobsStatusStorage := jobetcd.NewREST(restOptionsGetter)
+		jobsStorage, jobsStatusStorage := jobstore.NewREST(restOptionsGetter)
 		storage["jobs"] = jobsStorage
 		storage["jobs/status"] = jobsStatusStorage
 	}
@@ -66,12 +66,12 @@ func (p RESTStorageProvider) v2alpha1Storage(apiResourceConfigSource genericapis
 
 	storage := map[string]rest.Storage{}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("jobs")) {
-		jobsStorage, jobsStatusStorage := jobetcd.NewREST(restOptionsGetter)
+		jobsStorage, jobsStatusStorage := jobstore.NewREST(restOptionsGetter)
 		storage["jobs"] = jobsStorage
 		storage["jobs/status"] = jobsStatusStorage
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("cronjobs")) {
-		cronJobsStorage, cronJobsStatusStorage := cronjobetcd.NewREST(restOptionsGetter)
+		cronJobsStorage, cronJobsStatusStorage := cronjobstore.NewREST(restOptionsGetter)
 		storage["cronjobs"] = cronJobsStorage
 		storage["cronjobs/status"] = cronJobsStatusStorage
 		storage["scheduledjobs"] = cronJobsStorage

@@ -84,9 +84,9 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/registry/core/service/allocator:all-srcs",
-        "//pkg/registry/core/service/etcd:all-srcs",
         "//pkg/registry/core/service/ipallocator:all-srcs",
         "//pkg/registry/core/service/portallocator:all-srcs",
+        "//pkg/registry/core/service/storage:all-srcs",
     ],
     tags = ["automanaged"],
 )

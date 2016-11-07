@@ -38,28 +38,28 @@ import (
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/registry/core/componentstatus"
-	configmapetcd "k8s.io/kubernetes/pkg/registry/core/configmap/etcd"
-	controlleretcd "k8s.io/kubernetes/pkg/registry/core/controller/etcd"
+	configmapstore "k8s.io/kubernetes/pkg/registry/core/configmap/storage"
+	controllerstore "k8s.io/kubernetes/pkg/registry/core/controller/storage"
 	"k8s.io/kubernetes/pkg/registry/core/endpoint"
-	endpointsetcd "k8s.io/kubernetes/pkg/registry/core/endpoint/etcd"
-	eventetcd "k8s.io/kubernetes/pkg/registry/core/event/etcd"
-	limitrangeetcd "k8s.io/kubernetes/pkg/registry/core/limitrange/etcd"
-	namespaceetcd "k8s.io/kubernetes/pkg/registry/core/namespace/etcd"
-	nodeetcd "k8s.io/kubernetes/pkg/registry/core/node/etcd"
-	pvetcd "k8s.io/kubernetes/pkg/registry/core/persistentvolume/etcd"
-	pvcetcd "k8s.io/kubernetes/pkg/registry/core/persistentvolumeclaim/etcd"
-	podetcd "k8s.io/kubernetes/pkg/registry/core/pod/etcd"
-	podtemplateetcd "k8s.io/kubernetes/pkg/registry/core/podtemplate/etcd"
+	endpointsstore "k8s.io/kubernetes/pkg/registry/core/endpoint/storage"
+	eventstore "k8s.io/kubernetes/pkg/registry/core/event/storage"
+	limitrangestore "k8s.io/kubernetes/pkg/registry/core/limitrange/storage"
+	namespacestore "k8s.io/kubernetes/pkg/registry/core/namespace/storage"
+	nodestore "k8s.io/kubernetes/pkg/registry/core/node/storage"
+	pvstore "k8s.io/kubernetes/pkg/registry/core/persistentvolume/storage"
+	pvcstore "k8s.io/kubernetes/pkg/registry/core/persistentvolumeclaim/storage"
+	podstore "k8s.io/kubernetes/pkg/registry/core/pod/storage"
+	podtemplatestore "k8s.io/kubernetes/pkg/registry/core/podtemplate/storage"
 	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
-	resourcequotaetcd "k8s.io/kubernetes/pkg/registry/core/resourcequota/etcd"
-	secretetcd "k8s.io/kubernetes/pkg/registry/core/secret/etcd"
+	resourcequotastore "k8s.io/kubernetes/pkg/registry/core/resourcequota/storage"
+	secretstore "k8s.io/kubernetes/pkg/registry/core/secret/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service"
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
-	etcdallocator "k8s.io/kubernetes/pkg/registry/core/service/allocator/etcd"
-	serviceetcd "k8s.io/kubernetes/pkg/registry/core/service/etcd"
+	serviceallocator "k8s.io/kubernetes/pkg/registry/core/service/allocator/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
-	serviceaccountetcd "k8s.io/kubernetes/pkg/registry/core/serviceaccount/etcd"
+	servicestore "k8s.io/kubernetes/pkg/registry/core/service/storage"
+	serviceaccountstore "k8s.io/kubernetes/pkg/registry/core/serviceaccount/storage"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 )
@@ -113,36 +113,36 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	}
 	restStorage := LegacyRESTStorage{}
 
-	podTemplateStorage := podtemplateetcd.NewREST(restOptionsGetter)
+	podTemplateStorage := podtemplatestore.NewREST(restOptionsGetter)
 
-	eventStorage := eventetcd.NewREST(restOptionsGetter, uint64(c.EventTTL.Seconds()))
-	limitRangeStorage := limitrangeetcd.NewREST(restOptionsGetter)
+	eventStorage := eventstore.NewREST(restOptionsGetter, uint64(c.EventTTL.Seconds()))
+	limitRangeStorage := limitrangestore.NewREST(restOptionsGetter)
 
-	resourceQuotaStorage, resourceQuotaStatusStorage := resourcequotaetcd.NewREST(restOptionsGetter)
-	secretStorage := secretetcd.NewREST(restOptionsGetter)
-	serviceAccountStorage := serviceaccountetcd.NewREST(restOptionsGetter)
-	persistentVolumeStorage, persistentVolumeStatusStorage := pvetcd.NewREST(restOptionsGetter)
-	persistentVolumeClaimStorage, persistentVolumeClaimStatusStorage := pvcetcd.NewREST(restOptionsGetter)
-	configMapStorage := configmapetcd.NewREST(restOptionsGetter)
+	resourceQuotaStorage, resourceQuotaStatusStorage := resourcequotastore.NewREST(restOptionsGetter)
+	secretStorage := secretstore.NewREST(restOptionsGetter)
+	serviceAccountStorage := serviceaccountstore.NewREST(restOptionsGetter)
+	persistentVolumeStorage, persistentVolumeStatusStorage := pvstore.NewREST(restOptionsGetter)
+	persistentVolumeClaimStorage, persistentVolumeClaimStatusStorage := pvcstore.NewREST(restOptionsGetter)
+	configMapStorage := configmapstore.NewREST(restOptionsGetter)
 
-	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage := namespaceetcd.NewREST(restOptionsGetter)
+	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage := namespacestore.NewREST(restOptionsGetter)
 
-	endpointsStorage := endpointsetcd.NewREST(restOptionsGetter)
+	endpointsStorage := endpointsstore.NewREST(restOptionsGetter)
 	endpointRegistry := endpoint.NewRegistry(endpointsStorage)
 
-	nodeStorage, err := nodeetcd.NewStorage(restOptionsGetter, c.KubeletClientConfig, c.ProxyTransport)
+	nodeStorage, err := nodestore.NewStorage(restOptionsGetter, c.KubeletClientConfig, c.ProxyTransport)
 	if err != nil {
 		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
 	}
 
-	podStorage := podetcd.NewStorage(
+	podStorage := podstore.NewStorage(
 		restOptionsGetter,
 		nodeStorage.KubeletConnectionInfo,
 		c.ProxyTransport,
 		podDisruptionClient,
 	)
 
-	serviceRESTStorage, serviceStatusStorage := serviceetcd.NewREST(restOptionsGetter)
+	serviceRESTStorage, serviceStatusStorage := servicestore.NewREST(restOptionsGetter)
 	serviceRegistry := service.NewRegistry(serviceRESTStorage)
 
 	var serviceClusterIPRegistry rangeallocation.RangeRegistry
@@ -159,7 +159,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	ServiceClusterIPAllocator := ipallocator.NewAllocatorCIDRRange(&serviceClusterIPRange, func(max int, rangeSpec string) allocator.Interface {
 		mem := allocator.NewAllocationMap(max, rangeSpec)
 		// TODO etcdallocator package to return a storage interface via the storageFactory
-		etcd := etcdallocator.NewEtcd(mem, "/ranges/serviceips", api.Resource("serviceipallocations"), serviceStorageConfig)
+		etcd := serviceallocator.NewEtcd(mem, "/ranges/serviceips", api.Resource("serviceipallocations"), serviceStorageConfig)
 		serviceClusterIPRegistry = etcd
 		return etcd
 	})
@@ -169,13 +169,13 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	ServiceNodePortAllocator := portallocator.NewPortAllocatorCustom(c.ServiceNodePortRange, func(max int, rangeSpec string) allocator.Interface {
 		mem := allocator.NewAllocationMap(max, rangeSpec)
 		// TODO etcdallocator package to return a storage interface via the storageFactory
-		etcd := etcdallocator.NewEtcd(mem, "/ranges/servicenodeports", api.Resource("servicenodeportallocations"), serviceStorageConfig)
+		etcd := serviceallocator.NewEtcd(mem, "/ranges/servicenodeports", api.Resource("servicenodeportallocations"), serviceStorageConfig)
 		serviceNodePortRegistry = etcd
 		return etcd
 	})
 	restStorage.ServiceNodePortAllocator = serviceNodePortRegistry
 
-	controllerStorage := controlleretcd.NewStorage(restOptionsGetter)
+	controllerStorage := controllerstore.NewStorage(restOptionsGetter)
 
 	serviceRest := service.NewStorage(serviceRegistry, endpointRegistry, ServiceClusterIPAllocator, ServiceNodePortAllocator, c.ProxyTransport)
 

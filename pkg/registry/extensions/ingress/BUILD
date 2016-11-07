@@ -55,7 +55,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/registry/extensions/ingress/etcd:all-srcs",
+        "//pkg/registry/extensions/ingress/storage:all-srcs",
     ],
     tags = ["automanaged"],
 )

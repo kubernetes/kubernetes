@@ -40,7 +40,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/registry/core/service/allocator/etcd:all-srcs",
+        "//pkg/registry/core/service/allocator/storage:all-srcs",
     ],
     tags = ["automanaged"],
 )
