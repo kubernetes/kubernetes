@@ -217,7 +217,7 @@ func getTestLoadBalancer(services ...api.Service) network.LoadBalancer {
 				Name: to.StringPtr(ruleName),
 				Properties: &network.LoadBalancingRulePropertiesFormat{
 					FrontendPort: to.Int32Ptr(port.Port),
-					BackendPort:  to.Int32Ptr(port.NodePort),
+					BackendPort:  to.Int32Ptr(port.Port),
 				},
 			})
 			probes = append(probes, network.Probe{
@@ -248,7 +248,7 @@ func getTestSecurityGroup(services ...api.Service) network.SecurityGroup {
 			rules = append(rules, network.SecurityRule{
 				Name: to.StringPtr(ruleName),
 				Properties: &network.SecurityRulePropertiesFormat{
-					DestinationPortRange: to.StringPtr(fmt.Sprintf("%d", port.NodePort)),
+					DestinationPortRange: to.StringPtr(fmt.Sprintf("%d", port.Port)),
 				},
 			})
 		}
@@ -273,13 +273,13 @@ func validateLoadBalancer(t *testing.T, loadBalancer network.LoadBalancer, servi
 			for _, actualRule := range *loadBalancer.Properties.LoadBalancingRules {
 				if strings.EqualFold(*actualRule.Name, wantedRuleName) &&
 					*actualRule.Properties.FrontendPort == wantedRule.Port &&
-					*actualRule.Properties.BackendPort == wantedRule.NodePort {
+					*actualRule.Properties.BackendPort == wantedRule.Port {
 					foundRule = true
 					break
 				}
 			}
 			if !foundRule {
-				t.Errorf("Expected rule but didn't find it: %q", wantedRuleName)
+				t.Errorf("Expected load balancer rule but didn't find it: %q", wantedRuleName)
 			}
 
 			foundProbe := false
@@ -291,7 +291,7 @@ func validateLoadBalancer(t *testing.T, loadBalancer network.LoadBalancer, servi
 				}
 			}
 			if !foundProbe {
-				t.Errorf("Expected probe but didn't find it: %q", wantedRuleName)
+				t.Errorf("Expected loadbalancer probe but didn't find it: %q", wantedRuleName)
 			}
 		}
 	}
@@ -315,13 +315,13 @@ func validateSecurityGroup(t *testing.T, securityGroup network.SecurityGroup, se
 			foundRule := false
 			for _, actualRule := range *securityGroup.Properties.SecurityRules {
 				if strings.EqualFold(*actualRule.Name, wantedRuleName) &&
-					*actualRule.Properties.DestinationPortRange == fmt.Sprintf("%d", wantedRule.NodePort) {
+					*actualRule.Properties.DestinationPortRange == fmt.Sprintf("%d", wantedRule.Port) {
 					foundRule = true
 					break
 				}
 			}
 			if !foundRule {
-				t.Errorf("Expected rule but didn't find it: %q", wantedRuleName)
+				t.Errorf("Expected security group rule but didn't find it: %q", wantedRuleName)
 			}
 		}
 	}
