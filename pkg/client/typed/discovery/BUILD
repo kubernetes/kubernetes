@@ -32,6 +32,7 @@ go_library(
         "//pkg/version:go_default_library",
         "//plugin/pkg/client/auth:go_default_library",
         "//vendor:github.com/emicklei/go-restful/swagger",
+        "//vendor:github.com/golang/glog",
     ],
 )
 
@@ -44,11 +45,15 @@ go_test(
     library = "go_default_library",
     tags = ["automanaged"],
     deps = [
+        "//pkg/api/errors:go_default_library",
         "//pkg/api/unversioned:go_default_library",
         "//pkg/api/v1:go_default_library",
+        "//pkg/apimachinery/registered:go_default_library",
         "//pkg/client/restclient:go_default_library",
+        "//pkg/client/restclient/fake:go_default_library",
         "//pkg/version:go_default_library",
         "//vendor:github.com/emicklei/go-restful/swagger",
+        "//vendor:github.com/stretchr/testify/assert",
     ],
 )
 
