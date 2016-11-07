@@ -52,7 +52,7 @@ func TestPodAdmission(t *testing.T) {
 	}
 
 	tests := []struct {
-		defaultNodeSelector             string
+		defaultClusterNodeSelector      string
 		namespaceNodeSelector           string
 		whitelist                       string
 		podNodeSelector                 map[string]string
@@ -62,7 +62,7 @@ func TestPodAdmission(t *testing.T) {
 		testName                        string
 	}{
 		{
-			defaultNodeSelector:             "",
+			defaultClusterNodeSelector:      "",
 			podNodeSelector:                 map[string]string{},
 			mergedNodeSelector:              labels.Set{},
 			ignoreTestNamespaceNodeSelector: true,
@@ -70,7 +70,7 @@ func TestPodAdmission(t *testing.T) {
 			testName: "No node selectors",
 		},
 		{
-			defaultNodeSelector:             "infra = false",
+			defaultClusterNodeSelector:      "infra = false",
 			podNodeSelector:                 map[string]string{},
 			mergedNodeSelector:              labels.Set{"infra": "false"},
 			ignoreTestNamespaceNodeSelector: true,
@@ -78,67 +78,67 @@ func TestPodAdmission(t *testing.T) {
 			testName: "Default node selector and no conflicts",
 		},
 		{
-			defaultNodeSelector:   "",
-			namespaceNodeSelector: " infra = false ",
-			podNodeSelector:       map[string]string{},
-			mergedNodeSelector:    labels.Set{"infra": "false"},
-			admit:                 true,
-			testName:              "TestNamespace node selector with whitespaces and no conflicts",
+			defaultClusterNodeSelector: "",
+			namespaceNodeSelector:      " infra = false ",
+			podNodeSelector:            map[string]string{},
+			mergedNodeSelector:         labels.Set{"infra": "false"},
+			admit:                      true,
+			testName:                   "TestNamespace node selector with whitespaces and no conflicts",
 		},
 		{
-			defaultNodeSelector:   "infra = false",
-			namespaceNodeSelector: "infra=true",
-			podNodeSelector:       map[string]string{},
-			mergedNodeSelector:    labels.Set{"infra": "true"},
-			admit:                 true,
-			testName:              "Default and namespace node selector, no conflicts",
+			defaultClusterNodeSelector: "infra = false",
+			namespaceNodeSelector:      "infra=true",
+			podNodeSelector:            map[string]string{},
+			mergedNodeSelector:         labels.Set{"infra": "true"},
+			admit:                      true,
+			testName:                   "Default and namespace node selector, no conflicts",
 		},
 		{
-			defaultNodeSelector:   "infra = false",
-			namespaceNodeSelector: "",
-			podNodeSelector:       map[string]string{},
-			mergedNodeSelector:    labels.Set{},
-			admit:                 true,
-			testName:              "Empty namespace node selector and no conflicts",
+			defaultClusterNodeSelector: "infra = false",
+			namespaceNodeSelector:      "",
+			podNodeSelector:            map[string]string{},
+			mergedNodeSelector:         labels.Set{},
+			admit:                      true,
+			testName:                   "Empty namespace node selector and no conflicts",
 		},
 		{
-			defaultNodeSelector:   "infra = false",
-			namespaceNodeSelector: "infra=true",
-			podNodeSelector:       map[string]string{"env": "test"},
-			mergedNodeSelector:    labels.Set{"infra": "true", "env": "test"},
-			admit:                 true,
-			testName:              "TestNamespace and pod node selector, no conflicts",
+			defaultClusterNodeSelector: "infra = false",
+			namespaceNodeSelector:      "infra=true",
+			podNodeSelector:            map[string]string{"env": "test"},
+			mergedNodeSelector:         labels.Set{"infra": "true", "env": "test"},
+			admit:                      true,
+			testName:                   "TestNamespace and pod node selector, no conflicts",
 		},
 		{
-			defaultNodeSelector:   "env = test",
-			namespaceNodeSelector: "infra=true",
-			podNodeSelector:       map[string]string{"infra": "false"},
-			admit:                 false,
-			testName:              "Conflicting pod and namespace node selector, one label",
+			defaultClusterNodeSelector: "env = test",
+			namespaceNodeSelector:      "infra=true",
+			podNodeSelector:            map[string]string{"infra": "false"},
+			admit:                      false,
+			testName:                   "Conflicting pod and namespace node selector, one label",
 		},
 		{
-			defaultNodeSelector:   "env=dev",
-			namespaceNodeSelector: "infra=false, env = test",
-			podNodeSelector:       map[string]string{"env": "dev", "color": "blue"},
-			admit:                 false,
-			testName:              "Conflicting pod and namespace node selector, multiple labels",
+			defaultClusterNodeSelector: "env=dev",
+			namespaceNodeSelector:      "infra=false, env = test",
+			podNodeSelector:            map[string]string{"env": "dev", "color": "blue"},
+			admit:                      false,
+			testName:                   "Conflicting pod and namespace node selector, multiple labels",
 		},
 		{
-			defaultNodeSelector:   "env=dev",
-			namespaceNodeSelector: "infra=false, env = dev",
-			whitelist:             "env=dev, infra=false, color=blue",
-			podNodeSelector:       map[string]string{"env": "dev", "color": "blue"},
-			mergedNodeSelector:    labels.Set{"infra": "false", "env": "dev", "color": "blue"},
-			admit:                 true,
-			testName:              "Merged pod node selectors satisfy the whitelist",
+			defaultClusterNodeSelector: "env=dev",
+			namespaceNodeSelector:      "infra=false, env = dev",
+			whitelist:                  "env=dev, infra=false, color=blue",
+			podNodeSelector:            map[string]string{"env": "dev", "color": "blue"},
+			mergedNodeSelector:         labels.Set{"infra": "false", "env": "dev", "color": "blue"},
+			admit:                      true,
+			testName:                   "Merged pod node selectors satisfy the whitelist",
 		},
 		{
-			defaultNodeSelector:   "env=dev",
-			namespaceNodeSelector: "infra=false, env = dev",
-			whitelist:             "env=dev, infra=true, color=blue",
-			podNodeSelector:       map[string]string{"env": "dev", "color": "blue"},
-			admit:                 false,
-			testName:              "Merged pod node selectors conflict with the whitelist",
+			defaultClusterNodeSelector: "env=dev",
+			namespaceNodeSelector:      "infra=false, env = dev",
+			whitelist:                  "env=dev, infra=true, color=blue",
+			podNodeSelector:            map[string]string{"env": "dev", "color": "blue"},
+			admit:                      false,
+			testName:                   "Merged pod node selectors conflict with the whitelist",
 		},
 	}
 	for _, test := range tests {
@@ -146,9 +146,9 @@ func TestPodAdmission(t *testing.T) {
 			namespace.ObjectMeta.Annotations = map[string]string{"scheduler.alpha.kubernetes.io/node-selector": test.namespaceNodeSelector}
 			handler.namespaceInformer.GetStore().Update(namespace)
 		}
-		handler.clusterNodeSelectors = make(map[string]string)
-		handler.clusterNodeSelectors["clusterDefaultNodeSelector"] = test.defaultNodeSelector
-		handler.clusterNodeSelectors[namespace.Name] = test.whitelist
+		handler.clusterNodeSelectors = make(map[string]labels.Set)
+		handler.clusterNodeSelectors["clusterDefaultNodeSelector"], _ = labels.ConvertSelectorToLabelsMap(test.defaultClusterNodeSelector)
+		handler.clusterNodeSelectors[namespace.Name], _ = labels.ConvertSelectorToLabelsMap(test.whitelist)
 		pod.Spec = api.PodSpec{NodeSelector: test.podNodeSelector}
 
 		err := handler.Admit(admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
