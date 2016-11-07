@@ -133,6 +133,17 @@ func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 	return scheme, mapper, codec
 }
 
+type fakeCachedDiscoveryClient struct {
+	discovery.DiscoveryInterface
+}
+
+func (d *fakeCachedDiscoveryClient) Fresh() bool {
+	return true
+}
+
+func (d *fakeCachedDiscoveryClient) Invalidate() {
+}
+
 type TestFactory struct {
 	Mapper       meta.RESTMapper
 	Typer        runtime.ObjectTyper
@@ -162,6 +173,14 @@ func NewTestFactory() (cmdutil.Factory, *TestFactory, runtime.Codec, runtime.Neg
 		tf:    t,
 		Codec: codec,
 	}, t, codec, negotiatedSerializer
+}
+
+func (f *FakeFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(f.tf.ClientConfig)
+	if err != nil {
+		return nil, err
+	}
+	return &fakeCachedDiscoveryClient{DiscoveryInterface: discoveryClient}, nil
 }
 
 func (f *FakeFactory) FlagSet() *pflag.FlagSet {
