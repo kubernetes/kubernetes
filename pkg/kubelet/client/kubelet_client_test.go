@@ -19,13 +19,13 @@ package client
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/client/restclient"
 )
 
 // Ensure a node client can be used as a NodeGetter.
 // This allows anyone with a node client to easily construct a NewNodeConnectionInfoGetter.
-var _ = NodeGetter(internalversion.NodeInterface(nil))
+var _ = NodeGetter(unversionedcore.NodeInterface(nil))
 
 func TestMakeTransportInvalid(t *testing.T) {
 	config := &KubeletClientConfig{
