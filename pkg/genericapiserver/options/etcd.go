@@ -70,7 +70,7 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 		"List of etcd servers to connect with (scheme://ip:port), comma separated.")
 
 	fs.StringVar(&s.StorageConfig.Prefix, "etcd-prefix", s.StorageConfig.Prefix,
-		"The prefix for all resource paths in etcd.")
+		"The prefix to prepend to all resource paths in etcd.")
 
 	fs.StringVar(&s.StorageConfig.KeyFile, "etcd-keyfile", s.StorageConfig.KeyFile,
 		"SSL key file used to secure etcd communication.")
