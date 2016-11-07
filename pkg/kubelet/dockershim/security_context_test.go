@@ -61,6 +61,9 @@ func TestModifyContainerConfig(t *testing.T) {
 
 func TestModifyHostConfig(t *testing.T) {
 	priv := true
+	setNetworkHC := &dockercontainer.HostConfig{
+		NetworkMode: "none",
+	}
 	setPrivSC := &runtimeapi.LinuxContainerSecurityContext{}
 	setPrivSC.Privileged = &priv
 	setPrivHC := &dockercontainer.HostConfig{
@@ -91,6 +94,11 @@ func TestModifyHostConfig(t *testing.T) {
 			name:     "fully set container.SecurityContext",
 			sc:       fullValidSecurityContext(),
 			expected: fullValidHostConfig(),
+		},
+		{
+			name:     "empty container.SecurityContext",
+			sc:       &runtimeapi.LinuxContainerSecurityContext{},
+			expected: setNetworkHC,
 		},
 		{
 			name:     "container.SecurityContext.Privileged",

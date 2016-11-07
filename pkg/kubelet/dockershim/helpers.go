@@ -133,8 +133,6 @@ func generateMountBindings(mounts []*runtimeApi.Mount) (result []string) {
 		// does not provide an SELinux context relabeling will label the volume with
 		// the container's randomly allocated MCS label. This would restrict access
 		// to the volume to the container which mounts it first.
-		// TODO: always relabel if SELinux is enabled and the volume support relabeling
-		// (refer #33951 and #33663).
 		if m.GetSelinuxRelabel() {
 			if readOnly {
 				bind += ",Z"

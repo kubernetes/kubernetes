@@ -36,16 +36,11 @@ func applySandboxSecurityContext(lc *runtimeapi.LinuxPodSandboxConfig, config *d
 	var sc *runtimeapi.LinuxContainerSecurityContext
 	if lc.SecurityContext != nil {
 		sc = &runtimeapi.LinuxContainerSecurityContext{
-			// TODO: We skip application of supplemental groups to the
-			// sandbox container to work around a runc issue which
-			// requires containers to have the '/etc/group'. For more
-			// information see: https://github.com/opencontainers/runc/pull/313.
-			// This can be removed once the fix makes it into the required
-			// version of docker.
-			RunAsUser:        lc.SecurityContext.RunAsUser,
-			ReadonlyRootfs:   lc.SecurityContext.ReadonlyRootfs,
-			SelinuxOptions:   lc.SecurityContext.SelinuxOptions,
-			NamespaceOptions: lc.SecurityContext.NamespaceOptions,
+			SupplementalGroups: lc.SecurityContext.SupplementalGroups,
+			RunAsUser:          lc.SecurityContext.RunAsUser,
+			ReadonlyRootfs:     lc.SecurityContext.ReadonlyRootfs,
+			SelinuxOptions:     lc.SecurityContext.SelinuxOptions,
+			NamespaceOptions:   lc.SecurityContext.NamespaceOptions,
 		}
 	}
 
@@ -128,7 +123,7 @@ func modifyNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, sandboxID string
 	if sandboxID == "" {
 		modifyHostNetworkOptionForSandbox(hostNetwork, hostConfig)
 	} else {
-		// Set for container is sandboxID is provided.
+		// Set for container if sandboxID is provided.
 		modifyHostNetworkOptionForContainer(hostNetwork, sandboxID, hostConfig)
 	}
 }
