@@ -431,7 +431,7 @@ func (s *ServiceController) ensureClusterService(cachedService *cachedService, c
 			}
 
 			if util.ObjectMetaAndSpecEquivalent(svc, service) {
-				glog.V(4).Infof("Service %q in cluster %q does not need an update: cluster service is equivalent to federated service", svc, clusterName)
+				glog.V(4).Infof("Service %q in cluster %q does not need an update: cluster service is equivalent to federated service %q", svc, clusterName, service)
 			} else {
 				svc.Spec = service.Spec
 				_, err = client.Core().Services(svc.Namespace).Update(svc)
@@ -608,6 +608,9 @@ func portEqualExcludeNodePort(x, y *v1.ServicePort) bool {
 	}
 
 	if x.Port != y.Port {
+		return false
+	}
+	if x.TargetPort != y.Port {
 		return false
 	}
 	return true
