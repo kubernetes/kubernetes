@@ -45,6 +45,7 @@ type ImageOptions struct {
 	ShortOutput bool
 	All         bool
 	Record      bool
+	Output      string
 	ChangeCause string
 	Local       bool
 	Cmd         *cobra.Command
@@ -104,6 +105,7 @@ func NewCmdImage(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().BoolVar(&options.Local, "local", false, "If true, set image will NOT contact api-server but run locally.")
 	cmdutil.AddRecordFlag(cmd)
+	cmdutil.AddDryRunFlag(cmd)
 	return cmd
 }
 
@@ -115,6 +117,7 @@ func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	o.Record = cmdutil.GetRecordFlag(cmd)
 	o.ChangeCause = f.Command()
 	o.PrintObject = f.PrintObject
+	o.Output = cmdutil.GetFlagString(cmd, "output")
 	o.Cmd = cmd
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
@@ -198,7 +201,7 @@ func (o *ImageOptions) Run() error {
 			continue
 		}
 
-		if o.Local {
+		if len(o.Output) > 0 || o.Local || cmdutil.GetDryRunFlag(o.Cmd) {
 			return o.PrintObject(o.Cmd, o.Mapper, info.Object, o.Out)
 		}
 
