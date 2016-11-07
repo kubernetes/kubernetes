@@ -71,7 +71,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 		})
 
 		Context("when it is exec hook", func() {
-			It("should execute poststart exec hook properly", func() {
+			It("should execute poststart exec hook properly [Conformance]", func() {
 				podWithHook := getLifecycleHookTestPod("pod-with-poststart-exec-hook",
 					// Block forever
 					[]string{"tail", "-f", "/dev/null"},
@@ -84,7 +84,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 				testPodWithHook(podWithHook)
 			})
 
-			It("should execute prestop exec hook properly", func() {
+			It("should execute prestop exec hook properly [Conformance]", func() {
 				podWithHook := getLifecycleHookTestPod("pod-with-prestop-exec-hook",
 					// Block forever
 					[]string{"tail", "-f", "/dev/null"},
@@ -117,7 +117,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 				podHandleHookRequest = podClient.CreateSync(podHandleHookRequest)
 				targetIP = podHandleHookRequest.Status.PodIP
 			})
-			It("should execute poststart http hook properly", func() {
+			It("should execute poststart http hook properly [Conformance]", func() {
 				podWithHook := getLifecycleHookTestPod("pod-with-poststart-http-hook",
 					// Block forever
 					[]string{"tail", "-f", "/dev/null"},
@@ -132,7 +132,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 				}
 				testPodWithHook(podWithHook)
 			})
-			It("should execute prestop http hook properly", func() {
+			It("should execute prestop http hook properly [Conformance]", func() {
 				podWithHook := getLifecycleHookTestPod("pod-with-prestop-http-hook",
 					// Block forever
 					[]string{"tail", "-f", "/dev/null"},
