@@ -18,6 +18,7 @@ package fake
 
 import (
 	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/testing"
 )
 
@@ -29,4 +30,8 @@ func (c *FakeNodes) PatchStatus(nodeName string, data []byte) (*v1.Node, error) 
 	}
 
 	return obj.(*v1.Node), err
+}
+
+func (c *FakeNodes) ProxyGet(scheme, name, port, path string, params map[string]string) rest.ResponseWrapper {
+	return c.Fake.InvokesProxy(testing.NewProxyGetAction(NodesResource, c.ns, scheme, name, port, path, params))
 }
