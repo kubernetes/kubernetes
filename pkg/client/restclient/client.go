@@ -62,8 +62,7 @@ type RESTClient struct {
 	// base is the root URL for all invocations of the client
 	base *url.URL
 	// VersionedAPIPath is a path segment connecting the base URL to the resource root
-	// TODO: Change it back to private when we make clientset work for eviction subresource
-	VersionedAPIPath string
+	versionedAPIPath string
 
 	// contentConfig is the information used to communicate with the server.
 	contentConfig ContentConfig
@@ -119,7 +118,7 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ContentConf
 	}
 	return &RESTClient{
 		base:             &base,
-		VersionedAPIPath: versionedAPIPath,
+		versionedAPIPath: versionedAPIPath,
 		contentConfig:    config,
 		serializers:      *serializers,
 		createBackoffMgr: readExpBackoffConfig,
@@ -223,9 +222,9 @@ func (c *RESTClient) Verb(verb string) *Request {
 	backoff := c.createBackoffMgr()
 
 	if c.Client == nil {
-		return NewRequest(nil, verb, c.base, c.VersionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle)
+		return NewRequest(nil, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle)
 	}
-	return NewRequest(c.Client, verb, c.base, c.VersionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle)
+	return NewRequest(c.Client, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle)
 }
 
 // Post begins a POST request. Short for c.Verb("POST").

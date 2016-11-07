@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
 	"k8s.io/kubernetes/pkg/client/restclient/fake"
 	"k8s.io/kubernetes/pkg/conversion"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
@@ -489,6 +488,23 @@ func TestDrain(t *testing.T) {
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					m := &MyReq{req}
 					switch {
+					case req.Method == "GET" && req.URL.Path == "/api":
+						apiVersions := unversioned.APIVersions{
+							Versions: []string{"v1"},
+						}
+						return genResponseWithJsonEncodedBody(apiVersions)
+					case req.Method == "GET" && req.URL.Path == "/apis":
+						groupList := unversioned.APIGroupList{
+							Groups: []unversioned.APIGroup{
+								{
+									Name: "policy",
+									PreferredVersion: unversioned.GroupVersionForDiscovery{
+										GroupVersion: "policy/v1beta1",
+									},
+								},
+							},
+						}
+						return genResponseWithJsonEncodedBody(groupList)
 					case req.Method == "GET" && req.URL.Path == "/api/v1":
 						resourceList := unversioned.APIResourceList{
 							GroupVersion: "v1",
@@ -496,16 +512,12 @@ func TestDrain(t *testing.T) {
 						if testEviction {
 							resourceList.APIResources = []unversioned.APIResource{
 								{
-									Name: internalversion.EvictionSubresource,
-									Kind: internalversion.EvictionKind,
+									Name: EvictionSubresource,
+									Kind: EvictionKind,
 								},
 							}
 						}
-						resp, err := genResponseWithJsonEncodedBody(resourceList)
-						if err != nil {
-							return nil, err
-						}
-						return resp, nil
+						return genResponseWithJsonEncodedBody(resourceList)
 					case m.isFor("GET", "/nodes/node"):
 						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, test.node)}, nil
 					case m.isFor("GET", "/namespaces/default/replicationcontrollers/rc"):

@@ -17,16 +17,7 @@ limitations under the License.
 package internalversion
 
 import (
-	"strings"
-
 	policy "k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/client/restclient"
-)
-
-const (
-	PolicyAPIVersion    = "policy/v1beta1"
-	EvictionKind        = "Eviction"
-	EvictionSubresource = "pods/eviction"
 )
 
 // The EvictionExpansion interface allows manually adding extra methods to the ScaleInterface.
@@ -35,10 +26,8 @@ type EvictionExpansion interface {
 }
 
 func (c *evictions) Evict(eviction *policy.Eviction) error {
-	client := c.client.(*restclient.RESTClient)
-	originalVersionedAPIPath := client.VersionedAPIPath
-	client.VersionedAPIPath = strings.Replace(originalVersionedAPIPath, "/apis/"+PolicyAPIVersion, "/api/v1", 1)
-	err := client.Post().
+	return c.client.Post().
+		AbsPath("/api/v1").
 		Namespace(eviction.Namespace).
 		Resource("pods").
 		Name(eviction.Name).
@@ -46,6 +35,4 @@ func (c *evictions) Evict(eviction *policy.Eviction) error {
 		Body(eviction).
 		Do().
 		Error()
-	client.VersionedAPIPath = originalVersionedAPIPath
-	return err
 }

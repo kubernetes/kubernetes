@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -74,6 +73,9 @@ type fatal struct {
 }
 
 const (
+	EvictionKind        = "Eviction"
+	EvictionSubresource = "pods/eviction"
+
 	kDaemonsetFatal      = "DaemonSet-managed pods (use --ignore-daemonsets to ignore)"
 	kDaemonsetWarning    = "Ignoring DaemonSet-managed pods"
 	kLocalStorageFatal   = "pods with local storage (use --delete-local-data to override)"
@@ -429,7 +431,7 @@ func (o *DrainOptions) deletePod(pod api.Pod) error {
 	return o.client.Core().Pods(pod.Namespace).Delete(pod.Name, deleteOptions)
 }
 
-func (o *DrainOptions) evictPod(pod api.Pod) error {
+func (o *DrainOptions) evictPod(pod api.Pod, policyGroupVersion string) error {
 	deleteOptions := &api.DeleteOptions{}
 	if o.GracePeriodSeconds >= 0 {
 		gracePeriodSeconds := int64(o.GracePeriodSeconds)
@@ -437,8 +439,8 @@ func (o *DrainOptions) evictPod(pod api.Pod) error {
 	}
 	eviction := &policy.Eviction{
 		TypeMeta: unversioned.TypeMeta{
-			APIVersion: internalversion.PolicyAPIVersion,
-			Kind:       internalversion.EvictionKind,
+			APIVersion: policyGroupVersion,
+			Kind:       EvictionKind,
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name:      pod.Name,
@@ -456,14 +458,14 @@ func (o *DrainOptions) deleteOrEvictPods(pods []api.Pod) error {
 		return nil
 	}
 
-	supportEviction, err := SupportEviction(o.client)
+	policyGroupVersion, err := SupportEviction(o.client)
 	if err != nil {
 		return err
 	}
 
 	for _, pod := range pods {
-		if supportEviction {
-			err = o.evictPod(pod)
+		if len(policyGroupVersion) > 0 {
+			err = o.evictPod(pod, policyGroupVersion)
 		} else {
 			err = o.deletePod(pod)
 		}
@@ -503,17 +505,35 @@ func (o *DrainOptions) waitForDelete(pods []api.Pod, interval, timeout time.Dura
 }
 
 // SupportEviction uses Discovery API to find out if the server support eviction subresource
-func SupportEviction(clientset *internalclientset.Clientset) (bool, error) {
-	resourceList, err := clientset.Discovery().ServerResourcesForGroupVersion("v1")
+// If support, it will return its groupVersion; Otherwise, it will return ""
+func SupportEviction(clientset *internalclientset.Clientset) (string, error) {
+	discoveryClient := clientset.Discovery()
+	groupList, err := discoveryClient.ServerGroups()
 	if err != nil {
-		return false, err
+		return "", err
 	}
-	for _, resource := range resourceList.APIResources {
-		if resource.Name == internalversion.EvictionSubresource && resource.Kind == internalversion.EvictionKind {
-			return true, nil
+	foundPolicyGroup := false
+	var policyGroupVersion string
+	for _, group := range groupList.Groups {
+		if group.Name == "policy" {
+			foundPolicyGroup = true
+			policyGroupVersion = group.PreferredVersion.GroupVersion
+			break
 		}
 	}
-	return false, nil
+	if !foundPolicyGroup {
+		return "", nil
+	}
+	resourceList, err := discoveryClient.ServerResourcesForGroupVersion("v1")
+	if err != nil {
+		return "", err
+	}
+	for _, resource := range resourceList.APIResources {
+		if resource.Name == EvictionSubresource && resource.Kind == EvictionKind {
+			return policyGroupVersion, nil
+		}
+	}
+	return "", nil
 }
 
 // RunCordonOrUncordon runs either Cordon or Uncordon.  The desired value for
