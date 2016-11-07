@@ -1044,20 +1044,13 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	d.Spec.Strategy.RollingUpdate = new(extensions.RollingUpdateDeployment)
 	d.Spec.Strategy.RollingUpdate.MaxSurge = intstr.FromInt(3)
 	d.Spec.Strategy.RollingUpdate.MaxUnavailable = intstr.FromInt(2)
-	By(fmt.Sprintf("Creating deployment %q", deploymentName))
-	_, err := c.Extensions().Deployments(ns).Create(d)
-	Expect(err).NotTo(HaveOccurred())
 
-	// Check that deployment is created fine.
-	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
+	By(fmt.Sprintf("Creating deployment %q", deploymentName))
+	deployment, err := c.Extensions().Deployments(ns).Create(d)
 	Expect(err).NotTo(HaveOccurred())
 
 	By(fmt.Sprintf("Waiting for observed generation %d", deployment.Generation))
-	err = framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
-	Expect(err).NotTo(HaveOccurred())
-
-	deployment, err = c.Extensions().Deployments(ns).Get(deploymentName)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)).NotTo(HaveOccurred())
 
 	// Verify that the required pods have come up.
 	By("Waiting for all required pods to come up")
@@ -1066,8 +1059,8 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 		framework.Logf("error in waiting for pods to come up: %s", err)
 		Expect(err).NotTo(HaveOccurred())
 	}
-	err = framework.WaitForDeploymentStatus(c, deployment)
-	Expect(err).NotTo(HaveOccurred())
+	By(fmt.Sprintf("Waiting for deployment %q to complete", deployment.Name))
+	Expect(framework.WaitForDeploymentStatusValid(c, deployment)).NotTo(HaveOccurred())
 
 	first, err := deploymentutil.GetNewReplicaSet(deployment, c)
 	Expect(err).NotTo(HaveOccurred())
