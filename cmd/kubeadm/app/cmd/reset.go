@@ -30,6 +30,10 @@ import (
 	"k8s.io/kubernetes/pkg/util/initsystem"
 )
 
+const (
+	kubeletService = "kubelet"
+)
+
 // NewCmdReset returns "kubeadm reset" command.
 func NewCmdReset(out io.Writer) *cobra.Command {
 	var skipPreFlight bool
@@ -118,13 +122,15 @@ func resetConfigDir(configDirPath string) {
 
 // Run reverts any changes made to this host by "kubeadm init" or "kubeadm join".
 func (r *Reset) Run(out io.Writer) error {
-	serviceToStop := "kubelet"
-	initSystem, err := initsystem.GetInitSystem()
-	if err != nil {
-		fmt.Printf("%v", err)
+	initSystem, initSystemErr := initsystem.GetInitSystem()
+	if initSystemErr != nil {
+		fmt.Printf("%v", initSystemErr)
 	} else {
-		fmt.Printf("Stopping the %s service...\n", serviceToStop)
-		initSystem.ServiceStop(serviceToStop)
+		fmt.Printf("Stopping the %s service...\n", kubeletService)
+		if err := initSystem.ServiceStop(kubeletService); err != nil {
+			fmt.Printf("failed to stop the %s service.\n", kubeletService)
+		}
+
 	}
 
 	fmt.Printf("Unmounting directories in /var/lib/kubelet...\n")
@@ -147,6 +153,13 @@ func (r *Reset) Run(out io.Writer) error {
 		}
 	} else {
 		fmt.Println("docker doesn't seem to be running, skipping the removal of kubernetes containers")
+	}
+
+	if initSystemErr == nil {
+		fmt.Printf("Starting the %s service...\n", kubeletService)
+		if err := initSystem.ServiceStart(kubeletService); err != nil {
+			fmt.Printf("failed to start the %s service.\n", kubeletService)
+		}
 	}
 
 	return nil
