@@ -31,7 +31,7 @@ func TestObjectMeta(t *testing.T) {
 		UID:             "1231231412",
 		ResourceVersion: "999",
 	}
-	o2 := CopyObjectMeta(o1)
+	o2 := copyObjectMeta(o1)
 	o3 := api_v1.ObjectMeta{
 		Namespace:   "ns1",
 		Name:        "s1",

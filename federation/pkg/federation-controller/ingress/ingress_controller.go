@@ -643,7 +643,7 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 		if !clusterIngressFound {
 			glog.V(4).Infof("No existing Ingress %s in cluster %s - checking if appropriate to queue a create operation", ingress, cluster.Name)
 			// We can't supply server-created fields when creating a new object.
-			desiredIngress.ObjectMeta = util.DeepCopyObjectMeta(baseIngress.ObjectMeta)
+			desiredIngress.ObjectMeta = util.DeepCopyRelevantObjectMeta(baseIngress.ObjectMeta)
 			ic.eventRecorder.Eventf(baseIngress, api.EventTypeNormal, "CreateInCluster",
 				"Creating ingress in cluster %s", cluster.Name)
 

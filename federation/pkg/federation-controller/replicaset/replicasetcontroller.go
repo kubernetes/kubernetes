@@ -464,9 +464,10 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 			return statusError, err
 		}
 
+		// The object can be modified.
 		lrs := &extensionsv1.ReplicaSet{
-			ObjectMeta: fedutil.CopyObjectMeta(frs.ObjectMeta),
-			Spec:       frs.Spec,
+			ObjectMeta: fedutil.DeepCopyRelevantObjectMeta(frs.ObjectMeta),
+			Spec:       fedutil.DeepCopyApiTypeOrPanic(frs.Spec).(extensionsv1.ReplicaSetSpec),
 		}
 		specReplicas := int32(replicas)
 		lrs.Spec.Replicas = &specReplicas
