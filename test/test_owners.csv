@@ -137,6 +137,7 @@ Federation API server authentication should not accept cluster resources when th
 Federation API server authentication should not accept cluster resources when the client has no authentication credentials,nikhiljindal,1
 Federation apiserver Admission control should not be able to create resources if namespace does not exist,alex-mohr,1
 Federation apiserver Cluster objects should be created and deleted successfully,ghodss,1
+Federation daemonsets DaemonSet objects should be created and deleted successfully,nikhiljindal,0
 Federation events Event objects should be created and deleted successfully,karlkfi,1
 Federation namespace Namespace objects all resources in the namespace should be deleted when namespace is deleted,nikhiljindal,0
 Federation namespace Namespace objects should be created and deleted successfully,xiang90,1
