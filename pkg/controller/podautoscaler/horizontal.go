@@ -136,6 +136,15 @@ func (a *HorizontalController) Run(stopCh <-chan struct{}) {
 	glog.Infof("Shutting down HPA Controller")
 }
 
+// getLastScaleTime returns the hpa's last scale time or the hpa's creation time if the last scale time is nil.
+func getLastScaleTime(hpa *autoscaling.HorizontalPodAutoscaler) time.Time {
+	lastScaleTime := hpa.Status.LastScaleTime
+	if lastScaleTime == nil {
+		lastScaleTime = &hpa.CreationTimestamp
+	}
+	return lastScaleTime.Time
+}
+
 func (a *HorizontalController) computeReplicasForCPUUtilization(hpa *autoscaling.HorizontalPodAutoscaler, scale *extensions.Scale) (int32, *int32, time.Time, error) {
 	targetUtilization := int32(defaultTargetCPUUtilizationPercentage)
 	if hpa.Spec.TargetCPUUtilizationPercentage != nil {
@@ -159,7 +168,13 @@ func (a *HorizontalController) computeReplicasForCPUUtilization(hpa *autoscaling
 
 	// TODO: what to do on partial errors (like metrics obtained for 75% of pods).
 	if err != nil {
-		a.eventRecorder.Event(hpa, api.EventTypeWarning, "FailedGetMetrics", err.Error())
+		lastScaleTime := getLastScaleTime(hpa)
+		if time.Now().After(lastScaleTime.Add(upscaleForbiddenWindow)) {
+			a.eventRecorder.Event(hpa, api.EventTypeWarning, "FailedGetMetrics", err.Error())
+		} else {
+			a.eventRecorder.Event(hpa, api.EventTypeNormal, "MetricsNotAvailableYet", err.Error())
+		}
+
 		return 0, nil, time.Time{}, fmt.Errorf("failed to get CPU utilization: %v", err)
 	}
 
@@ -179,8 +194,8 @@ func (a *HorizontalController) computeReplicasForCPUUtilization(hpa *autoscaling
 	return int32(desiredReplicas), &utilization, timestamp, nil
 }
 
-// Computes the desired number of replicas based on the CustomMetrics passed in cmAnnotation as json-serialized
-// extensions.CustomMetricsTargetList.
+// computeReplicasForCustomMetrics computes the desired number of replicas based on the CustomMetrics passed in cmAnnotation
+// as json-serialized extensions.CustomMetricsTargetList.
 // Returns number of replicas, metric which required highest number of replicas,
 // status string (also json-serialized extensions.CustomMetricsCurrentStatusList),
 // last timestamp of the metrics involved in computations or error, if occurred.
@@ -221,7 +236,13 @@ func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *autoscaling.
 		value, currentTimestamp, err := a.metricsClient.GetCustomMetric(customMetricTarget.Name, hpa.Namespace, selector)
 		// TODO: what to do on partial errors (like metrics obtained for 75% of pods).
 		if err != nil {
-			a.eventRecorder.Event(hpa, api.EventTypeWarning, "FailedGetCustomMetrics", err.Error())
+			lastScaleTime := getLastScaleTime(hpa)
+			if time.Now().After(lastScaleTime.Add(upscaleForbiddenWindow)) {
+				a.eventRecorder.Event(hpa, api.EventTypeWarning, "FailedGetCustomMetrics", err.Error())
+			} else {
+				a.eventRecorder.Event(hpa, api.EventTypeNormal, "CustomMetricsNotAvailableYet", err.Error())
+			}
+
 			return 0, "", "", time.Time{}, fmt.Errorf("failed to get custom metric value: %v", err)
 		}
 		floatTarget := float64(customMetricTarget.TargetValue.MilliValue()) / 1000.0
@@ -298,7 +319,14 @@ func (a *HorizontalController) reconcileAutoscaler(hpa *autoscaling.HorizontalPo
 			cpuDesiredReplicas, cpuCurrentUtilization, cpuTimestamp, err = a.computeReplicasForCPUUtilization(hpa, scale)
 			if err != nil {
 				a.updateCurrentReplicasInStatus(hpa, currentReplicas)
-				a.eventRecorder.Event(hpa, api.EventTypeWarning, "FailedComputeReplicas", err.Error())
+
+				lastScaleTime := getLastScaleTime(hpa)
+				if time.Now().After(lastScaleTime.Add(upscaleForbiddenWindow)) {
+					a.eventRecorder.Event(hpa, api.EventTypeWarning, "FailedComputeReplicas", err.Error())
+				} else {
+					a.eventRecorder.Event(hpa, api.EventTypeNormal, "FailedComputeReplicas", err.Error())
+				}
+
 				return fmt.Errorf("failed to compute desired number of replicas based on CPU utilization for %s: %v", reference, err)
 			}
 		}
@@ -307,7 +335,14 @@ func (a *HorizontalController) reconcileAutoscaler(hpa *autoscaling.HorizontalPo
 			cmDesiredReplicas, cmMetric, cmStatus, cmTimestamp, err = a.computeReplicasForCustomMetrics(hpa, scale, cmAnnotation)
 			if err != nil {
 				a.updateCurrentReplicasInStatus(hpa, currentReplicas)
-				a.eventRecorder.Event(hpa, api.EventTypeWarning, "FailedComputeCMReplicas", err.Error())
+
+				lastScaleTime := getLastScaleTime(hpa)
+				if time.Now().After(lastScaleTime.Add(upscaleForbiddenWindow)) {
+					a.eventRecorder.Event(hpa, api.EventTypeWarning, "FailedComputeCMReplicas", err.Error())
+				} else {
+					a.eventRecorder.Event(hpa, api.EventTypeNormal, "FailedComputeCMReplicas", err.Error())
+				}
+
 				return fmt.Errorf("failed to compute desired number of replicas based on Custom Metrics for %s: %v", reference, err)
 			}
 		}
