@@ -141,8 +141,11 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		return fmt.Errorf("unable to parse %q: %v", patch, err)
 	}
 
-	mapper, typer := f.Object()
-	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	mapper, typer, err := f.UnstructuredObject()
+	if err != nil {
+		return err
+	}
+	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), runtime.UnstructuredJSONScheme).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &options.FilenameOptions).
@@ -161,15 +164,15 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		}
 		name, namespace := info.Name, info.Namespace
 		mapping := info.ResourceMapping()
-		client, err := f.ClientForMapping(mapping)
-		if err != nil {
-			return err
-		}
 
 		if !options.Local {
-			helper := resource.NewHelper(client, mapping)
-			_, err := helper.Patch(namespace, name, patchType, patchBytes)
+			client, err := f.UnstructuredClientForMapping(mapping)
 			if err != nil {
+				return err
+			}
+			helper := resource.NewHelper(client, mapping)
+
+			if _, err := helper.Patch(namespace, name, patchType, patchBytes); err != nil {
 				return err
 			}
 			if cmdutil.ShouldRecord(cmd, info) {
@@ -192,26 +195,23 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 
 		count++
 
-		patchedObj, err := api.Scheme.DeepCopy(info.VersionedObject)
+		// strategic merge patches require a versioned object **that is locally compiled** to navigate
+		examplarObj, err := api.Scheme.New(info.Object.GetObjectKind().GroupVersionKind())
 		if err != nil {
 			return err
 		}
-		originalObjJS, err := runtime.Encode(api.Codecs.LegacyCodec(mapping.GroupVersionKind.GroupVersion()), info.VersionedObject.(runtime.Object))
+		originalObjJS, err := runtime.Encode(runtime.UnstructuredJSONScheme, info.Object)
 		if err != nil {
 			return err
 		}
-		originalPatchedObjJS, err := getPatchedJSON(patchType, originalObjJS, patchBytes, patchedObj.(runtime.Object))
+		originalPatchedObjJS, err := getPatchedJSON(patchType, originalObjJS, patchBytes, examplarObj)
 		if err != nil {
 			return err
 		}
-		targetObj, err := runtime.Decode(api.Codecs.UniversalDecoder(), originalPatchedObjJS)
+		targetObj, err := runtime.Decode(runtime.UnstructuredJSONScheme, originalPatchedObjJS)
 		if err != nil {
 			return err
 		}
-		// TODO: if we ever want to go generic, this allows a clean -o yaml without trying to print columns or anything
-		// rawExtension := &runtime.Unknown{
-		//	Raw: originalPatchedObjJS,
-		// }
 
 		printer, err := f.PrinterForMapping(cmd, mapping, false)
 		if err != nil {
