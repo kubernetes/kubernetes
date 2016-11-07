@@ -38,7 +38,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 	f := framework.NewDefaultFramework("cluster-upgrade")
 
 	framework.KubeDescribe("master upgrade", func() {
-		It("should maintain responsive services [Feature:MasterUpgrade]", func() {
+		It("should maintain functioning cluster during upgrade [Feature:MasterUpgrade]", func() {
 			cm := chaosmonkey.New(func() {
 				v, err := realVersion(framework.TestContext.UpgradeTarget)
 				framework.ExpectNoError(err)
@@ -78,7 +78,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 			cm.Do()
 		})
 
-		It("should maintain responsive services [Feature:ExperimentalNodeUpgrade]", func() {
+		It("should maintain functioning cluster during upgrade [Feature:ExperimentalNodeUpgrade]", func() {
 			cm := chaosmonkey.New(func() {
 				v, err := realVersion(framework.TestContext.UpgradeTarget)
 				framework.ExpectNoError(err)
@@ -120,7 +120,7 @@ var _ = framework.KubeDescribe("Upgrade [Feature:Upgrade]", func() {
 			cm.Do()
 		})
 
-		It("should maintain responsive services [Feature:ExperimentalClusterUpgrade]", func() {
+		It("should maintain functioning cluster during upgrade [Feature:ExperimentalClusterUpgrade]", func() {
 			cm := chaosmonkey.New(func() {
 				v, err := realVersion(framework.TestContext.UpgradeTarget)
 				framework.ExpectNoError(err)
@@ -424,7 +424,7 @@ func testJobs(f *framework.Framework, sem *chaosmonkey.Semaphore, testDuringDisr
 
 	// Setup
 	By("setup job")
-	job := TestJobsSetup("randomlySucceedOrFail", "rand-non-local", api.RestartPolicyNever, parallelism, completions)
+	job := TestJobsSetup(f, "randomlySucceedOrFail", "rand-non-local", api.RestartPolicyNever, parallelism, completions)
 	// Validate
 	By("validate job before upgrade")
 	TestJobsValidate(f, job, completions)
@@ -448,4 +448,5 @@ func testJobs(f *framework.Framework, sem *chaosmonkey.Semaphore, testDuringDisr
 	TestJobsValidate(f, job, completions)
 
 	// Teardown
+	TestJobsTeardown(f, job)
 }

@@ -333,25 +333,31 @@ func newBool(val bool) *bool {
 	return p
 }
 
-func TestJobsSetup(behavior, name string, rPol api.RestartPolicy, parallelism, completions int32) *batch.Job {
-	return newTestJob(behavior, name, rPol, parallelism, completions)
-}
+func TestJobsSetup(f *framework.Framework, behavior, name string, rPol api.RestartPolicy, parallelism, completions int32) *batch.Job {
+	job := newTestJob(behavior, name, rPol, parallelism, completions)
 
-func TestJobsValidate(f *framework.Framework, job *batch.Job, completions int32) {
 	By("Creating a job")
 	job, err := createJob(f.ClientSet, f.Namespace.Name, job)
 	Expect(err).NotTo(HaveOccurred())
 
+	return job
+}
+
+func TestJobsValidate(f *framework.Framework, job *batch.Job, completions int32) {
 	By("Ensuring job reaches completions")
-	err = waitForJobFinish(f.ClientSet, f.Namespace.Name, job.Name, completions)
+	err := waitForJobFinish(f.ClientSet, f.Namespace.Name, job.Name, completions)
 	Expect(err).NotTo(HaveOccurred())
 
+}
+
+func TestJobsTeardown(f *framework.Framework, job *batch.Job) {
 	By("Delete the job")
-	err = deleteJob(f.ClientSet, f.Namespace.Name, job.ObjectMeta.Name)
+	err := deleteJob(f.ClientSet, f.Namespace.Name, job.ObjectMeta.Name)
 	Expect(err).NotTo(HaveOccurred())
 }
 
 func TestJobs(f *framework.Framework, behavior, name string, rPol api.RestartPolicy, parallelism, completions int32) {
-	job := TestJobsSetup(behavior, name, rPol, parallelism, completions)
+	job := TestJobsSetup(f, behavior, name, rPol, parallelism, completions)
 	TestJobsValidate(f, job, completions)
+	TestJobsTeardown(f, job)
 }
