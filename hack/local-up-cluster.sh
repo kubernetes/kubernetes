@@ -16,7 +16,8 @@
 
 # This command builds and runs a local kubernetes cluster. It's just like
 # local-up.sh, but this one launches the three separate binaries.
-# You may need to run this as root to allow kubelet to open docker's socket.
+# You may need to run this as root to allow kubelet to open docker's socket,
+# and to write the test CA in /var/run/kubernetes.
 DOCKER_OPTS=${DOCKER_OPTS:-""}
 DOCKER=(docker ${DOCKER_OPTS})
 DOCKERIZE_KUBELET=${DOCKERIZE_KUBELET:-""}
