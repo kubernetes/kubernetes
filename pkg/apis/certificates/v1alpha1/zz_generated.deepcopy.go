@@ -105,6 +105,15 @@ func DeepCopy_v1alpha1_CertificateSigningRequestSpec(in interface{}, out interfa
 		} else {
 			out.Request = nil
 		}
+		if in.Usages != nil {
+			in, out := &in.Usages, &out.Usages
+			*out = make([]KeyUsage, len(*in))
+			for i := range *in {
+				(*out)[i] = (*in)[i]
+			}
+		} else {
+			out.Usages = nil
+		}
 		out.Username = in.Username
 		out.UID = in.UID
 		if in.Groups != nil {
