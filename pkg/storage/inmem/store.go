@@ -77,21 +77,15 @@ func (s *store) Create(ctx context.Context, path string, obj, out runtime.Object
 		return errors.New("resourceVersion should not be set on objects to be created")
 	}
 
-	glog.Infof("1")
-
 	data, err := runtime.Encode(s.codec, obj)
 	if err != nil {
 		return err
 	}
 
-	glog.Infof("2")
-
 	objMeta, err := api.ObjectMetaFor(obj)
 	if err != nil {
 		return storage.NewInternalErrorf("can't get meta on un-introspectable object %v, got error: %v", obj, err)
 	}
-
-	glog.Infof("3")
 
 	bucket, k := splitPath(path)
 	item := itemData{objMeta.UID, data, 0, 0}
@@ -99,7 +93,7 @@ func (s *store) Create(ctx context.Context, path string, obj, out runtime.Object
 		item.expiry = uint64(time.Now().Unix()) + ttl
 	}
 
-	lsn, err := s.backend.Create(bucket, k, item)
+	response, err := s.backend.Create(bucket, k, item)
 	if err != nil {
 		if err == errorAlreadyExists {
 			return storage.NewKeyExistsError(path, 0)
@@ -108,7 +102,7 @@ func (s *store) Create(ctx context.Context, path string, obj, out runtime.Object
 	}
 
 	if out != nil {
-		return decode(s.codec, s.versioner, data, out, lsn)
+		return decode(s.codec, s.versioner, data, out, response.lsn)
 	}
 	return nil
 }
@@ -302,6 +296,7 @@ func (s *store) GuaranteedUpdate(
 
 	bucket, k := splitPath(path)
 
+	var doCreate bool
 	var uid types.UID
 	var origState *objState
 	if len(suggestion) == 1 && suggestion[0] != nil {
@@ -321,7 +316,8 @@ func (s *store) GuaranteedUpdate(
 		if err != nil {
 			if err == errorItemNotFound {
 				if ignoreNotFound {
-					// keep goig
+					// keep going
+					doCreate = true
 				} else {
 					return storage.NewKeyNotFoundError(path, 0)
 				}
@@ -360,9 +356,17 @@ func (s *store) GuaranteedUpdate(
 			newItem.expiry = uint64(time.Now().Unix()) + ttl
 		}
 
-		// response will be the new item if we swapped,
-		// or the existing item if err==errorLSNMismatch
-		response, err := s.backend.Update(bucket, k, origState.rev, newItem)
+		var response itemData
+		if doCreate {
+			glog.Infof("Trying create of %s with lsn %d", path, origState.rev)
+			response, err = s.backend.Create(bucket, k, newItem)
+		} else {
+			// response will be the new item if we swapped,
+			// or the existing item if err==errorLSNMismatch
+			glog.Infof("Trying update of %s with lsn %d", path, origState.rev)
+			response, err = s.backend.Update(bucket, k, origState.rev, newItem)
+		}
+
 		if err != nil {
 			if err == errorLSNMismatch {
 				glog.V(4).Infof("GuaranteedUpdate of %s failed because of a conflict, going to retry", path)
@@ -372,6 +376,7 @@ func (s *store) GuaranteedUpdate(
 					return err
 				}
 
+				doCreate = false
 				continue
 			} else if err == errorItemNotFound {
 				if ignoreNotFound {
@@ -382,10 +387,22 @@ func (s *store) GuaranteedUpdate(
 					if err := runtime.SetZeroValue(origState.obj); err != nil {
 						return err
 					}
+					doCreate = true
 					continue
 				}
 
 				return storage.NewKeyNotFoundError(path, 0)
+			} else if err == errorAlreadyExists {
+				// this is the create path
+				glog.V(4).Infof("GuaranteedUpdate of %s failed because of a conflict (on create), going to retry", path)
+
+				origState, err = s.getState(response, v)
+				if err != nil {
+					return err
+				}
+
+				doCreate = false
+				continue
 			} else {
 				return err
 			}

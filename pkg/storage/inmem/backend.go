@@ -142,14 +142,14 @@ func normalizePath(path string) string {
 	return b.String()
 }
 
-func (s *Backend) Create(bucket string, k string, item itemData) (LSN, error) {
+func (s *Backend) Create(bucket string, k string, item itemData) (itemData, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	b := s.root.resolveBucket(bucket, true)
-	_, found := b.items[k]
+	existing, found := b.items[k]
 	if found {
-		return 0, errorAlreadyExists
+		return existing, errorAlreadyExists
 	}
 
 	s.lastLSN++
@@ -169,7 +169,7 @@ func (s *Backend) Create(bucket string, k string, item itemData) (LSN, error) {
 		s.expiryManager.add(b, k, item.expiry)
 	}
 
-	return lsn, nil
+	return item, nil
 }
 
 func (s *Backend) Delete(bucket string, k string, preconditions *storage.Preconditions) (itemData, error) {
