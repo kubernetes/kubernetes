@@ -32,7 +32,7 @@ hack/local-up-cluster.sh
 ```
 If you want to enable RBAC on local cluster, you can run the following:
 ```shell
-ALLOW_ANY_TOKEN=true ENABLE_RBAC=true hack/local-up-cluster.sh
+ALLOW_ANY_TOKEN=true KUBECONFIG_TOKEN=admin/system:masters ENABLE_RBAC=true hack/local-up-cluster.sh
 ```
 
 This will build and start a lightweight local cluster, consisting of a master
