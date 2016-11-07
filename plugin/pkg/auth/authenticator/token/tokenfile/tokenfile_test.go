@@ -118,17 +118,6 @@ token4
 	}
 }
 
-func TestDuplicateTokenFile(t *testing.T) {
-       _, err := newWithContents(t, `
-token1,user1,uid1
-token2,user2,uid2
-token1,user3,uid3
-`)
-       if err == nil {
-               t.Fatalf("unexpected non error")
-       }
-}
-
 func TestInsufficientColumnsTokenFile(t *testing.T) {
 	_, err := newWithContents(t, "token4\n")
 	if err == nil {

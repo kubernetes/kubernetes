@@ -46,6 +46,7 @@ func NewCSV(path string) (*TokenAuthenticator, error) {
 	}
 	defer file.Close()
 
+	isDuplicate := false
 	tokens := make(map[string]*user.DefaultInfo)
 	reader := csv.NewReader(file)
 	reader.FieldsPerRecord = -1
@@ -64,14 +65,18 @@ func NewCSV(path string) (*TokenAuthenticator, error) {
 			Name: record[1],
 			UID:  record[2],
 		}
-                if _, exist := tokens[record[0]]; exist {
-                        return nil, fmt.Errorf("duplicate token has been found in token file '%s'", path)
-                }
+		if _, exist := tokens[record[0]]; exist {
+			isDuplicate = true
+		}
 		tokens[record[0]] = obj
 
 		if len(record) >= 4 {
 			obj.Groups = strings.Split(record[3], ",")
 		}
+	}
+
+	if isDuplicate {
+		glog.Warningf("duplicate token has been found in token file '%s'", path)
 	}
 
 	return &TokenAuthenticator{

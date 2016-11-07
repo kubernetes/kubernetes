@@ -99,16 +99,6 @@ password4
 	}
 }
 
-func TestDuplicatePasswordFile(t *testing.T) {
-	if _, err := newWithContents(t, `
-password1,user1,uid1
-password2,user2,uid2
-password3,user1,uid3
-`); err == nil {
-		t.Fatalf("unexpected non error")
-	}
-}
-
 func TestInsufficientColumnsPasswordFile(t *testing.T) {
 	if _, err := newWithContents(t, "password4\n"); err == nil {
 		t.Fatalf("unexpected non error")
