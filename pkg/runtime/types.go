@@ -16,6 +16,8 @@ limitations under the License.
 
 package runtime
 
+import "k8s.io/kubernetes/pkg/api/unversioned"
+
 // Note that the types provided in this file are not versioned and are intended to be
 // safe to use from within all versions of every API object.
 
@@ -122,6 +124,13 @@ type Unknown struct {
 	ContentType string `protobuf:"bytes,4,opt,name=contentType"`
 }
 
+func (in *Unknown) DeepCopyObject() unversioned.Object {
+	out := new(Unknown)
+	*out = *in
+	copy(out.Raw, in.Raw)
+	return out
+}
+
 // Unstructured allows objects that do not have Golang structs registered to be manipulated
 // generically. This can be used to deal with the API objects from a plug-in. Unstructured
 // objects still have functioning TypeMeta features-- kind, version, etc.
@@ -131,6 +140,41 @@ type Unstructured struct {
 	// Object is a JSON compatible map with string, float, int, []interface{}, or map[string]interface{}
 	// children.
 	Object map[string]interface{}
+}
+
+func jsonDeepCopy(in interface{}) interface{} {
+	if in == nil {
+		return nil
+	}
+	switch tin := in.(type) {
+	case string:
+		return tin
+	case int:
+		return tin
+	case float64:
+		return tin
+	case []interface{}:
+		out := make([]interface{}, len(tin))
+		for i := range tin {
+			out[i] = jsonDeepCopy(tin[i])
+		}
+		return out
+	case map[string]interface{}:
+		out := map[string]interface{}{}
+		for k, v := range tin {
+			out[k] = jsonDeepCopy(v)
+		}
+		return out
+	}
+
+	return nil
+}
+
+func (in *Unstructured) DeepCopyObject() unversioned.Object {
+	out := new(Unstructured)
+	*out = *in
+	out.Object = jsonDeepCopy(in.Object).(map[string]interface{})
+	return out
 }
 
 // VersionedObjects is used by Decoders to give callers a way to access all versions

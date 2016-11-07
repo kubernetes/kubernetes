@@ -31,6 +31,13 @@ type encodable struct {
 
 func (e encodable) GetObjectKind() unversioned.ObjectKind { return e.obj.GetObjectKind() }
 
+func (e encodable) DeepCopyObject() unversioned.Object {
+	var out encodable = e
+	out.obj = e.obj.DeepCopyObject()
+	copy(out.versions, e.versions)
+	return out
+}
+
 // NewEncodable creates an object that will be encoded with the provided codec on demand.
 // Provided as a convenience for test cases dealing with internal objects.
 func NewEncodable(e Encoder, obj Object, versions ...unversioned.GroupVersion) Object {

@@ -435,6 +435,17 @@ func (u *UnstructuredList) GroupVersionKind() unversioned.GroupVersionKind {
 	return gvk
 }
 
+func (in *UnstructuredList) DeepCopyObject() unversioned.Object {
+	out := new(UnstructuredList)
+	*out = *in
+	out.Object = jsonDeepCopy(in.Object).(map[string]interface{})
+	out.Items = make([]*Unstructured, len(out.Items))
+	for i := range in.Items {
+		out.Items[i] = in.Items[i].DeepCopyObject().(*Unstructured)
+	}
+	return out
+}
+
 // UnstructuredJSONScheme is capable of converting JSON data into the Unstructured
 // type, which can be used for generic access to objects without a predefined scheme.
 // TODO: move into serializer/json.
