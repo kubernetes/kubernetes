@@ -590,7 +590,8 @@ function start_kubedns {
         sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-svc.yaml.in" >| skydns-svc.yaml
         export KUBERNETES_PROVIDER=local
         ${KUBECTL} config set-cluster local --server=https://${API_HOST}:${API_SECURE_PORT} --certificate-authority=${ROOT_CA_FILE}
-        ${KUBECTL} config set-context local --cluster=local
+        ${KUBECTL} config set-credentials myself --username=admin --password=admin
+        ${KUBECTL} config set-context local --cluster=local --user=myself
         ${KUBECTL} config use-context local
 
         # use kubectl to create skydns rc and service
