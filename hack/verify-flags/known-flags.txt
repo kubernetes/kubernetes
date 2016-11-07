@@ -592,6 +592,7 @@ watch-only
 whitelist-override-label
 windows-line-endings
 www-prefix
+zone-id
 zone-name
 garbage-collector-enabled
 viper-config
