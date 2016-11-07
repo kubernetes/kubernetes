@@ -699,8 +699,12 @@ func (s *Server) getPortForward(request *restful.Request, response *restful.Resp
 		response.WriteError(http.StatusNotFound, fmt.Errorf("pod does not exist"))
 		return
 	}
+	if len(params.podUID) > 0 && pod.UID != params.podUID {
+		response.WriteError(http.StatusNotFound, fmt.Errorf("pod not found"))
+		return
+	}
 
-	redirect, err := s.host.GetPortForward(params.podName, params.podNamespace, params.podUID)
+	redirect, err := s.host.GetPortForward(pod.Name, pod.Namespace, pod.UID)
 	if err != nil {
 		response.WriteError(streaming.HTTPStatus(err), err)
 		return
