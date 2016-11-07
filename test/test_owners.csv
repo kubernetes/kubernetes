@@ -138,7 +138,10 @@ Federation API server authentication should not accept cluster resources when th
 Federation apiserver Admission control should not be able to create resources if namespace does not exist,alex-mohr,1
 Federation apiserver Cluster objects should be created and deleted successfully,ghodss,1
 Federation events Event objects should be created and deleted successfully,karlkfi,1
+Federation namespace Namespace objects all resources in the namespace should be deleted when namespace is deleted,nikhiljindal,0
 Federation namespace Namespace objects should be created and deleted successfully,xiang90,1
+Federation namespace Namespace objects should be deleted from underlying clusters when OrphanDependents is false,nikhiljindal,0
+Federation namespace Namespace objects should not be deleted from underlying clusters when OrphanDependents is true,nikhiljindal,0
 Federation replicasets Federated ReplicaSet should create and update matching replicasets in underling clusters,childsb,1
 Federation replicasets ReplicaSet objects should be created and deleted successfully,apelisse,1
 Federation secrets Secret objects should be created and deleted successfully,pmorie,1
