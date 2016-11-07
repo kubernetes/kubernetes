@@ -40,8 +40,6 @@ go_library(
         "//pkg/util/integer:go_default_library",
         "//pkg/util/labels:go_default_library",
         "//pkg/util/metrics:go_default_library",
-        "//pkg/util/pod:go_default_library",
-        "//pkg/util/replicaset:go_default_library",
         "//pkg/util/runtime:go_default_library",
         "//pkg/util/wait:go_default_library",
         "//pkg/util/workqueue:go_default_library",
