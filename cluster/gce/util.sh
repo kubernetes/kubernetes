@@ -782,6 +782,7 @@ function create-master() {
   fi
 
   KUBERNETES_MASTER_NAME="${MASTER_RESERVED_IP}"
+  MASTER_ADVERTISE_ADDRESS="${MASTER_RESERVED_IP}"
 
   create-certs "${MASTER_RESERVED_IP}"
 
