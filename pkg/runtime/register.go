@@ -64,3 +64,12 @@ func (obj *VersionedObjects) Last() Object {
 	}
 	return obj.Objects[len(obj.Objects)-1]
 }
+
+func (obj *VersionedObjects) DeepCopyObject() unversioned.Object {
+	out := new(VersionedObjects)
+	out.Objects = make([]Object, len(obj.Objects))
+	for i := range obj.Objects {
+		out.Objects[i] = obj.Objects[i].DeepCopyObject()
+	}
+	return out
+}
