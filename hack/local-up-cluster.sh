@@ -601,7 +601,11 @@ fi
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
   auth_arg=""
   if [[ -n "${ALLOW_ANY_TOKEN:-}"  ]]; then
-      auth_arg="--token=admin/system:masters"
+      if [[ -n "${KUBECONFIG_TOKEN:-}"  ]]; then
+          auth_arg=${KUBECONFIG_TOKEN}
+      else
+          auth_arg="--token=admin/system:masters"
+      fi
   else
       auth_arg="--username=admin --password=admin"
   fi
