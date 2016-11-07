@@ -20,7 +20,6 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
@@ -33,8 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/selection"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/sets"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
 // Semantic can do semantic deep equality checks for api objects.
