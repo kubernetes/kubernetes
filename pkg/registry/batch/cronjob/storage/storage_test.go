@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package etcd
+package storage
 
 import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -31,42 +31,32 @@ import (
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 )
 
+// TODO: allow for global factory override
 func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) {
-	etcdStorage, server := registrytest.NewEtcdStorage(t, extensions.GroupName)
+	etcdStorage, server := registrytest.NewEtcdStorage(t, batch.GroupName)
 	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1}
-	jobStorage, statusStorage := NewREST(restOptions)
-	return jobStorage, statusStorage, server
+	storage, statusStorage := NewREST(restOptions)
+	return storage, statusStorage, server
 }
 
-func validNewJob() *batch.Job {
-	completions := int32(1)
-	parallelism := int32(1)
-	return &batch.Job{
+func validNewCronJob() *batch.CronJob {
+	return &batch.CronJob{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
-			Namespace: "default",
+			Namespace: api.NamespaceDefault,
 		},
-		Spec: batch.JobSpec{
-			Completions: &completions,
-			Parallelism: &parallelism,
-			Selector: &unversioned.LabelSelector{
-				MatchLabels: map[string]string{"a": "b"},
-			},
-			ManualSelector: newBool(true),
-			Template: api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
-					Labels: map[string]string{"a": "b"},
-				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Name:            "test",
-							Image:           "test_image",
-							ImagePullPolicy: api.PullIfNotPresent,
+		Spec: batch.CronJobSpec{
+			Schedule:          "* * * * ?",
+			ConcurrencyPolicy: batch.AllowConcurrent,
+			JobTemplate: batch.JobTemplateSpec{
+				Spec: batch.JobSpec{
+					Template: api.PodTemplateSpec{
+						Spec: api.PodSpec{
+							RestartPolicy: api.RestartPolicyOnFailure,
+							DNSPolicy:     api.DNSClusterFirst,
+							Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: api.PullIfNotPresent}},
 						},
 					},
-					RestartPolicy: api.RestartPolicyOnFailure,
-					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
 		},
@@ -74,86 +64,107 @@ func validNewJob() *batch.Job {
 }
 
 func TestCreate(t *testing.T) {
+	// scheduled jobs should be tested only when batch/v2alpha1 is enabled
+	if *testapi.Batch.GroupVersion() != v2alpha1.SchemeGroupVersion {
+		return
+	}
+
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
-	validJob := validNewJob()
-	validJob.ObjectMeta = api.ObjectMeta{}
+	validCronJob := validNewCronJob()
+	validCronJob.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
 		// valid
-		validJob,
-		// invalid (empty selector)
-		&batch.Job{
-			Spec: batch.JobSpec{
-				Completions: validJob.Spec.Completions,
-				Selector:    &unversioned.LabelSelector{},
-				Template:    validJob.Spec.Template,
-			},
+		validCronJob,
+		// invalid (empty spec)
+		&batch.CronJob{
+			Spec: batch.CronJobSpec{},
 		},
 	)
 }
 
 func TestUpdate(t *testing.T) {
+	// scheduled jobs should be tested only when batch/v2alpha1 is enabled
+	if *testapi.Batch.GroupVersion() != v2alpha1.SchemeGroupVersion {
+		return
+	}
+
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
-	two := int32(2)
+	schedule := "1 1 1 1 ?"
 	test.TestUpdate(
 		// valid
-		validNewJob(),
+		validNewCronJob(),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*batch.Job)
-			object.Spec.Parallelism = &two
+			object := obj.(*batch.CronJob)
+			object.Spec.Schedule = schedule
 			return object
 		},
 		// invalid updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*batch.Job)
-			object.Spec.Selector = &unversioned.LabelSelector{}
-			return object
-		},
-		func(obj runtime.Object) runtime.Object {
-			object := obj.(*batch.Job)
-			object.Spec.Completions = &two
+			object := obj.(*batch.CronJob)
+			object.Spec.Schedule = "* * *"
 			return object
 		},
 	)
 }
 
 func TestDelete(t *testing.T) {
+	// scheduled jobs should be tested only when batch/v2alpha1 is enabled
+	if *testapi.Batch.GroupVersion() != v2alpha1.SchemeGroupVersion {
+		return
+	}
+
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
-	test.TestDelete(validNewJob())
+	test.TestDelete(validNewCronJob())
 }
 
 func TestGet(t *testing.T) {
+	// scheduled jobs should be tested only when batch/v2alpha1 is enabled
+	if *testapi.Batch.GroupVersion() != v2alpha1.SchemeGroupVersion {
+		return
+	}
+
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
-	test.TestGet(validNewJob())
+	test.TestGet(validNewCronJob())
 }
 
 func TestList(t *testing.T) {
+	// scheduled jobs should be tested only when batch/v2alpha1 is enabled
+	if *testapi.Batch.GroupVersion() != v2alpha1.SchemeGroupVersion {
+		return
+	}
+
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
-	test.TestList(validNewJob())
+	test.TestList(validNewCronJob())
 }
 
 func TestWatch(t *testing.T) {
+	// scheduled jobs should be tested only when batch/v2alpha1 is enabled
+	if *testapi.Batch.GroupVersion() != v2alpha1.SchemeGroupVersion {
+		return
+	}
+
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	test.TestWatch(
-		validNewJob(),
+		validNewCronJob(),
 		// matching labels
 		[]labels.Set{},
 		// not matching labels
@@ -171,9 +182,3 @@ func TestWatch(t *testing.T) {
 }
 
 // TODO: test update /status
-
-func newBool(val bool) *bool {
-	p := new(bool)
-	*p = val
-	return p
-}
