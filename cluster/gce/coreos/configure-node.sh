@@ -135,6 +135,9 @@ function configure-master-addons() {
 
   if [[ "${ENABLE_CLUSTER_DNS}" == "true" ]]; then
     evaluate-manifests-dir ${MANIFESTS_DIR}/addons/dns ${addon_dir}/dns
+    if [[ "${ENABLE_DNS_HORIZONTAL_AUTOSCALER}" == "true" ]]; then
+      evaluate-manifests-dir ${MANIFESTS_DIR}/addons/dns-horizontal-autoscaler ${addon_dir}/dns-horizontal-autoscaler
+    fi
   fi
 
   if [[ "${ENABLE_CLUSTER_UI}" == "true" ]]; then

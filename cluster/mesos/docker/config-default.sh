@@ -34,6 +34,9 @@ DNS_SERVER_IP="10.10.10.10"
 DNS_DOMAIN="cluster.local"
 DNS_REPLICAS=1
 
+# Optional: Enable DNS horizontal autoscaler
+ENABLE_DNS_HORIZONTAL_AUTOSCALER="${KUBE_ENABLE_DNS_HORIZONTAL_AUTOSCALER:-false}"
+
 # Optional: Deploy cluster web interface.
 ENABLE_CLUSTER_UI=true
 
