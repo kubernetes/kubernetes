@@ -552,8 +552,11 @@ func (g *genDeepCopy) doMap(t *types.Type, sw *generator.SnippetWriter) {
 				sw.Do("newVal := new($.|raw$)\n", t.Elem)
 				sw.Do("val.DeepCopyInto(newVal)\n", nil)
 				sw.Do("(*out)[key] = *newVal\n", nil)
-			} else {
-				sw.Do("newVal := c.DeepCopy(&val)\n", nil)
+			} else if t.Elem.Kind == types.Slice && t.Elem.Elem.Kind == types.Builtin {
+				sw.Do("(*out)[key] = make($.|raw$, len(val))\n", t.Elem)
+				sw.Do("copy((*out)[key], val)\n", nil)
+			}else {
+				sw.Do("newVal := val.DeepCopy()\n", nil)
 				sw.Do("(*out)[key] = *newVal.(*$.|raw$)\n", t.Elem)
 			}
 			sw.Do("}\n", nil)
