@@ -170,7 +170,7 @@ func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset, sched
 		return err
 	}
 
-	n.ObjectMeta.Labels["kubeadm.alpha.kubernetes.io/role"] = "master"
+	n.ObjectMeta.Labels[unversionedapi.NodeLabelKubeadmAlphaRole] = unversionedapi.NodeLabelRoleMaster
 
 	if !schedulable {
 		taintsAnnotation, _ := json.Marshal([]api.Taint{{Key: "dedicated", Value: "master", Effect: "NoSchedule"}})
@@ -224,7 +224,9 @@ func SetNodeAffinity(meta *api.ObjectMeta, expr ...api.NodeSelectorRequirement) 
 // MasterNodeAffinity returns api.NodeSelectorRequirement to be used with SetNodeAffinity to set affinity to master node
 func MasterNodeAffinity() api.NodeSelectorRequirement {
 	return api.NodeSelectorRequirement{
-		Key: "kubeadm.alpha.kubernetes.io/role", Operator: api.NodeSelectorOpIn, Values: []string{"master"},
+		Key:      unversionedapi.NodeLabelKubeadmAlphaRole,
+		Operator: api.NodeSelectorOpIn,
+		Values:   []string{unversionedapi.NodeLabelRoleMaster},
 	}
 }
 
