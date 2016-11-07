@@ -28,7 +28,7 @@ import (
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	horizontalpodautoscaleretcd "k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler/etcd"
-	jobetcd "k8s.io/kubernetes/pkg/registry/batch/job/etcd"
+	jobstore "k8s.io/kubernetes/pkg/registry/batch/job/storage"
 	expcontrolleretcd "k8s.io/kubernetes/pkg/registry/extensions/controller/etcd"
 	daemonetcd "k8s.io/kubernetes/pkg/registry/extensions/daemonset/etcd"
 	deploymentetcd "k8s.io/kubernetes/pkg/registry/extensions/deployment/etcd"
@@ -89,7 +89,7 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapise
 		storage["deployments/scale"] = deploymentStorage.Scale
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("jobs")) {
-		jobsStorage, jobsStatusStorage := jobetcd.NewREST(restOptionsGetter)
+		jobsStorage, jobsStatusStorage := jobstore.NewREST(restOptionsGetter)
 		storage["jobs"] = jobsStorage
 		storage["jobs/status"] = jobsStatusStorage
 	}
