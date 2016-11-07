@@ -104,3 +104,41 @@ func TestVolumePluginMgrFunc(t *testing.T) {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
 	}
 }
+
+func Test_ValidatePodTemplate(t *testing.T) {
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name:         "vol",
+					VolumeSource: v1.VolumeSource{},
+				},
+			},
+		},
+	}
+	var want error
+	if got := ValidateRecyclerPodTemplate(pod); got != want {
+		t.Errorf("isPodTemplateValid(%v) returned (%v), want (%v)", pod.String(), got.Error(), want)
+	}
+
+	// Check that the default recycle pod template is valid
+	pod = NewPersistentVolumeRecyclerPodTemplate()
+	want = nil
+	if got := ValidateRecyclerPodTemplate(pod); got != want {
+		t.Errorf("isPodTemplateValid(%v) returned (%v), want (%v)", pod.String(), got.Error(), want)
+	}
+
+	pod = &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "pv-recycler",
+				},
+			},
+		},
+	}
+	// want = an error
+	if got := ValidateRecyclerPodTemplate(pod); got == nil {
+		t.Errorf("isPodTemplateValid(%v) returned (%v), want (%v)", pod.String(), got, "Error: pod specification does not contain any volume(s).")
+	}
+}
