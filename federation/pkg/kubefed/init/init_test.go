@@ -85,7 +85,17 @@ func TestInitFederation(t *testing.T) {
 			dnsZoneName:        "example.test.",
 			lbIP:               "10.20.30.40",
 			image:              "example.test/foo:bar",
-			etcdPVCapacity:     "10Gi",
+			etcdPVCapacity:     "5Gi",
+			expectedErr:        "",
+		},
+		{
+			federation:         "union",
+			kubeconfigGlobal:   fakeKubeFiles[0],
+			kubeconfigExplicit: "",
+			dnsZoneName:        "example.test.",
+			lbIP:               "10.20.30.40",
+			image:              "example.test/foo:bar",
+			etcdPVCapacity:     "",
 			expectedErr:        "",
 		},
 	}
@@ -110,7 +120,9 @@ func TestInitFederation(t *testing.T) {
 		cmd.Flags().Set("host-cluster-context", "substrate")
 		cmd.Flags().Set("dns-zone-name", tc.dnsZoneName)
 		cmd.Flags().Set("image", tc.image)
-		cmd.Flags().Set("etcd-pv-capacity", tc.etcdPVCapacity)
+		if "" != tc.etcdPVCapacity {
+			cmd.Flags().Set("etcd-pv-capacity", tc.etcdPVCapacity)
+		}
 		cmd.Run(cmd, []string{tc.federation})
 
 		if tc.expectedErr == "" {
@@ -378,10 +390,19 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
 	cmKubeconfigSecretName := federationName + "-controller-manager-kubeconfig"
-	capacity, err := resource.ParseQuantity(etcdPVCapacity)
+	pvCap := ""
+
+	if "" != etcdPVCapacity {
+		pvCap = etcdPVCapacity
+	} else {
+		pvCap = "10Gi" //test for default value
+	}
+
+	capacity, err := resource.ParseQuantity(pvCap)
 	if err != nil {
 		return nil, err
 	}
+
 	pvcName := svcName + "-etcd-claim"
 	replicas := int32(1)
 
