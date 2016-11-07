@@ -328,7 +328,7 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 		return
 	}
 
-	baseNamespaceObj, exist, err := nc.namespaceInformerStore.GetByKey(namespace)
+	namespaceObjFromStore, exist, err := nc.namespaceInformerStore.GetByKey(namespace)
 	if err != nil {
 		glog.Errorf("Failed to query main namespace store for %v: %v", namespace, err)
 		nc.deliverNamespace(namespace, 0, true)
@@ -339,7 +339,11 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 		// Not federated namespace, ignoring.
 		return
 	}
-	baseNamespace := baseNamespaceObj.(*api_v1.Namespace)
+	namespaceFromStore := namespaceObjFromStore.(*api_v1.Namespace)
+	// Create a copy before modifying the namespace to prevent race condition with
+	// other readers of namespace from store.
+	baseNamespace := &api_v1.Namespace{}
+	*baseNamespace = *namespaceFromStore
 	if baseNamespace.DeletionTimestamp != nil {
 		if err := nc.delete(baseNamespace); err != nil {
 			glog.Errorf("Failed to delete %s: %v", namespace, err)
