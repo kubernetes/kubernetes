@@ -1965,11 +1965,6 @@
 			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
-			"ImportPath": "github.com/rackspace/gophercloud/openstack/common/extensions",
-			"Comment": "v1.0.0-1012-ge00690e8",
-			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
-		},
-		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/compute/v2/extensions/bootfromvolume",
 			"Comment": "v1.0.0-1012-ge00690e8",
 			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
@@ -2010,82 +2005,7 @@
 			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
-			"ImportPath": "github.com/rackspace/gophercloud/openstack/identity/v3/extensions/trust",
-			"Comment": "v1.0.0-1012-ge00690e8",
-			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
-		},
-		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/identity/v3/tokens",
-			"Comment": "v1.0.0-1012-ge00690e8",
-			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
-		},
-		{
-			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions",
-			"Comment": "v1.0.0-1012-ge00690e8",
-			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
-		},
-		{
-			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/layer3/floatingips",
-			"Comment": "v1.0.0-1012-ge00690e8",
-			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
-		},
-		{
-			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/layer3/routers",
-			"Comment": "v1.0.0-1012-ge00690e8",
-			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
-		},
-		{
-			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/members",
-			"Comment": "v1.0.0-1012-ge00690e8",
-			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
-		},
-		{
-			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/monitors",
-			"Comment": "v1.0.0-1012-ge00690e8",
-			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
-		},
-		{
-			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/pools",
-			"Comment": "v1.0.0-1012-ge00690e8",
-			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
-		},
-		{
-			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/vips",
-			"Comment": "v1.0.0-1012-ge00690e8",
-			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
-		},
-		{
-			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas_v2/listeners",
-			"Comment": "v1.0.0-1012-ge00690e8",
-			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
-		},
-		{
-			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas_v2/loadbalancers",
-			"Comment": "v1.0.0-1012-ge00690e8",
-			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
-		},
-		{
-			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas_v2/monitors",
-			"Comment": "v1.0.0-1012-ge00690e8",
-			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
-		},
-		{
-			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas_v2/pools",
-			"Comment": "v1.0.0-1012-ge00690e8",
-			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
-		},
-		{
-			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/security/groups",
-			"Comment": "v1.0.0-1012-ge00690e8",
-			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
-		},
-		{
-			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/security/rules",
-			"Comment": "v1.0.0-1012-ge00690e8",
-			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
-		},
-		{
-			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/ports",
 			"Comment": "v1.0.0-1012-ge00690e8",
 			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
