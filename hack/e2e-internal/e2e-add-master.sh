@@ -16,7 +16,7 @@
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
-export KUBE_EXPERIMENTAL_REPLICATE_EXISTING_MASTER=true
+export KUBE_REPLICATE_EXISTING_MASTER=true
 
 source "${KUBE_ROOT}/hack/e2e-internal/e2e-up.sh"
 

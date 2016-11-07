@@ -614,7 +614,7 @@ function kube-up() {
   if [[ ${KUBE_USE_EXISTING_MASTER:-} == "true" ]]; then
     parse-master-env
     create-nodes
-  elif [[ ${KUBE_EXPERIMENTAL_REPLICATE_EXISTING_MASTER:-} == "true" ]]; then
+  elif [[ ${KUBE_REPLICATE_EXISTING_MASTER:-} == "true" ]]; then
     if  [[ "${MASTER_OS_DISTRIBUTION}" != "gci" && "${MASTER_OS_DISTRIBUTION}" != "debian" ]]; then
       echo "Master replication supported only for gci and debian"
       return 1
