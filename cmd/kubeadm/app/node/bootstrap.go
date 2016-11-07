@@ -22,14 +22,14 @@ import (
 	"sync"
 	"time"
 
+	clientset "k8s.io/client-go/kubernetes"
+	certclient "k8s.io/client-go/kubernetes/typed/certificates/v1alpha1"
+	certificates "k8s.io/client-go/pkg/apis/certificates/v1alpha1"
+	"k8s.io/client-go/pkg/types"
+	"k8s.io/client-go/pkg/util/wait"
+	"k8s.io/client-go/tools/clientcmd"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/apis/certificates"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	certclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/internalversion"
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
-	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // ConnectionDetails represents a master API endpoint connection
