@@ -56,9 +56,17 @@ const (
 
 var _ = framework.KubeDescribe("Deployment", func() {
 	f := framework.NewDefaultFramework("deployment")
+	var ns string
+	var c clientset.Interface
 
-	// TODO: Add failure traps once we have JustAfterEach
-	// See https://github.com/onsi/ginkgo/issues/303
+	BeforeEach(func() {
+		c = f.ClientSet
+		ns = f.Namespace.Name
+	})
+
+	AfterEach(func() {
+		failureTrap(c, ns)
+	})
 
 	It("deployment should create new pods", func() {
 		testNewDeployment(f)
@@ -111,6 +119,19 @@ var _ = framework.KubeDescribe("Deployment", func() {
 	// TODO: add tests that cover deployment.Spec.MinReadySeconds once we solved clock-skew issues
 	// See https://github.com/kubernetes/kubernetes/issues/29229
 })
+
+func failureTrap(c clientset.Interface, ns string) {
+	deployments, _ := c.Extensions().Deployments(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
+	for _, d := range deployments.Items {
+		out, _ := framework.RunKubectl("get", "deploy", d.Name, fmt.Sprintf("--namespace=%s", ns), "--output=yaml")
+		framework.Logf("\nDeployment %q:\n%v", d.Name, out)
+	}
+	rss, _ := c.Extensions().ReplicaSets(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
+	for _, rs := range rss.Items {
+		out, _ := framework.RunKubectl("get", "rs", rs.Name, fmt.Sprintf("--namespace=%s", ns), "--output=yaml")
+		framework.Logf("\nReplica set %q:\n%v", rs.Name, out)
+	}
+}
 
 func intOrStrP(num int) *intstr.IntOrString {
 	intstr := intstr.FromInt(num)
