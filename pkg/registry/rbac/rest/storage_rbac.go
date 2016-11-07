@@ -30,17 +30,17 @@ import (
 	rbacclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/registry/rbac/clusterrole"
-	clusterroleetcd "k8s.io/kubernetes/pkg/registry/rbac/clusterrole/etcd"
 	clusterrolepolicybased "k8s.io/kubernetes/pkg/registry/rbac/clusterrole/policybased"
+	clusterrolestore "k8s.io/kubernetes/pkg/registry/rbac/clusterrole/storage"
 	"k8s.io/kubernetes/pkg/registry/rbac/clusterrolebinding"
-	clusterrolebindingetcd "k8s.io/kubernetes/pkg/registry/rbac/clusterrolebinding/etcd"
 	clusterrolebindingpolicybased "k8s.io/kubernetes/pkg/registry/rbac/clusterrolebinding/policybased"
+	clusterrolebindingstore "k8s.io/kubernetes/pkg/registry/rbac/clusterrolebinding/storage"
 	"k8s.io/kubernetes/pkg/registry/rbac/role"
-	roleetcd "k8s.io/kubernetes/pkg/registry/rbac/role/etcd"
 	rolepolicybased "k8s.io/kubernetes/pkg/registry/rbac/role/policybased"
+	rolestore "k8s.io/kubernetes/pkg/registry/rbac/role/storage"
 	"k8s.io/kubernetes/pkg/registry/rbac/rolebinding"
-	rolebindingetcd "k8s.io/kubernetes/pkg/registry/rbac/rolebinding/etcd"
 	rolebindingpolicybased "k8s.io/kubernetes/pkg/registry/rbac/rolebinding/policybased"
+	rolebindingstore "k8s.io/kubernetes/pkg/registry/rbac/rolebinding/storage"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
@@ -71,10 +71,10 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapis
 	newRuleValidator := func() rbacvalidation.AuthorizationRuleResolver {
 		once.Do(func() {
 			authorizationRuleResolver = rbacvalidation.NewDefaultRuleResolver(
-				role.AuthorizerAdapter{Registry: role.NewRegistry(roleetcd.NewREST(restOptionsGetter(rbac.Resource("roles"))))},
-				rolebinding.AuthorizerAdapter{Registry: rolebinding.NewRegistry(rolebindingetcd.NewREST(restOptionsGetter(rbac.Resource("rolebindings"))))},
-				clusterrole.AuthorizerAdapter{Registry: clusterrole.NewRegistry(clusterroleetcd.NewREST(restOptionsGetter(rbac.Resource("clusterroles"))))},
-				clusterrolebinding.AuthorizerAdapter{Registry: clusterrolebinding.NewRegistry(clusterrolebindingetcd.NewREST(restOptionsGetter(rbac.Resource("clusterrolebindings"))))},
+				role.AuthorizerAdapter{Registry: role.NewRegistry(rolestore.NewREST(restOptionsGetter(rbac.Resource("roles"))))},
+				rolebinding.AuthorizerAdapter{Registry: rolebinding.NewRegistry(rolebindingstore.NewREST(restOptionsGetter(rbac.Resource("rolebindings"))))},
+				clusterrole.AuthorizerAdapter{Registry: clusterrole.NewRegistry(clusterrolestore.NewREST(restOptionsGetter(rbac.Resource("clusterroles"))))},
+				clusterrolebinding.AuthorizerAdapter{Registry: clusterrolebinding.NewRegistry(clusterrolebindingstore.NewREST(restOptionsGetter(rbac.Resource("clusterrolebindings"))))},
 			)
 		})
 		return authorizationRuleResolver
@@ -82,19 +82,19 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapis
 
 	storage := map[string]rest.Storage{}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("roles")) {
-		rolesStorage := roleetcd.NewREST(restOptionsGetter(rbac.Resource("roles")))
+		rolesStorage := rolestore.NewREST(restOptionsGetter(rbac.Resource("roles")))
 		storage["roles"] = rolepolicybased.NewStorage(rolesStorage, newRuleValidator(), p.AuthorizerRBACSuperUser)
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("rolebindings")) {
-		roleBindingsStorage := rolebindingetcd.NewREST(restOptionsGetter(rbac.Resource("rolebindings")))
+		roleBindingsStorage := rolebindingstore.NewREST(restOptionsGetter(rbac.Resource("rolebindings")))
 		storage["rolebindings"] = rolebindingpolicybased.NewStorage(roleBindingsStorage, newRuleValidator(), p.AuthorizerRBACSuperUser)
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("clusterroles")) {
-		clusterRolesStorage := clusterroleetcd.NewREST(restOptionsGetter(rbac.Resource("clusterroles")))
+		clusterRolesStorage := clusterrolestore.NewREST(restOptionsGetter(rbac.Resource("clusterroles")))
 		storage["clusterroles"] = clusterrolepolicybased.NewStorage(clusterRolesStorage, newRuleValidator(), p.AuthorizerRBACSuperUser)
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("clusterrolebindings")) {
-		clusterRoleBindingsStorage := clusterrolebindingetcd.NewREST(restOptionsGetter(rbac.Resource("clusterrolebindings")))
+		clusterRoleBindingsStorage := clusterrolebindingstore.NewREST(restOptionsGetter(rbac.Resource("clusterrolebindings")))
 		storage["clusterrolebindings"] = clusterrolebindingpolicybased.NewStorage(clusterRoleBindingsStorage, newRuleValidator(), p.AuthorizerRBACSuperUser)
 	}
 	return storage

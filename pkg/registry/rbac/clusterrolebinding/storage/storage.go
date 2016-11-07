@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package etcd
+package storage
 
 import (
 	"k8s.io/kubernetes/pkg/api"
@@ -22,33 +22,33 @@ import (
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
-	"k8s.io/kubernetes/pkg/registry/rbac/clusterrole"
+	"k8s.io/kubernetes/pkg/registry/rbac/clusterrolebinding"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 )
 
-// REST implements a RESTStorage for ClusterRole against etcd
+// REST implements a RESTStorage for ClusterRoleBinding
 type REST struct {
 	*registry.Store
 }
 
-// NewREST returns a RESTStorage object that will work against ClusterRole objects.
+// NewREST returns a RESTStorage object that will work against ClusterRoleBinding objects.
 func NewREST(opts generic.RESTOptions) *REST {
 	prefix := "/" + opts.ResourcePrefix
 
-	newListFunc := func() runtime.Object { return &rbac.ClusterRoleList{} }
+	newListFunc := func() runtime.Object { return &rbac.ClusterRoleBindingList{} }
 	storageInterface, dFunc := opts.Decorator(
 		opts.StorageConfig,
-		cachesize.GetWatchCacheSizeByResource(cachesize.ClusterRoles),
-		&rbac.ClusterRole{},
+		cachesize.GetWatchCacheSizeByResource(cachesize.ClusterRoleBindings),
+		&rbac.ClusterRoleBinding{},
 		prefix,
-		clusterrole.Strategy,
+		clusterrolebinding.Strategy,
 		newListFunc,
 		storage.NoTriggerPublisher,
 	)
 
 	store := &registry.Store{
-		NewFunc:     func() runtime.Object { return &rbac.ClusterRole{} },
+		NewFunc:     func() runtime.Object { return &rbac.ClusterRoleBinding{} },
 		NewListFunc: newListFunc,
 		KeyRootFunc: func(ctx api.Context) string {
 			return registry.NamespaceKeyRootFunc(ctx, prefix)
@@ -57,16 +57,16 @@ func NewREST(opts generic.RESTOptions) *REST {
 			return registry.NoNamespaceKeyFunc(ctx, prefix, id)
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*rbac.ClusterRole).Name, nil
+			return obj.(*rbac.ClusterRoleBinding).Name, nil
 		},
-		PredicateFunc:           clusterrole.Matcher,
-		QualifiedResource:       rbac.Resource("clusterroles"),
+		PredicateFunc:           clusterrolebinding.Matcher,
+		QualifiedResource:       rbac.Resource("clusterrolebindings"),
 		EnableGarbageCollection: opts.EnableGarbageCollection,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
-		CreateStrategy: clusterrole.Strategy,
-		UpdateStrategy: clusterrole.Strategy,
-		DeleteStrategy: clusterrole.Strategy,
+		CreateStrategy: clusterrolebinding.Strategy,
+		UpdateStrategy: clusterrolebinding.Strategy,
+		DeleteStrategy: clusterrolebinding.Strategy,
 
 		Storage:     storageInterface,
 		DestroyFunc: dFunc,
