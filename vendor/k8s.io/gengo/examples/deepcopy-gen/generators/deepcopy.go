@@ -408,7 +408,7 @@ func (g *genDeepCopy) DeepCopyableInterfaces(c *generator.Context, t *types.Type
 		return nil, nil
 	}
 
-	intfs := types.ExtractCommentTags("+", t.SecondClosestCommentLines)[interfacesTagName]
+	intfs := types.ExtractCommentTags("+", t.CommentLines)[interfacesTagName]
 
 	var ts []*types.Type
 	for _, intf := range intfs {
@@ -445,19 +445,38 @@ func (g *genDeepCopy) GenerateType(c *generator.Context, t *types.Type, w io.Wri
 
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	args := argsFromType(t)
-	sw.Do("// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.\n", nil)
-	sw.Do("func (in *$.type|raw$) DeepCopyInto(out *$.type|raw$) {\n", args)
-	g.generateFor(t, sw)
-	sw.Do("return\n", nil)
-	sw.Do("}\n\n", nil)
+	if t.Name.Name == "Time" {
+		glog.Infof("methods %s %+v", t.Name.Name, t.Methods)
+	}
+	_, foundDeepCopyInto := t.Methods["DeepCopyInto"]
+	_, foundDeepCopy := t.Methods["DeepCopy"]
+	if !foundDeepCopyInto {
+		sw.Do("// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.\n", nil)
+		sw.Do("func (in *$.type|raw$) DeepCopyInto(out *$.type|raw$) {\n", args)
+		if foundDeepCopy {
+			if t.Methods["DeepCopy"].Signature.Receiver.Kind == types.Pointer {
+				sw.Do("clone := in.DeepCopy()\n", nil)
+				sw.Do("*out = *clone\n", nil)
+			} else {
+				sw.Do("*out = in.DeepCopy()\n", nil)
+			}
+			sw.Do("return\n", nil)
+		} else {
+			g.generateFor(t, sw)
+			sw.Do("return\n", nil)
+		}
+		sw.Do("}\n\n", nil)
+	}
 
-	sw.Do("// DeepCopy will perform a deep copy of the receiver, creating a new $.type|raw$.\n", args)
-	sw.Do("func (x *$.type|raw$) DeepCopy() *$.type|raw$ {\n", args)
-	sw.Do("if x == nil { return nil }\n", nil)
-	sw.Do("out := new($.type|raw$)\n", args)
-	sw.Do("x.DeepCopyInto(out)\n", nil)
-	sw.Do("return out\n", nil)
-	sw.Do("}\n\n", nil)
+	if !foundDeepCopy {
+		sw.Do("// DeepCopy will perform a deep copy of the receiver, creating a new $.type|raw$.\n", args)
+		sw.Do("func (x *$.type|raw$) DeepCopy() *$.type|raw$ {\n", args)
+		sw.Do("if x == nil { return nil }\n", nil)
+		sw.Do("out := new($.type|raw$)\n", args)
+		sw.Do("x.DeepCopyInto(out)\n", nil)
+		sw.Do("return out\n", nil)
+		sw.Do("}\n\n", nil)
+	}
 
 	intfs, err := g.DeepCopyableInterfaces(c, t)
 	if err != nil {
