@@ -483,7 +483,7 @@ function start_kubelet {
 
       image_service_endpoint_args=""
       if [[ -n "${IMAGE_SERVICE_ENDPOINT}" ]]; then
-	image_service_endpoint_args="--image-service-endpoint=${IMAGE_SERVICE_ENDPOINT}"
+        image_service_endpoint_args="--image-service-endpoint=${IMAGE_SERVICE_ENDPOINT}"
       fi
 
       sudo -E "${GO_OUT}/hyperkube" kubelet ${priv_arg}\
