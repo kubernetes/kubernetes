@@ -11,7 +11,7 @@ spec:
   dnsPolicy: Default
   containers:
   - name: fluentd-cloud-logging
-    image: gcr.io/google_containers/fluentd-gcp:1.25
+    image: gcr.io/google_containers/fluentd-gcp:1.26
     resources:
       limits:
         memory: 200Mi
@@ -23,6 +23,10 @@ spec:
     env:
     - name: FLUENTD_ARGS
       value: -q
+    - name: "LD_PRELOAD"
+      value: "/opt/td-agent/embedded/lib/libjemalloc.so"
+    - name: "RUBY_GC_HEAP_OLDOBJECT_LIMIT_FACTOR"
+      value: "0.9"
     volumeMounts:
     - name: varlog
       mountPath: /var/log
