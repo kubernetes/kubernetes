@@ -33555,7 +33555,7 @@
     }
    },
    "v1beta1.Job": {
-    "description": "Job represents the configuration of a single job.",
+    "description": "Job represents the configuration of a single job. DEPRECATED: extensions/v1beta1.Job is deprecated, use batch/v1.Job instead.",
     "properties": {
      "metadata": {
       "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
@@ -33605,7 +33605,7 @@
     }
    },
    "v1beta1.JobList": {
-    "description": "JobList is a collection of jobs.",
+    "description": "JobList is a collection of jobs. DEPRECATED: extensions/v1beta1.JobList is deprecated, use batch/v1.JobList instead.",
     "required": [
      "items"
     ],
