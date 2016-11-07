@@ -802,6 +802,7 @@ k8s.io/kubernetes/pkg/util/parsers,derekwaynecarr,1
 k8s.io/kubernetes/pkg/util/procfs,roberthbailey,1
 k8s.io/kubernetes/pkg/util/proxy,cjcullen,1
 k8s.io/kubernetes/pkg/util/rand,madhusudancs,1
+k8s.io/kubernetes/pkg/util/ratelimit,justinsb,1
 k8s.io/kubernetes/pkg/util/runtime,davidopp,1
 k8s.io/kubernetes/pkg/util/sets,quinton-hoole,0
 k8s.io/kubernetes/pkg/util/slice,quinton-hoole,0

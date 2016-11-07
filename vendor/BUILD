@@ -4241,15 +4241,6 @@ go_binary(
 )
 
 go_library(
-    name = "github.com/juju/ratelimit",
-    srcs = [
-        "github.com/juju/ratelimit/ratelimit.go",
-        "github.com/juju/ratelimit/reader.go",
-    ],
-    tags = ["automanaged"],
-)
-
-go_library(
     name = "github.com/kardianos/osext",
     srcs = [
         "github.com/kardianos/osext/osext.go",
@@ -8054,15 +8045,6 @@ go_library(
 )
 
 go_library(
-    name = "k8s.io/client-go/_vendor/github.com/juju/ratelimit",
-    srcs = [
-        "k8s.io/client-go/_vendor/github.com/juju/ratelimit/ratelimit.go",
-        "k8s.io/client-go/_vendor/github.com/juju/ratelimit/reader.go",
-    ],
-    tags = ["automanaged"],
-)
-
-go_library(
     name = "k8s.io/client-go/_vendor/github.com/mailru/easyjson/buffer",
     srcs = ["k8s.io/client-go/_vendor/github.com/mailru/easyjson/buffer/pool.go"],
     tags = ["automanaged"],
@@ -10764,7 +10746,7 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//vendor:github.com/juju/ratelimit",
+        "//pkg/util/ratelimit:go_default_library",
         "//vendor:k8s.io/client-go/pkg/util/clock",
         "//vendor:k8s.io/client-go/pkg/util/integer",
     ],
