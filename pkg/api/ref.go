@@ -130,3 +130,9 @@ func (obj *ObjectReference) GroupVersionKind() unversioned.GroupVersionKind {
 }
 
 func (obj *ObjectReference) GetObjectKind() unversioned.ObjectKind { return obj }
+
+func (obj *ObjectReference) DeepCopyObject() unversioned.Object {
+	out := new(ObjectReference)
+	*out = *obj
+	return out
+}
