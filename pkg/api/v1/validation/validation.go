@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
@@ -129,6 +130,29 @@ func ValidatePodLogOptions(opts *v1.PodLogOptions) field.ErrorList {
 	case opts.SinceSeconds != nil:
 		if *opts.SinceSeconds < 1 {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("sinceSeconds"), *opts.SinceSeconds, "must be greater than 0"))
+		}
+	}
+	return allErrs
+}
+
+func AccumulateUniqueHostPorts(containers []v1.Container, accumulator *sets.String, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	for ci, ctr := range containers {
+		idxPath := fldPath.Index(ci)
+		portsPath := idxPath.Child("ports")
+		for pi := range ctr.Ports {
+			idxPath := portsPath.Index(pi)
+			port := ctr.Ports[pi].HostPort
+			if port == 0 {
+				continue
+			}
+			str := fmt.Sprintf("%d/%s", port, ctr.Ports[pi].Protocol)
+			if accumulator.Has(str) {
+				allErrs = append(allErrs, field.Duplicate(idxPath.Child("hostPort"), str))
+			} else {
+				accumulator.Insert(str)
+			}
 		}
 	}
 	return allErrs
