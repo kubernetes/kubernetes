@@ -32,6 +32,7 @@ import (
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/watch"
@@ -328,7 +329,7 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 		return
 	}
 
-	baseNamespaceObj, exist, err := nc.namespaceInformerStore.GetByKey(namespace)
+	namespaceObjFromStore, exist, err := nc.namespaceInformerStore.GetByKey(namespace)
 	if err != nil {
 		glog.Errorf("Failed to query main namespace store for %v: %v", namespace, err)
 		nc.deliverNamespace(namespace, 0, true)
@@ -339,7 +340,15 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 		// Not federated namespace, ignoring.
 		return
 	}
-	baseNamespace := baseNamespaceObj.(*api_v1.Namespace)
+	// Create a copy before modifying the namespace to prevent race condition with
+	// other readers of namespace from store.
+	namespaceObj, err := conversion.NewCloner().DeepCopy(namespaceObjFromStore)
+	baseNamespace, ok := namespaceObj.(*api_v1.Namespace)
+	if err != nil || !ok {
+		glog.Errorf("Error in retrieving obj from store: %v, %v", ok, err)
+		nc.deliverNamespace(namespace, 0, true)
+		return
+	}
 	if baseNamespace.DeletionTimestamp != nil {
 		if err := nc.delete(baseNamespace); err != nil {
 			glog.Errorf("Failed to delete %s: %v", namespace, err)
