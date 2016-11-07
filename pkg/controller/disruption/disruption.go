@@ -475,6 +475,7 @@ func (dc *DisruptionController) sync(key string) error {
 	pdb := obj.(*policy.PodDisruptionBudget)
 
 	if err := dc.trySync(pdb); err != nil {
+		glog.Errorf("Failed to sync pdb %s/%s: %v", pdb.Namespace, pdb.Name, err)
 		return dc.failSafe(pdb)
 	}
 
@@ -484,16 +485,21 @@ func (dc *DisruptionController) sync(key string) error {
 func (dc *DisruptionController) trySync(pdb *policy.PodDisruptionBudget) error {
 	pods, err := dc.getPodsForPdb(pdb)
 	if err != nil {
+		dc.recorder.Eventf(pdb, api.EventTypeWarning, "NoPods", "Failed to get pods: %v", err)
 		return err
+	}
+	if len(pods) == 0 {
+		dc.recorder.Eventf(pdb, api.EventTypeNormal, "NoPods", "No matching pods found")
 	}
 
 	expectedCount, desiredHealthy, err := dc.getExpectedPodCount(pdb, pods)
 	if err != nil {
+		dc.recorder.Eventf(pdb, api.EventTypeNormal, "ExpectedPods", "Failed to calculate the number of expected pods: %v", err)
 		return err
 	}
 
 	currentTime := time.Now()
-	disruptedPods, recheckTime := buildDisruptedPodMap(pods, pdb, currentTime)
+	disruptedPods, recheckTime := dc.buildDisruptedPodMap(pods, pdb, currentTime)
 	currentHealthy := countHealthyPods(pods, disruptedPods, currentTime)
 	err = dc.updatePdbStatus(pdb, currentHealthy, desiredHealthy, expectedCount, disruptedPods)
 
@@ -597,7 +603,7 @@ Pod:
 
 // Builds new PodDisruption map, possibly removing items that refer to non-existing, already deleted
 // or not-deleted at all items. Also returns an information when this check should be repeated.
-func buildDisruptedPodMap(pods []*api.Pod, pdb *policy.PodDisruptionBudget, currentTime time.Time) (map[string]unversioned.Time, *time.Time) {
+func (dc *DisruptionController) buildDisruptedPodMap(pods []*api.Pod, pdb *policy.PodDisruptionBudget, currentTime time.Time) (map[string]unversioned.Time, *time.Time) {
 	disruptedPods := pdb.Status.DisruptedPods
 	result := make(map[string]unversioned.Time)
 	var recheckTime *time.Time
@@ -619,6 +625,8 @@ func buildDisruptedPodMap(pods []*api.Pod, pdb *policy.PodDisruptionBudget, curr
 		if expectedDeletion.Before(currentTime) {
 			glog.V(1).Infof("Pod %s/%s was expected to be deleted at %s but it wasn't, updating pdb %s/%s",
 				pod.Namespace, pod.Name, disruptionTime.String(), pdb.Namespace, pdb.Name)
+			dc.recorder.Eventf(pod, api.EventTypeWarning, "NotDeleted", "Pod was expected by PDB %s/%s to be deleted but it wasn't",
+				pdb.Namespace, pdb.Namespace)
 		} else {
 			if recheckTime == nil || expectedDeletion.Before(*recheckTime) {
 				recheckTime = &expectedDeletion
