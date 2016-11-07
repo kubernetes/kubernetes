@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package etcd
+package storage
 
 import (
 	"testing"
@@ -28,137 +28,141 @@ import (
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
-func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) {
-	etcdStorage, server := registrytest.NewEtcdStorage(t, extensions.GroupName)
+func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
+	etcdStorage, server := registrytest.NewEtcdStorage(t, "extensions")
 	restOptions := generic.RESTOptions{
 		StorageConfig:           etcdStorage,
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 1,
-		ResourcePrefix:          "daemonsets",
+		ResourcePrefix:          "networkpolicies",
 	}
-	daemonSetStorage, statusStorage := NewREST(restOptions)
-	return daemonSetStorage, statusStorage, server
+	return NewREST(restOptions), server
 }
 
-func newValidDaemonSet() *extensions.DaemonSet {
-	return &extensions.DaemonSet{
+// createNetworkPolicy is a helper function that returns a NetworkPolicy with the updated resource version.
+func createNetworkPolicy(storage *REST, np extensions.NetworkPolicy, t *testing.T) (extensions.NetworkPolicy, error) {
+	ctx := api.WithNamespace(api.NewContext(), np.Namespace)
+	obj, err := storage.Create(ctx, &np)
+	if err != nil {
+		t.Errorf("Failed to create NetworkPolicy, %v", err)
+	}
+	newNP := obj.(*extensions.NetworkPolicy)
+	return *newNP, nil
+}
+
+func validNewNetworkPolicy() *extensions.NetworkPolicy {
+	port := intstr.FromInt(80)
+	return &extensions.NetworkPolicy{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
 			Namespace: api.NamespaceDefault,
+			Labels:    map[string]string{"a": "b"},
 		},
-		Spec: extensions.DaemonSetSpec{
-			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
-			Template: api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
-					Labels: map[string]string{"a": "b"},
-				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+		Spec: extensions.NetworkPolicySpec{
+			PodSelector: metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
+			Ingress: []extensions.NetworkPolicyIngressRule{
+				{
+					From: []extensions.NetworkPolicyPeer{
 						{
-							Name:            "test",
-							Image:           "test_image",
-							ImagePullPolicy: api.PullIfNotPresent,
+							PodSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"c": "d"}},
 						},
 					},
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
+					Ports: []extensions.NetworkPolicyPort{
+						{
+							Port: &port,
+						},
+					},
 				},
 			},
 		},
 	}
 }
 
-var validDaemonSet = newValidDaemonSet()
+var validNetworkPolicy = *validNewNetworkPolicy()
 
 func TestCreate(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
-	ds := newValidDaemonSet()
-	ds.ObjectMeta = api.ObjectMeta{}
+	np := validNewNetworkPolicy()
+	np.ObjectMeta = api.ObjectMeta{}
+
+	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	test.TestCreate(
 		// valid
-		ds,
+		np,
 		// invalid (invalid selector)
-		&extensions.DaemonSet{
-			Spec: extensions.DaemonSetSpec{
-				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{}},
-				Template: validDaemonSet.Spec.Template,
-			},
-		},
-		// invalid update strategy
-		&extensions.DaemonSet{
-			Spec: extensions.DaemonSetSpec{
-				Selector: validDaemonSet.Spec.Selector,
-				Template: validDaemonSet.Spec.Template,
+		&extensions.NetworkPolicy{
+			Spec: extensions.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{MatchLabels: invalidSelector},
+				Ingress:     []extensions.NetworkPolicyIngressRule{},
 			},
 		},
 	)
 }
 
 func TestUpdate(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	test.TestUpdate(
 		// valid
-		newValidDaemonSet(),
-		// updateFunc
+		validNewNetworkPolicy(),
+		// valid updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*extensions.DaemonSet)
-			object.Spec.Template.Spec.NodeSelector = map[string]string{"c": "d"}
-			object.Spec.Template.Spec.DNSPolicy = api.DNSDefault
+			object := obj.(*extensions.NetworkPolicy)
 			return object
 		},
 		// invalid updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*extensions.DaemonSet)
+			object := obj.(*extensions.NetworkPolicy)
 			object.Name = ""
 			return object
 		},
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*extensions.DaemonSet)
-			object.Spec.Template.Spec.RestartPolicy = api.RestartPolicyOnFailure
+			object := obj.(*extensions.NetworkPolicy)
+			object.Spec.PodSelector = metav1.LabelSelector{MatchLabels: map[string]string{}}
 			return object
 		},
 	)
 }
 
 func TestDelete(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
-	test.TestDelete(newValidDaemonSet())
+	test.TestDelete(validNewNetworkPolicy())
 }
 
 func TestGet(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
-	test.TestGet(newValidDaemonSet())
+	test.TestGet(validNewNetworkPolicy())
 }
 
 func TestList(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
-	test.TestList(newValidDaemonSet())
+	test.TestList(validNewNetworkPolicy())
 }
 
 func TestWatch(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	test.TestWatch(
-		validDaemonSet,
+		validNewNetworkPolicy(),
 		// matching labels
 		[]labels.Set{
 			{"a": "b"},
@@ -172,12 +176,10 @@ func TestWatch(t *testing.T) {
 		[]fields.Set{
 			{"metadata.name": "foo"},
 		},
-		// notmatching fields
+		// not matchin fields
 		[]fields.Set{
 			{"metadata.name": "bar"},
 			{"name": "foo"},
 		},
 	)
 }
-
-// TODO TestUpdateStatus

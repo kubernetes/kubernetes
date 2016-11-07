@@ -14,56 +14,57 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package etcd
+package storage
 
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/registry/extensions/ingress"
+	"k8s.io/kubernetes/pkg/registry/extensions/daemonset"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	genericregistry "k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-// rest implements a RESTStorage for replication controllers against etcd
+// rest implements a RESTStorage for DaemonSets
 type REST struct {
 	*genericregistry.Store
 }
 
-// NewREST returns a RESTStorage object that will work against replication controllers.
+// NewREST returns a RESTStorage object that will work against DaemonSets.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
-		NewFunc:     func() runtime.Object { return &extensions.Ingress{} },
-		NewListFunc: func() runtime.Object { return &extensions.IngressList{} },
+		NewFunc:     func() runtime.Object { return &extensions.DaemonSet{} },
+		NewListFunc: func() runtime.Object { return &extensions.DaemonSetList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*extensions.Ingress).Name, nil
+			return obj.(*extensions.DaemonSet).Name, nil
 		},
-		PredicateFunc:     ingress.MatchIngress,
-		QualifiedResource: extensions.Resource("ingresses"),
+		PredicateFunc:     daemonset.MatchDaemonSet,
+		QualifiedResource: extensions.Resource("daemonsets"),
 
-		CreateStrategy: ingress.Strategy,
-		UpdateStrategy: ingress.Strategy,
-		DeleteStrategy: ingress.Strategy,
+		CreateStrategy: daemonset.Strategy,
+		UpdateStrategy: daemonset.Strategy,
+		DeleteStrategy: daemonset.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: ingress.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: daemonset.GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}
 
 	statusStore := *store
-	statusStore.UpdateStrategy = ingress.StatusStrategy
+	statusStore.UpdateStrategy = daemonset.StatusStrategy
+
 	return &REST{store}, &StatusREST{store: &statusStore}
 }
 
-// StatusREST implements the REST endpoint for changing the status of an ingress
+// StatusREST implements the REST endpoint for changing the status of a daemonset
 type StatusREST struct {
 	store *genericregistry.Store
 }
 
 func (r *StatusREST) New() runtime.Object {
-	return &extensions.Ingress{}
+	return &extensions.DaemonSet{}
 }
 
 // Get retrieves the object from the storage. It is required to support Patch.

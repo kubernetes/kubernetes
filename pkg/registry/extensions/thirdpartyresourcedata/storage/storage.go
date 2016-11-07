@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package etcd
+package storage
 
 import (
 	"strings"
@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-// REST implements a RESTStorage for ThirdPartyResourceDatas against etcd
+// REST implements a RESTStorage for ThirdPartyResourceData
 type REST struct {
 	*genericregistry.Store
 	kind string

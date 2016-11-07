@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package etcd
+package storage
 
 import (
 	extensionsapi "k8s.io/kubernetes/pkg/apis/extensions"
@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-// rest implements a RESTStorage for network policies against etcd
+// rest implements a RESTStorage for network policies
 type REST struct {
 	*genericregistry.Store
 }
