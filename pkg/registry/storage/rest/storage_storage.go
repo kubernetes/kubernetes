@@ -21,7 +21,7 @@ import (
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	storageapiv1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/genericapiserver"
-	storageclassetcd "k8s.io/kubernetes/pkg/registry/storage/storageclass/etcd"
+	storageclassstore "k8s.io/kubernetes/pkg/registry/storage/storageclass/storage"
 )
 
 type RESTStorageProvider struct {
@@ -46,7 +46,7 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapise
 	storage := map[string]rest.Storage{}
 
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("storageclasses")) {
-		storageClassStorage := storageclassetcd.NewREST(restOptionsGetter(storageapi.Resource("storageclasses")))
+		storageClassStorage := storageclassstore.NewREST(restOptionsGetter(storageapi.Resource("storageclasses")))
 		storage["storageclasses"] = storageClassStorage
 	}
 
