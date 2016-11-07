@@ -116,7 +116,7 @@ func describerMap(c clientset.Interface) map[unversioned.GroupKind]Describer {
 		extensions.Kind("Job"):                         &JobDescriber{c},
 		extensions.Kind("Ingress"):                     &IngressDescriber{c},
 		batch.Kind("Job"):                              &JobDescriber{c},
-		batch.Kind("ScheduledJob"):                     &ScheduledJobDescriber{c},
+		batch.Kind("CronJob"):                          &CronJobDescriber{c},
 		apps.Kind("StatefulSet"):                       &StatefulSetDescriber{c},
 		certificates.Kind("CertificateSigningRequest"): &CertificateSigningRequestDescriber{c},
 		storage.Kind("StorageClass"):                   &StorageClassDescriber{c},
@@ -1222,13 +1222,13 @@ func describeJob(job *batch.Job, events *api.EventList) (string, error) {
 	})
 }
 
-// ScheduledJobDescriber generates information about a scheduled job and the jobs it has created.
-type ScheduledJobDescriber struct {
+// CronJobDescriber generates information about a scheduled job and the jobs it has created.
+type CronJobDescriber struct {
 	clientset.Interface
 }
 
-func (d *ScheduledJobDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	scheduledJob, err := d.Batch().ScheduledJobs(namespace).Get(name)
+func (d *CronJobDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+	scheduledJob, err := d.Batch().CronJobs(namespace).Get(name)
 	if err != nil {
 		return "", err
 	}
@@ -1238,10 +1238,10 @@ func (d *ScheduledJobDescriber) Describe(namespace, name string, describerSettin
 		events, _ = d.Core().Events(namespace).Search(scheduledJob)
 	}
 
-	return describeScheduledJob(scheduledJob, events)
+	return describeCronJob(scheduledJob, events)
 }
 
-func describeScheduledJob(scheduledJob *batch.ScheduledJob, events *api.EventList) (string, error) {
+func describeCronJob(scheduledJob *batch.CronJob, events *api.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", scheduledJob.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", scheduledJob.Namespace)

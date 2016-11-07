@@ -24,8 +24,8 @@ import (
 
 type BatchInterface interface {
 	RESTClient() restclient.Interface
+	CronJobsGetter
 	JobsGetter
-	ScheduledJobsGetter
 }
 
 // BatchClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
@@ -33,12 +33,12 @@ type BatchClient struct {
 	restClient restclient.Interface
 }
 
-func (c *BatchClient) Jobs(namespace string) JobInterface {
-	return newJobs(c, namespace)
+func (c *BatchClient) CronJobs(namespace string) CronJobInterface {
+	return newCronJobs(c, namespace)
 }
 
-func (c *BatchClient) ScheduledJobs(namespace string) ScheduledJobInterface {
-	return newScheduledJobs(c, namespace)
+func (c *BatchClient) Jobs(namespace string) JobInterface {
+	return newJobs(c, namespace)
 }
 
 // NewForConfig creates a new BatchClient for the given config.

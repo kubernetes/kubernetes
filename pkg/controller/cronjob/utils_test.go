@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduledjob
+package cronjob
 
 import (
 	//"fmt"
@@ -37,14 +37,14 @@ func TestGetJobFromTemplate(t *testing.T) {
 	var one int64 = 1
 	var no bool = false
 
-	sj := batch.ScheduledJob{
+	sj := batch.CronJob{
 		ObjectMeta: api.ObjectMeta{
-			Name:      "myscheduledjob",
+			Name:      "mycronjob",
 			Namespace: "snazzycats",
 			UID:       types.UID("1a2b3c"),
-			SelfLink:  "/apis/extensions/v1beta1/namespaces/snazzycats/jobs/myscheduledjob",
+			SelfLink:  "/apis/extensions/v1beta1/namespaces/snazzycats/jobs/mycronjob",
 		},
-		Spec: batch.ScheduledJobSpec{
+		Spec: batch.CronJobSpec{
 			Schedule:          "* * * * ?",
 			ConcurrencyPolicy: batch.AllowConcurrent,
 			JobTemplate: batch.JobTemplateSpec{
@@ -77,7 +77,7 @@ func TestGetJobFromTemplate(t *testing.T) {
 	if err != nil {
 		t.Errorf("Did not expect error: %s", err)
 	}
-	if !strings.HasPrefix(job.ObjectMeta.Name, "myscheduledjob-") {
+	if !strings.HasPrefix(job.ObjectMeta.Name, "mycronjob-") {
 		t.Errorf("Wrong Name")
 	}
 	if len(job.ObjectMeta.Labels) != 1 {
@@ -90,7 +90,7 @@ func TestGetJobFromTemplate(t *testing.T) {
 	if !ok {
 		t.Errorf("Missing created-by annotation")
 	}
-	expectedCreatedBy := `{"kind":"SerializedReference","apiVersion":"v1","reference":{"kind":"ScheduledJob","namespace":"snazzycats","name":"myscheduledjob","uid":"1a2b3c","apiVersion":"extensions"}}
+	expectedCreatedBy := `{"kind":"SerializedReference","apiVersion":"v1","reference":{"kind":"CronJob","namespace":"snazzycats","name":"mycronjob","uid":"1a2b3c","apiVersion":"extensions"}}
 `
 	if len(v) != len(expectedCreatedBy) {
 		t.Errorf("Wrong length for created-by annotation, expected %v got %v", len(expectedCreatedBy), len(v))
@@ -140,7 +140,7 @@ func TestGetParentUIDFromJob(t *testing.T) {
 	}
 	{
 		// Case 2: Has UID annotation
-		j.ObjectMeta.Annotations = map[string]string{api.CreatedByAnnotation: `{"kind":"SerializedReference","apiVersion":"v1","reference":{"kind":"ScheduledJob","namespace":"default","name":"pi","uid":"5ef034e0-1890-11e6-8935-42010af0003e","apiVersion":"extensions","resourceVersion":"427339"}}`}
+		j.ObjectMeta.Annotations = map[string]string{api.CreatedByAnnotation: `{"kind":"SerializedReference","apiVersion":"v1","reference":{"kind":"CronJob","namespace":"default","name":"pi","uid":"5ef034e0-1890-11e6-8935-42010af0003e","apiVersion":"extensions","resourceVersion":"427339"}}`}
 
 		expectedUID := types.UID("5ef034e0-1890-11e6-8935-42010af0003e")
 
@@ -158,14 +158,14 @@ func TestGroupJobsByParent(t *testing.T) {
 	uid1 := types.UID("11111111-1111-1111-1111-111111111111")
 	uid2 := types.UID("22222222-2222-2222-2222-222222222222")
 	uid3 := types.UID("33333333-3333-3333-3333-333333333333")
-	createdBy1 := map[string]string{api.CreatedByAnnotation: `{"kind":"SerializedReference","apiVersion":"v1","reference":{"kind":"ScheduledJob","namespace":"x","name":"pi","uid":"11111111-1111-1111-1111-111111111111","apiVersion":"extensions","resourceVersion":"111111"}}`}
-	createdBy2 := map[string]string{api.CreatedByAnnotation: `{"kind":"SerializedReference","apiVersion":"v1","reference":{"kind":"ScheduledJob","namespace":"x","name":"pi","uid":"22222222-2222-2222-2222-222222222222","apiVersion":"extensions","resourceVersion":"222222"}}`}
-	createdBy3 := map[string]string{api.CreatedByAnnotation: `{"kind":"SerializedReference","apiVersion":"v1","reference":{"kind":"ScheduledJob","namespace":"y","name":"pi","uid":"33333333-3333-3333-3333-333333333333","apiVersion":"extensions","resourceVersion":"333333"}}`}
+	createdBy1 := map[string]string{api.CreatedByAnnotation: `{"kind":"SerializedReference","apiVersion":"v1","reference":{"kind":"CronJob","namespace":"x","name":"pi","uid":"11111111-1111-1111-1111-111111111111","apiVersion":"extensions","resourceVersion":"111111"}}`}
+	createdBy2 := map[string]string{api.CreatedByAnnotation: `{"kind":"SerializedReference","apiVersion":"v1","reference":{"kind":"CronJob","namespace":"x","name":"pi","uid":"22222222-2222-2222-2222-222222222222","apiVersion":"extensions","resourceVersion":"222222"}}`}
+	createdBy3 := map[string]string{api.CreatedByAnnotation: `{"kind":"SerializedReference","apiVersion":"v1","reference":{"kind":"CronJob","namespace":"y","name":"pi","uid":"33333333-3333-3333-3333-333333333333","apiVersion":"extensions","resourceVersion":"333333"}}`}
 	noCreatedBy := map[string]string{}
 
 	{
 		// Case 1: There are no jobs and scheduledJobs
-		sjs := []batch.ScheduledJob{}
+		sjs := []batch.CronJob{}
 		js := []batch.Job{}
 		jobsBySj := groupJobsByParent(sjs, js)
 		if len(jobsBySj) != 0 {
@@ -175,7 +175,7 @@ func TestGroupJobsByParent(t *testing.T) {
 
 	{
 		// Case 2: there is one controller with no job.
-		sjs := []batch.ScheduledJob{
+		sjs := []batch.CronJob{
 			{ObjectMeta: api.ObjectMeta{Name: "e", Namespace: "x", UID: uid1}},
 		}
 		js := []batch.Job{}
@@ -187,7 +187,7 @@ func TestGroupJobsByParent(t *testing.T) {
 
 	{
 		// Case 3: there is one controller with one job it created.
-		sjs := []batch.ScheduledJob{
+		sjs := []batch.CronJob{
 			{ObjectMeta: api.ObjectMeta{Name: "e", Namespace: "x", UID: uid1}},
 		}
 		js := []batch.Job{
@@ -219,7 +219,7 @@ func TestGroupJobsByParent(t *testing.T) {
 			{ObjectMeta: api.ObjectMeta{Name: "b", Namespace: "y", Annotations: createdBy3}},
 			{ObjectMeta: api.ObjectMeta{Name: "d", Namespace: "y", Annotations: noCreatedBy}},
 		}
-		sjs := []batch.ScheduledJob{
+		sjs := []batch.CronJob{
 			{ObjectMeta: api.ObjectMeta{Name: "e", Namespace: "x", UID: uid1}},
 			{ObjectMeta: api.ObjectMeta{Name: "f", Namespace: "x", UID: uid2}},
 			{ObjectMeta: api.ObjectMeta{Name: "g", Namespace: "y", UID: uid3}},
@@ -269,13 +269,13 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 		t.Errorf("test setup error: %v", err)
 	}
 
-	sj := batch.ScheduledJob{
+	sj := batch.CronJob{
 		ObjectMeta: api.ObjectMeta{
-			Name:      "myscheduledjob",
+			Name:      "mycronjob",
 			Namespace: api.NamespaceDefault,
 			UID:       types.UID("1a2b3c"),
 		},
-		Spec: batch.ScheduledJobSpec{
+		Spec: batch.CronJobSpec{
 			Schedule:          schedule,
 			ConcurrencyPolicy: batch.AllowConcurrent,
 			JobTemplate:       batch.JobTemplateSpec{},

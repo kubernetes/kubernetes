@@ -589,7 +589,7 @@ k8s.io/kubernetes/pkg/controller/replicaset,fgrzadkowski,0
 k8s.io/kubernetes/pkg/controller/replication,fgrzadkowski,0
 k8s.io/kubernetes/pkg/controller/resourcequota,ghodss,1
 k8s.io/kubernetes/pkg/controller/route,gmarek,0
-k8s.io/kubernetes/pkg/controller/scheduledjob,soltysh,1
+k8s.io/kubernetes/pkg/controller/cronjob,soltysh,1
 k8s.io/kubernetes/pkg/controller/service,asalkeld,0
 k8s.io/kubernetes/pkg/controller/serviceaccount,liggitt,0
 k8s.io/kubernetes/pkg/controller/volume/attachdetach,luxas,1
@@ -677,8 +677,8 @@ k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler,bgrant0607,1
 k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler/etcd,justinsb,1
 k8s.io/kubernetes/pkg/registry/batch/job,kargakis,1
 k8s.io/kubernetes/pkg/registry/batch/job/etcd,Q-Lee,1
-k8s.io/kubernetes/pkg/registry/batch/scheduledjob,nikhiljindal,1
-k8s.io/kubernetes/pkg/registry/batch/scheduledjob/etcd,mtaufen,1
+k8s.io/kubernetes/pkg/registry/batch/cronjob,nikhiljindal,1
+k8s.io/kubernetes/pkg/registry/batch/cronjob/etcd,mtaufen,1
 k8s.io/kubernetes/pkg/registry/certificates/certificates,smarterclayton,1
 k8s.io/kubernetes/pkg/registry/core/componentstatus,krousey,1
 k8s.io/kubernetes/pkg/registry/core/configmap,janetkuo,1

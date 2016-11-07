@@ -83,6 +83,8 @@ func TestDefaulting(t *testing.T) {
 		{Group: "autoscaling", Version: "v1", Kind: "HorizontalPodAutoscalerList"}:          {},
 		{Group: "batch", Version: "v1", Kind: "Job"}:                                        {},
 		{Group: "batch", Version: "v1", Kind: "JobList"}:                                    {},
+		{Group: "batch", Version: "v2alpha1", Kind: "CronJob"}:                              {},
+		{Group: "batch", Version: "v2alpha1", Kind: "CronJobList"}:                          {},
 		{Group: "batch", Version: "v2alpha1", Kind: "Job"}:                                  {},
 		{Group: "batch", Version: "v2alpha1", Kind: "JobList"}:                              {},
 		{Group: "batch", Version: "v2alpha1", Kind: "JobTemplate"}:                          {},

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduledjob
+package cronjob
 
 import (
 	"testing"
@@ -31,13 +31,13 @@ func newBool(a bool) *bool {
 	return r
 }
 
-func TestScheduledJobStrategy(t *testing.T) {
+func TestCronJobStrategy(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	if !Strategy.NamespaceScoped() {
-		t.Errorf("ScheduledJob must be namespace scoped")
+		t.Errorf("CronJob must be namespace scoped")
 	}
 	if Strategy.AllowCreateOnUpdate() {
-		t.Errorf("ScheduledJob should not allow create on update")
+		t.Errorf("CronJob should not allow create on update")
 	}
 
 	validPodTemplateSpec := api.PodTemplateSpec{
@@ -47,12 +47,12 @@ func TestScheduledJobStrategy(t *testing.T) {
 			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 		},
 	}
-	scheduledJob := &batch.ScheduledJob{
+	scheduledJob := &batch.CronJob{
 		ObjectMeta: api.ObjectMeta{
-			Name:      "myscheduledjob",
+			Name:      "mycronjob",
 			Namespace: api.NamespaceDefault,
 		},
-		Spec: batch.ScheduledJobSpec{
+		Spec: batch.CronJobSpec{
 			Schedule:          "* * * * ?",
 			ConcurrencyPolicy: batch.AllowConcurrent,
 			JobTemplate: batch.JobTemplateSpec{
@@ -65,41 +65,41 @@ func TestScheduledJobStrategy(t *testing.T) {
 
 	Strategy.PrepareForCreate(ctx, scheduledJob)
 	if len(scheduledJob.Status.Active) != 0 {
-		t.Errorf("ScheduledJob does not allow setting status on create")
+		t.Errorf("CronJob does not allow setting status on create")
 	}
 	errs := Strategy.Validate(ctx, scheduledJob)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error validating %v", errs)
 	}
 	now := unversioned.Now()
-	updatedScheduledJob := &batch.ScheduledJob{
+	updatedCronJob := &batch.CronJob{
 		ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "4"},
-		Spec: batch.ScheduledJobSpec{
+		Spec: batch.CronJobSpec{
 			Schedule: "5 5 5 * ?",
 		},
-		Status: batch.ScheduledJobStatus{
+		Status: batch.CronJobStatus{
 			LastScheduleTime: &now,
 		},
 	}
 
 	// ensure we do not change status
-	Strategy.PrepareForUpdate(ctx, updatedScheduledJob, scheduledJob)
-	if updatedScheduledJob.Status.Active != nil {
+	Strategy.PrepareForUpdate(ctx, updatedCronJob, scheduledJob)
+	if updatedCronJob.Status.Active != nil {
 		t.Errorf("PrepareForUpdate should have preserved prior version status")
 	}
-	errs = Strategy.ValidateUpdate(ctx, updatedScheduledJob, scheduledJob)
+	errs = Strategy.ValidateUpdate(ctx, updatedCronJob, scheduledJob)
 	if len(errs) == 0 {
 		t.Errorf("Expected a validation error")
 	}
 }
 
-func TestScheduledJobStatusStrategy(t *testing.T) {
+func TestCronJobStatusStrategy(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	if !StatusStrategy.NamespaceScoped() {
-		t.Errorf("ScheduledJob must be namespace scoped")
+		t.Errorf("CronJob must be namespace scoped")
 	}
 	if StatusStrategy.AllowCreateOnUpdate() {
-		t.Errorf("ScheduledJob should not allow create on update")
+		t.Errorf("CronJob should not allow create on update")
 	}
 	validPodTemplateSpec := api.PodTemplateSpec{
 		Spec: api.PodSpec{
@@ -109,13 +109,13 @@ func TestScheduledJobStatusStrategy(t *testing.T) {
 		},
 	}
 	oldSchedule := "* * * * ?"
-	oldScheduledJob := &batch.ScheduledJob{
+	oldCronJob := &batch.CronJob{
 		ObjectMeta: api.ObjectMeta{
-			Name:            "myscheduledjob",
+			Name:            "mycronjob",
 			Namespace:       api.NamespaceDefault,
 			ResourceVersion: "10",
 		},
-		Spec: batch.ScheduledJobSpec{
+		Spec: batch.CronJobSpec{
 			Schedule:          oldSchedule,
 			ConcurrencyPolicy: batch.AllowConcurrent,
 			JobTemplate: batch.JobTemplateSpec{
@@ -126,13 +126,13 @@ func TestScheduledJobStatusStrategy(t *testing.T) {
 		},
 	}
 	now := unversioned.Now()
-	newScheduledJob := &batch.ScheduledJob{
+	newCronJob := &batch.CronJob{
 		ObjectMeta: api.ObjectMeta{
-			Name:            "myscheduledjob",
+			Name:            "mycronjob",
 			Namespace:       api.NamespaceDefault,
 			ResourceVersion: "9",
 		},
-		Spec: batch.ScheduledJobSpec{
+		Spec: batch.CronJobSpec{
 			Schedule:          "5 5 * * ?",
 			ConcurrencyPolicy: batch.AllowConcurrent,
 			JobTemplate: batch.JobTemplateSpec{
@@ -141,23 +141,23 @@ func TestScheduledJobStatusStrategy(t *testing.T) {
 				},
 			},
 		},
-		Status: batch.ScheduledJobStatus{
+		Status: batch.CronJobStatus{
 			LastScheduleTime: &now,
 		},
 	}
 
-	StatusStrategy.PrepareForUpdate(ctx, newScheduledJob, oldScheduledJob)
-	if newScheduledJob.Status.LastScheduleTime == nil {
-		t.Errorf("ScheduledJob status updates must allow changes to scheduledJob status")
+	StatusStrategy.PrepareForUpdate(ctx, newCronJob, oldCronJob)
+	if newCronJob.Status.LastScheduleTime == nil {
+		t.Errorf("CronJob status updates must allow changes to scheduledJob status")
 	}
-	if newScheduledJob.Spec.Schedule != oldSchedule {
-		t.Errorf("ScheduledJob status updates must now allow changes to scheduledJob spec")
+	if newCronJob.Spec.Schedule != oldSchedule {
+		t.Errorf("CronJob status updates must now allow changes to scheduledJob spec")
 	}
-	errs := StatusStrategy.ValidateUpdate(ctx, newScheduledJob, oldScheduledJob)
+	errs := StatusStrategy.ValidateUpdate(ctx, newCronJob, oldCronJob)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error %v", errs)
 	}
-	if newScheduledJob.ResourceVersion != "9" {
+	if newCronJob.ResourceVersion != "9" {
 		t.Errorf("Incoming resource version on update should not be mutated")
 	}
 }
@@ -166,8 +166,8 @@ func TestScheduledJobStatusStrategy(t *testing.T) {
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		"batch/v2alpha1",
-		"ScheduledJob",
-		ScheduledJobToSelectableFields(&batch.ScheduledJob{}),
+		"CronJob",
+		CronJobToSelectableFields(&batch.CronJob{}),
 		nil,
 	)
 }
