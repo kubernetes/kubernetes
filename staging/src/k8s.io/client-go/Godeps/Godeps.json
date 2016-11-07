@@ -162,10 +162,6 @@
 			"Rev": "72f9bd7c4e0c2a40055ab3d0f09654f730cce982"
 		},
 		{
-			"ImportPath": "github.com/juju/ratelimit",
-			"Rev": "77ed1c8a01217656d2080ad51981f6e99adaa177"
-		},
-		{
 			"ImportPath": "github.com/mailru/easyjson/buffer",
 			"Rev": "d5b7844b561a7bc640052f1b935f7b800330d7e0"
 		},
