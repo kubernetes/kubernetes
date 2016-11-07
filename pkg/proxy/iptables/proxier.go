@@ -222,8 +222,8 @@ var _ proxy.ProxyProvider = &Proxier{}
 // will not terminate if a particular iptables call fails.
 func NewProxier(ipt utiliptables.Interface, sysctl utilsysctl.Interface, exec utilexec.Interface, syncPeriod time.Duration, minSyncPeriod time.Duration, masqueradeAll bool, masqueradeBit int, clusterCIDR string, hostname string, nodeIP net.IP) (*Proxier, error) {
 	// check valid user input
-	if minSyncPeriod == 0 || minSyncPeriod > syncPeriod {
-		return nil, fmt.Errorf("min-sync (%v) must be < sync(%v) and > 0 ", minSyncPeriod, syncPeriod)
+	if minSyncPeriod > syncPeriod {
+		return nil, fmt.Errorf("min-sync (%v) must be < sync(%v)", minSyncPeriod, syncPeriod)
 	}
 
 	// Set the route_localnet sysctl we need for
@@ -252,16 +252,21 @@ func NewProxier(ipt utiliptables.Interface, sysctl utilsysctl.Interface, exec ut
 
 	go healthcheck.Run()
 
-	syncsPerSecond := float32(time.Second) / float32(minSyncPeriod)
+	var throttle flowcontrol.RateLimiter
+	// Defaulting back to not limit sync rate when minSyncPeriod is 0.
+	if minSyncPeriod != 0 {
+		syncsPerSecond := float32(time.Second) / float32(minSyncPeriod)
+		// The average use case will process 2 updates in short succession
+		throttle = flowcontrol.NewTokenBucketRateLimiter(syncsPerSecond, 2)
+	}
 
 	return &Proxier{
-		serviceMap:    make(map[proxy.ServicePortName]*serviceInfo),
-		endpointsMap:  make(map[proxy.ServicePortName][]*endpointsInfo),
-		portsMap:      make(map[localPort]closeable),
-		syncPeriod:    syncPeriod,
-		minSyncPeriod: minSyncPeriod,
-		// The average use case will process 2 updates in short succession
-		throttle:       flowcontrol.NewTokenBucketRateLimiter(syncsPerSecond, 2),
+		serviceMap:     make(map[proxy.ServicePortName]*serviceInfo),
+		endpointsMap:   make(map[proxy.ServicePortName][]*endpointsInfo),
+		portsMap:       make(map[localPort]closeable),
+		syncPeriod:     syncPeriod,
+		minSyncPeriod:  minSyncPeriod,
+		throttle:       throttle,
 		iptables:       ipt,
 		masqueradeAll:  masqueradeAll,
 		masqueradeMark: masqueradeMark,
