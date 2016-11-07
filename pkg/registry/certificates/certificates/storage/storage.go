@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package etcd
+package storage
 
 import (
 	"k8s.io/kubernetes/pkg/api"
@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-// REST implements a RESTStorage for CertificateSigningRequest against etcd
+// REST implements a RESTStorage for CertificateSigningRequest
 type REST struct {
 	*genericregistry.Store
 }

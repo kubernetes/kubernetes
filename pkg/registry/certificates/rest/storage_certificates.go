@@ -21,7 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	certificatesapiv1alpha1 "k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
 	"k8s.io/kubernetes/pkg/genericapiserver"
-	certificateetcd "k8s.io/kubernetes/pkg/registry/certificates/certificates/etcd"
+	certificatestore "k8s.io/kubernetes/pkg/registry/certificates/certificates/storage"
 	"k8s.io/kubernetes/pkg/registry/generic"
 )
 
@@ -43,7 +43,7 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapis
 
 	storage := map[string]rest.Storage{}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("certificatesigningrequests")) {
-		csrStorage, csrStatusStorage, csrApprovalStorage := certificateetcd.NewREST(restOptionsGetter)
+		csrStorage, csrStatusStorage, csrApprovalStorage := certificatestore.NewREST(restOptionsGetter)
 		storage["certificatesigningrequests"] = csrStorage
 		storage["certificatesigningrequests/status"] = csrStatusStorage
 		storage["certificatesigningrequests/approval"] = csrApprovalStorage
