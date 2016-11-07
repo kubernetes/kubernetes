@@ -895,6 +895,13 @@
       "type": "string",
       "description": "Base64-encoded PKCS#10 CSR data"
      },
+     "usages": {
+      "type": "array",
+      "items": {
+       "$ref": "v1alpha1.KeyUsage"
+      },
+      "description": "allowedUsages specifies a set of usage contexts the key will be valid for. See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3\n     https://tools.ietf.org/html/rfc5280#section-4.2.1.12"
+     },
      "username": {
       "type": "string",
       "description": "Information about the requesting user (if relevant) See user.Info interface for details"
@@ -909,6 +916,10 @@
       }
      }
     }
+   },
+   "v1alpha1.KeyUsage": {
+    "id": "v1alpha1.KeyUsage",
+    "properties": {}
    },
    "v1alpha1.CertificateSigningRequestStatus": {
     "id": "v1alpha1.CertificateSigningRequestStatus",

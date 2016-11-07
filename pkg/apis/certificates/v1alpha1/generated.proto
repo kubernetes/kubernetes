@@ -76,6 +76,12 @@ message CertificateSigningRequestSpec {
   // Base64-encoded PKCS#10 CSR data
   optional bytes request = 1;
 
+  // allowedUsages specifies a set of usage contexts the key will be
+  // valid for.
+  // See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3
+  //      https://tools.ietf.org/html/rfc5280#section-4.2.1.12
+  repeated string keyUsage = 5;
+
   // Information about the requesting user (if relevant)
   // See user.Info interface for details
   // +optional

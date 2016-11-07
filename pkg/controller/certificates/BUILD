@@ -12,6 +12,7 @@ go_library(
     srcs = [
         "certificate_controller.go",
         "certificate_controller_utils.go",
+        "cfssl_signer.go",
         "doc.go",
         "groupapprove.go",
     ],

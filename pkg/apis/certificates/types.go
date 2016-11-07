@@ -50,7 +50,7 @@ type CertificateSigningRequestSpec struct {
 	// valid for.
 	// See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3
 	//      https://tools.ietf.org/html/rfc5280#section-4.2.1.12
-	Usages []KeyUsage `json:"usage"`
+	Usages []KeyUsage `json:"usages"`
 
 	// Information about the requesting user (if relevant)
 	// See user.Info interface for details
