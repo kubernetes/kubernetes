@@ -370,7 +370,28 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 	namespaceKubeClient := client("namespace-controller")
 	namespaceClientPool := dynamic.NewClientPool(restclient.AddUserAgent(kubeconfig, "namespace-controller"), restMapper, dynamic.LegacyAPIPathResolverFunc)
 	// TODO: consider using a list-watch + cache here rather than polling
-	gvrFn := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources
+	var gvrFn func() ([]unversioned.GroupVersionResource, error)
+	rsrcs, err := namespaceKubeClient.Discovery().ServerResources()
+	if err != nil {
+		glog.Fatalf("Failed to get group version resources: %v", err)
+	}
+	for _, rsrcList := range rsrcs {
+		for ix := range rsrcList.APIResources {
+			rsrc := &rsrcList.APIResources[ix]
+			if rsrc.Kind == "ThirdPartyResource" {
+				gvrFn = namespaceKubeClient.Discovery().ServerPreferredNamespacedResources
+			}
+		}
+	}
+	if gvrFn == nil {
+		gvr, err := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources()
+		if err != nil {
+			glog.Fatalf("Failed to get resources: %v", err)
+		}
+		gvrFn = func() ([]unversioned.GroupVersionResource, error) {
+			return gvr, nil
+		}
+	}
 	namespaceController := namespacecontroller.NewNamespaceController(namespaceKubeClient, namespaceClientPool, gvrFn, s.NamespaceSyncPeriod.Duration, api.FinalizerKubernetes)
 	go namespaceController.Run(int(s.ConcurrentNamespaceSyncs), wait.NeverStop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
