@@ -29,12 +29,136 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&CronJob{}, func(obj interface{}) { SetObjectDefaults_CronJob(obj.(*CronJob)) })
+	scheme.AddTypeDefaultingFunc(&CronJobList{}, func(obj interface{}) { SetObjectDefaults_CronJobList(obj.(*CronJobList)) })
 	scheme.AddTypeDefaultingFunc(&Job{}, func(obj interface{}) { SetObjectDefaults_Job(obj.(*Job)) })
 	scheme.AddTypeDefaultingFunc(&JobList{}, func(obj interface{}) { SetObjectDefaults_JobList(obj.(*JobList)) })
 	scheme.AddTypeDefaultingFunc(&JobTemplate{}, func(obj interface{}) { SetObjectDefaults_JobTemplate(obj.(*JobTemplate)) })
-	scheme.AddTypeDefaultingFunc(&ScheduledJob{}, func(obj interface{}) { SetObjectDefaults_ScheduledJob(obj.(*ScheduledJob)) })
-	scheme.AddTypeDefaultingFunc(&ScheduledJobList{}, func(obj interface{}) { SetObjectDefaults_ScheduledJobList(obj.(*ScheduledJobList)) })
 	return nil
+}
+
+func SetObjectDefaults_CronJob(in *CronJob) {
+	SetDefaults_CronJob(in)
+	v1.SetDefaults_PodSpec(&in.Spec.JobTemplate.Spec.Template.Spec)
+	for i := range in.Spec.JobTemplate.Spec.Template.Spec.Volumes {
+		a := &in.Spec.JobTemplate.Spec.Template.Spec.Volumes[i]
+		v1.SetDefaults_Volume(a)
+		if a.VolumeSource.Secret != nil {
+			v1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
+		}
+		if a.VolumeSource.ISCSI != nil {
+			v1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
+		}
+		if a.VolumeSource.RBD != nil {
+			v1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+		}
+		if a.VolumeSource.DownwardAPI != nil {
+			v1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
+			for j := range a.VolumeSource.DownwardAPI.Items {
+				b := &a.VolumeSource.DownwardAPI.Items[j]
+				if b.FieldRef != nil {
+					v1.SetDefaults_ObjectFieldSelector(b.FieldRef)
+				}
+			}
+		}
+		if a.VolumeSource.ConfigMap != nil {
+			v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
+		}
+		if a.VolumeSource.AzureDisk != nil {
+			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
+		}
+	}
+	for i := range in.Spec.JobTemplate.Spec.Template.Spec.InitContainers {
+		a := &in.Spec.JobTemplate.Spec.Template.Spec.InitContainers[i]
+		v1.SetDefaults_Container(a)
+		for j := range a.Ports {
+			b := &a.Ports[j]
+			v1.SetDefaults_ContainerPort(b)
+		}
+		for j := range a.Env {
+			b := &a.Env[j]
+			if b.ValueFrom != nil {
+				if b.ValueFrom.FieldRef != nil {
+					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+				}
+			}
+		}
+		v1.SetDefaults_ResourceList(&a.Resources.Limits)
+		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		if a.LivenessProbe != nil {
+			v1.SetDefaults_Probe(a.LivenessProbe)
+			if a.LivenessProbe.Handler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.Handler.HTTPGet)
+			}
+		}
+		if a.ReadinessProbe != nil {
+			v1.SetDefaults_Probe(a.ReadinessProbe)
+			if a.ReadinessProbe.Handler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
+			}
+		}
+		if a.Lifecycle != nil {
+			if a.Lifecycle.PostStart != nil {
+				if a.Lifecycle.PostStart.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+				}
+			}
+			if a.Lifecycle.PreStop != nil {
+				if a.Lifecycle.PreStop.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+				}
+			}
+		}
+	}
+	for i := range in.Spec.JobTemplate.Spec.Template.Spec.Containers {
+		a := &in.Spec.JobTemplate.Spec.Template.Spec.Containers[i]
+		v1.SetDefaults_Container(a)
+		for j := range a.Ports {
+			b := &a.Ports[j]
+			v1.SetDefaults_ContainerPort(b)
+		}
+		for j := range a.Env {
+			b := &a.Env[j]
+			if b.ValueFrom != nil {
+				if b.ValueFrom.FieldRef != nil {
+					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
+				}
+			}
+		}
+		v1.SetDefaults_ResourceList(&a.Resources.Limits)
+		v1.SetDefaults_ResourceList(&a.Resources.Requests)
+		if a.LivenessProbe != nil {
+			v1.SetDefaults_Probe(a.LivenessProbe)
+			if a.LivenessProbe.Handler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.Handler.HTTPGet)
+			}
+		}
+		if a.ReadinessProbe != nil {
+			v1.SetDefaults_Probe(a.ReadinessProbe)
+			if a.ReadinessProbe.Handler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
+			}
+		}
+		if a.Lifecycle != nil {
+			if a.Lifecycle.PostStart != nil {
+				if a.Lifecycle.PostStart.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+				}
+			}
+			if a.Lifecycle.PreStop != nil {
+				if a.Lifecycle.PreStop.HTTPGet != nil {
+					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+				}
+			}
+		}
+	}
+}
+
+func SetObjectDefaults_CronJobList(in *CronJobList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_CronJob(a)
+	}
 }
 
 func SetObjectDefaults_Job(in *Job) {
@@ -274,129 +398,5 @@ func SetObjectDefaults_JobTemplate(in *JobTemplate) {
 				}
 			}
 		}
-	}
-}
-
-func SetObjectDefaults_ScheduledJob(in *ScheduledJob) {
-	SetDefaults_ScheduledJob(in)
-	v1.SetDefaults_PodSpec(&in.Spec.JobTemplate.Spec.Template.Spec)
-	for i := range in.Spec.JobTemplate.Spec.Template.Spec.Volumes {
-		a := &in.Spec.JobTemplate.Spec.Template.Spec.Volumes[i]
-		v1.SetDefaults_Volume(a)
-		if a.VolumeSource.Secret != nil {
-			v1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
-		}
-		if a.VolumeSource.ISCSI != nil {
-			v1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
-		}
-		if a.VolumeSource.RBD != nil {
-			v1.SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
-		}
-		if a.VolumeSource.DownwardAPI != nil {
-			v1.SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
-			for j := range a.VolumeSource.DownwardAPI.Items {
-				b := &a.VolumeSource.DownwardAPI.Items[j]
-				if b.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.FieldRef)
-				}
-			}
-		}
-		if a.VolumeSource.ConfigMap != nil {
-			v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
-		}
-		if a.VolumeSource.AzureDisk != nil {
-			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
-		}
-	}
-	for i := range in.Spec.JobTemplate.Spec.Template.Spec.InitContainers {
-		a := &in.Spec.JobTemplate.Spec.Template.Spec.InitContainers[i]
-		v1.SetDefaults_Container(a)
-		for j := range a.Ports {
-			b := &a.Ports[j]
-			v1.SetDefaults_ContainerPort(b)
-		}
-		for j := range a.Env {
-			b := &a.Env[j]
-			if b.ValueFrom != nil {
-				if b.ValueFrom.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
-				}
-			}
-		}
-		v1.SetDefaults_ResourceList(&a.Resources.Limits)
-		v1.SetDefaults_ResourceList(&a.Resources.Requests)
-		if a.LivenessProbe != nil {
-			v1.SetDefaults_Probe(a.LivenessProbe)
-			if a.LivenessProbe.Handler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.Handler.HTTPGet)
-			}
-		}
-		if a.ReadinessProbe != nil {
-			v1.SetDefaults_Probe(a.ReadinessProbe)
-			if a.ReadinessProbe.Handler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
-			}
-		}
-		if a.Lifecycle != nil {
-			if a.Lifecycle.PostStart != nil {
-				if a.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
-				}
-			}
-			if a.Lifecycle.PreStop != nil {
-				if a.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
-				}
-			}
-		}
-	}
-	for i := range in.Spec.JobTemplate.Spec.Template.Spec.Containers {
-		a := &in.Spec.JobTemplate.Spec.Template.Spec.Containers[i]
-		v1.SetDefaults_Container(a)
-		for j := range a.Ports {
-			b := &a.Ports[j]
-			v1.SetDefaults_ContainerPort(b)
-		}
-		for j := range a.Env {
-			b := &a.Env[j]
-			if b.ValueFrom != nil {
-				if b.ValueFrom.FieldRef != nil {
-					v1.SetDefaults_ObjectFieldSelector(b.ValueFrom.FieldRef)
-				}
-			}
-		}
-		v1.SetDefaults_ResourceList(&a.Resources.Limits)
-		v1.SetDefaults_ResourceList(&a.Resources.Requests)
-		if a.LivenessProbe != nil {
-			v1.SetDefaults_Probe(a.LivenessProbe)
-			if a.LivenessProbe.Handler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.Handler.HTTPGet)
-			}
-		}
-		if a.ReadinessProbe != nil {
-			v1.SetDefaults_Probe(a.ReadinessProbe)
-			if a.ReadinessProbe.Handler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.Handler.HTTPGet)
-			}
-		}
-		if a.Lifecycle != nil {
-			if a.Lifecycle.PostStart != nil {
-				if a.Lifecycle.PostStart.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
-				}
-			}
-			if a.Lifecycle.PreStop != nil {
-				if a.Lifecycle.PreStop.HTTPGet != nil {
-					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
-				}
-			}
-		}
-	}
-}
-
-func SetObjectDefaults_ScheduledJobList(in *ScheduledJobList) {
-	for i := range in.Items {
-		a := &in.Items[i]
-		SetObjectDefaults_ScheduledJob(a)
 	}
 }

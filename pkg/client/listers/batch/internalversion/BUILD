@@ -13,10 +13,10 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "cronjob.go",
         "expansion_generated.go",
         "job.go",
         "job_expansion.go",
-        "scheduledjob.go",
     ],
     tags = ["automanaged"],
     deps = [

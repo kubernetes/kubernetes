@@ -26,12 +26,12 @@ type FakeBatch struct {
 	*core.Fake
 }
 
-func (c *FakeBatch) Jobs(namespace string) internalversion.JobInterface {
-	return &FakeJobs{c, namespace}
+func (c *FakeBatch) CronJobs(namespace string) internalversion.CronJobInterface {
+	return &FakeCronJobs{c, namespace}
 }
 
-func (c *FakeBatch) ScheduledJobs(namespace string) internalversion.ScheduledJobInterface {
-	return &FakeScheduledJobs{c, namespace}
+func (c *FakeBatch) Jobs(namespace string) internalversion.JobInterface {
+	return &FakeJobs{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

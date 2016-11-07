@@ -196,8 +196,8 @@ type JobCondition struct {
 
 // +genclient=true
 
-// ScheduledJob represents the configuration of a single scheduled job.
-type ScheduledJob struct {
+// CronJob represents the configuration of a single cron job.
+type CronJob struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
@@ -207,28 +207,28 @@ type ScheduledJob struct {
 	// Spec is a structure defining the expected behavior of a job, including the schedule.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
 	// +optional
-	Spec ScheduledJobSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+	Spec CronJobSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// Status is a structure describing current status of a job.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
 	// +optional
-	Status ScheduledJobStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+	Status CronJobStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
-// ScheduledJobList is a collection of scheduled jobs.
-type ScheduledJobList struct {
+// CronJobList is a collection of cron jobs.
+type CronJobList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	// +optional
 	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Items is the list of ScheduledJob.
-	Items []ScheduledJob `json:"items" protobuf:"bytes,2,rep,name=items"`
+	// Items is the list of CronJob.
+	Items []CronJob `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
-// ScheduledJobSpec describes how the job execution will look like and when it will actually run.
-type ScheduledJobSpec struct {
+// CronJobSpec describes how the job execution will look like and when it will actually run.
+type CronJobSpec struct {
 
 	// Schedule contains the schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
 	Schedule string `json:"schedule" protobuf:"bytes,1,opt,name=schedule"`
@@ -248,7 +248,7 @@ type ScheduledJobSpec struct {
 	Suspend *bool `json:"suspend,omitempty" protobuf:"varint,4,opt,name=suspend"`
 
 	// JobTemplate is the object that describes the job that will be created when
-	// executing a ScheduledJob.
+	// executing a CronJob.
 	JobTemplate JobTemplateSpec `json:"jobTemplate" protobuf:"bytes,5,opt,name=jobTemplate"`
 }
 
@@ -259,7 +259,7 @@ type ScheduledJobSpec struct {
 type ConcurrencyPolicy string
 
 const (
-	// AllowConcurrent allows ScheduledJobs to run concurrently.
+	// AllowConcurrent allows CronJobs to run concurrently.
 	AllowConcurrent ConcurrencyPolicy = "Allow"
 
 	// ForbidConcurrent forbids concurrent runs, skipping next run if previous
@@ -270,8 +270,8 @@ const (
 	ReplaceConcurrent ConcurrencyPolicy = "Replace"
 )
 
-// ScheduledJobStatus represents the current state of a Job.
-type ScheduledJobStatus struct {
+// CronJobStatus represents the current state of a cron job.
+type CronJobStatus struct {
 	// Active holds pointers to currently running jobs.
 	// +optional
 	Active []v1.ObjectReference `json:"active,omitempty" protobuf:"bytes,1,rep,name=active"`

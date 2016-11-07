@@ -16,6 +16,6 @@ limitations under the License.
 
 package internalversion
 
-type JobExpansion interface{}
+type CronJobExpansion interface{}
 
-type ScheduledJobExpansion interface{}
+type JobExpansion interface{}

@@ -26,70 +26,70 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 )
 
-// ScheduledJobLister helps list ScheduledJobs.
-type ScheduledJobLister interface {
-	// List lists all ScheduledJobs in the indexer.
-	List(selector labels.Selector) (ret []*v2alpha1.ScheduledJob, err error)
-	// ScheduledJobs returns an object that can list and get ScheduledJobs.
-	ScheduledJobs(namespace string) ScheduledJobNamespaceLister
-	ScheduledJobListerExpansion
+// CronJobLister helps list CronJobs.
+type CronJobLister interface {
+	// List lists all CronJobs in the indexer.
+	List(selector labels.Selector) (ret []*v2alpha1.CronJob, err error)
+	// CronJobs returns an object that can list and get CronJobs.
+	CronJobs(namespace string) CronJobNamespaceLister
+	CronJobListerExpansion
 }
 
-// scheduledJobLister implements the ScheduledJobLister interface.
-type scheduledJobLister struct {
+// cronJobLister implements the CronJobLister interface.
+type cronJobLister struct {
 	indexer cache.Indexer
 }
 
-// NewScheduledJobLister returns a new ScheduledJobLister.
-func NewScheduledJobLister(indexer cache.Indexer) ScheduledJobLister {
-	return &scheduledJobLister{indexer: indexer}
+// NewCronJobLister returns a new CronJobLister.
+func NewCronJobLister(indexer cache.Indexer) CronJobLister {
+	return &cronJobLister{indexer: indexer}
 }
 
-// List lists all ScheduledJobs in the indexer.
-func (s *scheduledJobLister) List(selector labels.Selector) (ret []*v2alpha1.ScheduledJob, err error) {
+// List lists all CronJobs in the indexer.
+func (s *cronJobLister) List(selector labels.Selector) (ret []*v2alpha1.CronJob, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2alpha1.ScheduledJob))
+		ret = append(ret, m.(*v2alpha1.CronJob))
 	})
 	return ret, err
 }
 
-// ScheduledJobs returns an object that can list and get ScheduledJobs.
-func (s *scheduledJobLister) ScheduledJobs(namespace string) ScheduledJobNamespaceLister {
-	return scheduledJobNamespaceLister{indexer: s.indexer, namespace: namespace}
+// CronJobs returns an object that can list and get CronJobs.
+func (s *cronJobLister) CronJobs(namespace string) CronJobNamespaceLister {
+	return cronJobNamespaceLister{indexer: s.indexer, namespace: namespace}
 }
 
-// ScheduledJobNamespaceLister helps list and get ScheduledJobs.
-type ScheduledJobNamespaceLister interface {
-	// List lists all ScheduledJobs in the indexer for a given namespace.
-	List(selector labels.Selector) (ret []*v2alpha1.ScheduledJob, err error)
-	// Get retrieves the ScheduledJob from the indexer for a given namespace and name.
-	Get(name string) (*v2alpha1.ScheduledJob, error)
-	ScheduledJobNamespaceListerExpansion
+// CronJobNamespaceLister helps list and get CronJobs.
+type CronJobNamespaceLister interface {
+	// List lists all CronJobs in the indexer for a given namespace.
+	List(selector labels.Selector) (ret []*v2alpha1.CronJob, err error)
+	// Get retrieves the CronJob from the indexer for a given namespace and name.
+	Get(name string) (*v2alpha1.CronJob, error)
+	CronJobNamespaceListerExpansion
 }
 
-// scheduledJobNamespaceLister implements the ScheduledJobNamespaceLister
+// cronJobNamespaceLister implements the CronJobNamespaceLister
 // interface.
-type scheduledJobNamespaceLister struct {
+type cronJobNamespaceLister struct {
 	indexer   cache.Indexer
 	namespace string
 }
 
-// List lists all ScheduledJobs in the indexer for a given namespace.
-func (s scheduledJobNamespaceLister) List(selector labels.Selector) (ret []*v2alpha1.ScheduledJob, err error) {
+// List lists all CronJobs in the indexer for a given namespace.
+func (s cronJobNamespaceLister) List(selector labels.Selector) (ret []*v2alpha1.CronJob, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v2alpha1.ScheduledJob))
+		ret = append(ret, m.(*v2alpha1.CronJob))
 	})
 	return ret, err
 }
 
-// Get retrieves the ScheduledJob from the indexer for a given namespace and name.
-func (s scheduledJobNamespaceLister) Get(name string) (*v2alpha1.ScheduledJob, error) {
+// Get retrieves the CronJob from the indexer for a given namespace and name.
+func (s cronJobNamespaceLister) Get(name string) (*v2alpha1.CronJob, error) {
 	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(batch.Resource("scheduledjob"), name)
+		return nil, errors.NewNotFound(batch.Resource("cronjob"), name)
 	}
-	return obj.(*v2alpha1.ScheduledJob), nil
+	return obj.(*v2alpha1.CronJob), nil
 }

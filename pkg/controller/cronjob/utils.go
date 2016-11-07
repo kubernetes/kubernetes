@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduledjob
+package cronjob
 
 import (
 	"encoding/json"
@@ -33,9 +33,9 @@ import (
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
-// Utilities for dealing with Jobs and ScheduledJobs and time.
+// Utilities for dealing with Jobs and CronJobs and time.
 
-func inActiveList(sj batch.ScheduledJob, uid types.UID) bool {
+func inActiveList(sj batch.CronJob, uid types.UID) bool {
 	for _, j := range sj.Status.Active {
 		if j.UID == uid {
 			return true
@@ -44,7 +44,7 @@ func inActiveList(sj batch.ScheduledJob, uid types.UID) bool {
 	return false
 }
 
-func deleteFromActiveList(sj *batch.ScheduledJob, uid types.UID) {
+func deleteFromActiveList(sj *batch.CronJob, uid types.UID) {
 	if sj == nil {
 		return
 	}
@@ -70,8 +70,8 @@ func getParentUIDFromJob(j batch.Job) (types.UID, bool) {
 		glog.V(4).Infof("Job with unparsable created-by annotation, name %s namespace %s: %v", j.Name, j.Namespace, err)
 		return types.UID(""), false
 	}
-	if sr.Reference.Kind != "ScheduledJob" {
-		glog.V(4).Infof("Job with non-ScheduledJob parent, name %s namespace %s", j.Name, j.Namespace)
+	if sr.Reference.Kind != "CronJob" {
+		glog.V(4).Infof("Job with non-CronJob parent, name %s namespace %s", j.Name, j.Namespace)
 		return types.UID(""), false
 	}
 	// Don't believe a job that claims to have a parent in a different namespace.
@@ -85,7 +85,7 @@ func getParentUIDFromJob(j batch.Job) (types.UID, bool) {
 
 // groupJobsByParent groups jobs into a map keyed by the job parent UID (e.g. scheduledJob).
 // It has no receiver, to facilitate testing.
-func groupJobsByParent(sjs []batch.ScheduledJob, js []batch.Job) map[types.UID][]batch.Job {
+func groupJobsByParent(sjs []batch.CronJob, js []batch.Job) map[types.UID][]batch.Job {
 	jobsBySj := make(map[types.UID][]batch.Job)
 	for _, job := range js {
 		parentUID, found := getParentUIDFromJob(job)
@@ -120,7 +120,7 @@ func getNextStartTimeAfter(schedule string, now time.Time) (time.Time, error) {
 //
 // If there are too many (>100) unstarted times, just give up and return an empty slice.
 // If there were missed times prior to the last known start time, then those are not returned.
-func getRecentUnmetScheduleTimes(sj batch.ScheduledJob, now time.Time) ([]time.Time, error) {
+func getRecentUnmetScheduleTimes(sj batch.CronJob, now time.Time) ([]time.Time, error) {
 	starts := []time.Time{}
 	sched, err := cron.ParseStandard(sj.Spec.Schedule)
 	if err != nil {
@@ -135,7 +135,7 @@ func getRecentUnmetScheduleTimes(sj batch.ScheduledJob, now time.Time) ([]time.T
 		// in kubernetes says it may need to be recreated), or that we have
 		// started a job, but have not noticed it yet (distributed systems can
 		// have arbitrary delays).  In any case, use the creation time of the
-		// ScheduledJob as last known start time.
+		// CronJob as last known start time.
 		earliestTime = sj.ObjectMeta.CreationTimestamp.Time
 	}
 
@@ -172,8 +172,8 @@ func getRecentUnmetScheduleTimes(sj batch.ScheduledJob, now time.Time) ([]time.T
 
 // XXX unit test this
 
-// getJobFromTemplate makes a Job from a ScheduledJob
-func getJobFromTemplate(sj *batch.ScheduledJob, scheduledTime time.Time) (*batch.Job, error) {
+// getJobFromTemplate makes a Job from a CronJob
+func getJobFromTemplate(sj *batch.CronJob, scheduledTime time.Time) (*batch.Job, error) {
 	// TODO: consider adding the following labels:
 	// nominal-start-time=$RFC_3339_DATE_OF_INTENDED_START -- for user convenience
 	// scheduled-job-name=$SJ_NAME -- for user convenience

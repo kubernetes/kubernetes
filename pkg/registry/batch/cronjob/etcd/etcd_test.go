@@ -38,13 +38,13 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) 
 	return storage, statusStorage, server
 }
 
-func validNewScheduledJob() *batch.ScheduledJob {
-	return &batch.ScheduledJob{
+func validNewCronJob() *batch.CronJob {
+	return &batch.CronJob{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
 			Namespace: api.NamespaceDefault,
 		},
-		Spec: batch.ScheduledJobSpec{
+		Spec: batch.CronJobSpec{
 			Schedule:          "* * * * ?",
 			ConcurrencyPolicy: batch.AllowConcurrent,
 			JobTemplate: batch.JobTemplateSpec{
@@ -72,14 +72,14 @@ func TestCreate(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
-	validScheduledJob := validNewScheduledJob()
-	validScheduledJob.ObjectMeta = api.ObjectMeta{}
+	validCronJob := validNewCronJob()
+	validCronJob.ObjectMeta = api.ObjectMeta{}
 	test.TestCreate(
 		// valid
-		validScheduledJob,
+		validCronJob,
 		// invalid (empty spec)
-		&batch.ScheduledJob{
-			Spec: batch.ScheduledJobSpec{},
+		&batch.CronJob{
+			Spec: batch.CronJobSpec{},
 		},
 	)
 }
@@ -97,16 +97,16 @@ func TestUpdate(t *testing.T) {
 	schedule := "1 1 1 1 ?"
 	test.TestUpdate(
 		// valid
-		validNewScheduledJob(),
+		validNewCronJob(),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*batch.ScheduledJob)
+			object := obj.(*batch.CronJob)
 			object.Spec.Schedule = schedule
 			return object
 		},
 		// invalid updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*batch.ScheduledJob)
+			object := obj.(*batch.CronJob)
 			object.Spec.Schedule = "* * *"
 			return object
 		},
@@ -123,7 +123,7 @@ func TestDelete(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
-	test.TestDelete(validNewScheduledJob())
+	test.TestDelete(validNewCronJob())
 }
 
 func TestGet(t *testing.T) {
@@ -136,7 +136,7 @@ func TestGet(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
-	test.TestGet(validNewScheduledJob())
+	test.TestGet(validNewCronJob())
 }
 
 func TestList(t *testing.T) {
@@ -149,7 +149,7 @@ func TestList(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
-	test.TestList(validNewScheduledJob())
+	test.TestList(validNewCronJob())
 }
 
 func TestWatch(t *testing.T) {
@@ -163,7 +163,7 @@ func TestWatch(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	test.TestWatch(
-		validNewScheduledJob(),
+		validNewCronJob(),
 		// matching labels
 		[]labels.Set{},
 		// not matching labels

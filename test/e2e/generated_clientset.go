@@ -188,17 +188,17 @@ var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 	})
 })
 
-func newTestingScheduledJob(name string, value string) *v2alpha1.ScheduledJob {
+func newTestingCronJob(name string, value string) *v2alpha1.CronJob {
 	parallelism := int32(1)
 	completions := int32(1)
-	return &v2alpha1.ScheduledJob{
+	return &v2alpha1.CronJob{
 		ObjectMeta: v1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
 				"time": value,
 			},
 		},
-		Spec: v2alpha1.ScheduledJobSpec{
+		Spec: v2alpha1.CronJobSpec{
 			Schedule:          "*/1 * * * ?",
 			ConcurrencyPolicy: v2alpha1.AllowConcurrent,
 			JobTemplate: v2alpha1.JobTemplateSpec{
@@ -238,7 +238,7 @@ func newTestingScheduledJob(name string, value string) *v2alpha1.ScheduledJob {
 
 var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 	f := framework.NewDefaultFramework("clientset")
-	It("should create v2alpha1 scheduleJobs, delete scheduleJobs, watch scheduleJobs", func() {
+	It("should create v2alpha1 cronJobs, delete cronJobs, watch cronJobs", func() {
 		var enabled bool
 		groupList, err := f.ClientSet_1_5.Discovery().ServerGroups()
 		ExpectNoError(err)
@@ -256,59 +256,59 @@ var _ = framework.KubeDescribe("Generated release_1_5 clientset", func() {
 			framework.Logf("%s is not enabled, test skipped", v2alpha1.SchemeGroupVersion)
 			return
 		}
-		scheduleJobClient := f.ClientSet_1_5.BatchV2alpha1().ScheduledJobs(f.Namespace.Name)
-		By("constructing the scheduledJob")
-		name := "scheduledjob" + string(uuid.NewUUID())
+		cronJobClient := f.ClientSet_1_5.BatchV2alpha1().CronJobs(f.Namespace.Name)
+		By("constructing the cronJob")
+		name := "cronjob" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
-		scheduledJob := newTestingScheduledJob(name, value)
+		cronJob := newTestingCronJob(name, value)
 		By("setting up watch")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value})).String()
 		options := v1.ListOptions{LabelSelector: selector}
-		scheduleJobs, err := scheduleJobClient.List(options)
+		cronJobs, err := cronJobClient.List(options)
 		if err != nil {
-			framework.Failf("Failed to query for scheduleJobs: %v", err)
+			framework.Failf("Failed to query for cronJobs: %v", err)
 		}
-		Expect(len(scheduleJobs.Items)).To(Equal(0))
+		Expect(len(cronJobs.Items)).To(Equal(0))
 		options = v1.ListOptions{
 			LabelSelector:   selector,
-			ResourceVersion: scheduleJobs.ListMeta.ResourceVersion,
+			ResourceVersion: cronJobs.ListMeta.ResourceVersion,
 		}
-		w, err := scheduleJobClient.Watch(options)
+		w, err := cronJobClient.Watch(options)
 		if err != nil {
 			framework.Failf("Failed to set up watch: %v", err)
 		}
 
-		By("creating the scheduledJob")
-		scheduledJob, err = scheduleJobClient.Create(scheduledJob)
+		By("creating the cronJob")
+		cronJob, err = cronJobClient.Create(cronJob)
 		if err != nil {
-			framework.Failf("Failed to create scheduledJob: %v", err)
+			framework.Failf("Failed to create cronJob: %v", err)
 		}
 
-		By("verifying the scheduledJob is in kubernetes")
+		By("verifying the cronJob is in kubernetes")
 		options = v1.ListOptions{
 			LabelSelector:   selector,
-			ResourceVersion: scheduledJob.ResourceVersion,
+			ResourceVersion: cronJob.ResourceVersion,
 		}
-		scheduleJobs, err = scheduleJobClient.List(options)
+		cronJobs, err = cronJobClient.List(options)
 		if err != nil {
-			framework.Failf("Failed to query for scheduleJobs: %v", err)
+			framework.Failf("Failed to query for cronJobs: %v", err)
 		}
-		Expect(len(scheduleJobs.Items)).To(Equal(1))
+		Expect(len(cronJobs.Items)).To(Equal(1))
 
-		By("verifying scheduledJob creation was observed")
+		By("verifying cronJob creation was observed")
 		observeCreation(w)
 
-		By("deleting the scheduledJob")
-		if err := scheduleJobClient.Delete(scheduledJob.Name, nil); err != nil {
-			framework.Failf("Failed to delete scheduledJob: %v", err)
+		By("deleting the cronJob")
+		if err := cronJobClient.Delete(cronJob.Name, nil); err != nil {
+			framework.Failf("Failed to delete cronJob: %v", err)
 		}
 
 		options = v1.ListOptions{LabelSelector: selector}
-		scheduleJobs, err = scheduleJobClient.List(options)
+		cronJobs, err = cronJobClient.List(options)
 		if err != nil {
-			framework.Failf("Failed to list scheduleJobs to verify deletion: %v", err)
+			framework.Failf("Failed to list cronJobs to verify deletion: %v", err)
 		}
-		Expect(len(scheduleJobs.Items)).To(Equal(0))
+		Expect(len(cronJobs.Items)).To(Equal(0))
 	})
 })
 
