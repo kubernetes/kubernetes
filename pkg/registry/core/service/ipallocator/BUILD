@@ -41,7 +41,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/registry/core/service/ipallocator/controller:all-srcs",
-        "//pkg/registry/core/service/ipallocator/etcd:all-srcs",
+        "//pkg/registry/core/service/ipallocator/storage:all-srcs",
     ],
     tags = ["automanaged"],
 )

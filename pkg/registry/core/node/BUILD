@@ -61,8 +61,8 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/registry/core/node/etcd:all-srcs",
         "//pkg/registry/core/node/rest:all-srcs",
+        "//pkg/registry/core/node/storage:all-srcs",
     ],
     tags = ["automanaged"],
 )

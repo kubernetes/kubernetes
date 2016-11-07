@@ -54,7 +54,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/registry/batch/cronjob/etcd:all-srcs",
+        "//pkg/registry/batch/cronjob/storage:all-srcs",
     ],
     tags = ["automanaged"],
 )

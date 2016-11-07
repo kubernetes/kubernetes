@@ -53,7 +53,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/registry/core/event/etcd:all-srcs",
+        "//pkg/registry/core/event/storage:all-srcs",
     ],
     tags = ["automanaged"],
 )
