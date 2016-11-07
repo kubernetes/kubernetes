@@ -147,6 +147,7 @@ Federation apiserver Cluster objects should be created and deleted successfully,
 Federation daemonsets DaemonSet objects should be created and deleted successfully,soltysh,1
 Federation deployments Deployment objects should be created and deleted successfully,soltysh,1
 Federation deployments Federated Deployment should create and update matching deployments in underling clusters,soltysh,1
+Federation daemonsets DaemonSet objects should be created and deleted successfully,nikhiljindal,0
 Federation events Event objects should be created and deleted successfully,karlkfi,1
 Federation namespace Namespace objects all resources in the namespace should be deleted when namespace is deleted,nikhiljindal,0
 Federation namespace Namespace objects should be created and deleted successfully,xiang90,1
