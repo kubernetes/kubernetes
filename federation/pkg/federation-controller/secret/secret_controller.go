@@ -265,8 +265,9 @@ func (secretcontroller *SecretController) reconcileSecret(secret types.Namespace
 			return
 		}
 
+		// The data should not be modified.
 		desiredSecret := &api_v1.Secret{
-			ObjectMeta: util.CopyObjectMeta(baseSecret.ObjectMeta),
+			ObjectMeta: util.DeepCopyRelevantObjectMeta(baseSecret.ObjectMeta),
 			Data:       baseSecret.Data,
 			Type:       baseSecret.Type,
 		}

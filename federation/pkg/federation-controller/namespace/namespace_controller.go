@@ -391,9 +391,10 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 			nc.deliverNamespace(namespace, 0, true)
 			return
 		}
+		// The object should not be modified.
 		desiredNamespace := &api_v1.Namespace{
-			ObjectMeta: util.CopyObjectMeta(baseNamespace.ObjectMeta),
-			Spec:       baseNamespace.Spec,
+			ObjectMeta: util.DeepCopyRelevantObjectMeta(baseNamespace.ObjectMeta),
+			Spec:       util.DeepCopyApiTypeOrPanic(baseNamespace.Spec).(api_v1.NamespaceSpec),
 		}
 		glog.V(5).Infof("Desired namespace in underlying clusters: %+v", desiredNamespace)
 
