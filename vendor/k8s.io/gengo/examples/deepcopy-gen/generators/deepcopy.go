@@ -409,9 +409,6 @@ func (g *genDeepCopy) DeepCopyableInterfaces(c *generator.Context, t *types.Type
 	}
 
 	intfs := types.ExtractCommentTags("+", t.SecondClosestCommentLines)[interfacesTagName]
-	if t.Name.Name == "TypeMeta" {
-		glog.Infof("intfs %+v", intfs)
-	}
 
 	var ts []*types.Type
 	for _, intf := range intfs {
