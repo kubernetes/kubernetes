@@ -114,3 +114,22 @@ func validateResourceName(value string, fldPath *field.Path) field.ErrorList {
 
 	return field.ErrorList{}
 }
+
+func ValidatePodLogOptions(opts *v1.PodLogOptions) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if opts.TailLines != nil && *opts.TailLines < 0 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("tailLines"), *opts.TailLines, isNegativeErrorMsg))
+	}
+	if opts.LimitBytes != nil && *opts.LimitBytes < 1 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("limitBytes"), *opts.LimitBytes, "must be greater than 0"))
+	}
+	switch {
+	case opts.SinceSeconds != nil && opts.SinceTime != nil:
+		allErrs = append(allErrs, field.Forbidden(field.NewPath(""), "at most one of `sinceTime` or `sinceSeconds` may be specified"))
+	case opts.SinceSeconds != nil:
+		if *opts.SinceSeconds < 1 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("sinceSeconds"), *opts.SinceSeconds, "must be greater than 0"))
+		}
+	}
+	return allErrs
+}
