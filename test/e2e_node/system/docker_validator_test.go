@@ -17,6 +17,7 @@ limitations under the License.
 package system
 
 import (
+	"os"
 	"testing"
 
 	"github.com/docker/engine-api/types"
@@ -24,7 +25,9 @@ import (
 )
 
 func TestValidateDockerInfo(t *testing.T) {
-	v := &DockerValidator{}
+	v := &DockerValidator{
+		Reporter: DefaultReporter,
+	}
 	spec := &DockerSpec{
 		Version:     []string{`1\.(9|\d{2,})\..*`},
 		GraphDriver: []string{"driver_1", "driver_2"},

@@ -79,7 +79,7 @@ func TestE2eNode(t *testing.T) {
 	}
 	if *systemValidateMode {
 		// If system-validate-mode is specified, only run system validation in current process.
-		if err := system.Validate(); err != nil {
+		if err := system.ValidateDefault(); err != nil {
 			glog.Exitf("system validation failed: %v", err)
 		}
 		return

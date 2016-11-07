@@ -17,13 +17,16 @@ limitations under the License.
 package system
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestValidateOS(t *testing.T) {
-	v := &OSValidator{}
+	v := &OSValidator{
+		Reporter: DefaultReporter,
+	}
 	specOS := "Linux"
 	for _, test := range []struct {
 		os  string

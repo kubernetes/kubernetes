@@ -16,6 +16,10 @@ limitations under the License.
 
 package system
 
+import (
+	"os"
+)
+
 // KernelConfig defines one kernel configration item.
 type KernelConfig struct {
 	// Name is the general name of the kernel configuration. It is used to
@@ -119,4 +123,9 @@ var DefaultSysSpec = SysSpec{
 			GraphDriver: []string{"aufs", "overlay", "devicemapper"},
 		},
 	},
+}
+
+// DefaultReporter is the default Reporter
+var DefaultReporter = StreamReporter{
+	WriteStream: os.Stdout,
 }
