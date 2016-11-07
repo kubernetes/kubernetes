@@ -167,29 +167,6 @@ func TestVersion(t *testing.T) {
 	}
 }
 
-// TestFindExternalAddress verifies both pass and fail cases for the unexported
-// findExternalAddress function
-func TestFindExternalAddress(t *testing.T) {
-	assert := assert.New(t)
-	expectedIP := "172.0.0.1"
-
-	nodes := []*api.Node{new(api.Node), new(api.Node), new(api.Node)}
-	nodes[0].Status.Addresses = []api.NodeAddress{{Type: "ExternalIP", Address: expectedIP}}
-	nodes[1].Status.Addresses = []api.NodeAddress{{Type: "LegacyHostIP", Address: expectedIP}}
-	nodes[2].Status.Addresses = []api.NodeAddress{{Type: "ExternalIP", Address: expectedIP}, {Type: "LegacyHostIP", Address: "172.0.0.2"}}
-
-	// Pass Case
-	for _, node := range nodes {
-		ip, err := findExternalAddress(node)
-		assert.NoError(err, "error getting node external address")
-		assert.Equal(expectedIP, ip, "expected ip to be %s, but was %s", expectedIP, ip)
-	}
-
-	// Fail case
-	_, err := findExternalAddress(new(api.Node))
-	assert.Error(err, "expected findExternalAddress to fail on a node with missing ip information")
-}
-
 type fakeEndpointReconciler struct{}
 
 func (*fakeEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []api.EndpointPort, reconcilePorts bool) error {
