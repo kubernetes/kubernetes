@@ -25,26 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 )
 
-func TestConversionError(t *testing.T) {
-	var i int
-	var s string
-	i = 3
-	s = "foo"
-	c := ConversionError{
-		In: &i, Out: &s,
-		Message: "Can't make x into y, silly",
-	}
-	var e error
-	e = &c // ensure it implements error
-	msg := e.Error()
-	t.Logf("Message is %v", msg)
-	for _, part := range []string{"3", "int", "string", "Can't"} {
-		if !strings.Contains(msg, part) {
-			t.Errorf("didn't find %v", part)
-		}
-	}
-}
-
 func TestSemantic(t *testing.T) {
 	table := []struct {
 		a, b        interface{}

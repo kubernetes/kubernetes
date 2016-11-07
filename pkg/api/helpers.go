@@ -37,20 +37,6 @@ import (
 	"github.com/davecgh/go-spew/spew"
 )
 
-// Conversion error conveniently packages up errors in conversions.
-type ConversionError struct {
-	In, Out interface{}
-	Message string
-}
-
-// Return a helpful string about the error
-func (c *ConversionError) Error() string {
-	return spew.Sprintf(
-		"Conversion error: %s. (in: %v(%+v) out: %v)",
-		c.Message, reflect.TypeOf(c.In), c.In, reflect.TypeOf(c.Out),
-	)
-}
-
 // Semantic can do semantic deep equality checks for api objects.
 // Example: api.Semantic.DeepEqual(aPod, aPodWithNonNilButEmptyMaps) == true
 var Semantic = conversion.EqualitiesOrDie(
