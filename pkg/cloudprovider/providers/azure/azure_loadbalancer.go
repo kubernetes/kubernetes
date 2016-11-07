@@ -133,7 +133,7 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *api.Service, no
 		return nil, utilerrors.Flatten(errs)
 	}
 
-	glog.V(2).Infof("ensure(%s): FINISH - %s", service.Name, *pip.Properties.IPAddress)
+	glog.V(2).Infof("ensure(%s): FINISH - %s", serviceName, *pip.Properties.IPAddress)
 	return &api.LoadBalancerStatus{
 		Ingress: []api.LoadBalancerIngress{{IP: *pip.Properties.IPAddress}},
 	}, nil
@@ -362,8 +362,9 @@ func (az *Cloud) reconcileLoadBalancer(lb network.LoadBalancer, pip *network.Pub
 				Probe: &network.SubResource{
 					ID: to.StringPtr(az.getLoadBalancerProbeID(lbName, lbRuleName)),
 				},
-				FrontendPort: to.Int32Ptr(port.Port),
-				BackendPort:  to.Int32Ptr(port.NodePort),
+				FrontendPort:     to.Int32Ptr(port.Port),
+				BackendPort:      to.Int32Ptr(port.Port),
+				EnableFloatingIP: to.BoolPtr(true),
 			},
 		}
 	}
@@ -470,7 +471,7 @@ func (az *Cloud) reconcileSecurityGroup(sg network.SecurityGroup, clusterName st
 			Properties: &network.SecurityRulePropertiesFormat{
 				Protocol:                 securityProto,
 				SourcePortRange:          to.StringPtr("*"),
-				DestinationPortRange:     to.StringPtr(strconv.Itoa(int(port.NodePort))),
+				DestinationPortRange:     to.StringPtr(strconv.Itoa(int(port.Port))),
 				SourceAddressPrefix:      to.StringPtr("Internet"),
 				DestinationAddressPrefix: to.StringPtr("*"),
 				Access:    network.Allow,
