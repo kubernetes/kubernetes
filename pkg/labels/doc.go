@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// +k8s:deepcopy-gen=package,register
+
 // Package labels implements a simple label system, parsing and matching
 // selectors with sets of labels.
 package labels // import "k8s.io/kubernetes/pkg/labels"

@@ -16,6 +16,8 @@ limitations under the License.
 
 package types
 
+import "strings"
+
 // Ref makes a reference to the given type. It can only be used for e.g.
 // passing to namers.
 func Ref(packageName, typeName string) *Type {
@@ -42,6 +44,19 @@ func (n Name) String() string {
 		return n.Name
 	}
 	return n.Package + "." + n.Name
+}
+
+// ParseFullyQualifiedName parses a name like k8s.io/kubernetes/pkg/api.Pod into a Name.
+func ParseFullyQualifiedName(fqn string) Name {
+	cs := strings.Split(fqn, ".")
+	pkg := ""
+	if len(cs) > 1 {
+		pkg = strings.Join(cs[0:len(cs) - 1], ".")
+	}
+	return Name{
+		Name: cs[len(cs) - 1],
+		Package: pkg,
+	}
 }
 
 // The possible classes of types.

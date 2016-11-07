@@ -27,6 +27,8 @@ package unversioned
 
 import "strings"
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/kubernetes/pkg/api/unversioned.Object
+
 // TypeMeta describes an individual object in an API response or request
 // with strings representing the type of the object and its API schema version.
 // Structures that are versioned or persisted should inline TypeMeta.
@@ -45,6 +47,12 @@ type TypeMeta struct {
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources
 	// +optional
 	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,2,opt,name=apiVersion"`
+}
+
+// Object
+type Object interface {
+	GetObjectKind() ObjectKind
+	DeepCopyObject() Object
 }
 
 // ListMeta describes metadata that synthetic resources must have, including lists and
