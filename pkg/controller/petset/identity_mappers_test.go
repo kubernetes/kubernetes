@@ -157,18 +157,19 @@ func TestPetIDReset(t *testing.T) {
 		},
 	}
 	firstPCB.pod.Spec.Volumes = append(firstPCB.pod.Spec.Volumes, userAdded)
-	pod, needsUpdate, err := copyPetID(firstPCB, secondPCB)
+	mutated, err := update(ps, "2", firstPCB.pod, secondPCB.pod)
+
 	if err != nil {
 		t.Errorf("%v", err)
 	}
-	if !needsUpdate {
+	if !mutated {
 		t.Errorf("expected update since identity of %v was reset", secondPCB.pod.Name)
 	}
-	if identityHash(ps, &pod) != identityHash(ps, secondPCB.pod) {
+	if identityHash(ps, firstPCB.pod) != identityHash(ps, secondPCB.pod) {
 		t.Errorf("Failed to copy identity for pod %v -> %v", firstPCB.pod.Name, secondPCB.pod.Name)
 	}
 	foundVol := false
-	for _, v := range pod.Spec.Volumes {
+	for _, v := range firstPCB.pod.Spec.Volumes {
 		if reflect.DeepEqual(v, userAdded) {
 			foundVol = true
 			break

@@ -37,9 +37,11 @@ func newFakeStatefulSetController() (*StatefulSetController, *fakePetClient) {
 	return &StatefulSetController{
 		kubeClient:       nil,
 		blockingPetStore: newUnHealthyPetTracker(fpc),
-		podStoreSynced:   func() bool { return true },
-		psStore:          cache.StoreToStatefulSetLister{Store: cache.NewStore(controller.KeyFunc)},
-		podStore:         cache.StoreToPodLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{})},
+		podStoreSynced: func() bool {
+			return true
+		},
+		psStore:  cache.StoreToStatefulSetLister{Store: cache.NewStore(controller.KeyFunc)},
+		podStore: cache.StoreToPodLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{})},
 		newSyncer: func(blockingPet *pcb) *petSyncer {
 			return &petSyncer{fpc, blockingPet}
 		},
@@ -56,6 +58,7 @@ func checkPets(ps *apps.StatefulSet, creates, deletes int, fc *fakePetClient, t 
 	}
 	for i := range fc.pets {
 		expectedPet, _ := newPCB(fmt.Sprintf("%v", i), ps)
+
 		if identityHash(ps, fc.pets[i].pod) != identityHash(ps, expectedPet.pod) {
 			t.Errorf("Unexpected pod at index %d", i)
 		}
@@ -108,6 +111,12 @@ func TestStatefulSetControllerCreates(t *testing.T) {
 		t.Errorf("Error syncing StatefulSet: %v", err)
 	}
 	checkPets(ps, replicas+1, 0, fc, t)
+	for _, pet := range fc.pets {
+		if r := getReplicasAnnotation(pet.pod); r != ps.Spec.Replicas {
+			t.Errorf("Expected %d replicas found %d", ps.Spec.Replicas, r)
+		}
+	}
+
 }
 
 func TestStatefulSetControllerDeletes(t *testing.T) {
@@ -133,6 +142,11 @@ func TestStatefulSetControllerDeletes(t *testing.T) {
 		t.Errorf("Error syncing StatefulSet: %v", errors.NewAggregate(errs))
 	}
 	checkPets(ps, replicas, replicas, fc, t)
+	for _, pet := range fc.pets {
+		if r := getReplicasAnnotation(pet.pod); r != ps.Spec.Replicas {
+			t.Errorf("Expected %d replicas found %d", ps.Spec.Replicas, r)
+		}
+	}
 }
 
 func TestStatefulSetControllerRespectsTermination(t *testing.T) {
@@ -213,7 +227,7 @@ func TestStatefulSetControllerBlocksScaling(t *testing.T) {
 	newPodList := fc.getPodList()
 	for _, p := range newPodList {
 		if p.Name == deletedPod.Name {
-			t.Errorf("Deleted pod was created while existing pod was unhealthy")
+			t.Error("Deleted pod was created while existing pod was unhealthy")
 		}
 	}
 
@@ -230,7 +244,7 @@ func TestStatefulSetControllerBlocksScaling(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("Deleted pod was not created after existing pods became healthy")
+		t.Error("Deleted pod was not created after existing pods became healthy")
 	}
 }
 
@@ -276,7 +290,7 @@ func TestSyncStatefulSetBlockedPet(t *testing.T) {
 	ps := newStatefulSet(3)
 	i, _ := psc.syncStatefulSet(ps, fc.getPodList())
 	if i != len(fc.getPodList()) {
-		t.Errorf("syncStatefulSet should return actual amount of pods")
+		t.Error("syncStatefulSet should return actual amount of pods")
 	}
 }
 

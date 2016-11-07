@@ -221,27 +221,3 @@ func identityHash(ps *apps.StatefulSet, pet *api.Pod) string {
 	}
 	return fmt.Sprintf("%x", md5.Sum([]byte(id)))
 }
-
-// copyPetID gives the realPet the same identity as the expectedPet.
-// Note that this is *not* a literal copy, but a copy of the fields that
-// contribute to the pet's identity. The returned boolean 'needsUpdate' will
-// be false if the realPet already has the same identity as the expectedPet.
-func copyPetID(realPet, expectedPet *pcb) (pod api.Pod, needsUpdate bool, err error) {
-	if realPet.pod == nil || expectedPet.pod == nil {
-		return pod, false, fmt.Errorf("Need a valid to and from pet for copy")
-	}
-	if realPet.parent.UID != expectedPet.parent.UID {
-		return pod, false, fmt.Errorf("Cannot copy pets with different parents")
-	}
-	ps := realPet.parent
-	if identityHash(ps, realPet.pod) == identityHash(ps, expectedPet.pod) {
-		return *realPet.pod, false, nil
-	}
-	copyPod := *realPet.pod
-	// This is the easiest way to give an identity to a pod. It won't work
-	// when we stop using names for id.
-	for _, idMapper := range newIdentityMappers(ps) {
-		idMapper.SetIdentity(expectedPet.id, &copyPod)
-	}
-	return copyPod, true, nil
-}
