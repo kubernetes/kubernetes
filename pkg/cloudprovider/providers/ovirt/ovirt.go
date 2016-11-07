@@ -173,7 +173,11 @@ func (v *OVirtCloud) NodeAddresses(nodeName types.NodeName) ([]api.NodeAddress, 
 		address = resolved[0]
 	}
 
-	return []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: address.String()}}, nil
+	return []api.NodeAddress{
+		{Type: api.NodeLegacyHostIP, Address: address.String()},
+		{Type: api.NodeInternalIP, Address: address.String()},
+		{Type: api.NodeExternalIP, Address: address.String()},
+	}, nil
 }
 
 // mapNodeNameToInstanceName maps from a k8s NodeName to an ovirt instance name (the hostname)
