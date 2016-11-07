@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	extensionsrest "k8s.io/kubernetes/pkg/registry/extensions/rest"
 	"k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata"
-	thirdpartyresourcedataetcd "k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata/etcd"
+	thirdpartyresourcedatastore "k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata/storage"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
@@ -87,7 +87,7 @@ func NewThirdPartyResourceServer(genericAPIServer *genericapiserver.GenericAPISe
 // for easy lookup.
 type thirdPartyEntry struct {
 	// Map from plural resource name to entry
-	storage map[string]*thirdpartyresourcedataetcd.REST
+	storage map[string]*thirdpartyresourcedatastore.REST
 	group   unversioned.APIGroup
 }
 
@@ -160,7 +160,7 @@ func (m *ThirdPartyResourceServer) RemoveThirdPartyResource(path string) error {
 	return nil
 }
 
-func (m *ThirdPartyResourceServer) removeAllThirdPartyResources(registry *thirdpartyresourcedataetcd.REST) error {
+func (m *ThirdPartyResourceServer) removeAllThirdPartyResources(registry *thirdpartyresourcedatastore.REST) error {
 	ctx := api.NewDefaultContext()
 	existingData, err := registry.List(ctx, nil)
 	if err != nil {
@@ -217,14 +217,14 @@ func (m *ThirdPartyResourceServer) hasThirdPartyGroupStorage(path string) bool {
 	return found
 }
 
-func (m *ThirdPartyResourceServer) addThirdPartyResourceStorage(path, resource string, storage *thirdpartyresourcedataetcd.REST, apiGroup unversioned.APIGroup) {
+func (m *ThirdPartyResourceServer) addThirdPartyResourceStorage(path, resource string, storage *thirdpartyresourcedatastore.REST, apiGroup unversioned.APIGroup) {
 	m.thirdPartyResourcesLock.Lock()
 	defer m.thirdPartyResourcesLock.Unlock()
 	entry, found := m.thirdPartyResources[path]
 	if entry == nil {
 		entry = &thirdPartyEntry{
 			group:   apiGroup,
-			storage: map[string]*thirdpartyresourcedataetcd.REST{},
+			storage: map[string]*thirdpartyresourcedatastore.REST{},
 		}
 		m.thirdPartyResources[path] = entry
 	}
@@ -268,7 +268,7 @@ func (m *ThirdPartyResourceServer) InstallThirdPartyResource(rsrc *extensions.Th
 	// If storage exists, this group has already been added, just update
 	// the group with the new API
 	if m.hasThirdPartyGroupStorage(path) {
-		m.addThirdPartyResourceStorage(path, plural.Resource, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedataetcd.REST), apiGroup)
+		m.addThirdPartyResourceStorage(path, plural.Resource, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedatastore.REST), apiGroup)
 		return thirdparty.UpdateREST(m.genericAPIServer.HandlerContainer.Container)
 	}
 
@@ -277,12 +277,12 @@ func (m *ThirdPartyResourceServer) InstallThirdPartyResource(rsrc *extensions.Th
 	}
 	m.genericAPIServer.HandlerContainer.Add(apiserver.NewGroupWebService(api.Codecs, path, apiGroup))
 
-	m.addThirdPartyResourceStorage(path, plural.Resource, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedataetcd.REST), apiGroup)
+	m.addThirdPartyResourceStorage(path, plural.Resource, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedatastore.REST), apiGroup)
 	return nil
 }
 
 func (m *ThirdPartyResourceServer) thirdpartyapi(group, kind, version, pluralResource string) *apiserver.APIGroupVersion {
-	resourceStorage := thirdpartyresourcedataetcd.NewREST(
+	resourceStorage := thirdpartyresourcedatastore.NewREST(
 		generic.RESTOptions{
 			StorageConfig:           m.thirdPartyStorageConfig,
 			Decorator:               generic.UndecoratedStorage,

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package etcd
+package storage
 
 import (
 	"k8s.io/kubernetes/pkg/api"
@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/storage"
 )
 
-// REST implements a RESTStorage for PodSecurityPolicies against etcd.
+// REST implements a RESTStorage for PodSecurityPolicies.
 type REST struct {
 	*registry.Store
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,51 +14,89 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package etcd
+package storage
 
 import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	// Ensure that extensions/v1beta1 package is initialized.
-	_ "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
-	etcdStorage, server := registrytest.NewEtcdStorage(t, extensions.GroupName)
+	etcdStorage, server := registrytest.NewEtcdStorage(t, "extensions")
 	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1}
-	return NewREST(restOptions, "foo", "bar"), server
+	return NewREST(restOptions), server
 }
 
-func validNewThirdPartyResourceData(name string) *extensions.ThirdPartyResourceData {
-	return &extensions.ThirdPartyResourceData{
+// createNetworkPolicy is a helper function that returns a NetworkPolicy with the updated resource version.
+func createNetworkPolicy(storage *REST, np extensions.NetworkPolicy, t *testing.T) (extensions.NetworkPolicy, error) {
+	ctx := api.WithNamespace(api.NewContext(), np.Namespace)
+	obj, err := storage.Create(ctx, &np)
+	if err != nil {
+		t.Errorf("Failed to create NetworkPolicy, %v", err)
+	}
+	newNP := obj.(*extensions.NetworkPolicy)
+	return *newNP, nil
+}
+
+func validNewNetworkPolicy() *extensions.NetworkPolicy {
+	port := intstr.FromInt(80)
+	return &extensions.NetworkPolicy{
 		ObjectMeta: api.ObjectMeta{
-			Name:      name,
+			Name:      "foo",
 			Namespace: api.NamespaceDefault,
+			Labels:    map[string]string{"a": "b"},
 		},
-		Data: []byte("foobarbaz"),
+		Spec: extensions.NetworkPolicySpec{
+			PodSelector: unversioned.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
+			Ingress: []extensions.NetworkPolicyIngressRule{
+				{
+					From: []extensions.NetworkPolicyPeer{
+						{
+							PodSelector: &unversioned.LabelSelector{MatchLabels: map[string]string{"c": "d"}},
+						},
+					},
+					Ports: []extensions.NetworkPolicyPort{
+						{
+							Port: &port,
+						},
+					},
+				},
+			},
+		},
 	}
 }
+
+var validNetworkPolicy = *validNewNetworkPolicy()
 
 func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
-	rsrc := validNewThirdPartyResourceData("foo")
-	rsrc.ObjectMeta = api.ObjectMeta{}
+	np := validNewNetworkPolicy()
+	np.ObjectMeta = api.ObjectMeta{}
+
+	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	test.TestCreate(
 		// valid
-		rsrc,
-		// invalid
-		&extensions.ThirdPartyResourceData{},
+		np,
+		// invalid (invalid selector)
+		&extensions.NetworkPolicy{
+			Spec: extensions.NetworkPolicySpec{
+				PodSelector: unversioned.LabelSelector{MatchLabels: invalidSelector},
+				Ingress:     []extensions.NetworkPolicyIngressRule{},
+			},
+		},
 	)
 }
 
@@ -69,11 +107,21 @@ func TestUpdate(t *testing.T) {
 	test := registrytest.New(t, storage.Store)
 	test.TestUpdate(
 		// valid
-		validNewThirdPartyResourceData("foo"),
-		// updateFunc
+		validNewNetworkPolicy(),
+		// valid updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*extensions.ThirdPartyResourceData)
-			object.Data = []byte("new description")
+			object := obj.(*extensions.NetworkPolicy)
+			return object
+		},
+		// invalid updateFunc
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*extensions.NetworkPolicy)
+			object.Name = ""
+			return object
+		},
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*extensions.NetworkPolicy)
+			object.Spec.PodSelector = unversioned.LabelSelector{MatchLabels: map[string]string{}}
 			return object
 		},
 	)
@@ -84,7 +132,7 @@ func TestDelete(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
-	test.TestDelete(validNewThirdPartyResourceData("foo"))
+	test.TestDelete(validNewNetworkPolicy())
 }
 
 func TestGet(t *testing.T) {
@@ -92,7 +140,7 @@ func TestGet(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
-	test.TestGet(validNewThirdPartyResourceData("foo"))
+	test.TestGet(validNewNetworkPolicy())
 }
 
 func TestList(t *testing.T) {
@@ -100,7 +148,7 @@ func TestList(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
-	test.TestList(validNewThirdPartyResourceData("foo"))
+	test.TestList(validNewNetworkPolicy())
 }
 
 func TestWatch(t *testing.T) {
@@ -109,16 +157,21 @@ func TestWatch(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	test.TestWatch(
-		validNewThirdPartyResourceData("foo"),
+		validNewNetworkPolicy(),
 		// matching labels
-		[]labels.Set{},
+		[]labels.Set{
+			{"a": "b"},
+		},
 		// not matching labels
 		[]labels.Set{
+			{"a": "c"},
 			{"foo": "bar"},
 		},
 		// matching fields
-		[]fields.Set{},
-		// not matching fields
+		[]fields.Set{
+			{"metadata.name": "foo"},
+		},
+		// not matchin fields
 		[]fields.Set{
 			{"metadata.name": "bar"},
 			{"name": "foo"},

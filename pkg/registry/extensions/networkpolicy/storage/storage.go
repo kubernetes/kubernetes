@@ -14,95 +14,73 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package etcd
+package storage
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	extensionsapi "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
-	ingress "k8s.io/kubernetes/pkg/registry/extensions/ingress"
+	"k8s.io/kubernetes/pkg/registry/extensions/networkpolicy"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 )
 
-// rest implements a RESTStorage for replication controllers against etcd
+// rest implements a RESTStorage for network policies
 type REST struct {
 	*registry.Store
 }
 
-// NewREST returns a RESTStorage object that will work against replication controllers.
-func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
+// NewREST returns a RESTStorage object that will work against network policies.
+func NewREST(opts generic.RESTOptions) *REST {
 	prefix := "/" + opts.ResourcePrefix
 
-	newListFunc := func() runtime.Object { return &extensions.IngressList{} }
+	newListFunc := func() runtime.Object { return &extensionsapi.NetworkPolicyList{} }
 	storageInterface, dFunc := opts.Decorator(
 		opts.StorageConfig,
-		cachesize.GetWatchCacheSizeByResource(cachesize.Ingress),
-		&extensions.Ingress{},
+		cachesize.GetWatchCacheSizeByResource(cachesize.NetworkPolicys),
+		&extensionsapi.NetworkPolicy{},
 		prefix,
-		ingress.Strategy,
+		networkpolicy.Strategy,
 		newListFunc,
 		storage.NoTriggerPublisher,
 	)
 
 	store := &registry.Store{
-		NewFunc: func() runtime.Object { return &extensions.Ingress{} },
+		NewFunc: func() runtime.Object { return &extensionsapi.NetworkPolicy{} },
 
 		// NewListFunc returns an object capable of storing results of an etcd list.
 		NewListFunc: newListFunc,
-		// Produces a ingress that etcd understands, to the root of the resource
+		// Produces a NetworkPolicy that etcd understands, to the root of the resource
 		// by combining the namespace in the context with the given prefix
 		KeyRootFunc: func(ctx api.Context) string {
 			return registry.NamespaceKeyRootFunc(ctx, prefix)
 		},
-		// Produces a ingress that etcd understands, to the resource by combining
+		// Produces a NetworkPolicy that etcd understands, to the resource by combining
 		// the namespace in the context with the given prefix
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
 			return registry.NamespaceKeyFunc(ctx, prefix, name)
 		},
-		// Retrieve the name field of a replication controller
+		// Retrieve the name field of a network policy
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
-			return obj.(*extensions.Ingress).Name, nil
+			return obj.(*extensionsapi.NetworkPolicy).Name, nil
 		},
 		// Used to match objects based on labels/fields for list and watch
-		PredicateFunc:           ingress.MatchIngress,
-		QualifiedResource:       extensions.Resource("ingresses"),
+		PredicateFunc:           networkpolicy.MatchNetworkPolicy,
+		QualifiedResource:       extensionsapi.Resource("networkpolicies"),
 		EnableGarbageCollection: opts.EnableGarbageCollection,
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		// Used to validate controller creation
-		CreateStrategy: ingress.Strategy,
+		CreateStrategy: networkpolicy.Strategy,
 
 		// Used to validate controller updates
-		UpdateStrategy: ingress.Strategy,
-		DeleteStrategy: ingress.Strategy,
+		UpdateStrategy: networkpolicy.Strategy,
+		DeleteStrategy: networkpolicy.Strategy,
 
 		Storage:     storageInterface,
 		DestroyFunc: dFunc,
 	}
-	statusStore := *store
-	statusStore.UpdateStrategy = ingress.StatusStrategy
-	return &REST{store}, &StatusREST{store: &statusStore}
-}
-
-// StatusREST implements the REST endpoint for changing the status of an ingress
-type StatusREST struct {
-	store *registry.Store
-}
-
-func (r *StatusREST) New() runtime.Object {
-	return &extensions.Ingress{}
-}
-
-// Get retrieves the object from the storage. It is required to support Patch.
-func (r *StatusREST) Get(ctx api.Context, name string) (runtime.Object, error) {
-	return r.store.Get(ctx, name)
-}
-
-// Update alters the status subset of an object.
-func (r *StatusREST) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, name, objInfo)
+	return &REST{store}
 }

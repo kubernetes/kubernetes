@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,10 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package etcd
+package storage
 
 import (
-	"fmt"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -33,43 +32,47 @@ import (
 )
 
 func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
-	etcdStorage, server := registrytest.NewEtcdStorage(t, extensions.GroupName)
+	etcdStorage, server := registrytest.NewEtcdStorage(t, "extensions")
 	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1}
 	return NewREST(restOptions), server
 }
 
-func validNewThirdPartyResource(name string) *extensions.ThirdPartyResource {
-	return &extensions.ThirdPartyResource{
+func validNewPodSecurityPolicy() *extensions.PodSecurityPolicy {
+	return &extensions.PodSecurityPolicy{
 		ObjectMeta: api.ObjectMeta{
-			Name: name,
+			Name: "foo",
 		},
-		Versions: []extensions.APIVersion{
-			{
-				Name: "v1",
+		Spec: extensions.PodSecurityPolicySpec{
+			SELinux: extensions.SELinuxStrategyOptions{
+				Rule: extensions.SELinuxStrategyRunAsAny,
+			},
+			RunAsUser: extensions.RunAsUserStrategyOptions{
+				Rule: extensions.RunAsUserStrategyRunAsAny,
+			},
+			FSGroup: extensions.FSGroupStrategyOptions{
+				Rule: extensions.FSGroupStrategyRunAsAny,
+			},
+			SupplementalGroups: extensions.SupplementalGroupsStrategyOptions{
+				Rule: extensions.SupplementalGroupsStrategyRunAsAny,
 			},
 		},
 	}
-}
-
-func namer(i int) string {
-	return fmt.Sprintf("kind%d.example.com", i)
 }
 
 func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store).ClusterScope().Namer(namer).GeneratesName()
-	rsrc := validNewThirdPartyResource("kind.domain.tld")
+	test := registrytest.New(t, storage.Store).ClusterScope()
+	psp := validNewPodSecurityPolicy()
+	psp.ObjectMeta = api.ObjectMeta{GenerateName: "foo-"}
 	test.TestCreate(
 		// valid
-		rsrc,
+		psp,
 		// invalid
-		&extensions.ThirdPartyResource{},
-		&extensions.ThirdPartyResource{ObjectMeta: api.ObjectMeta{Name: "kind"}, Versions: []extensions.APIVersion{{Name: "v1"}}},
-		&extensions.ThirdPartyResource{ObjectMeta: api.ObjectMeta{Name: "kind.tld"}, Versions: []extensions.APIVersion{{Name: "v1"}}},
-		&extensions.ThirdPartyResource{ObjectMeta: api.ObjectMeta{Name: "kind.domain.tld"}, Versions: []extensions.APIVersion{{Name: "v.1"}}},
-		&extensions.ThirdPartyResource{ObjectMeta: api.ObjectMeta{Name: "kind.domain.tld"}, Versions: []extensions.APIVersion{{Name: "stable/v1"}}},
+		&extensions.PodSecurityPolicy{
+			ObjectMeta: api.ObjectMeta{Name: "name with spaces"},
+		},
 	)
 }
 
@@ -77,14 +80,14 @@ func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store).ClusterScope().Namer(namer)
+	test := registrytest.New(t, storage.Store).ClusterScope()
 	test.TestUpdate(
 		// valid
-		validNewThirdPartyResource("kind.domain.tld"),
+		validNewPodSecurityPolicy(),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*extensions.ThirdPartyResource)
-			object.Description = "new description"
+			object := obj.(*extensions.PodSecurityPolicy)
+			object.Labels = map[string]string{"a": "b"}
 			return object
 		},
 	)
@@ -94,33 +97,33 @@ func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store).ClusterScope().Namer(namer)
-	test.TestDelete(validNewThirdPartyResource("kind.domain.tld"))
+	test := registrytest.New(t, storage.Store).ClusterScope().ReturnDeletedObject()
+	test.TestDelete(validNewPodSecurityPolicy())
 }
 
 func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store).ClusterScope().Namer(namer)
-	test.TestGet(validNewThirdPartyResource("kind.domain.tld"))
+	test := registrytest.New(t, storage.Store).ClusterScope()
+	test.TestGet(validNewPodSecurityPolicy())
 }
 
 func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store).ClusterScope().Namer(namer)
-	test.TestList(validNewThirdPartyResource("kind.domain.tld"))
+	test := registrytest.New(t, storage.Store).ClusterScope()
+	test.TestList(validNewPodSecurityPolicy())
 }
 
 func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := registrytest.New(t, storage.Store).ClusterScope().Namer(namer)
+	test := registrytest.New(t, storage.Store).ClusterScope()
 	test.TestWatch(
-		validNewThirdPartyResource("kind.domain.tld"),
+		validNewPodSecurityPolicy(),
 		// matching labels
 		[]labels.Set{},
 		// not matching labels
@@ -128,7 +131,9 @@ func TestWatch(t *testing.T) {
 			{"foo": "bar"},
 		},
 		// matching fields
-		[]fields.Set{},
+		[]fields.Set{
+			{"metadata.name": "foo"},
+		},
 		// not matching fields
 		[]fields.Set{
 			{"metadata.name": "bar"},

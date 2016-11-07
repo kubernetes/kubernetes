@@ -30,14 +30,14 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	horizontalpodautoscalerstore "k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler/storage"
 	jobstore "k8s.io/kubernetes/pkg/registry/batch/job/storage"
-	expcontrolleretcd "k8s.io/kubernetes/pkg/registry/extensions/controller/etcd"
-	daemonetcd "k8s.io/kubernetes/pkg/registry/extensions/daemonset/etcd"
-	deploymentetcd "k8s.io/kubernetes/pkg/registry/extensions/deployment/etcd"
-	ingressetcd "k8s.io/kubernetes/pkg/registry/extensions/ingress/etcd"
-	networkpolicyetcd "k8s.io/kubernetes/pkg/registry/extensions/networkpolicy/etcd"
-	pspetcd "k8s.io/kubernetes/pkg/registry/extensions/podsecuritypolicy/etcd"
-	replicasetetcd "k8s.io/kubernetes/pkg/registry/extensions/replicaset/etcd"
-	thirdpartyresourceetcd "k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresource/etcd"
+	expcontrollerstore "k8s.io/kubernetes/pkg/registry/extensions/controller/storage"
+	daemonstore "k8s.io/kubernetes/pkg/registry/extensions/daemonset/storage"
+	deploymentstore "k8s.io/kubernetes/pkg/registry/extensions/deployment/storage"
+	ingressstore "k8s.io/kubernetes/pkg/registry/extensions/ingress/storage"
+	networkpolicystore "k8s.io/kubernetes/pkg/registry/extensions/networkpolicy/storage"
+	pspstore "k8s.io/kubernetes/pkg/registry/extensions/podsecuritypolicy/storage"
+	replicasetstore "k8s.io/kubernetes/pkg/registry/extensions/replicaset/storage"
+	thirdpartyresourcestore "k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresource/storage"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -69,22 +69,22 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapise
 		storage["horizontalpodautoscalers"] = hpaStorage
 		storage["horizontalpodautoscalers/status"] = hpaStatusStorage
 
-		controllerStorage := expcontrolleretcd.NewStorage(restOptionsGetter(api.Resource("replicationControllers")))
+		controllerStorage := expcontrollerstore.NewStorage(restOptionsGetter(api.Resource("replicationControllers")))
 		storage["replicationcontrollers"] = controllerStorage.ReplicationController
 		storage["replicationcontrollers/scale"] = controllerStorage.Scale
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("thirdpartyresources")) {
-		thirdPartyResourceStorage := thirdpartyresourceetcd.NewREST(restOptionsGetter(extensions.Resource("thirdpartyresources")))
+		thirdPartyResourceStorage := thirdpartyresourcestore.NewREST(restOptionsGetter(extensions.Resource("thirdpartyresources")))
 		storage["thirdpartyresources"] = thirdPartyResourceStorage
 	}
 
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("daemonsets")) {
-		daemonSetStorage, daemonSetStatusStorage := daemonetcd.NewREST(restOptionsGetter(extensions.Resource("daemonsets")))
+		daemonSetStorage, daemonSetStatusStorage := daemonstore.NewREST(restOptionsGetter(extensions.Resource("daemonsets")))
 		storage["daemonsets"] = daemonSetStorage
 		storage["daemonsets/status"] = daemonSetStatusStorage
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("deployments")) {
-		deploymentStorage := deploymentetcd.NewStorage(restOptionsGetter(extensions.Resource("deployments")))
+		deploymentStorage := deploymentstore.NewStorage(restOptionsGetter(extensions.Resource("deployments")))
 		storage["deployments"] = deploymentStorage.Deployment
 		storage["deployments/status"] = deploymentStorage.Status
 		storage["deployments/rollback"] = deploymentStorage.Rollback
@@ -96,22 +96,22 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource genericapise
 		storage["jobs/status"] = jobsStatusStorage
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("ingresses")) {
-		ingressStorage, ingressStatusStorage := ingressetcd.NewREST(restOptionsGetter(extensions.Resource("ingresses")))
+		ingressStorage, ingressStatusStorage := ingressstore.NewREST(restOptionsGetter(extensions.Resource("ingresses")))
 		storage["ingresses"] = ingressStorage
 		storage["ingresses/status"] = ingressStatusStorage
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("podsecuritypolicy")) {
-		podSecurityExtensionsStorage := pspetcd.NewREST(restOptionsGetter(extensions.Resource("podsecuritypolicy")))
+		podSecurityExtensionsStorage := pspstore.NewREST(restOptionsGetter(extensions.Resource("podsecuritypolicy")))
 		storage["podSecurityPolicies"] = podSecurityExtensionsStorage
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("replicasets")) {
-		replicaSetStorage := replicasetetcd.NewStorage(restOptionsGetter(extensions.Resource("replicasets")))
+		replicaSetStorage := replicasetstore.NewStorage(restOptionsGetter(extensions.Resource("replicasets")))
 		storage["replicasets"] = replicaSetStorage.ReplicaSet
 		storage["replicasets/status"] = replicaSetStorage.Status
 		storage["replicasets/scale"] = replicaSetStorage.Scale
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("networkpolicies")) {
-		networkExtensionsStorage := networkpolicyetcd.NewREST(restOptionsGetter(extensions.Resource("networkpolicies")))
+		networkExtensionsStorage := networkpolicystore.NewREST(restOptionsGetter(extensions.Resource("networkpolicies")))
 		storage["networkpolicies"] = networkExtensionsStorage
 	}
 
