@@ -461,10 +461,10 @@ function start_kubelet {
       fi
 
       auth_args=""
-      if [[ -n "${KUBELET_AUTHORIZATION_WEBHOOK}" ]]; then
+      if [[ -n "${KUBELET_AUTHORIZATION_WEBHOOK:-}" ]]; then
         auth_args="${auth_args} --authorization-mode=Webhook"
       fi
-      if [[ -n "${KUBELET_AUTHENTICATION_WEBHOOK}" ]]; then
+      if [[ -n "${KUBELET_AUTHENTICATION_WEBHOOK:-}" ]]; then
         auth_args="${auth_args} --authentication-token-webhook"
       fi
       if [[ -n "${CLIENT_CA_FILE:-}" ]]; then
