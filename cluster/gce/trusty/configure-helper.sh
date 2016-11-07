@@ -603,6 +603,8 @@ start_kube_apiserver() {
     params="${params} --advertise-address=${vm_external_ip}"
     params="${params} --ssh-user=${PROXY_SSH_USER}"
     params="${params} --ssh-keyfile=/etc/srv/sshproxy/.sshkeyfile"
+  else [ -n "${MASTER_RESERVED_IP:-}" ]
+    params="${params} --advertise-address=${MASTER_RESERVED_IP}"
   fi
   readonly kube_apiserver_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-apiserver.docker_tag)
 

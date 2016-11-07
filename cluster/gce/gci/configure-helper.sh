@@ -777,6 +777,8 @@ function start-kube-apiserver {
     params+=" --advertise-address=${vm_external_ip}"
     params+=" --ssh-user=${PROXY_SSH_USER}"
     params+=" --ssh-keyfile=/etc/srv/sshproxy/.sshkeyfile"
+  else [ -n "${MASTER_RESERVED_IP:-}" ]
+    params="${params} --advertise-address=${MASTER_RESERVED_IP}"
   fi
 
   local webhook_authn_config_mount=""
