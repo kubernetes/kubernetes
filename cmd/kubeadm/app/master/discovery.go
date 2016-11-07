@@ -22,13 +22,14 @@ import (
 	"fmt"
 	"time"
 
+	clientset "k8s.io/client-go/kubernetes"
+	internal_api "k8s.io/client-go/pkg/api"
+	api "k8s.io/client-go/pkg/api/v1"
+	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	certutil "k8s.io/client-go/pkg/util/cert"
+	"k8s.io/client-go/pkg/util/wait"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	certutil "k8s.io/kubernetes/pkg/util/cert"
-	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 type kubeDiscovery struct {
@@ -67,7 +68,7 @@ func newKubeDiscoveryPodSpec(cfg *kubeadmapi.MasterConfiguration) api.PodSpec {
 		// buisness and CNI support isn't quite there yet (except for kubenet)
 		// (see https://github.com/kubernetes/kubernetes/issues/31307)
 		// TODO update this when #31307 is resolved
-		SecurityContext: &api.PodSecurityContext{HostNetwork: true},
+		HostNetwork: true,
 		Containers: []api.Container{{
 			Name:    kubeDiscoveryName,
 			Image:   kubeadmapi.GlobalEnvParams.DiscoveryImage,
@@ -120,10 +121,10 @@ func newKubeDiscovery(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Certific
 func CreateDiscoveryDeploymentAndSecret(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset, caCert *x509.Certificate) error {
 	kd := newKubeDiscovery(cfg, caCert)
 
-	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(kd.Deployment); err != nil {
+	if _, err := client.Extensions().Deployments(internal_api.NamespaceSystem).Create(kd.Deployment); err != nil {
 		return fmt.Errorf("<master/discovery> failed to create %q deployment [%v]", kubeDiscoveryName, err)
 	}
-	if _, err := client.Secrets(api.NamespaceSystem).Create(kd.Secret); err != nil {
+	if _, err := client.Secrets(internal_api.NamespaceSystem).Create(kd.Secret); err != nil {
 		return fmt.Errorf("<master/discovery> failed to create %q secret [%v]", kubeDiscoverySecretName, err)
 	}
 
@@ -131,7 +132,7 @@ func CreateDiscoveryDeploymentAndSecret(cfg *kubeadmapi.MasterConfiguration, cli
 
 	start := time.Now()
 	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
-		d, err := client.Extensions().Deployments(api.NamespaceSystem).Get(kubeDiscoveryName)
+		d, err := client.Extensions().Deployments(internal_api.NamespaceSystem).Get(kubeDiscoveryName)
 		if err != nil {
 			return false, nil
 		}
