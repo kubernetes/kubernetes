@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller/informers"
@@ -39,8 +40,11 @@ var NamespaceNodeSelectors = []string{"scheduler.alpha.kubernetes.io/node-select
 
 func init() {
 	admission.RegisterPlugin("PodNodeSelector", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
-		pluginConfig := readConfig(config)
-		plugin := NewPodNodeSelector(client, pluginConfig.PodNodeSelectorPluginConfig)
+		lsMap, err := readConfig(config)
+		if err != nil {
+			return nil, err
+		}
+		plugin := NewPodNodeSelector(client, lsMap)
 		return plugin, nil
 	})
 }
@@ -51,7 +55,7 @@ type podNodeSelector struct {
 	client            clientset.Interface
 	namespaceInformer cache.SharedIndexInformer
 	// global default node selector and namespace whitelists in a cluster.
-	clusterNodeSelectors map[string]string
+	clusterNodeSelectors map[string]labels.Set
 }
 
 type pluginConfig struct {
@@ -66,10 +70,10 @@ type pluginConfig struct {
 //  clusterDefaultNodeSelector: <node-selectors-labels>
 //  namespace1: <node-selectors-labels>
 //  namespace2: <node-selectors-labels>
-func readConfig(config io.Reader) *pluginConfig {
+func readConfig(config io.Reader) (map[string]labels.Set, error) {
 	defaultConfig := &pluginConfig{}
 	if config == nil || reflect.ValueOf(config).IsNil() {
-		return defaultConfig
+		return nil, nil
 	}
 	d := yaml.NewYAMLOrJSONDecoder(config, 4096)
 	for {
@@ -80,7 +84,8 @@ func readConfig(config io.Reader) *pluginConfig {
 		}
 		break
 	}
-	return defaultConfig
+
+	return validatePluginConfig(defaultConfig.PodNodeSelectorPluginConfig)
 }
 
 // Admit enforces that pod and its namespace node label selectors matches at least a node in the cluster.
@@ -138,10 +143,7 @@ func (p *podNodeSelector) Admit(a admission.Attributes) error {
 		return errors.NewForbidden(resource, name, fmt.Errorf("pod node label selector conflicts with its namespace node label selector"))
 	}
 
-	whitelist, err := labels.ConvertSelectorToLabelsMap(p.clusterNodeSelectors[namespace.Name])
-	if err != nil {
-		return err
-	}
+	whitelist := p.clusterNodeSelectors[namespace.Name]
 
 	// Merge pod node selector = namespace node selector + current pod node selector
 	podNodeSelectorLabels := labels.Merge(namespaceNodeSelector, pod.Spec.NodeSelector)
@@ -156,7 +158,7 @@ func (p *podNodeSelector) Admit(a admission.Attributes) error {
 	return nil
 }
 
-func NewPodNodeSelector(client clientset.Interface, clusterNodeSelectors map[string]string) *podNodeSelector {
+func NewPodNodeSelector(client clientset.Interface, clusterNodeSelectors map[string]labels.Set) *podNodeSelector {
 	return &podNodeSelector{
 		Handler:              admission.NewHandler(admission.Create),
 		client:               client,
@@ -207,10 +209,22 @@ func (p *podNodeSelector) getNodeSelectorMap(namespace *api.Namespace) (labels.S
 		}
 	}
 	if !found {
-		selector, err = labels.ConvertSelectorToLabelsMap(p.clusterNodeSelectors["clusterDefaultNodeSelector"])
-		if err != nil {
-			return labels.Set{}, err
-		}
+		selector = p.clusterNodeSelectors["clusterDefaultNodeSelector"]
 	}
 	return selector, nil
+}
+
+func validatePluginConfig(sMap map[string]string) (map[string]labels.Set, error) {
+	lsMap := map[string]labels.Set{}
+	for k, v := range sMap {
+		if errs := validation.ValidateNamespaceName(k, false); k != "clusterDefaultNodeSelector" && len(errs) > 0 {
+			return map[string]labels.Set{}, fmt.Errorf("invalid namespace name: %s - %v", k, errs)
+		}
+		vSet, err := labels.ConvertSelectorToLabelsMap(v)
+		if err != nil {
+			return map[string]labels.Set{}, err
+		}
+		lsMap[k] = vSet
+	}
+	return lsMap, nil
 }
