@@ -404,10 +404,11 @@ func (kl *Kubelet) setNodeAddress(node *api.Node) error {
 		}
 		if addressNodeHostName == nil {
 			hostnameAddress := api.NodeAddress{Type: api.NodeHostName, Address: kl.GetHostname()}
-			node.Status.Addresses = append(nodeAddresses, hostnameAddress)
+			nodeAddresses = append(nodeAddresses, hostnameAddress)
 		} else {
 			glog.V(2).Infof("Using Node Hostname from cloudprovider: %q", addressNodeHostName.Address)
 		}
+		node.Status.Addresses = nodeAddresses
 	} else {
 		var ipAddr net.IP
 		var err error
