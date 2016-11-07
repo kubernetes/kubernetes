@@ -521,12 +521,12 @@ func (s unstructuredJSONScheme) decodeInto(data []byte, obj Object) error {
 		return s.decodeToUnstructured(data, x)
 	case *UnstructuredList:
 		return s.decodeToList(data, x)
-	case *VersionedObjects:
+	/*case *VersionedObjects:
 		o, err := s.decode(data)
 		if err == nil {
 			x.Objects = []Object{o}
 		}
-		return err
+		return err*/
 	default:
 		return json.Unmarshal(data, x)
 	}
