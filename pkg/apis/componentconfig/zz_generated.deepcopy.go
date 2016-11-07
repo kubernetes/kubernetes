@@ -21,6 +21,7 @@ limitations under the License.
 package componentconfig
 
 import (
+	api "k8s.io/kubernetes/pkg/api"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	config "k8s.io/kubernetes/pkg/util/config"
@@ -336,6 +337,15 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.MaxOpenFiles = in.MaxOpenFiles
 		out.ReconcileCIDR = in.ReconcileCIDR
 		out.RegisterSchedulable = in.RegisterSchedulable
+		if in.RegisterWithTaints != nil {
+			in, out := &in.RegisterWithTaints, &out.RegisterWithTaints
+			*out = make([]api.Taint, len(*in))
+			for i := range *in {
+				(*out)[i] = (*in)[i]
+			}
+		} else {
+			out.RegisterWithTaints = nil
+		}
 		out.ContentType = in.ContentType
 		out.KubeAPIQPS = in.KubeAPIQPS
 		out.KubeAPIBurst = in.KubeAPIBurst
