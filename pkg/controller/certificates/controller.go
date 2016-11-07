@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -37,10 +38,22 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/cloudflare/cfssl/config"
+	"github.com/cloudflare/cfssl/helpers"
 	"github.com/cloudflare/cfssl/signer"
 	"github.com/cloudflare/cfssl/signer/local"
 	"github.com/golang/glog"
 )
+
+// this should not be used but the signer needs a default. The default it
+// uses if not provided allows server and client auth which is scarier than
+// this policy.
+var onlySigningPolicy = &config.Signing{
+	Default: &config.SigningProfile{
+		Usage:        []string{"signing"},
+		Expiry:       helpers.OneYear,
+		ExpiryString: "8760h",
+	},
+}
 
 type CertificateController struct {
 	kubeClient clientset.Interface
@@ -53,7 +66,10 @@ type CertificateController struct {
 
 	approveAllKubeletCSRsForGroup string
 
-	signer *local.Signer
+	// we need to serialize signing because we will be swapping out the
+	// signing policy per CSR
+	signerLock sync.Mutex
+	signer     *local.Signer
 
 	queue workqueue.RateLimitingInterface
 }
@@ -64,12 +80,7 @@ func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Du
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: kubeClient.Core().Events("")})
 
-	// Configure cfssl signer
-	// TODO: support non-default policy and remote/pkcs11 signing
-	policy := &config.Signing{
-		Default: config.DefaultConfig(),
-	}
-	ca, err := local.NewSignerFromFile(caCertFile, caKeyFile, policy)
+	ca, err := local.NewSignerFromFile(caCertFile, caKeyFile, onlySigningPolicy)
 	if err != nil {
 		return nil, err
 	}
@@ -206,9 +217,7 @@ func (cc *CertificateController) maybeSignCertificate(key string) error {
 	// 3. Update the Status subresource
 
 	if csr.Status.Certificate == nil && IsCertificateRequestApproved(csr) {
-		pemBytes := csr.Spec.Request
-		req := signer.SignRequest{Request: string(pemBytes)}
-		certBytes, err := cc.signer.Sign(req)
+		certBytes, err := cc.sign(csr)
 		if err != nil {
 			return err
 		}
@@ -261,4 +270,25 @@ func (cc *CertificateController) maybeAutoApproveCSR(csr *certificates.Certifica
 		Message: "Auto approving of all kubelet CSRs is enabled on the controller manager",
 	})
 	return cc.kubeClient.Certificates().CertificateSigningRequests().UpdateApproval(csr)
+}
+
+func (cc *CertificateController) sign(csr *certificates.CertificateSigningRequest) ([]byte, error) {
+	cc.signerLock.Lock()
+	defer func() {
+		cc.signer.SetPolicy(onlySigningPolicy)
+		cc.signerLock.Unlock()
+	}()
+	var usages []string
+	for _, usage := range csr.Spec.Usages {
+		usages = append(usages, string(usage))
+	}
+	cc.signer.SetPolicy(&config.Signing{
+		Default: &config.SigningProfile{
+			Usage:        usages,
+			Expiry:       helpers.OneYear,
+			ExpiryString: "8760h",
+		},
+	})
+	req := signer.SignRequest{Request: string(csr.Spec.Request)}
+	return cc.signer.Sign(req)
 }
