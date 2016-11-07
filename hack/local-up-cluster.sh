@@ -16,7 +16,8 @@
 
 # This command builds and runs a local kubernetes cluster. It's just like
 # local-up.sh, but this one launches the three separate binaries.
-# You may need to run this as root to allow kubelet to open docker's socket.
+# You may need to run this as root to allow kubelet to open docker's socket,
+# and to write the test CA in /var/run/kubernetes.
 DOCKER_OPTS=${DOCKER_OPTS:-""}
 DOCKER=(docker ${DOCKER_OPTS})
 DOCKERIZE_KUBELET=${DOCKERIZE_KUBELET:-""}
@@ -172,6 +173,8 @@ CPU_CFS_QUOTA=${CPU_CFS_QUOTA:-true}
 ENABLE_HOSTPATH_PROVISIONER=${ENABLE_HOSTPATH_PROVISIONER:-"false"}
 CLAIM_BINDER_SYNC_PERIOD=${CLAIM_BINDER_SYNC_PERIOD:-"15s"} # current k8s default
 ENABLE_CONTROLLER_ATTACH_DETACH=${ENABLE_CONTROLLER_ATTACH_DETACH:-"true"} # current default
+# This is the default dir and filename where the apiserver will generate a self-signed cert
+# which should be able to be used as the CA to verify itself
 CERT_DIR=${CERT_DIR:-"/var/run/kubernetes"}
 ROOT_CA_FILE=$CERT_DIR/apiserver.crt
 EXPERIMENTAL_CRI=${EXPERIMENTAL_CRI:-"false"}
@@ -461,10 +464,10 @@ function start_kubelet {
       fi
 
       auth_args=""
-      if [[ -n "${KUBELET_AUTHORIZATION_WEBHOOK}" ]]; then
+      if [[ -n "${KUBELET_AUTHORIZATION_WEBHOOK:-}" ]]; then
         auth_args="${auth_args} --authorization-mode=Webhook"
       fi
-      if [[ -n "${KUBELET_AUTHENTICATION_WEBHOOK}" ]]; then
+      if [[ -n "${KUBELET_AUTHENTICATION_WEBHOOK:-}" ]]; then
         auth_args="${auth_args} --authentication-token-webhook"
       fi
       if [[ -n "${CLIENT_CA_FILE:-}" ]]; then
@@ -483,7 +486,7 @@ function start_kubelet {
 
       image_service_endpoint_args=""
       if [[ -n "${IMAGE_SERVICE_ENDPOINT}" ]]; then
-	image_service_endpoint_args="--image-service-endpoint=${IMAGE_SERVICE_ENDPOINT}"
+        image_service_endpoint_args="--image-service-endpoint=${IMAGE_SERVICE_ENDPOINT}"
       fi
 
       sudo -E "${GO_OUT}/hyperkube" kubelet ${priv_arg}\
@@ -588,17 +591,12 @@ function start_kubedns {
           sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" skydns-rc.yaml
         fi
         sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-svc.yaml.in" >| skydns-svc.yaml
-        cat <<EOF >namespace.yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: kube-system
-EOF
+        export KUBERNETES_PROVIDER=local
         ${KUBECTL} config set-cluster local --server=https://${API_HOST}:${API_SECURE_PORT} --certificate-authority=${ROOT_CA_FILE}
-        ${KUBECTL} config set-context local --cluster=local
+        ${KUBECTL} config set-credentials myself --username=admin --password=admin
+        ${KUBECTL} config set-context local --cluster=local --user=myself
         ${KUBECTL} config use-context local
 
-        ${KUBECTL} create -f namespace.yaml
         # use kubectl to create skydns rc and service
         ${KUBECTL} --namespace=kube-system create -f skydns-rc.yaml
         ${KUBECTL} --namespace=kube-system create -f skydns-svc.yaml
