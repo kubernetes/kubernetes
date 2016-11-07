@@ -36,8 +36,10 @@ import (
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/services"
+	"k8s.io/kubernetes/test/e2e_node/system"
 
 	"github.com/golang/glog"
+	"github.com/kardianos/osext"
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/config"
 	more_reporters "github.com/onsi/ginkgo/reporters"
@@ -47,7 +49,9 @@ import (
 
 var e2es *services.E2EServices
 
+// TODO(random-liu): Change the following modes to sub-command.
 var runServicesMode = flag.Bool("run-services-mode", false, "If true, only run services (etcd, apiserver) in current process, and not run test.")
+var systemValidateMode = flag.Bool("system-validate-mode", false, "If true, only run system validation in current process, and not run test.")
 
 func init() {
 	framework.RegisterCommonFlags()
@@ -71,6 +75,13 @@ func TestE2eNode(t *testing.T) {
 	if *runServicesMode {
 		// If run-services-mode is specified, only run services in current process.
 		services.RunE2EServices()
+		return
+	}
+	if *systemValidateMode {
+		// If system-validate-mode is specified, only run system validation in current process.
+		if err := system.Validate(); err != nil {
+			glog.Exitf("system validation failed: %v", err)
+		}
 		return
 	}
 	// If run-services-mode is not specified, run test.
@@ -100,6 +111,10 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 		Expect(err).NotTo(HaveOccurred(), "should be able to get node name")
 		framework.TestContext.NodeName = hostname
 	}
+
+	// Run system validation test.
+	Expect(validateSystem()).To(Succeed(), "system validation")
+
 	// Pre-pull the images tests depend on so we can fail immediately if there is an image pull issue
 	// This helps with debugging test flakes since it is hard to tell when a test failure is due to image pulling.
 	if framework.TestContext.PrepullImages {
@@ -150,6 +165,22 @@ var _ = SynchronizedAfterSuite(func() {}, func() {
 
 	glog.Infof("Tests Finished")
 })
+
+// validateSystem runs system validation in a separate process and returns error if validation fails.
+func validateSystem() error {
+	testBin, err := osext.Executable()
+	if err != nil {
+		return fmt.Errorf("can't get current binary: %v", err)
+	}
+	// TODO(random-liu): Remove sudo in containerize PR.
+	output, err := exec.Command("sudo", testBin, "--system-validate-mode").CombinedOutput()
+	// The output of system validation should have been formatted, directly print here.
+	fmt.Print(string(output))
+	if err != nil {
+		return fmt.Errorf("system validation failed")
+	}
+	return nil
+}
 
 func maskLocksmithdOnCoreos() {
 	data, err := ioutil.ReadFile("/etc/os-release")
