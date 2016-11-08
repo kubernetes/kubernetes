@@ -1454,7 +1454,7 @@ func TestGetUidFromUser(t *testing.T) {
 		},
 	}
 	for k, v := range tests {
-		actual := getUidFromUser(v.input)
+		actual := GetUidFromUser(v.input)
 		if actual != v.expect {
 			t.Errorf("%s failed.  Expected %s but got %s", k, v.expect, actual)
 		}

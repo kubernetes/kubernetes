@@ -18,12 +18,14 @@ package dockershim
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	dockertypes "github.com/docker/engine-api/types"
 
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 )
 
 // This file contains helper functions to convert docker API types to runtime
@@ -55,14 +57,25 @@ func imageInspectToRuntimeAPIImage(image *dockertypes.ImageInspect) (*runtimeApi
 		return nil, fmt.Errorf("unable to convert a nil pointer to a runtime API image")
 	}
 
+	var err error
+	var uid int64
 	size := uint64(image.VirtualSize)
+	imageUid := dockertools.GetUidFromUser(image.Config.User)
+	// Convert image UID to int64 format. Not that it assumes the process in
+	// the image is running as root if image.Config.User is not set.
+	if imageUid != "" {
+		uid, err = strconv.ParseInt(imageUid, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("non-numeric user (%q)", imageUid)
+		}
+	}
 	return &runtimeApi.Image{
 		Id:          &image.ID,
 		RepoTags:    image.RepoTags,
 		RepoDigests: image.RepoDigests,
 		Size_:       &size,
+		Uid:         &uid,
 	}, nil
-
 }
 
 func toPullableImageID(id string, image *dockertypes.ImageInspect) string {
