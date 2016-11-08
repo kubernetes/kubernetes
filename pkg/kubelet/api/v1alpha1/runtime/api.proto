@@ -159,8 +159,9 @@ message LinuxSandboxSecurityContext {
     optional NamespaceOption namespace_options = 1;
     // Optional SELinux context to be applied.
     optional SELinuxOption selinux_options = 2;
-    // The UID to run the entrypoint of the sandbox process.
-    optional int64 run_as_user = 3;
+    // The user to run the entrypoint of the sandbox process, it could be uid or
+    // user name.
+    optional string run_as_user = 3;
     // If set, the root filesystem of the sandbox is read-only.
     optional bool readonly_rootfs = 4;
     // A list of groups applied to the first process run in the sandbox, in addition
@@ -439,9 +440,10 @@ message LinuxContainerSecurityContext {
     optional NamespaceOption namespace_options = 3;
     // Optional SELinux context to be applied.
     optional SELinuxOption selinux_options = 4;
-    // The UID to run the the container process as.
+    // The user to run the the container process as, it could be uid or user
+    // name.
     // Defaults to user specified in image metadata if unspecified.
-    optional int64 run_as_user = 5;
+    optional string run_as_user = 5;
     // If set, the root filesystem of the container is read-only.
     optional bool readonly_rootfs = 6;
     // A list of groups applied to the first process run in the container, in addition
@@ -758,8 +760,8 @@ message Image {
     repeated string repo_digests = 3;
     // The size of the image in bytes.
     optional uint64 size = 4;
-    // The uid that will run the command(s).
-    optional int64 uid = 5;
+    // The user that will run the command(s).
+    optional string user = 5;
 }
 
 message ListImagesResponse {
