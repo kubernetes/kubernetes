@@ -148,6 +148,11 @@ func (c *fakeDiscoveryClient) ServerPreferredResources() ([]unversioned.GroupVer
 	return []unversioned.GroupVersionResource{}, nil
 }
 
+func (c *fakeDiscoveryClient) ServerNamespacedResources() ([]unversioned.GroupVersionResource, error) {
+	c.resourceCalls = c.resourceCalls + 1
+	return []unversioned.GroupVersionResource{}, nil
+}
+
 func (c *fakeDiscoveryClient) ServerPreferredNamespacedResources() ([]unversioned.GroupVersionResource, error) {
 	c.resourceCalls = c.resourceCalls + 1
 	return []unversioned.GroupVersionResource{}, nil

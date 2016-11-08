@@ -330,14 +330,6 @@ func TestGetServerPreferredResources(t *testing.T) {
 			{Name: "namespaces", Namespaced: false, Kind: "Namespace"},
 		},
 	}
-	/*beta := unversioned.APIResourceList{
-		GroupVersion: "extensions/v1",
-		APIResources: []unversioned.APIResource{
-			{Name: "deployments", Namespaced: true, Kind: "Deployment"},
-			{Name: "ingresses", Namespaced: true, Kind: "Ingress"},
-			{Name: "jobs", Namespaced: true, Kind: "Job"},
-		},
-	}*/
 	tests := []struct {
 		resourcesList *unversioned.APIResourceList
 		response      func(w http.ResponseWriter, req *http.Request)
@@ -427,9 +419,6 @@ func TestGetServerPreferredResources(t *testing.T) {
 				w.Write(output)
 			},
 		},
-		/*{
-			resourcesList: &stable,
-		},*/
 	}
 	for _, test := range tests {
 		server := httptest.NewServer(http.HandlerFunc(test.response))
@@ -549,6 +538,121 @@ func TestGetServerPreferredResourcesRetries(t *testing.T) {
 		}
 		if len(got) != tc.expectResources {
 			t.Errorf("case %d: expect %d resources, got %#v", i, tc.expectResources, got)
+		}
+		server.Close()
+	}
+}
+
+func TestGetServerNamespacedResources(t *testing.T) {
+	stable := unversioned.APIResourceList{
+		GroupVersion: "v1",
+		APIResources: []unversioned.APIResource{
+			{Name: "pods", Namespaced: true, Kind: "Pod"},
+			{Name: "services", Namespaced: true, Kind: "Service"},
+			{Name: "namespaces", Namespaced: false, Kind: "Namespace"},
+		},
+	}
+	batchv1 := unversioned.APIResourceList{
+		GroupVersion: "batch/v1",
+		APIResources: []unversioned.APIResource{
+			{Name: "jobs", Namespaced: true, Kind: "Job"},
+		},
+	}
+	batchv2alpha1 := unversioned.APIResourceList{
+		GroupVersion: "batch/v2alpha1",
+		APIResources: []unversioned.APIResource{
+			{Name: "jobs", Namespaced: true, Kind: "Job"},
+			{Name: "cronjobs", Namespaced: true, Kind: "CronJob"},
+		},
+	}
+	tests := []struct {
+		response func(w http.ResponseWriter, req *http.Request)
+		expected []unversioned.GroupVersionResource
+	}{
+		{
+			response: func(w http.ResponseWriter, req *http.Request) {
+				var list interface{}
+				switch req.URL.Path {
+				case "/api/v1":
+					list = &stable
+				case "/api":
+					list = &unversioned.APIVersions{
+						Versions: []string{
+							"v1",
+						},
+					}
+				default:
+					t.Logf("unexpected request: %s", req.URL.Path)
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+				output, err := json.Marshal(list)
+				if err != nil {
+					t.Errorf("unexpected encoding error: %v", err)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				w.Write(output)
+			},
+			expected: []unversioned.GroupVersionResource{
+				{Group: "", Version: "v1", Resource: "pods"},
+				{Group: "", Version: "v1", Resource: "services"},
+			},
+		},
+		{
+			response: func(w http.ResponseWriter, req *http.Request) {
+				var list interface{}
+				switch req.URL.Path {
+				case "/apis":
+					list = &unversioned.APIGroupList{
+						Groups: []unversioned.APIGroup{
+							{
+								Name: "batch",
+								Versions: []unversioned.GroupVersionForDiscovery{
+									{GroupVersion: "batch/v1", Version: "v1"},
+									{GroupVersion: "batch/v2alpha1", Version: "v2alpha1"},
+								},
+							},
+						},
+					}
+				case "/apis/batch/v1":
+					list = &batchv1
+				case "/apis/batch/v2alpha1":
+					list = &batchv2alpha1
+				default:
+					t.Logf("unexpected request: %s", req.URL.Path)
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+				output, err := json.Marshal(list)
+				if err != nil {
+					t.Errorf("unexpected encoding error: %v", err)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				w.Write(output)
+			},
+			expected: []unversioned.GroupVersionResource{
+				{Group: "batch", Version: "v1", Resource: "jobs"},
+				{Group: "batch", Version: "v2alpha1", Resource: "jobs"},
+				{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"},
+			},
+		},
+	}
+	for _, test := range tests {
+		server := httptest.NewServer(http.HandlerFunc(test.response))
+		defer server.Close()
+
+		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+		got, err := client.ServerNamespacedResources()
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+			continue
+		}
+		if !reflect.DeepEqual(got, test.expected) {
+			t.Errorf("expected:\n%v\ngot:\n%v\n", test.expected, got)
 		}
 		server.Close()
 	}

@@ -1091,7 +1091,7 @@ func hasRemainingContent(c clientset.Interface, clientPool dynamic.ClientPool, n
 	}
 
 	// find out what content is supported on the server
-	groupVersionResources, err := c.Discovery().ServerPreferredNamespacedResources()
+	groupVersionResources, err := c.Discovery().ServerNamespacedResources()
 	if err != nil {
 		return false, err
 	}
