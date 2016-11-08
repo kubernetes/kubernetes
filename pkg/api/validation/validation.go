@@ -1350,11 +1350,13 @@ func validateEnvVarValueFrom(ev api.EnvVar, fldPath *field.Path) field.ErrorList
 		allErrs = append(allErrs, validateSecretKeySelector(ev.ValueFrom.SecretKeyRef, fldPath.Child("secretKeyRef"))...)
 	}
 
-	if len(ev.Value) != 0 {
+	if numSources == 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, "", "must specify one of: `fieldRef`, `resourceFieldRef`, `configMapKeyRef` or `secretKeyRef`"))
+	} else if len(ev.Value) != 0 {
 		if numSources != 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath, "", "may not be specified when `value` is not empty"))
 		}
-	} else if numSources != 1 {
+	} else if numSources > 1 {
 		allErrs = append(allErrs, field.Invalid(fldPath, "", "may not have more than one field specified at a time"))
 	}
 
