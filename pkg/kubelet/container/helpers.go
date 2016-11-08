@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"hash/adler32"
 	"strings"
+	"time"
 
 	"github.com/golang/glog"
 
@@ -236,10 +237,10 @@ func DirectStreamingRunner(runtime DirectStreamingRuntime) ContainerCommandRunne
 	return &containerCommandRunnerWrapper{runtime}
 }
 
-func (r *containerCommandRunnerWrapper) RunInContainer(id ContainerID, cmd []string) ([]byte, error) {
+func (r *containerCommandRunnerWrapper) RunInContainer(id ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
 	var buffer bytes.Buffer
 	output := ioutils.WriteCloserWrapper(&buffer)
-	err := r.ExecInContainer(id, cmd, nil, output, output, false, nil)
+	err := r.ExecInContainer(id, cmd, nil, output, output, false, nil, timeout)
 	// Even if err is non-nil, there still may be output (e.g. the exec wrote to stdout or stderr but
 	// the command returned a nonzero exit code). Therefore, always return the output along with the
 	// error.

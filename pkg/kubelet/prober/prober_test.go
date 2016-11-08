@@ -305,7 +305,7 @@ func TestNewExecInContainer(t *testing.T) {
 		container := api.Container{}
 		containerID := kubecontainer.ContainerID{Type: "docker", ID: "containerID"}
 		cmd := []string{"/foo", "bar"}
-		exec := prober.newExecInContainer(container, containerID, cmd)
+		exec := prober.newExecInContainer(container, containerID, cmd, 0)
 
 		actualOutput, err := exec.CombinedOutput()
 		if e, a := containerID, runner.ContainerID; e != a {

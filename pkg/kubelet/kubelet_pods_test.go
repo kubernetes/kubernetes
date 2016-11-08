@@ -1081,7 +1081,7 @@ func TestExec(t *testing.T) {
 			assert.Error(t, err, description)
 			assert.Nil(t, redirect, description)
 
-			err = kubelet.ExecInContainer(tc.podFullName, podUID, tc.container, command, stdin, stdout, stderr, tty, nil)
+			err = kubelet.ExecInContainer(tc.podFullName, podUID, tc.container, command, stdin, stdout, stderr, tty, nil, 0)
 			assert.Error(t, err, description)
 		}
 		{ // Direct streaming case
@@ -1093,7 +1093,7 @@ func TestExec(t *testing.T) {
 			assert.NoError(t, err, description)
 			assert.Nil(t, redirect, description)
 
-			err = kubelet.ExecInContainer(tc.podFullName, podUID, tc.container, command, stdin, stdout, stderr, tty, nil)
+			err = kubelet.ExecInContainer(tc.podFullName, podUID, tc.container, command, stdin, stdout, stderr, tty, nil, 0)
 			if tc.expectError {
 				assert.Error(t, err, description)
 			} else {
@@ -1119,7 +1119,7 @@ func TestExec(t *testing.T) {
 				assert.Equal(t, containertest.FakeHost, redirect.Host, description+": redirect")
 			}
 
-			err = kubelet.ExecInContainer(tc.podFullName, podUID, tc.container, command, stdin, stdout, stderr, tty, nil)
+			err = kubelet.ExecInContainer(tc.podFullName, podUID, tc.container, command, stdin, stdout, stderr, tty, nil, 0)
 			assert.Error(t, err, description)
 		}
 	}
