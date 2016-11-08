@@ -116,6 +116,10 @@ func (r *EvictionREST) Create(ctx api.Context, obj runtime.Object) (runtime.Obje
 }
 
 func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb policy.PodDisruptionBudget) (ok bool, err error) {
+	if pdb.Status.ObservedGeneration == nil || *pdb.Status.ObservedGeneration != pdb.Generation {
+		return false, fmt.Errorf("pdb status has not been updated after spec change")
+	}
+
 	if pdb.Status.PodDisruptionsAllowed < 0 {
 		return false, fmt.Errorf("pdb disruptions allowed is negative")
 	}
