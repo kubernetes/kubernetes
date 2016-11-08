@@ -91,8 +91,15 @@ func TestStatusUpdate(t *testing.T) {
 	if err := storage.Storage.Create(ctx, key, validPodDisruptionBudget, nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
+	obj, err := storage.Get(ctx, "foo")
+	if err != nil {
+		t.Fatalf("failed to get pdb: %v", err)
+	}
+	obtainedPdb := obj.(*policy.PodDisruptionBudget)
+
 	update := policy.PodDisruptionBudget{
-		ObjectMeta: validPodDisruptionBudget.ObjectMeta,
+		ObjectMeta: obtainedPdb.ObjectMeta,
 		Spec: policy.PodDisruptionBudgetSpec{
 			MinAvailable: intstr.FromInt(8),
 		},
@@ -104,7 +111,7 @@ func TestStatusUpdate(t *testing.T) {
 	if _, _, err := statusStorage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update, api.Scheme)); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	obj, err := storage.Get(ctx, "foo")
+	obj, err = storage.Get(ctx, "foo")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -58,14 +58,16 @@ func (ps *pdbStates) Get(key string) policy.PodDisruptionBudget {
 
 func (ps *pdbStates) VerifyPdbStatus(t *testing.T, key string, disruptionsAllowed, currentHealthy, desiredHealthy, expectedPods int32,
 	disruptedPodMap map[string]unversioned.Time) {
+	actualPDB := ps.Get(key)
 	expectedStatus := policy.PodDisruptionBudgetStatus{
 		PodDisruptionsAllowed: disruptionsAllowed,
 		CurrentHealthy:        currentHealthy,
 		DesiredHealthy:        desiredHealthy,
 		ExpectedPods:          expectedPods,
 		DisruptedPods:         disruptedPodMap,
+		ObservedGeneration:    actualPDB.Generation,
 	}
-	actualStatus := ps.Get(key).Status
+	actualStatus := actualPDB.Status
 	if !reflect.DeepEqual(actualStatus, expectedStatus) {
 		debug.PrintStack()
 		t.Fatalf("PDB %q status mismatch.  Expected %+v but got %+v.", key, expectedStatus, actualStatus)

@@ -669,7 +669,8 @@ func (dc *DisruptionController) updatePdbStatus(pdb *policy.PodDisruptionBudget,
 		pdb.Status.DesiredHealthy == desiredHealthy &&
 		pdb.Status.ExpectedPods == expectedCount &&
 		pdb.Status.PodDisruptionsAllowed == disruptionsAllowed &&
-		reflect.DeepEqual(pdb.Status.DisruptedPods, disruptedPods) {
+		reflect.DeepEqual(pdb.Status.DisruptedPods, disruptedPods) &&
+		pdb.Status.ObservedGeneration == pdb.Generation {
 		return nil
 	}
 
@@ -685,6 +686,7 @@ func (dc *DisruptionController) updatePdbStatus(pdb *policy.PodDisruptionBudget,
 		ExpectedPods:          expectedCount,
 		PodDisruptionsAllowed: disruptionsAllowed,
 		DisruptedPods:         disruptedPods,
+		ObservedGeneration:    pdb.Generation,
 	}
 
 	return dc.getUpdater()(&newPdb)
