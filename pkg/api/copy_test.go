@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"math/rand"
 	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -78,6 +79,19 @@ func doDeepCopyTest(t *testing.T, kind schema.GroupVersionKind, f *fuzz.Fuzzer) 
 		t.Log(diff.StringDiff(prefuzzData.String(), postfuzzData.String()))
 		t.Errorf("Fuzzing copy modified original of %#v", kind)
 		return
+	}
+
+	// Most runtime.Objects are pointers
+	// Make sure calling DeepCopy() with a non-pointer struct either errors, or actually deep copies
+	itemValue := reflect.ValueOf(item)
+	if itemValue.Kind() == reflect.Ptr {
+		itemStructValue := itemValue.Elem()
+		itemStruct := itemStructValue.Interface()
+		_, err := api.Scheme.DeepCopy(itemStruct)
+		if err != nil && !strings.Contains(err.Error(), "unaddressable") {
+			t.Errorf("Unexpected error copying struct of %v, got %v", reflect.TypeOf(itemStructValue), err)
+			return
+		}
 	}
 }
 
