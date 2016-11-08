@@ -201,9 +201,11 @@ func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *autoscaling.
 
 	var targetList extensions.CustomMetricTargetList
 	if err := json.Unmarshal([]byte(cmAnnotation), &targetList); err != nil {
+		a.eventRecorder.Event(hpa, api.EventTypeWarning, "FailedParseCustomMetricsAnnotation", err.Error())
 		return 0, "", "", time.Time{}, fmt.Errorf("failed to parse custom metrics annotation: %v", err)
 	}
 	if len(targetList.Items) == 0 {
+		a.eventRecorder.Event(hpa, api.EventTypeWarning, "NoCustomMetricsInAnnotation", err.Error())
 		return 0, "", "", time.Time{}, fmt.Errorf("no custom metrics in annotation")
 	}
 
@@ -244,6 +246,7 @@ func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *autoscaling.
 		}
 		quantity, err := resource.ParseQuantity(fmt.Sprintf("%.3f", utilizationProposal))
 		if err != nil {
+			a.eventRecorder.Event(hpa, api.EventTypeWarning, "FailedSetCustomMetrics", err.Error())
 			return 0, "", "", time.Time{}, fmt.Errorf("failed to set custom metric value: %v", err)
 		}
 		statusList.Items = append(statusList.Items, extensions.CustomMetricCurrentStatus{
@@ -253,7 +256,14 @@ func (a *HorizontalController) computeReplicasForCustomMetrics(hpa *autoscaling.
 	}
 	byteStatusList, err := json.Marshal(statusList)
 	if err != nil {
+		a.eventRecorder.Event(hpa, api.EventTypeWarning, "FailedSerializeCustomMetrics", err.Error())
 		return 0, "", "", time.Time{}, fmt.Errorf("failed to serialize custom metric status: %v", err)
+	}
+
+	if replicas != currentReplicas {
+		a.eventRecorder.Eventf(hpa, api.EventTypeNormal, "DesiredReplicasComputedCustomMetric",
+			"Computed the desired num of replicas: %d, metric: %s, current replicas: %d",
+			int32(replicas), metric, scale.Status.Replicas)
 	}
 
 	return replicas, metric, string(byteStatusList), timestamp, nil
@@ -302,14 +312,6 @@ func (a *HorizontalController) reconcileAutoscaler(hpa *autoscaling.HorizontalPo
 			cpuDesiredReplicas, cpuCurrentUtilization, cpuTimestamp, err = a.computeReplicasForCPUUtilization(hpa, scale)
 			if err != nil {
 				a.updateCurrentReplicasInStatus(hpa, currentReplicas)
-
-				lastScaleTime := getLastScaleTime(hpa)
-				if time.Now().After(lastScaleTime.Add(upscaleForbiddenWindow)) {
-					a.eventRecorder.Event(hpa, api.EventTypeWarning, "FailedComputeReplicas", err.Error())
-				} else {
-					a.eventRecorder.Event(hpa, api.EventTypeNormal, "FailedComputeReplicas", err.Error())
-				}
-
 				return fmt.Errorf("failed to compute desired number of replicas based on CPU utilization for %s: %v", reference, err)
 			}
 		}
@@ -318,14 +320,6 @@ func (a *HorizontalController) reconcileAutoscaler(hpa *autoscaling.HorizontalPo
 			cmDesiredReplicas, cmMetric, cmStatus, cmTimestamp, err = a.computeReplicasForCustomMetrics(hpa, scale, cmAnnotation)
 			if err != nil {
 				a.updateCurrentReplicasInStatus(hpa, currentReplicas)
-
-				lastScaleTime := getLastScaleTime(hpa)
-				if time.Now().After(lastScaleTime.Add(upscaleForbiddenWindow)) {
-					a.eventRecorder.Event(hpa, api.EventTypeWarning, "FailedComputeCMReplicas", err.Error())
-				} else {
-					a.eventRecorder.Event(hpa, api.EventTypeNormal, "FailedComputeCMReplicas", err.Error())
-				}
-
 				return fmt.Errorf("failed to compute desired number of replicas based on Custom Metrics for %s: %v", reference, err)
 			}
 		}
