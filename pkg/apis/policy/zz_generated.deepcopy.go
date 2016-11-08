@@ -126,10 +126,13 @@ func DeepCopy_policy_PodDisruptionBudgetStatus(in interface{}, out interface{}, 
 	{
 		in := in.(*PodDisruptionBudgetStatus)
 		out := out.(*PodDisruptionBudgetStatus)
-		out.PodDisruptionsAllowed = in.PodDisruptionsAllowed
-		out.CurrentHealthy = in.CurrentHealthy
-		out.DesiredHealthy = in.DesiredHealthy
-		out.ExpectedPods = in.ExpectedPods
+		if in.ObservedGeneration != nil {
+			in, out := &in.ObservedGeneration, &out.ObservedGeneration
+			*out = new(int64)
+			**out = **in
+		} else {
+			out.ObservedGeneration = nil
+		}
 		if in.DisruptedPods != nil {
 			in, out := &in.DisruptedPods, &out.DisruptedPods
 			*out = make(map[string]unversioned.Time)
@@ -139,6 +142,10 @@ func DeepCopy_policy_PodDisruptionBudgetStatus(in interface{}, out interface{}, 
 		} else {
 			out.DisruptedPods = nil
 		}
+		out.PodDisruptionsAllowed = in.PodDisruptionsAllowed
+		out.CurrentHealthy = in.CurrentHealthy
+		out.DesiredHealthy = in.DesiredHealthy
+		out.ExpectedPods = in.ExpectedPods
 		return nil
 	}
 }
