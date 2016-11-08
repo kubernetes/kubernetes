@@ -18,6 +18,8 @@ package kubeadm
 
 import (
 	"flag"
+	"os"
+	"path/filepath"
 	"regexp"
 	"testing"
 )
@@ -29,7 +31,7 @@ const (
 var kubeadmPath string
 
 func init() {
-	flag.StringVar(&kubeadmPath, "kubeadm-path", "cluster/kubeadm.sh", "Location of kubeadm")
+	flag.StringVar(&kubeadmPath, "kubeadm-path", filepath.Join(os.Getenv("KUBE_ROOT"), "cluster/kubeadm.sh"), "Location of kubeadm")
 }
 
 func TestCmdTokenGenerate(t *testing.T) {

@@ -24,6 +24,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -43,18 +44,18 @@ const (
 	kubeDiscoverySecretName = "clusterinfo"
 )
 
-func encodeKubeDiscoverySecretData(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Certificate) map[string][]byte {
+func encodeKubeDiscoverySecretData(dcfg *kubeadmapi.TokenDiscovery, apicfg kubeadmapi.API, caCert *x509.Certificate) map[string][]byte {
 	var (
 		data         = map[string][]byte{}
 		endpointList = []string{}
 		tokenMap     = map[string]string{}
 	)
 
-	for _, addr := range cfg.API.AdvertiseAddresses {
-		endpointList = append(endpointList, fmt.Sprintf("https://%s:%d", addr, cfg.API.BindPort))
+	for _, addr := range apicfg.AdvertiseAddresses {
+		endpointList = append(endpointList, fmt.Sprintf("https://%s:%d", addr, apicfg.Port))
 	}
 
-	tokenMap[cfg.Secrets.TokenID] = cfg.Secrets.BearerToken
+	tokenMap[dcfg.ID] = dcfg.Secret
 
 	data["endpoint-list.json"], _ = json.Marshal(endpointList)
 	data["token-map.json"], _ = json.Marshal(tokenMap)
@@ -83,7 +84,7 @@ func newKubeDiscoveryPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.PodSpec {
 			Ports: []v1.ContainerPort{
 				// TODO when CNI issue (#31307) is resolved, we should consider adding
 				// `HostIP: s.API.AdvertiseAddrs[0]`, if there is only one address`
-				{Name: "http", ContainerPort: kubeadmapiext.DefaultDiscoveryBindPort, HostPort: cfg.Discovery.BindPort},
+				{Name: "http", ContainerPort: kubeadmapiext.DefaultDiscoveryBindPort, HostPort: kubeadmutil.DiscoveryPort(cfg.Discovery.Token)},
 			},
 			SecurityContext: &v1.SecurityContext{
 				SELinuxOptions: &v1.SELinuxOptions{
@@ -110,7 +111,7 @@ func newKubeDiscovery(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Certific
 		Secret: &v1.Secret{
 			ObjectMeta: v1.ObjectMeta{Name: kubeDiscoverySecretName},
 			Type:       v1.SecretTypeOpaque,
-			Data:       encodeKubeDiscoverySecretData(cfg, caCert),
+			Data:       encodeKubeDiscoverySecretData(cfg.Discovery.Token, cfg.API, caCert),
 		},
 	}
 

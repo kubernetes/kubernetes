@@ -34,7 +34,7 @@ func CreateCertsAndConfigForClients(cfg kubeadmapi.API, clientNames []string, ca
 		// TODO this is not great, but there is only one address we can use here
 		// so we'll pick the first one, there is much of chance to have an empty
 		// slice by the time this gets called
-		fmt.Sprintf("https://%s:%d", cfg.AdvertiseAddresses[0], cfg.BindPort),
+		fmt.Sprintf("https://%s:%d", cfg.AdvertiseAddresses[0], cfg.Port),
 		certutil.EncodeCertPEM(caCert),
 	)
 

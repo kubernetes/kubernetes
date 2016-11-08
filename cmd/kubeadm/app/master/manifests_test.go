@@ -364,7 +364,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 	}{
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				API:        kubeadm.API{BindPort: 123},
+				API:        kubeadm.API{Port: 123},
 				Networking: kubeadm.Networking{ServiceSubnet: "bar"},
 			},
 			expected: []string{
@@ -384,7 +384,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				API:        kubeadm.API{BindPort: 123, AdvertiseAddresses: []string{"foo"}},
+				API:        kubeadm.API{Port: 123, AdvertiseAddresses: []string{"foo"}},
 				Networking: kubeadm.Networking{ServiceSubnet: "bar"},
 			},
 			expected: []string{
@@ -405,7 +405,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				API:        kubeadm.API{BindPort: 123},
+				API:        kubeadm.API{Port: 123},
 				Networking: kubeadm.Networking{ServiceSubnet: "bar"},
 				Etcd:       kubeadm.Etcd{CertFile: "fiz", KeyFile: "faz"},
 			},
@@ -429,7 +429,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 		// Make sure --kubelet-preferred-address-types
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				API:               kubeadm.API{BindPort: 123, AdvertiseAddresses: []string{"foo"}},
+				API:               kubeadm.API{Port: 123, AdvertiseAddresses: []string{"foo"}},
 				Networking:        kubeadm.Networking{ServiceSubnet: "bar"},
 				KubernetesVersion: "v1.5.3",
 			},

@@ -107,7 +107,7 @@ func TestEstablishMasterConnection(t *testing.T) {
 		},
 	}
 	for _, rt := range tests {
-		s := &kubeadmapi.NodeConfiguration{}
+		s := &kubeadmapi.TokenDiscovery{}
 		c := &kubeadmapi.ClusterInfo{Endpoints: []string{rt.e}, CertificateAuthorities: []string{rt.c}}
 		_, actual := EstablishMasterConnection(s, c)
 		if (actual == nil) != rt.expect {
