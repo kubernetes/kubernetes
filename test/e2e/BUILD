@@ -29,6 +29,7 @@ go_library(
         "density.go",
         "deployment.go",
         "dns.go",
+        "dns_autoscaling.go",
         "e2e.go",
         "empty.go",
         "empty_dir_wrapper.go",
