@@ -63,7 +63,7 @@ const (
 	// How long to wait for a load balancer to be created/modified.
 	//TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
 	loadBalancerCreateTimeoutDefault = 20 * time.Minute
-	loadBalancerCreateTimeoutLarge   = time.Hour
+	loadBalancerCreateTimeoutLarge   = 2 * time.Hour
 
 	largeClusterMinNodesNumber = 100
 
