@@ -18,7 +18,9 @@ limitations under the License.
 
 package cm
 
-import "k8s.io/kubernetes/pkg/api"
+import (
+	"k8s.io/kubernetes/pkg/api"
+)
 
 const (
 	MinShares     = 0
