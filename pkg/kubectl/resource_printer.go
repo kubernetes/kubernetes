@@ -1749,6 +1749,9 @@ func printRoleBindingList(list *rbac.RoleBindingList, w io.Writer, options Print
 }
 
 func printClusterRole(clusterRole *rbac.ClusterRole, w io.Writer, options PrintOptions) error {
+	if options.WithNamespace {
+		return fmt.Errorf("clusterRole is not namespaced")
+	}
 	return printObjectMeta(clusterRole.ObjectMeta, w, options, false)
 }
 
