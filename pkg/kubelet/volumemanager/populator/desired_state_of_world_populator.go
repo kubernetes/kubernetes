@@ -344,20 +344,20 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 	}
 
 	// Do not return the original volume object, since the source could mutate it
-	clonedPodVolumeObj, err := api.Scheme.DeepCopy(podVolume)
+	clonedPodVolumeObj, err := api.Scheme.DeepCopy(&podVolume)
 	if err != nil || clonedPodVolumeObj == nil {
 		return nil, "", fmt.Errorf(
 			"failed to deep copy %q volume object. err=%v", podVolume.Name, err)
 	}
 
-	clonedPodVolume, ok := clonedPodVolumeObj.(v1.Volume)
+	clonedPodVolume, ok := clonedPodVolumeObj.(*v1.Volume)
 	if !ok {
 		return nil, "", fmt.Errorf(
 			"failed to cast clonedPodVolume %#v to v1.Volume",
 			clonedPodVolumeObj)
 	}
 
-	return volume.NewSpecFromVolume(&clonedPodVolume), "", nil
+	return volume.NewSpecFromVolume(clonedPodVolume), "", nil
 }
 
 // getPVCExtractPV fetches the PVC object with the given namespace and name from

@@ -644,14 +644,14 @@ func (dc *DisruptionController) buildDisruptedPodMap(pods []*v1.Pod, pdb *policy
 // this field correctly, we will prevent the /evict handler from approving an
 // eviction when it may be unsafe to do so.
 func (dc *DisruptionController) failSafe(pdb *policy.PodDisruptionBudget) error {
-	obj, err := api.Scheme.DeepCopy(*pdb)
+	obj, err := api.Scheme.DeepCopy(pdb)
 	if err != nil {
 		return err
 	}
-	newPdb := obj.(policy.PodDisruptionBudget)
+	newPdb := obj.(*policy.PodDisruptionBudget)
 	newPdb.Status.PodDisruptionsAllowed = 0
 
-	return dc.getUpdater()(&newPdb)
+	return dc.getUpdater()(newPdb)
 }
 
 func (dc *DisruptionController) updatePdbStatus(pdb *policy.PodDisruptionBudget, currentHealthy, desiredHealthy, expectedCount int32,
@@ -675,11 +675,11 @@ func (dc *DisruptionController) updatePdbStatus(pdb *policy.PodDisruptionBudget,
 		return nil
 	}
 
-	obj, err := api.Scheme.DeepCopy(*pdb)
+	obj, err := api.Scheme.DeepCopy(pdb)
 	if err != nil {
 		return err
 	}
-	newPdb := obj.(policy.PodDisruptionBudget)
+	newPdb := obj.(*policy.PodDisruptionBudget)
 
 	newPdb.Status = policy.PodDisruptionBudgetStatus{
 		CurrentHealthy:        currentHealthy,
@@ -690,7 +690,7 @@ func (dc *DisruptionController) updatePdbStatus(pdb *policy.PodDisruptionBudget,
 		ObservedGeneration:    pdb.Generation,
 	}
 
-	return dc.getUpdater()(&newPdb)
+	return dc.getUpdater()(newPdb)
 }
 
 // refresh tries to re-GET the given PDB.  If there are any errors, it just

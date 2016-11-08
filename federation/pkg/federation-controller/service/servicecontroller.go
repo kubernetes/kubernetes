@@ -40,8 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
-
-	"k8s.io/kubernetes/pkg/conversion"
 )
 
 const (
@@ -361,7 +359,7 @@ func (s *ServiceController) processServiceForCluster(cachedService *cachedServic
 // should be retried.
 func (s *ServiceController) updateFederationService(key string, cachedService *cachedService) (error, bool) {
 	// Clone federation service, and create them in underlying k8s cluster
-	clone, err := conversion.NewCloner().DeepCopy(cachedService.lastState)
+	clone, err := api.Scheme.DeepCopy(cachedService.lastState)
 	if err != nil {
 		return err, !retryable
 	}

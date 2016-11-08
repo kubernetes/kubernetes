@@ -28,7 +28,6 @@ import (
 	kcache "k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
-	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
 
@@ -74,7 +73,7 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 			continue
 		}
 
-		clonedNode, err := conversion.NewCloner().DeepCopy(nodeObj)
+		clonedNode, err := api.Scheme.DeepCopy(nodeObj)
 		if err != nil {
 			return fmt.Errorf("error cloning node %q: %v",
 				nodeName,

@@ -32,7 +32,6 @@ import (
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/watch"
@@ -338,7 +337,7 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 	}
 	// Create a copy before modifying the namespace to prevent race condition with
 	// other readers of namespace from store.
-	namespaceObj, err := conversion.NewCloner().DeepCopy(namespaceObjFromStore)
+	namespaceObj, err := api.Scheme.DeepCopy(namespaceObjFromStore)
 	baseNamespace, ok := namespaceObj.(*api_v1.Namespace)
 	if err != nil || !ok {
 		glog.Errorf("Error in retrieving obj from store: %v, %v", ok, err)
