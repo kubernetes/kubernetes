@@ -1270,10 +1270,12 @@ type LinuxContainerConfig struct {
 	Resources *LinuxContainerResources `protobuf:"bytes,1,opt,name=resources" json:"resources,omitempty"`
 	// Capabilities to add or drop.
 	Capabilities *Capability `protobuf:"bytes,2,opt,name=capabilities" json:"capabilities,omitempty"`
-	// Optional SELinux context to be applied.
-	SelinuxOptions *SELinuxOption `protobuf:"bytes,3,opt,name=selinux_options,json=selinuxOptions" json:"selinux_options,omitempty"`
+	// Optional SELinux label for container processes
+	SelinuxProcessLabel *SELinuxOption `protobuf:"bytes,3,opt,name=selinux_process_label" json:"selinux_process_label,omitempty"`
+	// Optional SELinux mount label for container mount points
+	SelinuxMountLabel *SELinuxOption `protobuf:"bytes,4,opt,name=selinux_mount_label" json:"selinux_mount_label,omitempty"`
 	// User contains the user for the container process.
-	User             *LinuxUser `protobuf:"bytes,4,opt,name=user" json:"user,omitempty"`
+	User             *LinuxUser `protobuf:"bytes,5,opt,name=user" json:"user,omitempty"`
 	XXX_unrecognized []byte     `json:"-"`
 }
 
@@ -1296,9 +1298,16 @@ func (m *LinuxContainerConfig) GetCapabilities() *Capability {
 	return nil
 }
 
-func (m *LinuxContainerConfig) GetSelinuxOptions() *SELinuxOption {
+func (m *LinuxContainerConfig) GetSelinuxProcessLabel() *SELinuxOption {
 	if m != nil {
-		return m.SelinuxOptions
+		return m.SelinuxProcessLabel
+	}
+	return nil
+}
+
+func (m *LinuxContainerConfig) GetSelinuxMountLabel() *SELinuxOption {
+	if m != nil {
+		return m.SelinuxMountLabel
 	}
 	return nil
 }

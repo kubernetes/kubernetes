@@ -416,10 +416,12 @@ message LinuxContainerConfig {
     optional LinuxContainerResources resources = 1;
     // Capabilities to add or drop.
     optional Capability capabilities = 2;
-    // Optional SELinux context to be applied.
-    optional SELinuxOption selinux_options = 3;
+    // Optional SELinux label for container processes
+    optional SELinuxOption selinux_process_label = 3;
+    // Optional SELinux mount label for container mount points
+    optional SELinuxOption selinux_mount_label = 4;
     // User contains the user for the container process.
-    optional LinuxUser user = 4;
+    optional LinuxUser user = 5;
 }
 
 message LinuxUser {
