@@ -514,7 +514,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	var nl *noOpLegacyHost
 	pluginSettings.LegacyRuntimeHost = nl
 
-	if kubeCfg.ExperimentalRuntimeIntegrationType == "cri" {
+	if kubeCfg.EnableCRI {
 		// kubelet defers to the runtime shim to setup networking. Setting
 		// this to nil will prevent it from trying to invoke the plugin.
 		// It's easier to always probe and initialize plugins till cri
@@ -2002,7 +2002,7 @@ func (kl *Kubelet) updateRuntimeUp() {
 	}
 	// Only check specific conditions when runtime integration type is cri,
 	// because the old integration doesn't populate any runtime condition.
-	if kl.kubeletConfiguration.ExperimentalRuntimeIntegrationType == "cri" {
+	if kl.kubeletConfiguration.EnableCRI {
 		if s == nil {
 			glog.Errorf("Container runtime status is nil")
 			return

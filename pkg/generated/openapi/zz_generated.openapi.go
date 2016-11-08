@@ -2996,10 +2996,10 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "",
 						},
 					},
-					"experimentalRuntimeIntegrationType": {
+					"enableCRI": {
 						SchemaProps: spec.SchemaProps{
-							Description: "How to integrate with runtime. If set to cri, kubelet will switch to using the new Container Runtine Interface.",
-							Type:        []string{"string"},
+							Description: "Enable Container Runtime Interface (CRI) integration.",
+							Type:        []string{"boolean"},
 							Format:      "",
 						},
 					},
@@ -14750,10 +14750,10 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "",
 						},
 					},
-					"experimentalRuntimeIntegrationType": {
+					"enableCRI": {
 						SchemaProps: spec.SchemaProps{
-							Description: "How to integrate with runtime. If set to CRI, kubelet will switch to using the new Container Runtine Interface.",
-							Type:        []string{"string"},
+							Description: "Enable Container Runtime Interface (CRI) integration.",
+							Type:        []string{"boolean"},
 							Format:      "",
 						},
 					},
