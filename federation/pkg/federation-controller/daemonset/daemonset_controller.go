@@ -34,7 +34,6 @@ import (
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/conversion"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
@@ -350,7 +349,7 @@ func (daemonsetcontroller *DaemonSetController) reconcileDaemonSet(namespace str
 		// Not federated daemonset, ignoring.
 		return
 	}
-	baseDaemonSetObj, err := conversion.NewCloner().DeepCopy(baseDaemonSetObjFromStore)
+	baseDaemonSetObj, err := api.Scheme.DeepCopy(baseDaemonSetObjFromStore)
 	baseDaemonSet, ok := baseDaemonSetObj.(*extensionsv1.DaemonSet)
 	if err != nil || !ok {
 		glog.Errorf("Error in retrieving obj %s from store: %v, %v", daemonsetName, ok, err)
