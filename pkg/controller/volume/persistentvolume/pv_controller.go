@@ -30,7 +30,6 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	vol "k8s.io/kubernetes/pkg/volume"
 
@@ -462,7 +461,7 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *api.PersistentVolume)
 			// This speeds up binding of provisioned volumes - provisioner saves
 			// only the new PV and it expects that next syncClaim will bind the
 			// claim to it.
-			clone, err := conversion.NewCloner().DeepCopy(claim)
+			clone, err := api.Scheme.DeepCopy(claim)
 			if err != nil {
 				return fmt.Errorf("error cloning claim %q: %v", claimToClaimKey(claim), err)
 			}
@@ -531,7 +530,7 @@ func (ctrl *PersistentVolumeController) updateClaimStatus(claim *api.PersistentV
 
 	dirty := false
 
-	clone, err := conversion.NewCloner().DeepCopy(claim)
+	clone, err := api.Scheme.DeepCopy(claim)
 	if err != nil {
 		return nil, fmt.Errorf("Error cloning claim: %v", err)
 	}
@@ -631,7 +630,7 @@ func (ctrl *PersistentVolumeController) updateVolumePhase(volume *api.Persistent
 		return volume, nil
 	}
 
-	clone, err := conversion.NewCloner().DeepCopy(volume)
+	clone, err := api.Scheme.DeepCopy(volume)
 	if err != nil {
 		return nil, fmt.Errorf("Error cloning claim: %v", err)
 	}
@@ -696,7 +695,7 @@ func (ctrl *PersistentVolumeController) bindVolumeToClaim(volume *api.Persistent
 
 	// The volume from method args can be pointing to watcher cache. We must not
 	// modify these, therefore create a copy.
-	clone, err := conversion.NewCloner().DeepCopy(volume)
+	clone, err := api.Scheme.DeepCopy(volume)
 	if err != nil {
 		return nil, fmt.Errorf("Error cloning pv: %v", err)
 	}
@@ -761,7 +760,7 @@ func (ctrl *PersistentVolumeController) bindClaimToVolume(claim *api.PersistentV
 
 	// The claim from method args can be pointing to watcher cache. We must not
 	// modify these, therefore create a copy.
-	clone, err := conversion.NewCloner().DeepCopy(claim)
+	clone, err := api.Scheme.DeepCopy(claim)
 	if err != nil {
 		return nil, fmt.Errorf("Error cloning claim: %v", err)
 	}
@@ -861,7 +860,7 @@ func (ctrl *PersistentVolumeController) unbindVolume(volume *api.PersistentVolum
 	glog.V(4).Infof("updating PersistentVolume[%s]: rolling back binding from %q", volume.Name, claimrefToClaimKey(volume.Spec.ClaimRef))
 
 	// Save the PV only when any modification is neccessary.
-	clone, err := conversion.NewCloner().DeepCopy(volume)
+	clone, err := api.Scheme.DeepCopy(volume)
 	if err != nil {
 		return fmt.Errorf("Error cloning pv: %v", err)
 	}

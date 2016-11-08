@@ -411,18 +411,18 @@ func (adc *attachDetachController) createVolumeSpec(
 
 	// Do not return the original volume object, since it's from the shared
 	// informer it may be mutated by another consumer.
-	clonedPodVolumeObj, err := api.Scheme.DeepCopy(podVolume)
+	clonedPodVolumeObj, err := api.Scheme.DeepCopy(&podVolume)
 	if err != nil || clonedPodVolumeObj == nil {
 		return nil, fmt.Errorf(
 			"failed to deep copy %q volume object. err=%v", podVolume.Name, err)
 	}
 
-	clonedPodVolume, ok := clonedPodVolumeObj.(api.Volume)
+	clonedPodVolume, ok := clonedPodVolumeObj.(*api.Volume)
 	if !ok {
 		return nil, fmt.Errorf("failed to cast clonedPodVolume %#v to api.Volume", clonedPodVolumeObj)
 	}
 
-	return volume.NewSpecFromVolume(&clonedPodVolume), nil
+	return volume.NewSpecFromVolume(clonedPodVolume), nil
 }
 
 // getPVCFromCacheExtractPV fetches the PVC object with the given namespace and
@@ -503,19 +503,19 @@ func (adc *attachDetachController) getPVSpecFromCache(
 
 	// Do not return the object from the informer, since the store is shared it
 	// may be mutated by another consumer.
-	clonedPVObj, err := api.Scheme.DeepCopy(*pv)
+	clonedPVObj, err := api.Scheme.DeepCopy(pv)
 	if err != nil || clonedPVObj == nil {
 		return nil, fmt.Errorf(
 			"failed to deep copy %q PV object. err=%v", name, err)
 	}
 
-	clonedPV, ok := clonedPVObj.(api.PersistentVolume)
+	clonedPV, ok := clonedPVObj.(*api.PersistentVolume)
 	if !ok {
 		return nil, fmt.Errorf(
 			"failed to cast %q clonedPV %#v to PersistentVolume", name, pvObj)
 	}
 
-	return volume.NewSpecFromPersistentVolume(&clonedPV, pvcReadOnly), nil
+	return volume.NewSpecFromPersistentVolume(clonedPV, pvcReadOnly), nil
 }
 
 // processVolumesInUse processes the list of volumes marked as "in-use"
