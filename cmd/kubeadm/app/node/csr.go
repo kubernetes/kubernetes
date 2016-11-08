@@ -18,16 +18,18 @@ package node
 
 import (
 	"fmt"
+	"os"
 
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/kubelet/util/csr"
+	"k8s.io/kubernetes/pkg/types"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
 )
 
-// PerformTLSBootstrap executes a certificate signing request with the
-// provided connection details.
-func PerformTLSBootstrap(connection *ConnectionDetails) (*clientcmdapi.Config, error) {
+func PerformTLSBootstrapDeprecated(connection *ConnectionDetails) (*clientcmdapi.Config, error) {
 	csrClient := connection.CertClient.CertificateSigningRequests()
 
 	fmt.Println("[csr] Created API client to obtain unique certificate for this node, generating keys and certificate signing request")
@@ -54,4 +56,50 @@ func PerformTLSBootstrap(connection *ConnectionDetails) (*clientcmdapi.Config, e
 	)
 
 	return finalConfig, nil
+}
+
+// PerformTLSBootstrap executes a certificate signing request with the
+// provided connection details.
+func PerformTLSBootstrap(cfg *clientcmdapi.Config) error {
+	hostName, err := os.Hostname()
+	if err != nil {
+		return err
+	}
+	name := types.NodeName(hostName)
+
+	rc, err := clientcmd.NewDefaultClientConfig(*cfg, nil).ClientConfig()
+	if err != nil {
+		return err
+	}
+	c, err := clientset.NewForConfig(rc)
+	if err != nil {
+		return err
+	}
+	fmt.Println("<node/csr> created API client to obtain unique certificate for this node, generating keys and certificate signing request")
+
+	key, err := certutil.MakeEllipticPrivateKeyPEM()
+	if err != nil {
+		return fmt.Errorf("<node/csr> failed to generating private key [%v]", err)
+	}
+	cert, err := csr.RequestNodeCertificate(c.Certificates().CertificateSigningRequests(), key, name)
+	if err != nil {
+		return fmt.Errorf("<node/csr> failed to request signed certificate from the API server [%v]", err)
+	}
+	fmtCert, err := certutil.FormatBytesCert(cert)
+	if err != nil {
+		return fmt.Errorf("<node/csr> failed to format certificate [%v]", err)
+	}
+	fmt.Printf("<node/csr> received signed certificate from the API server:\n%s\n", fmtCert)
+	fmt.Println("<node/csr> generating kubelet configuration")
+
+	cfg.AuthInfos["kubelet"] = &clientcmdapi.AuthInfo{
+		ClientKeyData:         key,
+		ClientCertificateData: []byte(fmtCert),
+	}
+	cfg.Contexts["kubelet"] = &clientcmdapi.Context{
+		AuthInfo: "kubelet",
+		Cluster:  cfg.Contexts[cfg.CurrentContext].Cluster,
+	}
+	cfg.CurrentContext = "kubelet"
+	return nil
 }
