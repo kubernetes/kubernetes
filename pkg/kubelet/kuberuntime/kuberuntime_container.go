@@ -184,7 +184,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 }
 
 // generateLinuxContainerConfig generates linux container config for kubelet runtime api.
-func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *api.Container, pod *api.Pod, imageUser int64) *runtimeApi.LinuxContainerConfig {
+func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *api.Container, pod *api.Pod, imageUser string) *runtimeApi.LinuxContainerConfig {
 	lc := &runtimeApi.LinuxContainerConfig{
 		Resources:       &runtimeApi.LinuxContainerResources{},
 		SecurityContext: m.determineEffectiveSecurityContext(pod, container, imageUser),

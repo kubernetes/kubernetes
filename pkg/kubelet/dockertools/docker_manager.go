@@ -2474,7 +2474,7 @@ func (dm *DockerManager) isImageRoot(image string) (bool, error) {
 		return false, fmt.Errorf("unable to inspect image %s, nil Config", image)
 	}
 
-	user := GetUidFromUser(img.Config.User)
+	user := GetUserFromImageUser(img.Config.User)
 	// if no user is defined container will run as root
 	if user == "" {
 		return true, nil
@@ -2488,16 +2488,16 @@ func (dm *DockerManager) isImageRoot(image string) (bool, error) {
 	return uid == 0, nil
 }
 
-// GetUidFromUser splits the uid out of an uid:gid string.
-func GetUidFromUser(id string) string {
+// GetUserFromImageUser splits the user out of an user:group string.
+func GetUserFromImageUser(id string) string {
 	if id == "" {
 		return id
 	}
-	// split instances where the id may contain uid:gid
+	// split instances where the id may contain user:group
 	if strings.Contains(id, ":") {
 		return strings.Split(id, ":")[0]
 	}
-	// no gid, just return the id
+	// no group, just return the id
 	return id
 }
 
