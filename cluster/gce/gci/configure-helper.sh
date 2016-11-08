@@ -613,14 +613,23 @@ function prepare-etcd-manifest {
   local host_name=$(hostname)
   local etcd_cluster=""
   local cluster_state="new"
+  local etcd_protocol="http"
+  local etcd_creds=""
+
+  if [[ -n "${ETCD_CA_KEY:-}" && -n "${ETCD_CA_CERT:-}" && -n "${ETCD_PEER_KEY:-}" && -n "${ETCD_PEER_CERT:-}" ]]; then
+    local etcd_creds=" --peer-trusted-ca-file /etc/srv/kubernetes/etcd-ca.crt --peer-cert-file /etc/srv/kubernetes/etcd-peer.crt --peer-key-file /etc/srv/kubernetes/etcd-peer.key -peer-client-cert-auth "
+    local etcd_protocol="https"
+  fi
+
   for host in $(echo "${INITIAL_ETCD_CLUSTER:-${host_name}}" | tr "," "\n"); do
-    etcd_host="etcd-${host}=https://${host}:$3"
+    etcd_host="etcd-${host}=${etcd_protocol}://${host}:$3"
     if [[ -n "${etcd_cluster}" ]]; then
       etcd_cluster+=","
       cluster_state="existing"
     fi
     etcd_cluster+="${etcd_host}"
   done
+
   local -r temp_file="/tmp/$5"
   cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/etcd.manifest" "${temp_file}"
   remove-salt-config-comments "${temp_file}"
@@ -642,8 +651,8 @@ function prepare-etcd-manifest {
   else
     sed -i -e "s@{{ *pillar\.get('etcd_docker_tag', '\(.*\)') *}}@\1@g" "${temp_file}"
   fi
-  sed -i -e "s@{{ *etcd_protocol *}}@https@g" "${temp_file}"
-  sed -i -e "s@{{ *etcd_creds *}}@--peer-trusted-ca-file /etc/srv/kubernetes/etcd-ca.crt --peer-cert-file /etc/srv/kubernetes/etcd-peer.crt --peer-key-file /etc/srv/kubernetes/etcd-peer.key -peer-client-cert-auth@g" "${temp_file}"
+  sed -i -e "s@{{ *etcd_protocol *}}@$etcd_protocol@g" "${temp_file}"
+  sed -i -e "s@{{ *etcd_creds *}}@$etcd_creds@g" "${temp_file}"
   if [[ -n "${ETCD_VERSION:-}" ]]; then
     sed -i -e "s@{{ *pillar\.get('etcd_version', '\(.*\)') *}}@${ETCD_VERSION}@g" "${temp_file}"
   else
