@@ -22,12 +22,12 @@ source "${KUBE_ROOT}/cluster/lib/util.sh"
 # what what is default in hack/lib/etcd.sh
 # To avoid it, if it is empty, we set it to 'avoid-overwrite' and
 # clean it after that.
-if [ -z "${ETCD_VERSION}" ]; then
-  ETCD_VERSION="avoid-overwrite"
+if [ -z "${ETCD_IMAGE}" ]; then
+  ETCD_IMAGE="avoid-overwrite"
 fi
 source "${KUBE_ROOT}/hack/lib/init.sh"
-if [ "${ETCD_VERSION}" == "avoid-overwrite" ]; then
-  ETCD_VERSION=""
+if [ "${ETCD_IMAGE}" == "avoid-overwrite" ]; then
+  ETCD_IMAGE=""
 fi
 
 detect-project &> /dev/null
