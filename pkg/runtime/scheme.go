@@ -90,6 +90,15 @@ func NewScheme() *Scheme {
 	}
 	s.converter = conversion.NewConverter(s.nameFunc)
 
+	// Add the deep copy funcs that can't auto-register themselves
+	// This should only be the runtime and unversioned packages
+	if err := s.AddGeneratedDeepCopyFuncs(GetGeneratedDeepCopyFuncs()...); err != nil {
+		panic(err)
+	}
+	if err := s.AddGeneratedDeepCopyFuncs(unversioned.GetGeneratedDeepCopyFuncs()...); err != nil {
+		panic(err)
+	}
+
 	s.AddConversionFuncs(DefaultEmbeddedConversions()...)
 
 	// Enable map[string][]string conversions by default
@@ -451,7 +460,10 @@ func (s *Scheme) Copy(src Object) (Object, error) {
 	return dst.(Object), nil
 }
 
-// Performs a deep copy of the given object.
+// DeepCopy performs a deep copy of the given object.
+// If custom or generated copy functions are registered only for pointers to the source type
+// (or any types contained within it), an addressable value (e.g. a pointer, not a struct)
+// must be passed to DeepCopy().
 func (s *Scheme) DeepCopy(src interface{}) (interface{}, error) {
 	return s.cloner.DeepCopy(src)
 }
