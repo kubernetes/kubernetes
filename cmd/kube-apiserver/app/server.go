@@ -234,6 +234,7 @@ func Run(s *options.ServerRunOptions) error {
 		ServiceAccountLookup:        s.ServiceAccountLookup,
 		ServiceAccountTokenGetter:   serviceAccountGetter,
 		KeystoneURL:                 s.GenericServerRunOptions.KeystoneURL,
+		KeystoneCAFile:              s.GenericServerRunOptions.KeystoneCAFile,
 		WebhookTokenAuthnConfigFile: s.WebhookTokenAuthnConfigFile,
 		WebhookTokenAuthnCacheTTL:   s.WebhookTokenAuthnCacheTTL,
 		RequestHeaderConfig:         s.GenericServerRunOptions.AuthenticationRequestHeaderConfig(),
