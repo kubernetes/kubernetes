@@ -15,9 +15,19 @@
 # Build the etcd image
 #
 # Usage:
-# 	[TAG=2.2.1] [REGISTRY=gcr.io/google_containers] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
+# 	[TAGS=2.2.1 2.3.7 3.0.13] [REGISTRY=gcr.io/google_containers] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
 
-TAG?=3.0.4
+# The image contains different etcd versions to simplify
+# upgrades. Thus be careful when removing any tag from here.
+#
+# NOTE: The etcd upgrade rules are that you can upgrade only 1 minor
+# version at a time, and patch release don't matter.
+#
+# Except from etcd-$(tag) and etcdctl-$(tag) binaries, we also
+# need etcd and etcdctl binaries for backward compatibility reasons.
+# That binary will be set to the last tag from $(TAGS).
+TAGS?=2.2.1 2.3.7 3.0.13
+REGISTRY_TAG?=3.0.13
 ARCH?=amd64
 REGISTRY?=gcr.io/google_containers
 GOLANG_VERSION?=1.6.3
@@ -42,22 +52,41 @@ build:
 	# without copying the subdirectories.
 	find ./ -maxdepth 1 -type f | xargs cp -t $(TEMP_DIR)
 
-	make -C ../../../ WHAT=cluster/images/etcd/attachlease KUBE_STATIC_OVERRIDES="etcd";
-	cp "../../../_output/bin/attachlease" $(TEMP_DIR)
+	# Compile attachlease
+	docker run -it -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes -v $(TEMP_DIR):/build -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
+		/bin/bash -c "CGO_ENABLED=0 go build -o /build/attachlease k8s.io/kubernetes/cluster/images/etcd/attachlease"
+	# Compile rollback
+	docker run -it -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes -v $(TEMP_DIR):/build -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
+		/bin/bash -c "CGO_ENABLED=0 go build -o /build/rollback k8s.io/kubernetes/cluster/images/etcd/rollback"
+
 
 ifeq ($(ARCH),amd64)
 
 	# Do not compile if we should make an image for amd64, use the official etcd binaries instead
-	curl -sSL --retry 5 https://github.com/coreos/etcd/releases/download/v$(TAG)/etcd-v$(TAG)-linux-amd64.tar.gz | tar -xz -C $(TEMP_DIR) --strip-components=1
+	# For each release create a tmp dir 'etcd_release_tmp_dir' and unpack the release tar there.
+	for tag in $(TAGS); do \
+		etcd_release_tmp_dir=$(shell mktemp -d); \
+		curl -sSL --retry 5 https://github.com/coreos/etcd/releases/download/v$$tag/etcd-v$$tag-linux-amd64.tar.gz | tar -xz -C $$etcd_release_tmp_dir --strip-components=1; \
+		cp $$etcd_release_tmp_dir/etcd $$etcd_release_tmp_dir/etcdctl $(TEMP_DIR)/; \
+		cp $(TEMP_DIR)/etcd $(TEMP_DIR)/etcd-$$tag; \
+		cp $(TEMP_DIR)/etcdctl $(TEMP_DIR)/etcdctl-$$tag; \
+	done
 else
 
 	# Download etcd in a golang container and cross-compile it statically
-	docker run -it -v $(TEMP_DIR):/etcdbin golang:$(GOLANG_VERSION) /bin/bash -c \
-		"git clone https://github.com/coreos/etcd /go/src/github.com/coreos/etcd \
-		&& cd /go/src/github.com/coreos/etcd \
-		&& git checkout v$(TAG) \
-		&& GOARM=$(GOARM) GOARCH=$(ARCH) ./build \
-		&& cp bin/$(ARCH)/* /etcdbin"
+	# For each release create a tmp dir 'etcd_release_tmp_dir' and unpack the release tar there.
+	for tag in $(TAGS); do \
+		etcd_release_tmp_dir=$(shell mktemp -d); \
+		docker run -it -v $$etcd_release_tmp_dir:/etcdbin golang:$(GOLANG_VERSION) /bin/bash -c \
+			"git clone https://github.com/coreos/etcd /go/src/github.com/coreos/etcd \
+			&& cd /go/src/github.com/coreos/etcd \
+			&& git checkout v$$tag \
+			&& GOARM=$(GOARM) GOARCH=$(ARCH) ./build \
+			&& cp -f bin/$(ARCH)/etcd* bin/etcd* /etcdbin; echo 'done'"; \
+		cp $$etcd_release_tmp_dir/etcd $$etcd_release_tmp_dir/etcdctl $(TEMP_DIR)/; \
+		cp $(TEMP_DIR)/etcd $(TEMP_DIR)/etcd-$$tag; \
+		cp $(TEMP_DIR)/etcdctl $(TEMP_DIR)/etcdctl-$$tag; \
+	done
 
 	# Add this ENV variable in order to workaround an unsupported arch blocker
 	# The multiarch feature is in an limited and experimental state right now, and etcd should work fine on arm64
@@ -70,15 +99,15 @@ endif
 	cd $(TEMP_DIR) && sed -i.bak 's|BASEIMAGE|$(BASEIMAGE)|g' Dockerfile
 
 	# And build the image
-	docker build -t $(REGISTRY)/etcd-$(ARCH):$(TAG) $(TEMP_DIR)
+	docker build -t $(REGISTRY)/etcd-$(ARCH):$(REGISTRY_TAG) $(TEMP_DIR)
 
 push: build
-	gcloud docker -- push $(REGISTRY)/etcd-$(ARCH):$(TAG)
+	gcloud docker -- push $(REGISTRY)/etcd-$(ARCH):$(REGISTRY_TAG)
 
 ifeq ($(ARCH),amd64)
 	# Backward compatibility. TODO: deprecate this image tag
-	docker tag $(REGISTRY)/etcd-$(ARCH):$(TAG) $(REGISTRY)/etcd:$(TAG)
-	gcloud docker -- push $(REGISTRY)/etcd:$(TAG)
+	docker tag $(REGISTRY)/etcd-$(ARCH):$(REGISTRY_TAG) $(REGISTRY)/etcd:$(REGISTRY_TAG)
+	gcloud docker -- push $(REGISTRY)/etcd:$(REGISTRY_TAG)
 endif
 
 all: build
