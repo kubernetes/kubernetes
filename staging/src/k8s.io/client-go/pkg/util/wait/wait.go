@@ -192,6 +192,20 @@ func PollInfinite(interval time.Duration, condition ConditionFunc) error {
 	return PollUntil(interval, condition, done)
 }
 
+// PollImmediateInfinite is identical to PollInfinite, except that it
+// performs the first check immediately, not waiting interval
+// beforehand.
+func PollImmediateInfinite(interval time.Duration, condition ConditionFunc) error {
+	done, err := condition()
+	if err != nil {
+		return err
+	}
+	if done {
+		return nil
+	}
+	return PollInfinite(interval, condition)
+}
+
 // PollUntil is like Poll, but it takes a stop change instead of total duration
 func PollUntil(interval time.Duration, condition ConditionFunc, stopCh <-chan struct{}) error {
 	return WaitFor(poller(interval, 0), condition, stopCh)

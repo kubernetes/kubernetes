@@ -377,7 +377,7 @@ func (IngressTLS) SwaggerDoc() map[string]string {
 }
 
 var map_Job = map[string]string{
-	"":         "Job represents the configuration of a single job.",
+	"":         "Job represents the configuration of a single job. DEPRECATED: extensions/v1beta1.Job is deprecated, use batch/v1.Job instead.",
 	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
 	"spec":     "Spec is a structure defining the expected behavior of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
 	"status":   "Status is a structure describing current status of a job. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status",
@@ -402,7 +402,7 @@ func (JobCondition) SwaggerDoc() map[string]string {
 }
 
 var map_JobList = map[string]string{
-	"":         "JobList is a collection of jobs.",
+	"":         "JobList is a collection of jobs. DEPRECATED: extensions/v1beta1.JobList is deprecated, use batch/v1.JobList instead.",
 	"metadata": "Standard list metadata More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
 	"items":    "Items is the list of Job.",
 }

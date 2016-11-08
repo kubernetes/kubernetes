@@ -51,7 +51,7 @@ type horizontalPodAutoscalers struct {
 }
 
 // newHorizontalPodAutoscalers returns a HorizontalPodAutoscalers
-func newHorizontalPodAutoscalers(c *AutoscalingClient, namespace string) *horizontalPodAutoscalers {
+func newHorizontalPodAutoscalers(c *AutoscalingV1Client, namespace string) *horizontalPodAutoscalers {
 	return &horizontalPodAutoscalers{
 		client: c.RESTClient(),
 		ns:     namespace,

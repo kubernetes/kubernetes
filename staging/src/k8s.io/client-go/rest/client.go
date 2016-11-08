@@ -173,9 +173,16 @@ func createSerializers(config ContentConfig) (*Serializers, error) {
 		info = mediaTypes[0]
 	}
 
-	internalGV := unversioned.GroupVersion{
-		Group:   config.GroupVersion.Group,
-		Version: runtime.APIVersionInternal,
+	internalGV := unversioned.GroupVersions{
+		{
+			Group:   config.GroupVersion.Group,
+			Version: runtime.APIVersionInternal,
+		},
+		// always include the legacy group as a decoding target to handle non-error `Status` return types
+		{
+			Group:   "",
+			Version: runtime.APIVersionInternal,
+		},
 	}
 
 	s := &Serializers{

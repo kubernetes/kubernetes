@@ -42,6 +42,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&Scale{},
 		&v1.ListOptions{},
 		&v1.DeleteOptions{},
+		&v1.ExportOptions{},
 	)
 	versionedwatch.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

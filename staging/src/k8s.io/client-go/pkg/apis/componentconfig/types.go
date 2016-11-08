@@ -78,8 +78,12 @@ type KubeProxyConfiguration struct {
 	// regardless of conntrackMaxPerCore (set conntrackMaxPerCore=0 to leave the limit as-is).
 	ConntrackMin int32 `json:"conntrackMin"`
 	// conntrackTCPEstablishedTimeout is how long an idle TCP connection will be kept open
-	// (e.g. '250ms', '2s').  Must be greater than 0.
+	// (e.g. '2s').  Must be greater than 0.
 	ConntrackTCPEstablishedTimeout unversioned.Duration `json:"conntrackTCPEstablishedTimeout"`
+	// conntrackTCPCloseWaitTimeout is how long an idle conntrack entry
+	// in CLOSE_WAIT state will remain in the conntrack
+	// table. (e.g. '60s'). Must be greater than 0 to set.
+	ConntrackTCPCloseWaitTimeout unversioned.Duration `json:"conntrackTCPCloseWaitTimeout"`
 }
 
 // Currently two modes of proxying are available: 'userspace' (older, stable) or 'iptables'
@@ -455,10 +459,15 @@ type KubeletConfiguration struct {
 	// Whitelist of unsafe sysctls or sysctl patterns (ending in *).
 	// +optional
 	AllowedUnsafeSysctls []string `json:"experimentalAllowedUnsafeSysctls,omitempty"`
-	// How to integrate with runtime. If set to cri, kubelet will switch to
-	// using the new Container Runtine Interface.
+	// featureGates is a string of comma-separated key=value pairs that describe feature
+	// gates for alpha/experimental features.
+	FeatureGates string `json:"featureGates"`
+	// Enable Container Runtime Interface (CRI) integration.
 	// +optional
-	ExperimentalRuntimeIntegrationType string `json:"experimentalRuntimeIntegrationType,omitempty"`
+	EnableCRI bool `json:"enableCRI,omitempty"`
+	// TODO(#34726:1.8.0): Remove the opt-in for failing when swap is enabled.
+	// Tells the Kubelet to fail to start if swap is enabled on the node.
+	ExperimentalFailSwapOn bool `json:"experimentalFailSwapOn,omitempty"`
 }
 
 type KubeletAuthorizationMode string
@@ -582,6 +591,9 @@ type KubeControllerManagerConfiguration struct {
 	Port int32 `json:"port"`
 	// address is the IP address to serve on (set to 0.0.0.0 for all interfaces).
 	Address string `json:"address"`
+	// useServiceAccountCredentials indicates whether controllers should be run with
+	// individual service account credentials.
+	UseServiceAccountCredentials bool `json:"useServiceAccountCredentials"`
 	// cloudProvider is the provider for cloud services.
 	CloudProvider string `json:"cloudProvider"`
 	// cloudConfigFile is the path to the cloud provider configuration file.

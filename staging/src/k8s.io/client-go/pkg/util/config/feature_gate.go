@@ -42,6 +42,7 @@ const (
 	appArmor                  = "AppArmor"
 	dynamicKubeletConfig      = "DynamicKubeletConfig"
 	dynamicVolumeProvisioning = "DynamicVolumeProvisioning"
+	streamingProxyRedirects   = "StreamingProxyRedirects"
 )
 
 var (
@@ -53,6 +54,7 @@ var (
 		appArmor:                  {true, beta},
 		dynamicKubeletConfig:      {false, alpha},
 		dynamicVolumeProvisioning: {true, alpha},
+		streamingProxyRedirects:   {false, alpha},
 	}
 
 	// Special handling for a few gates.
@@ -85,6 +87,8 @@ const (
 // a string like feature1=true,feature2=false,...
 type FeatureGate interface {
 	AddFlag(fs *pflag.FlagSet)
+	Set(value string) error
+	KnownFeatures() []string
 
 	// Every feature gate should add method here following this template:
 	//
@@ -104,9 +108,13 @@ type FeatureGate interface {
 	// alpha: v1.3
 	DynamicVolumeProvisioning() bool
 
-	// owner: mtaufen
+	// owner: @mtaufen
 	// alpha: v1.4
 	DynamicKubeletConfig() bool
+
+	// owner: timstclair
+	// alpha: v1.5
+	StreamingProxyRedirects() bool
 }
 
 // featureGate implements FeatureGate as well as pflag.Value for flag parsing.
@@ -195,6 +203,12 @@ func (f *featureGate) DynamicVolumeProvisioning() bool {
 	return f.lookup(dynamicVolumeProvisioning)
 }
 
+// StreamingProxyRedirects controls whether the apiserver should intercept (and follow)
+// redirects from the backend (Kubelet) for streaming requests (exec/attach/port-forward).
+func (f *featureGate) StreamingProxyRedirects() bool {
+	return f.lookup(streamingProxyRedirects)
+}
+
 func (f *featureGate) lookup(key string) bool {
 	defaultValue := f.known[key].enabled
 	if f.enabled != nil {
@@ -208,6 +222,14 @@ func (f *featureGate) lookup(key string) bool {
 
 // AddFlag adds a flag for setting global feature gates to the specified FlagSet.
 func (f *featureGate) AddFlag(fs *pflag.FlagSet) {
+	known := f.KnownFeatures()
+	fs.Var(f, flagName, ""+
+		"A set of key=value pairs that describe feature gates for alpha/experimental features. "+
+		"Options are:\n"+strings.Join(known, "\n"))
+}
+
+// Returns a string describing the FeatureGate's known features.
+func (f *featureGate) KnownFeatures() []string {
 	var known []string
 	for k, v := range f.known {
 		pre := ""
@@ -217,7 +239,5 @@ func (f *featureGate) AddFlag(fs *pflag.FlagSet) {
 		known = append(known, fmt.Sprintf("%s=true|false (%sdefault=%t)", k, pre, v.enabled))
 	}
 	sort.Strings(known)
-	fs.Var(f, flagName, ""+
-		"A set of key=value pairs that describe feature gates for alpha/experimental features. "+
-		"Options are:\n"+strings.Join(known, "\n"))
+	return known
 }

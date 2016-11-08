@@ -49,7 +49,7 @@ type storageClasses struct {
 }
 
 // newStorageClasses returns a StorageClasses
-func newStorageClasses(c *StorageClient) *storageClasses {
+func newStorageClasses(c *StorageV1beta1Client) *storageClasses {
 	return &storageClasses{
 		client: c.RESTClient(),
 	}

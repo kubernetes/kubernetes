@@ -51,7 +51,7 @@ type jobs struct {
 }
 
 // newJobs returns a Jobs
-func newJobs(c *ExtensionsClient, namespace string) *jobs {
+func newJobs(c *ExtensionsV1beta1Client, namespace string) *jobs {
 	return &jobs{
 		client: c.RESTClient(),
 		ns:     namespace,

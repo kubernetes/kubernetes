@@ -28,8 +28,7 @@ import (
 //  - Network: A single stable DNS and hostname.
 //  - Storage: As many VolumeClaims as requested.
 // The StatefulSet guarantees that a given network identity will always
-// map to the same storage identity. StatefulSet is currently in alpha and
-// and subject to change without notice.
+// map to the same storage identity.
 type StatefulSet struct {
 	unversioned.TypeMeta `json:",inline"`
 	// +optional

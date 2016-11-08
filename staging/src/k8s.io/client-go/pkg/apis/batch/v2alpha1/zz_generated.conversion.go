@@ -22,10 +22,12 @@ package v2alpha1
 
 import (
 	api "k8s.io/client-go/pkg/api"
+	unversioned "k8s.io/client-go/pkg/api/unversioned"
 	v1 "k8s.io/client-go/pkg/api/v1"
 	batch "k8s.io/client-go/pkg/apis/batch"
 	conversion "k8s.io/client-go/pkg/conversion"
 	runtime "k8s.io/client-go/pkg/runtime"
+	unsafe "unsafe"
 )
 
 func init() {
@@ -36,6 +38,14 @@ func init() {
 // Public to allow building arbitrary schemes.
 func RegisterConversions(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedConversionFuncs(
+		Convert_v2alpha1_CronJob_To_batch_CronJob,
+		Convert_batch_CronJob_To_v2alpha1_CronJob,
+		Convert_v2alpha1_CronJobList_To_batch_CronJobList,
+		Convert_batch_CronJobList_To_v2alpha1_CronJobList,
+		Convert_v2alpha1_CronJobSpec_To_batch_CronJobSpec,
+		Convert_batch_CronJobSpec_To_v2alpha1_CronJobSpec,
+		Convert_v2alpha1_CronJobStatus_To_batch_CronJobStatus,
+		Convert_batch_CronJobStatus_To_v2alpha1_CronJobStatus,
 		Convert_v2alpha1_Job_To_batch_Job,
 		Convert_batch_Job_To_v2alpha1_Job,
 		Convert_v2alpha1_JobCondition_To_batch_JobCondition,
@@ -50,15 +60,133 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_batch_JobTemplate_To_v2alpha1_JobTemplate,
 		Convert_v2alpha1_JobTemplateSpec_To_batch_JobTemplateSpec,
 		Convert_batch_JobTemplateSpec_To_v2alpha1_JobTemplateSpec,
-		Convert_v2alpha1_ScheduledJob_To_batch_ScheduledJob,
-		Convert_batch_ScheduledJob_To_v2alpha1_ScheduledJob,
-		Convert_v2alpha1_ScheduledJobList_To_batch_ScheduledJobList,
-		Convert_batch_ScheduledJobList_To_v2alpha1_ScheduledJobList,
-		Convert_v2alpha1_ScheduledJobSpec_To_batch_ScheduledJobSpec,
-		Convert_batch_ScheduledJobSpec_To_v2alpha1_ScheduledJobSpec,
-		Convert_v2alpha1_ScheduledJobStatus_To_batch_ScheduledJobStatus,
-		Convert_batch_ScheduledJobStatus_To_v2alpha1_ScheduledJobStatus,
 	)
+}
+
+func autoConvert_v2alpha1_CronJob_To_batch_CronJob(in *CronJob, out *batch.CronJob, s conversion.Scope) error {
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
+	if err := Convert_v2alpha1_CronJobSpec_To_batch_CronJobSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_v2alpha1_CronJobStatus_To_batch_CronJobStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v2alpha1_CronJob_To_batch_CronJob(in *CronJob, out *batch.CronJob, s conversion.Scope) error {
+	return autoConvert_v2alpha1_CronJob_To_batch_CronJob(in, out, s)
+}
+
+func autoConvert_batch_CronJob_To_v2alpha1_CronJob(in *batch.CronJob, out *CronJob, s conversion.Scope) error {
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
+	if err := Convert_batch_CronJobSpec_To_v2alpha1_CronJobSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_batch_CronJobStatus_To_v2alpha1_CronJobStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_batch_CronJob_To_v2alpha1_CronJob(in *batch.CronJob, out *CronJob, s conversion.Scope) error {
+	return autoConvert_batch_CronJob_To_v2alpha1_CronJob(in, out, s)
+}
+
+func autoConvert_v2alpha1_CronJobList_To_batch_CronJobList(in *CronJobList, out *batch.CronJobList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]batch.CronJob, len(*in))
+		for i := range *in {
+			if err := Convert_v2alpha1_CronJob_To_batch_CronJob(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func Convert_v2alpha1_CronJobList_To_batch_CronJobList(in *CronJobList, out *batch.CronJobList, s conversion.Scope) error {
+	return autoConvert_v2alpha1_CronJobList_To_batch_CronJobList(in, out, s)
+}
+
+func autoConvert_batch_CronJobList_To_v2alpha1_CronJobList(in *batch.CronJobList, out *CronJobList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]CronJob, len(*in))
+		for i := range *in {
+			if err := Convert_batch_CronJob_To_v2alpha1_CronJob(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
+	return nil
+}
+
+func Convert_batch_CronJobList_To_v2alpha1_CronJobList(in *batch.CronJobList, out *CronJobList, s conversion.Scope) error {
+	return autoConvert_batch_CronJobList_To_v2alpha1_CronJobList(in, out, s)
+}
+
+func autoConvert_v2alpha1_CronJobSpec_To_batch_CronJobSpec(in *CronJobSpec, out *batch.CronJobSpec, s conversion.Scope) error {
+	out.Schedule = in.Schedule
+	out.StartingDeadlineSeconds = (*int64)(unsafe.Pointer(in.StartingDeadlineSeconds))
+	out.ConcurrencyPolicy = batch.ConcurrencyPolicy(in.ConcurrencyPolicy)
+	out.Suspend = (*bool)(unsafe.Pointer(in.Suspend))
+	if err := Convert_v2alpha1_JobTemplateSpec_To_batch_JobTemplateSpec(&in.JobTemplate, &out.JobTemplate, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v2alpha1_CronJobSpec_To_batch_CronJobSpec(in *CronJobSpec, out *batch.CronJobSpec, s conversion.Scope) error {
+	return autoConvert_v2alpha1_CronJobSpec_To_batch_CronJobSpec(in, out, s)
+}
+
+func autoConvert_batch_CronJobSpec_To_v2alpha1_CronJobSpec(in *batch.CronJobSpec, out *CronJobSpec, s conversion.Scope) error {
+	out.Schedule = in.Schedule
+	out.StartingDeadlineSeconds = (*int64)(unsafe.Pointer(in.StartingDeadlineSeconds))
+	out.ConcurrencyPolicy = ConcurrencyPolicy(in.ConcurrencyPolicy)
+	out.Suspend = (*bool)(unsafe.Pointer(in.Suspend))
+	if err := Convert_batch_JobTemplateSpec_To_v2alpha1_JobTemplateSpec(&in.JobTemplate, &out.JobTemplate, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_batch_CronJobSpec_To_v2alpha1_CronJobSpec(in *batch.CronJobSpec, out *CronJobSpec, s conversion.Scope) error {
+	return autoConvert_batch_CronJobSpec_To_v2alpha1_CronJobSpec(in, out, s)
+}
+
+func autoConvert_v2alpha1_CronJobStatus_To_batch_CronJobStatus(in *CronJobStatus, out *batch.CronJobStatus, s conversion.Scope) error {
+	out.Active = *(*[]api.ObjectReference)(unsafe.Pointer(&in.Active))
+	out.LastScheduleTime = (*unversioned.Time)(unsafe.Pointer(in.LastScheduleTime))
+	return nil
+}
+
+func Convert_v2alpha1_CronJobStatus_To_batch_CronJobStatus(in *CronJobStatus, out *batch.CronJobStatus, s conversion.Scope) error {
+	return autoConvert_v2alpha1_CronJobStatus_To_batch_CronJobStatus(in, out, s)
+}
+
+func autoConvert_batch_CronJobStatus_To_v2alpha1_CronJobStatus(in *batch.CronJobStatus, out *CronJobStatus, s conversion.Scope) error {
+	out.Active = *(*[]v1.ObjectReference)(unsafe.Pointer(&in.Active))
+	out.LastScheduleTime = (*unversioned.Time)(unsafe.Pointer(in.LastScheduleTime))
+	return nil
+}
+
+func Convert_batch_CronJobStatus_To_v2alpha1_CronJobStatus(in *batch.CronJobStatus, out *CronJobStatus, s conversion.Scope) error {
+	return autoConvert_batch_CronJobStatus_To_v2alpha1_CronJobStatus(in, out, s)
 }
 
 func autoConvert_v2alpha1_Job_To_batch_Job(in *Job, out *batch.Job, s conversion.Scope) error {
@@ -166,11 +294,11 @@ func Convert_batch_JobList_To_v2alpha1_JobList(in *batch.JobList, out *JobList, 
 }
 
 func autoConvert_v2alpha1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSpec, s conversion.Scope) error {
-	out.Parallelism = in.Parallelism
-	out.Completions = in.Completions
-	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
-	out.Selector = in.Selector
-	out.ManualSelector = in.ManualSelector
+	out.Parallelism = (*int32)(unsafe.Pointer(in.Parallelism))
+	out.Completions = (*int32)(unsafe.Pointer(in.Completions))
+	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
+	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.ManualSelector = (*bool)(unsafe.Pointer(in.ManualSelector))
 	if err := v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -178,11 +306,11 @@ func autoConvert_v2alpha1_JobSpec_To_batch_JobSpec(in *JobSpec, out *batch.JobSp
 }
 
 func autoConvert_batch_JobSpec_To_v2alpha1_JobSpec(in *batch.JobSpec, out *JobSpec, s conversion.Scope) error {
-	out.Parallelism = in.Parallelism
-	out.Completions = in.Completions
-	out.ActiveDeadlineSeconds = in.ActiveDeadlineSeconds
-	out.Selector = in.Selector
-	out.ManualSelector = in.ManualSelector
+	out.Parallelism = (*int32)(unsafe.Pointer(in.Parallelism))
+	out.Completions = (*int32)(unsafe.Pointer(in.Completions))
+	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
+	out.Selector = (*unversioned.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.ManualSelector = (*bool)(unsafe.Pointer(in.ManualSelector))
 	if err := v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
@@ -190,19 +318,9 @@ func autoConvert_batch_JobSpec_To_v2alpha1_JobSpec(in *batch.JobSpec, out *JobSp
 }
 
 func autoConvert_v2alpha1_JobStatus_To_batch_JobStatus(in *JobStatus, out *batch.JobStatus, s conversion.Scope) error {
-	if in.Conditions != nil {
-		in, out := &in.Conditions, &out.Conditions
-		*out = make([]batch.JobCondition, len(*in))
-		for i := range *in {
-			if err := Convert_v2alpha1_JobCondition_To_batch_JobCondition(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Conditions = nil
-	}
-	out.StartTime = in.StartTime
-	out.CompletionTime = in.CompletionTime
+	out.Conditions = *(*[]batch.JobCondition)(unsafe.Pointer(&in.Conditions))
+	out.StartTime = (*unversioned.Time)(unsafe.Pointer(in.StartTime))
+	out.CompletionTime = (*unversioned.Time)(unsafe.Pointer(in.CompletionTime))
 	out.Active = in.Active
 	out.Succeeded = in.Succeeded
 	out.Failed = in.Failed
@@ -214,19 +332,9 @@ func Convert_v2alpha1_JobStatus_To_batch_JobStatus(in *JobStatus, out *batch.Job
 }
 
 func autoConvert_batch_JobStatus_To_v2alpha1_JobStatus(in *batch.JobStatus, out *JobStatus, s conversion.Scope) error {
-	if in.Conditions != nil {
-		in, out := &in.Conditions, &out.Conditions
-		*out = make([]JobCondition, len(*in))
-		for i := range *in {
-			if err := Convert_batch_JobCondition_To_v2alpha1_JobCondition(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Conditions = nil
-	}
-	out.StartTime = in.StartTime
-	out.CompletionTime = in.CompletionTime
+	out.Conditions = *(*[]JobCondition)(unsafe.Pointer(&in.Conditions))
+	out.StartTime = (*unversioned.Time)(unsafe.Pointer(in.StartTime))
+	out.CompletionTime = (*unversioned.Time)(unsafe.Pointer(in.CompletionTime))
 	out.Active = in.Active
 	out.Succeeded = in.Succeeded
 	out.Failed = in.Failed
@@ -295,152 +403,4 @@ func autoConvert_batch_JobTemplateSpec_To_v2alpha1_JobTemplateSpec(in *batch.Job
 
 func Convert_batch_JobTemplateSpec_To_v2alpha1_JobTemplateSpec(in *batch.JobTemplateSpec, out *JobTemplateSpec, s conversion.Scope) error {
 	return autoConvert_batch_JobTemplateSpec_To_v2alpha1_JobTemplateSpec(in, out, s)
-}
-
-func autoConvert_v2alpha1_ScheduledJob_To_batch_ScheduledJob(in *ScheduledJob, out *batch.ScheduledJob, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
-	if err := Convert_v2alpha1_ScheduledJobSpec_To_batch_ScheduledJobSpec(&in.Spec, &out.Spec, s); err != nil {
-		return err
-	}
-	if err := Convert_v2alpha1_ScheduledJobStatus_To_batch_ScheduledJobStatus(&in.Status, &out.Status, s); err != nil {
-		return err
-	}
-	return nil
-}
-
-func Convert_v2alpha1_ScheduledJob_To_batch_ScheduledJob(in *ScheduledJob, out *batch.ScheduledJob, s conversion.Scope) error {
-	return autoConvert_v2alpha1_ScheduledJob_To_batch_ScheduledJob(in, out, s)
-}
-
-func autoConvert_batch_ScheduledJob_To_v2alpha1_ScheduledJob(in *batch.ScheduledJob, out *ScheduledJob, s conversion.Scope) error {
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
-	if err := Convert_batch_ScheduledJobSpec_To_v2alpha1_ScheduledJobSpec(&in.Spec, &out.Spec, s); err != nil {
-		return err
-	}
-	if err := Convert_batch_ScheduledJobStatus_To_v2alpha1_ScheduledJobStatus(&in.Status, &out.Status, s); err != nil {
-		return err
-	}
-	return nil
-}
-
-func Convert_batch_ScheduledJob_To_v2alpha1_ScheduledJob(in *batch.ScheduledJob, out *ScheduledJob, s conversion.Scope) error {
-	return autoConvert_batch_ScheduledJob_To_v2alpha1_ScheduledJob(in, out, s)
-}
-
-func autoConvert_v2alpha1_ScheduledJobList_To_batch_ScheduledJobList(in *ScheduledJobList, out *batch.ScheduledJobList, s conversion.Scope) error {
-	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]batch.ScheduledJob, len(*in))
-		for i := range *in {
-			if err := Convert_v2alpha1_ScheduledJob_To_batch_ScheduledJob(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
-	return nil
-}
-
-func Convert_v2alpha1_ScheduledJobList_To_batch_ScheduledJobList(in *ScheduledJobList, out *batch.ScheduledJobList, s conversion.Scope) error {
-	return autoConvert_v2alpha1_ScheduledJobList_To_batch_ScheduledJobList(in, out, s)
-}
-
-func autoConvert_batch_ScheduledJobList_To_v2alpha1_ScheduledJobList(in *batch.ScheduledJobList, out *ScheduledJobList, s conversion.Scope) error {
-	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]ScheduledJob, len(*in))
-		for i := range *in {
-			if err := Convert_batch_ScheduledJob_To_v2alpha1_ScheduledJob(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
-	return nil
-}
-
-func Convert_batch_ScheduledJobList_To_v2alpha1_ScheduledJobList(in *batch.ScheduledJobList, out *ScheduledJobList, s conversion.Scope) error {
-	return autoConvert_batch_ScheduledJobList_To_v2alpha1_ScheduledJobList(in, out, s)
-}
-
-func autoConvert_v2alpha1_ScheduledJobSpec_To_batch_ScheduledJobSpec(in *ScheduledJobSpec, out *batch.ScheduledJobSpec, s conversion.Scope) error {
-	out.Schedule = in.Schedule
-	out.StartingDeadlineSeconds = in.StartingDeadlineSeconds
-	out.ConcurrencyPolicy = batch.ConcurrencyPolicy(in.ConcurrencyPolicy)
-	out.Suspend = in.Suspend
-	if err := Convert_v2alpha1_JobTemplateSpec_To_batch_JobTemplateSpec(&in.JobTemplate, &out.JobTemplate, s); err != nil {
-		return err
-	}
-	return nil
-}
-
-func Convert_v2alpha1_ScheduledJobSpec_To_batch_ScheduledJobSpec(in *ScheduledJobSpec, out *batch.ScheduledJobSpec, s conversion.Scope) error {
-	return autoConvert_v2alpha1_ScheduledJobSpec_To_batch_ScheduledJobSpec(in, out, s)
-}
-
-func autoConvert_batch_ScheduledJobSpec_To_v2alpha1_ScheduledJobSpec(in *batch.ScheduledJobSpec, out *ScheduledJobSpec, s conversion.Scope) error {
-	out.Schedule = in.Schedule
-	out.StartingDeadlineSeconds = in.StartingDeadlineSeconds
-	out.ConcurrencyPolicy = ConcurrencyPolicy(in.ConcurrencyPolicy)
-	out.Suspend = in.Suspend
-	if err := Convert_batch_JobTemplateSpec_To_v2alpha1_JobTemplateSpec(&in.JobTemplate, &out.JobTemplate, s); err != nil {
-		return err
-	}
-	return nil
-}
-
-func Convert_batch_ScheduledJobSpec_To_v2alpha1_ScheduledJobSpec(in *batch.ScheduledJobSpec, out *ScheduledJobSpec, s conversion.Scope) error {
-	return autoConvert_batch_ScheduledJobSpec_To_v2alpha1_ScheduledJobSpec(in, out, s)
-}
-
-func autoConvert_v2alpha1_ScheduledJobStatus_To_batch_ScheduledJobStatus(in *ScheduledJobStatus, out *batch.ScheduledJobStatus, s conversion.Scope) error {
-	if in.Active != nil {
-		in, out := &in.Active, &out.Active
-		*out = make([]api.ObjectReference, len(*in))
-		for i := range *in {
-			// TODO: Inefficient conversion - can we improve it?
-			if err := s.Convert(&(*in)[i], &(*out)[i], 0); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Active = nil
-	}
-	out.LastScheduleTime = in.LastScheduleTime
-	return nil
-}
-
-func Convert_v2alpha1_ScheduledJobStatus_To_batch_ScheduledJobStatus(in *ScheduledJobStatus, out *batch.ScheduledJobStatus, s conversion.Scope) error {
-	return autoConvert_v2alpha1_ScheduledJobStatus_To_batch_ScheduledJobStatus(in, out, s)
-}
-
-func autoConvert_batch_ScheduledJobStatus_To_v2alpha1_ScheduledJobStatus(in *batch.ScheduledJobStatus, out *ScheduledJobStatus, s conversion.Scope) error {
-	if in.Active != nil {
-		in, out := &in.Active, &out.Active
-		*out = make([]v1.ObjectReference, len(*in))
-		for i := range *in {
-			// TODO: Inefficient conversion - can we improve it?
-			if err := s.Convert(&(*in)[i], &(*out)[i], 0); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Active = nil
-	}
-	out.LastScheduleTime = in.LastScheduleTime
-	return nil
-}
-
-func Convert_batch_ScheduledJobStatus_To_v2alpha1_ScheduledJobStatus(in *batch.ScheduledJobStatus, out *ScheduledJobStatus, s conversion.Scope) error {
-	return autoConvert_batch_ScheduledJobStatus_To_v2alpha1_ScheduledJobStatus(in, out, s)
 }
