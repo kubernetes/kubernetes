@@ -28,6 +28,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"syscall"
 	"testing"
 	"time"
 
@@ -71,6 +72,10 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+// When running the containerized conformance test, we'll mount the
+// host root filesystem as readonly to /rootfs.
+const rootfs = "/rootfs"
+
 func TestE2eNode(t *testing.T) {
 	if *runServicesMode {
 		// If run-services-mode is specified, only run services in current process.
@@ -79,6 +84,15 @@ func TestE2eNode(t *testing.T) {
 	}
 	if *systemValidateMode {
 		// If system-validate-mode is specified, only run system validation in current process.
+		if framework.TestContext.NodeConformance {
+			// Chroot to /rootfs to make system validation can check system
+			// as in the root filesystem.
+			// TODO(random-liu): Consider to chroot the whole test process to make writing
+			// test easier.
+			if err := syscall.Chroot(rootfs); err != nil {
+				glog.Exitf("chroot %q failed: %v", rootfs, err)
+			}
+		}
 		if err := system.Validate(); err != nil {
 			glog.Exitf("system validation failed: %v", err)
 		}
@@ -172,12 +186,12 @@ func validateSystem() error {
 	if err != nil {
 		return fmt.Errorf("can't get current binary: %v", err)
 	}
-	// TODO(random-liu): Remove sudo in containerize PR.
-	output, err := exec.Command("sudo", testBin, "--system-validate-mode").CombinedOutput()
+	// Pass all flags into the child process, so that it will see the same flag set.
+	output, err := exec.Command(testBin, append([]string{"--system-validate-mode"}, os.Args[1:]...)...).CombinedOutput()
 	// The output of system validation should have been formatted, directly print here.
 	fmt.Print(string(output))
 	if err != nil {
-		return fmt.Errorf("system validation failed")
+		return fmt.Errorf("system validation failed: %v", err)
 	}
 	return nil
 }
@@ -190,7 +204,7 @@ func maskLocksmithdOnCoreos() {
 		return
 	}
 	if bytes.Contains(data, []byte("ID=coreos")) {
-		output, err := exec.Command("sudo", "systemctl", "mask", "--now", "locksmithd").CombinedOutput()
+		output, err := exec.Command("systemctl", "mask", "--now", "locksmithd").CombinedOutput()
 		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("should be able to mask locksmithd - output: %q", string(output)))
 		glog.Infof("Locksmithd is masked successfully")
 	}
