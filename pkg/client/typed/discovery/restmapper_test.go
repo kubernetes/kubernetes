@@ -299,6 +299,14 @@ func (c *fakeCachedDiscoveryInterface) ServerResources() (map[string]*unversione
 	return map[string]*unversioned.APIResourceList{}, nil
 }
 
+func (c *fakeCachedDiscoveryInterface) ServerAllResources() ([]unversioned.GroupVersionResource, error) {
+	return []unversioned.GroupVersionResource{}, nil
+}
+
+func (c *fakeCachedDiscoveryInterface) ServerAllNamespacedResources() ([]unversioned.GroupVersionResource, error) {
+	return []unversioned.GroupVersionResource{}, nil
+}
+
 func (c *fakeCachedDiscoveryInterface) ServerPreferredResources() ([]unversioned.GroupVersionResource, error) {
 	if c.enabledA {
 		return []unversioned.GroupVersionResource{

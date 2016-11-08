@@ -208,12 +208,20 @@ func (d *CachedDiscoveryClient) RESTClient() restclient.Interface {
 	return d.delegate.RESTClient()
 }
 
+func (d *CachedDiscoveryClient) ServerAllResources() ([]unversioned.GroupVersionResource, error) {
+	return d.delegate.ServerAllResources()
+}
+
+func (d *CachedDiscoveryClient) ServerAllNamespacedResources() ([]unversioned.GroupVersionResource, error) {
+	return d.delegate.ServerAllNamespacedResources()
+}
+
 func (d *CachedDiscoveryClient) ServerPreferredResources() ([]unversioned.GroupVersionResource, error) {
 	return d.delegate.ServerPreferredResources()
 }
 
 func (d *CachedDiscoveryClient) ServerPreferredNamespacedResources() ([]unversioned.GroupVersionResource, error) {
-	return d.delegate.ServerPreferredNamespacedResources()
+	return d.delegate.ServerAllNamespacedResources()
 }
 
 func (d *CachedDiscoveryClient) ServerVersion() (*version.Info, error) {
