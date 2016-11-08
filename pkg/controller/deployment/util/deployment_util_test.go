@@ -431,7 +431,7 @@ func TestEqualIgnoreHash(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		runTest := func(t1, t2 v1.PodTemplateSpec, reversed bool) {
+		runTest := func(t1, t2 *v1.PodTemplateSpec, reversed bool) {
 			// Set up
 			t1Copy, err := api.Scheme.DeepCopy(t1)
 			if err != nil {
@@ -446,7 +446,7 @@ func TestEqualIgnoreHash(t *testing.T) {
 				reverseString = " (reverse order)"
 			}
 			// Run
-			equal, err := equalIgnoreHash(t1, t2)
+			equal, err := equalIgnoreHash(*t1, *t2)
 			// Check
 			if err != nil {
 				t.Errorf("In test case %q%s, expected no error, returned %v", test.test, reverseString, err)
@@ -461,9 +461,9 @@ func TestEqualIgnoreHash(t *testing.T) {
 				t.Errorf("In test case %q%s, unexpected input template modified", test.test, reverseString)
 			}
 		}
-		runTest(test.former, test.latter, false)
+		runTest(&test.former, &test.latter, false)
 		// Test the same case in reverse order
-		runTest(test.latter, test.former, true)
+		runTest(&test.latter, &test.former, true)
 	}
 }
 

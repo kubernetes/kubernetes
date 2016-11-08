@@ -44,11 +44,11 @@ func (ps *pdbStates) Set(pdb *policy.PodDisruptionBudget) error {
 	if err != nil {
 		return err
 	}
-	obj, err := api.Scheme.DeepCopy(*pdb)
+	obj, err := api.Scheme.DeepCopy(pdb)
 	if err != nil {
 		return err
 	}
-	(*ps)[key] = obj.(policy.PodDisruptionBudget)
+	(*ps)[key] = *obj.(*policy.PodDisruptionBudget)
 
 	return nil
 }
