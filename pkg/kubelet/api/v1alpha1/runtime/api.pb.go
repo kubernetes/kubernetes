@@ -638,14 +638,22 @@ type PodSandboxConfig struct {
 	PortMappings []*PortMapping `protobuf:"bytes,5,rep,name=port_mappings,json=portMappings" json:"port_mappings,omitempty"`
 	// Key-value pairs that may be used to scope and select individual resources.
 	Labels map[string]string `protobuf:"bytes,6,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	// Annotations is an unstructured key value map that may be set by external
-	// tools to store and retrieve arbitrary metadata. There are a few features are
-	// driven by annotations, Runtimes could support them optionally:
+	// Unstructured key value map that may be set by external tools to store
+	// and retrieve arbitrary metadata. Annotations MUST NOT be altered or in
+	// any way processed by the runtime.
+	//
+	// In order to preserve a well-defined interface between the kubelet and
+	// the container runtime, annotations SHOULD NOT influence runtime behaviour.
+	// For legacy reasons, there are two annotations which currently explicitly
+	// break this rule, listed below; in future versions of the interface these
+	// will be promoted to typed features. Runtime authors should similarly
+	// consider proposing new fields for any new features instead of using
+	// annotations.
 	//
 	// 1. AppArmor
 	//
 	//    key: container.apparmor.security.beta.kubernetes.io/<container_name>
-	//    description: apparmor profile for the container.
+	//    description: apparmor profile for every container created in this pod.
 	//    value:
 	//      * runtime/default: equivalent to not specifying a profile.
 	//      * localhost/<profile_name>: profile loaded on the node
@@ -925,8 +933,10 @@ type PodSandboxStatus struct {
 	Linux *LinuxPodSandboxStatus `protobuf:"bytes,6,opt,name=linux" json:"linux,omitempty"`
 	// Labels are key value pairs that may be used to scope and select individual resources.
 	Labels map[string]string `protobuf:"bytes,7,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	// Annotations is an unstructured key value map that may be set by external
-	// tools to store and retrieve arbitrary metadata.
+	// Unstructured key value map that may be set by external tools to store
+	// and retrieve arbitrary metadata.
+	// The value of this field MUST be identical to that of the corresponding
+	// PodSandboxConfig used to instantiate the pod sandbox this status represents.
 	Annotations      map[string]string `protobuf:"bytes,8,rep,name=annotations" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	XXX_unrecognized []byte            `json:"-"`
 }
@@ -1080,8 +1090,10 @@ type PodSandbox struct {
 	CreatedAt *int64 `protobuf:"varint,4,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
 	// Labels of the PodSandbox.
 	Labels map[string]string `protobuf:"bytes,5,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	// Annotations is an unstructured key value map that may be set by external
-	// tools to store and retrieve arbitrary metadata.
+	// Unstructured key value map that may be set by external tools to store
+	// and retrieve arbitrary metadata.
+	// The value of this field MUST be identical to that of the corresponding
+	// PodSandboxConfig used to instantiate this PodSandbox.
 	Annotations      map[string]string `protobuf:"bytes,6,rep,name=annotations" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	XXX_unrecognized []byte            `json:"-"`
 }
@@ -1534,8 +1546,9 @@ type ContainerConfig struct {
 	//     prefix ::= DNS_SUBDOMAIN
 	//     name ::= DNS_LABEL
 	Labels map[string]string `protobuf:"bytes,9,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	// Annotations is an unstructured key value map that may be set by external
-	// tools to store and retrieve arbitrary metadata.
+	// Unstructured key value map that may be set by external tools to store
+	// and retrieve arbitrary metadata. Annotations MUST NOT be altered or in
+	// any way processed by the runtime.
 	Annotations map[string]string `protobuf:"bytes,10,rep,name=annotations" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Path relative to PodSandboxConfig.LogDirectory for container to store
 	// the log (STDOUT and STDERR) on the host.
@@ -1904,8 +1917,11 @@ type Container struct {
 	CreatedAt *int64 `protobuf:"varint,7,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
 	// Key-value pairs that may be used to scope and select individual resources.
 	Labels map[string]string `protobuf:"bytes,8,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	// Annotations is an unstructured key value map that may be set by external
-	// tools to store and retrieve arbitrary metadata.
+	// Unstructured key value map that may be set by external tools to store
+	// and retrieve arbitrary metadata. Annotations MUST NOT be altered or in
+	// any way processed by the runtime.
+	// The value of this field MUST be identical to that of the corresponding
+	// ContainerConfig used to instantiate this Container.
 	Annotations      map[string]string `protobuf:"bytes,9,rep,name=annotations" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	XXX_unrecognized []byte            `json:"-"`
 }
@@ -2042,7 +2058,10 @@ type ContainerStatus struct {
 	Message *string `protobuf:"bytes,11,opt,name=message" json:"message,omitempty"`
 	// Key-value pairs that may be used to scope and select individual resources.
 	Labels map[string]string `protobuf:"bytes,12,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	// Annotations is an unstructured key value map.
+	// Unstructured key value map that may be set by external tools to store
+	// and retrieve arbitrary metadata.
+	// The value of this field MUST be identical to that of the corresponding
+	// ContainerConfig used to instantiate the Container this status represents.
 	Annotations map[string]string `protobuf:"bytes,13,rep,name=annotations" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Mounts for the container.
 	Mounts           []*Mount `protobuf:"bytes,14,rep,name=mounts" json:"mounts,omitempty"`

@@ -228,14 +228,22 @@ message PodSandboxConfig {
     repeated PortMapping port_mappings = 5;
     // Key-value pairs that may be used to scope and select individual resources.
     map<string, string> labels = 6;
-    // Annotations is an unstructured key value map that may be set by external
-    // tools to store and retrieve arbitrary metadata. There are a few features are
-    // driven by annotations, Runtimes could support them optionally:
+    // Unstructured key value map that may be set by external tools to store
+    // and retrieve arbitrary metadata. Annotations MUST NOT be altered or in
+    // any way processed by the runtime.
+    //
+    // In order to preserve a well-defined interface between the kubelet and
+    // the container runtime, annotations SHOULD NOT influence runtime behaviour.
+    // For legacy reasons, there are two annotations which currently explicitly
+    // break this rule, listed below; in future versions of the interface these
+    // will be promoted to typed features. Runtime authors should similarly
+    // consider proposing new fields for any new features instead of using
+    // annotations.
     //
     // 1. AppArmor
     //
     //    key: container.apparmor.security.beta.kubernetes.io/<container_name>
-    //    description: apparmor profile for the container.
+    //    description: apparmor profile for every container created in this pod.
     //    value:
     //      * runtime/default: equivalent to not specifying a profile.
     //      * localhost/<profile_name>: profile loaded on the node
@@ -333,8 +341,10 @@ message PodSandboxStatus {
     optional LinuxPodSandboxStatus linux = 6;
     // Labels are key value pairs that may be used to scope and select individual resources.
     map<string, string> labels = 7;
-    // Annotations is an unstructured key value map that may be set by external
-    // tools to store and retrieve arbitrary metadata.
+    // Unstructured key value map that may be set by external tools to store
+    // and retrieve arbitrary metadata.
+    // The value of this field MUST be identical to that of the corresponding
+    // PodSandboxConfig used to instantiate the pod sandbox this status represents.
     map<string, string> annotations = 8;
 }
 
@@ -374,8 +384,10 @@ message PodSandbox {
     optional int64 created_at = 4;
     // Labels of the PodSandbox.
     map<string, string> labels = 5;
-    // Annotations is an unstructured key value map that may be set by external
-    // tools to store and retrieve arbitrary metadata.
+    // Unstructured key value map that may be set by external tools to store
+    // and retrieve arbitrary metadata.
+    // The value of this field MUST be identical to that of the corresponding
+    // PodSandboxConfig used to instantiate this PodSandbox.
     map<string, string> annotations = 6;
 }
 
@@ -515,8 +527,9 @@ message ContainerConfig {
     //     prefix ::= DNS_SUBDOMAIN
     //     name ::= DNS_LABEL
     map<string, string> labels = 9;
-    // Annotations is an unstructured key value map that may be set by external
-    // tools to store and retrieve arbitrary metadata.
+    // Unstructured key value map that may be set by external tools to store
+    // and retrieve arbitrary metadata. Annotations MUST NOT be altered or in
+    // any way processed by the runtime.
     map<string, string> annotations = 10;
     // Path relative to PodSandboxConfig.LogDirectory for container to store
     // the log (STDOUT and STDERR) on the host.
@@ -629,8 +642,11 @@ message Container {
     optional int64 created_at = 7;
     // Key-value pairs that may be used to scope and select individual resources.
     map<string, string> labels = 8;
-    // Annotations is an unstructured key value map that may be set by external
-    // tools to store and retrieve arbitrary metadata.
+    // Unstructured key value map that may be set by external tools to store
+    // and retrieve arbitrary metadata. Annotations MUST NOT be altered or in
+    // any way processed by the runtime.
+    // The value of this field MUST be identical to that of the corresponding
+    // ContainerConfig used to instantiate this Container.
     map<string, string> annotations = 9;
 }
 
@@ -672,7 +688,10 @@ message ContainerStatus {
     optional string message = 11;
     // Key-value pairs that may be used to scope and select individual resources.
     map<string,string> labels = 12;
-    // Annotations is an unstructured key value map.
+    // Unstructured key value map that may be set by external tools to store
+    // and retrieve arbitrary metadata.
+    // The value of this field MUST be identical to that of the corresponding
+    // ContainerConfig used to instantiate the Container this status represents.
     map<string,string> annotations = 13;
     // Mounts for the container.
     repeated Mount mounts = 14;
