@@ -79,6 +79,9 @@ DNS_SERVER_IP="10.244.240.240"
 DNS_DOMAIN="cluster.local"
 DNS_REPLICAS=1
 
+# Optional: Enable DNS horizontal autoscaler
+ENABLE_DNS_HORIZONTAL_AUTOSCALER="${KUBE_ENABLE_DNS_HORIZONTAL_AUTOSCALER:-false}"
+
 # Optional: Install Kubernetes UI
 ENABLE_CLUSTER_UI=true
 
