@@ -331,6 +331,7 @@ PrivilegedPod should test privileged pod,vishh,0
 Probing container should *not* be restarted with a /healthz http liveness probe,Random-Liu,0
 "Probing container should *not* be restarted with a exec ""cat /tmp/health"" liveness probe",Random-Liu,0
 Probing container should be restarted with a /healthz http liveness probe,Random-Liu,0
+Probing container should be restarted with a docker exec liveness probe with timeout,timstclair,0
 "Probing container should be restarted with a exec ""cat /tmp/health"" liveness probe",Random-Liu,0
 Probing container should have monotonically increasing restart count,Random-Liu,0
 Probing container with readiness probe should not be ready before initial delay and never restart,Random-Liu,0
