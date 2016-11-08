@@ -22,8 +22,39 @@ package unversioned
 
 import (
 	conversion "k8s.io/kubernetes/pkg/conversion"
-	time "time"
+	reflect "reflect"
 )
+
+// GetGeneratedDeepCopyFuncs returns the generated funcs, since we aren't registering them.
+func GetGeneratedDeepCopyFuncs() []conversion.GeneratedDeepCopyFunc {
+	return []conversion.GeneratedDeepCopyFunc{
+		{Fn: DeepCopy_unversioned_APIGroup, InType: reflect.TypeOf(&APIGroup{})},
+		{Fn: DeepCopy_unversioned_APIGroupList, InType: reflect.TypeOf(&APIGroupList{})},
+		{Fn: DeepCopy_unversioned_APIResource, InType: reflect.TypeOf(&APIResource{})},
+		{Fn: DeepCopy_unversioned_APIResourceList, InType: reflect.TypeOf(&APIResourceList{})},
+		{Fn: DeepCopy_unversioned_APIVersions, InType: reflect.TypeOf(&APIVersions{})},
+		{Fn: DeepCopy_unversioned_Duration, InType: reflect.TypeOf(&Duration{})},
+		{Fn: DeepCopy_unversioned_ExportOptions, InType: reflect.TypeOf(&ExportOptions{})},
+		{Fn: DeepCopy_unversioned_GroupKind, InType: reflect.TypeOf(&GroupKind{})},
+		{Fn: DeepCopy_unversioned_GroupResource, InType: reflect.TypeOf(&GroupResource{})},
+		{Fn: DeepCopy_unversioned_GroupVersion, InType: reflect.TypeOf(&GroupVersion{})},
+		{Fn: DeepCopy_unversioned_GroupVersionForDiscovery, InType: reflect.TypeOf(&GroupVersionForDiscovery{})},
+		{Fn: DeepCopy_unversioned_GroupVersionKind, InType: reflect.TypeOf(&GroupVersionKind{})},
+		{Fn: DeepCopy_unversioned_GroupVersionResource, InType: reflect.TypeOf(&GroupVersionResource{})},
+		{Fn: DeepCopy_unversioned_LabelSelector, InType: reflect.TypeOf(&LabelSelector{})},
+		{Fn: DeepCopy_unversioned_LabelSelectorRequirement, InType: reflect.TypeOf(&LabelSelectorRequirement{})},
+		{Fn: DeepCopy_unversioned_ListMeta, InType: reflect.TypeOf(&ListMeta{})},
+		{Fn: DeepCopy_unversioned_Patch, InType: reflect.TypeOf(&Patch{})},
+		{Fn: DeepCopy_unversioned_RootPaths, InType: reflect.TypeOf(&RootPaths{})},
+		{Fn: DeepCopy_unversioned_ServerAddressByClientCIDR, InType: reflect.TypeOf(&ServerAddressByClientCIDR{})},
+		{Fn: DeepCopy_unversioned_Status, InType: reflect.TypeOf(&Status{})},
+		{Fn: DeepCopy_unversioned_StatusCause, InType: reflect.TypeOf(&StatusCause{})},
+		{Fn: DeepCopy_unversioned_StatusDetails, InType: reflect.TypeOf(&StatusDetails{})},
+		{Fn: DeepCopy_unversioned_Time, InType: reflect.TypeOf(&Time{})},
+		{Fn: DeepCopy_unversioned_Timestamp, InType: reflect.TypeOf(&Timestamp{})},
+		{Fn: DeepCopy_unversioned_TypeMeta, InType: reflect.TypeOf(&TypeMeta{})},
+	}
+}
 
 func DeepCopy_unversioned_APIGroup(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
@@ -360,11 +391,8 @@ func DeepCopy_unversioned_Time(in interface{}, out interface{}, c *conversion.Cl
 	{
 		in := in.(*Time)
 		out := out.(*Time)
-		if newVal, err := c.DeepCopy(&in.Time); err != nil {
-			return err
-		} else {
-			out.Time = *newVal.(*time.Time)
-		}
+		outCopy := in.DeepCopy()
+		*out = outCopy
 		return nil
 	}
 }
