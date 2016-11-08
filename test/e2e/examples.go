@@ -253,12 +253,12 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			// have to change dns prefix because of the dynamic namespace
-			input, err := ioutil.ReadFile(mkpath("cassandra-petset.yaml"))
+			input, err := ioutil.ReadFile(mkpath("cassandra-statefulset.yaml"))
 			Expect(err).NotTo(HaveOccurred())
 
 			output := strings.Replace(string(input), "cassandra-0.cassandra.default.svc.cluster.local", "cassandra-0.cassandra."+ns+".svc.cluster.local", -1)
 
-			statefulsetYaml := "/tmp/cassandra-petset.yaml"
+			statefulsetYaml := "/tmp/cassandra-statefulset.yaml"
 
 			err = ioutil.WriteFile(statefulsetYaml, []byte(output), 0644)
 			Expect(err).NotTo(HaveOccurred())
@@ -277,7 +277,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			statefulsetPoll := 30 * time.Second
 			statefulsetTimeout := 10 * time.Minute
 			// TODO - parse this number out of the yaml
-			numPets := 3
+			numMembers := 3
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"app": "cassandra"}))
 			err = wait.PollImmediate(statefulsetPoll, statefulsetTimeout,
 				func() (bool, error) {
@@ -286,12 +286,12 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 						return false, fmt.Errorf("Unable to get list of pods in statefulset %s", label)
 					}
 					ExpectNoError(err)
-					if len(podList.Items) < numPets {
-						framework.Logf("Found %d pets, waiting for %d", len(podList.Items), numPets)
+					if len(podList.Items) < numMembers {
+						framework.Logf("Found %d members, waiting for %d", len(podList.Items), numMembers)
 						return false, nil
 					}
-					if len(podList.Items) > numPets {
-						return false, fmt.Errorf("Too many pods scheduled, expected %d got %d", numPets, len(podList.Items))
+					if len(podList.Items) > numMembers {
+						return false, fmt.Errorf("Too many pods scheduled, expected %d got %d", numMembers, len(podList.Items))
 					}
 					for _, p := range podList.Items {
 						isReady := api.IsPodReady(&p)
