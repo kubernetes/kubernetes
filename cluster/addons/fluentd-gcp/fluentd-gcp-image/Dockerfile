@@ -53,7 +53,6 @@ RUN apt-get -qq update && \
 # Copy the Fluentd configuration files for logging Docker container logs.
 # Either configuration file can be used by specifying `-c <file>` as a command
 # line argument.
-RUN rm /etc/td-agent/td-agent.conf
 COPY google-fluentd.conf /etc/td-agent/td-agent.conf
 COPY google-fluentd-journal.conf /etc/td-agent/td-agent-journal.conf
 
