@@ -20,7 +20,7 @@ import (
 	"net/http"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // TODO: Reconcile custom types in kubelet/types and this subpackage
@@ -59,7 +59,7 @@ func (t *Timestamp) GetString() string {
 }
 
 // A type to help sort container statuses based on container names.
-type SortedContainerStatuses []api.ContainerStatus
+type SortedContainerStatuses []v1.ContainerStatus
 
 func (s SortedContainerStatuses) Len() int      { return len(s) }
 func (s SortedContainerStatuses) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
@@ -70,7 +70,7 @@ func (s SortedContainerStatuses) Less(i, j int) bool {
 
 // SortInitContainerStatuses ensures that statuses are in the order that their
 // init container appears in the pod spec
-func SortInitContainerStatuses(p *api.Pod, statuses []api.ContainerStatus) {
+func SortInitContainerStatuses(p *v1.Pod, statuses []v1.ContainerStatus) {
 	containers := p.Spec.InitContainers
 	current := 0
 	for _, container := range containers {
@@ -87,7 +87,7 @@ func SortInitContainerStatuses(p *api.Pod, statuses []api.ContainerStatus) {
 // Reservation represents reserved resources for non-pod components.
 type Reservation struct {
 	// System represents resources reserved for non-kubernetes components.
-	System api.ResourceList
+	System v1.ResourceList
 	// Kubernetes represents resources reserved for kubernetes system components.
-	Kubernetes api.ResourceList
+	Kubernetes v1.ResourceList
 }

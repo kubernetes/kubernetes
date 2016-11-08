@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 
 	dockercontainer "github.com/docker/engine-api/types/container"
@@ -37,7 +37,7 @@ type SimpleSecurityContextProvider struct{}
 // ModifyContainerConfig is called before the Docker createContainer call.
 // The security context provider can make changes to the Config with which
 // the container is created.
-func (p SimpleSecurityContextProvider) ModifyContainerConfig(pod *api.Pod, container *api.Container, config *dockercontainer.Config) {
+func (p SimpleSecurityContextProvider) ModifyContainerConfig(pod *v1.Pod, container *v1.Container, config *dockercontainer.Config) {
 	effectiveSC := DetermineEffectiveSecurityContext(pod, container)
 	if effectiveSC == nil {
 		return
@@ -50,7 +50,7 @@ func (p SimpleSecurityContextProvider) ModifyContainerConfig(pod *api.Pod, conta
 // ModifyHostConfig is called before the Docker runContainer call. The
 // security context provider can make changes to the HostConfig, affecting
 // security options, whether the container is privileged, volume binds, etc.
-func (p SimpleSecurityContextProvider) ModifyHostConfig(pod *api.Pod, container *api.Container, hostConfig *dockercontainer.HostConfig, supplementalGids []int64) {
+func (p SimpleSecurityContextProvider) ModifyHostConfig(pod *v1.Pod, container *v1.Container, hostConfig *dockercontainer.HostConfig, supplementalGids []int64) {
 	// Apply supplemental groups
 	if container.Name != leaky.PodInfraContainerName {
 		// TODO: We skip application of supplemental groups to the
@@ -96,7 +96,7 @@ func (p SimpleSecurityContextProvider) ModifyHostConfig(pod *api.Pod, container 
 }
 
 // ModifySecurityOptions adds SELinux options to config.
-func ModifySecurityOptions(config []string, selinuxOpts *api.SELinuxOptions) []string {
+func ModifySecurityOptions(config []string, selinuxOpts *v1.SELinuxOptions) []string {
 	config = modifySecurityOption(config, DockerLabelUser, selinuxOpts.User)
 	config = modifySecurityOption(config, DockerLabelRole, selinuxOpts.Role)
 	config = modifySecurityOption(config, DockerLabelType, selinuxOpts.Type)
@@ -115,7 +115,7 @@ func modifySecurityOption(config []string, name, value string) []string {
 }
 
 // MakeCapabilities creates string slices from Capability slices
-func MakeCapabilities(capAdd []api.Capability, capDrop []api.Capability) ([]string, []string) {
+func MakeCapabilities(capAdd []v1.Capability, capDrop []v1.Capability) ([]string, []string) {
 	var (
 		addCaps  []string
 		dropCaps []string
@@ -129,7 +129,7 @@ func MakeCapabilities(capAdd []api.Capability, capDrop []api.Capability) ([]stri
 	return addCaps, dropCaps
 }
 
-func DetermineEffectiveSecurityContext(pod *api.Pod, container *api.Container) *api.SecurityContext {
+func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1.SecurityContext {
 	effectiveSc := securityContextFromPodSecurityContext(pod)
 	containerSc := container.SecurityContext
 
@@ -144,12 +144,12 @@ func DetermineEffectiveSecurityContext(pod *api.Pod, container *api.Container) *
 	}
 
 	if containerSc.SELinuxOptions != nil {
-		effectiveSc.SELinuxOptions = new(api.SELinuxOptions)
+		effectiveSc.SELinuxOptions = new(v1.SELinuxOptions)
 		*effectiveSc.SELinuxOptions = *containerSc.SELinuxOptions
 	}
 
 	if containerSc.Capabilities != nil {
-		effectiveSc.Capabilities = new(api.Capabilities)
+		effectiveSc.Capabilities = new(v1.Capabilities)
 		*effectiveSc.Capabilities = *containerSc.Capabilities
 	}
 
@@ -176,15 +176,15 @@ func DetermineEffectiveSecurityContext(pod *api.Pod, container *api.Container) *
 	return effectiveSc
 }
 
-func securityContextFromPodSecurityContext(pod *api.Pod) *api.SecurityContext {
+func securityContextFromPodSecurityContext(pod *v1.Pod) *v1.SecurityContext {
 	if pod.Spec.SecurityContext == nil {
 		return nil
 	}
 
-	synthesized := &api.SecurityContext{}
+	synthesized := &v1.SecurityContext{}
 
 	if pod.Spec.SecurityContext.SELinuxOptions != nil {
-		synthesized.SELinuxOptions = &api.SELinuxOptions{}
+		synthesized.SELinuxOptions = &v1.SELinuxOptions{}
 		*synthesized.SELinuxOptions = *pod.Spec.SecurityContext.SELinuxOptions
 	}
 	if pod.Spec.SecurityContext.RunAsUser != nil {

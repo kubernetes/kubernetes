@@ -29,9 +29,10 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api"
+"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -57,7 +58,7 @@ func TestUpdateOnNonExistentFile(t *testing.T) {
 	case got := <-ch:
 		update := got.(kubetypes.PodUpdate)
 		expected := CreatePodUpdate(kubetypes.SET, kubetypes.FileSource)
-		if !api.Semantic.DeepDerivative(expected, update) {
+		if !v1.Semantic.DeepDerivative(expected, update) {
 			t.Fatalf("expected %#v, Got %#v", expected, update)
 		}
 
@@ -85,11 +86,16 @@ func TestReadPodsFromFileExistAlready(t *testing.T) {
 			case got := <-ch:
 				update := got.(kubetypes.PodUpdate)
 				for _, pod := range update.Pods {
-					if errs := validation.ValidatePod(pod); len(errs) > 0 {
-						t.Fatalf("%s: Invalid pod %#v, %#v", testCase.desc, pod, errs)
+					// TODO: remove the conversion when validation is performed on versioned objects.
+				internalPod := &api.Pod{}
+				if err := v1.Convert_v1_Pod_To_api_Pod(pod, internalPod, nil); err != nil {
+					t.Fatalf("%s: Cannot convert pod %#v, %#v", testCase.desc, pod, err)
+				}
+				if errs := validation.ValidatePod(internalPod); len(errs) > 0 {
+						t.Fatalf("%s: Invalid pod %#v, %#v", testCase.desc, internalPod, errs)
 					}
 				}
-				if !api.Semantic.DeepEqual(testCase.expected, update) {
+				if !v1.Semantic.DeepEqual(testCase.expected, update) {
 					t.Fatalf("%s: Expected %#v, Got %#v", testCase.desc, testCase.expected, update)
 				}
 			case <-time.After(wait.ForeverTestTimeout):
@@ -153,7 +159,7 @@ func TestExtractFromEmptyDir(t *testing.T) {
 
 	update := (<-ch).(kubetypes.PodUpdate)
 	expected := CreatePodUpdate(kubetypes.SET, kubetypes.FileSource)
-	if !api.Semantic.DeepEqual(expected, update) {
+	if !v1.Semantic.DeepEqual(expected, update) {
 		t.Fatalf("expected %#v, Got %#v", expected, update)
 	}
 }
@@ -169,47 +175,47 @@ func getTestCases(hostname types.NodeName) []*testCase {
 	return []*testCase{
 		{
 			desc: "Simple pod",
-			pod: &api.Pod{
+			pod: &v1.Pod{
 				TypeMeta: unversioned.TypeMeta{
 					Kind:       "Pod",
 					APIVersion: "",
 				},
-				ObjectMeta: api.ObjectMeta{
+				ObjectMeta: v1.ObjectMeta{
 					Name:      "test",
 					UID:       "12345",
 					Namespace: "mynamespace",
 				},
-				Spec: api.PodSpec{
-					Containers:      []api.Container{{Name: "image", Image: "test/image", SecurityContext: securitycontext.ValidSecurityContextWithContainerDefaults()}},
-					SecurityContext: &api.PodSecurityContext{},
+				Spec: v1.PodSpec{
+					Containers:      []v1.Container{{Name: "image", Image: "test/image", SecurityContext: securitycontext.ValidSecurityContextWithContainerDefaults()}},
+					SecurityContext: &v1.PodSecurityContext{},
 				},
-				Status: api.PodStatus{
-					Phase: api.PodPending,
+				Status: v1.PodStatus{
+					Phase: v1.PodPending,
 				},
 			},
-			expected: CreatePodUpdate(kubetypes.SET, kubetypes.FileSource, &api.Pod{
-				ObjectMeta: api.ObjectMeta{
+			expected: CreatePodUpdate(kubetypes.SET, kubetypes.FileSource, &v1.Pod{
+				ObjectMeta: v1.ObjectMeta{
 					Name:        "test-" + string(hostname),
 					UID:         "12345",
 					Namespace:   "mynamespace",
 					Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "12345"},
 					SelfLink:    getSelfLink("test-"+string(hostname), "mynamespace"),
 				},
-				Spec: api.PodSpec{
+				Spec: v1.PodSpec{
 					NodeName:                      string(hostname),
-					RestartPolicy:                 api.RestartPolicyAlways,
-					DNSPolicy:                     api.DNSClusterFirst,
+					RestartPolicy:                 v1.RestartPolicyAlways,
+					DNSPolicy:                     v1.DNSClusterFirst,
 					TerminationGracePeriodSeconds: &grace,
-					Containers: []api.Container{{
+					Containers: []v1.Container{{
 						Name:  "image",
 						Image: "test/image",
 						TerminationMessagePath: "/dev/termination-log",
 						ImagePullPolicy:        "Always",
 						SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults()}},
-					SecurityContext: &api.PodSecurityContext{},
+					SecurityContext: &v1.PodSecurityContext{},
 				},
-				Status: api.PodStatus{
-					Phase: api.PodPending,
+				Status: v1.PodStatus{
+					Phase: v1.PodPending,
 				},
 			}),
 		},
@@ -312,7 +318,7 @@ func watchFileChanged(watchDir bool, t *testing.T) {
 				lock.Lock()
 				defer lock.Unlock()
 
-				pod := testCase.pod.(*api.Pod)
+				pod := testCase.pod.(*v1.Pod)
 				pod.Spec.Containers[0].Name = "image2"
 
 				testCase.expected.Pods[0].Spec.Containers[0].Name = "image2"
@@ -355,12 +361,17 @@ func expectUpdate(t *testing.T, ch chan interface{}, testCase *testCase) {
 		case got := <-ch:
 			update := got.(kubetypes.PodUpdate)
 			for _, pod := range update.Pods {
-				if errs := validation.ValidatePod(pod); len(errs) > 0 {
-					t.Fatalf("%s: Invalid pod %#v, %#v", testCase.desc, pod, errs)
+				// TODO: remove the conversion when validation is performed on versioned objects.
+				internalPod := &api.Pod{}
+				if err := v1.Convert_v1_Pod_To_api_Pod(pod, internalPod, nil); err != nil {
+					t.Fatalf("%s: Cannot convert pod %#v, %#v", testCase.desc, pod, err)
+				}
+				if errs := validation.ValidatePod(internalPod); len(errs) > 0 {
+					t.Fatalf("%s: Invalid pod %#v, %#v", testCase.desc, internalPod, errs)
 				}
 			}
 
-			if !api.Semantic.DeepEqual(testCase.expected, update) {
+			if !v1.Semantic.DeepEqual(testCase.expected, update) {
 				t.Fatalf("%s: Expected: %#v, Got: %#v", testCase.desc, testCase.expected, update)
 			}
 			return

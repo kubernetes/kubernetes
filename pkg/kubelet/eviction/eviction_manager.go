@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -46,11 +46,11 @@ type managerImpl struct {
 	// protects access to internal state
 	sync.RWMutex
 	// node conditions are the set of conditions present
-	nodeConditions []api.NodeConditionType
+	nodeConditions []v1.NodeConditionType
 	// captures when a node condition was last observed based on a threshold being met
 	nodeConditionsLastObservedAt nodeConditionsObservedAt
 	// nodeRef is a reference to the node
-	nodeRef *api.ObjectReference
+	nodeRef *v1.ObjectReference
 	// used to record events about the node
 	recorder record.EventRecorder
 	// used to measure usage stats on system
@@ -60,9 +60,9 @@ type managerImpl struct {
 	// records the set of thresholds that have been met (including graceperiod) but not yet resolved
 	thresholdsMet []Threshold
 	// resourceToRankFunc maps a resource to ranking function for that resource.
-	resourceToRankFunc map[api.ResourceName]rankFunc
+	resourceToRankFunc map[v1.ResourceName]rankFunc
 	// resourceToNodeReclaimFuncs maps a resource to an ordered list of functions that know how to reclaim that resource.
-	resourceToNodeReclaimFuncs map[api.ResourceName]nodeReclaimFuncs
+	resourceToNodeReclaimFuncs map[v1.ResourceName]nodeReclaimFuncs
 	// last observations from synchronize
 	lastObservations signalObservations
 }
@@ -77,7 +77,7 @@ func NewManager(
 	killPodFunc KillPodFunc,
 	imageGC ImageGC,
 	recorder record.EventRecorder,
-	nodeRef *api.ObjectReference,
+	nodeRef *v1.ObjectReference,
 	clock clock.Clock) (Manager, lifecycle.PodAdmitHandler, error) {
 	manager := &managerImpl{
 		clock:           clock,
@@ -102,7 +102,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	}
 
 	// the node has memory pressure, admit if not best-effort
-	if hasNodeCondition(m.nodeConditions, api.NodeMemoryPressure) {
+	if hasNodeCondition(m.nodeConditions, v1.NodeMemoryPressure) {
 		notBestEffort := qos.BestEffort != qos.GetPodQOS(attrs.Pod)
 		if notBestEffort {
 			return lifecycle.PodAdmitResult{Admit: true}
@@ -129,14 +129,14 @@ func (m *managerImpl) Start(diskInfoProvider DiskInfoProvider, podFunc ActivePod
 func (m *managerImpl) IsUnderMemoryPressure() bool {
 	m.RLock()
 	defer m.RUnlock()
-	return hasNodeCondition(m.nodeConditions, api.NodeMemoryPressure)
+	return hasNodeCondition(m.nodeConditions, v1.NodeMemoryPressure)
 }
 
 // IsUnderDiskPressure returns true if the node is under disk pressure.
 func (m *managerImpl) IsUnderDiskPressure() bool {
 	m.RLock()
 	defer m.RUnlock()
-	return hasNodeCondition(m.nodeConditions, api.NodeDiskPressure)
+	return hasNodeCondition(m.nodeConditions, v1.NodeDiskPressure)
 }
 
 // synchronize is the main control loop that enforces eviction thresholds.
@@ -221,7 +221,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	softEviction := isSoftEviction(thresholds, resourceToReclaim)
 
 	// record an event about the resources we are now attempting to reclaim via eviction
-	m.recorder.Eventf(m.nodeRef, api.EventTypeWarning, "EvictionThresholdMet", "Attempting to reclaim %s", resourceToReclaim)
+	m.recorder.Eventf(m.nodeRef, v1.EventTypeWarning, "EvictionThresholdMet", "Attempting to reclaim %s", resourceToReclaim)
 
 	// check if there are node-level resources we can reclaim to reduce pressure before evicting end-user pods.
 	if m.reclaimNodeLevelResources(resourceToReclaim, observations) {
@@ -253,13 +253,13 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	// we kill at most a single pod during each eviction interval
 	for i := range activePods {
 		pod := activePods[i]
-		status := api.PodStatus{
-			Phase:   api.PodFailed,
+		status := v1.PodStatus{
+			Phase:   v1.PodFailed,
 			Message: fmt.Sprintf(message, resourceToReclaim),
 			Reason:  reason,
 		}
 		// record that we are evicting the pod
-		m.recorder.Eventf(pod, api.EventTypeWarning, reason, fmt.Sprintf(message, resourceToReclaim))
+		m.recorder.Eventf(pod, v1.EventTypeWarning, reason, fmt.Sprintf(message, resourceToReclaim))
 		gracePeriodOverride := int64(0)
 		if softEviction {
 			gracePeriodOverride = m.config.MaxPodGracePeriodSeconds
@@ -278,7 +278,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 }
 
 // reclaimNodeLevelResources attempts to reclaim node level resources.  returns true if thresholds were satisfied and no pod eviction is required.
-func (m *managerImpl) reclaimNodeLevelResources(resourceToReclaim api.ResourceName, observations signalObservations) bool {
+func (m *managerImpl) reclaimNodeLevelResources(resourceToReclaim v1.ResourceName, observations signalObservations) bool {
 	nodeReclaimFuncs := m.resourceToNodeReclaimFuncs[resourceToReclaim]
 	for _, nodeReclaimFunc := range nodeReclaimFuncs {
 		// attempt to reclaim the pressured resource.

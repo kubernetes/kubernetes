@@ -28,7 +28,8 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -64,7 +65,7 @@ type DesiredStateOfWorldPopulator interface {
 //     that exist on this host
 // desiredStateOfWorld - the cache to populate
 func NewDesiredStateOfWorldPopulator(
-	kubeClient internalclientset.Interface,
+	kubeClient clientset.Interface,
 	loopSleepDuration time.Duration,
 	getPodStatusRetryDuration time.Duration,
 	podManager pod.Manager,
@@ -83,7 +84,7 @@ func NewDesiredStateOfWorldPopulator(
 }
 
 type desiredStateOfWorldPopulator struct {
-	kubeClient                internalclientset.Interface
+	kubeClient                clientset.Interface
 	loopSleepDuration         time.Duration
 	getPodStatusRetryDuration time.Duration
 	podManager                pod.Manager
@@ -199,7 +200,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 
 // processPodVolumes processes the volumes in the given pod and adds them to the
 // desired state of the world.
-func (dswp *desiredStateOfWorldPopulator) processPodVolumes(pod *api.Pod) {
+func (dswp *desiredStateOfWorldPopulator) processPodVolumes(pod *v1.Pod) {
 	if pod == nil {
 		return
 	}
@@ -277,7 +278,7 @@ func (dswp *desiredStateOfWorldPopulator) deleteProcessedPod(
 // createVolumeSpec creates and returns a mutatable volume.Spec object for the
 // specified volume. It dereference any PVC to get PV objects, if needed.
 func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
-	podVolume api.Volume, podNamespace string) (*volume.Spec, string, error) {
+	podVolume v1.Volume, podNamespace string) (*volume.Spec, string, error) {
 	if pvcSource :=
 		podVolume.VolumeSource.PersistentVolumeClaim; pvcSource != nil {
 		glog.V(10).Infof(
@@ -332,10 +333,10 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 			"failed to deep copy %q volume object. err=%v", podVolume.Name, err)
 	}
 
-	clonedPodVolume, ok := clonedPodVolumeObj.(api.Volume)
+	clonedPodVolume, ok := clonedPodVolumeObj.(v1.Volume)
 	if !ok {
 		return nil, "", fmt.Errorf(
-			"failed to cast clonedPodVolume %#v to api.Volume",
+			"failed to cast clonedPodVolume %#v to v1.Volume",
 			clonedPodVolumeObj)
 	}
 
@@ -357,7 +358,7 @@ func (dswp *desiredStateOfWorldPopulator) getPVCExtractPV(
 			err)
 	}
 
-	if pvc.Status.Phase != api.ClaimBound || pvc.Spec.VolumeName == "" {
+	if pvc.Status.Phase != v1.ClaimBound || pvc.Spec.VolumeName == "" {
 		return "", "", fmt.Errorf(
 			"PVC %s/%s has non-bound phase (%q) or empty pvc.Spec.VolumeName (%q)",
 			namespace,
@@ -400,7 +401,7 @@ func (dswp *desiredStateOfWorldPopulator) getPVSpec(
 	return volume.NewSpecFromPersistentVolume(pv, pvcReadOnly), volumeGidValue, nil
 }
 
-func getPVVolumeGidAnnotationValue(pv *api.PersistentVolume) string {
+func getPVVolumeGidAnnotationValue(pv *v1.PersistentVolume) string {
 	if volumeGid, ok := pv.Annotations[volumehelper.VolumeGidAnnotationKey]; ok {
 		return volumeGid
 	}

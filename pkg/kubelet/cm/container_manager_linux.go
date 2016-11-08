@@ -34,8 +34,8 @@ import (
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/configs"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/util"
@@ -103,7 +103,7 @@ type containerManagerImpl struct {
 	periodicTasks    []func()
 	// holds all the mounted cgroup subsystems
 	subsystems *CgroupSubsystems
-	nodeInfo   *api.Node
+	nodeInfo   *v1.Node
 }
 
 type features struct {
@@ -391,7 +391,7 @@ func (cm *containerManagerImpl) setupNode() error {
 			})
 		} else if cm.RuntimeCgroupsName != "" {
 			cont := newSystemCgroups(cm.RuntimeCgroupsName)
-			var capacity = api.ResourceList{}
+			var capacity = v1.ResourceList{}
 			if info, err := cm.cadvisorInterface.MachineInfo(); err == nil {
 				capacity = cadvisor.CapacityFromMachineInfo(info)
 			}
@@ -528,7 +528,7 @@ func (cm *containerManagerImpl) Status() Status {
 	return cm.status
 }
 
-func (cm *containerManagerImpl) Start(node *api.Node) error {
+func (cm *containerManagerImpl) Start(node *v1.Node) error {
 	// cache the node Info including resource capacity and
 	// allocatable of the node
 	cm.nodeInfo = node
@@ -571,7 +571,7 @@ func (cm *containerManagerImpl) Start(node *api.Node) error {
 	return nil
 }
 
-func (cm *containerManagerImpl) SystemCgroupsLimit() api.ResourceList {
+func (cm *containerManagerImpl) SystemCgroupsLimit() v1.ResourceList {
 	cpuLimit := int64(0)
 
 	// Sum up resources of all external containers.
@@ -579,8 +579,8 @@ func (cm *containerManagerImpl) SystemCgroupsLimit() api.ResourceList {
 		cpuLimit += cont.cpuMillicores
 	}
 
-	return api.ResourceList{
-		api.ResourceCPU: *resource.NewMilliQuantity(
+	return v1.ResourceList{
+		v1.ResourceCPU: *resource.NewMilliQuantity(
 			cpuLimit,
 			resource.DecimalSI),
 	}

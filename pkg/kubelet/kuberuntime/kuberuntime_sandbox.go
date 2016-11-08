@@ -23,7 +23,7 @@ import (
 	"sort"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -32,7 +32,7 @@ import (
 )
 
 // createPodSandbox creates a pod sandbox and returns (podSandBoxID, message, error).
-func (m *kubeGenericRuntimeManager) createPodSandbox(pod *api.Pod, attempt uint32) (string, string, error) {
+func (m *kubeGenericRuntimeManager) createPodSandbox(pod *v1.Pod, attempt uint32) (string, string, error) {
 	podSandboxConfig, err := m.generatePodSandboxConfig(pod, attempt)
 	if err != nil {
 		message := fmt.Sprintf("GeneratePodSandboxConfig for pod %q failed: %v", format.Pod(pod), err)
@@ -58,8 +58,8 @@ func (m *kubeGenericRuntimeManager) createPodSandbox(pod *api.Pod, attempt uint3
 	return podSandBoxID, "", nil
 }
 
-// generatePodSandboxConfig generates pod sandbox config from api.Pod.
-func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *api.Pod, attempt uint32) (*runtimeApi.PodSandboxConfig, error) {
+// generatePodSandboxConfig generates pod sandbox config from v1.Pod.
+func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attempt uint32) (*runtimeApi.PodSandboxConfig, error) {
 	// TODO: deprecating podsandbox resource requirements in favor of the pod level cgroup
 	// Refer https://github.com/kubernetes/kubernetes/issues/29871
 	podUID := string(pod.UID)
@@ -128,8 +128,8 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *api.Pod, attem
 	return podSandboxConfig, nil
 }
 
-// generatePodSandboxLinuxConfig generates LinuxPodSandboxConfig from api.Pod.
-func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *api.Pod, cgroupParent string) *runtimeApi.LinuxPodSandboxConfig {
+// generatePodSandboxLinuxConfig generates LinuxPodSandboxConfig from v1.Pod.
+func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod, cgroupParent string) *runtimeApi.LinuxPodSandboxConfig {
 	if pod.Spec.SecurityContext == nil && cgroupParent == "" {
 		return nil
 	}
@@ -142,9 +142,9 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *api.Pod, 
 		sc := pod.Spec.SecurityContext
 		lc.SecurityContext = &runtimeApi.LinuxSandboxSecurityContext{
 			NamespaceOptions: &runtimeApi.NamespaceOption{
-				HostNetwork: &sc.HostNetwork,
-				HostIpc:     &sc.HostIPC,
-				HostPid:     &sc.HostPID,
+				HostNetwork: &pod.Spec.HostNetwork,
+				HostIpc:     &pod.Spec.HostIPC,
+				HostPid:     &pod.Spec.HostPID,
 			},
 			RunAsUser: sc.RunAsUser,
 		}
