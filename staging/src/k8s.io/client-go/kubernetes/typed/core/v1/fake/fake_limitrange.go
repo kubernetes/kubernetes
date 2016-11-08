@@ -27,7 +27,7 @@ import (
 
 // FakeLimitRanges implements LimitRangeInterface
 type FakeLimitRanges struct {
-	Fake *FakeCore
+	Fake *FakeCoreV1
 	ns   string
 }
 

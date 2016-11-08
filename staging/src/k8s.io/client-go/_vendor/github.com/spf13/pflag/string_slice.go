@@ -66,7 +66,7 @@ func (s *stringSliceValue) String() string {
 }
 
 func stringSliceConv(sval string) (interface{}, error) {
-	sval = strings.Trim(sval, "[]")
+	sval = sval[1 : len(sval)-1]
 	// An empty string would cause a slice with one (empty) string
 	if len(sval) == 0 {
 		return []string{}, nil

@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/pkg/runtime"
 	"k8s.io/client-go/pkg/runtime/serializer/streaming"
 	"k8s.io/client-go/pkg/util/clock"
+	"k8s.io/client-go/pkg/util/diff"
 	"k8s.io/client-go/pkg/util/flowcontrol"
 	"k8s.io/client-go/pkg/util/httpstream"
 	"k8s.io/client-go/pkg/util/intstr"
@@ -582,7 +583,8 @@ func TestTransformUnstructuredError(t *testing.T) {
 		Resource string
 		Name     string
 
-		ErrFn func(error) bool
+		ErrFn       func(error) bool
+		Transformed error
 	}{
 		{
 			Resource: "foo",
@@ -626,9 +628,46 @@ func TestTransformUnstructuredError(t *testing.T) {
 			},
 			ErrFn: apierrors.IsBadRequest,
 		},
+		{
+			// status in response overrides transformed result
+			Req:   &http.Request{},
+			Res:   &http.Response{StatusCode: http.StatusBadRequest, Body: ioutil.NopCloser(bytes.NewReader([]byte(`{"kind":"Status","apiVersion":"v1","status":"Failure","code":404}`)))},
+			ErrFn: apierrors.IsBadRequest,
+			Transformed: &apierrors.StatusError{
+				ErrStatus: unversioned.Status{Status: unversioned.StatusFailure, Code: http.StatusNotFound},
+			},
+		},
+		{
+			// successful status is ignored
+			Req:   &http.Request{},
+			Res:   &http.Response{StatusCode: http.StatusBadRequest, Body: ioutil.NopCloser(bytes.NewReader([]byte(`{"kind":"Status","apiVersion":"v1","status":"Success","code":404}`)))},
+			ErrFn: apierrors.IsBadRequest,
+		},
+		{
+			// empty object does not change result
+			Req:   &http.Request{},
+			Res:   &http.Response{StatusCode: http.StatusBadRequest, Body: ioutil.NopCloser(bytes.NewReader([]byte(`{}`)))},
+			ErrFn: apierrors.IsBadRequest,
+		},
+		{
+			// we default apiVersion for backwards compatibility with old clients
+			// TODO: potentially remove in 1.7
+			Req:   &http.Request{},
+			Res:   &http.Response{StatusCode: http.StatusBadRequest, Body: ioutil.NopCloser(bytes.NewReader([]byte(`{"kind":"Status","status":"Failure","code":404}`)))},
+			ErrFn: apierrors.IsBadRequest,
+			Transformed: &apierrors.StatusError{
+				ErrStatus: unversioned.Status{Status: unversioned.StatusFailure, Code: http.StatusNotFound},
+			},
+		},
+		{
+			// we do not default kind
+			Req:   &http.Request{},
+			Res:   &http.Response{StatusCode: http.StatusBadRequest, Body: ioutil.NopCloser(bytes.NewReader([]byte(`{"status":"Failure","code":404}`)))},
+			ErrFn: apierrors.IsBadRequest,
+		},
 	}
 
-	for _, testCase := range testCases {
+	for i, testCase := range testCases {
 		r := &Request{
 			content:      defaultContentConfig(),
 			serializers:  defaultSerializers(),
@@ -641,11 +680,39 @@ func TestTransformUnstructuredError(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 			continue
 		}
+		if !apierrors.IsUnexpectedServerError(err) {
+			t.Errorf("%d: unexpected error type: %v", i, err)
+		}
 		if len(testCase.Name) != 0 && !strings.Contains(err.Error(), testCase.Name) {
 			t.Errorf("unexpected error string: %s", err)
 		}
 		if len(testCase.Resource) != 0 && !strings.Contains(err.Error(), testCase.Resource) {
 			t.Errorf("unexpected error string: %s", err)
+		}
+
+		// verify Error() properly transforms the error
+		transformed := result.Error()
+		expect := testCase.Transformed
+		if expect == nil {
+			expect = err
+		}
+		if !reflect.DeepEqual(expect, transformed) {
+			t.Errorf("%d: unexpected Error(): %s", i, diff.ObjectReflectDiff(expect, transformed))
+		}
+
+		// verify result.Get properly transforms the error
+		if _, err := result.Get(); !reflect.DeepEqual(expect, err) {
+			t.Errorf("%d: unexpected error on Get(): %s", i, diff.ObjectReflectDiff(expect, err))
+		}
+
+		// verify result.Into properly handles the error
+		if err := result.Into(&api.Pod{}); !reflect.DeepEqual(expect, err) {
+			t.Errorf("%d: unexpected error on Into(): %s", i, diff.ObjectReflectDiff(expect, err))
+		}
+
+		// verify result.Raw leaves the error in the untransformed state
+		if _, err := result.Raw(); !reflect.DeepEqual(result.err, err) {
+			t.Errorf("%d: unexpected error on Raw(): %s", i, diff.ObjectReflectDiff(expect, err))
 		}
 	}
 }

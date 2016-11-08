@@ -19,7 +19,7 @@ package flowcontrol
 import (
 	"sync"
 
-	"k8s.io/kubernetes/pkg/util/ratelimit"
+	"k8s.io/client-go/pkg/util/ratelimit"
 )
 
 type RateLimiter interface {

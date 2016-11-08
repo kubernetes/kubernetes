@@ -519,6 +519,15 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 
 	gvk, ok := target.KindForGroupVersionKinds(kinds)
 	if !ok {
+		// try to see if this type is listed as unversioned (for legacy support)
+		// TODO: when we move to server API versions, we should completely remove the unversioned concept
+		if unversionedKind, ok := s.unversionedTypes[t]; ok {
+			if gvk, ok := target.KindForGroupVersionKinds([]unversioned.GroupVersionKind{unversionedKind}); ok {
+				return copyAndSetTargetKind(copy, s, in, gvk)
+			}
+			return copyAndSetTargetKind(copy, s, in, unversionedKind)
+		}
+
 		// TODO: should this be a typed error?
 		return nil, fmt.Errorf("%v is not suitable for converting to %q", t, target)
 	}
