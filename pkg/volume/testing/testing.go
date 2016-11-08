@@ -450,15 +450,6 @@ func (fr *fakeRecycler) GetPath() string {
 	return fr.path
 }
 
-func NewFakeRecycler(pvName string, spec *Spec, eventRecorder RecycleEventRecorder, host VolumeHost, config VolumeConfig) (Recycler, error) {
-	if spec.PersistentVolume == nil || spec.PersistentVolume.Spec.HostPath == nil {
-		return nil, fmt.Errorf("fakeRecycler only supports spec.PersistentVolume.Spec.HostPath")
-	}
-	return &fakeRecycler{
-		path: spec.PersistentVolume.Spec.HostPath.Path,
-	}, nil
-}
-
 type FakeDeleter struct {
 	path string
 	MetricsNil

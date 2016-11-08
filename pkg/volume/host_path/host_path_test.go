@@ -71,7 +71,7 @@ func TestGetAccessModes(t *testing.T) {
 func TestRecycler(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	pluginHost := volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil)
-	plugMgr.InitPlugins([]volume.VolumePlugin{&hostPathPlugin{nil, volumetest.NewFakeRecycler, nil, nil, volume.VolumeConfig{}}}, pluginHost)
+	plugMgr.InitPlugins([]volume.VolumePlugin{&hostPathPlugin{nil, volume.VolumeConfig{}}}, pluginHost)
 
 	spec := &volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/foo"}}}}}
 	plug, err := plugMgr.FindRecyclablePluginBySpec(spec)
@@ -84,9 +84,6 @@ func TestRecycler(t *testing.T) {
 	}
 	if recycler.GetPath() != spec.PersistentVolume.Spec.HostPath.Path {
 		t.Errorf("Expected %s but got %s", spec.PersistentVolume.Spec.HostPath.Path, recycler.GetPath())
-	}
-	if err := recycler.Recycle(); err != nil {
-		t.Errorf("Mock Recycler expected to return nil but got %s", err)
 	}
 }
 
