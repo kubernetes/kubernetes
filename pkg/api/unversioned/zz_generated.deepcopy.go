@@ -20,371 +20,583 @@ limitations under the License.
 
 package unversioned
 
-import (
-	conversion "k8s.io/kubernetes/pkg/conversion"
-	time "time"
-)
-
-func DeepCopy_unversioned_APIGroup(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*APIGroup)
-		out := out.(*APIGroup)
-		out.TypeMeta = in.TypeMeta
-		out.Name = in.Name
-		if in.Versions != nil {
-			in, out := &in.Versions, &out.Versions
-			*out = make([]GroupVersionForDiscovery, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.Versions = nil
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *APIGroup) DeepCopyInto(out *APIGroup) {
+	out.TypeMeta = in.TypeMeta
+	out.Name = in.Name
+	if in.Versions != nil {
+		in, out := &in.Versions, &out.Versions
+		*out = make([]GroupVersionForDiscovery, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
 		}
-		out.PreferredVersion = in.PreferredVersion
-		if in.ServerAddressByClientCIDRs != nil {
-			in, out := &in.ServerAddressByClientCIDRs, &out.ServerAddressByClientCIDRs
-			*out = make([]ServerAddressByClientCIDR, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.ServerAddressByClientCIDRs = nil
+	} else {
+		out.Versions = nil
+	}
+	out.PreferredVersion = in.PreferredVersion
+	if in.ServerAddressByClientCIDRs != nil {
+		in, out := &in.ServerAddressByClientCIDRs, &out.ServerAddressByClientCIDRs
+		*out = make([]ServerAddressByClientCIDR, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
 		}
+	} else {
+		out.ServerAddressByClientCIDRs = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new APIGroup.
+func (x *APIGroup) DeepCopy() *APIGroup {
+	if x == nil {
+		return nil
+	}
+	out := new(APIGroup)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *APIGroup) DeepCopyObject() Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_unversioned_APIGroupList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*APIGroupList)
-		out := out.(*APIGroupList)
-		out.TypeMeta = in.TypeMeta
-		if in.Groups != nil {
-			in, out := &in.Groups, &out.Groups
-			*out = make([]APIGroup, len(*in))
-			for i := range *in {
-				if err := DeepCopy_unversioned_APIGroup(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Groups = nil
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *APIGroupList) DeepCopyInto(out *APIGroupList) {
+	out.TypeMeta = in.TypeMeta
+	if in.Groups != nil {
+		in, out := &in.Groups, &out.Groups
+		*out = make([]APIGroup, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	} else {
+		out.Groups = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new APIGroupList.
+func (x *APIGroupList) DeepCopy() *APIGroupList {
+	if x == nil {
+		return nil
+	}
+	out := new(APIGroupList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *APIGroupList) DeepCopyObject() Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_unversioned_APIResource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*APIResource)
-		out := out.(*APIResource)
-		out.Name = in.Name
-		out.Namespaced = in.Namespaced
-		out.Kind = in.Kind
-		return nil
-	}
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *APIResource) DeepCopyInto(out *APIResource) {
+	out.Name = in.Name
+	out.Namespaced = in.Namespaced
+	out.Kind = in.Kind
+	return
 }
 
-func DeepCopy_unversioned_APIResourceList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*APIResourceList)
-		out := out.(*APIResourceList)
-		out.TypeMeta = in.TypeMeta
-		out.GroupVersion = in.GroupVersion
-		if in.APIResources != nil {
-			in, out := &in.APIResources, &out.APIResources
-			*out = make([]APIResource, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.APIResources = nil
+// DeepCopy will perform a deep copy of the receiver, creating a new APIResource.
+func (x *APIResource) DeepCopy() *APIResource {
+	if x == nil {
+		return nil
+	}
+	out := new(APIResource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *APIResourceList) DeepCopyInto(out *APIResourceList) {
+	out.TypeMeta = in.TypeMeta
+	out.GroupVersion = in.GroupVersion
+	if in.APIResources != nil {
+		in, out := &in.APIResources, &out.APIResources
+		*out = make([]APIResource, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
 		}
+	} else {
+		out.APIResources = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new APIResourceList.
+func (x *APIResourceList) DeepCopy() *APIResourceList {
+	if x == nil {
+		return nil
+	}
+	out := new(APIResourceList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *APIResourceList) DeepCopyObject() Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_unversioned_APIVersions(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*APIVersions)
-		out := out.(*APIVersions)
-		out.TypeMeta = in.TypeMeta
-		if in.Versions != nil {
-			in, out := &in.Versions, &out.Versions
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.Versions = nil
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *APIVersions) DeepCopyInto(out *APIVersions) {
+	out.TypeMeta = in.TypeMeta
+	if in.Versions != nil {
+		in, out := &in.Versions, &out.Versions
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.Versions = nil
+	}
+	if in.ServerAddressByClientCIDRs != nil {
+		in, out := &in.ServerAddressByClientCIDRs, &out.ServerAddressByClientCIDRs
+		*out = make([]ServerAddressByClientCIDR, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
 		}
-		if in.ServerAddressByClientCIDRs != nil {
-			in, out := &in.ServerAddressByClientCIDRs, &out.ServerAddressByClientCIDRs
-			*out = make([]ServerAddressByClientCIDR, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.ServerAddressByClientCIDRs = nil
+	} else {
+		out.ServerAddressByClientCIDRs = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new APIVersions.
+func (x *APIVersions) DeepCopy() *APIVersions {
+	if x == nil {
+		return nil
+	}
+	out := new(APIVersions)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *APIVersions) DeepCopyObject() Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Duration) DeepCopyInto(out *Duration) {
+	out.Duration = in.Duration
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new Duration.
+func (x *Duration) DeepCopy() *Duration {
+	if x == nil {
+		return nil
+	}
+	out := new(Duration)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ExportOptions) DeepCopyInto(out *ExportOptions) {
+	out.TypeMeta = in.TypeMeta
+	out.Export = in.Export
+	out.Exact = in.Exact
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ExportOptions.
+func (x *ExportOptions) DeepCopy() *ExportOptions {
+	if x == nil {
+		return nil
+	}
+	out := new(ExportOptions)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *ExportOptions) DeepCopyObject() Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *GroupKind) DeepCopyInto(out *GroupKind) {
+	out.Group = in.Group
+	out.Kind = in.Kind
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new GroupKind.
+func (x *GroupKind) DeepCopy() *GroupKind {
+	if x == nil {
+		return nil
+	}
+	out := new(GroupKind)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *GroupResource) DeepCopyInto(out *GroupResource) {
+	out.Group = in.Group
+	out.Resource = in.Resource
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new GroupResource.
+func (x *GroupResource) DeepCopy() *GroupResource {
+	if x == nil {
+		return nil
+	}
+	out := new(GroupResource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *GroupVersion) DeepCopyInto(out *GroupVersion) {
+	out.Group = in.Group
+	out.Version = in.Version
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new GroupVersion.
+func (x *GroupVersion) DeepCopy() *GroupVersion {
+	if x == nil {
+		return nil
+	}
+	out := new(GroupVersion)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *GroupVersionForDiscovery) DeepCopyInto(out *GroupVersionForDiscovery) {
+	out.GroupVersion = in.GroupVersion
+	out.Version = in.Version
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new GroupVersionForDiscovery.
+func (x *GroupVersionForDiscovery) DeepCopy() *GroupVersionForDiscovery {
+	if x == nil {
+		return nil
+	}
+	out := new(GroupVersionForDiscovery)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *GroupVersionKind) DeepCopyInto(out *GroupVersionKind) {
+	out.Group = in.Group
+	out.Version = in.Version
+	out.Kind = in.Kind
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new GroupVersionKind.
+func (x *GroupVersionKind) DeepCopy() *GroupVersionKind {
+	if x == nil {
+		return nil
+	}
+	out := new(GroupVersionKind)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *GroupVersionResource) DeepCopyInto(out *GroupVersionResource) {
+	out.Group = in.Group
+	out.Version = in.Version
+	out.Resource = in.Resource
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new GroupVersionResource.
+func (x *GroupVersionResource) DeepCopy() *GroupVersionResource {
+	if x == nil {
+		return nil
+	}
+	out := new(GroupVersionResource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *LabelSelector) DeepCopyInto(out *LabelSelector) {
+	if in.MatchLabels != nil {
+		in, out := &in.MatchLabels, &out.MatchLabels
+		*out = make(map[string]string)
+		for key, val := range *in {
+			(*out)[key] = val
 		}
-		return nil
+	} else {
+		out.MatchLabels = nil
 	}
-}
-
-func DeepCopy_unversioned_Duration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Duration)
-		out := out.(*Duration)
-		out.Duration = in.Duration
-		return nil
-	}
-}
-
-func DeepCopy_unversioned_ExportOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ExportOptions)
-		out := out.(*ExportOptions)
-		out.TypeMeta = in.TypeMeta
-		out.Export = in.Export
-		out.Exact = in.Exact
-		return nil
-	}
-}
-
-func DeepCopy_unversioned_GroupKind(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*GroupKind)
-		out := out.(*GroupKind)
-		out.Group = in.Group
-		out.Kind = in.Kind
-		return nil
-	}
-}
-
-func DeepCopy_unversioned_GroupResource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*GroupResource)
-		out := out.(*GroupResource)
-		out.Group = in.Group
-		out.Resource = in.Resource
-		return nil
-	}
-}
-
-func DeepCopy_unversioned_GroupVersion(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*GroupVersion)
-		out := out.(*GroupVersion)
-		out.Group = in.Group
-		out.Version = in.Version
-		return nil
-	}
-}
-
-func DeepCopy_unversioned_GroupVersionForDiscovery(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*GroupVersionForDiscovery)
-		out := out.(*GroupVersionForDiscovery)
-		out.GroupVersion = in.GroupVersion
-		out.Version = in.Version
-		return nil
-	}
-}
-
-func DeepCopy_unversioned_GroupVersionKind(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*GroupVersionKind)
-		out := out.(*GroupVersionKind)
-		out.Group = in.Group
-		out.Version = in.Version
-		out.Kind = in.Kind
-		return nil
-	}
-}
-
-func DeepCopy_unversioned_GroupVersionResource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*GroupVersionResource)
-		out := out.(*GroupVersionResource)
-		out.Group = in.Group
-		out.Version = in.Version
-		out.Resource = in.Resource
-		return nil
-	}
-}
-
-func DeepCopy_unversioned_LabelSelector(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*LabelSelector)
-		out := out.(*LabelSelector)
-		if in.MatchLabels != nil {
-			in, out := &in.MatchLabels, &out.MatchLabels
-			*out = make(map[string]string)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		} else {
-			out.MatchLabels = nil
+	if in.MatchExpressions != nil {
+		in, out := &in.MatchExpressions, &out.MatchExpressions
+		*out = make([]LabelSelectorRequirement, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
-		if in.MatchExpressions != nil {
-			in, out := &in.MatchExpressions, &out.MatchExpressions
-			*out = make([]LabelSelectorRequirement, len(*in))
-			for i := range *in {
-				if err := DeepCopy_unversioned_LabelSelectorRequirement(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.MatchExpressions = nil
+	} else {
+		out.MatchExpressions = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new LabelSelector.
+func (x *LabelSelector) DeepCopy() *LabelSelector {
+	if x == nil {
+		return nil
+	}
+	out := new(LabelSelector)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *LabelSelectorRequirement) DeepCopyInto(out *LabelSelectorRequirement) {
+	out.Key = in.Key
+	out.Operator = in.Operator
+	if in.Values != nil {
+		in, out := &in.Values, &out.Values
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.Values = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new LabelSelectorRequirement.
+func (x *LabelSelectorRequirement) DeepCopy() *LabelSelectorRequirement {
+	if x == nil {
+		return nil
+	}
+	out := new(LabelSelectorRequirement)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ListMeta) DeepCopyInto(out *ListMeta) {
+	out.SelfLink = in.SelfLink
+	out.ResourceVersion = in.ResourceVersion
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ListMeta.
+func (x *ListMeta) DeepCopy() *ListMeta {
+	if x == nil {
+		return nil
+	}
+	out := new(ListMeta)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Patch) DeepCopyInto(out *Patch) {
+	_ = in
+	_ = out
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new Patch.
+func (x *Patch) DeepCopy() *Patch {
+	if x == nil {
+		return nil
+	}
+	out := new(Patch)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *RootPaths) DeepCopyInto(out *RootPaths) {
+	if in.Paths != nil {
+		in, out := &in.Paths, &out.Paths
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.Paths = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new RootPaths.
+func (x *RootPaths) DeepCopy() *RootPaths {
+	if x == nil {
+		return nil
+	}
+	out := new(RootPaths)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ServerAddressByClientCIDR) DeepCopyInto(out *ServerAddressByClientCIDR) {
+	out.ClientCIDR = in.ClientCIDR
+	out.ServerAddress = in.ServerAddress
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ServerAddressByClientCIDR.
+func (x *ServerAddressByClientCIDR) DeepCopy() *ServerAddressByClientCIDR {
+	if x == nil {
+		return nil
+	}
+	out := new(ServerAddressByClientCIDR)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Status) DeepCopyInto(out *Status) {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	out.Status = in.Status
+	out.Message = in.Message
+	out.Reason = in.Reason
+	if in.Details != nil {
+		in, out := &in.Details, &out.Details
+		*out = (*in).DeepCopy()
+	} else {
+		out.Details = nil
+	}
+	out.Code = in.Code
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new Status.
+func (x *Status) DeepCopy() *Status {
+	if x == nil {
+		return nil
+	}
+	out := new(Status)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *Status) DeepCopyObject() Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *StatusCause) DeepCopyInto(out *StatusCause) {
+	out.Type = in.Type
+	out.Message = in.Message
+	out.Field = in.Field
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new StatusCause.
+func (x *StatusCause) DeepCopy() *StatusCause {
+	if x == nil {
+		return nil
+	}
+	out := new(StatusCause)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *StatusDetails) DeepCopyInto(out *StatusDetails) {
+	out.Name = in.Name
+	out.Group = in.Group
+	out.Kind = in.Kind
+	if in.Causes != nil {
+		in, out := &in.Causes, &out.Causes
+		*out = make([]StatusCause, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
 		}
-		return nil
+	} else {
+		out.Causes = nil
 	}
+	out.RetryAfterSeconds = in.RetryAfterSeconds
+	return
 }
 
-func DeepCopy_unversioned_LabelSelectorRequirement(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*LabelSelectorRequirement)
-		out := out.(*LabelSelectorRequirement)
-		out.Key = in.Key
-		out.Operator = in.Operator
-		if in.Values != nil {
-			in, out := &in.Values, &out.Values
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.Values = nil
-		}
+// DeepCopy will perform a deep copy of the receiver, creating a new StatusDetails.
+func (x *StatusDetails) DeepCopy() *StatusDetails {
+	if x == nil {
 		return nil
 	}
+	out := new(StatusDetails)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_unversioned_ListMeta(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ListMeta)
-		out := out.(*ListMeta)
-		out.SelfLink = in.SelfLink
-		out.ResourceVersion = in.ResourceVersion
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Time) DeepCopyInto(out *Time) {
+	*out = in.DeepCopy()
+	return
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Timestamp) DeepCopyInto(out *Timestamp) {
+	out.Seconds = in.Seconds
+	out.Nanos = in.Nanos
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new Timestamp.
+func (x *Timestamp) DeepCopy() *Timestamp {
+	if x == nil {
 		return nil
 	}
+	out := new(Timestamp)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_unversioned_Patch(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Patch)
-		out := out.(*Patch)
-		_ = in
-		_ = out
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *TypeMeta) DeepCopyInto(out *TypeMeta) {
+	out.Kind = in.Kind
+	out.APIVersion = in.APIVersion
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new TypeMeta.
+func (x *TypeMeta) DeepCopy() *TypeMeta {
+	if x == nil {
 		return nil
 	}
+	out := new(TypeMeta)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_unversioned_RootPaths(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*RootPaths)
-		out := out.(*RootPaths)
-		if in.Paths != nil {
-			in, out := &in.Paths, &out.Paths
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.Paths = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_unversioned_ServerAddressByClientCIDR(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ServerAddressByClientCIDR)
-		out := out.(*ServerAddressByClientCIDR)
-		out.ClientCIDR = in.ClientCIDR
-		out.ServerAddress = in.ServerAddress
-		return nil
-	}
-}
-
-func DeepCopy_unversioned_Status(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Status)
-		out := out.(*Status)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
-		out.Status = in.Status
-		out.Message = in.Message
-		out.Reason = in.Reason
-		if in.Details != nil {
-			in, out := &in.Details, &out.Details
-			*out = new(StatusDetails)
-			if err := DeepCopy_unversioned_StatusDetails(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.Details = nil
-		}
-		out.Code = in.Code
-		return nil
-	}
-}
-
-func DeepCopy_unversioned_StatusCause(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*StatusCause)
-		out := out.(*StatusCause)
-		out.Type = in.Type
-		out.Message = in.Message
-		out.Field = in.Field
-		return nil
-	}
-}
-
-func DeepCopy_unversioned_StatusDetails(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*StatusDetails)
-		out := out.(*StatusDetails)
-		out.Name = in.Name
-		out.Group = in.Group
-		out.Kind = in.Kind
-		if in.Causes != nil {
-			in, out := &in.Causes, &out.Causes
-			*out = make([]StatusCause, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.Causes = nil
-		}
-		out.RetryAfterSeconds = in.RetryAfterSeconds
-		return nil
-	}
-}
-
-func DeepCopy_unversioned_Time(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Time)
-		out := out.(*Time)
-		if newVal, err := c.DeepCopy(&in.Time); err != nil {
-			return err
-		} else {
-			out.Time = *newVal.(*time.Time)
-		}
-		return nil
-	}
-}
-
-func DeepCopy_unversioned_Timestamp(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Timestamp)
-		out := out.(*Timestamp)
-		out.Seconds = in.Seconds
-		out.Nanos = in.Nanos
-		return nil
-	}
-}
-
-func DeepCopy_unversioned_TypeMeta(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*TypeMeta)
-		out := out.(*TypeMeta)
-		out.Kind = in.Kind
-		out.APIVersion = in.APIVersion
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *TypeMeta) DeepCopyObject() Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
