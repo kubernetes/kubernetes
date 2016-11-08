@@ -152,6 +152,7 @@ duration-sec
 e2e-output-dir
 e2e-verify-service-account
 enable-controller-attach-detach
+enable-cri
 enable-custom-metrics
 enable-debugging-handlers
 enable-dynamic-provisioning
@@ -193,7 +194,7 @@ experimental-mounter-path
 experimental-mounter-rootfs-path
 experimental-nvidia-gpus
 experimental-prefix
-experimental-runtime-integration-type
+experimental-cri
 external-etcd-cafile
 external-etcd-certfile
 external-etcd-endpoints
@@ -494,7 +495,6 @@ run-proxy
 run-services-mode
 runtime-cgroups
 runtime-config
-runtime-integration-type
 runtime-request-timeout
 save-config
 schedule-pods-here

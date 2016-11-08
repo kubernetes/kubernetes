@@ -217,9 +217,8 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		// "--experimental-mounter-rootfs-path", framework.TestContext.MounterRootfsPath,
 	)
 
-	if framework.TestContext.RuntimeIntegrationType != "" {
-		cmdArgs = append(cmdArgs, "--experimental-runtime-integration-type",
-			framework.TestContext.RuntimeIntegrationType) // Whether to use experimental cri integration.
+	if framework.TestContext.EnableCRI {
+		cmdArgs = append(cmdArgs, "--experimental-cri", "true") // Whether to use experimental cri integration.
 	}
 	if framework.TestContext.ContainerRuntimeEndpoint != "" {
 		cmdArgs = append(cmdArgs, "--container-runtime-endpoint", framework.TestContext.ContainerRuntimeEndpoint)

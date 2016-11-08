@@ -335,7 +335,7 @@ func (cm *containerManagerImpl) setupNode() error {
 	systemContainers := []*systemContainer{}
 	if cm.ContainerRuntime == "docker" {
 		dockerVersion := getDockerVersion(cm.cadvisorInterface)
-		if cm.RuntimeIntegrationType == "cri" {
+		if cm.EnableCRI {
 			// If kubelet uses CRI, dockershim will manage the cgroups and oom
 			// score for the docker processes.
 			// In the future, NodeSpec should mandate the cgroup that the
