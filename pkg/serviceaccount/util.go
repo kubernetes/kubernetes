@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/auth/user"
@@ -91,6 +92,27 @@ func IsServiceAccountToken(secret *v1.Secret, sa *v1.ServiceAccount) bool {
 
 	name := secret.Annotations[v1.ServiceAccountNameKey]
 	uid := secret.Annotations[v1.ServiceAccountUIDKey]
+	if name != sa.Name {
+		// Name must match
+		return false
+	}
+	if len(uid) > 0 && uid != string(sa.UID) {
+		// If UID is specified, it must match
+		return false
+	}
+
+	return true
+}
+
+// TODO: remove the duplicate code
+// InternalIsServiceAccountToken returns true if the secret is a valid api token for the service account
+func InternalIsServiceAccountToken(secret *api.Secret, sa *api.ServiceAccount) bool {
+	if secret.Type != api.SecretTypeServiceAccountToken {
+		return false
+	}
+
+	name := secret.Annotations[api.ServiceAccountNameKey]
+	uid := secret.Annotations[api.ServiceAccountUIDKey]
 	if name != sa.Name {
 		// Name must match
 		return false
