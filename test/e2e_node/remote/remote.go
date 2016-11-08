@@ -168,10 +168,9 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 	glog.Infof("Staging test binaries on %s", host)
 	workspace := fmt.Sprintf("/tmp/node-e2e-%s", getTimestamp())
 	// Do not sudo here, so that we can use scp to copy test archive to the directdory.
-	_, err := SSHNoSudo(host, "mkdir", workspace)
-	if err != nil {
+	if output, err := SSHNoSudo(host, "mkdir", workspace); err != nil {
 		// Exit failure with the error
-		return "", false, err
+		return "", false, fmt.Errorf("failed to create workspace directory: %v output: %q", err, output)
 	}
 	if cleanup {
 		defer func() {
@@ -188,9 +187,9 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 		fmt.Sprintf("mkdir -p %s", cniPath),
 		fmt.Sprintf("wget -O - %s | tar -xz -C %s", CNIURL, cniPath),
 	)
-	if _, err := SSH(host, "sh", "-c", cmd); err != nil {
+	if output, err := SSH(host, "sh", "-c", cmd); err != nil {
 		// Exit failure with the error
-		return "", false, err
+		return "", false, fmt.Errorf("failed to install cni plugin: %v output: %q", err, output)
 	}
 
 	// Configure iptables firewall rules
@@ -215,10 +214,9 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 	}
 
 	// Copy the archive to the staging directory
-	_, err = runSSHCommand("scp", archive, fmt.Sprintf("%s:%s/", GetHostnameOrIp(host), workspace))
-	if err != nil {
+	if output, err = runSSHCommand("scp", archive, fmt.Sprintf("%s:%s/", GetHostnameOrIp(host), workspace)); err != nil {
 		// Exit failure with the error
-		return "", false, err
+		return "", false, fmt.Errorf("failed to copy test archive: %v, output: %q", err, output)
 	}
 
 	// Kill any running node processes
@@ -239,10 +237,9 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 		fmt.Sprintf("tar -xzvf ./%s", archiveName),
 	)
 	glog.Infof("Extracting tar on %s", host)
-	output, err = SSH(host, "sh", "-c", cmd)
-	if err != nil {
+	if output, err = SSH(host, "sh", "-c", cmd); err != nil {
 		// Exit failure with the error
-		return "", false, err
+		return "", false, fmt.Errorf("failed to extract test archive: %v, output: %q", err, output)
 	}
 
 	// If we are testing on a GCI node, we chmod 544 the mounter and specify a different mounter path in the test args.
@@ -291,12 +288,10 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 
 	glog.Infof("Starting tests on %s", host)
 	output, err = SSH(host, "sh", "-c", cmd)
-
+	// Do not log the output here, let the caller deal with the test output.
 	if err != nil {
 		aggErrs = append(aggErrs, err)
-	}
 
-	if err != nil {
 		// Encountered an unexpected error. The remote test harness may not
 		// have finished retrieved and stored all the logs in this case. Try
 		// to get some logs for debugging purposes.
@@ -311,14 +306,13 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 		// Try getting the system logs from journald and store it to a file.
 		// Don't reuse the original test directory on the remote host because
 		// it could've be been removed if the node was rebooted.
-		_, err := SSH(host, "sh", "-c", fmt.Sprintf("'journalctl --system --all > %s'", logPath))
-		if err == nil {
+		if output, err := SSH(host, "sh", "-c", fmt.Sprintf("'journalctl --system --all > %s'", logPath)); err == nil {
 			glog.Infof("Got the system logs from journald; copying it back...")
-			if _, err := runSSHCommand("scp", fmt.Sprintf("%s:%s", GetHostnameOrIp(host), logPath), destPath); err != nil {
-				glog.Infof("Failed to copy the log: err: %v", err)
+			if output, err := runSSHCommand("scp", fmt.Sprintf("%s:%s", GetHostnameOrIp(host), logPath), destPath); err != nil {
+				glog.Infof("Failed to copy the log: err: %v, output: %q", err, output)
 			}
 		} else {
-			glog.Infof("Failed to run journactl (normal if it doesn't exist on the node): %v", err)
+			glog.Infof("Failed to run journactl (normal if it doesn't exist on the node): %v, output: %q", err, output)
 		}
 	}
 
@@ -383,7 +377,7 @@ func runSSHCommand(cmd string, args ...string) (string, error) {
 	}
 	output, err := exec.Command(cmd, args...).CombinedOutput()
 	if err != nil {
-		return fmt.Sprintf("%s", output), fmt.Errorf("command [%s %s] failed with error: %v and output:\n%s", cmd, strings.Join(args, " "), err, output)
+		return string(output), fmt.Errorf("command [%s %s] failed with error: %v", cmd, strings.Join(args, " "), err)
 	}
-	return fmt.Sprintf("%s", output), nil
+	return string(output), nil
 }
