@@ -147,6 +147,8 @@ Federation namespace Namespace objects should not be deleted from underlying clu
 Federation replicasets Federated ReplicaSet should create and update matching replicasets in underling clusters,childsb,1
 Federation replicasets ReplicaSet objects should be created and deleted successfully,apelisse,1
 Federation secrets Secret objects should be created and deleted successfully,pmorie,1
+Federation secrets Secret objects should be deleted from underlying clusters when OrphanDependents is false,nikhiljindal,0
+Federation secrets Secret objects should not be deleted from underlying clusters when OrphanDependents is true,nikhiljindal,0
 GKE local SSD should write and read from node local SSD,fabioy,0
 GKE node pools should create a cluster with multiple node pools,fabioy,1
 Garbage collector should delete pods created by rc when not orphaning,justinsb,1

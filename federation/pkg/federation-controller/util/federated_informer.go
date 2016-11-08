@@ -54,6 +54,9 @@ type FederatedReadOnlyStore interface {
 	// Returns all items from a cluster.
 	ListFromCluster(clusterName string) ([]interface{}, error)
 
+	// GetKeyFor returns the key under which the item would be put in the store.
+	GetKeyFor(item interface{}) string
+
 	// GetByKey returns the item stored under the given key in the specified cluster (if exist).
 	GetByKey(clusterName string, key string) (interface{}, bool, error)
 

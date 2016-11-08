@@ -122,7 +122,7 @@ func (dh *DeletionHelper) HandleObjectInUnderlyingClusters(obj runtime.Object) (
 	}
 	hasOrphanFinalizer := dh.hasFinalizerFunc(obj, api_v1.FinalizerOrphan)
 	if hasOrphanFinalizer {
-		glog.V(3).Infof("Found finalizer orphan. Nothing to do, just remove the finalizer")
+		glog.V(2).Infof("Found finalizer orphan. Nothing to do, just remove the finalizer")
 		// If the obj has FinalizerOrphan finalizer, then we need to orphan the
 		// corresponding objects in underlying clusters.
 		// Just remove both the finalizers in that case.
@@ -133,6 +133,7 @@ func (dh *DeletionHelper) HandleObjectInUnderlyingClusters(obj runtime.Object) (
 		return dh.removeFinalizerFunc(obj, FinalizerDeleteFromUnderlyingClusters)
 	}
 
+	glog.V(2).Infof("Deleting obj %s from underlying clusters", objName)
 	// Else, we need to delete the obj from all underlying clusters.
 	unreadyClusters, err := dh.informer.GetUnreadyClusters()
 	if err != nil {
@@ -141,7 +142,9 @@ func (dh *DeletionHelper) HandleObjectInUnderlyingClusters(obj runtime.Object) (
 	// TODO: Handle the case when cluster resource is watched after this is executed.
 	// This can happen if a namespace is deleted before its creation had been
 	// observed in all underlying clusters.
-	clusterNsObjs, err := dh.informer.GetTargetStore().GetFromAllClusters(objName)
+	storeKey := dh.informer.GetTargetStore().GetKeyFor(obj)
+	clusterNsObjs, err := dh.informer.GetTargetStore().GetFromAllClusters(storeKey)
+	glog.V(3).Infof("Found %d objects in underlying clusters", len(clusterNsObjs))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get object %s from underlying clusters: %v", objName, err)
 	}
