@@ -25,7 +25,7 @@
         "containers": [
             {
                 "name": "cluster-autoscaler",
-                "image": "gcr.io/google_containers/cluster-autoscaler:v0.3.0",
+                "image": "gcr.io/google_containers/cluster-autoscaler:v0.4.0-beta1",
                 "command": [
                     "/bin/sh",
                     "-c",
