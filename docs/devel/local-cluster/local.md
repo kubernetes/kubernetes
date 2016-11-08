@@ -30,6 +30,10 @@ and run the following (since one needs sudo access to start/stop Kubernetes daem
 cd kubernetes
 hack/local-up-cluster.sh
 ```
+If you want to enable RBAC on local cluster, you can run the following:
+```shell
+ALLOW_ANY_TOKEN=true ENABLE_RBAC=true hack/local-up-cluster.sh
+```
 
 This will build and start a lightweight local cluster, consisting of a master
 and a single node. Type Control-C to shut it down.
