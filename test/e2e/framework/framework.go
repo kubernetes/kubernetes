@@ -445,7 +445,10 @@ func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (
 		createTestingNS = CreateTestingNS
 	}
 	ns, err := createTestingNS(baseName, f.ClientSet, labels)
-	if err == nil {
+	// check ns instead of err to see if it's nil as we may
+	// fail to create serviceAccount in it.
+	// In this case, we should not forget to delete the namespace.
+	if ns != nil {
 		f.namespacesToDelete = append(f.namespacesToDelete, ns)
 	}
 	return ns, err
