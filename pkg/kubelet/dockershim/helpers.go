@@ -123,13 +123,16 @@ func extractLabels(input map[string]string) (map[string]string, map[string]strin
 // '<HostPath>:<ContainerPath>:Z', if the volume requires SELinux
 // relabeling and the pod provides an SELinux label
 func generateMountBindings(mounts []*runtimeApi.Mount) (result []string) {
-	// TODO: resolve podHasSELinuxLabel
 	for _, m := range mounts {
 		bind := fmt.Sprintf("%s:%s", m.GetHostPath(), m.GetContainerPath())
 		readOnly := m.GetReadonly()
 		if readOnly {
 			bind += ":ro"
 		}
+		// Only request relabeling if the pod provides an SELinux context. If the pod
+		// does not provide an SELinux context relabeling will label the volume with
+		// the container's randomly allocated MCS label. This would restrict access
+		// to the volume to the container which mounts it first.
 		if m.GetSelinuxRelabel() {
 			if readOnly {
 				bind += ",Z"
