@@ -1727,7 +1727,41 @@ func printRoleList(list *rbac.RoleList, w io.Writer, options PrintOptions) error
 }
 
 func printRoleBinding(roleBinding *rbac.RoleBinding, w io.Writer, options PrintOptions) error {
-	return printObjectMeta(roleBinding.ObjectMeta, w, options, true)
+	meta := roleBinding.ObjectMeta
+	name := formatResourceName(options.Kind, meta.Name, options.WithKind)
+
+	if options.WithNamespace {
+		if _, err := fmt.Fprintf(w, "%s\t", meta.Namespace); err != nil {
+			return err
+		}
+	}
+
+	if _, err := fmt.Fprintf(
+		w, "%s\t%s",
+		name,
+		translateTimestamp(meta.CreationTimestamp),
+	); err != nil {
+		return err
+	}
+
+	if options.Wide {
+		roleRef := fmt.Sprintf("%s/%s", roleBinding.RoleRef.Kind, roleBinding.RoleRef.Name)
+		users, groups, sas, _ := rbac.SubjectsStrings(roleBinding.Subjects)
+		if _, err := fmt.Fprintf(w, "\t%s\t%v\t%v\t%v",
+			roleRef,
+			strings.Join(users, ", "),
+			strings.Join(groups, ", "),
+			strings.Join(sas, ", "),
+		); err != nil {
+			return err
+		}
+	}
+
+	if _, err := fmt.Fprint(w, AppendLabels(meta.Labels, options.ColumnLabels)); err != nil {
+		return err
+	}
+	_, err := fmt.Fprint(w, AppendAllLabels(options.ShowLabels, meta.Labels))
+	return err
 }
 
 // Prints the RoleBinding in a human-friendly format.
@@ -1755,7 +1789,39 @@ func printClusterRoleList(list *rbac.ClusterRoleList, w io.Writer, options Print
 }
 
 func printClusterRoleBinding(clusterRoleBinding *rbac.ClusterRoleBinding, w io.Writer, options PrintOptions) error {
-	return printObjectMeta(clusterRoleBinding.ObjectMeta, w, options, false)
+	meta := clusterRoleBinding.ObjectMeta
+	name := formatResourceName(options.Kind, meta.Name, options.WithKind)
+
+	if options.WithNamespace {
+		return fmt.Errorf("clusterRoleBinding is not namespaced")
+	}
+
+	if _, err := fmt.Fprintf(
+		w, "%s\t%s",
+		name,
+		translateTimestamp(meta.CreationTimestamp),
+	); err != nil {
+		return err
+	}
+
+	if options.Wide {
+		roleRef := clusterRoleBinding.RoleRef.Name
+		users, groups, sas, _ := rbac.SubjectsStrings(clusterRoleBinding.Subjects)
+		if _, err := fmt.Fprintf(w, "\t%s\t%v\t%v\t%v",
+			roleRef,
+			strings.Join(users, ", "),
+			strings.Join(groups, ", "),
+			strings.Join(sas, ", "),
+		); err != nil {
+			return err
+		}
+	}
+
+	if _, err := fmt.Fprint(w, AppendLabels(meta.Labels, options.ColumnLabels)); err != nil {
+		return err
+	}
+	_, err := fmt.Fprint(w, AppendAllLabels(options.ShowLabels, meta.Labels))
+	return err
 }
 
 // Prints the ClusterRoleBinding in a human-friendly format.
@@ -2223,6 +2289,12 @@ func formatWideHeaders(wide bool, t reflect.Type) []string {
 		}
 		if t.String() == "*api.Node" || t.String() == "*api.NodeList" {
 			return []string{"EXTERNAL-IP"}
+		}
+		if t.String() == "*rbac.RoleBinding" || t.String() == "*rbac.RoleBindingList" {
+			return []string{"ROLE", "USERS", "GROUPS", "SERVICEACCOUNTS"}
+		}
+		if t.String() == "*rbac.ClusterRoleBinding" || t.String() == "*rbac.ClusterRoleBindingList" {
+			return []string{"ROLE", "USERS", "GROUPS", "SERVICEACCOUNTS"}
 		}
 	}
 	return nil
