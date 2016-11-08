@@ -466,6 +466,7 @@ type KubeletConfiguration struct {
 	// using the new Container Runtine Interface.
 	// +optional
 	ExperimentalRuntimeIntegrationType string `json:"experimentalRuntimeIntegrationType,omitempty"`
+	Standalone                         bool   `json:"standalone"`
 }
 
 type KubeletAuthorizationMode string
