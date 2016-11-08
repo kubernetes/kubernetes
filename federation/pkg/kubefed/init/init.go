@@ -119,6 +119,7 @@ func NewCmdInit(cmdOut io.Writer, config util.AdminConfig) *cobra.Command {
 	cmd.Flags().String("dns-zone-name", "", "DNS suffix for this federation. Federated Service DNS names are published with this suffix.")
 	cmd.Flags().String("image", defaultImage, "Image to use for federation API server and controller manager binaries.")
 	cmd.Flags().String("etcd-pv-capacity", "10Gi", "Size of persistent volume claim to be used for etcd.")
+	cmd.Flags().Bool("dry-run", false, "dry run without sending commands to server.")
 	return cmd
 }
 
@@ -133,13 +134,18 @@ type entityKeyPairs struct {
 // See the design doc in https://github.com/kubernetes/kubernetes/pull/34484
 // for details.
 func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Command, args []string) error {
+	ips := []string{}
+	hostnames := []string{}
+
 	initFlags, err := util.GetSubcommandFlags(cmd, args)
 	if err != nil {
 		return err
 	}
+
 	dnsZoneName := cmdutil.GetFlagString(cmd, "dns-zone-name")
 	image := cmdutil.GetFlagString(cmd, "image")
 	etcdPVCapacity := cmdutil.GetFlagString(cmd, "etcd-pv-capacity")
+	dryRun := cmdutil.GetDryRunFlag(cmd)
 
 	hostFactory := config.HostFactory(initFlags.Host, initFlags.Kubeconfig)
 	hostClientset, err := hostFactory.ClientSet()
@@ -153,19 +159,23 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	cmKubeconfigName := fmt.Sprintf("%s-kubeconfig", cmName)
 
 	// 1. Create a namespace for federation system components
-	_, err = createNamespace(hostClientset, initFlags.FederationSystemNamespace)
+	_, err = createNamespace(hostClientset, initFlags.FederationSystemNamespace, dryRun)
 	if err != nil {
 		return err
 	}
 
 	// 2. Expose a network endpoint for the federation API server
-	svc, err := createService(hostClientset, initFlags.FederationSystemNamespace, serverName)
+	svc, err := createService(hostClientset, initFlags.FederationSystemNamespace, serverName, dryRun)
 	if err != nil {
 		return err
 	}
-	ips, hostnames, err := waitForLoadBalancerAddress(hostClientset, svc)
-	if err != nil {
-		return err
+
+	if !dryRun {
+		var err error
+		ips, hostnames, err = waitForLoadBalancerAddress(hostClientset, svc)
+		if err != nil {
+			return err
+		}
 	}
 
 	// 3. Generate TLS certificates and credentials
@@ -174,13 +184,13 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 		return err
 	}
 
-	_, err = createAPIServerCredentialsSecret(hostClientset, initFlags.FederationSystemNamespace, serverCredName, entKeyPairs)
+	_, err = createAPIServerCredentialsSecret(hostClientset, initFlags.FederationSystemNamespace, serverCredName, entKeyPairs, dryRun)
 	if err != nil {
 		return err
 	}
 
 	// 4. Create a kubeconfig secret
-	_, err = createControllerManagerKubeconfigSecret(hostClientset, initFlags.FederationSystemNamespace, initFlags.Name, svc.Name, cmKubeconfigName, entKeyPairs)
+	_, err = createControllerManagerKubeconfigSecret(hostClientset, initFlags.FederationSystemNamespace, initFlags.Name, svc.Name, cmKubeconfigName, entKeyPairs, dryRun)
 	if err != nil {
 		return err
 	}
@@ -188,7 +198,7 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	// 5. Create a persistent volume and a claim to store the federation
 	// API server's state. This is where federation API server's etcd
 	// stores its data.
-	pvc, err := createPVC(hostClientset, initFlags.FederationSystemNamespace, svc.Name, etcdPVCapacity)
+	pvc, err := createPVC(hostClientset, initFlags.FederationSystemNamespace, svc.Name, etcdPVCapacity, dryRun)
 	if err != nil {
 		return err
 	}
@@ -206,38 +216,47 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	}
 
 	// 6. Create federation API server
-	_, err = createAPIServer(hostClientset, initFlags.FederationSystemNamespace, serverName, image, serverCredName, pvc.Name, advertiseAddress)
+	_, err = createAPIServer(hostClientset, initFlags.FederationSystemNamespace, serverName, image, serverCredName, pvc.Name, advertiseAddress, dryRun)
 	if err != nil {
 		return err
 	}
 
 	// 7. Create federation controller manager
-	_, err = createControllerManager(hostClientset, initFlags.FederationSystemNamespace, initFlags.Name, cmName, image, cmKubeconfigName, dnsZoneName)
+	_, err = createControllerManager(hostClientset, initFlags.FederationSystemNamespace, initFlags.Name, cmName, image, cmKubeconfigName, dnsZoneName, dryRun)
 	if err != nil {
 		return err
 	}
 
 	// 8. Write the federation API server endpoint info, credentials
 	// and context to kubeconfig
-	err = updateKubeconfig(config, initFlags.Name, endpoint, entKeyPairs)
+	err = updateKubeconfig(config, initFlags.Name, endpoint, entKeyPairs, dryRun)
 	if err != nil {
 		return err
 	}
 
-	return printSuccess(cmdOut, ips, hostnames)
+	if !dryRun {
+		return printSuccess(cmdOut, ips, hostnames)
+	} else {
+		_, err := fmt.Fprintf(cmdOut, "Federation control plane runs (dry run)\n")
+		return err
+	}
 }
 
-func createNamespace(clientset *client.Clientset, namespace string) (*api.Namespace, error) {
+func createNamespace(clientset *client.Clientset, namespace string, dryRun bool) (*api.Namespace, error) {
 	ns := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
 			Name: namespace,
 		},
 	}
 
-	return clientset.Core().Namespaces().Create(ns)
+	if !dryRun {
+		return clientset.Core().Namespaces().Create(ns)
+	} else {
+		return nil, nil
+	}
 }
 
-func createService(clientset *client.Clientset, namespace, svcName string) (*api.Service, error) {
+func createService(clientset *client.Clientset, namespace, svcName string, dryRun bool) (*api.Service, error) {
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name:      svcName,
@@ -258,7 +277,11 @@ func createService(clientset *client.Clientset, namespace, svcName string) (*api
 		},
 	}
 
-	return clientset.Core().Services(namespace).Create(svc)
+	if !dryRun {
+		return clientset.Core().Services(namespace).Create(svc)
+	} else {
+		return svc, nil
+	}
 }
 
 func waitForLoadBalancerAddress(clientset *client.Clientset, svc *api.Service) ([]string, []string, error) {
@@ -317,7 +340,7 @@ func genCerts(svcNamespace, name, svcName, localDNSZoneName string, ips, hostnam
 	}, nil
 }
 
-func createAPIServerCredentialsSecret(clientset *client.Clientset, namespace, credentialsName string, entKeyPairs *entityKeyPairs) (*api.Secret, error) {
+func createAPIServerCredentialsSecret(clientset *client.Clientset, namespace, credentialsName string, entKeyPairs *entityKeyPairs, dryRun bool) (*api.Secret, error) {
 	// Build the secret object with API server credentials.
 	secret := &api.Secret{
 		ObjectMeta: api.ObjectMeta{
@@ -331,11 +354,15 @@ func createAPIServerCredentialsSecret(clientset *client.Clientset, namespace, cr
 		},
 	}
 
-	// Boilerplate to create the secret in the host cluster.
-	return clientset.Core().Secrets(namespace).Create(secret)
+	if !dryRun {
+		// Boilerplate to create the secret in the host cluster.
+		return clientset.Core().Secrets(namespace).Create(secret)
+	} else {
+		return nil, nil
+	}
 }
 
-func createControllerManagerKubeconfigSecret(clientset *client.Clientset, namespace, name, svcName, kubeconfigName string, entKeyPairs *entityKeyPairs) (*api.Secret, error) {
+func createControllerManagerKubeconfigSecret(clientset *client.Clientset, namespace, name, svcName, kubeconfigName string, entKeyPairs *entityKeyPairs, dryRun bool) (*api.Secret, error) {
 	basicClientConfig := kubeadmutil.CreateBasicClientConfig(
 		name,
 		fmt.Sprintf("https://%s", svcName),
@@ -350,10 +377,14 @@ func createControllerManagerKubeconfigSecret(clientset *client.Clientset, namesp
 		certutil.EncodeCertPEM(entKeyPairs.controllerManager.Cert),
 	)
 
-	return util.CreateKubeconfigSecret(clientset, config, namespace, kubeconfigName, false)
+	if !dryRun {
+		return util.CreateKubeconfigSecret(clientset, config, namespace, kubeconfigName, false)
+	} else {
+		return nil, nil
+	}
 }
 
-func createPVC(clientset *client.Clientset, namespace, svcName, etcdPVCapacity string) (*api.PersistentVolumeClaim, error) {
+func createPVC(clientset *client.Clientset, namespace, svcName, etcdPVCapacity string, dryRun bool) (*api.PersistentVolumeClaim, error) {
 
 	capacity, err := resource.ParseQuantity(etcdPVCapacity)
 	if err != nil {
@@ -381,10 +412,14 @@ func createPVC(clientset *client.Clientset, namespace, svcName, etcdPVCapacity s
 		},
 	}
 
-	return clientset.Core().PersistentVolumeClaims(namespace).Create(pvc)
+	if !dryRun {
+		return clientset.Core().PersistentVolumeClaims(namespace).Create(pvc)
+	} else {
+		return pvc, nil
+	}
 }
 
-func createAPIServer(clientset *client.Clientset, namespace, name, image, credentialsName, pvcName, advertiseAddress string) (*extensions.Deployment, error) {
+func createAPIServer(clientset *client.Clientset, namespace, name, image, credentialsName, pvcName, advertiseAddress string, dryRun bool) (*extensions.Deployment, error) {
 	command := []string{
 		"/hyperkube",
 		"federation-apiserver",
@@ -479,10 +514,14 @@ func createAPIServer(clientset *client.Clientset, namespace, name, image, creden
 		},
 	}
 
-	return clientset.Extensions().Deployments(namespace).Create(dep)
+	if !dryRun {
+		return clientset.Extensions().Deployments(namespace).Create(dep)
+	} else {
+		return nil, nil
+	}
 }
 
-func createControllerManager(clientset *client.Clientset, namespace, name, cmName, image, kubeconfigName, dnsZoneName string) (*extensions.Deployment, error) {
+func createControllerManager(clientset *client.Clientset, namespace, name, cmName, image, kubeconfigName, dnsZoneName string, dryRun bool) (*extensions.Deployment, error) {
 	dep := &extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name:      cmName,
@@ -545,7 +584,11 @@ func createControllerManager(clientset *client.Clientset, namespace, name, cmNam
 		},
 	}
 
-	return clientset.Extensions().Deployments(namespace).Create(dep)
+	if !dryRun {
+		return clientset.Extensions().Deployments(namespace).Create(dep)
+	} else {
+		return nil, nil
+	}
 }
 
 func printSuccess(cmdOut io.Writer, ips, hostnames []string) error {
@@ -554,7 +597,7 @@ func printSuccess(cmdOut io.Writer, ips, hostnames []string) error {
 	return err
 }
 
-func updateKubeconfig(config util.AdminConfig, name, endpoint string, entKeyPairs *entityKeyPairs) error {
+func updateKubeconfig(config util.AdminConfig, name, endpoint string, entKeyPairs *entityKeyPairs, dryRun bool) error {
 	po := config.PathOptions()
 	kubeconfig, err := po.GetStartingConfig()
 	if err != nil {
@@ -587,9 +630,11 @@ func updateKubeconfig(config util.AdminConfig, name, endpoint string, entKeyPair
 	kubeconfig.AuthInfos[name] = authInfo
 	kubeconfig.Contexts[name] = context
 
-	// Write the update kubeconfig.
-	if err := clientcmd.ModifyConfig(po, *kubeconfig, true); err != nil {
-		return err
+	if !dryRun {
+		// Write the update kubeconfig.
+		if err := clientcmd.ModifyConfig(po, *kubeconfig, true); err != nil {
+			return err
+		}
 	}
 
 	return nil
