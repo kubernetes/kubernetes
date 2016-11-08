@@ -364,6 +364,9 @@ func (l *SSHTunnelList) healthCheck(e sshTunnelEntry) error {
 		Dial: e.Tunnel.Dial,
 		// TODO(cjcullen): Plumb real TLS options through.
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		// We don't reuse the clients, so disable the keep-alive to properly
+		// close the connection.
+		DisableKeepAlives: true,
 	})
 	client := &http.Client{Transport: transport}
 	resp, err := client.Get(l.healthCheckURL.String())
