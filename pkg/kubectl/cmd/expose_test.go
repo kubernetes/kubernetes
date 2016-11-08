@@ -429,6 +429,38 @@ func TestRunExposeService(t *testing.T) {
 			},
 			status: 200,
 		},
+		{
+			name: "expose-headless-service",
+			args: []string{"service", "baz"},
+			ns:   "test",
+			calls: map[string]string{
+				"GET":  "/namespaces/test/services/baz",
+				"POST": "/namespaces/test/services",
+			},
+			input: &api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{"app": "go"},
+				},
+			},
+			flags: map[string]string{"selector": "func=stream", "protocol": "UDP", "name": "foo", "labels": "svc=test", "cluster-ip": "None", "dry-run": "true"},
+			output: &api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "test"}},
+				Spec: api.ServiceSpec{
+					Ports: []api.ServicePort{
+						{
+							Protocol:   api.ProtocolUDP,
+							Port:       14,
+							TargetPort: intstr.FromInt(14),
+						},
+					},
+					Selector:  map[string]string{"func": "stream"},
+					ClusterIP: api.ClusterIPNone,
+				},
+			},
+			expected: "service \"foo\" exposed",
+			status:   200,
+		},
 	}
 
 	for _, test := range tests {
