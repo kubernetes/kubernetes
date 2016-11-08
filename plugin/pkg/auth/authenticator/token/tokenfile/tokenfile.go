@@ -23,6 +23,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/auth/user"
 )
 
@@ -63,6 +64,9 @@ func NewCSV(path string) (*TokenAuthenticator, error) {
 		obj := &user.DefaultInfo{
 			Name: record[1],
 			UID:  record[2],
+		}
+		if _, exist := tokens[record[0]]; exist {
+			glog.Warningf("duplicate token has been found in token file '%s'", path)
 		}
 		tokens[record[0]] = obj
 
