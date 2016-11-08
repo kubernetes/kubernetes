@@ -369,7 +369,7 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 	// Find the list of namespaced resources via discovery that the namespace controller must manage
 	namespaceKubeClient := client("namespace-controller")
 	namespaceClientPool := dynamic.NewClientPool(restclient.AddUserAgent(kubeconfig, "namespace-controller"), restMapper, dynamic.LegacyAPIPathResolverFunc)
-	groupVersionResources, err := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources()
+	groupVersionResources, err := namespaceKubeClient.Discovery().ServerAllNamespacedResources()
 	if err != nil {
 		glog.Fatalf("Failed to get supported resources from server: %v", err)
 	}
@@ -546,7 +546,7 @@ func StartControllers(s *options.CMServer, kubeconfig *restclient.Config, rootCl
 
 	if s.EnableGarbageCollector {
 		gcClientset := client("generic-garbage-collector")
-		groupVersionResources, err := gcClientset.Discovery().ServerPreferredResources()
+		groupVersionResources, err := gcClientset.Discovery().ServerAllResources()
 		if err != nil {
 			glog.Fatalf("Failed to get supported resources from server: %v", err)
 		}

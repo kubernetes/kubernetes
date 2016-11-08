@@ -143,6 +143,16 @@ func (c *fakeDiscoveryClient) ServerResources() (map[string]*unversioned.APIReso
 	return map[string]*unversioned.APIResourceList{}, nil
 }
 
+func (c *fakeDiscoveryClient) ServerAllResources() ([]unversioned.GroupVersionResource, error) {
+	c.resourceCalls = c.resourceCalls + 1
+	return []unversioned.GroupVersionResource{}, nil
+}
+
+func (c *fakeDiscoveryClient) ServerAllNamespacedResources() ([]unversioned.GroupVersionResource, error) {
+	c.resourceCalls = c.resourceCalls + 1
+	return []unversioned.GroupVersionResource{}, nil
+}
+
 func (c *fakeDiscoveryClient) ServerPreferredResources() ([]unversioned.GroupVersionResource, error) {
 	c.resourceCalls = c.resourceCalls + 1
 	return []unversioned.GroupVersionResource{}, nil

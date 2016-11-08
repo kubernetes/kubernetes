@@ -128,7 +128,7 @@ func setup(t *testing.T) (*httptest.Server, *garbagecollector.GarbageCollector, 
 	if err != nil {
 		t.Fatalf("Error in create clientset: %v", err)
 	}
-	groupVersionResources, err := clientSet.Discovery().ServerPreferredResources()
+	groupVersionResources, err := clientSet.Discovery().ServerAllResources()
 	if err != nil {
 		t.Fatalf("Failed to get supported resources from server: %v", err)
 	}
