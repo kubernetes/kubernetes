@@ -2495,8 +2495,23 @@ func GetUidFromUser(id string) string {
 	}
 	// split instances where the id may contain uid:gid
 	if strings.Contains(id, ":") {
-		return strings.Split(id, ":")[0]
+		id = strings.Split(id, ":")[0]
 	}
+	switch id {
+	case "root":
+		return "0"
+	case "nobody":
+		// On many os distros, nobody is default to 65534. However,
+		// **NOTICE** that this is not always true, for example on
+		// Fedora nobody is default to 99.
+		// This is fine for now, because we only need to know whether
+		// the user is root or not. However, in the future, this may
+		// become a problem if we rely on accurate uid.
+		return "65534"
+	default:
+		return id
+	}
+
 	// no gid, just return the id
 	return id
 }

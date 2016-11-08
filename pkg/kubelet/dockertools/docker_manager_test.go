@@ -1452,6 +1452,14 @@ func TestGetUidFromUser(t *testing.T) {
 			input:  "1:2:3",
 			expect: "1",
 		},
+		"root user": {
+			input:  "root:root",
+			expect: "0",
+		},
+		"nobody user": {
+			input:  "nobody:nobody",
+			expect: "65534",
+		},
 	}
 	for k, v := range tests {
 		actual := GetUidFromUser(v.input)
