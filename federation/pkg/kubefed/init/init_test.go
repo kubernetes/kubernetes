@@ -77,6 +77,7 @@ func TestInitFederation(t *testing.T) {
 		image              string
 		etcdPVCapacity     string
 		expectedErr        string
+		dryRun             string
 	}{
 		{
 			federation:         "union",
@@ -87,6 +88,7 @@ func TestInitFederation(t *testing.T) {
 			image:              "example.test/foo:bar",
 			etcdPVCapacity:     "5Gi",
 			expectedErr:        "",
+			dryRun:             "",
 		},
 		{
 			federation:         "union",
@@ -97,8 +99,22 @@ func TestInitFederation(t *testing.T) {
 			image:              "example.test/foo:bar",
 			etcdPVCapacity:     "",
 			expectedErr:        "",
+			dryRun:             "",
+		},
+		{
+			federation:         "union",
+			kubeconfigGlobal:   fakeKubeFiles[0],
+			kubeconfigExplicit: "",
+			dnsZoneName:        "example.test.",
+			lbIP:               "10.20.30.40",
+			image:              "example.test/foo:bar",
+			etcdPVCapacity:     "",
+			expectedErr:        "",
+			dryRun:             "valid-run",
 		},
 	}
+
+	//TODO: implement a negative case for dry run
 
 	for i, tc := range testCases {
 		cmdErrMsg = ""
@@ -123,13 +139,22 @@ func TestInitFederation(t *testing.T) {
 		if "" != tc.etcdPVCapacity {
 			cmd.Flags().Set("etcd-pv-capacity", tc.etcdPVCapacity)
 		}
+		if "valid-run" == tc.dryRun {
+			cmd.Flags().Set("dry-run", "true")
+		}
+
 		cmd.Run(cmd, []string{tc.federation})
 
 		if tc.expectedErr == "" {
 			// uses the name from the federation, not the response
 			// Actual data passed are tested in the fake secret and cluster
 			// REST clients.
-			want := fmt.Sprintf("Federation API server is running at: %s\n", tc.lbIP)
+			want := ""
+			if "" != tc.dryRun {
+				want = fmt.Sprintf("Federation control plane runs (dry run)\n")
+			} else {
+				want = fmt.Sprintf("Federation API server is running at: %s\n", tc.lbIP)
+			}
 			if got := buf.String(); got != want {
 				t.Errorf("[%d] unexpected output: got: %s, want: %s", i, got, want)
 				if cmdErrMsg != "" {
@@ -141,9 +166,11 @@ func TestInitFederation(t *testing.T) {
 				t.Errorf("[%d] expected error: %s, got: %s, output: %s", i, tc.expectedErr, cmdErrMsg, buf.String())
 			}
 		}
-
-		testKubeconfigUpdate(t, tc.federation, tc.lbIP, tc.kubeconfigGlobal, tc.kubeconfigExplicit)
 	}
+
+	//test config update as a separate test case
+	tc := testCases[0]
+	testKubeconfigUpdate(t, tc.federation, tc.lbIP, tc.kubeconfigGlobal, tc.kubeconfigExplicit)
 }
 
 // TestCertsTLS tests TLS handshake with client authentication for any server
