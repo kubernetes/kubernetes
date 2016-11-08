@@ -99,7 +99,7 @@ By way of an HTTP GET the output would be:
             ]        
         },
         {
-            "type": "addtionalconfigs",
+            "type": "additionalconfigs",
             "list": [
                 "bKey": "bValue",
                 ...
@@ -122,10 +122,10 @@ Here we mention points of contentions and alternatives as we make progress in th
 
 ## Future Work
 
-* Collect all possible configurations that could be extracted. Determine which configurations belong under the compomentconfig object and which do not and have an understanding why. 
+* Collect all possible configurations that could be extracted. Determine which configurations belong under the compomentconfig object and which do not and have an understanding why.
 
 * In the future configurations will be versioned, so that you can get specific
-version of a given type 
+version of a given type
 
     ```
     /configs/componentconfigs/v1/
