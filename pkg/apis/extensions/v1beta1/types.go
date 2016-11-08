@@ -617,6 +617,7 @@ type ThirdPartyResourceDataList struct {
 // +genclient=true
 
 // Job represents the configuration of a single job.
+// DEPRECATED: extensions/v1beta1.Job is deprecated, use batch/v1.Job instead.
 type Job struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -636,6 +637,7 @@ type Job struct {
 }
 
 // JobList is a collection of jobs.
+// DEPRECATED: extensions/v1beta1.JobList is deprecated, use batch/v1.JobList instead.
 type JobList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata
