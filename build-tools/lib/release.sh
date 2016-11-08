@@ -103,8 +103,8 @@ function kube::release::package_src_tarball() {
       -not \( \
         \( -path ./_\*        -o \
            -path ./.git\*     -o \
-           -path ./.config/\* -o \
-           -path ./.gsutil/\*    \
+           -path ./.config\* -o \
+           -path ./.gsutil\*    \
         \) -prune \
       \))
   )
