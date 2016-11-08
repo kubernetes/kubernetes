@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/conversion"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/types"
@@ -368,7 +367,7 @@ func TestPodUpdateAnnotations(t *testing.T) {
 	pod.Annotations = make(map[string]string, 0)
 	pod.Annotations["kubernetes.io/blah"] = "blah"
 
-	clone, err := conversion.NewCloner().DeepCopy(pod)
+	clone, err := api.Scheme.DeepCopy(pod)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -400,7 +399,7 @@ func TestPodUpdateLabels(t *testing.T) {
 	pod.Labels = make(map[string]string, 0)
 	pod.Labels["key"] = "value"
 
-	clone, err := conversion.NewCloner().DeepCopy(pod)
+	clone, err := api.Scheme.DeepCopy(pod)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}

@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
-	"k8s.io/kubernetes/pkg/conversion"
 )
 
 func TestAdmission(t *testing.T) {
@@ -187,7 +186,7 @@ func TestAdmission(t *testing.T) {
 		glog.V(4).Infof("starting test %q", test.name)
 
 		// clone the claim, it's going to be modified
-		clone, err := conversion.NewCloner().DeepCopy(test.claim)
+		clone, err := api.Scheme.DeepCopy(test.claim)
 		if err != nil {
 			t.Fatalf("Cannot clone claim: %v", err)
 		}
