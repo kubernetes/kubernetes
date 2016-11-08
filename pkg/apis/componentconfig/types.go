@@ -465,6 +465,9 @@ type KubeletConfiguration struct {
 	// Enable Container Runtime Interface (CRI) integration.
 	// +optional
 	EnableCRI bool `json:"enableCRI,omitempty"`
+	// TODO(#34726:1.8.0): Remove the opt-in for failing when swap is enabled.
+	// Tells the Kubelet to fail to start if swap is enabled on the node.
+	ExperimentalFailSwapOn bool `json:"experimentalFailSwapOn,omitempty"`
 }
 
 type KubeletAuthorizationMode string
