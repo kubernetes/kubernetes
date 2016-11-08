@@ -238,7 +238,7 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration) (command []string)
 		"--tls-cert-file="+pkiDir+"/apiserver.pem",
 		"--tls-private-key-file="+pkiDir+"/apiserver-key.pem",
 		"--token-auth-file="+pkiDir+"/tokens.csv",
-		fmt.Sprintf("--secure-port=%d", cfg.API.BindPort),
+		fmt.Sprintf("--secure-port=%d", cfg.API.Port),
 		"--allow-privileged",
 	)
 

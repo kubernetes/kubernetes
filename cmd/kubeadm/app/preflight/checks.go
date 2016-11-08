@@ -220,14 +220,13 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		HostnameCheck{},
 		ServiceCheck{Service: "kubelet"},
 		ServiceCheck{Service: "docker"},
-		PortOpenCheck{port: int(cfg.API.BindPort)},
+		PortOpenCheck{port: int(cfg.API.Port)},
 		PortOpenCheck{port: 2379},
 		PortOpenCheck{port: 8080},
-		PortOpenCheck{port: int(cfg.Discovery.BindPort)},
 		PortOpenCheck{port: 10250},
 		PortOpenCheck{port: 10251},
 		PortOpenCheck{port: 10252},
-		HttpProxyCheck{Proto: "https", Host: cfg.API.AdvertiseAddresses[0], Port: int(cfg.API.BindPort)},
+		HttpProxyCheck{Proto: "https", Host: cfg.API.AdvertiseAddresses[0], Port: int(cfg.API.Port)},
 		DirAvailableCheck{Path: "/etc/kubernetes/manifests"},
 		DirAvailableCheck{Path: "/etc/kubernetes/pki"},
 		DirAvailableCheck{Path: "/var/lib/etcd"},
@@ -244,6 +243,11 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		InPathCheck{executable: "tc", mandatory: false},
 		InPathCheck{executable: "touch", mandatory: false},
 	}
+	if cfg.Discovery.Token != nil {
+		checks = append(checks, []PreFlightError{
+			PortOpenCheck{port: int(cfg.Discovery.Token.Port)},
+		}...)
+	}
 
 	return runChecks(checks, os.Stderr)
 }
@@ -256,8 +260,6 @@ func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 		ServiceCheck{Service: "docker"},
 		ServiceCheck{Service: "kubelet"},
 		PortOpenCheck{port: 10250},
-		HttpProxyCheck{Proto: "https", Host: cfg.MasterAddresses[0], Port: int(cfg.APIPort)},
-		HttpProxyCheck{Proto: "http", Host: cfg.MasterAddresses[0], Port: int(cfg.DiscoveryPort)},
 		DirAvailableCheck{Path: "/etc/kubernetes/manifests"},
 		DirAvailableCheck{Path: "/var/lib/kubelet"},
 		FileAvailableCheck{Path: "/etc/kubernetes/kubelet.conf"},
@@ -270,6 +272,12 @@ func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 		InPathCheck{executable: "socat", mandatory: true},
 		InPathCheck{executable: "tc", mandatory: false},
 		InPathCheck{executable: "touch", mandatory: false},
+	}
+	if cfg.Discovery.Token != nil {
+		checks = append(checks, []PreFlightError{
+			HttpProxyCheck{Proto: "https", Host: cfg.Discovery.Token.Addresses[0], Port: int(cfg.APIPort)},
+			HttpProxyCheck{Proto: "http", Host: cfg.Discovery.Token.Addresses[0], Port: int(cfg.Discovery.Token.Port)},
+		}...)
 	}
 
 	return runChecks(checks, os.Stderr)

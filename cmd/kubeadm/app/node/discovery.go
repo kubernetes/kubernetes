@@ -32,9 +32,8 @@ import (
 // the amount of time to wait between each request to the discovery API
 const discoveryRetryTimeout = 5 * time.Second
 
-func RetrieveTrustedClusterInfo(s *kubeadmapi.NodeConfiguration) (*kubeadmapi.ClusterInfo, error) {
-	host, port := s.MasterAddresses[0], s.DiscoveryPort
-	requestURL := fmt.Sprintf("http://%s:%d/cluster-info/v1/?token-id=%s", host, port, s.Secrets.TokenID)
+func RetrieveTrustedClusterInfo(d *kubeadmapi.TokenDiscovery) (*kubeadmapi.ClusterInfo, error) {
+	requestURL := fmt.Sprintf("http://%s/cluster-info/v1/?token-id=%s", d.Addresses[0], d.TokenID)
 	req, err := http.NewRequest("GET", requestURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("<node/discovery> failed to consturct an HTTP request [%v]", err)
@@ -63,7 +62,7 @@ func RetrieveTrustedClusterInfo(s *kubeadmapi.NodeConfiguration) (*kubeadmapi.Cl
 
 	fmt.Println("<node/discovery> cluster info object received, verifying signature using given token")
 
-	output, err := object.Verify(s.Secrets.Token)
+	output, err := object.Verify(d.Token)
 	if err != nil {
 		return nil, fmt.Errorf("<node/discovery> failed to verify JWS signature of received cluster info object [%v]", err)
 	}
