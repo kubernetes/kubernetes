@@ -493,14 +493,14 @@ func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
 	// Set default value for ExternalAddress if not specified.
 	if len(options.ExternalHost) == 0 {
 		// TODO: extend for other providers
-		if options.CloudProvider == "gce" {
+		if options.CloudProvider == "gce" || options.CloudProvider == "aws" {
 			cloud, err := cloudprovider.InitCloudProvider(options.CloudProvider, options.CloudConfigFile)
 			if err != nil {
 				glog.Fatalf("Cloud provider could not be initialized: %v", err)
 			}
 			instances, supported := cloud.Instances()
 			if !supported {
-				glog.Fatalf("GCE cloud provider has no instances.  this shouldn't happen. exiting.")
+				glog.Fatalf("%q cloud provider has no instances.  this shouldn't happen. exiting.", options.CloudProvider)
 			}
 			hostname, err := os.Hostname()
 			if err != nil {
