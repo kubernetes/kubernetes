@@ -19,7 +19,8 @@ package core
 import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -27,18 +28,18 @@ import (
 
 // NewReplicationControllerEvaluator returns an evaluator that can evaluate replication controllers
 func NewReplicationControllerEvaluator(kubeClient clientset.Interface) quota.Evaluator {
-	allResources := []api.ResourceName{api.ResourceReplicationControllers}
+	allResources := []v1.ResourceName{v1.ResourceReplicationControllers}
 	return &generic.GenericEvaluator{
 		Name:              "Evaluator.ReplicationController",
 		InternalGroupKind: api.Kind("ReplicationController"),
-		InternalOperationResources: map[admission.Operation][]api.ResourceName{
+		InternalOperationResources: map[admission.Operation][]v1.ResourceName{
 			admission.Create: allResources,
 		},
 		MatchedResourceNames: allResources,
 		MatchesScopeFunc:     generic.MatchesNoScopeFunc,
-		ConstraintsFunc:      generic.ObjectCountConstraintsFunc(api.ResourceReplicationControllers),
-		UsageFunc:            generic.ObjectCountUsageFunc(api.ResourceReplicationControllers),
-		ListFuncByNamespace: func(namespace string, options api.ListOptions) ([]runtime.Object, error) {
+		ConstraintsFunc:      generic.ObjectCountConstraintsFunc(v1.ResourceReplicationControllers),
+		UsageFunc:            generic.ObjectCountUsageFunc(v1.ResourceReplicationControllers),
+		ListFuncByNamespace: func(namespace string, options v1.ListOptions) ([]runtime.Object, error) {
 			itemList, err := kubeClient.Core().ReplicationControllers(namespace).List(options)
 			if err != nil {
 				return nil, err

@@ -23,8 +23,8 @@ import (
 	"sync"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -40,7 +40,7 @@ type VolumeOptions struct {
 	// many kinds of provisioners.
 
 	// Reclamation policy for a persistent volume
-	PersistentVolumeReclaimPolicy api.PersistentVolumeReclaimPolicy
+	PersistentVolumeReclaimPolicy v1.PersistentVolumeReclaimPolicy
 	// PV.Name of the appropriate PersistentVolume. Used to generate cloud
 	// volume name.
 	PVName string
@@ -48,7 +48,7 @@ type VolumeOptions struct {
 	// Provisioners *must* create a PV that would be matched by this PVC,
 	// i.e. with required capacity, accessMode, labels matching PVC.Selector and
 	// so on.
-	PVC *api.PersistentVolumeClaim
+	PVC *v1.PersistentVolumeClaim
 	// Unique name of Kubernetes cluster.
 	ClusterName string
 	// Tags to attach to the real volume in the cloud provider - e.g. AWS EBS
@@ -90,12 +90,12 @@ type VolumePlugin interface {
 
 	// NewMounter creates a new volume.Mounter from an API specification.
 	// Ownership of the spec pointer in *not* transferred.
-	// - spec: The api.Volume spec
+	// - spec: The v1.Volume spec
 	// - pod: The enclosing pod
-	NewMounter(spec *Spec, podRef *api.Pod, opts VolumeOptions) (Mounter, error)
+	NewMounter(spec *Spec, podRef *v1.Pod, opts VolumeOptions) (Mounter, error)
 
 	// NewUnmounter creates a new volume.Unmounter from recoverable state.
-	// - name: The volume name, as per the api.Volume spec.
+	// - name: The volume name, as per the v1.Volume spec.
 	// - podUID: The UID of the enclosing pod
 	NewUnmounter(name string, podUID types.UID) (Unmounter, error)
 
@@ -111,7 +111,7 @@ type VolumePlugin interface {
 type PersistentVolumePlugin interface {
 	VolumePlugin
 	// GetAccessModes describes the ways a given volume can be accessed/mounted.
-	GetAccessModes() []api.PersistentVolumeAccessMode
+	GetAccessModes() []v1.PersistentVolumeAccessMode
 }
 
 // RecyclableVolumePlugin is an extended interface of VolumePlugin and is used
@@ -190,7 +190,7 @@ type VolumeHost interface {
 	// the provided spec.  This is used to implement volume plugins which
 	// "wrap" other plugins.  For example, the "secret" volume is
 	// implemented in terms of the "emptyDir" volume.
-	NewWrapperMounter(volName string, spec Spec, pod *api.Pod, opts VolumeOptions) (Mounter, error)
+	NewWrapperMounter(volName string, spec Spec, pod *v1.Pod, opts VolumeOptions) (Mounter, error)
 
 	// NewWrapperUnmounter finds an appropriate plugin with which to handle
 	// the provided spec.  See comments on NewWrapperMounter for more
@@ -213,7 +213,7 @@ type VolumeHost interface {
 	GetHostIP() (net.IP, error)
 
 	// Returns node allocatable
-	GetNodeAllocatable() (api.ResourceList, error)
+	GetNodeAllocatable() (v1.ResourceList, error)
 }
 
 // VolumePluginMgr tracks registered plugins.
@@ -224,8 +224,8 @@ type VolumePluginMgr struct {
 
 // Spec is an internal representation of a volume.  All API volume types translate to Spec.
 type Spec struct {
-	Volume           *api.Volume
-	PersistentVolume *api.PersistentVolume
+	Volume           *v1.Volume
+	PersistentVolume *v1.PersistentVolume
 	ReadOnly         bool
 }
 
@@ -269,7 +269,7 @@ type VolumeConfig struct {
 	// which override specific properties of the pod in accordance with that
 	// plugin. See NewPersistentVolumeRecyclerPodTemplate for the properties
 	// that are expected to be overridden.
-	RecyclerPodTemplate *api.Pod
+	RecyclerPodTemplate *v1.Pod
 
 	// RecyclerMinimumTimeout is the minimum amount of time in seconds for the
 	// recycler pod's ActiveDeadlineSeconds attribute. Added to the minimum
@@ -296,15 +296,15 @@ type VolumeConfig struct {
 	ProvisioningEnabled bool
 }
 
-// NewSpecFromVolume creates an Spec from an api.Volume
-func NewSpecFromVolume(vs *api.Volume) *Spec {
+// NewSpecFromVolume creates an Spec from an v1.Volume
+func NewSpecFromVolume(vs *v1.Volume) *Spec {
 	return &Spec{
 		Volume: vs,
 	}
 }
 
-// NewSpecFromPersistentVolume creates an Spec from an api.PersistentVolume
-func NewSpecFromPersistentVolume(pv *api.PersistentVolume, readOnly bool) *Spec {
+// NewSpecFromPersistentVolume creates an Spec from an v1.PersistentVolume
+func NewSpecFromPersistentVolume(pv *v1.PersistentVolume, readOnly bool) *Spec {
 	return &Spec{
 		PersistentVolume: pv,
 		ReadOnly:         readOnly,
@@ -526,32 +526,32 @@ func (pm *VolumePluginMgr) FindAttachablePluginByName(name string) (AttachableVo
 //     before failing.  Recommended.  Default is 60 seconds.
 //
 // See HostPath and NFS for working recycler examples
-func NewPersistentVolumeRecyclerPodTemplate() *api.Pod {
+func NewPersistentVolumeRecyclerPodTemplate() *v1.Pod {
 	timeout := int64(60)
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			GenerateName: "pv-recycler-",
-			Namespace:    api.NamespaceDefault,
+			Namespace:    v1.NamespaceDefault,
 		},
-		Spec: api.PodSpec{
+		Spec: v1.PodSpec{
 			ActiveDeadlineSeconds: &timeout,
-			RestartPolicy:         api.RestartPolicyNever,
-			Volumes: []api.Volume{
+			RestartPolicy:         v1.RestartPolicyNever,
+			Volumes: []v1.Volume{
 				{
 					Name: "vol",
 					// IMPORTANT!  All plugins using this template MUST
 					// override pod.Spec.Volumes[0].VolumeSource Recycler
 					// implementations without a valid VolumeSource will fail.
-					VolumeSource: api.VolumeSource{},
+					VolumeSource: v1.VolumeSource{},
 				},
 			},
-			Containers: []api.Container{
+			Containers: []v1.Container{
 				{
 					Name:    "pv-recycler",
 					Image:   "gcr.io/google_containers/busybox",
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", "test -e /scrub && rm -rf /scrub/..?* /scrub/.[!.]* /scrub/*  && test -z \"$(ls -A /scrub)\" || exit 1"},
-					VolumeMounts: []api.VolumeMount{
+					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "vol",
 							MountPath: "/scrub",

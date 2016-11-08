@@ -19,7 +19,7 @@ package system
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 func TestIsMasterNode(t *testing.T) {
@@ -37,7 +37,7 @@ func TestIsMasterNode(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		node := api.Node{ObjectMeta: api.ObjectMeta{Name: tc.input}}
+		node := v1.Node{ObjectMeta: v1.ObjectMeta{Name: tc.input}}
 		res := IsMasterNode(&node)
 		if res != tc.result {
 			t.Errorf("case \"%s\": expected %t, got %t", tc.input, tc.result, res)

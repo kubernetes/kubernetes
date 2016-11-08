@@ -19,11 +19,11 @@ package system
 import (
 	"regexp"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // TODO: find a better way of figuring out if given node is a registered master.
-func IsMasterNode(node *api.Node) bool {
+func IsMasterNode(node *v1.Node) bool {
 	r := regexp.MustCompile("master(-...)?$")
 	return r.MatchString(node.Name)
 }

@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // formatMap formats map[string]string to a string.
@@ -67,7 +68,7 @@ func ExtractFieldPathAsString(obj interface{}, fieldPath string) (string, error)
 
 // ExtractResourceValueByContainerName extracts the value of a resource
 // by providing container name
-func ExtractResourceValueByContainerName(fs *api.ResourceFieldSelector, pod *api.Pod, containerName string) (string, error) {
+func ExtractResourceValueByContainerName(fs *v1.ResourceFieldSelector, pod *v1.Pod, containerName string) (string, error) {
 	container, err := findContainerInPod(pod, containerName)
 	if err != nil {
 		return "", err
@@ -77,7 +78,7 @@ func ExtractResourceValueByContainerName(fs *api.ResourceFieldSelector, pod *api
 
 // ExtractResourceValueByContainerNameAndNodeAllocatable extracts the value of a resource
 // by providing container name and node allocatable
-func ExtractResourceValueByContainerNameAndNodeAllocatable(fs *api.ResourceFieldSelector, pod *api.Pod, containerName string, nodeAllocatable api.ResourceList) (string, error) {
+func ExtractResourceValueByContainerNameAndNodeAllocatable(fs *v1.ResourceFieldSelector, pod *v1.Pod, containerName string, nodeAllocatable v1.ResourceList) (string, error) {
 	realContainer, err := findContainerInPod(pod, containerName)
 	if err != nil {
 		return "", err
@@ -88,7 +89,7 @@ func ExtractResourceValueByContainerNameAndNodeAllocatable(fs *api.ResourceField
 		return "", fmt.Errorf("failed to perform a deep copy of container object: %v", err)
 	}
 
-	container, ok := containerCopy.(*api.Container)
+	container, ok := containerCopy.(*v1.Container)
 	if !ok {
 		return "", fmt.Errorf("unexpected type returned from deep copy of container object")
 	}
@@ -100,7 +101,7 @@ func ExtractResourceValueByContainerNameAndNodeAllocatable(fs *api.ResourceField
 
 // ExtractContainerResourceValue extracts the value of a resource
 // in an already known container
-func ExtractContainerResourceValue(fs *api.ResourceFieldSelector, container *api.Container) (string, error) {
+func ExtractContainerResourceValue(fs *v1.ResourceFieldSelector, container *v1.Container) (string, error) {
 	divisor := resource.Quantity{}
 	if divisor.Cmp(fs.Divisor) == 0 {
 		divisor = resource.MustParse("1")
@@ -123,7 +124,7 @@ func ExtractContainerResourceValue(fs *api.ResourceFieldSelector, container *api
 }
 
 // findContainerInPod finds a container by its name in the provided pod
-func findContainerInPod(pod *api.Pod, containerName string) (*api.Container, error) {
+func findContainerInPod(pod *v1.Pod, containerName string) (*v1.Container, error) {
 	for _, container := range pod.Spec.Containers {
 		if container.Name == containerName {
 			return &container, nil
@@ -148,12 +149,12 @@ func convertResourceMemoryToString(memory *resource.Quantity, divisor resource.Q
 
 // MergeContainerResourceLimits checks if a limit is applied for
 // the container, and if not, it sets the limit to the passed resource list.
-func MergeContainerResourceLimits(container *api.Container,
-	allocatable api.ResourceList) {
+func MergeContainerResourceLimits(container *v1.Container,
+	allocatable v1.ResourceList) {
 	if container.Resources.Limits == nil {
-		container.Resources.Limits = make(api.ResourceList)
+		container.Resources.Limits = make(v1.ResourceList)
 	}
-	for _, resource := range []api.ResourceName{api.ResourceCPU, api.ResourceMemory} {
+	for _, resource := range []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory} {
 		if quantity, exists := container.Resources.Limits[resource]; !exists || quantity.IsZero() {
 			if cap, exists := allocatable[resource]; exists {
 				container.Resources.Limits[resource] = *cap.Copy()

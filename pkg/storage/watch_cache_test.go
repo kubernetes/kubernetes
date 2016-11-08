@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/clock"
@@ -312,14 +313,14 @@ func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 }
 
 type testLW struct {
-	ListFunc  func(options api.ListOptions) (runtime.Object, error)
-	WatchFunc func(options api.ListOptions) (watch.Interface, error)
+	ListFunc  func(options v1.ListOptions) (runtime.Object, error)
+	WatchFunc func(options v1.ListOptions) (watch.Interface, error)
 }
 
-func (t *testLW) List(options api.ListOptions) (runtime.Object, error) {
+func (t *testLW) List(options v1.ListOptions) (runtime.Object, error) {
 	return t.ListFunc(options)
 }
-func (t *testLW) Watch(options api.ListOptions) (watch.Interface, error) {
+func (t *testLW) Watch(options v1.ListOptions) (watch.Interface, error) {
 	return t.WatchFunc(options)
 }
 
@@ -337,12 +338,12 @@ func TestReflectorForWatchCache(t *testing.T) {
 	}
 
 	lw := &testLW{
-		WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+		WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 			fw := watch.NewFake()
 			go fw.Stop()
 			return fw, nil
 		},
-		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+		ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 			return &api.PodList{ListMeta: unversioned.ListMeta{ResourceVersion: "10"}}, nil
 		},
 	}

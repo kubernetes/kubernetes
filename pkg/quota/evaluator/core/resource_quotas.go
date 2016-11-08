@@ -19,7 +19,8 @@ package core
 import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -27,18 +28,18 @@ import (
 
 // NewResourceQuotaEvaluator returns an evaluator that can evaluate resource quotas
 func NewResourceQuotaEvaluator(kubeClient clientset.Interface) quota.Evaluator {
-	allResources := []api.ResourceName{api.ResourceQuotas}
+	allResources := []v1.ResourceName{v1.ResourceQuotas}
 	return &generic.GenericEvaluator{
 		Name:              "Evaluator.ResourceQuota",
 		InternalGroupKind: api.Kind("ResourceQuota"),
-		InternalOperationResources: map[admission.Operation][]api.ResourceName{
+		InternalOperationResources: map[admission.Operation][]v1.ResourceName{
 			admission.Create: allResources,
 		},
 		MatchedResourceNames: allResources,
 		MatchesScopeFunc:     generic.MatchesNoScopeFunc,
-		ConstraintsFunc:      generic.ObjectCountConstraintsFunc(api.ResourceQuotas),
-		UsageFunc:            generic.ObjectCountUsageFunc(api.ResourceQuotas),
-		ListFuncByNamespace: func(namespace string, options api.ListOptions) ([]runtime.Object, error) {
+		ConstraintsFunc:      generic.ObjectCountConstraintsFunc(v1.ResourceQuotas),
+		UsageFunc:            generic.ObjectCountUsageFunc(v1.ResourceQuotas),
+		ListFuncByNamespace: func(namespace string, options v1.ListOptions) ([]runtime.Object, error) {
 			itemList, err := kubeClient.Core().ResourceQuotas(namespace).List(options)
 			if err != nil {
 				return nil, err

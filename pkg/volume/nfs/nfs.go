@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
@@ -85,19 +85,19 @@ func (plugin *nfsPlugin) RequiresRemount() bool {
 	return false
 }
 
-func (plugin *nfsPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
-	return []api.PersistentVolumeAccessMode{
-		api.ReadWriteOnce,
-		api.ReadOnlyMany,
-		api.ReadWriteMany,
+func (plugin *nfsPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
+	return []v1.PersistentVolumeAccessMode{
+		v1.ReadWriteOnce,
+		v1.ReadOnlyMany,
+		v1.ReadWriteMany,
 	}
 }
 
-func (plugin *nfsPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *nfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
 	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter())
 }
 
-func (plugin *nfsPlugin) newMounterInternal(spec *volume.Spec, pod *api.Pod, mounter mount.Interface) (volume.Mounter, error) {
+func (plugin *nfsPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, mounter mount.Interface) (volume.Mounter, error) {
 	source, readOnly, err := getVolumeSource(spec)
 	if err != nil {
 		return nil, err
@@ -124,7 +124,7 @@ func (plugin *nfsPlugin) newUnmounterInternal(volName string, podUID types.UID, 
 	return &nfsUnmounter{&nfs{
 		volName: volName,
 		mounter: mounter,
-		pod:     &api.Pod{ObjectMeta: api.ObjectMeta{UID: podUID}},
+		pod:     &v1.Pod{ObjectMeta: v1.ObjectMeta{UID: podUID}},
 		plugin:  plugin,
 	}}, nil
 }
@@ -134,10 +134,10 @@ func (plugin *nfsPlugin) NewRecycler(pvName string, spec *volume.Spec, eventReco
 }
 
 func (plugin *nfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
-	nfsVolume := &api.Volume{
+	nfsVolume := &v1.Volume{
 		Name: volumeName,
-		VolumeSource: api.VolumeSource{
-			NFS: &api.NFSVolumeSource{
+		VolumeSource: v1.VolumeSource{
+			NFS: &v1.NFSVolumeSource{
 				Path: volumeName,
 			},
 		},
@@ -148,7 +148,7 @@ func (plugin *nfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*vol
 // NFS volumes represent a bare host file or directory mount of an NFS export.
 type nfs struct {
 	volName string
-	pod     *api.Pod
+	pod     *v1.Pod
 	mounter mount.Interface
 	plugin  *nfsPlugin
 	volume.MetricsNil
@@ -309,8 +309,8 @@ func (r *nfsRecycler) Recycle() error {
 	// overrides
 	pod.Spec.ActiveDeadlineSeconds = &r.timeout
 	pod.GenerateName = "pv-recycler-nfs-"
-	pod.Spec.Volumes[0].VolumeSource = api.VolumeSource{
-		NFS: &api.NFSVolumeSource{
+	pod.Spec.Volumes[0].VolumeSource = v1.VolumeSource{
+		NFS: &v1.NFSVolumeSource{
 			Server: r.server,
 			Path:   r.path,
 		},
@@ -318,7 +318,7 @@ func (r *nfsRecycler) Recycle() error {
 	return volume.RecycleVolumeByWatchingPodUntilCompletion(r.pvName, pod, r.host.GetKubeClient(), r.eventRecorder)
 }
 
-func getVolumeSource(spec *volume.Spec) (*api.NFSVolumeSource, bool, error) {
+func getVolumeSource(spec *volume.Spec) (*v1.NFSVolumeSource, bool, error) {
 	if spec.Volume != nil && spec.Volume.NFS != nil {
 		return spec.Volume.NFS, spec.Volume.NFS.ReadOnly, nil
 	} else if spec.PersistentVolume != nil &&

@@ -19,19 +19,19 @@ package core
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/quota"
 )
 
 func TestServiceEvaluatorMatchesResources(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset()
 	evaluator := NewServiceEvaluator(kubeClient)
-	expected := quota.ToSet([]api.ResourceName{
-		api.ResourceServices,
-		api.ResourceServicesNodePorts,
-		api.ResourceServicesLoadBalancers,
+	expected := quota.ToSet([]v1.ResourceName{
+		v1.ResourceServices,
+		v1.ResourceServicesNodePorts,
+		v1.ResourceServicesLoadBalancers,
 	})
 	actual := quota.ToSet(evaluator.MatchesResources())
 	if !expected.Equal(actual) {
@@ -43,55 +43,55 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset()
 	evaluator := NewServiceEvaluator(kubeClient)
 	testCases := map[string]struct {
-		service *api.Service
-		usage   api.ResourceList
+		service *v1.Service
+		usage   v1.ResourceList
 	}{
 		"loadbalancer": {
-			service: &api.Service{
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeLoadBalancer,
+			service: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type: v1.ServiceTypeLoadBalancer,
 				},
 			},
-			usage: api.ResourceList{
-				api.ResourceServicesNodePorts:     resource.MustParse("0"),
-				api.ResourceServicesLoadBalancers: resource.MustParse("1"),
-				api.ResourceServices:              resource.MustParse("1"),
+			usage: v1.ResourceList{
+				v1.ResourceServicesNodePorts:     resource.MustParse("0"),
+				v1.ResourceServicesLoadBalancers: resource.MustParse("1"),
+				v1.ResourceServices:              resource.MustParse("1"),
 			},
 		},
 		"clusterip": {
-			service: &api.Service{
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeClusterIP,
+			service: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type: v1.ServiceTypeClusterIP,
 				},
 			},
-			usage: api.ResourceList{
-				api.ResourceServices:              resource.MustParse("1"),
-				api.ResourceServicesNodePorts:     resource.MustParse("0"),
-				api.ResourceServicesLoadBalancers: resource.MustParse("0"),
+			usage: v1.ResourceList{
+				v1.ResourceServices:              resource.MustParse("1"),
+				v1.ResourceServicesNodePorts:     resource.MustParse("0"),
+				v1.ResourceServicesLoadBalancers: resource.MustParse("0"),
 			},
 		},
 		"nodeports": {
-			service: &api.Service{
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeNodePort,
-					Ports: []api.ServicePort{
+			service: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type: v1.ServiceTypeNodePort,
+					Ports: []v1.ServicePort{
 						{
 							Port: 27443,
 						},
 					},
 				},
 			},
-			usage: api.ResourceList{
-				api.ResourceServices:              resource.MustParse("1"),
-				api.ResourceServicesNodePorts:     resource.MustParse("1"),
-				api.ResourceServicesLoadBalancers: resource.MustParse("0"),
+			usage: v1.ResourceList{
+				v1.ResourceServices:              resource.MustParse("1"),
+				v1.ResourceServicesNodePorts:     resource.MustParse("1"),
+				v1.ResourceServicesLoadBalancers: resource.MustParse("0"),
 			},
 		},
 		"multi-nodeports": {
-			service: &api.Service{
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeNodePort,
-					Ports: []api.ServicePort{
+			service: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type: v1.ServiceTypeNodePort,
+					Ports: []v1.ServicePort{
 						{
 							Port: 27443,
 						},
@@ -101,10 +101,10 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 					},
 				},
 			},
-			usage: api.ResourceList{
-				api.ResourceServices:              resource.MustParse("1"),
-				api.ResourceServicesNodePorts:     resource.MustParse("2"),
-				api.ResourceServicesLoadBalancers: resource.MustParse("0"),
+			usage: v1.ResourceList{
+				v1.ResourceServices:              resource.MustParse("1"),
+				v1.ResourceServicesNodePorts:     resource.MustParse("2"),
+				v1.ResourceServicesLoadBalancers: resource.MustParse("0"),
 			},
 		},
 	}
@@ -118,44 +118,44 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 
 func TestServiceConstraintsFunc(t *testing.T) {
 	testCases := map[string]struct {
-		service  *api.Service
-		required []api.ResourceName
+		service  *v1.Service
+		required []v1.ResourceName
 		err      string
 	}{
 		"loadbalancer": {
-			service: &api.Service{
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeLoadBalancer,
+			service: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type: v1.ServiceTypeLoadBalancer,
 				},
 			},
-			required: []api.ResourceName{api.ResourceServicesLoadBalancers},
+			required: []v1.ResourceName{v1.ResourceServicesLoadBalancers},
 		},
 		"clusterip": {
-			service: &api.Service{
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeClusterIP,
+			service: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type: v1.ServiceTypeClusterIP,
 				},
 			},
-			required: []api.ResourceName{api.ResourceServicesLoadBalancers, api.ResourceServices},
+			required: []v1.ResourceName{v1.ResourceServicesLoadBalancers, v1.ResourceServices},
 		},
 		"nodeports": {
-			service: &api.Service{
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeNodePort,
-					Ports: []api.ServicePort{
+			service: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type: v1.ServiceTypeNodePort,
+					Ports: []v1.ServicePort{
 						{
 							Port: 27443,
 						},
 					},
 				},
 			},
-			required: []api.ResourceName{api.ResourceServicesNodePorts},
+			required: []v1.ResourceName{v1.ResourceServicesNodePorts},
 		},
 		"multi-nodeports": {
-			service: &api.Service{
-				Spec: api.ServiceSpec{
-					Type: api.ServiceTypeNodePort,
-					Ports: []api.ServicePort{
+			service: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type: v1.ServiceTypeNodePort,
+					Ports: []v1.ServicePort{
 						{
 							Port: 27443,
 						},
@@ -165,7 +165,7 @@ func TestServiceConstraintsFunc(t *testing.T) {
 					},
 				},
 			},
-			required: []api.ResourceName{api.ResourceServicesNodePorts},
+			required: []v1.ResourceName{v1.ResourceServicesNodePorts},
 		},
 	}
 	for testName, test := range testCases {

@@ -19,13 +19,13 @@ package volume
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 func TestSpecSourceConverters(t *testing.T) {
-	v := &api.Volume{
+	v := &v1.Volume{
 		Name:         "foo",
-		VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
+		VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}},
 	}
 
 	converted := NewSpecFromVolume(v)
@@ -36,10 +36,10 @@ func TestSpecSourceConverters(t *testing.T) {
 		t.Errorf("Expected %v but got %v", v.Name, converted.Name())
 	}
 
-	pv := &api.PersistentVolume{
-		ObjectMeta: api.ObjectMeta{Name: "bar"},
-		Spec: api.PersistentVolumeSpec{
-			PersistentVolumeSource: api.PersistentVolumeSource{AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{}},
+	pv := &v1.PersistentVolume{
+		ObjectMeta: v1.ObjectMeta{Name: "bar"},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{}},
 		},
 	}
 

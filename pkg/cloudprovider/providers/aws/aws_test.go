@@ -28,8 +28,8 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/stretchr/testify/assert"
@@ -624,7 +624,7 @@ func TestList(t *testing.T) {
 	}
 }
 
-func testHasNodeAddress(t *testing.T, addrs []api.NodeAddress, addressType api.NodeAddressType, address string) {
+func testHasNodeAddress(t *testing.T, addrs []v1.NodeAddress, addressType v1.NodeAddressType, address string) {
 	for _, addr := range addrs {
 		if addr.Type == addressType && addr.Address == address {
 			return
@@ -697,9 +697,9 @@ func TestNodeAddresses(t *testing.T) {
 	if len(addrs3) != 3 {
 		t.Errorf("Should return exactly 3 NodeAddresses")
 	}
-	testHasNodeAddress(t, addrs3, api.NodeInternalIP, "192.168.0.1")
-	testHasNodeAddress(t, addrs3, api.NodeLegacyHostIP, "192.168.0.1")
-	testHasNodeAddress(t, addrs3, api.NodeExternalIP, "1.2.3.4")
+	testHasNodeAddress(t, addrs3, v1.NodeInternalIP, "192.168.0.1")
+	testHasNodeAddress(t, addrs3, v1.NodeLegacyHostIP, "192.168.0.1")
+	testHasNodeAddress(t, addrs3, v1.NodeExternalIP, "1.2.3.4")
 
 	// Fetch from metadata
 	aws4, fakeServices := mockInstancesResp(&instance0, []*ec2.Instance{&instance0})
@@ -710,8 +710,8 @@ func TestNodeAddresses(t *testing.T) {
 	if err4 != nil {
 		t.Errorf("unexpected error: %v", err4)
 	}
-	testHasNodeAddress(t, addrs4, api.NodeInternalIP, "192.168.0.2")
-	testHasNodeAddress(t, addrs4, api.NodeExternalIP, "2.3.4.5")
+	testHasNodeAddress(t, addrs4, v1.NodeInternalIP, "192.168.0.2")
+	testHasNodeAddress(t, addrs4, v1.NodeExternalIP, "2.3.4.5")
 }
 
 func TestGetRegion(t *testing.T) {
@@ -1192,7 +1192,7 @@ func TestDescribeLoadBalancerOnDelete(t *testing.T) {
 	c, _ := newAWSCloud(strings.NewReader("[global]"), awsServices)
 	awsServices.elb.expectDescribeLoadBalancers("aid")
 
-	c.EnsureLoadBalancerDeleted(TestClusterName, &api.Service{ObjectMeta: api.ObjectMeta{Name: "myservice", UID: "id"}})
+	c.EnsureLoadBalancerDeleted(TestClusterName, &v1.Service{ObjectMeta: v1.ObjectMeta{Name: "myservice", UID: "id"}})
 }
 
 func TestDescribeLoadBalancerOnUpdate(t *testing.T) {
@@ -1200,7 +1200,7 @@ func TestDescribeLoadBalancerOnUpdate(t *testing.T) {
 	c, _ := newAWSCloud(strings.NewReader("[global]"), awsServices)
 	awsServices.elb.expectDescribeLoadBalancers("aid")
 
-	c.UpdateLoadBalancer(TestClusterName, &api.Service{ObjectMeta: api.ObjectMeta{Name: "myservice", UID: "id"}}, []string{})
+	c.UpdateLoadBalancer(TestClusterName, &v1.Service{ObjectMeta: v1.ObjectMeta{Name: "myservice", UID: "id"}}, []string{})
 }
 
 func TestDescribeLoadBalancerOnGet(t *testing.T) {
@@ -1208,7 +1208,7 @@ func TestDescribeLoadBalancerOnGet(t *testing.T) {
 	c, _ := newAWSCloud(strings.NewReader("[global]"), awsServices)
 	awsServices.elb.expectDescribeLoadBalancers("aid")
 
-	c.GetLoadBalancer(TestClusterName, &api.Service{ObjectMeta: api.ObjectMeta{Name: "myservice", UID: "id"}})
+	c.GetLoadBalancer(TestClusterName, &v1.Service{ObjectMeta: v1.ObjectMeta{Name: "myservice", UID: "id"}})
 }
 
 func TestDescribeLoadBalancerOnEnsure(t *testing.T) {
@@ -1216,7 +1216,7 @@ func TestDescribeLoadBalancerOnEnsure(t *testing.T) {
 	c, _ := newAWSCloud(strings.NewReader("[global]"), awsServices)
 	awsServices.elb.expectDescribeLoadBalancers("aid")
 
-	c.EnsureLoadBalancer(TestClusterName, &api.Service{ObjectMeta: api.ObjectMeta{Name: "myservice", UID: "id"}}, []string{})
+	c.EnsureLoadBalancer(TestClusterName, &v1.Service{ObjectMeta: v1.ObjectMeta{Name: "myservice", UID: "id"}}, []string{})
 }
 
 func TestBuildListener(t *testing.T) {
@@ -1317,11 +1317,11 @@ func TestBuildListener(t *testing.T) {
 			annotations[ServiceAnnotationLoadBalancerCertificate] = test.certAnnotation
 		}
 		ports := getPortSets(test.sslPortAnnotation)
-		l, err := buildListener(api.ServicePort{
+		l, err := buildListener(v1.ServicePort{
 			NodePort: int32(test.instancePort),
 			Port:     int32(test.lbPort),
 			Name:     test.portName,
-			Protocol: api.Protocol("tcp"),
+			Protocol: v1.Protocol("tcp"),
 		}, annotations, ports)
 		if test.expectError {
 			if err == nil {

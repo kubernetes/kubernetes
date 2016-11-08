@@ -23,7 +23,8 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -32,18 +33,18 @@ import (
 
 // NewPersistentVolumeClaimEvaluator returns an evaluator that can evaluate persistent volume claims
 func NewPersistentVolumeClaimEvaluator(kubeClient clientset.Interface) quota.Evaluator {
-	allResources := []api.ResourceName{api.ResourcePersistentVolumeClaims, api.ResourceRequestsStorage}
+	allResources := []v1.ResourceName{v1.ResourcePersistentVolumeClaims, v1.ResourceRequestsStorage}
 	return &generic.GenericEvaluator{
 		Name:              "Evaluator.PersistentVolumeClaim",
 		InternalGroupKind: api.Kind("PersistentVolumeClaim"),
-		InternalOperationResources: map[admission.Operation][]api.ResourceName{
+		InternalOperationResources: map[admission.Operation][]v1.ResourceName{
 			admission.Create: allResources,
 		},
 		MatchedResourceNames: allResources,
 		MatchesScopeFunc:     generic.MatchesNoScopeFunc,
 		ConstraintsFunc:      PersistentVolumeClaimConstraintsFunc,
 		UsageFunc:            PersistentVolumeClaimUsageFunc,
-		ListFuncByNamespace: func(namespace string, options api.ListOptions) ([]runtime.Object, error) {
+		ListFuncByNamespace: func(namespace string, options v1.ListOptions) ([]runtime.Object, error) {
 			itemList, err := kubeClient.Core().PersistentVolumeClaims(namespace).List(options)
 			if err != nil {
 				return nil, err
@@ -58,23 +59,23 @@ func NewPersistentVolumeClaimEvaluator(kubeClient clientset.Interface) quota.Eva
 }
 
 // PersistentVolumeClaimUsageFunc knows how to measure usage associated with persistent volume claims
-func PersistentVolumeClaimUsageFunc(object runtime.Object) api.ResourceList {
-	pvc, ok := object.(*api.PersistentVolumeClaim)
+func PersistentVolumeClaimUsageFunc(object runtime.Object) v1.ResourceList {
+	pvc, ok := object.(*v1.PersistentVolumeClaim)
 	if !ok {
-		return api.ResourceList{}
+		return v1.ResourceList{}
 	}
-	result := api.ResourceList{}
-	result[api.ResourcePersistentVolumeClaims] = resource.MustParse("1")
-	if request, found := pvc.Spec.Resources.Requests[api.ResourceStorage]; found {
-		result[api.ResourceRequestsStorage] = request
+	result := v1.ResourceList{}
+	result[v1.ResourcePersistentVolumeClaims] = resource.MustParse("1")
+	if request, found := pvc.Spec.Resources.Requests[v1.ResourceStorage]; found {
+		result[v1.ResourceRequestsStorage] = request
 	}
 	return result
 }
 
 // PersistentVolumeClaimConstraintsFunc verifies that all required resources are present on the claim
 // In addition, it validates that the resources are valid (i.e. requests < limits)
-func PersistentVolumeClaimConstraintsFunc(required []api.ResourceName, object runtime.Object) error {
-	pvc, ok := object.(*api.PersistentVolumeClaim)
+func PersistentVolumeClaimConstraintsFunc(required []v1.ResourceName, object runtime.Object) error {
+	pvc, ok := object.(*v1.PersistentVolumeClaim)
 	if !ok {
 		return fmt.Errorf("unexpected input object %v", object)
 	}
