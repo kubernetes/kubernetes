@@ -44,7 +44,7 @@ type server struct {
 	// startCommand is the command used to start the server
 	startCommand *exec.Cmd
 	// killCommand is the command used to stop the server. It is not required. If it
-	// is not specified, `sudo kill` will be used to stop the server.
+	// is not specified, `kill` will be used to stop the server.
 	killCommand *exec.Cmd
 	// restartCommand is the command used to restart the server. If provided, it will be used
 	// instead of startCommand when restarting the server.
@@ -338,19 +338,7 @@ func (s *server) kill() error {
 	const timeout = 10 * time.Second
 	for _, signal := range []string{"-TERM", "-KILL"} {
 		glog.V(2).Infof("Killing process %d (%s) with %s", pid, name, signal)
-		cmd := exec.Command("sudo", "kill", signal, strconv.Itoa(pid))
-
-		// Run the 'kill' command in a separate process group so sudo doesn't ignore it
-		attrs := &syscall.SysProcAttr{}
-		// Hack to set unix-only field without build tags.
-		setpgidField := reflect.ValueOf(attrs).Elem().FieldByName("Setpgid")
-		if setpgidField.IsValid() {
-			setpgidField.Set(reflect.ValueOf(true))
-		} else {
-			return fmt.Errorf("Failed to set Setpgid field (non-unix build)")
-		}
-		cmd.SysProcAttr = attrs
-
+		cmd := exec.Command("kill", signal, strconv.Itoa(pid))
 		_, err := cmd.Output()
 		if err != nil {
 			glog.Errorf("Error signaling process %d (%s) with %s: %v", pid, name, signal, err)
