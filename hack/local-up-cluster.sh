@@ -55,6 +55,12 @@ CLOUD_PROVIDER=${CLOUD_PROVIDER:-""}
 CLOUD_CONFIG=${CLOUD_CONFIG:-""}
 FEATURE_GATES=${FEATURE_GATES:-"AllAlpha=true"}
 
+# RBAC Mode options
+ALLOW_ANY_TOKEN=${ALLOW_ANY_TOKEN:-false}
+ENABLE_RBAC=${ENABLE_RBAC:-false}
+KUBECONFIG_TOKEN=${KUBECONFIG_TOKEN:-""}
+AUTH_ARGS=${AUTH_ARGS:-""}
+
 # start the cache mutation detector by default so that cache mutators will be found
 KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
 export KUBE_CACHE_MUTATION_DETECTOR
@@ -326,11 +332,11 @@ function start_apiserver {
     # which should be able to be used as the CA to verify itself
 
     anytoken_arg=""
-    if [[ -n "${ALLOW_ANY_TOKEN:-}" ]]; then
+    if [[ "${ALLOW_ANY_TOKEN}" = true ]]; then
       anytoken_arg="--insecure-allow-any-token "
     fi
     authorizer_arg=""
-    if [[ -n "${ENABLE_RBAC:-}" ]]; then
+    if [[ "${ENABLE_RBAC}" = true ]]; then
       authorizer_arg="--authorization-mode=RBAC "
     fi
     priv_arg=""
@@ -401,6 +407,20 @@ contexts:
     name: service-to-apiserver
 current-context: service-to-apiserver
 EOF
+
+    if [[ -z "${AUTH_ARGS}" ]]; then
+        if [[ "${ALLOW_ANY_TOKEN}" = true ]]; then
+            # use token authentication
+            if [[ -n "${KUBECONFIG_TOKEN}" ]]; then
+                AUTH_ARGS="--token=${KUBECONFIG_TOKEN}"
+            else
+                AUTH_ARGS="--token=system:admin/system:masters"
+            fi
+        else
+            # default to use basic authentication
+            AUTH_ARGS="--username=admin --password=admin"
+        fi
+    fi
 
     # Wait for kube-apiserver to come up before launching the rest of the components.
     echo "Waiting for apiserver to come up"
@@ -630,7 +650,7 @@ To start using your cluster, open up another terminal/tab and run:
   export KUBERNETES_PROVIDER=local
 
   cluster/kubectl.sh config set-cluster local --server=https://${API_HOST}:${API_SECURE_PORT} --certificate-authority=${ROOT_CA_FILE}
-  cluster/kubectl.sh config set-credentials myself --username=admin --password=admin
+  cluster/kubectl.sh config set-credentials myself ${AUTH_ARGS}
   cluster/kubectl.sh config set-context local --cluster=local --user=myself
   cluster/kubectl.sh config use-context local
   cluster/kubectl.sh
