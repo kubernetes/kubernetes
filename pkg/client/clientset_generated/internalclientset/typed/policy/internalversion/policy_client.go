@@ -24,12 +24,17 @@ import (
 
 type PolicyInterface interface {
 	RESTClient() restclient.Interface
+	EvictionsGetter
 	PodDisruptionBudgetsGetter
 }
 
 // PolicyClient is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
 type PolicyClient struct {
 	restClient restclient.Interface
+}
+
+func (c *PolicyClient) Evictions(namespace string) EvictionInterface {
+	return newEvictions(c, namespace)
 }
 
 func (c *PolicyClient) PodDisruptionBudgets(namespace string) PodDisruptionBudgetInterface {
