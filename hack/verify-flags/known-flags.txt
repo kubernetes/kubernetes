@@ -190,6 +190,7 @@ exit-on-lock-contention
 experimental-allowed-unsafe-sysctls
 experimental-bootstrap-kubeconfig
 experimental-keystone-url
+experimental-keystone-ca-file
 experimental-mounter-path
 experimental-mounter-rootfs-path
 experimental-nvidia-gpus
