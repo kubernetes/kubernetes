@@ -13,33 +13,27 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "error.go",
-        "kubeconfig.go",
-        "tokens.go",
+        "discovery.go",
+        "flags.go",
     ],
     tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:go_default_library",
-        "//cmd/kubeadm/app/preflight:go_default_library",
-        "//pkg/client/unversioned/clientcmd:go_default_library",
+        "//cmd/kubeadm/app/discovery/file:go_default_library",
+        "//cmd/kubeadm/app/discovery/https:go_default_library",
+        "//cmd/kubeadm/app/discovery/token:go_default_library",
         "//pkg/client/unversioned/clientcmd/api:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/renstrom/dedent",
+        "//vendor:github.com/spf13/pflag",
     ],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "error_test.go",
-        "kubeconfig_test.go",
-    ],
+    srcs = ["flags_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//cmd/kubeadm/app/preflight:go_default_library",
-        "//pkg/client/unversioned/clientcmd/api:go_default_library",
+        "//vendor:github.com/davecgh/go-spew/spew",
     ],
 )

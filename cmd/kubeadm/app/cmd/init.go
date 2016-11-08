@@ -28,6 +28,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -79,10 +80,6 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		},
 	}
 
-	cmd.PersistentFlags().StringVar(
-		&cfg.Secrets.GivenToken, "token", cfg.Secrets.GivenToken,
-		"Shared secret used to secure cluster bootstrap; if none is provided, one will be generated for you",
-	)
 	cmd.PersistentFlags().StringSliceVar(
 		&cfg.API.AdvertiseAddresses, "api-advertise-addresses", cfg.API.AdvertiseAddresses,
 		"The IP addresses to advertise, in case autodetection fails",
@@ -109,50 +106,20 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	)
 
 	cmd.PersistentFlags().StringVar(
-		&cfg.KubernetesVersion, "use-kubernetes-version", cfg.KubernetesVersion,
+		&cfg.KubernetesVersion, "version", cfg.KubernetesVersion,
 		`Choose a specific Kubernetes version for the control plane`,
 	)
 
 	cmd.PersistentFlags().StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file")
-
-	// TODO (phase1+) @errordeveloper make the flags below not show up in --help but rather on --advanced-help
-	cmd.PersistentFlags().StringSliceVar(
-		&cfg.Etcd.Endpoints, "external-etcd-endpoints", cfg.Etcd.Endpoints,
-		"etcd endpoints to use, in case you have an external cluster",
-	)
-	cmd.PersistentFlags().MarkDeprecated("external-etcd-endpoints", "this flag will be removed when componentconfig exists")
-
-	cmd.PersistentFlags().StringVar(
-		&cfg.Etcd.CAFile, "external-etcd-cafile", cfg.Etcd.CAFile,
-		"etcd certificate authority certificate file. Note: The path must be in /etc/ssl/certs",
-	)
-	cmd.PersistentFlags().MarkDeprecated("external-etcd-cafile", "this flag will be removed when componentconfig exists")
-
-	cmd.PersistentFlags().StringVar(
-		&cfg.Etcd.CertFile, "external-etcd-certfile", cfg.Etcd.CertFile,
-		"etcd client certificate file. Note: The path must be in /etc/ssl/certs",
-	)
-	cmd.PersistentFlags().MarkDeprecated("external-etcd-certfile", "this flag will be removed when componentconfig exists")
-
-	cmd.PersistentFlags().StringVar(
-		&cfg.Etcd.KeyFile, "external-etcd-keyfile", cfg.Etcd.KeyFile,
-		"etcd client key file. Note: The path must be in /etc/ssl/certs",
-	)
-	cmd.PersistentFlags().MarkDeprecated("external-etcd-keyfile", "this flag will be removed when componentconfig exists")
 
 	cmd.PersistentFlags().BoolVar(
 		&skipPreFlight, "skip-preflight-checks", skipPreFlight,
 		"skip preflight checks normally run before modifying the system",
 	)
 
-	cmd.PersistentFlags().Int32Var(
-		&cfg.API.BindPort, "api-port", cfg.API.BindPort,
-		"Port for API to bind to",
-	)
-
-	cmd.PersistentFlags().Int32Var(
-		&cfg.Discovery.BindPort, "discovery-port", cfg.Discovery.BindPort,
-		"Port for JWS discovery service to bind to",
+	cmd.PersistentFlags().Var(
+		discovery.NewDiscoveryValue(&cfg.Discovery), "discovery",
+		"Discovery",
 	)
 
 	return cmd
@@ -213,7 +180,7 @@ type joinArgsData struct {
 
 // Run executes master node provisioning, including certificates, needed static pod manifests, etc.
 func (i *Init) Run(out io.Writer) error {
-	if err := kubemaster.CreateTokenAuthFile(&i.cfg.Secrets); err != nil {
+	if err := kubemaster.CreateTokenAuthFile(i.cfg.Discovery.Token); err != nil {
 		return err
 	}
 

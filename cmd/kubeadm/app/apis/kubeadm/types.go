@@ -31,7 +31,6 @@ type EnvParams struct {
 type MasterConfiguration struct {
 	unversioned.TypeMeta
 
-	Secrets           Secrets
 	API               API
 	Discovery         Discovery
 	Etcd              Etcd
@@ -43,11 +42,27 @@ type MasterConfiguration struct {
 type API struct {
 	AdvertiseAddresses []string
 	ExternalDNSNames   []string
-	BindPort           int32
+	Port               int32
 }
 
 type Discovery struct {
-	BindPort int32
+	HTTPS *HTTPSDiscovery
+	File  *FileDiscovery
+	Token *TokenDiscovery
+}
+
+type HTTPSDiscovery struct {
+	URL string
+}
+
+type FileDiscovery struct {
+	Path string
+}
+
+type TokenDiscovery struct {
+	TokenID   string
+	Token     string
+	Addresses []string
 }
 
 type Networking struct {
@@ -63,20 +78,10 @@ type Etcd struct {
 	KeyFile   string
 }
 
-type Secrets struct {
-	GivenToken  string // dot-separated `<TokenID>.<Token>` set by the user
-	TokenID     string // optional on master side, will be generated if not specified
-	Token       []byte // optional on master side, will be generated if not specified
-	BearerToken string // set based on Token
-}
-
 type NodeConfiguration struct {
 	unversioned.TypeMeta
 
-	MasterAddresses []string
-	Secrets         Secrets
-	APIPort         int32
-	DiscoveryPort   int32
+	Discovery Discovery
 }
 
 // ClusterInfo TODO add description

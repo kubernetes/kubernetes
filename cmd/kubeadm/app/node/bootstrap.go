@@ -48,7 +48,7 @@ const retryTimeout = 5
 // The function builds a client for every endpoint and concurrently keeps trying to connect to any one
 // of the provided endpoints. Blocks until at least one connection is established, then it stops the
 // connection attempts for other endpoints.
-func EstablishMasterConnection(s *kubeadmapi.NodeConfiguration, clusterInfo *kubeadmapi.ClusterInfo) (*ConnectionDetails, error) {
+func EstablishMasterConnection(c *kubeadmapi.TokenDiscovery, clusterInfo *kubeadmapi.ClusterInfo) (*ConnectionDetails, error) {
 	hostName, err := os.Hostname()
 	if err != nil {
 		return nil, fmt.Errorf("<node/bootstrap> failed to get node hostname [%v]", err)
@@ -63,7 +63,7 @@ func EstablishMasterConnection(s *kubeadmapi.NodeConfiguration, clusterInfo *kub
 	result := make(chan *ConnectionDetails)
 	var wg sync.WaitGroup
 	for _, endpoint := range endpoints {
-		clientSet, err := createClients(caCert, endpoint, s.Secrets.BearerToken, nodeName)
+		clientSet, err := createClients(caCert, endpoint, kubeadmutil.BearerToken(c), nodeName)
 		if err != nil {
 			fmt.Printf("<node/bootstrap> warning: %s. Skipping endpoint %s\n", err, endpoint)
 			continue

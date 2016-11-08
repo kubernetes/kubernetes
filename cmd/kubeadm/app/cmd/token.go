@@ -75,12 +75,12 @@ func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
 }
 
 func RunGenerateToken(out io.Writer) error {
-	s := &kubeadmapi.Secrets{}
-	err := util.GenerateToken(s)
+	d := &kubeadmapi.TokenDiscovery{}
+	err := util.GenerateToken(d)
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintln(out, s.GivenToken)
+	fmt.Fprintln(out, util.BearerToken(d))
 	return nil
 }

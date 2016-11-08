@@ -543,15 +543,9 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 		func(obj *kubeadm.MasterConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
 			obj.KubernetesVersion = "v10"
-			obj.API.BindPort = 20
-			obj.Discovery.BindPort = 20
+			obj.API.Port = 20
 			obj.Networking.ServiceSubnet = "foo"
 			obj.Networking.DNSDomain = "foo"
-		},
-		func(obj *kubeadm.NodeConfiguration, c fuzz.Continue) {
-			c.FuzzNoCustom(obj)
-			obj.APIPort = 20
-			obj.DiscoveryPort = 20
 		},
 		func(s *policy.PodDisruptionBudgetStatus, c fuzz.Continue) {
 			c.FuzzNoCustom(s) // fuzz self without calling this function again

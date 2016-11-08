@@ -21,10 +21,9 @@ import "k8s.io/kubernetes/pkg/api/unversioned"
 type MasterConfiguration struct {
 	unversioned.TypeMeta `json:",inline"`
 
-	Secrets           Secrets    `json:"secrets"`
 	API               API        `json:"api"`
-	Etcd              Etcd       `json:"etcd"`
 	Discovery         Discovery  `json:"discovery"`
+	Etcd              Etcd       `json:"etcd"`
 	Networking        Networking `json:"networking"`
 	KubernetesVersion string     `json:"kubernetesVersion"`
 	CloudProvider     string     `json:"cloudProvider"`
@@ -33,11 +32,27 @@ type MasterConfiguration struct {
 type API struct {
 	AdvertiseAddresses []string `json:"advertiseAddresses"`
 	ExternalDNSNames   []string `json:"externalDNSNames"`
-	BindPort           int32    `json:"bindPort"`
+	Port               int32    `json:"port"`
 }
 
 type Discovery struct {
-	BindPort int32 `json:"bindPort"`
+	HTTPS *HTTPSDiscovery
+	File  *FileDiscovery
+	Token *TokenDiscovery
+}
+
+type HTTPSDiscovery struct {
+	URL string
+}
+
+type FileDiscovery struct {
+	Path string
+}
+
+type TokenDiscovery struct {
+	TokenID   string
+	Token     string
+	Addresses []string
 }
 
 type Networking struct {
@@ -63,10 +78,7 @@ type Secrets struct {
 type NodeConfiguration struct {
 	unversioned.TypeMeta `json:",inline"`
 
-	MasterAddresses []string `json:"masterAddresses"`
-	Secrets         Secrets  `json:"secrets"`
-	APIPort         int32    `json:"apiPort"`
-	DiscoveryPort   int32    `json:"discoveryPort"`
+	Discovery Discovery `json:"discovery"`
 }
 
 // ClusterInfo TODO add description
