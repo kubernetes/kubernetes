@@ -206,61 +206,75 @@ func IsGroupDiscoveryFailedError(err error) bool {
 	return err != nil && ok
 }
 
-// serverPreferredResources returns the supported resources with the version preferred by the
-// server. If namespaced is true, only namespaced resources will be returned.
-func (d *DiscoveryClient) serverPreferredResources(namespaced bool) ([]unversioned.GroupVersionResource, error) {
+// serverResources returns the supported resources with the version preferred by the
+// server, if preferred is true. If namespaced is true, only namespaced resources will be returned.
+func (d *DiscoveryClient) serverResources(namespaced bool) ([]unversioned.GroupVersionResource, error) {
 	// retry in case the groups supported by the server change after ServerGroup() returns.
 	const maxRetries = 2
 	var failedGroups map[unversioned.GroupVersion]error
-	var results []unversioned.GroupVersionResource
+	var results map[unversioned.GroupResource]unversioned.GroupVersionResource
 RetrieveGroups:
 	for i := 0; i < maxRetries; i++ {
-		results = []unversioned.GroupVersionResource{}
+		results = map[unversioned.GroupResource]unversioned.GroupVersionResource{}
 		failedGroups = make(map[unversioned.GroupVersion]error)
 		serverGroupList, err := d.ServerGroups()
 		if err != nil {
-			return results, err
+			return getValues(results), err
 		}
 
 		for _, apiGroup := range serverGroupList.Groups {
-			preferredVersion := apiGroup.PreferredVersion
-			groupVersion := unversioned.GroupVersion{Group: apiGroup.Name, Version: preferredVersion.Version}
-			apiResourceList, err := d.ServerResourcesForGroupVersion(preferredVersion.GroupVersion)
-			if err != nil {
-				if i < maxRetries-1 {
-					continue RetrieveGroups
-				}
-				failedGroups[groupVersion] = err
-				continue
-			}
-			for _, apiResource := range apiResourceList.APIResources {
-				// ignore the root scoped resources if "namespaced" is true.
-				if namespaced && !apiResource.Namespaced {
+			versions := apiGroup.Versions
+			for _, version := range versions {
+				groupVersion := unversioned.GroupVersion{Group: apiGroup.Name, Version: version.Version}
+				apiResourceList, err := d.ServerResourcesForGroupVersion(version.GroupVersion)
+				if err != nil {
+					if i < maxRetries-1 {
+						continue RetrieveGroups
+					}
+					failedGroups[groupVersion] = err
 					continue
 				}
-				if strings.Contains(apiResource.Name, "/") {
-					continue
+				for _, apiResource := range apiResourceList.APIResources {
+					// ignore the root scoped resources if "namespaced" is true.
+					if namespaced && !apiResource.Namespaced {
+						continue
+					}
+					if strings.Contains(apiResource.Name, "/") {
+						continue
+					}
+					newgvr := groupVersion.WithResource(apiResource.Name)
+					if oldgvr, ok := results[newgvr.GroupResource()]; ok && oldgvr.Version == apiGroup.PreferredVersion.Version {
+						continue
+					}
+					results[newgvr.GroupResource()] = newgvr
 				}
-				results = append(results, groupVersion.WithResource(apiResource.Name))
 			}
 		}
 		if len(failedGroups) == 0 {
-			return results, nil
+			return getValues(results), nil
 		}
 	}
-	return results, &ErrGroupDiscoveryFailed{Groups: failedGroups}
+	return getValues(results), &ErrGroupDiscoveryFailed{Groups: failedGroups}
+}
+
+func getValues(gvrMap map[unversioned.GroupResource]unversioned.GroupVersionResource) []unversioned.GroupVersionResource {
+	result := make([]unversioned.GroupVersionResource, 0, len(gvrMap))
+	for _, value := range gvrMap {
+		result = append(result, value)
+	}
+	return result
 }
 
 // ServerPreferredResources returns the supported resources with the version preferred by the
 // server.
 func (d *DiscoveryClient) ServerPreferredResources() ([]unversioned.GroupVersionResource, error) {
-	return d.serverPreferredResources(false)
+	return d.serverResources(false)
 }
 
 // ServerPreferredNamespacedResources returns the supported namespaced resources with the
 // version preferred by the server.
 func (d *DiscoveryClient) ServerPreferredNamespacedResources() ([]unversioned.GroupVersionResource, error) {
-	return d.serverPreferredResources(true)
+	return d.serverResources(true)
 }
 
 // ServerVersion retrieves and parses the server's version (git version).
