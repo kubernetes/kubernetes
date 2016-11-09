@@ -55,7 +55,6 @@ import (
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/serviceaccount"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -94,6 +93,7 @@ func Run(s *options.ServerRunOptions) error {
 							ApplyOptions(s.GenericServerRunOptions). // apply the options selected
 							ApplySecureServingOptions(s.SecureServing).
 							ApplyInsecureServingOptions(s.InsecureServing).
+							ApplyAuthenticationOptions(s.Authentication).
 							Complete() // set default values based on the known values
 
 	serviceIPRange, apiServerServiceIP, err := genericapiserver.DefaultServiceIPRange(s.GenericServerRunOptions.ServiceClusterIPRange)
@@ -210,46 +210,26 @@ func Run(s *options.ServerRunOptions) error {
 	}
 
 	// Default to the private server key for service account token signing
-	if len(s.ServiceAccountKeyFiles) == 0 && s.SecureServing.ServerCert.CertKey.KeyFile != "" {
+	if len(s.Authentication.ServiceAccounts.KeyFiles) == 0 && s.SecureServing.ServerCert.CertKey.KeyFile != "" {
 		if authenticator.IsValidServiceAccountKeyFile(s.SecureServing.ServerCert.CertKey.KeyFile) {
-			s.ServiceAccountKeyFiles = []string{s.SecureServing.ServerCert.CertKey.KeyFile}
+			s.Authentication.ServiceAccounts.KeyFiles = []string{s.SecureServing.ServerCert.CertKey.KeyFile}
 		} else {
 			glog.Warning("No TLS key provided, service account token authentication disabled")
 		}
 	}
 
-	var serviceAccountGetter serviceaccount.ServiceAccountTokenGetter
-	if s.ServiceAccountLookup {
+	authenticatorConfig := s.Authentication.ToAuthenticationConfig(s.SecureServing.ClientCA)
+	if s.Authentication.ServiceAccounts.Lookup {
 		// If we need to look up service accounts and tokens,
 		// go directly to etcd to avoid recursive auth insanity
 		storageConfig, err := storageFactory.NewConfig(api.Resource("serviceaccounts"))
 		if err != nil {
 			glog.Fatalf("Unable to get serviceaccounts storage: %v", err)
 		}
-		serviceAccountGetter = serviceaccountcontroller.NewGetterFromStorageInterface(storageConfig, storageFactory.ResourcePrefix(api.Resource("serviceaccounts")), storageFactory.ResourcePrefix(api.Resource("secrets")))
+		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromStorageInterface(storageConfig, storageFactory.ResourcePrefix(api.Resource("serviceaccounts")), storageFactory.ResourcePrefix(api.Resource("secrets")))
 	}
 
-	apiAuthenticator, securityDefinitions, err := authenticator.New(authenticator.AuthenticatorConfig{
-		Anonymous:                   s.GenericServerRunOptions.AnonymousAuth,
-		AnyToken:                    s.GenericServerRunOptions.EnableAnyToken,
-		BasicAuthFile:               s.GenericServerRunOptions.BasicAuthFile,
-		ClientCAFile:                s.SecureServing.ClientCA,
-		TokenAuthFile:               s.GenericServerRunOptions.TokenAuthFile,
-		OIDCIssuerURL:               s.GenericServerRunOptions.OIDCIssuerURL,
-		OIDCClientID:                s.GenericServerRunOptions.OIDCClientID,
-		OIDCCAFile:                  s.GenericServerRunOptions.OIDCCAFile,
-		OIDCUsernameClaim:           s.GenericServerRunOptions.OIDCUsernameClaim,
-		OIDCGroupsClaim:             s.GenericServerRunOptions.OIDCGroupsClaim,
-		ServiceAccountKeyFiles:      s.ServiceAccountKeyFiles,
-		ServiceAccountLookup:        s.ServiceAccountLookup,
-		ServiceAccountTokenGetter:   serviceAccountGetter,
-		KeystoneURL:                 s.GenericServerRunOptions.KeystoneURL,
-		KeystoneCAFile:              s.GenericServerRunOptions.KeystoneCAFile,
-		WebhookTokenAuthnConfigFile: s.WebhookTokenAuthnConfigFile,
-		WebhookTokenAuthnCacheTTL:   s.WebhookTokenAuthnCacheTTL,
-		RequestHeaderConfig:         s.GenericServerRunOptions.AuthenticationRequestHeaderConfig(),
-	})
-
+	apiAuthenticator, securityDefinitions, err := authenticator.New(authenticatorConfig)
 	if err != nil {
 		glog.Fatalf("Invalid Authentication Config: %v", err)
 	}
