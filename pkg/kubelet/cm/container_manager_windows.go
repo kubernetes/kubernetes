@@ -37,6 +37,6 @@ func (cm *containerManagerImpl) Start(_ *api.Node) error {
 	return nil
 }
 
-func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig) (ContainerManager, error) {
+func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool) (ContainerManager, error) {
 	return &containerManagerImpl{}, nil
 }
