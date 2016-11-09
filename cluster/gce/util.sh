@@ -729,6 +729,18 @@ function get-master-root-disk-size() {
   fi
 }
 
+# Assumes:
+#   NUM_NODES
+# Sets:
+#   MASTER_DISK_SIZE
+function get-master-disk-size() {
+  if [[ "${NUM_NODES}" -le "1000" ]]; then
+    export MASTER_DISK_SIZE="20GB"
+  else
+    export MASTER_DISK_SIZE="100GB"
+  fi
+}
+
 function create-master() {
   echo "Starting master and configuring firewalls"
   gcloud compute firewall-rules create "${MASTER_NAME}-https" \
@@ -739,6 +751,7 @@ function create-master() {
 
   # We have to make sure the disk is created before creating the master VM, so
   # run this in the foreground.
+  get-master-disk-size
   gcloud compute disks create "${MASTER_NAME}-pd" \
     --project "${PROJECT}" \
     --zone "${ZONE}" \
@@ -846,6 +859,7 @@ function replicate-master() {
 
   # We have to make sure the disk is created before creating the master VM, so
   # run this in the foreground.
+  get-master-disk-size
   gcloud compute disks create "${REPLICA_NAME}-pd" \
     --project "${PROJECT}" \
     --zone "${ZONE}" \
