@@ -15,9 +15,9 @@ go_library(
     srcs = [
         "authenticator.go",
         "doc.go",
-        "etcd_options.go",
+        "etcd.go",
         "server_run_options.go",
-        "serving_options.go",
+        "serving.go",
     ],
     tags = ["automanaged"],
     deps = [
@@ -25,7 +25,6 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/apimachinery/registered:go_default_library",
         "//pkg/apiserver/authenticator:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/restclient:go_default_library",
         "//pkg/runtime/schema:go_default_library",
         "//pkg/storage/storagebackend:go_default_library",
