@@ -445,9 +445,7 @@ func (g *genDeepCopy) GenerateType(c *generator.Context, t *types.Type, w io.Wri
 
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	args := argsFromType(t)
-	if t.Name.Name == "Time" {
-		glog.Infof("methods %s %+v", t.Name.Name, t.Methods)
-	}
+
 	_, foundDeepCopyInto := t.Methods["DeepCopyInto"]
 	_, foundDeepCopy := t.Methods["DeepCopy"]
 	if !foundDeepCopyInto {
