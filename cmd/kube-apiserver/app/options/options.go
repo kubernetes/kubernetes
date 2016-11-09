@@ -31,7 +31,11 @@ import (
 
 // ServerRunOptions runs a kubernetes api server.
 type ServerRunOptions struct {
-	GenericServerRunOptions     *genericoptions.ServerRunOptions
+	GenericServerRunOptions *genericoptions.ServerRunOptions
+	Etcd                    *genericoptions.EtcdOptions
+	SecureServing           *genericoptions.SecureServingOptions
+	InsecureServing         *genericoptions.ServingOptions
+
 	AllowPrivileged             bool
 	EventTTL                    time.Duration
 	KubeletConfig               kubeletclient.KubeletClientConfig
@@ -47,8 +51,12 @@ type ServerRunOptions struct {
 // NewServerRunOptions creates a new ServerRunOptions object with default parameters
 func NewServerRunOptions() *ServerRunOptions {
 	s := ServerRunOptions{
-		GenericServerRunOptions: genericoptions.NewServerRunOptions().WithEtcdOptions(),
-		EventTTL:                1 * time.Hour,
+		GenericServerRunOptions: genericoptions.NewServerRunOptions(),
+		Etcd:            genericoptions.NewEtcdOptions(),
+		SecureServing:   genericoptions.NewSecureServingOptions(),
+		InsecureServing: genericoptions.NewInsecureServingOptions(),
+
+		EventTTL: 1 * time.Hour,
 		KubeletConfig: kubeletclient.KubeletClientConfig{
 			Port: ports.KubeletPort,
 			PreferredAddressTypes: []string{
@@ -69,8 +77,13 @@ func NewServerRunOptions() *ServerRunOptions {
 func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	// Add the generic flags.
 	s.GenericServerRunOptions.AddUniversalFlags(fs)
-	//Add etcd specific flags.
-	s.GenericServerRunOptions.Etcd.AddEtcdStorageFlags(fs)
+
+	s.Etcd.AddFlags(fs)
+	s.SecureServing.AddFlags(pflag.CommandLine)
+	s.SecureServing.AddDeprecatedFlags(pflag.CommandLine)
+	s.InsecureServing.AddFlags(pflag.CommandLine)
+	s.InsecureServing.AddDeprecatedFlags(pflag.CommandLine)
+
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.
 
