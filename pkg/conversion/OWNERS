@@ -1,5 +1,29 @@
-assignees:
-  - derekwaynecarr
-  - lavalamp
-  - smarterclayton
-  - wojtek-t
+approvers:
+- derekwaynecarr
+- lavalamp
+- smarterclayton
+- wojtek-t
+reviewers:
+- thockin
+- lavalamp
+- smarterclayton
+- wojtek-t
+- deads2k
+- yujuhong
+- brendandburns
+- caesarxuchao
+- mikedanese
+- liggitt
+- pmorie
+- sttts
+- kargakis
+- ncdc
+- eparis
+- jbeda
+- dims
+- krousey
+- resouer
+- david-mcmahon
+- feihujiang
+- ghodss
+- rhcarvalho
