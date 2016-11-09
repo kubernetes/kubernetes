@@ -246,3 +246,18 @@ func (r *containerCommandRunnerWrapper) RunInContainer(id ContainerID, cmd []str
 	// error.
 	return buffer.Bytes(), err
 }
+
+// GetContainerSpec gets the container spec by containerName.
+func GetContainerSpec(pod *v1.Pod, containerName string) *v1.Container {
+	for i, c := range pod.Spec.Containers {
+		if containerName == c.Name {
+			return &pod.Spec.Containers[i]
+		}
+	}
+	for i, c := range pod.Spec.InitContainers {
+		if containerName == c.Name {
+			return &pod.Spec.InitContainers[i]
+		}
+	}
+	return nil
+}

@@ -140,7 +140,7 @@ type DirectStreamingRuntime interface {
 // the runtime server.
 type IndirectStreamingRuntime interface {
 	GetExec(id ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error)
-	GetAttach(id ContainerID, stdin, stdout, stderr bool) (*url.URL, error)
+	GetAttach(id ContainerID, stdin, stdout, stderr, tty bool) (*url.URL, error)
 	GetPortForward(podName, podNamespace string, podUID types.UID) (*url.URL, error)
 }
 
