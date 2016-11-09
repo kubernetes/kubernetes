@@ -17,6 +17,7 @@ limitations under the License.
 package qos
 
 import (
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -51,6 +52,73 @@ func GetPodQOS(pod *v1.Pod) QOSClass {
 	limits := v1.ResourceList{}
 	zeroQuantity := resource.MustParse("0")
 	isGuaranteed := true
+	for _, container := range pod.Spec.Containers {
+		// process requests
+		for name, quantity := range container.Resources.Requests {
+			if !supportedQoSComputeResources.Has(string(name)) {
+				continue
+			}
+			if quantity.Cmp(zeroQuantity) == 1 {
+				delta := quantity.Copy()
+				if _, exists := requests[name]; !exists {
+					requests[name] = *delta
+				} else {
+					delta.Add(requests[name])
+					requests[name] = *delta
+				}
+			}
+		}
+		// process limits
+		qosLimitsFound := sets.NewString()
+		for name, quantity := range container.Resources.Limits {
+			if !supportedQoSComputeResources.Has(string(name)) {
+				continue
+			}
+			if quantity.Cmp(zeroQuantity) == 1 {
+				qosLimitsFound.Insert(string(name))
+				delta := quantity.Copy()
+				if _, exists := limits[name]; !exists {
+					limits[name] = *delta
+				} else {
+					delta.Add(limits[name])
+					limits[name] = *delta
+				}
+			}
+		}
+
+		if len(qosLimitsFound) != len(supportedQoSComputeResources) {
+			isGuaranteed = false
+		}
+	}
+	if len(requests) == 0 && len(limits) == 0 {
+		return BestEffort
+	}
+	// Check is requests match limits for all resources.
+	if isGuaranteed {
+		for name, req := range requests {
+			if lim, exists := limits[name]; !exists || lim.Cmp(req) != 0 {
+				isGuaranteed = false
+				break
+			}
+		}
+	}
+	if isGuaranteed &&
+		len(requests) == len(limits) {
+		return Guaranteed
+	}
+	return Burstable
+}
+
+// GetPodQOS returns the QoS class of a pod.
+// A pod is besteffort if none of its containers have specified any requests or limits.
+// A pod is guaranteed only when requests and limits are specified for all the containers and they are equal.
+// A pod is burstable if limits and requests do not match across all containers.
+func InternalGetPodQOS(pod *api.Pod) QOSClass {
+	requests := api.ResourceList{}
+	limits := api.ResourceList{}
+	zeroQuantity := resource.MustParse("0")
+	isGuaranteed := true
+	var supportedQoSComputeResources = sets.NewString(string(api.ResourceCPU), string(api.ResourceMemory))
 	for _, container := range pod.Spec.Containers {
 		// process requests
 		for name, quantity := range container.Resources.Requests {
