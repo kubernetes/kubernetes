@@ -17,6 +17,7 @@ go_library(
         "doc.go",
         "etcd_options.go",
         "server_run_options.go",
+        "serving_options.go",
     ],
     tags = ["automanaged"],
     deps = [
