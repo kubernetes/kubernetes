@@ -2415,6 +2415,7 @@ func (p *PodDisruptionBudgetDescriber) Describe(namespace, name string, describe
 			fmt.Fprintf(out, "Selector:\t<unset>\n")
 		}
 		fmt.Fprintf(out, "Status:\n")
+		fmt.Fprintf(out, "    Allowed disruptions:\t%d\n", pdb.Status.PodDisruptionsAllowed)
 		fmt.Fprintf(out, "    Current:\t%d\n", pdb.Status.CurrentHealthy)
 		fmt.Fprintf(out, "    Desired:\t%d\n", pdb.Status.DesiredHealthy)
 		fmt.Fprintf(out, "    Total:\t%d\n", pdb.Status.ExpectedPods)
