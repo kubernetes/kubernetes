@@ -137,7 +137,7 @@ var _ = framework.KubeDescribe("Pods Delete Grace Period", func() {
 
 		By("verifying the kubelet observed the termination notice")
 		Expect(wait.Poll(time.Second*5, time.Second*30, func() (bool, error) {
-			podList, err := framework.GetKubeletPods(f.ClientSet, pod.Spec.NodeName)
+			podList, err := framework.GetKubeletPods(f.Client, pod.Spec.NodeName)
 			if err != nil {
 				framework.Logf("Unable to retrieve kubelet pods for node %v: %v", pod.Spec.NodeName, err)
 				return false, nil
