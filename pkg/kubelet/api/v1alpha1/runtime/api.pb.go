@@ -1336,8 +1336,9 @@ type LinuxContainerSecurityContext struct {
 	NamespaceOptions *NamespaceOption `protobuf:"bytes,3,opt,name=namespace_options,json=namespaceOptions" json:"namespace_options,omitempty"`
 	// Optional SELinux context to be applied.
 	SelinuxOptions *SELinuxOption `protobuf:"bytes,4,opt,name=selinux_options,json=selinuxOptions" json:"selinux_options,omitempty"`
-	// The user to run the the container process as, it could be uid or user
-	// name.
+	// User to run the entrypoint of the sandbox process. Can be either UID or
+	// user name. User must exist in the container image already, or else
+	// runtime should return an error.
 	// Defaults to user specified in image metadata if unspecified.
 	RunAsUser *string `protobuf:"bytes,5,opt,name=run_as_user,json=runAsUser" json:"run_as_user,omitempty"`
 	// If set, the root filesystem of the container is read-only.
@@ -2441,7 +2442,8 @@ type Image struct {
 	RepoDigests []string `protobuf:"bytes,3,rep,name=repo_digests,json=repoDigests" json:"repo_digests,omitempty"`
 	// The size of the image in bytes.
 	Size_ *uint64 `protobuf:"varint,4,opt,name=size" json:"size,omitempty"`
-	// The user that will run the command(s).
+	// User that will run the command(s). Can be either UID or user name.
+	// Notice that all numerical user name is not supported.
 	User             *string `protobuf:"bytes,5,opt,name=user" json:"user,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }

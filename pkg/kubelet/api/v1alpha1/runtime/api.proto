@@ -440,8 +440,9 @@ message LinuxContainerSecurityContext {
     optional NamespaceOption namespace_options = 3;
     // Optional SELinux context to be applied.
     optional SELinuxOption selinux_options = 4;
-    // The user to run the the container process as, it could be uid or user
-    // name.
+    // User to run the entrypoint of the sandbox process. Can be either UID or
+    // user name. User must exist in the container image already, or else
+    // runtime should return an error.
     // Defaults to user specified in image metadata if unspecified.
     optional string run_as_user = 5;
     // If set, the root filesystem of the container is read-only.
@@ -760,7 +761,8 @@ message Image {
     repeated string repo_digests = 3;
     // The size of the image in bytes.
     optional uint64 size = 4;
-    // The user that will run the command(s).
+    // User that will run the command(s). Can be either UID or user name.
+    // Notice that all numerical user name is not supported.
     optional string user = 5;
 }
 
