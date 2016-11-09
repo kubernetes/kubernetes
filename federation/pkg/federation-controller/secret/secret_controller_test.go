@@ -127,6 +127,12 @@ func TestSecretController(t *testing.T) {
 	assert.Equal(t, secret1.Namespace, updatedSecret.Namespace)
 	assert.True(t, secretsEqual(secret1, *updatedSecret),
 		fmt.Sprintf("expected: %v, actual: %v", secret1, *updatedSecret))
+	// Wait for the secret to be updated in the informer store.
+	err = WaitForSecretStoreUpdate(
+		secretController.secretFederatedInformer.GetTargetStore(),
+		cluster1.Name, types.NamespacedName{Namespace: secret1.Namespace, Name: secret1.Name}.String(),
+		updatedSecret, wait.ForeverTestTimeout)
+	assert.Nil(t, err, "secret should have been updated in the informer store")
 
 	// Test update federated secret.
 	secret1.Data = map[string][]byte{
@@ -134,8 +140,8 @@ func TestSecretController(t *testing.T) {
 	}
 	secretWatch.Modify(&secret1)
 	updatedSecret2 := GetSecretFromChan(cluster1UpdateChan)
-	assert.NotNil(t, updatedSecret)
-	assert.Equal(t, secret1.Name, updatedSecret.Name)
+	assert.NotNil(t, updatedSecret2)
+	assert.Equal(t, secret1.Name, updatedSecret2.Name)
 	assert.Equal(t, secret1.Namespace, updatedSecret.Namespace)
 	assert.True(t, secretsEqual(secret1, *updatedSecret2),
 		fmt.Sprintf("expected: %v, actual: %v", secret1, *updatedSecret2))
@@ -170,4 +176,18 @@ func secretsEqual(a, b api_v1.Secret) bool {
 func GetSecretFromChan(c chan runtime.Object) *api_v1.Secret {
 	secret := GetObjectFromChan(c).(*api_v1.Secret)
 	return secret
+}
+
+// Wait till the store is updated with latest secret.
+func WaitForSecretStoreUpdate(store util.FederatedReadOnlyStore, clusterName, key string, desiredSecret *api_v1.Secret, timeout time.Duration) error {
+	retryInterval := 100 * time.Millisecond
+	err := wait.PollImmediate(retryInterval, timeout, func() (bool, error) {
+		obj, found, err := store.GetByKey(clusterName, key)
+		if !found || err != nil {
+			return false, err
+		}
+		equal := secretsEqual(*obj.(*api_v1.Secret), *desiredSecret)
+		return equal, err
+	})
+	return err
 }
