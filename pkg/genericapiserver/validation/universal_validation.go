@@ -51,19 +51,17 @@ func verifyServiceNodePort(options *options.ServerRunOptions) []error {
 
 func verifySecureAndInsecurePort(options *options.ServerRunOptions) []error {
 	errors := []error{}
-	if options.SecurePort < 0 || options.SecurePort > 65535 {
-		errors = append(errors, fmt.Errorf("--secure-port %v must be between 0 and 65535, inclusive. 0 for turning off secure port.", options.SecurePort))
-	}
+	errors = append(errors, options.SecureServingOptions.Validate()...)
 
 	if options.InsecurePort < 0 || options.InsecurePort > 65535 {
 		errors = append(errors, fmt.Errorf("--insecure-port %v must be between 0 and 65535, inclusive. 0 for turning off insecure port.", options.InsecurePort))
 	}
 
-	if options.SecurePort == 0 && options.InsecurePort == 0 {
+	if (options.SecureServingOptions == nil || options.SecureServingOptions.ServingOptions.BindPort == 0) && options.InsecurePort == 0 {
 		glog.Fatalf("--secure-port and --insecure-port cannot be turned off at the same time.")
 	}
 
-	if options.SecurePort == options.InsecurePort {
+	if options.SecureServingOptions != nil && options.SecureServingOptions.ServingOptions.BindPort == options.InsecurePort {
 		errors = append(errors, fmt.Errorf("--secure-port and --insecure-port cannot use the same port."))
 	}
 	return errors

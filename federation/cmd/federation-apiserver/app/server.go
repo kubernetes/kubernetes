@@ -121,7 +121,7 @@ func Run(s *options.ServerRunOptions) error {
 		Anonymous:           s.GenericServerRunOptions.AnonymousAuth,
 		AnyToken:            s.GenericServerRunOptions.EnableAnyToken,
 		BasicAuthFile:       s.GenericServerRunOptions.BasicAuthFile,
-		ClientCAFile:        s.GenericServerRunOptions.ClientCAFile,
+		ClientCAFile:        s.GenericServerRunOptions.SecureServingOptions.ClientCA,
 		TokenAuthFile:       s.GenericServerRunOptions.TokenAuthFile,
 		OIDCIssuerURL:       s.GenericServerRunOptions.OIDCIssuerURL,
 		OIDCClientID:        s.GenericServerRunOptions.OIDCClientID,
