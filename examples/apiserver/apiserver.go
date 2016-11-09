@@ -60,6 +60,7 @@ type ServerRunOptions struct {
 	Etcd                    *genericoptions.EtcdOptions
 	SecureServing           *genericoptions.SecureServingOptions
 	InsecureServing         *genericoptions.ServingOptions
+	Authentication          *genericoptions.BuiltInAuthenticationOptions
 }
 
 func NewServerRunOptions() *ServerRunOptions {
@@ -68,6 +69,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		Etcd:            genericoptions.NewEtcdOptions(),
 		SecureServing:   genericoptions.NewSecureServingOptions(),
 		InsecureServing: genericoptions.NewInsecureServingOptions(),
+		Authentication:  genericoptions.NewBuiltInAuthenticationOptions().WithAll(),
 	}
 	s.InsecureServing.BindPort = InsecurePort
 	s.SecureServing.ServingOptions.BindPort = SecurePort
@@ -96,6 +98,7 @@ func (serverOptions *ServerRunOptions) Run(stopCh <-chan struct{}) error {
 		ApplyOptions(serverOptions.GenericServerRunOptions).
 		ApplySecureServingOptions(serverOptions.SecureServing).
 		ApplyInsecureServingOptions(serverOptions.InsecureServing).
+		ApplyAuthenticationOptions(serverOptions.Authentication).
 		Complete()
 	if err := config.MaybeGenerateServingCerts(); err != nil {
 		// this wasn't treated as fatal for this process before

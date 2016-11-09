@@ -282,6 +282,15 @@ func (c *Config) ApplyInsecureServingOptions(insecureServing *options.ServingOpt
 	return c
 }
 
+func (c *Config) ApplyAuthenticationOptions(o *options.BuiltInAuthenticationOptions) *Config {
+	if o == nil || o.PasswordFile == nil {
+		return c
+	}
+
+	c.SupportsBasicAuth = len(o.PasswordFile.BasicAuthFile) > 0
+	return c
+}
+
 // ApplyOptions applies the run options to the method receiver and returns self
 func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 	if len(options.AuditLogPath) != 0 {
@@ -303,7 +312,6 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 	c.MaxRequestsInFlight = options.MaxRequestsInFlight
 	c.MinRequestTimeout = options.MinRequestTimeout
 	c.PublicAddress = options.AdvertiseAddress
-	c.SupportsBasicAuth = len(options.BasicAuthFile) > 0
 
 	return c
 }
