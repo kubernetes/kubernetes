@@ -483,8 +483,9 @@ func isTestEnabled() bool {
 		}
 		return false
 	}
+	// disable tests for containervm for now
 	if strings.Contains(framework.TestContext.NodeName, "-containervm-") {
-		return true
+		//return true
 	}
 	return false
 }
