@@ -1,8 +1,3 @@
-approvers:
-- krousey
-- lavalamp
-- nikhiljindal
-- smarterclayton
 reviewers:
 - thockin
 - lavalamp
@@ -18,11 +13,9 @@ reviewers:
 - bprashanth
 - gmarek
 - erictune
-- pmorie
 - sttts
 - saad-ali
 - zmerlynn
-- luxas
 - justinsb
 - roberthbailey
 - ncdc
@@ -33,7 +26,6 @@ reviewers:
 - soltysh
 - piosz
 - jsafrane
-- jbeda
 - dims
 - hongchaodeng
 - krousey
@@ -44,3 +36,6 @@ reviewers:
 - jdef
 - a-robinson
 - aveshagarwal
+- resouer
+- cjcullen
+- mbohlool
