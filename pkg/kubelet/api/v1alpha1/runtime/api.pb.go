@@ -233,7 +233,7 @@ func (x *ContainerState) UnmarshalJSON(data []byte) error {
 func (ContainerState) EnumDescriptor() ([]byte, []int) { return fileDescriptorApi, []int{2} }
 
 type VersionRequest struct {
-	// The version of kubelet runtime API.
+	// Version of the kubelet runtime API.
 	Version          *string `protobuf:"bytes,1,opt,name=version" json:"version,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
@@ -251,14 +251,14 @@ func (m *VersionRequest) GetVersion() string {
 }
 
 type VersionResponse struct {
-	// The version of the kubelet runtime API.
+	// Version of the kubelet runtime API.
 	Version *string `protobuf:"bytes,1,opt,name=version" json:"version,omitempty"`
-	// The name of the container runtime.
+	// Name of the container runtime.
 	RuntimeName *string `protobuf:"bytes,2,opt,name=runtime_name,json=runtimeName" json:"runtime_name,omitempty"`
-	// The version of the container runtime. The string must be
+	// Version of the container runtime. The string must be
 	// semver-compatible.
 	RuntimeVersion *string `protobuf:"bytes,3,opt,name=runtime_version,json=runtimeVersion" json:"runtime_version,omitempty"`
-	// The API version of the container runtime. The string must be
+	// API version of the container runtime. The string must be
 	// semver-compatible.
 	RuntimeApiVersion *string `protobuf:"bytes,4,opt,name=runtime_api_version,json=runtimeApiVersion" json:"runtime_api_version,omitempty"`
 	XXX_unrecognized  []byte  `json:"-"`
@@ -337,13 +337,13 @@ func (m *DNSConfig) GetOptions() []string {
 
 // PortMapping specifies the port mapping configurations of a sandbox.
 type PortMapping struct {
-	// The protocol of the port mapping.
+	// Protocol of the port mapping.
 	Protocol *Protocol `protobuf:"varint,1,opt,name=protocol,enum=runtime.Protocol" json:"protocol,omitempty"`
-	// The port number within the container.
+	// Port number within the container.
 	ContainerPort *int32 `protobuf:"varint,2,opt,name=container_port,json=containerPort" json:"container_port,omitempty"`
-	// The port number on the host.
+	// Port number on the host.
 	HostPort *int32 `protobuf:"varint,3,opt,name=host_port,json=hostPort" json:"host_port,omitempty"`
-	// The host IP.
+	// Host IP.
 	HostIp           *string `protobuf:"bytes,4,opt,name=host_ip,json=hostIp" json:"host_ip,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
@@ -383,13 +383,13 @@ func (m *PortMapping) GetHostIp() string {
 
 // Mount specifies a host volume to mount into a container.
 type Mount struct {
-	// The path of the mount within the container.
+	// Path of the mount within the container.
 	ContainerPath *string `protobuf:"bytes,1,opt,name=container_path,json=containerPath" json:"container_path,omitempty"`
-	// The path of the mount on the host.
+	// Path of the mount on the host.
 	HostPath *string `protobuf:"bytes,2,opt,name=host_path,json=hostPath" json:"host_path,omitempty"`
 	// If set, the mount is read-only.
 	Readonly *bool `protobuf:"varint,3,opt,name=readonly" json:"readonly,omitempty"`
-	// If set, the mount needs SELinux relabeling
+	// If set, the mount needs SELinux relabeling.
 	SelinuxRelabel   *bool  `protobuf:"varint,4,opt,name=selinux_relabel,json=selinuxRelabel" json:"selinux_relabel,omitempty"`
 	XXX_unrecognized []byte `json:"-"`
 }
@@ -470,18 +470,18 @@ func (m *NamespaceOption) GetHostIpc() bool {
 // 2) It may not be applicable to a PodSandbox which does not contain any running
 //    process.
 type LinuxSandboxSecurityContext struct {
-	// The configurations for the sandbox's namespaces.
+	// Configurations for the sandbox's namespaces.
 	// This will be used only if the PodSandbox uses namespace for isolation.
 	NamespaceOptions *NamespaceOption `protobuf:"bytes,1,opt,name=namespace_options,json=namespaceOptions" json:"namespace_options,omitempty"`
 	// Optional SELinux context to be applied.
 	SelinuxOptions *SELinuxOption `protobuf:"bytes,2,opt,name=selinux_options,json=selinuxOptions" json:"selinux_options,omitempty"`
-	// The user to run the entrypoint of the sandbox process, it could be uid or
+	// User to run the entrypoint of the sandbox process. Can be either UID or
 	// user name.
 	RunAsUser *string `protobuf:"bytes,3,opt,name=run_as_user,json=runAsUser" json:"run_as_user,omitempty"`
 	// If set, the root filesystem of the sandbox is read-only.
 	ReadonlyRootfs *bool `protobuf:"varint,4,opt,name=readonly_rootfs,json=readonlyRootfs" json:"readonly_rootfs,omitempty"`
-	// A list of groups applied to the first process run in the sandbox, in addition
-	// to the sandbox's primary GID.
+	// List of groups applied to the first process run in the sandbox, in
+	// addition to the sandbox's primary GID.
 	SupplementalGroups []int64 `protobuf:"varint,5,rep,name=supplemental_groups,json=supplementalGroups" json:"supplemental_groups,omitempty"`
 	XXX_unrecognized   []byte  `json:"-"`
 }
@@ -529,7 +529,7 @@ func (m *LinuxSandboxSecurityContext) GetSupplementalGroups() []int64 {
 // LinuxPodSandboxConfig holds platform-specific configurations for Linux
 // host platforms and Linux-based containers.
 type LinuxPodSandboxConfig struct {
-	// The parent cgroup of the pod sandbox.
+	// Parent cgroup of the PodSandbox.
 	// The cgroupfs style syntax will be used, but the container runtime can
 	// convert it to systemd semantics if needed.
 	CgroupParent *string `protobuf:"bytes,1,opt,name=cgroup_parent,json=cgroupParent" json:"cgroup_parent,omitempty"`
@@ -562,13 +562,13 @@ func (m *LinuxPodSandboxConfig) GetSecurityContext() *LinuxSandboxSecurityContex
 // PodSandbox in its user interface for better user experience. For example,
 // the runtime can construct a unique PodSandboxName based on the metadata.
 type PodSandboxMetadata struct {
-	// The pod name of the sandbox. Same as the pod name in the PodSpec.
+	// Pod name of the sandbox. Same as the pod name in the PodSpec.
 	Name *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
-	// The pod UID of the sandbox. Same as the pod UID in the PodSpec.
+	// Pod UID of the sandbox. Same as the pod UID in the PodSpec.
 	Uid *string `protobuf:"bytes,2,opt,name=uid" json:"uid,omitempty"`
-	// The pod namespace of the sandbox. Same as the pod namespace in the PodSpec.
+	// Pod namespace of the sandbox. Same as the pod namespace in the PodSpec.
 	Namespace *string `protobuf:"bytes,3,opt,name=namespace" json:"namespace,omitempty"`
-	// The attempt number of creating the sandbox.
+	// Attempt number of creating the sandbox.
 	Attempt          *uint32 `protobuf:"varint,4,opt,name=attempt" json:"attempt,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
@@ -609,12 +609,12 @@ func (m *PodSandboxMetadata) GetAttempt() uint32 {
 // PodSandboxConfig holds all the required and optional fields for creating a
 // sandbox.
 type PodSandboxConfig struct {
-	// The metadata of the sandbox. This information will uniquely identify
-	// the sandbox, and the runtime should leverage this to ensure correct
+	// Metadata of the sandbox. This information will uniquely identify the
+	// sandbox, and the runtime should leverage this to ensure correct
 	// operation. The runtime may also use this information to improve UX, such
 	// as by constructing a readable name.
 	Metadata *PodSandboxMetadata `protobuf:"bytes,1,opt,name=metadata" json:"metadata,omitempty"`
-	// The hostname of the sandbox.
+	// Hostname of the sandbox.
 	Hostname *string `protobuf:"bytes,2,opt,name=hostname" json:"hostname,omitempty"`
 	// Path to the directory on the host in which container log files are
 	// stored.
@@ -632,11 +632,11 @@ type PodSandboxConfig struct {
 	// https://issues.k8s.io/24677. There *may* be future change of direction
 	// for logging as the discussion carries on.
 	LogDirectory *string `protobuf:"bytes,3,opt,name=log_directory,json=logDirectory" json:"log_directory,omitempty"`
-	// The DNS config for the sandbox.
+	// DNS config for the sandbox.
 	DnsConfig *DNSConfig `protobuf:"bytes,4,opt,name=dns_config,json=dnsConfig" json:"dns_config,omitempty"`
-	// The port mappings for the sandbox.
+	// Port mappings for the sandbox.
 	PortMappings []*PortMapping `protobuf:"bytes,5,rep,name=port_mappings,json=portMappings" json:"port_mappings,omitempty"`
-	// Labels are key value pairs that may be used to scope and select individual resources.
+	// Key-value pairs that may be used to scope and select individual resources.
 	Labels map[string]string `protobuf:"bytes,6,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Annotations is an unstructured key value map that may be set by external
 	// tools to store and retrieve arbitrary metadata. There are a few features are
@@ -736,7 +736,7 @@ func (m *PodSandboxConfig) GetLinux() *LinuxPodSandboxConfig {
 }
 
 type RunPodSandboxRequest struct {
-	// The configuration for creating a PodSandbox.
+	// Configuration for creating a PodSandbox.
 	Config           *PodSandboxConfig `protobuf:"bytes,1,opt,name=config" json:"config,omitempty"`
 	XXX_unrecognized []byte            `json:"-"`
 }
@@ -754,7 +754,7 @@ func (m *RunPodSandboxRequest) GetConfig() *PodSandboxConfig {
 }
 
 type RunPodSandboxResponse struct {
-	// The id of the PodSandbox
+	// ID of the PodSandbox to run.
 	PodSandboxId     *string `protobuf:"bytes,1,opt,name=pod_sandbox_id,json=podSandboxId" json:"pod_sandbox_id,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
@@ -772,7 +772,7 @@ func (m *RunPodSandboxResponse) GetPodSandboxId() string {
 }
 
 type StopPodSandboxRequest struct {
-	// The id of the PodSandbox
+	// ID of the PodSandbox to stop.
 	PodSandboxId     *string `protobuf:"bytes,1,opt,name=pod_sandbox_id,json=podSandboxId" json:"pod_sandbox_id,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
@@ -799,7 +799,7 @@ func (*StopPodSandboxResponse) ProtoMessage()               {}
 func (*StopPodSandboxResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{13} }
 
 type RemovePodSandboxRequest struct {
-	// The id of the PodSandbox
+	// ID of the PodSandbox to remove.
 	PodSandboxId     *string `protobuf:"bytes,1,opt,name=pod_sandbox_id,json=podSandboxId" json:"pod_sandbox_id,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
@@ -826,7 +826,7 @@ func (*RemovePodSandboxResponse) ProtoMessage()               {}
 func (*RemovePodSandboxResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{15} }
 
 type PodSandboxStatusRequest struct {
-	// The id of the PodSandbox
+	// ID of the PodSandbox for which to retrieve status.
 	PodSandboxId     *string `protobuf:"bytes,1,opt,name=pod_sandbox_id,json=podSandboxId" json:"pod_sandbox_id,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
@@ -845,7 +845,7 @@ func (m *PodSandboxStatusRequest) GetPodSandboxId() string {
 
 // PodSandboxNetworkStatus is the status of the network for a PodSandbox.
 type PodSandboxNetworkStatus struct {
-	// The IP address of the PodSandbox
+	// IP address of the PodSandbox.
 	Ip               *string `protobuf:"bytes,1,opt,name=ip" json:"ip,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
@@ -864,9 +864,9 @@ func (m *PodSandboxNetworkStatus) GetIp() string {
 
 // Namespace contains paths to the namespaces.
 type Namespace struct {
-	// Network is the path to the network namespace.
+	// Path to the network namespace.
 	Network *string `protobuf:"bytes,1,opt,name=network" json:"network,omitempty"`
-	// Options is the namespace options for linux namespaces
+	// Namespace options for Linux namespaces.
 	Options          *NamespaceOption `protobuf:"bytes,2,opt,name=options" json:"options,omitempty"`
 	XXX_unrecognized []byte           `json:"-"`
 }
@@ -892,7 +892,7 @@ func (m *Namespace) GetOptions() *NamespaceOption {
 
 // LinuxSandboxStatus contains status specific to Linux sandboxes.
 type LinuxPodSandboxStatus struct {
-	// Namespaces contains paths to the sandbox's namespaces.
+	// Paths to the sandbox's namespaces.
 	Namespaces       *Namespace `protobuf:"bytes,1,opt,name=namespaces" json:"namespaces,omitempty"`
 	XXX_unrecognized []byte     `json:"-"`
 }
@@ -921,7 +921,7 @@ type PodSandboxStatus struct {
 	CreatedAt *int64 `protobuf:"varint,4,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
 	// Network contains network status if network is handled by the runtime.
 	Network *PodSandboxNetworkStatus `protobuf:"bytes,5,opt,name=network" json:"network,omitempty"`
-	// Linux specific status to a pod sandbox.
+	// Linux-specific status to a pod sandbox.
 	Linux *LinuxPodSandboxStatus `protobuf:"bytes,6,opt,name=linux" json:"linux,omitempty"`
 	// Labels are key value pairs that may be used to scope and select individual resources.
 	Labels map[string]string `protobuf:"bytes,7,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
@@ -993,7 +993,7 @@ func (m *PodSandboxStatus) GetAnnotations() map[string]string {
 }
 
 type PodSandboxStatusResponse struct {
-	// The status of the PodSandbox
+	// Status of the PodSandbox.
 	Status           *PodSandboxStatus `protobuf:"bytes,1,opt,name=status" json:"status,omitempty"`
 	XXX_unrecognized []byte            `json:"-"`
 }
@@ -1070,15 +1070,15 @@ func (m *ListPodSandboxRequest) GetFilter() *PodSandboxFilter {
 
 // PodSandbox contains minimal information about a sandbox.
 type PodSandbox struct {
-	// The id of the PodSandbox
+	// ID of the PodSandbox.
 	Id *string `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	// Metadata of the sandbox
+	// Metadata of the PodSandbox.
 	Metadata *PodSandboxMetadata `protobuf:"bytes,2,opt,name=metadata" json:"metadata,omitempty"`
-	// The state of the PodSandbox
+	// State of the PodSandbox.
 	State *PodSandboxState `protobuf:"varint,3,opt,name=state,enum=runtime.PodSandboxState" json:"state,omitempty"`
-	// Creation timestamps of the sandbox in nanoseconds
+	// Creation timestamps of the PodSandbox in nanoseconds.
 	CreatedAt *int64 `protobuf:"varint,4,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	// The labels of the PodSandbox
+	// Labels of the PodSandbox.
 	Labels map[string]string `protobuf:"bytes,5,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Annotations is an unstructured key value map that may be set by external
 	// tools to store and retrieve arbitrary metadata.
@@ -1134,7 +1134,7 @@ func (m *PodSandbox) GetAnnotations() map[string]string {
 }
 
 type ListPodSandboxResponse struct {
-	// List of PodSandbox
+	// List of PodSandboxes.
 	Items            []*PodSandbox `protobuf:"bytes,1,rep,name=items" json:"items,omitempty"`
 	XXX_unrecognized []byte        `json:"-"`
 }
@@ -1202,13 +1202,13 @@ func (m *KeyValue) GetValue() string {
 // TODO: Consider using Resources from opencontainers/runtime-spec/specs-go
 // directly.
 type LinuxContainerResources struct {
-	// CPU CFS (Completely Fair Scheduler) period
+	// CPU CFS (Completely Fair Scheduler) period.
 	CpuPeriod *int64 `protobuf:"varint,1,opt,name=cpu_period,json=cpuPeriod" json:"cpu_period,omitempty"`
-	// CPU CFS (Completely Fair Scheduler) quota
+	// CPU CFS (Completely Fair Scheduler) quota.
 	CpuQuota *int64 `protobuf:"varint,2,opt,name=cpu_quota,json=cpuQuota" json:"cpu_quota,omitempty"`
-	// CPU shares (relative weight vs. other containers)
+	// CPU shares (relative weight vs. other containers).
 	CpuShares *int64 `protobuf:"varint,3,opt,name=cpu_shares,json=cpuShares" json:"cpu_shares,omitempty"`
-	// Memory limit in bytes
+	// Memory limit in bytes.
 	MemoryLimitInBytes *int64 `protobuf:"varint,4,opt,name=memory_limit_in_bytes,json=memoryLimitInBytes" json:"memory_limit_in_bytes,omitempty"`
 	// OOMScoreAdj adjusts the oom-killer score.
 	OomScoreAdj      *int64 `protobuf:"varint,5,opt,name=oom_score_adj,json=oomScoreAdj" json:"oom_score_adj,omitempty"`
@@ -1331,19 +1331,19 @@ type LinuxContainerSecurityContext struct {
 	Capabilities *Capability `protobuf:"bytes,1,opt,name=capabilities" json:"capabilities,omitempty"`
 	// If set, run container in privileged mode.
 	Privileged *bool `protobuf:"varint,2,opt,name=privileged" json:"privileged,omitempty"`
-	// The configurations for the container's namespaces.
-	// This will be used only if the container uses namespace for isolation.
+	// Configurations for the container's namespaces.
+	// Only used if the container uses namespace for isolation.
 	NamespaceOptions *NamespaceOption `protobuf:"bytes,3,opt,name=namespace_options,json=namespaceOptions" json:"namespace_options,omitempty"`
-	// Optional SELinux context to be applied.
+	// SELinux context to be optionally applied.
 	SelinuxOptions *SELinuxOption `protobuf:"bytes,4,opt,name=selinux_options,json=selinuxOptions" json:"selinux_options,omitempty"`
-	// The user to run the the container process as, it could be uid or user
+	// The user to run the the container process as. Can be either UID or user
 	// name.
 	// Defaults to user specified in image metadata if unspecified.
 	RunAsUser *string `protobuf:"bytes,5,opt,name=run_as_user,json=runAsUser" json:"run_as_user,omitempty"`
 	// If set, the root filesystem of the container is read-only.
 	ReadonlyRootfs *bool `protobuf:"varint,6,opt,name=readonly_rootfs,json=readonlyRootfs" json:"readonly_rootfs,omitempty"`
-	// A list of groups applied to the first process run in the container, in addition
-	// to the container's primary GID.
+	// List of groups applied to the first process run in the container, in
+	// addition to the container's primary GID.
 	SupplementalGroups []int64 `protobuf:"varint,7,rep,name=supplemental_groups,json=supplementalGroups" json:"supplemental_groups,omitempty"`
 	XXX_unrecognized   []byte  `json:"-"`
 }
@@ -1439,9 +1439,9 @@ func (m *LinuxContainerConfig) GetSecurityContext() *LinuxContainerSecurityConte
 // container name based on the metadata. Note that (name, attempt) is unique
 // within a sandbox for the entire lifetime of the sandbox.
 type ContainerMetadata struct {
-	// The name of the container. Same as the container name in the PodSpec.
+	// Name of the container. Same as the container name in the PodSpec.
 	Name *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
-	// The attempt number of creating the container.
+	// Attempt number of creating the container.
 	Attempt          *uint32 `protobuf:"varint,2,opt,name=attempt" json:"attempt,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
@@ -1467,9 +1467,9 @@ func (m *ContainerMetadata) GetAttempt() uint32 {
 
 // Device specifies a host device to mount into a container.
 type Device struct {
-	// The path of the device within the container.
+	// Path of the device within the container.
 	ContainerPath *string `protobuf:"bytes,1,opt,name=container_path,json=containerPath" json:"container_path,omitempty"`
-	// The path of the device on the host.
+	// Path of the device on the host.
 	HostPath *string `protobuf:"bytes,2,opt,name=host_path,json=hostPath" json:"host_path,omitempty"`
 	// Cgroups permissions of the device, candidates are one or more of
 	// * r - allows container to read from the specified device.
@@ -1508,8 +1508,8 @@ func (m *Device) GetPermissions() string {
 // ContainerConfig holds all the required and optional fields for creating a
 // container.
 type ContainerConfig struct {
-	// The metadata of the container. This information will uniquely identify
-	// the container, and the runtime should leverage this to ensure correct
+	// Metadata of the container. This information will uniquely identify the
+	// container, and the runtime should leverage this to ensure correct
 	// operation. The runtime may also use this information to improve UX, such
 	// as by constructing a readable name.
 	Metadata *ContainerMetadata `protobuf:"bytes,1,opt,name=metadata" json:"metadata,omitempty"`
@@ -1523,11 +1523,11 @@ type ContainerConfig struct {
 	WorkingDir *string `protobuf:"bytes,5,opt,name=working_dir,json=workingDir" json:"working_dir,omitempty"`
 	// List of environment variable to set in the container.
 	Envs []*KeyValue `protobuf:"bytes,6,rep,name=envs" json:"envs,omitempty"`
-	// Mounts specifies mounts for the container.
+	// Mounts for the container.
 	Mounts []*Mount `protobuf:"bytes,7,rep,name=mounts" json:"mounts,omitempty"`
-	// Devices specifies devices for the container.
+	// Devices for the container.
 	Devices []*Device `protobuf:"bytes,8,rep,name=devices" json:"devices,omitempty"`
-	// Labels are key value pairs that may be used to scope and select individual resources.
+	// Key-value pairs that may be used to scope and select individual resources.
 	// Label keys are of the form:
 	//     label-key ::= prefixed-name | name
 	//     prefixed-name ::= prefix '/' name
@@ -1555,7 +1555,7 @@ type ContainerConfig struct {
 	Stdin     *bool `protobuf:"varint,12,opt,name=stdin" json:"stdin,omitempty"`
 	StdinOnce *bool `protobuf:"varint,13,opt,name=stdin_once,json=stdinOnce" json:"stdin_once,omitempty"`
 	Tty       *bool `protobuf:"varint,14,opt,name=tty" json:"tty,omitempty"`
-	// Linux contains configuration specific to Linux containers.
+	// Configuration specific to Linux containers.
 	Linux            *LinuxContainerConfig `protobuf:"bytes,15,opt,name=linux" json:"linux,omitempty"`
 	XXX_unrecognized []byte                `json:"-"`
 }
@@ -1671,11 +1671,11 @@ func (m *ContainerConfig) GetLinux() *LinuxContainerConfig {
 }
 
 type CreateContainerRequest struct {
-	// The id of the PodSandbox
+	// ID of the PodSandbox in which the container should be created.
 	PodSandboxId *string `protobuf:"bytes,1,opt,name=pod_sandbox_id,json=podSandboxId" json:"pod_sandbox_id,omitempty"`
-	// The config of the container
+	// Config of the container.
 	Config *ContainerConfig `protobuf:"bytes,2,opt,name=config" json:"config,omitempty"`
-	// The config of the PodSandbox. This is the same config that was passed
+	// Config of the PodSandbox. This is the same config that was passed
 	// to RunPodSandboxRequest to create the PodSandbox. It is passed again
 	// here just for easy reference. The PodSandboxConfig is immutable and
 	// remains the same throughout the lifetime of the pod.
@@ -1710,7 +1710,7 @@ func (m *CreateContainerRequest) GetSandboxConfig() *PodSandboxConfig {
 }
 
 type CreateContainerResponse struct {
-	// The id of the created container
+	// ID of the created container.
 	ContainerId      *string `protobuf:"bytes,1,opt,name=container_id,json=containerId" json:"container_id,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
@@ -1728,7 +1728,7 @@ func (m *CreateContainerResponse) GetContainerId() string {
 }
 
 type StartContainerRequest struct {
-	// The id of the container
+	// ID of the container to start.
 	ContainerId      *string `protobuf:"bytes,1,opt,name=container_id,json=containerId" json:"container_id,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
@@ -1755,9 +1755,9 @@ func (*StartContainerResponse) ProtoMessage()               {}
 func (*StartContainerResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{39} }
 
 type StopContainerRequest struct {
-	// The id of the container
+	// ID of the container to stop.
 	ContainerId *string `protobuf:"bytes,1,opt,name=container_id,json=containerId" json:"container_id,omitempty"`
-	// Timeout in seconds to stop the container
+	// Timeout, in seconds, to stop the container.
 	Timeout          *int64 `protobuf:"varint,2,opt,name=timeout" json:"timeout,omitempty"`
 	XXX_unrecognized []byte `json:"-"`
 }
@@ -1791,7 +1791,7 @@ func (*StopContainerResponse) ProtoMessage()               {}
 func (*StopContainerResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{41} }
 
 type RemoveContainerRequest struct {
-	// The id of the container
+	// ID of the container to remove.
 	ContainerId      *string `protobuf:"bytes,1,opt,name=container_id,json=containerId" json:"container_id,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
@@ -1824,7 +1824,7 @@ type ContainerFilter struct {
 	Id *string `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
 	// State of the container.
 	State *ContainerState `protobuf:"varint,2,opt,name=state,enum=runtime.ContainerState" json:"state,omitempty"`
-	// The id of the pod sandbox
+	// ID of the PodSandbox.
 	PodSandboxId *string `protobuf:"bytes,3,opt,name=pod_sandbox_id,json=podSandboxId" json:"pod_sandbox_id,omitempty"`
 	// LabelSelector to select matches.
 	// Only api.MatchLabels is supported for now and the requirements
@@ -1886,23 +1886,23 @@ func (m *ListContainersRequest) GetFilter() *ContainerFilter {
 // Container provides the runtime information for a container, such as ID, hash,
 // state of the container.
 type Container struct {
-	// The ID of the container, used by the container runtime to identify
+	// ID of the container, used by the container runtime to identify
 	// a container.
 	Id *string `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
-	// The id of the sandbox which this container belongs to.
+	// ID of the sandbox to which this container belongs.
 	PodSandboxId *string `protobuf:"bytes,2,opt,name=pod_sandbox_id,json=podSandboxId" json:"pod_sandbox_id,omitempty"`
-	// The metadata of the container.
+	// Metadata of the container.
 	Metadata *ContainerMetadata `protobuf:"bytes,3,opt,name=metadata" json:"metadata,omitempty"`
-	// The spec of the image
+	// Spec of the image.
 	Image *ImageSpec `protobuf:"bytes,4,opt,name=image" json:"image,omitempty"`
 	// Reference to the image in use. For most runtimes, this should be an
 	// image ID.
 	ImageRef *string `protobuf:"bytes,5,opt,name=image_ref,json=imageRef" json:"image_ref,omitempty"`
-	// State is the state of the container.
+	// State of the container.
 	State *ContainerState `protobuf:"varint,6,opt,name=state,enum=runtime.ContainerState" json:"state,omitempty"`
 	// Creation time of the container in nanoseconds.
 	CreatedAt *int64 `protobuf:"varint,7,opt,name=created_at,json=createdAt" json:"created_at,omitempty"`
-	// Labels are key value pairs that may be used to scope and select individual resources.
+	// Key-value pairs that may be used to scope and select individual resources.
 	Labels map[string]string `protobuf:"bytes,8,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Annotations is an unstructured key value map that may be set by external
 	// tools to store and retrieve arbitrary metadata.
@@ -1979,7 +1979,7 @@ func (m *Container) GetAnnotations() map[string]string {
 }
 
 type ListContainersResponse struct {
-	// List of containers
+	// List of containers.
 	Containers       []*Container `protobuf:"bytes,1,rep,name=containers" json:"containers,omitempty"`
 	XXX_unrecognized []byte       `json:"-"`
 }
@@ -1997,7 +1997,7 @@ func (m *ListContainersResponse) GetContainers() []*Container {
 }
 
 type ContainerStatusRequest struct {
-	// The id of the container
+	// ID of the container for which to retrieve status.
 	ContainerId      *string `protobuf:"bytes,1,opt,name=container_id,json=containerId" json:"container_id,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
@@ -2030,21 +2030,21 @@ type ContainerStatus struct {
 	FinishedAt *int64 `protobuf:"varint,6,opt,name=finished_at,json=finishedAt" json:"finished_at,omitempty"`
 	// Exit code of the container.
 	ExitCode *int32 `protobuf:"varint,7,opt,name=exit_code,json=exitCode" json:"exit_code,omitempty"`
-	// The spec of the image
+	// Spec of the image.
 	Image *ImageSpec `protobuf:"bytes,8,opt,name=image" json:"image,omitempty"`
 	// Reference to the image in use. For most runtimes, this should be an
 	// image ID
 	ImageRef *string `protobuf:"bytes,9,opt,name=image_ref,json=imageRef" json:"image_ref,omitempty"`
-	// A brief CamelCase string explains why container is in such a status.
+	// Brief CamelCase string explaining why container is in its current state.
 	Reason *string `protobuf:"bytes,10,opt,name=reason" json:"reason,omitempty"`
-	// A human-readable message indication details about why container is in
-	// this state.
+	// Human-readable message indicating details about why container is in its
+	// current state.
 	Message *string `protobuf:"bytes,11,opt,name=message" json:"message,omitempty"`
-	// Labels are key value pairs that may be used to scope and select individual resources.
+	// Key-value pairs that may be used to scope and select individual resources.
 	Labels map[string]string `protobuf:"bytes,12,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Annotations is an unstructured key value map.
 	Annotations map[string]string `protobuf:"bytes,13,rep,name=annotations" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	// Mounts specifies mounts for the container
+	// Mounts for the container.
 	Mounts           []*Mount `protobuf:"bytes,14,rep,name=mounts" json:"mounts,omitempty"`
 	XXX_unrecognized []byte   `json:"-"`
 }
@@ -2153,7 +2153,7 @@ func (m *ContainerStatus) GetMounts() []*Mount {
 }
 
 type ContainerStatusResponse struct {
-	// The status of the container
+	// Status of the container.
 	Status           *ContainerStatus `protobuf:"bytes,1,opt,name=status" json:"status,omitempty"`
 	XXX_unrecognized []byte           `json:"-"`
 }
@@ -2171,9 +2171,9 @@ func (m *ContainerStatusResponse) GetStatus() *ContainerStatus {
 }
 
 type ExecSyncRequest struct {
-	// The id of the container
+	// ID of the container.
 	ContainerId *string `protobuf:"bytes,1,opt,name=container_id,json=containerId" json:"container_id,omitempty"`
-	// The cmd to execute
+	// Command to execute.
 	Cmd []string `protobuf:"bytes,2,rep,name=cmd" json:"cmd,omitempty"`
 	// Timeout in seconds to stop the command. Default: run forever.
 	Timeout          *int64 `protobuf:"varint,3,opt,name=timeout" json:"timeout,omitempty"`
@@ -2207,11 +2207,11 @@ func (m *ExecSyncRequest) GetTimeout() int64 {
 }
 
 type ExecSyncResponse struct {
-	// The captured command stdout output.
+	// Captured command stdout output.
 	Stdout []byte `protobuf:"bytes,1,opt,name=stdout" json:"stdout,omitempty"`
-	// The captured command stderr output.
+	// Captured command stderr output.
 	Stderr []byte `protobuf:"bytes,2,opt,name=stderr" json:"stderr,omitempty"`
-	// The exit code the command finished with.
+	// Exit code the command finished with.
 	ExitCode         *int32 `protobuf:"varint,3,opt,name=exit_code,json=exitCode" json:"exit_code,omitempty"`
 	XXX_unrecognized []byte `json:"-"`
 }
@@ -2243,13 +2243,13 @@ func (m *ExecSyncResponse) GetExitCode() int32 {
 }
 
 type ExecRequest struct {
-	// The id of the container
+	// ID of the container in which to execute the command.
 	ContainerId *string `protobuf:"bytes,1,opt,name=container_id,json=containerId" json:"container_id,omitempty"`
-	// The cmd to execute
+	// Command to execute.
 	Cmd []string `protobuf:"bytes,2,rep,name=cmd" json:"cmd,omitempty"`
-	// Whether use tty
+	// Whether use tty.
 	Tty *bool `protobuf:"varint,3,opt,name=tty" json:"tty,omitempty"`
-	// Whether to stream stdin
+	// Whether to stream stdin.
 	Stdin            *bool  `protobuf:"varint,4,opt,name=stdin" json:"stdin,omitempty"`
 	XXX_unrecognized []byte `json:"-"`
 }
@@ -2288,7 +2288,7 @@ func (m *ExecRequest) GetStdin() bool {
 }
 
 type ExecResponse struct {
-	// The fully qualified URL of the exec streaming server
+	// Fully qualified URL of the exec streaming server.
 	Url              *string `protobuf:"bytes,1,opt,name=url" json:"url,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
@@ -2306,9 +2306,9 @@ func (m *ExecResponse) GetUrl() string {
 }
 
 type AttachRequest struct {
-	// The id of the container
+	// ID of the container to which to attach.
 	ContainerId *string `protobuf:"bytes,1,opt,name=container_id,json=containerId" json:"container_id,omitempty"`
-	// Whether to stream stdin
+	// Whether to stream stdin.
 	Stdin            *bool  `protobuf:"varint,2,opt,name=stdin" json:"stdin,omitempty"`
 	XXX_unrecognized []byte `json:"-"`
 }
@@ -2333,7 +2333,7 @@ func (m *AttachRequest) GetStdin() bool {
 }
 
 type AttachResponse struct {
-	// The fully qualified URL of the attach streaming server
+	// Fully qualified URL of the attach streaming server.
 	Url              *string `protobuf:"bytes,1,opt,name=url" json:"url,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
@@ -2351,9 +2351,9 @@ func (m *AttachResponse) GetUrl() string {
 }
 
 type PortForwardRequest struct {
-	// The id of the container
+	// ID of the container to which to forward the port.
 	PodSandboxId *string `protobuf:"bytes,1,opt,name=pod_sandbox_id,json=podSandboxId" json:"pod_sandbox_id,omitempty"`
-	// The port to forward
+	// Port to forward.
 	Port             []int32 `protobuf:"varint,2,rep,name=port" json:"port,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
@@ -2378,7 +2378,7 @@ func (m *PortForwardRequest) GetPort() []int32 {
 }
 
 type PortForwardResponse struct {
-	// The fully qualified URL of the port-forward streaming server
+	// Fully qualified URL of the port-forward streaming server.
 	Url              *string `protobuf:"bytes,1,opt,name=url" json:"url,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
@@ -2396,7 +2396,7 @@ func (m *PortForwardResponse) GetUrl() string {
 }
 
 type ImageFilter struct {
-	// The spec of the image
+	// Spec of the image.
 	Image            *ImageSpec `protobuf:"bytes,1,opt,name=image" json:"image,omitempty"`
 	XXX_unrecognized []byte     `json:"-"`
 }
@@ -2414,7 +2414,7 @@ func (m *ImageFilter) GetImage() *ImageSpec {
 }
 
 type ListImagesRequest struct {
-	// The filter to list images
+	// Filter to list images.
 	Filter           *ImageFilter `protobuf:"bytes,1,opt,name=filter" json:"filter,omitempty"`
 	XXX_unrecognized []byte       `json:"-"`
 }
@@ -2439,9 +2439,9 @@ type Image struct {
 	RepoTags []string `protobuf:"bytes,2,rep,name=repo_tags,json=repoTags" json:"repo_tags,omitempty"`
 	// Digests by which this image is known.
 	RepoDigests []string `protobuf:"bytes,3,rep,name=repo_digests,json=repoDigests" json:"repo_digests,omitempty"`
-	// The size of the image in bytes.
+	// Size of the image in bytes.
 	Size_ *uint64 `protobuf:"varint,4,opt,name=size" json:"size,omitempty"`
-	// The user that will run the command(s).
+	// User that will run the command(s).
 	User             *string `protobuf:"bytes,5,opt,name=user" json:"user,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
@@ -2487,7 +2487,7 @@ func (m *Image) GetUser() string {
 }
 
 type ListImagesResponse struct {
-	// List of images
+	// List of images.
 	Images           []*Image `protobuf:"bytes,1,rep,name=images" json:"images,omitempty"`
 	XXX_unrecognized []byte   `json:"-"`
 }
@@ -2505,7 +2505,7 @@ func (m *ListImagesResponse) GetImages() []*Image {
 }
 
 type ImageStatusRequest struct {
-	// The spec of the image
+	// Spec of the image.
 	Image            *ImageSpec `protobuf:"bytes,1,opt,name=image" json:"image,omitempty"`
 	XXX_unrecognized []byte     `json:"-"`
 }
@@ -2523,7 +2523,7 @@ func (m *ImageStatusRequest) GetImage() *ImageSpec {
 }
 
 type ImageStatusResponse struct {
-	// The status of the image
+	// Status of the image.
 	Image            *Image `protobuf:"bytes,1,opt,name=image" json:"image,omitempty"`
 	XXX_unrecognized []byte `json:"-"`
 }
@@ -2602,11 +2602,11 @@ func (m *AuthConfig) GetRegistryToken() string {
 }
 
 type PullImageRequest struct {
-	// The spec of the image
+	// Spec of the image.
 	Image *ImageSpec `protobuf:"bytes,1,opt,name=image" json:"image,omitempty"`
-	// The auth config for pulling image
+	// Authentication configuration for pulling the image.
 	Auth *AuthConfig `protobuf:"bytes,2,opt,name=auth" json:"auth,omitempty"`
-	// The config of the PodSandbox, which is used to pull image in PodSandbox context
+	// Config of the PodSandbox, which is used to pull image in PodSandbox context.
 	SandboxConfig    *PodSandboxConfig `protobuf:"bytes,3,opt,name=sandbox_config,json=sandboxConfig" json:"sandbox_config,omitempty"`
 	XXX_unrecognized []byte            `json:"-"`
 }
@@ -2647,7 +2647,7 @@ func (*PullImageResponse) ProtoMessage()               {}
 func (*PullImageResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{67} }
 
 type RemoveImageRequest struct {
-	// The spec of the image
+	// Spec of the image to remove.
 	Image            *ImageSpec `protobuf:"bytes,1,opt,name=image" json:"image,omitempty"`
 	XXX_unrecognized []byte     `json:"-"`
 }
@@ -2674,7 +2674,7 @@ func (*RemoveImageResponse) ProtoMessage()               {}
 func (*RemoveImageResponse) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{69} }
 
 type NetworkConfig struct {
-	// The CIDR to use for pod IP addresses
+	// CIDR to use for pod IP addresses.
 	PodCidr          *string `protobuf:"bytes,1,opt,name=pod_cidr,json=podCidr" json:"pod_cidr,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
@@ -2752,9 +2752,9 @@ type RuntimeCondition struct {
 	Type *string `protobuf:"bytes,1,opt,name=type" json:"type,omitempty"`
 	// Status of the condition, one of true/false.
 	Status *bool `protobuf:"varint,2,opt,name=status" json:"status,omitempty"`
-	// Reason is brief reason for the condition's last transition.
+	// Brief CamelCase string containing reason for the condition's last transition.
 	Reason *string `protobuf:"bytes,3,opt,name=reason" json:"reason,omitempty"`
-	// Message is human readable message indicating details about last transition.
+	// Human-readable message indicating details about last transition.
 	Message          *string `protobuf:"bytes,4,opt,name=message" json:"message,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
@@ -2794,7 +2794,7 @@ func (m *RuntimeCondition) GetMessage() string {
 
 // RuntimeStatus is information about the current status of the runtime.
 type RuntimeStatus struct {
-	// Conditions is an array of current observed runtime conditions.
+	// List of current observed runtime conditions.
 	Conditions       []*RuntimeCondition `protobuf:"bytes,1,rep,name=conditions" json:"conditions,omitempty"`
 	XXX_unrecognized []byte              `json:"-"`
 }
@@ -2821,7 +2821,7 @@ func (*StatusRequest) ProtoMessage()               {}
 func (*StatusRequest) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{76} }
 
 type StatusResponse struct {
-	// The status of the Runtime.
+	// Status of the Runtime.
 	Status           *RuntimeStatus `protobuf:"bytes,1,opt,name=status" json:"status,omitempty"`
 	XXX_unrecognized []byte         `json:"-"`
 }
@@ -2933,7 +2933,7 @@ const _ = grpc.SupportPackageIsVersion3
 // Client API for RuntimeService service
 
 type RuntimeServiceClient interface {
-	// Version returns the runtime name, runtime version and runtime API version
+	// Version returns the runtime name, runtime version, and runtime API version.
 	Version(ctx context.Context, in *VersionRequest, opts ...grpc.CallOption) (*VersionResponse, error)
 	// RunPodSandbox creates and starts a pod-level sandbox. Runtimes must ensure
 	// the sandbox is in the ready state on success.
@@ -2964,6 +2964,7 @@ type RuntimeServiceClient interface {
 	// StopContainer stops a running container with a grace period (i.e., timeout).
 	// This call is idempotent, and must not return an error if the container has
 	// already been stopped.
+	// TODO: what must the runtime do after the grace period is reached?
 	StopContainer(ctx context.Context, in *StopContainerRequest, opts ...grpc.CallOption) (*StopContainerResponse, error)
 	// RemoveContainer removes the container. If the container is running, the
 	// container must be forcibly removed.
@@ -2982,7 +2983,7 @@ type RuntimeServiceClient interface {
 	Attach(ctx context.Context, in *AttachRequest, opts ...grpc.CallOption) (*AttachResponse, error)
 	// PortForward prepares a streaming endpoint to forward ports from a PodSandbox.
 	PortForward(ctx context.Context, in *PortForwardRequest, opts ...grpc.CallOption) (*PortForwardResponse, error)
-	// UpdateRuntimeConfig updates the runtime configuration based on request
+	// UpdateRuntimeConfig updates the runtime configuration based on the given request.
 	UpdateRuntimeConfig(ctx context.Context, in *UpdateRuntimeConfigRequest, opts ...grpc.CallOption) (*UpdateRuntimeConfigResponse, error)
 	// Status returns the status of the runtime.
 	Status(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusResponse, error)
@@ -3161,7 +3162,7 @@ func (c *runtimeServiceClient) Status(ctx context.Context, in *StatusRequest, op
 // Server API for RuntimeService service
 
 type RuntimeServiceServer interface {
-	// Version returns the runtime name, runtime version and runtime API version
+	// Version returns the runtime name, runtime version, and runtime API version.
 	Version(context.Context, *VersionRequest) (*VersionResponse, error)
 	// RunPodSandbox creates and starts a pod-level sandbox. Runtimes must ensure
 	// the sandbox is in the ready state on success.
@@ -3192,6 +3193,7 @@ type RuntimeServiceServer interface {
 	// StopContainer stops a running container with a grace period (i.e., timeout).
 	// This call is idempotent, and must not return an error if the container has
 	// already been stopped.
+	// TODO: what must the runtime do after the grace period is reached?
 	StopContainer(context.Context, *StopContainerRequest) (*StopContainerResponse, error)
 	// RemoveContainer removes the container. If the container is running, the
 	// container must be forcibly removed.
@@ -3210,7 +3212,7 @@ type RuntimeServiceServer interface {
 	Attach(context.Context, *AttachRequest) (*AttachResponse, error)
 	// PortForward prepares a streaming endpoint to forward ports from a PodSandbox.
 	PortForward(context.Context, *PortForwardRequest) (*PortForwardResponse, error)
-	// UpdateRuntimeConfig updates the runtime configuration based on request
+	// UpdateRuntimeConfig updates the runtime configuration based on the given request.
 	UpdateRuntimeConfig(context.Context, *UpdateRuntimeConfigRequest) (*UpdateRuntimeConfigResponse, error)
 	// Status returns the status of the runtime.
 	Status(context.Context, *StatusRequest) (*StatusResponse, error)
