@@ -51,6 +51,7 @@ import (
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
+	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/serviceaccount"
@@ -246,7 +247,7 @@ func Run(s *options.ServerRunOptions) error {
 	}
 
 	privilegedLoopbackToken := uuid.NewRandom().String()
-	selfClientConfig, err := s.GenericServerRunOptions.NewSelfClientConfig(privilegedLoopbackToken)
+	selfClientConfig, err := genericoptions.NewSelfClientConfig(s.GenericServerRunOptions.SecureServingOptions, s.GenericServerRunOptions.InsecureServingOptions, privilegedLoopbackToken)
 	if err != nil {
 		glog.Fatalf("Failed to create clientset: %v", err)
 	}

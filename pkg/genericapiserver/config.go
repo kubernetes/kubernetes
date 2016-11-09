@@ -222,7 +222,6 @@ func NewConfig() *Config {
 	defaultOptions := options.NewServerRunOptions()
 	// unset fields that can be overridden to avoid setting values so that we won't end up with lingering values.
 	// TODO we probably want to run the defaults the other way.  A default here drives it in the CLI flags
-	defaultOptions.InsecurePort = 0
 	defaultOptions.AuditLogPath = ""
 	return config.ApplyOptions(defaultOptions)
 }
@@ -273,9 +272,9 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 		c.ReadWritePort = options.SecureServingOptions.ServingOptions.BindPort
 	}
 
-	if options.InsecurePort > 0 {
+	if options.InsecureServingOptions != nil && options.InsecureServingOptions.BindPort > 0 {
 		insecureServingInfo := &ServingInfo{
-			BindAddress: net.JoinHostPort(options.InsecureBindAddress.String(), strconv.Itoa(options.InsecurePort)),
+			BindAddress: net.JoinHostPort(options.InsecureServingOptions.BindAddress.String(), strconv.Itoa(options.InsecureServingOptions.BindPort)),
 		}
 		c.InsecureServingInfo = insecureServingInfo
 	}
