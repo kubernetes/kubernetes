@@ -87,8 +87,9 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*extensions.ReplicaSe
 	currentCond := util.GetDeploymentCondition(d.Status, extensions.DeploymentProgressing)
 	isResyncEvent := newStatus.Replicas == newStatus.UpdatedReplicas && currentCond != nil && currentCond.Reason == util.NewRSAvailableReason
 	// Check for progress only if there is a progress deadline set and the latest rollout
-	// hasn't completed yet.
-	if d.Spec.ProgressDeadlineSeconds != nil && !isResyncEvent {
+	// hasn't completed yet. We also need to ensure the new replica set exists, otherwise
+	// we cannot estimate any progress.
+	if d.Spec.ProgressDeadlineSeconds != nil && !isResyncEvent && newRS != nil {
 		switch {
 		case util.DeploymentComplete(d, &newStatus):
 			// Update the deployment conditions with a message for the new replica set that
