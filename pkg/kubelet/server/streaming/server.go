@@ -42,7 +42,7 @@ type Server interface {
 	// Get the serving URL for the requests.
 	// Requests must not be nil. Responses may be nil iff an error is returned.
 	GetExec(*runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error)
-	GetAttach(req *runtimeapi.AttachRequest, tty bool) (*runtimeapi.AttachResponse, error)
+	GetAttach(req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error)
 	GetPortForward(*runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error)
 
 	// Start the server.
@@ -154,12 +154,12 @@ func (s *server) GetExec(req *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse,
 	}, nil
 }
 
-func (s *server) GetAttach(req *runtimeapi.AttachRequest, tty bool) (*runtimeapi.AttachResponse, error) {
+func (s *server) GetAttach(req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error) {
 	url := s.buildURL("attach", req.GetContainerId(), streamOpts{
 		stdin:  req.GetStdin(),
 		stdout: true,
-		stderr: !tty, // For TTY connections, both stderr is combined with stdout.
-		tty:    tty,
+		stderr: !req.GetTty(), // For TTY connections, both stderr is combined with stdout.
+		tty:    req.GetTty(),
 	})
 	return &runtimeapi.AttachResponse{
 		Url: &url,

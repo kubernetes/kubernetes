@@ -99,12 +99,11 @@ func (ds *dockerService) Attach(req *runtimeapi.AttachRequest) (*runtimeapi.Atta
 	if ds.streamingServer == nil {
 		return nil, streaming.ErrorStreamingDisabled("attach")
 	}
-	container, err := checkContainerStatus(ds.client, req.GetContainerId())
+	_, err := checkContainerStatus(ds.client, req.GetContainerId())
 	if err != nil {
 		return nil, err
 	}
-	tty := container.Config.Tty
-	return ds.streamingServer.GetAttach(req, tty)
+	return ds.streamingServer.GetAttach(req)
 }
 
 // PortForward prepares a streaming endpoint to forward ports from a PodSandbox, and returns the address.

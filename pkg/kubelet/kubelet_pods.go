@@ -1350,10 +1350,23 @@ func (kl *Kubelet) GetAttach(podFullName string, podUID types.UID, containerName
 			return nil, err
 		}
 		if container == nil {
-			return nil, fmt.Errorf("container not found (%q)", containerName)
+			return nil, fmt.Errorf("container %s not found in pod %s", containerName, podFullName)
 		}
 
-		return streamingRuntime.GetAttach(container.ID, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr)
+		// The TTY setting for attach must match the TTY setting in the initial container configuration,
+		// since whether the process is running in a TTY cannot be changed after it has started.  We
+		// need the api.Pod to get the TTY status.
+		pod, found := kl.GetPodByFullName(podFullName)
+		if !found || pod.UID != podUID {
+			return nil, fmt.Errorf("pod %s not found", podFullName)
+		}
+		containerSpec := kubecontainer.GetContainerSpec(pod, containerName)
+		if containerSpec == nil {
+			return nil, fmt.Errorf("container %s not found in pod %s", containerName, podFullName)
+		}
+		tty := containerSpec.TTY
+
+		return streamingRuntime.GetAttach(container.ID, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr, tty)
 	default:
 		return nil, fmt.Errorf("container runtime does not support attach")
 	}
