@@ -119,13 +119,6 @@ func TestE2eNode(t *testing.T) {
 
 // Setup the kubelet on the node
 var _ = SynchronizedBeforeSuite(func() []byte {
-	// Initialize node name here, so that the following code can get right node name.
-	if framework.TestContext.NodeName == "" {
-		hostname, err := os.Hostname()
-		Expect(err).NotTo(HaveOccurred(), "should be able to get node name")
-		framework.TestContext.NodeName = hostname
-	}
-
 	// Run system validation test.
 	Expect(validateSystem()).To(Succeed(), "system validation")
 
@@ -166,6 +159,9 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	// The node test context is updated in the first function, update it on every test node.
 	err := json.Unmarshal(data, &framework.TestContext.NodeTestContextType)
 	Expect(err).NotTo(HaveOccurred(), "should be able to deserialize node test context.")
+
+	// update test context with node configuration.
+	Expect(updateTestContext()).To(Succeed(), "update test context with node config.")
 })
 
 // Tear down the kubelet on the node
@@ -217,24 +213,60 @@ func waitForNodeReady() {
 		// nodeReadyPollInterval is the interval to check node ready.
 		nodeReadyPollInterval = 1 * time.Second
 	)
-	config, err := framework.LoadConfig()
-	Expect(err).NotTo(HaveOccurred())
-	client, err := clientset.NewForConfig(config)
-	Expect(err).NotTo(HaveOccurred())
+	client, err := getAPIServerClient()
+	Expect(err).NotTo(HaveOccurred(), "should be able to get apiserver client.")
 	Eventually(func() error {
-		nodes, err := client.Nodes().List(api.ListOptions{})
-		Expect(err).NotTo(HaveOccurred())
-		if nodes == nil {
-			return fmt.Errorf("the node list is nil.")
+		node, err := getNode(client)
+		if err != nil {
+			return fmt.Errorf("failed to get node: %v", err)
 		}
-		Expect(len(nodes.Items) > 1).NotTo(BeTrue())
-		if len(nodes.Items) == 0 {
-			return fmt.Errorf("empty node list: %+v", nodes)
-		}
-		node := nodes.Items[0]
-		if !api.IsNodeReady(&node) {
+		if !api.IsNodeReady(node) {
 			return fmt.Errorf("node is not ready: %+v", node)
 		}
 		return nil
 	}, nodeReadyTimeout, nodeReadyPollInterval).Should(Succeed())
+}
+
+// updateTestContext updates the test context with the node name.
+// TODO(random-liu): Using dynamic kubelet configuration feature to
+// update test context with node configuration.
+func updateTestContext() error {
+	client, err := getAPIServerClient()
+	if err != nil {
+		return fmt.Errorf("failed to get apiserver client: %v", err)
+	}
+	node, err := getNode(client)
+	if err != nil {
+		return fmt.Errorf("failed to get node: %v", err)
+	}
+	// Initialize the node name
+	framework.TestContext.NodeName = node.Name
+	return nil
+}
+
+// getNode gets node object from the apiserver.
+func getNode(c *clientset.Clientset) (*api.Node, error) {
+	nodes, err := c.Nodes().List(api.ListOptions{})
+	Expect(err).NotTo(HaveOccurred(), "should be able to list nodes.")
+	if nodes == nil {
+		return nil, fmt.Errorf("the node list is nil.")
+	}
+	Expect(len(nodes.Items) > 1).NotTo(BeTrue(), "should not be more than 1 nodes.")
+	if len(nodes.Items) == 0 {
+		return nil, fmt.Errorf("empty node list: %+v", nodes)
+	}
+	return &nodes.Items[0], nil
+}
+
+// getAPIServerClient gets a apiserver client.
+func getAPIServerClient() (*clientset.Clientset, error) {
+	config, err := framework.LoadConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load config: %v", err)
+	}
+	client, err := clientset.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %v", err)
+	}
+	return client, nil
 }
