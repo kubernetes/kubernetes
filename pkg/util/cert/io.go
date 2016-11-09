@@ -25,14 +25,25 @@ import (
 	"path/filepath"
 )
 
-// CanReadCertOrKey returns true if the certificate or key files already exists,
+// CanReadCertAndKey returns true if the certificate and key files already exists,
 // otherwise returns false.
-func CanReadCertOrKey(certPath, keyPath string) bool {
-	if canReadFile(certPath) || canReadFile(keyPath) {
-		return true
+func CanReadCertAndKey(certPath, keyPath string) (bool, error) {
+	certExist := canReadFile(certPath)
+	keyExist := canReadFile(keyPath)
+
+	if certExist == false && keyExist == false {
+		return false, nil
 	}
 
-	return false
+	if certExist == false {
+		return false, fmt.Errorf("error reading %s, certificate and key must be supplied as a pair", certPath)
+	}
+
+	if keyExist == false {
+		return false, fmt.Errorf("error reading %s, certificate and key must be supplied as a pair", keyPath)
+	}
+
+	return true, nil
 }
 
 // If the file represented by path exists and
