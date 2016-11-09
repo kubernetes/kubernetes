@@ -7070,6 +7070,28 @@ func TestValidateLimitRange(t *testing.T) {
 			},
 		},
 		{
+			name: "pvc-min-only",
+			spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Type: api.LimitTypePersistentVolumeClaim,
+						Min:  getStorageResourceList("5Gi"),
+					},
+				},
+			},
+		},
+		{
+			name: "pvc-max-only",
+			spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Type: api.LimitTypePersistentVolumeClaim,
+						Max:  getStorageResourceList("10Gi"),
+					},
+				},
+			},
+		},
+		{
 			name: "all-fields-valid-big-numbers",
 			spec: api.LimitRangeSpec{
 				Limits: []api.LimitRangeItem{
@@ -7276,27 +7298,15 @@ func TestValidateLimitRange(t *testing.T) {
 			}},
 			"must be a standard limit type or fully qualified",
 		},
-		"invalid missing required min field": {
+		"min and max values missing, one required": {
 			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
 				Limits: []api.LimitRangeItem{
 					{
 						Type: api.LimitTypePersistentVolumeClaim,
-						Max:  getStorageResourceList("10000T"),
 					},
 				},
 			}},
-			"minimum storage value is required",
-		},
-		"invalid missing required max field": {
-			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
-				Limits: []api.LimitRangeItem{
-					{
-						Type: api.LimitTypePersistentVolumeClaim,
-						Min:  getStorageResourceList("10000T"),
-					},
-				},
-			}},
-			"maximum storage value is required",
+			"either minimum or maximum storage value is required, but neither was provided",
 		},
 		"invalid min greater than max": {
 			api.LimitRange{ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{

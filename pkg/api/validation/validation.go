@@ -3047,11 +3047,8 @@ func ValidateLimitRange(limitRange *api.LimitRange) field.ErrorList {
 		if limit.Type == api.LimitTypePersistentVolumeClaim {
 			_, minQuantityFound := limit.Min[api.ResourceStorage]
 			_, maxQuantityFound := limit.Max[api.ResourceStorage]
-			if !minQuantityFound {
-				allErrs = append(allErrs, field.Required(idxPath.Child("min"), "minimum storage value is required"))
-			}
-			if !maxQuantityFound {
-				allErrs = append(allErrs, field.Required(idxPath.Child("max"), "maximum storage value is required"))
+			if !minQuantityFound && !maxQuantityFound {
+				allErrs = append(allErrs, field.Required(idxPath.Child("limits"), "either minimum or maximum storage value is required, but neither was provided"))
 			}
 		}
 
