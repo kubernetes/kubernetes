@@ -238,11 +238,6 @@ func (g *genDeepCopy) Namers(c *generator.Context) namer.NameSystems {
 	// Have the raw namer for this file track what it imports.
 	return namer.NameSystems{
 		"raw": namer.NewRawNamer(g.targetPackage, g.imports),
-		"dcFnName": &dcFnNamer{
-			public:    deepCopyNamer(),
-			tracker:   g.imports,
-			myPackage: g.targetPackage,
-		},
 	}
 }
 
@@ -353,21 +348,6 @@ func argsFromType(ts ...*types.Type) generator.Args {
 		a[fmt.Sprintf("type%d", i+1)] = t
 	}
 	return a
-}
-
-type dcFnNamer struct {
-	public    namer.Namer
-	tracker   namer.ImportTracker
-	myPackage string
-}
-
-func (n *dcFnNamer) Name(t *types.Type) string {
-	pubName := n.public.Name(t)
-	n.tracker.AddType(t)
-	if t.Name.Package == n.myPackage {
-		return "DeepCopy_" + pubName
-	}
-	return fmt.Sprintf("%s.DeepCopy_%s", n.tracker.LocalNameOf(t.Name.Package), pubName)
 }
 
 func (g *genDeepCopy) Init(c *generator.Context, w io.Writer) error {
@@ -574,10 +554,6 @@ func (g *genDeepCopy) doSlice(t *types.Type, sw *generator.SnippetWriter) {
 			sw.Do("(*out)[i] = (*in)[i].DeepCopy()\n", nil)
 		} else if t.Elem.IsAssignable() {
 			sw.Do("(*out)[i] = (*in)[i]\n", nil)
-		} else if g.copyableAndInBounds(t.Elem) {
-			sw.Do("$.type|dcFnName$(&(*in)[i], &(*out)[i], c); err != nil {\n", argsFromType(t.Elem))
-			sw.Do("return err\n", nil)
-			sw.Do("}\n", nil)
 		} else if t.Elem.Kind == types.Interface {
 			sw.Do(fmt.Sprintf("(*out)[i] = (*in)[i].DeepCopy%s()\n", t.Elem.Name.Name), t)
 		} else {
@@ -618,10 +594,6 @@ func (g *genDeepCopy) doStruct(t *types.Type, sw *generator.SnippetWriter) {
 				sw.Do("out.$.name$ = in.$.name$.DeepCopy()\n", args)
 			} else if t.IsAssignable() {
 				sw.Do("out.$.name$ = in.$.name$\n", args)
-			} else if g.copyableAndInBounds(t) {
-				sw.Do("if err := $.type|dcFnName$(&in.$.name$, &out.$.name$, c); err != nil {\n", args)
-				sw.Do("return err\n", nil)
-				sw.Do("}\n", nil)
 			} else {
 				sw.Do("in.$.name$.DeepCopyInto(&out.$.name$)\n", args)
 			}
@@ -645,11 +617,6 @@ func (g *genDeepCopy) doPointer(t *types.Type, sw *generator.SnippetWriter) {
 	} else if t.Elem.IsAssignable() {
 		sw.Do("*out = new($.Elem|raw$)\n", t)
 		sw.Do("**out = **in", nil)
-	} else if g.copyableAndInBounds(t.Elem) {
-		sw.Do("*out = new($.Elem|raw$)\n", t)
-		sw.Do("if err := $.type|dcFnName$(*in, *out, c); err != nil {\n", argsFromType(t.Elem))
-		sw.Do("return err\n", nil)
-		sw.Do("}\n", nil)
 	} else {
 		sw.Do("*out = (*in).DeepCopy()\n", t)
 	}
