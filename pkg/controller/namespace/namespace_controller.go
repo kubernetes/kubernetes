@@ -47,8 +47,6 @@ type NamespaceController struct {
 	controller *cache.Controller
 	// namespaces that have been queued up for processing by workers
 	queue workqueue.RateLimitingInterface
-	// list of preferred group versions and their corresponding resource set for namespace deletion
-	groupVersionResources []unversioned.GroupVersionResource
 	// opCache is a cache to remember if a particular operation is not supported to aid dynamic client.
 	opCache *operationNotSupportedCache
 	// finalizerToken is the finalizer token managed by this controller
@@ -59,7 +57,6 @@ type NamespaceController struct {
 func NewNamespaceController(
 	kubeClient clientset.Interface,
 	clientPool dynamic.ClientPool,
-	groupVersionResources []unversioned.GroupVersionResource,
 	resyncPeriod time.Duration,
 	finalizerToken api.FinalizerName) *NamespaceController {
 
@@ -83,12 +80,11 @@ func NewNamespaceController(
 
 	// create the controller so we can inject the enqueue function
 	namespaceController := &NamespaceController{
-		kubeClient: kubeClient,
-		clientPool: clientPool,
-		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "namespace"),
-		groupVersionResources: groupVersionResources,
-		opCache:               opCache,
-		finalizerToken:        finalizerToken,
+		kubeClient:     kubeClient,
+		clientPool:     clientPool,
+		queue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "namespace"),
+		opCache:        opCache,
+		finalizerToken: finalizerToken,
 	}
 
 	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
@@ -191,7 +187,13 @@ func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
 		return err
 	}
 	namespace := obj.(*api.Namespace)
-	return syncNamespace(nm.kubeClient, nm.clientPool, nm.opCache, nm.groupVersionResources, namespace, nm.finalizerToken)
+	// list of preferred group versions and their corresponding resource set for namespace deletion
+	groupVersionResources, err := nm.kubeClient.Discovery().ServerPreferredNamespacedResources()
+	if err != nil {
+		glog.Errorf("Failed to get supported resources from server: %v", err)
+		return err
+	}
+	return syncNamespace(nm.kubeClient, nm.clientPool, nm.opCache, groupVersionResources, namespace, nm.finalizerToken)
 }
 
 // Run starts observing the system with the specified number of workers.
