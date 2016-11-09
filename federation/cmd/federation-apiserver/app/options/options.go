@@ -31,6 +31,7 @@ type ServerRunOptions struct {
 	Etcd                    *genericoptions.EtcdOptions
 	SecureServing           *genericoptions.SecureServingOptions
 	InsecureServing         *genericoptions.ServingOptions
+	Authentication          *genericoptions.BuiltInAuthenticationOptions
 
 	EventTTL time.Duration
 }
@@ -42,6 +43,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		Etcd:            genericoptions.NewEtcdOptions(),
 		SecureServing:   genericoptions.NewSecureServingOptions(),
 		InsecureServing: genericoptions.NewInsecureServingOptions(),
+		Authentication:  genericoptions.NewBuiltInAuthenticationOptions().WithAll(),
 
 		EventTTL: 1 * time.Hour,
 	}
@@ -55,6 +57,7 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	s.Etcd.AddFlags(fs)
 	s.SecureServing.AddFlags(fs)
 	s.InsecureServing.AddFlags(fs)
+	s.Authentication.AddFlags(fs)
 
 	fs.DurationVar(&s.EventTTL, "event-ttl", s.EventTTL,
 		"Amount of time to retain events. Default is 1h.")
