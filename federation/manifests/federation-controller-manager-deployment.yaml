@@ -28,7 +28,7 @@ spec:
           mountPath: /etc/ssl/certs
         - name: kubeconfig
           readOnly: true
-          mountPath: "/etc/federation/controller-manager",
+          mountPath: "/etc/federation/controller-manager"
         image: {{.FEDERATION_CONTROLLER_MANAGER_IMAGE_REPO}}:{{.FEDERATION_CONTROLLER_MANAGER_IMAGE_TAG}}
         command:
         - /usr/local/bin/hyperkube
