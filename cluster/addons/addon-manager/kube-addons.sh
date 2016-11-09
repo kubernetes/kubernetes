@@ -36,7 +36,6 @@ ADDON_CHECK_INTERVAL_SEC=${TEST_ADDON_CHECK_INTERVAL_SEC:-60}
 ADDON_PATH=${ADDON_PATH:-/etc/kubernetes/addons}
 
 SYSTEM_NAMESPACE=kube-system
-trusty_master=${TRUSTY_MASTER:-false}
 
 # Remember that you can't log from functions that print some output (because
 # logs are also printed on stdout).
@@ -172,7 +171,11 @@ start_addon /opt/namespace.yaml 100 10 "" &
 token_found=""
 while [ -z "${token_found}" ]; do
   sleep .5
-  token_found=$(${KUBECTL} ${KUBECTL_OPTS} get --namespace="${SYSTEM_NAMESPACE}" serviceaccount default -o go-template="{{with index .secrets 0}}{{.name}}{{end}}" || true)
+  token_found=$(${KUBECTL} ${KUBECTL_OPTS} get --namespace="${SYSTEM_NAMESPACE}" serviceaccount default -o go-template="{{with index .secrets 0}}{{.name}}{{end}}")
+  if [[ $? -ne 0 ]]; then
+    token_found="";
+    log WRN "== Error getting default service account, retry in 0.5 second =="
+  fi
 done
 
 log INFO "== Default service account in the ${SYSTEM_NAMESPACE} namespace has token ${token_found} =="
