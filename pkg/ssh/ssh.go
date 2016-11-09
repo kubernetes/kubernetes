@@ -383,6 +383,9 @@ func (l *SSHTunnelList) removeAndReAdd(e sshTunnelEntry) {
 			l.entries = append(l.entries[:i], l.entries[i+1:]...)
 			l.adding[e.Address] = true
 			go l.createAndAddTunnel(e.Address)
+			if err := e.Tunnel.Close(); err != nil {
+				glog.Infof("Failed to close removed tunnel: %v", err)
+			}
 			return
 		}
 	}
