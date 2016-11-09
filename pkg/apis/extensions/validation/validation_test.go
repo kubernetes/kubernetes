@@ -666,6 +666,13 @@ func TestValidateDeployment(t *testing.T) {
 	invalidRollbackRevisionDeployment.Spec.RollbackTo.Revision = -3
 	errorCases["must be greater than or equal to 0"] = invalidRollbackRevisionDeployment
 
+	// ProgressDeadlineSeconds should be greater than MinReadySeconds
+	invalidProgressDeadlineDeployment := validDeployment()
+	seconds := int32(600)
+	invalidProgressDeadlineDeployment.Spec.ProgressDeadlineSeconds = &seconds
+	invalidProgressDeadlineDeployment.Spec.MinReadySeconds = seconds
+	errorCases["must be greater than minReadySeconds"] = invalidProgressDeadlineDeployment
+
 	for k, v := range errorCases {
 		errs := ValidateDeployment(v)
 		if len(errs) == 0 {
