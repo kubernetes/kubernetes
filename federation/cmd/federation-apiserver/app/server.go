@@ -81,6 +81,7 @@ func Run(s *options.ServerRunOptions) error {
 							ApplyOptions(s.GenericServerRunOptions). // apply the options selected
 							ApplySecureServingOptions(s.SecureServing).
 							ApplyInsecureServingOptions(s.InsecureServing).
+							ApplyAuthenticationOptions(s.Authentication).
 							Complete() // set default values based on the known values
 
 	if err := genericConfig.MaybeGenerateServingCerts(); err != nil {
@@ -126,20 +127,7 @@ func Run(s *options.ServerRunOptions) error {
 		storageFactory.SetEtcdLocation(groupResource, servers)
 	}
 
-	apiAuthenticator, securityDefinitions, err := authenticator.New(authenticator.AuthenticatorConfig{
-		Anonymous:           s.GenericServerRunOptions.AnonymousAuth,
-		AnyToken:            s.GenericServerRunOptions.EnableAnyToken,
-		BasicAuthFile:       s.GenericServerRunOptions.BasicAuthFile,
-		ClientCAFile:        s.SecureServing.ClientCA,
-		TokenAuthFile:       s.GenericServerRunOptions.TokenAuthFile,
-		OIDCIssuerURL:       s.GenericServerRunOptions.OIDCIssuerURL,
-		OIDCClientID:        s.GenericServerRunOptions.OIDCClientID,
-		OIDCCAFile:          s.GenericServerRunOptions.OIDCCAFile,
-		OIDCUsernameClaim:   s.GenericServerRunOptions.OIDCUsernameClaim,
-		OIDCGroupsClaim:     s.GenericServerRunOptions.OIDCGroupsClaim,
-		KeystoneURL:         s.GenericServerRunOptions.KeystoneURL,
-		RequestHeaderConfig: s.GenericServerRunOptions.AuthenticationRequestHeaderConfig(),
-	})
+	apiAuthenticator, securityDefinitions, err := authenticator.New(s.Authentication.ToAuthenticationConfig())
 	if err != nil {
 		glog.Fatalf("Invalid Authentication Config: %v", err)
 	}

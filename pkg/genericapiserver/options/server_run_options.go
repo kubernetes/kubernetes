@@ -63,58 +63,43 @@ type ServerRunOptions struct {
 	AuthorizationWebhookCacheUnauthorizedTTL time.Duration
 	AuthorizationRBACSuperUser               string
 
-	AnonymousAuth                bool
-	BasicAuthFile                string
-	CloudConfigFile              string
-	CloudProvider                string
-	CorsAllowedOriginList        []string
-	DefaultStorageMediaType      string
-	DeleteCollectionWorkers      int
-	AuditLogPath                 string
-	AuditLogMaxAge               int
-	AuditLogMaxBackups           int
-	AuditLogMaxSize              int
-	EnableGarbageCollection      bool
-	EnableProfiling              bool
-	EnableContentionProfiling    bool
-	EnableSwaggerUI              bool
-	EnableWatchCache             bool
-	ExternalHost                 string
-	KeystoneURL                  string
-	KeystoneCAFile               string
-	KubernetesServiceNodePort    int
-	LongRunningRequestRE         string
-	MasterCount                  int
-	MasterServiceNamespace       string
-	MaxRequestsInFlight          int
-	MinRequestTimeout            int
-	OIDCCAFile                   string
-	OIDCClientID                 string
-	OIDCIssuerURL                string
-	OIDCUsernameClaim            string
-	OIDCGroupsClaim              string
-	RequestHeaderUsernameHeaders []string
-	RequestHeaderClientCAFile    string
-	RequestHeaderAllowedNames    []string
-	RuntimeConfig                config.ConfigurationMap
-	ServiceClusterIPRange        net.IPNet // TODO: make this a list
-	ServiceNodePortRange         utilnet.PortRange
-	StorageVersions              string
+	CloudConfigFile           string
+	CloudProvider             string
+	CorsAllowedOriginList     []string
+	DefaultStorageMediaType   string
+	DeleteCollectionWorkers   int
+	AuditLogPath              string
+	AuditLogMaxAge            int
+	AuditLogMaxBackups        int
+	AuditLogMaxSize           int
+	EnableGarbageCollection   bool
+	EnableProfiling           bool
+	EnableContentionProfiling bool
+	EnableSwaggerUI           bool
+	EnableWatchCache          bool
+	ExternalHost              string
+	KubernetesServiceNodePort int
+	LongRunningRequestRE      string
+	MasterCount               int
+	MasterServiceNamespace    string
+	MaxRequestsInFlight       int
+	MinRequestTimeout         int
+	RuntimeConfig             config.ConfigurationMap
+	ServiceClusterIPRange     net.IPNet // TODO: make this a list
+	ServiceNodePortRange      utilnet.PortRange
+	StorageVersions           string
 	// The default values for StorageVersions. StorageVersions overrides
 	// these; you can change this if you want to change the defaults (e.g.,
 	// for testing). This is not actually exposed as a flag.
 	DefaultStorageVersions string
 	TargetRAMMB            int
 	TLSCAFile              string
-	TokenAuthFile          string
-	EnableAnyToken         bool
 	WatchCacheSizes        []string
 }
 
 func NewServerRunOptions() *ServerRunOptions {
 	return &ServerRunOptions{
 		AdmissionControl:                         "AlwaysAdmit",
-		AnonymousAuth:                            true,
 		AuthorizationMode:                        "AlwaysAllow",
 		AuthorizationWebhookCacheAuthorizedTTL:   5 * time.Minute,
 		AuthorizationWebhookCacheUnauthorizedTTL: 30 * time.Second,
@@ -247,15 +232,6 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"If specified, a username which avoids RBAC authorization checks and role binding "+
 		"privilege escalation checks, to be used with --authorization-mode=RBAC.")
 
-	fs.BoolVar(&s.AnonymousAuth, "anonymous-auth", s.AnonymousAuth, ""+
-		"Enables anonymous requests to the secure port of the API server. "+
-		"Requests that are not rejected by another authentication method are treated as anonymous requests. "+
-		"Anonymous requests have a username of system:anonymous, and a group name of system:unauthenticated.")
-
-	fs.StringVar(&s.BasicAuthFile, "basic-auth-file", s.BasicAuthFile, ""+
-		"If set, the file that will be used to admit requests to the secure port of the API server "+
-		"via http basic authentication.")
-
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider,
 		"The provider for cloud services. Empty string for no provider.")
 
@@ -304,13 +280,6 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ExternalHost, "external-hostname", s.ExternalHost,
 		"The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs).")
 
-	fs.StringVar(&s.KeystoneURL, "experimental-keystone-url", s.KeystoneURL,
-		"If passed, activates the keystone authentication plugin.")
-
-	fs.StringVar(&s.KeystoneCAFile, "experimental-keystone-ca-file", s.KeystoneCAFile, ""+
-		"If set, the Keystone server's certificate will be verified by one of the authorities "+
-		"in the experimental-keystone-ca-file, otherwise the host's root CA set will be used.")
-
 	// See #14282 for details on how to test/try this option out.
 	// TODO: remove this comment once this option is tested in CI.
 	fs.IntVar(&s.KubernetesServiceNodePort, "kubernetes-service-node-port", s.KubernetesServiceNodePort, ""+
@@ -337,39 +306,6 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"a request open before timing it out. Currently only honored by the watch request "+
 		"handler, which picks a randomized value above this number as the connection timeout, "+
 		"to spread out load.")
-
-	fs.StringVar(&s.OIDCIssuerURL, "oidc-issuer-url", s.OIDCIssuerURL, ""+
-		"The URL of the OpenID issuer, only HTTPS scheme will be accepted. "+
-		"If set, it will be used to verify the OIDC JSON Web Token (JWT).")
-
-	fs.StringVar(&s.OIDCClientID, "oidc-client-id", s.OIDCClientID,
-		"The client ID for the OpenID Connect client, must be set if oidc-issuer-url is set.")
-
-	fs.StringVar(&s.OIDCCAFile, "oidc-ca-file", s.OIDCCAFile, ""+
-		"If set, the OpenID server's certificate will be verified by one of the authorities "+
-		"in the oidc-ca-file, otherwise the host's root CA set will be used.")
-
-	fs.StringVar(&s.OIDCUsernameClaim, "oidc-username-claim", "sub", ""+
-		"The OpenID claim to use as the user name. Note that claims other than the default ('sub') "+
-		"is not guaranteed to be unique and immutable. This flag is experimental, please see "+
-		"the authentication documentation for further details.")
-
-	fs.StringVar(&s.OIDCGroupsClaim, "oidc-groups-claim", "", ""+
-		"If provided, the name of a custom OpenID Connect claim for specifying user groups. "+
-		"The claim value is expected to be a string or array of strings. This flag is experimental, "+
-		"please see the authentication documentation for further details.")
-
-	fs.StringSliceVar(&s.RequestHeaderUsernameHeaders, "requestheader-username-headers", s.RequestHeaderUsernameHeaders, ""+
-		"List of request headers to inspect for usernames. X-Remote-User is common.")
-
-	fs.StringVar(&s.RequestHeaderClientCAFile, "requestheader-client-ca-file", s.RequestHeaderClientCAFile, ""+
-		"Root certificate bundle to use to verify client certificates on incoming requests "+
-		"before trusting usernames in headers specified by --requestheader-username-headers")
-
-	fs.StringSliceVar(&s.RequestHeaderAllowedNames, "requestheader-allowed-names", s.RequestHeaderAllowedNames, ""+
-		"List of client certificate common names to allow to provide usernames in headers "+
-		"specified by --requestheader-username-headers. If empty, any client certificate validated "+
-		"by the authorities in --requestheader-client-ca-file is allowed.")
 
 	fs.Var(&s.RuntimeConfig, "runtime-config", ""+
 		"A set of key=value pairs that describe runtime configuration that may be passed "+
@@ -405,14 +341,6 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"You only need to pass the groups you wish to change from the defaults. "+
 		"It defaults to a list of preferred versions of all registered groups, "+
 		"which is derived from the KUBE_API_VERSIONS environment variable.")
-
-	fs.StringVar(&s.TokenAuthFile, "token-auth-file", s.TokenAuthFile, ""+
-		"If set, the file that will be used to secure the secure port of the API server "+
-		"via token authentication.")
-
-	fs.BoolVar(&s.EnableAnyToken, "insecure-allow-any-token", s.EnableAnyToken, ""+
-		"If set, your server will be INSECURE.  Any token will be allowed and user information will be parsed "+
-		"from the token as `username/group1,group2`")
 
 	fs.StringSliceVar(&s.WatchCacheSizes, "watch-cache-sizes", s.WatchCacheSizes, ""+
 		"List of watch cache sizes for every resource (pods, nodes, etc.), comma separated. "+
