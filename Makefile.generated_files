@@ -149,7 +149,7 @@ $(foreach dir, $(ALL_GO_DIRS), $(eval           \
 # but we only need to rebuild targets if the contents actually changed.  That
 # is what the .stamp file represents.
 $(foreach dir, $(ALL_GO_DIRS),  \
-    $(META_DIR)/$(dir)/$(GOFILES_META)):
+    $(META_DIR)/$(dir)/$(GOFILES_META)): set -x; \
 	FILES=$$(ls $</*.go | grep --color=never -v $(GENERATED_FILE_PREFIX));  \
 	mkdir -p $(@D);                                           \
 	echo "gofiles__$< := $$(echo $${FILES})" >$@.tmp;         \
