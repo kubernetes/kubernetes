@@ -1,3 +1,6 @@
-maintainers:
+approvers:
 - johscheuer
 - quofelix
+reviewers:
+- jsafrane
+- johscheuer
