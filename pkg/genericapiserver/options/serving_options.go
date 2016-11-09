@@ -17,11 +17,14 @@ limitations under the License.
 package options
 
 import (
+	"errors"
 	"fmt"
 	"net"
+	"strconv"
 
 	"github.com/spf13/pflag"
 
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/util/config"
 )
 
@@ -76,6 +79,30 @@ func NewDefaultSecureServingOptions() *SecureServingOptions {
 	}
 }
 
+func (s *SecureServingOptions) NewSelfClientConfig(token string) *restclient.Config {
+	if s == nil || s.ServingOptions.BindPort <= 0 && len(s.ServerCA) == 0 {
+		return nil
+	}
+	clientConfig := &restclient.Config{
+		// Increase QPS limits. The client is currently passed to all admission plugins,
+		// and those can be throttled in case of higher load on apiserver - see #22340 and #22422
+		// for more details. Once #22422 is fixed, we may want to remove it.
+		QPS:   50,
+		Burst: 100,
+	}
+
+	// Use secure port if the ServerCA is specified
+	host := s.ServingOptions.BindAddress.String()
+	if host == "0.0.0.0" {
+		host = "localhost"
+	}
+	clientConfig.Host = "https://" + net.JoinHostPort(host, strconv.Itoa(s.ServingOptions.BindPort))
+	clientConfig.CAFile = s.ServerCA
+	clientConfig.BearerToken = token
+
+	return clientConfig
+}
+
 func (s *SecureServingOptions) Validate() []error {
 	errors := []error{}
 	if s == nil {
@@ -83,16 +110,6 @@ func (s *SecureServingOptions) Validate() []error {
 	}
 
 	errors = append(errors, s.ServingOptions.Validate("secure-port")...)
-	return errors
-}
-
-func (s ServingOptions) Validate(portArg string) []error {
-	errors := []error{}
-
-	if s.BindPort < 0 || s.BindPort > 65535 {
-		errors = append(errors, fmt.Errorf("--%v %v must be between 0 and 65535, inclusive. 0 for turning off secure port.", portArg, s.BindPort))
-	}
-
 	return errors
 }
 
@@ -144,4 +161,71 @@ func (s *SecureServingOptions) AddDeprecatedSecureServingFlags(fs *pflag.FlagSet
 		"DEPRECATED: see --bind-address instead.")
 	fs.MarkDeprecated("public-address-override", "see --bind-address instead.")
 
+}
+
+func NewDefaultInsecureServingOptions() *ServingOptions {
+	return &ServingOptions{
+		BindAddress: net.ParseIP("127.0.0.1"),
+		BindPort:    8080,
+	}
+}
+
+func (s ServingOptions) Validate(portArg string) []error {
+	errors := []error{}
+
+	if s.BindPort < 0 || s.BindPort > 65535 {
+		errors = append(errors, fmt.Errorf("--%v %v must be between 0 and 65535, inclusive. 0 for turning off secure port.", portArg, s.BindPort))
+	}
+
+	return errors
+}
+
+func (s *ServingOptions) NewSelfClientConfig(token string) *restclient.Config {
+	if s == nil || s.BindPort <= 0 {
+		return nil
+	}
+	clientConfig := &restclient.Config{
+		// Increase QPS limits. The client is currently passed to all admission plugins,
+		// and those can be throttled in case of higher load on apiserver - see #22340 and #22422
+		// for more details. Once #22422 is fixed, we may want to remove it.
+		QPS:   50,
+		Burst: 100,
+	}
+
+	clientConfig.Host = net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.BindPort))
+
+	return clientConfig
+}
+
+func (s *ServingOptions) AddInsecureServingFlags(fs *pflag.FlagSet) {
+	fs.IPVar(&s.BindAddress, "insecure-bind-address", s.BindAddress, ""+
+		"The IP address on which to serve the --insecure-port (set to 0.0.0.0 for all interfaces). "+
+		"Defaults to localhost.")
+
+	fs.IntVar(&s.BindPort, "insecure-port", s.BindPort, ""+
+		"The port on which to serve unsecured, unauthenticated access. Default 8080. It is assumed "+
+		"that firewall rules are set up such that this port is not reachable from outside of "+
+		"the cluster and that port 443 on the cluster's public address is proxied to this "+
+		"port. This is performed by nginx in the default setup.")
+}
+
+func (s *ServingOptions) AddDeprecatedInsecureServingFlags(fs *pflag.FlagSet) {
+	fs.IPVar(&s.BindAddress, "address", s.BindAddress,
+		"DEPRECATED: see --insecure-bind-address instead.")
+	fs.MarkDeprecated("address", "see --insecure-bind-address instead.")
+
+	fs.IntVar(&s.BindPort, "port", s.BindPort, "DEPRECATED: see --insecure-port instead.")
+	fs.MarkDeprecated("port", "see --insecure-port instead.")
+}
+
+// Returns a clientconfig which can be used to talk to this apiserver.
+func NewSelfClientConfig(secureServingOptions *SecureServingOptions, insecureServingOptions *ServingOptions, token string) (*restclient.Config, error) {
+	if cfg := secureServingOptions.NewSelfClientConfig(token); cfg != nil {
+		return cfg, nil
+	}
+	if cfg := insecureServingOptions.NewSelfClientConfig(token); cfg != nil {
+		return cfg, nil
+	}
+
+	return nil, errors.New("Unable to set url for apiserver local client")
 }
