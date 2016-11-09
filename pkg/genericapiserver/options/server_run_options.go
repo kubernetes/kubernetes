@@ -54,7 +54,8 @@ var AuthorizationModeChoices = []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABA
 
 // ServerRunOptions contains the options while running a generic api server.
 type ServerRunOptions struct {
-	Etcd *EtcdOptions
+	Etcd                 *EtcdOptions
+	SecureServingOptions *SecureServingOptions
 
 	AdmissionControl           string
 	AdmissionControlConfigFile string
@@ -70,9 +71,6 @@ type ServerRunOptions struct {
 
 	AnonymousAuth                bool
 	BasicAuthFile                string
-	BindAddress                  net.IP
-	CertDirectory                string
-	ClientCAFile                 string
 	CloudConfigFile              string
 	CloudProvider                string
 	CorsAllowedOriginList        []string
@@ -107,7 +105,6 @@ type ServerRunOptions struct {
 	RequestHeaderClientCAFile    string
 	RequestHeaderAllowedNames    []string
 	RuntimeConfig                config.ConfigurationMap
-	SecurePort                   int
 	ServiceClusterIPRange        net.IPNet // TODO: make this a list
 	ServiceNodePortRange         utilnet.PortRange
 	StorageVersions              string
@@ -117,9 +114,6 @@ type ServerRunOptions struct {
 	DefaultStorageVersions string
 	TargetRAMMB            int
 	TLSCAFile              string
-	TLSCertFile            string
-	TLSPrivateKeyFile      string
-	SNICertKeys            []config.NamedCertKey
 	TokenAuthFile          string
 	EnableAnyToken         bool
 	WatchCacheSizes        []string
@@ -132,8 +126,6 @@ func NewServerRunOptions() *ServerRunOptions {
 		AuthorizationMode:                        "AlwaysAllow",
 		AuthorizationWebhookCacheAuthorizedTTL:   5 * time.Minute,
 		AuthorizationWebhookCacheUnauthorizedTTL: 30 * time.Second,
-		BindAddress:                              net.ParseIP("0.0.0.0"),
-		CertDirectory:                            "/var/run/kubernetes",
 		DefaultStorageMediaType:                  "application/json",
 		DefaultStorageVersions:                   registered.AllPreferredGroupVersions(),
 		DeleteCollectionWorkers:                  1,
@@ -149,7 +141,6 @@ func NewServerRunOptions() *ServerRunOptions {
 		MaxRequestsInFlight:                      400,
 		MinRequestTimeout:                        1800,
 		RuntimeConfig:                            make(config.ConfigurationMap),
-		SecurePort:                               6443,
 		ServiceNodePortRange:                     DefaultServiceNodePortRange,
 		StorageVersions:                          registered.AllPreferredGroupVersions(),
 	}
@@ -157,6 +148,10 @@ func NewServerRunOptions() *ServerRunOptions {
 
 func (o *ServerRunOptions) WithEtcdOptions() *ServerRunOptions {
 	o.Etcd = NewDefaultEtcdOptions()
+	return o
+}
+func (o *ServerRunOptions) WithSecureServingOptions() *ServerRunOptions {
+	o.SecureServingOptions = NewDefaultSecureServingOptions()
 	return o
 }
 
@@ -225,15 +220,16 @@ func (s *ServerRunOptions) NewSelfClientConfig(token string) (*restclient.Config
 		Burst: 100,
 	}
 
-	// Use secure port if the TLSCAFile is specified
-	if s.SecurePort > 0 && len(s.TLSCAFile) > 0 {
-		host := s.BindAddress.String()
+	// Use secure port if the ServerCA is specified
+	if s.SecureServingOptions != nil && s.SecureServingOptions.ServingOptions.BindPort > 0 && len(s.SecureServingOptions.ServerCA) > 0 {
+		host := s.SecureServingOptions.ServingOptions.BindAddress.String()
 		if host == "0.0.0.0" {
 			host = "localhost"
 		}
-		clientConfig.Host = "https://" + net.JoinHostPort(host, strconv.Itoa(s.SecurePort))
-		clientConfig.CAFile = s.TLSCAFile
+		clientConfig.Host = "https://" + net.JoinHostPort(host, strconv.Itoa(s.SecureServingOptions.ServingOptions.BindPort))
+		clientConfig.CAFile = s.SecureServingOptions.ServerCA
 		clientConfig.BearerToken = token
+
 	} else if s.InsecurePort > 0 {
 		clientConfig.Host = net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort))
 	} else {
@@ -292,24 +288,6 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.BasicAuthFile, "basic-auth-file", s.BasicAuthFile, ""+
 		"If set, the file that will be used to admit requests to the secure port of the API server "+
 		"via http basic authentication.")
-
-	fs.IPVar(&s.BindAddress, "public-address-override", s.BindAddress,
-		"DEPRECATED: see --bind-address instead.")
-	fs.MarkDeprecated("public-address-override", "see --bind-address instead.")
-
-	fs.IPVar(&s.BindAddress, "bind-address", s.BindAddress, ""+
-		"The IP address on which to listen for the --secure-port port. The "+
-		"associated interface(s) must be reachable by the rest of the cluster, and by CLI/web "+
-		"clients. If blank, all interfaces will be used (0.0.0.0).")
-
-	fs.StringVar(&s.CertDirectory, "cert-dir", s.CertDirectory, ""+
-		"The directory where the TLS certs are located (by default /var/run/kubernetes). "+
-		"If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored.")
-
-	fs.StringVar(&s.ClientCAFile, "client-ca-file", s.ClientCAFile, ""+
-		"If set, any request presenting a client certificate signed by one of "+
-		"the authorities in the client-ca-file is authenticated with an identity "+
-		"corresponding to the CommonName of the client certificate.")
 
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider,
 		"The provider for cloud services. Empty string for no provider.")
@@ -448,10 +426,6 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"apis/<groupVersion>/<resource> can be used to turn on/off specific resources. api/all and "+
 		"api/legacy are special keys to control all and legacy api versions respectively.")
 
-	fs.IntVar(&s.SecurePort, "secure-port", s.SecurePort, ""+
-		"The port on which to serve HTTPS with authentication and authorization. If 0, "+
-		"don't serve HTTPS at all.")
-
 	fs.IPNetVar(&s.ServiceClusterIPRange, "service-cluster-ip-range", s.ServiceClusterIPRange, ""+
 		"A CIDR notation IP range from which to assign service cluster IPs. This must not "+
 		"overlap with any IP ranges assigned to nodes for pods.")
@@ -480,28 +454,6 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"You only need to pass the groups you wish to change from the defaults. "+
 		"It defaults to a list of preferred versions of all registered groups, "+
 		"which is derived from the KUBE_API_VERSIONS environment variable.")
-
-	fs.StringVar(&s.TLSCAFile, "tls-ca-file", s.TLSCAFile, "If set, this "+
-		"certificate authority will used for secure access from Admission "+
-		"Controllers. This must be a valid PEM-encoded CA bundle.")
-
-	fs.StringVar(&s.TLSCertFile, "tls-cert-file", s.TLSCertFile, ""+
-		"File containing the default x509 Certificate for HTTPS. (CA cert, if any, concatenated "+
-		"after server cert). If HTTPS serving is enabled, and --tls-cert-file and "+
-		"--tls-private-key-file are not provided, a self-signed certificate and key "+
-		"are generated for the public address and saved to /var/run/kubernetes.")
-
-	fs.StringVar(&s.TLSPrivateKeyFile, "tls-private-key-file", s.TLSPrivateKeyFile,
-		"File containing the default x509 private key matching --tls-cert-file.")
-
-	fs.Var(config.NewNamedCertKeyArray(&s.SNICertKeys), "tls-sni-cert-key", ""+
-		"A pair of x509 certificate and private key file paths, optionally suffixed with a list of "+
-		"domain patterns which are fully qualified domain names, possibly with prefixed wildcard "+
-		"segments. If no domain patterns are provided, the names of the certificate are "+
-		"extracted. Non-wildcard matches trump over wildcard matches, explicit domain patterns "+
-		"trump over extracted names. For multiple key/certificate pairs, use the "+
-		"--tls-sni-cert-key multiple times. "+
-		"Examples: \"example.key,example.crt\" or \"*.foo.com,foo.com:foo.key,foo.crt\".")
 
 	fs.StringVar(&s.TokenAuthFile, "token-auth-file", s.TokenAuthFile, ""+
 		"If set, the file that will be used to secure the secure port of the API server "+
