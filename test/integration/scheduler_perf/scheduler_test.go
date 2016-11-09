@@ -45,13 +45,13 @@ func TestSchedule100Node3KPods(t *testing.T) {
 
 	config := defaultSchedulerBenchmarkConfig(100, 3000)
 	if min := schedulePods(config); min < threshold3K {
-		t.Errorf("To small pod scheduling throughput for 3k pods. Expected %v got %v", threshold3K, min)
+		t.Errorf("Too small pod scheduling throughput for 3k pods. Expected %v got %v", threshold3K, min)
 	} else {
 		fmt.Printf("Minimal observed throughput for 3k pod test: %v\n", min)
 	}
 }
 
-// TestSchedule100Node3KPods schedules 3k pods using Node affinity on 100 nodes.
+// TestSchedule100Node3KNodeAffinityPods schedules 3k pods using Node affinity on 100 nodes.
 func TestSchedule100Node3KNodeAffinityPods(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping because we want to run short tests")
@@ -108,7 +108,7 @@ func TestSchedule100Node3KNodeAffinityPods(t *testing.T) {
 	config.podCreator = testutils.NewTestPodCreator(config.schedulerConfigFactory.Client, podCreatorConfig)
 
 	if min := schedulePods(config); min < threshold30K {
-		t.Errorf("To small pod scheduling throughput for 30k pods. Expected %v got %v", threshold30K, min)
+		t.Errorf("Too small pod scheduling throughput for 30k pods. Expected %v got %v", threshold30K, min)
 	} else {
 		fmt.Printf("Minimal observed throughput for 30k pod test: %v\n", min)
 	}
@@ -194,26 +194,45 @@ func schedulePods(config *testConfig) int32 {
 	config.podCreator.CreatePods()
 
 	prev := 0
+	// On startup there may be a latent period where NO scheduling occurs (qps = 0).
+	// We are interested in low scheduling rates (i.e. qps=2),
 	minQps := int32(math.MaxInt32)
 	start := time.Now()
-	for {
-		// This can potentially affect performance of scheduler, since List() is done under mutex.
-		// Listing 10000 pods is an expensive operation, so running it frequently may impact scheduler.
-		// TODO: Setup watch on apiserver and wait until all pods scheduled.
-		scheduled := config.schedulerConfigFactory.ScheduledPodLister.Indexer.List()
-		if len(scheduled) >= config.numPods {
-			fmt.Printf("Scheduled %v Pods in %v seconds (%v per second on average).\n",
-				config.numPods, int(time.Since(start)/time.Second), config.numPods/int(time.Since(start)/time.Second))
-			return minQps
+
+	// Bake in time for the first pod scheduling event.
+	waitForStart := func() {
+		for {
+			time.Sleep(50 * time.Millisecond)
+			scheduled := config.schedulerConfigFactory.ScheduledPodLister.Indexer.List()
+			if len(scheduled) > 0 {
+				return
+			}
 		}
+	}
+	waitForStart()
+
+	// Now that scheduling has started, lets start taking the pulse on how many pods are happening per second.
+	for {
+		time.Sleep(1 * time.Second)
+		scheduled := config.schedulerConfigFactory.ScheduledPodLister.Indexer.List()
 		// There's no point in printing it for the last iteration, as the value is random
 		qps := len(scheduled) - prev
 		if int32(qps) < minQps {
 			minQps = int32(qps)
 		}
-
 		fmt.Printf("%ds\trate: %d\ttotal: %d\n", time.Since(start)/time.Second, qps, len(scheduled))
 		prev = len(scheduled)
-		time.Sleep(1 * time.Second)
+
+		// This can potentially affect performance of scheduler, since List() is done under mutex.
+		// Listing 10000 pods is an expensive operation, so running it frequently may impact scheduler.
+		// TODO: Setup watch on apiserver and wait until all pods scheduled.
+		if len(scheduled) >= config.numPods {
+			fmt.Printf("Scheduled %v Pods in %v seconds (%v per second on average). min QPS was %v\n",
+				config.numPods, int(time.Since(start)/time.Second), config.numPods/int(time.Since(start)/time.Second), minQps)
+			// We will be completed when all pods are done being scheduled.
+			// return the worst-case-scenario interval that was seen during this time.
+			// Note this should never be low due to cold-start, so allow bake in sched time if necessary.
+			return minQps
+		}
 	}
 }
