@@ -66,15 +66,6 @@ func TestNodeIPParam(t *testing.T) {
 	}
 }
 
-type countingDNSScrubber struct {
-	counter *int
-}
-
-func (cds countingDNSScrubber) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string) {
-	(*cds.counter)++
-	return nameservers, searches
-}
-
 func TestParseResolvConf(t *testing.T) {
 	testCases := []struct {
 		data        string
@@ -104,8 +95,10 @@ func TestParseResolvConf(t *testing.T) {
 		{"nameserver 1.2.3.4\nsearch foo\nnameserver 5.6.7.8\nsearch bar", []string{"1.2.3.4", "5.6.7.8"}, []string{"bar"}},
 		{"#comment\nnameserver 1.2.3.4\n#comment\nsearch foo\ncomment", []string{"1.2.3.4"}, []string{"foo"}},
 	}
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	kubelet := testKubelet.kubelet
 	for i, tc := range testCases {
-		ns, srch, err := parseResolvConf(strings.NewReader(tc.data), nil)
+		ns, srch, err := kubelet.parseResolvConf(strings.NewReader(tc.data))
 		if err != nil {
 			t.Errorf("expected success, got %v", err)
 			continue
@@ -115,23 +108,6 @@ func TestParseResolvConf(t *testing.T) {
 		}
 		if !reflect.DeepEqual(srch, tc.searches) {
 			t.Errorf("[%d] expected searches %#v, got %#v", i, tc.searches, srch)
-		}
-
-		counter := 0
-		cds := countingDNSScrubber{&counter}
-		ns, srch, err = parseResolvConf(strings.NewReader(tc.data), cds)
-		if err != nil {
-			t.Errorf("expected success, got %v", err)
-			continue
-		}
-		if !reflect.DeepEqual(ns, tc.nameservers) {
-			t.Errorf("[%d] expected nameservers %#v, got %#v", i, tc.nameservers, ns)
-		}
-		if !reflect.DeepEqual(srch, tc.searches) {
-			t.Errorf("[%d] expected searches %#v, got %#v", i, tc.searches, srch)
-		}
-		if counter != 1 {
-			t.Errorf("[%d] expected dnsScrubber to have been called: got %d", i, counter)
 		}
 	}
 }
