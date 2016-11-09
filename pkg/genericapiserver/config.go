@@ -406,7 +406,14 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 func (c completedConfig) MaybeGenerateServingCerts(alternateIPs ...net.IP) error {
 	// It would be nice to set a fqdn subject alt name, but only the kubelets know, the apiserver is clueless
 	// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
-	if c.SecureServingInfo != nil && c.SecureServingInfo.ServerCert.Generate && !certutil.CanReadCertOrKey(c.SecureServingInfo.ServerCert.CertFile, c.SecureServingInfo.ServerCert.KeyFile) {
+	if c.SecureServingInfo != nil && c.SecureServingInfo.ServerCert.Generate {
+		canReadCertAndKey, err := certutil.CanReadCertAndKey(c.SecureServingInfo.ServerCert.CertFile, c.SecureServingInfo.ServerCert.KeyFile)
+		if err != nil {
+			return err
+		}
+		if canReadCertAndKey {
+			return nil
+		}
 		// TODO (cjcullen): Is ClusterIP the right address to sign a cert with?
 		alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes", "localhost"}
 
