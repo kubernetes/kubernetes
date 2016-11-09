@@ -58,6 +58,7 @@ const (
 
 func TestInitFederation(t *testing.T) {
 	cmdErrMsg := ""
+	dnsProvider := ""
 	cmdutil.BehaviorOnFatal(func(str string, code int) {
 		cmdErrMsg = str
 	})
@@ -78,6 +79,7 @@ func TestInitFederation(t *testing.T) {
 		etcdPVCapacity     string
 		expectedErr        string
 		dryRun             string
+		dnsProvider        string
 	}{
 		{
 			federation:         "union",
@@ -89,6 +91,7 @@ func TestInitFederation(t *testing.T) {
 			etcdPVCapacity:     "5Gi",
 			expectedErr:        "",
 			dryRun:             "",
+			dnsProvider:        "test-dns-provider",
 		},
 		{
 			federation:         "union",
@@ -100,6 +103,7 @@ func TestInitFederation(t *testing.T) {
 			etcdPVCapacity:     "",
 			expectedErr:        "",
 			dryRun:             "",
+			dnsProvider:        "test-dns-provider",
 		},
 		{
 			federation:         "union",
@@ -110,7 +114,20 @@ func TestInitFederation(t *testing.T) {
 			image:              "example.test/foo:bar",
 			etcdPVCapacity:     "",
 			expectedErr:        "",
-			dryRun:             "valid-run",
+			dryRun:             "valid-run", //test for dry run
+			dnsProvider:        "test-dns-provider",
+		},
+		{
+			federation:         "union",
+			kubeconfigGlobal:   fakeKubeFiles[0],
+			kubeconfigExplicit: "",
+			dnsZoneName:        "example.test.",
+			lbIP:               "10.20.30.40",
+			image:              "example.test/foo:bar",
+			etcdPVCapacity:     "",
+			expectedErr:        "",
+			dryRun:             "",
+			dnsProvider:        "", //test for default value of dns provider
 		},
 	}
 
@@ -118,9 +135,16 @@ func TestInitFederation(t *testing.T) {
 
 	for i, tc := range testCases {
 		cmdErrMsg = ""
+		dnsProvider = ""
 		buf := bytes.NewBuffer([]byte{})
 
-		hostFactory, err := fakeInitHostFactory(tc.federation, util.DefaultFederationSystemNamespace, tc.lbIP, tc.dnsZoneName, tc.image, tc.etcdPVCapacity)
+		if "" != tc.dnsProvider {
+			dnsProvider = tc.dnsProvider
+		} else {
+			dnsProvider = "google-clouddns" //default value of dns-provider
+		}
+
+		hostFactory, err := fakeInitHostFactory(tc.federation, util.DefaultFederationSystemNamespace, tc.lbIP, tc.dnsZoneName, tc.image, tc.etcdPVCapacity, dnsProvider)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -141,6 +165,9 @@ func TestInitFederation(t *testing.T) {
 		}
 		if "valid-run" == tc.dryRun {
 			cmd.Flags().Set("dry-run", "true")
+		}
+		if "" != tc.dnsProvider {
+			cmd.Flags().Set("dns-provider", tc.dnsProvider)
 		}
 
 		cmd.Run(cmd, []string{tc.federation})
@@ -412,7 +439,7 @@ func TestCertsHTTPS(t *testing.T) {
 	}
 }
 
-func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, etcdPVCapacity string) (cmdutil.Factory, error) {
+func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, etcdPVCapacity, dnsProvider string) (cmdutil.Factory, error) {
 	svcName := federationName + "-apiserver"
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
@@ -648,7 +675,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 								"federation-controller-manager",
 								"--master=https://federation-apiserver",
 								"--kubeconfig=/etc/federation/controller-manager/kubeconfig",
-								"--dns-provider=gce",
+								fmt.Sprintf("--dns-provider=%s", dnsProvider),
 								"--dns-provider-config=",
 								fmt.Sprintf("--federation-name=%s", federationName),
 								fmt.Sprintf("--zone-name=%s", dnsZoneName),
