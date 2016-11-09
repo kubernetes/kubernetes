@@ -21,6 +21,7 @@ go_library(
         "//pkg/genericapiserver/openapi/common:go_default_library",
         "//vendor:github.com/go-openapi/spec",
         "//vendor:github.com/gogo/protobuf/proto",
+        "//vendor:github.com/golang/glog",
         "//vendor:github.com/google/gofuzz",
     ],
 )

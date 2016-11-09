@@ -20,12 +20,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"runtime/debug"
 	"strconv"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/genericapiserver/openapi/common"
 
 	"github.com/go-openapi/spec"
+	"github.com/golang/glog"
 	"github.com/google/gofuzz"
 )
 
@@ -57,6 +59,9 @@ const (
 // than int32.
 // TODO: convert to (val int32)
 func FromInt(val int) IntOrString {
+	if val > math.MaxInt32 || val < math.MinInt32 {
+		glog.Errorf("value: %d overflows int32\n%s\n", val, debug.Stack())
+	}
 	return IntOrString{Type: Int, IntVal: int32(val)}
 }
 
