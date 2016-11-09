@@ -475,7 +475,7 @@ func (h *HumanReadablePrinter) AfterPrint(output io.Writer, res string) error {
 var (
 	podColumns                   = []string{"NAME", "READY", "STATUS", "RESTARTS", "AGE"}
 	podTemplateColumns           = []string{"TEMPLATE", "CONTAINER(S)", "IMAGE(S)", "PODLABELS"}
-	podDisruptionBudgetColumns   = []string{"NAME", "MIN-AVAILABLE", "SELECTOR", "DISRUPTIONS"}
+	podDisruptionBudgetColumns   = []string{"NAME", "MIN-AVAILABLE", "ALLOWED-DISRUPTIONS", "AGE"}
 	replicationControllerColumns = []string{"NAME", "DESIRED", "CURRENT", "READY", "AGE"}
 	replicaSetColumns            = []string{"NAME", "DESIRED", "CURRENT", "READY", "AGE"}
 	jobColumns                   = []string{"NAME", "DESIRED", "SUCCESSFUL", "AGE"}
@@ -842,20 +842,11 @@ func printPodDisruptionBudget(pdb *policy.PodDisruptionBudget, w io.Writer, opti
 			return err
 		}
 	}
-
-	selector := "<none>"
-	if pdb.Spec.Selector != nil {
-		selector = unversioned.FormatLabelSelector(pdb.Spec.Selector)
-	}
-	disruptions := "Disallowed"
-	if pdb.Status.PodDisruptionAllowed {
-		disruptions = "Allowed"
-	}
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%d\t%s\n",
 		name,
 		pdb.Spec.MinAvailable.String(),
-		selector,
-		disruptions,
+		pdb.Status.PodDisruptionsAllowed,
+		translateTimestamp(pdb.CreationTimestamp),
 	); err != nil {
 		return err
 	}

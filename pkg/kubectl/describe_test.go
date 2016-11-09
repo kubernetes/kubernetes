@@ -31,9 +31,11 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 type describeClient struct {
@@ -690,6 +692,30 @@ func TestDescribeStorageClass(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if !strings.Contains(out, "foo") {
+		t.Errorf("unexpected out: %s", out)
+	}
+}
+
+func TestDescribePodDisruptionBudget(t *testing.T) {
+	f := fake.NewSimpleClientset(&policy.PodDisruptionBudget{
+		ObjectMeta: api.ObjectMeta{
+			Namespace:         "ns1",
+			Name:              "pdb1",
+			CreationTimestamp: unversioned.Time{Time: time.Now().Add(1.9e9)},
+		},
+		Spec: policy.PodDisruptionBudgetSpec{
+			MinAvailable: intstr.FromInt(22),
+		},
+		Status: policy.PodDisruptionBudgetStatus{
+			PodDisruptionsAllowed: 5,
+		},
+	})
+	s := PodDisruptionBudgetDescriber{f}
+	out, err := s.Describe("ns1", "pdb1", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "pdb1") {
 		t.Errorf("unexpected out: %s", out)
 	}
 }
