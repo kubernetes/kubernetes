@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 var (
@@ -133,17 +134,26 @@ func RunDescribe(f cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, a
 		allErrs = append(allErrs, err)
 	}
 
+	errs := sets.NewString()
 	first := true
 	for _, info := range infos {
 		mapping := info.ResourceMapping()
 		describer, err := f.Describer(mapping)
 		if err != nil {
+			if errs.Has(err.Error()) {
+				continue
+			}
 			allErrs = append(allErrs, err)
+			errs.Insert(err.Error())
 			continue
 		}
 		s, err := describer.Describe(info.Namespace, info.Name, *describerSettings)
 		if err != nil {
+			if errs.Has(err.Error()) {
+				continue
+			}
 			allErrs = append(allErrs, err)
+			errs.Insert(err.Error())
 			continue
 		}
 		if first {
