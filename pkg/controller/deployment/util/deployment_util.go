@@ -844,7 +844,7 @@ func DeploymentTimedOut(deployment *extensions.Deployment, newStatus *extensions
 	// Look at the difference in seconds between now and the last time we reported any
 	// progress or tried to create a replica set, or resumed a paused deployment and
 	// compare against progressDeadlineSeconds.
-	from := condition.LastTransitionTime
+	from := condition.LastUpdateTime
 	delta := time.Duration(*deployment.Spec.ProgressDeadlineSeconds) * time.Second
 	return from.Add(delta).Before(nowFn())
 }

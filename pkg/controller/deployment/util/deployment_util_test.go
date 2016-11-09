@@ -1055,9 +1055,9 @@ func TestDeploymentTimedOut(t *testing.T) {
 			Status: extensions.DeploymentStatus{
 				Conditions: []extensions.DeploymentCondition{
 					{
-						Type:               condType,
-						Status:             status,
-						LastTransitionTime: unversioned.Time{Time: from},
+						Type:           condType,
+						Status:         status,
+						LastUpdateTime: unversioned.Time{Time: from},
 					},
 				},
 			},
