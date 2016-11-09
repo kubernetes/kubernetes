@@ -722,6 +722,8 @@ message AttachRequest {
     optional string container_id = 1;
     // Whether to stream stdin.
     optional bool stdin = 2;
+    // Whether use tty
+    optional bool tty = 3;
 }
 
 message AttachResponse {

@@ -486,7 +486,7 @@ func (m *kubeGenericRuntimeManager) restoreSpecsFromContainerLabels(containerID 
 func (m *kubeGenericRuntimeManager) killContainer(pod *api.Pod, containerID kubecontainer.ContainerID, containerName string, reason string, gracePeriodOverride *int64) error {
 	var containerSpec *api.Container
 	if pod != nil {
-		containerSpec = getContainerSpec(pod, containerName)
+		containerSpec = kubecontainer.GetContainerSpec(pod, containerName)
 	} else {
 		// Restore necessary information if one of the specs is nil.
 		restoredPod, restoredContainer, err := m.restoreSpecsFromContainerLabels(containerID)
@@ -680,10 +680,11 @@ func (m *kubeGenericRuntimeManager) GetExec(id kubecontainer.ContainerID, cmd []
 }
 
 // GetAttach gets the endpoint the runtime will serve the attach request from.
-func (m *kubeGenericRuntimeManager) GetAttach(id kubecontainer.ContainerID, stdin, stdout, stderr bool) (*url.URL, error) {
+func (m *kubeGenericRuntimeManager) GetAttach(id kubecontainer.ContainerID, stdin, stdout, stderr, tty bool) (*url.URL, error) {
 	req := &runtimeApi.AttachRequest{
 		ContainerId: &id.ID,
 		Stdin:       &stdin,
+		Tty:         &tty,
 	}
 	resp, err := m.runtimeService.Attach(req)
 	if err != nil {

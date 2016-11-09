@@ -78,11 +78,15 @@ type FakeDirectStreamingRuntime struct {
 	}
 }
 
+var _ DirectStreamingRuntime = &FakeDirectStreamingRuntime{}
+
 const FakeHost = "localhost:12345"
 
 type FakeIndirectStreamingRuntime struct {
 	*FakeRuntime
 }
+
+var _ IndirectStreamingRuntime = &FakeIndirectStreamingRuntime{}
 
 // FakeRuntime should implement Runtime.
 var _ Runtime = &FakeRuntime{}
@@ -459,7 +463,7 @@ func (f *FakeIndirectStreamingRuntime) GetExec(id ContainerID, cmd []string, std
 	return &url.URL{Host: FakeHost}, f.Err
 }
 
-func (f *FakeIndirectStreamingRuntime) GetAttach(id ContainerID, stdin, stdout, stderr bool) (*url.URL, error) {
+func (f *FakeIndirectStreamingRuntime) GetAttach(id ContainerID, stdin, stdout, stderr, tty bool) (*url.URL, error) {
 	f.Lock()
 	defer f.Unlock()
 
