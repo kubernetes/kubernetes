@@ -712,8 +712,7 @@ function kube-down() {
 
   source "${KUBE_ROOT}/cluster/common.sh"
 
-  tear_down_alive_resources
-  check-pods-torn-down
+  prepare-kube-down
 
   local ii=0
   for i in ${nodes}; do
@@ -770,6 +769,33 @@ function kube-down() {
   done
 }
 
+# Clean up the k8s-resources before kube-down
+#     1) If master need down, cleaned up all resources
+#     2) If only nodes need down, tansfer pods and cleaned up node-resources
+function prepare-kube-down() {
+  local delete_master=false
+  for role in ${roles_array}; do
+    if [[ "${role}" == "ai" || "${role}" == "a" ]]; then
+      delete_master=true
+    fi
+  done
+  
+  if ${delete_master}; then
+    tear_down_alive_resources
+    check-pods-torn-down
+  else
+    # Just delete node-resources
+    local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+    for i in ${nodes}; do
+      to_be_deleted_node=${i#*@}
+      echo "Down node ${to_be_deleted_node} from cluster"
+	  "${kubectl}" drain ${to_be_deleted_node}
+      "${kubectl}" delete node ${to_be_deleted_node}
+    done
+    echo "Nodes release resources, please wait 15 seconds ..."
+    sleep 15
+  fi
+}
 
 # Perform common upgrade setup tasks
 function prepare-push() {
