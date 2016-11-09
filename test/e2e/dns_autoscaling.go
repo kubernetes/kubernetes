@@ -180,14 +180,14 @@ func updateDNSScalingConfigMap(c clientset.Interface, configMap *api.ConfigMap) 
 func getDNSReplicas(c clientset.Interface) (int, error) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{ClusterAddonLabelKey: KubeDNSLabelName}))
 	listOpts := api.ListOptions{LabelSelector: label}
-	rcs, err := c.Core().ReplicationControllers(DNSNamespace).List(listOpts)
+	deployments, err := c.Extensions().Deployments(DNSNamespace).List(listOpts)
 	if err != nil {
 		return 0, err
 	}
-	Expect(len(rcs.Items)).Should(Equal(1))
+	Expect(len(deployments.Items)).Should(Equal(1))
 
-	rc := rcs.Items[0]
-	return int(rc.Spec.Replicas), nil
+	deployment := deployments.Items[0]
+	return int(deployment.Spec.Replicas), nil
 }
 
 func deleteDNSAutoscalerPod(c clientset.Interface) error {
