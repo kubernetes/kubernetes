@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
-	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
@@ -67,7 +66,9 @@ cluster's shared state through which all other components interact.`,
 
 // Run runs the specified APIServer.  This should never exit.
 func Run(s *options.ServerRunOptions) error {
-	genericvalidation.VerifyEtcdServersList(s.GenericServerRunOptions)
+	if errs := s.GenericServerRunOptions.EtcdOptions.Validate(); len(errs) > 0 {
+		glog.Fatal(errs)
+	}
 	genericapiserver.DefaultAndValidateRunOptions(s.GenericServerRunOptions)
 	genericConfig := genericapiserver.NewConfig(). // create the new config
 							ApplyOptions(s.GenericServerRunOptions). // apply the options selected
@@ -80,23 +81,23 @@ func Run(s *options.ServerRunOptions) error {
 	// TODO: register cluster federation resources here.
 	resourceConfig := genericapiserver.NewResourceConfig()
 
-	if s.GenericServerRunOptions.StorageConfig.DeserializationCacheSize == 0 {
+	if s.GenericServerRunOptions.EtcdOptions.StorageConfig.DeserializationCacheSize == 0 {
 		// When size of cache is not explicitly set, set it to 50000
-		s.GenericServerRunOptions.StorageConfig.DeserializationCacheSize = 50000
+		s.GenericServerRunOptions.EtcdOptions.StorageConfig.DeserializationCacheSize = 50000
 	}
 	storageGroupsToEncodingVersion, err := s.GenericServerRunOptions.StorageGroupsToEncodingVersion()
 	if err != nil {
 		glog.Fatalf("error generating storage version map: %s", err)
 	}
 	storageFactory, err := genericapiserver.BuildDefaultStorageFactory(
-		s.GenericServerRunOptions.StorageConfig, s.GenericServerRunOptions.DefaultStorageMediaType, api.Codecs,
+		s.GenericServerRunOptions.EtcdOptions.StorageConfig, s.GenericServerRunOptions.DefaultStorageMediaType, api.Codecs,
 		genericapiserver.NewDefaultResourceEncodingConfig(), storageGroupsToEncodingVersion,
 		[]unversioned.GroupVersionResource{}, resourceConfig, s.GenericServerRunOptions.RuntimeConfig)
 	if err != nil {
 		glog.Fatalf("error in initializing storage factory: %s", err)
 	}
 
-	for _, override := range s.GenericServerRunOptions.EtcdServersOverrides {
+	for _, override := range s.GenericServerRunOptions.EtcdOptions.EtcdServersOverrides {
 		tokens := strings.Split(override, "#")
 		if len(tokens) != 2 {
 			glog.Errorf("invalid value of etcd server overrides: %s", override)

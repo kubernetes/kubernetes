@@ -64,9 +64,11 @@ func Run(serverOptions *genericoptions.ServerRunOptions, stopCh <-chan struct{})
 	// Set ServiceClusterIPRange
 	_, serviceClusterIPRange, _ := net.ParseCIDR("10.0.0.0/24")
 	serverOptions.ServiceClusterIPRange = *serviceClusterIPRange
-	serverOptions.StorageConfig.ServerList = []string{"http://127.0.0.1:2379"}
+	serverOptions.EtcdOptions.StorageConfig.ServerList = []string{"http://127.0.0.1:2379"}
 	genericvalidation.ValidateRunOptions(serverOptions)
-	genericvalidation.VerifyEtcdServersList(serverOptions)
+	if errs := serverOptions.EtcdOptions.Validate(); len(errs) > 0 {
+		panic(errs)
+	}
 	config := genericapiserver.NewConfig().ApplyOptions(serverOptions).Complete()
 	if err := config.MaybeGenerateServingCerts(); err != nil {
 		// this wasn't treated as fatal for this process before
