@@ -1,3 +1,8 @@
-assignees:
-  - euank
-  - yifan-gu
+approvers:
+- euank
+- yifan-gu
+reviewers:
+- yujuhong
+- feiskyer
+- euank
+- tmrts

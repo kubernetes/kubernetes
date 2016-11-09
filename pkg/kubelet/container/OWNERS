@@ -1,6 +1,3 @@
-approvers:
-- euank
-- yifan-gu
 reviewers:
 - thockin
 - lavalamp
@@ -12,10 +9,12 @@ reviewers:
 - caesarxuchao
 - vishh
 - mikedanese
+- liggitt
+- nikhiljindal
+- bprashanth
 - pmorie
 - dchen1107
 - saad-ali
-- zmerlynn
 - luxas
 - roberthbailey
 - ncdc
@@ -23,22 +22,20 @@ reviewers:
 - yifan-gu
 - eparis
 - feiskyer
-- dims
 - krousey
 - euank
 - vmarmol
 - fgrzadkowski
-- fabioy
+- jdef
+- freehan
 - aveshagarwal
+- ingvagabund
 - resouer
 - jessfraz
 - david-mcmahon
 - ronnielai
 - therc
-- pweil-
 - '249043822'
 - dcbw
 - tmrts
-- ddysher
-- nhlfr
-- jimmidyson
+- mqliang
