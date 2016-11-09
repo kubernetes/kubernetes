@@ -70,7 +70,7 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	// Add the generic flags.
 	s.GenericServerRunOptions.AddUniversalFlags(fs)
 	//Add etcd specific flags.
-	s.GenericServerRunOptions.AddEtcdStorageFlags(fs)
+	s.GenericServerRunOptions.Etcd.AddEtcdStorageFlags(fs)
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.
 
