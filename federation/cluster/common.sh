@@ -129,6 +129,13 @@ function create-federation-api-objects {
 	$template "${manifests_root}/federation-apiserver-lb-service.yaml" | $host_kubectl create -f -
 	for i in {1..30};do
 	    echo "attempting to get federation-apiserver loadbalancer hostname ($i / 30)"
+	    LB_STATUS=`${host_kubectl} get -o=jsonpath svc/${FEDERATION_APISERVER_DEPLOYMENT_NAME} --template '{.status.loadBalancer}'`
+	    # Check if ingress field has been set in load balancer status.
+	    if [[ "${LB_STATUS}" != *"ingress"* ]]; then
+	        echo "Waiting for load balancer status to be set"
+	        sleep 5
+	        continue
+	    fi
 	    for field in ip hostname;do
 		FEDERATION_API_HOST=`${host_kubectl} get -o=jsonpath svc/${FEDERATION_APISERVER_DEPLOYMENT_NAME} --template '{.status.loadBalancer.ingress[*].'"${field}}"`
 		if [[ ! -z "${FEDERATION_API_HOST// }" ]];then
