@@ -226,7 +226,6 @@ func NewConfig() *Config {
 	defaultOptions := options.NewServerRunOptions()
 	// unset fields that can be overridden to avoid setting values so that we won't end up with lingering values.
 	// TODO we probably want to run the defaults the other way.  A default here drives it in the CLI flags
-	defaultOptions.InsecurePort = 0
 	defaultOptions.AuditLogPath = ""
 	return config.ApplyOptions(defaultOptions)
 }
@@ -242,28 +241,28 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 		}
 	}
 
-	if options.SecureServingOptions != nil && options.SecureServingOptions.ServingOptions.BindPort > 0 {
+	if options.SecureServing != nil && options.SecureServing.ServingOptions.BindPort > 0 {
 		secureServingInfo := &SecureServingInfo{
 			ServingInfo: ServingInfo{
-				BindAddress: net.JoinHostPort(options.SecureServingOptions.ServingOptions.BindAddress.String(), strconv.Itoa(options.SecureServingOptions.ServingOptions.BindPort)),
+				BindAddress: net.JoinHostPort(options.SecureServing.ServingOptions.BindAddress.String(), strconv.Itoa(options.SecureServing.ServingOptions.BindPort)),
 			},
 			ServerCert: GeneratableKeyCert{
 				CertKey: CertKey{
-					CertFile: options.SecureServingOptions.ServerCert.CertKey.CertFile,
-					KeyFile:  options.SecureServingOptions.ServerCert.CertKey.KeyFile,
+					CertFile: options.SecureServing.ServerCert.CertKey.CertFile,
+					KeyFile:  options.SecureServing.ServerCert.CertKey.KeyFile,
 				},
 			},
 			SNICerts: []NamedCertKey{},
-			ClientCA: options.SecureServingOptions.ClientCA,
+			ClientCA: options.SecureServing.ClientCA,
 		}
-		if options.SecureServingOptions.ServerCert.CertKey.CertFile == "" && options.SecureServingOptions.ServerCert.CertKey.KeyFile == "" {
+		if options.SecureServing.ServerCert.CertKey.CertFile == "" && options.SecureServing.ServerCert.CertKey.KeyFile == "" {
 			secureServingInfo.ServerCert.Generate = true
-			secureServingInfo.ServerCert.CertFile = path.Join(options.SecureServingOptions.ServerCert.CertDirectory, options.SecureServingOptions.ServerCert.PairName+".crt")
-			secureServingInfo.ServerCert.KeyFile = path.Join(options.SecureServingOptions.ServerCert.CertDirectory, options.SecureServingOptions.ServerCert.PairName+".key")
+			secureServingInfo.ServerCert.CertFile = path.Join(options.SecureServing.ServerCert.CertDirectory, options.SecureServing.ServerCert.PairName+".crt")
+			secureServingInfo.ServerCert.KeyFile = path.Join(options.SecureServing.ServerCert.CertDirectory, options.SecureServing.ServerCert.PairName+".key")
 		}
 
 		secureServingInfo.SNICerts = nil
-		for _, nkc := range options.SecureServingOptions.SNICertKeys {
+		for _, nkc := range options.SecureServing.SNICertKeys {
 			secureServingInfo.SNICerts = append(secureServingInfo.SNICerts, NamedCertKey{
 				CertKey: CertKey{
 					KeyFile:  nkc.KeyFile,
@@ -274,12 +273,12 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 		}
 
 		c.SecureServingInfo = secureServingInfo
-		c.ReadWritePort = options.SecureServingOptions.ServingOptions.BindPort
+		c.ReadWritePort = options.SecureServing.ServingOptions.BindPort
 	}
 
-	if options.InsecurePort > 0 {
+	if options.InsecureServing != nil && options.InsecureServing.BindPort > 0 {
 		insecureServingInfo := &ServingInfo{
-			BindAddress: net.JoinHostPort(options.InsecureBindAddress.String(), strconv.Itoa(options.InsecurePort)),
+			BindAddress: net.JoinHostPort(options.InsecureServing.BindAddress.String(), strconv.Itoa(options.InsecureServing.BindPort)),
 		}
 		c.InsecureServingInfo = insecureServingInfo
 	}
@@ -487,8 +486,8 @@ func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
 	// If advertise-address is not specified, use bind-address. If bind-address
 	// is not usable (unset, 0.0.0.0, or loopback), we will use the host's default
 	// interface as valid public addr for master (see: util/net#ValidPublicAddrForMaster)
-	if options.SecureServingOptions != nil && (options.AdvertiseAddress == nil || options.AdvertiseAddress.IsUnspecified()) {
-		hostIP, err := utilnet.ChooseBindAddress(options.SecureServingOptions.ServingOptions.BindAddress)
+	if options.SecureServing != nil && (options.AdvertiseAddress == nil || options.AdvertiseAddress.IsUnspecified()) {
+		hostIP, err := utilnet.ChooseBindAddress(options.SecureServing.ServingOptions.BindAddress)
 		if err != nil {
 			glog.Fatalf("Unable to find suitable network address.error='%v' . "+
 				"Try to set the AdvertiseAddress directly or provide a valid BindAddress to fix this.", err)

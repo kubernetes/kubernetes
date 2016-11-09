@@ -17,9 +17,7 @@ limitations under the License.
 package options
 
 import (
-	"errors"
 	"net"
-	"strconv"
 	"strings"
 	"time"
 
@@ -27,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/config"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -54,8 +51,9 @@ var AuthorizationModeChoices = []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABA
 
 // ServerRunOptions contains the options while running a generic api server.
 type ServerRunOptions struct {
-	Etcd                 *EtcdOptions
-	SecureServingOptions *SecureServingOptions
+	Etcd            *EtcdOptions
+	SecureServing   *SecureServingOptions
+	InsecureServing *ServingOptions
 
 	AdmissionControl           string
 	AdmissionControlConfigFile string
@@ -86,8 +84,6 @@ type ServerRunOptions struct {
 	EnableSwaggerUI              bool
 	EnableWatchCache             bool
 	ExternalHost                 string
-	InsecureBindAddress          net.IP
-	InsecurePort                 int
 	KeystoneURL                  string
 	KeystoneCAFile               string
 	KubernetesServiceNodePort    int
@@ -133,8 +129,6 @@ func NewServerRunOptions() *ServerRunOptions {
 		EnableProfiling:                          true,
 		EnableContentionProfiling:                false,
 		EnableWatchCache:                         true,
-		InsecureBindAddress:                      net.ParseIP("127.0.0.1"),
-		InsecurePort:                             8080,
 		LongRunningRequestRE:                     DefaultLongRunningRequestRE,
 		MasterCount:                              1,
 		MasterServiceNamespace:                   api.NamespaceDefault,
@@ -150,8 +144,14 @@ func (o *ServerRunOptions) WithEtcdOptions() *ServerRunOptions {
 	o.Etcd = NewDefaultEtcdOptions()
 	return o
 }
+
 func (o *ServerRunOptions) WithSecureServingOptions() *ServerRunOptions {
-	o.SecureServingOptions = NewDefaultSecureServingOptions()
+	o.SecureServing = NewDefaultSecureServingOptions()
+	return o
+}
+
+func (o *ServerRunOptions) WithInsecureServingOptions() *ServerRunOptions {
+	o.InsecureServing = NewDefaultInsecureServingOptions()
 	return o
 }
 
@@ -203,40 +203,11 @@ func mergeGroupVersionIntoMap(gvList string, dest map[string]schema.GroupVersion
 
 // Returns a clientset which can be used to talk to this apiserver.
 func (s *ServerRunOptions) NewSelfClient(token string) (clientset.Interface, error) {
-	clientConfig, err := s.NewSelfClientConfig(token)
+	clientConfig, err := NewSelfClientConfig(s.SecureServing, s.InsecureServing, token)
 	if err != nil {
 		return nil, err
 	}
 	return clientset.NewForConfig(clientConfig)
-}
-
-// Returns a clientconfig which can be used to talk to this apiserver.
-func (s *ServerRunOptions) NewSelfClientConfig(token string) (*restclient.Config, error) {
-	clientConfig := &restclient.Config{
-		// Increase QPS limits. The client is currently passed to all admission plugins,
-		// and those can be throttled in case of higher load on apiserver - see #22340 and #22422
-		// for more details. Once #22422 is fixed, we may want to remove it.
-		QPS:   50,
-		Burst: 100,
-	}
-
-	// Use secure port if the ServerCA is specified
-	if s.SecureServingOptions != nil && s.SecureServingOptions.ServingOptions.BindPort > 0 && len(s.SecureServingOptions.ServerCA) > 0 {
-		host := s.SecureServingOptions.ServingOptions.BindAddress.String()
-		if host == "0.0.0.0" {
-			host = "localhost"
-		}
-		clientConfig.Host = "https://" + net.JoinHostPort(host, strconv.Itoa(s.SecureServingOptions.ServingOptions.BindPort))
-		clientConfig.CAFile = s.SecureServingOptions.ServerCA
-		clientConfig.BearerToken = token
-
-	} else if s.InsecurePort > 0 {
-		clientConfig.Host = net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort))
-	} else {
-		return nil, errors.New("Unable to set url for apiserver local client")
-	}
-
-	return clientConfig, nil
 }
 
 // AddFlags adds flags for a specific APIServer to the specified FlagSet
@@ -336,22 +307,6 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&s.ExternalHost, "external-hostname", s.ExternalHost,
 		"The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs).")
-
-	fs.IPVar(&s.InsecureBindAddress, "insecure-bind-address", s.InsecureBindAddress, ""+
-		"The IP address on which to serve the --insecure-port (set to 0.0.0.0 for all interfaces). "+
-		"Defaults to localhost.")
-	fs.IPVar(&s.InsecureBindAddress, "address", s.InsecureBindAddress,
-		"DEPRECATED: see --insecure-bind-address instead.")
-	fs.MarkDeprecated("address", "see --insecure-bind-address instead.")
-
-	fs.IntVar(&s.InsecurePort, "insecure-port", s.InsecurePort, ""+
-		"The port on which to serve unsecured, unauthenticated access. Default 8080. It is assumed "+
-		"that firewall rules are set up such that this port is not reachable from outside of "+
-		"the cluster and that port 443 on the cluster's public address is proxied to this "+
-		"port. This is performed by nginx in the default setup.")
-
-	fs.IntVar(&s.InsecurePort, "port", s.InsecurePort, "DEPRECATED: see --insecure-port instead.")
-	fs.MarkDeprecated("port", "see --insecure-port instead.")
 
 	fs.StringVar(&s.KeystoneURL, "experimental-keystone-url", s.KeystoneURL,
 		"If passed, activates the keystone authentication plugin.")

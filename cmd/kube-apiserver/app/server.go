@@ -50,6 +50,7 @@ import (
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
+	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/runtime/schema"
@@ -202,9 +203,9 @@ func Run(s *options.ServerRunOptions) error {
 	}
 
 	// Default to the private server key for service account token signing
-	if len(s.ServiceAccountKeyFiles) == 0 && s.GenericServerRunOptions.SecureServingOptions.ServerCert.CertKey.KeyFile != "" {
-		if authenticator.IsValidServiceAccountKeyFile(s.GenericServerRunOptions.SecureServingOptions.ServerCert.CertKey.KeyFile) {
-			s.ServiceAccountKeyFiles = []string{s.GenericServerRunOptions.SecureServingOptions.ServerCert.CertKey.KeyFile}
+	if len(s.ServiceAccountKeyFiles) == 0 && s.GenericServerRunOptions.SecureServing.ServerCert.CertKey.KeyFile != "" {
+		if authenticator.IsValidServiceAccountKeyFile(s.GenericServerRunOptions.SecureServing.ServerCert.CertKey.KeyFile) {
+			s.ServiceAccountKeyFiles = []string{s.GenericServerRunOptions.SecureServing.ServerCert.CertKey.KeyFile}
 		} else {
 			glog.Warning("No TLS key provided, service account token authentication disabled")
 		}
@@ -225,7 +226,7 @@ func Run(s *options.ServerRunOptions) error {
 		Anonymous:                   s.GenericServerRunOptions.AnonymousAuth,
 		AnyToken:                    s.GenericServerRunOptions.EnableAnyToken,
 		BasicAuthFile:               s.GenericServerRunOptions.BasicAuthFile,
-		ClientCAFile:                s.GenericServerRunOptions.SecureServingOptions.ClientCA,
+		ClientCAFile:                s.GenericServerRunOptions.SecureServing.ClientCA,
 		TokenAuthFile:               s.GenericServerRunOptions.TokenAuthFile,
 		OIDCIssuerURL:               s.GenericServerRunOptions.OIDCIssuerURL,
 		OIDCClientID:                s.GenericServerRunOptions.OIDCClientID,
@@ -247,7 +248,7 @@ func Run(s *options.ServerRunOptions) error {
 	}
 
 	privilegedLoopbackToken := uuid.NewRandom().String()
-	selfClientConfig, err := s.GenericServerRunOptions.NewSelfClientConfig(privilegedLoopbackToken)
+	selfClientConfig, err := genericoptions.NewSelfClientConfig(s.GenericServerRunOptions.SecureServing, s.GenericServerRunOptions.InsecureServing, privilegedLoopbackToken)
 	if err != nil {
 		glog.Fatalf("Failed to create clientset: %v", err)
 	}
