@@ -49,32 +49,12 @@ func verifyServiceNodePort(options *options.ServerRunOptions) []error {
 	return errors
 }
 
-func verifySecureAndInsecurePort(options *options.ServerRunOptions) []error {
-	errors := []error{}
-	errors = append(errors, options.SecureServing.Validate()...)
-	errors = append(errors, options.InsecureServing.Validate("insecure-port")...)
-
-	if (options.SecureServing == nil || options.SecureServing.ServingOptions.BindPort == 0) &&
-		(options.InsecureServing == nil || options.InsecureServing.BindPort == 0) {
-		glog.Fatalf("--secure-port and --insecure-port cannot be turned off at the same time.")
-	}
-
-	if options.SecureServing != nil && options.InsecureServing != nil &&
-		options.SecureServing.ServingOptions.BindPort == options.InsecureServing.BindPort {
-		errors = append(errors, fmt.Errorf("--secure-port and --insecure-port cannot use the same port."))
-	}
-	return errors
-}
-
 func ValidateRunOptions(options *options.ServerRunOptions) {
 	errors := []error{}
 	if errs := verifyClusterIPFlags(options); len(errs) > 0 {
 		errors = append(errors, errs...)
 	}
 	if errs := verifyServiceNodePort(options); len(errs) > 0 {
-		errors = append(errors, errs...)
-	}
-	if errs := verifySecureAndInsecurePort(options); len(errs) > 0 {
 		errors = append(errors, errs...)
 	}
 	if err := utilerrors.NewAggregate(errors); err != nil {

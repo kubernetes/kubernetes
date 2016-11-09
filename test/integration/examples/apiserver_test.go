@@ -44,7 +44,7 @@ func TestRunServer(t *testing.T) {
 	serverIP := fmt.Sprintf("http://localhost:%d", apiserver.InsecurePort)
 	stopCh := make(chan struct{})
 	go func() {
-		if err := apiserver.Run(apiserver.NewServerRunOptions(), stopCh); err != nil {
+		if err := apiserver.NewServerRunOptions().Run(stopCh); err != nil {
 			t.Fatalf("Error in bringing up the server: %v", err)
 		}
 	}()
@@ -65,7 +65,7 @@ func TestRunSecureServer(t *testing.T) {
 		options := apiserver.NewServerRunOptions()
 		options.InsecureServing.BindPort = 0
 		options.SecureServing.ServingOptions.BindPort = apiserver.SecurePort
-		if err := apiserver.Run(options, stopCh); err != nil {
+		if err := options.Run(stopCh); err != nil {
 			t.Fatalf("Error in bringing up the server: %v", err)
 		}
 	}()
