@@ -64,7 +64,7 @@ func TestRunSecureServer(t *testing.T) {
 	go func() {
 		options := apiserver.NewServerRunOptions()
 		options.InsecurePort = 0
-		options.SecurePort = apiserver.SecurePort
+		options.SecureServingOptions.ServingOptions.BindPort = apiserver.SecurePort
 		if err := apiserver.Run(options, stopCh); err != nil {
 			t.Fatalf("Error in bringing up the server: %v", err)
 		}

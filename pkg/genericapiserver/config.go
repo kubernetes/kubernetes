@@ -226,7 +226,6 @@ func NewConfig() *Config {
 	defaultOptions := options.NewServerRunOptions()
 	// unset fields that can be overridden to avoid setting values so that we won't end up with lingering values.
 	// TODO we probably want to run the defaults the other way.  A default here drives it in the CLI flags
-	defaultOptions.SecurePort = 0
 	defaultOptions.InsecurePort = 0
 	defaultOptions.AuditLogPath = ""
 	return config.ApplyOptions(defaultOptions)
@@ -243,28 +242,28 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 		}
 	}
 
-	if options.SecurePort > 0 {
+	if options.SecureServingOptions != nil && options.SecureServingOptions.ServingOptions.BindPort > 0 {
 		secureServingInfo := &SecureServingInfo{
 			ServingInfo: ServingInfo{
-				BindAddress: net.JoinHostPort(options.BindAddress.String(), strconv.Itoa(options.SecurePort)),
+				BindAddress: net.JoinHostPort(options.SecureServingOptions.ServingOptions.BindAddress.String(), strconv.Itoa(options.SecureServingOptions.ServingOptions.BindPort)),
 			},
 			ServerCert: GeneratableKeyCert{
 				CertKey: CertKey{
-					CertFile: options.TLSCertFile,
-					KeyFile:  options.TLSPrivateKeyFile,
+					CertFile: options.SecureServingOptions.ServerCert.CertKey.CertFile,
+					KeyFile:  options.SecureServingOptions.ServerCert.CertKey.KeyFile,
 				},
 			},
 			SNICerts: []NamedCertKey{},
-			ClientCA: options.ClientCAFile,
+			ClientCA: options.SecureServingOptions.ClientCA,
 		}
-		if options.TLSCertFile == "" && options.TLSPrivateKeyFile == "" {
+		if options.SecureServingOptions.ServerCert.CertKey.CertFile == "" && options.SecureServingOptions.ServerCert.CertKey.KeyFile == "" {
 			secureServingInfo.ServerCert.Generate = true
-			secureServingInfo.ServerCert.CertFile = path.Join(options.CertDirectory, "apiserver.crt")
-			secureServingInfo.ServerCert.KeyFile = path.Join(options.CertDirectory, "apiserver.key")
+			secureServingInfo.ServerCert.CertFile = path.Join(options.SecureServingOptions.ServerCert.CertDirectory, options.SecureServingOptions.ServerCert.PairName+".crt")
+			secureServingInfo.ServerCert.KeyFile = path.Join(options.SecureServingOptions.ServerCert.CertDirectory, options.SecureServingOptions.ServerCert.PairName+".key")
 		}
 
 		secureServingInfo.SNICerts = nil
-		for _, nkc := range options.SNICertKeys {
+		for _, nkc := range options.SecureServingOptions.SNICertKeys {
 			secureServingInfo.SNICerts = append(secureServingInfo.SNICerts, NamedCertKey{
 				CertKey: CertKey{
 					KeyFile:  nkc.KeyFile,
@@ -275,7 +274,7 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 		}
 
 		c.SecureServingInfo = secureServingInfo
-		c.ReadWritePort = options.SecurePort
+		c.ReadWritePort = options.SecureServingOptions.ServingOptions.BindPort
 	}
 
 	if options.InsecurePort > 0 {
@@ -488,8 +487,8 @@ func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
 	// If advertise-address is not specified, use bind-address. If bind-address
 	// is not usable (unset, 0.0.0.0, or loopback), we will use the host's default
 	// interface as valid public addr for master (see: util/net#ValidPublicAddrForMaster)
-	if options.AdvertiseAddress == nil || options.AdvertiseAddress.IsUnspecified() {
-		hostIP, err := utilnet.ChooseBindAddress(options.BindAddress)
+	if options.SecureServingOptions != nil && (options.AdvertiseAddress == nil || options.AdvertiseAddress.IsUnspecified()) {
+		hostIP, err := utilnet.ChooseBindAddress(options.SecureServingOptions.ServingOptions.BindAddress)
 		if err != nil {
 			glog.Fatalf("Unable to find suitable network address.error='%v' . "+
 				"Try to set the AdvertiseAddress directly or provide a valid BindAddress to fix this.", err)
