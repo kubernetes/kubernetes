@@ -383,6 +383,7 @@ func (l *SSHTunnelList) removeAndReAdd(e sshTunnelEntry) {
 			l.entries = append(l.entries[:i], l.entries[i+1:]...)
 			l.adding[e.Address] = true
 			go l.createAndAddTunnel(e.Address)
+			go e.Tunnel.Close()
 			return
 		}
 	}
