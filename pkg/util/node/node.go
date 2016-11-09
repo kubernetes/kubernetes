@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -87,6 +88,28 @@ func GetNodeHostIP(node *v1.Node) (net.IP, error) {
 		return net.ParseIP(addresses[0].Address), nil
 	}
 	if addresses, ok := addressMap[v1.NodeLegacyHostIP]; ok {
+		return net.ParseIP(addresses[0].Address), nil
+	}
+	return nil, fmt.Errorf("host IP unknown; known addresses: %v", addresses)
+}
+
+// InternalGetNodeHostIP returns the provided node's IP, based on the priority:
+// 1. NodeInternalIP
+// 2. NodeExternalIP
+// 3. NodeLegacyHostIP
+func InternalGetNodeHostIP(node *api.Node) (net.IP, error) {
+	addresses := node.Status.Addresses
+	addressMap := make(map[api.NodeAddressType][]api.NodeAddress)
+	for i := range addresses {
+		addressMap[addresses[i].Type] = append(addressMap[addresses[i].Type], addresses[i])
+	}
+	if addresses, ok := addressMap[api.NodeInternalIP]; ok {
+		return net.ParseIP(addresses[0].Address), nil
+	}
+	if addresses, ok := addressMap[api.NodeExternalIP]; ok {
+		return net.ParseIP(addresses[0].Address), nil
+	}
+	if addresses, ok := addressMap[api.NodeLegacyHostIP]; ok {
 		return net.ParseIP(addresses[0].Address), nil
 	}
 	return nil, fmt.Errorf("host IP unknown; known addresses: %v", addresses)
