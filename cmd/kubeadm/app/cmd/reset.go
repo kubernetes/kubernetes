@@ -124,12 +124,17 @@ func (r *Reset) Run(out io.Writer) error {
 		fmt.Printf("%v", err)
 	} else {
 		fmt.Printf("Stopping the %s service...\n", serviceToStop)
-		initSystem.ServiceStop(serviceToStop)
+		if err := initSystem.ServiceStop(serviceToStop); err != nil {
+			fmt.Printf("failed to stop the %s service", serviceToStop)
+		}
 	}
 
 	fmt.Printf("Unmounting directories in /var/lib/kubelet...\n")
-	// Don't check for errors here, since umount will return a non-zero exit code if there is no directories to umount
-	exec.Command("sh", "-c", "cat /proc/mounts | awk '{print $2}' | grep '/var/lib/kubelet' | xargs umount").Run()
+	umountDirsCmd := "cat /proc/mounts | awk '{print $2}' | grep '/var/lib/kubelet' | xargs -r umount"
+	umountOutputBytes, err := exec.Command("sh", "-c", umountDirsCmd).Output()
+	if err != nil {
+		fmt.Printf("failed to unmount directories in /var/lib/kubelet, %s", string(umountOutputBytes))
+	}
 
 	resetConfigDir("/etc/kubernetes/")
 
