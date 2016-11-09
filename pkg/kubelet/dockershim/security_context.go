@@ -61,9 +61,7 @@ func applyContainerSecurityContext(lc *runtimeapi.LinuxContainerConfig, sandboxI
 
 // modifyContainerConfig applies container security context config to dockercontainer.Config.
 func modifyContainerConfig(sc *runtimeapi.LinuxContainerSecurityContext, config *dockercontainer.Config) {
-	if sc != nil && sc.RunAsUser != nil {
-		config.User = strconv.FormatInt(sc.GetRunAsUser(), 10)
-	}
+	config.User = sc.GetRunAsUser()
 }
 
 // modifyHostConfig applies security context config to dockercontainer.HostConfig.
