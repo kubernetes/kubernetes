@@ -18,8 +18,7 @@ package cache
 
 import (
 	"k8s.io/kubernetes/pkg/api/errors"
-	rbacinternal "k8s.io/kubernetes/pkg/apis/rbac"
-	rbac "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
+	rbac "k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -87,7 +86,7 @@ func (s clusterRoleLister) Get(name string) (*rbac.ClusterRole, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(rbacinternal.Resource("clusterrole"), name)
+		return nil, errors.NewNotFound(rbac.Resource("clusterrole"), name)
 	}
 	return obj.(*rbac.ClusterRole), nil
 }
@@ -119,7 +118,7 @@ func (s clusterRoleBindingLister) Get(name string) (*rbac.ClusterRoleBinding, er
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(rbacinternal.Resource("clusterrolebinding"), name)
+		return nil, errors.NewNotFound(rbac.Resource("clusterrolebinding"), name)
 	}
 	return obj.(*rbac.ClusterRoleBinding), nil
 }
@@ -176,7 +175,7 @@ func (s roleNamespaceLister) Get(name string) (*rbac.Role, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(rbacinternal.Resource("role"), name)
+		return nil, errors.NewNotFound(rbac.Resource("role"), name)
 	}
 	return obj.(*rbac.Role), nil
 }
@@ -229,7 +228,7 @@ func (s roleBindingNamespaceLister) Get(name string) (*rbac.RoleBinding, error) 
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(rbacinternal.Resource("rolebinding"), name)
+		return nil, errors.NewNotFound(rbac.Resource("rolebinding"), name)
 	}
 	return obj.(*rbac.RoleBinding), nil
 }
