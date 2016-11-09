@@ -116,9 +116,11 @@ const (
 	defaultDNSOption = "ndots:5"
 
 	// Annotations for the ENTRYPOINT and CMD for an ACI that's converted from Docker image.
-	// TODO(yifan): Import them from docker2aci. See https://github.com/appc/docker2aci/issues/133.
-	appcDockerEntrypoint = "appc.io/docker/entrypoint"
-	appcDockerCmd        = "appc.io/docker/cmd"
+	// Taken from https://github.com/appc/docker2aci/blob/v0.12.3/lib/common/common.go#L33
+	appcDockerEntrypoint  = "appc.io/docker/entrypoint"
+	appcDockerCmd         = "appc.io/docker/cmd"
+	appcDockerRegistryURL = "appc.io/docker/registryurl"
+	appcDockerRepository  = "appc.io/docker/repository"
 
 	// TODO(yifan): Reuse this const with Docker runtime.
 	minimumGracePeriodInSeconds = 2
