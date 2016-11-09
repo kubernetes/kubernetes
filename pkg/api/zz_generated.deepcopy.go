@@ -136,6 +136,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PersistentVolumeSource, InType: reflect.TypeOf(&PersistentVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PersistentVolumeSpec, InType: reflect.TypeOf(&PersistentVolumeSpec{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PersistentVolumeStatus, InType: reflect.TypeOf(&PersistentVolumeStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PhotonPersistentDiskVolumeSource, InType: reflect.TypeOf(&PhotonPersistentDiskVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Pod, InType: reflect.TypeOf(&Pod{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodAffinity, InType: reflect.TypeOf(&PodAffinity{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodAffinityTerm, InType: reflect.TypeOf(&PodAffinityTerm{})},
@@ -2290,6 +2291,13 @@ func DeepCopy_api_PersistentVolumeSource(in interface{}, out interface{}, c *con
 		} else {
 			out.AzureDisk = nil
 		}
+		if in.PhotonPersistentDisk != nil {
+			in, out := &in.PhotonPersistentDisk, &out.PhotonPersistentDisk
+			*out = new(PhotonPersistentDiskVolumeSource)
+			**out = **in
+		} else {
+			out.PhotonPersistentDisk = nil
+		}
 		return nil
 	}
 }
@@ -2338,6 +2346,16 @@ func DeepCopy_api_PersistentVolumeStatus(in interface{}, out interface{}, c *con
 		out.Phase = in.Phase
 		out.Message = in.Message
 		out.Reason = in.Reason
+		return nil
+	}
+}
+
+func DeepCopy_api_PhotonPersistentDiskVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*PhotonPersistentDiskVolumeSource)
+		out := out.(*PhotonPersistentDiskVolumeSource)
+		out.PdID = in.PdID
+		out.FSType = in.FSType
 		return nil
 	}
 }
@@ -3751,6 +3769,13 @@ func DeepCopy_api_VolumeSource(in interface{}, out interface{}, c *conversion.Cl
 			}
 		} else {
 			out.AzureDisk = nil
+		}
+		if in.PhotonPersistentDisk != nil {
+			in, out := &in.PhotonPersistentDisk, &out.PhotonPersistentDisk
+			*out = new(PhotonPersistentDiskVolumeSource)
+			**out = **in
+		} else {
+			out.PhotonPersistentDisk = nil
 		}
 		return nil
 	}
