@@ -26,12 +26,12 @@ cd "${KUBE_ROOT}" > /dev/null
 # kubectl uses pkg/kubelet/qos
 
         #-path './plugin/pkg/admission/*' \
+        #-path './pkg/registry/rbac/rest/*' -o \
+        #-path './plugin/pkg/auth/authorizer/rbac/*' \
 
 find ./ -type f -name "*.go" \
     \( \
-        -path './pkg/dns/*' -o \
-        -path './pkg/registry/rbac/rest/*' -o \
-        -path './plugin/pkg/auth/authorizer/rbac/*' \
+        -path './pkg/dns/*' \
     \) -print0 > "${files_to_convert}"
 
 cat "${files_to_convert}" | while read -r -d $'\0' target; do
