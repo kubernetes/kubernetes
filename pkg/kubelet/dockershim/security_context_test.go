@@ -18,7 +18,6 @@ package dockershim
 
 import (
 	"fmt"
-	"strconv"
 	"testing"
 
 	dockercontainer "github.com/docker/engine-api/types/container"
@@ -29,7 +28,7 @@ import (
 )
 
 func TestModifyContainerConfig(t *testing.T) {
-	var uid int64 = 123
+	var uid string = "123"
 
 	cases := []struct {
 		name     string
@@ -42,7 +41,7 @@ func TestModifyContainerConfig(t *testing.T) {
 				RunAsUser: &uid,
 			},
 			expected: &dockercontainer.Config{
-				User: strconv.FormatInt(uid, 10),
+				User: uid,
 			},
 		},
 		{
