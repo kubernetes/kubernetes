@@ -2806,7 +2806,7 @@ func DeleteRCAndWaitForGC(c clientset.Interface, ns, name string) error {
 func podStoreForRC(c clientset.Interface, rc *api.ReplicationController) (*testutils.PodStore, error) {
 	labels := labels.SelectorFromSet(rc.Spec.Selector)
 	ps := testutils.NewPodStore(c, rc.Namespace, labels, fields.Everything())
-	err := wait.Poll(1*time.Second, 1*time.Minute, func() (bool, error) {
+	err := wait.Poll(1*time.Second, 2*time.Minute, func() (bool, error) {
 		if len(ps.Reflector.LastSyncResourceVersion()) != 0 {
 			return true, nil
 		}
