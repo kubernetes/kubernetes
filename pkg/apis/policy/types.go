@@ -40,17 +40,10 @@ type PodDisruptionBudgetSpec struct {
 // PodDisruptionBudgetStatus represents information about the status of a
 // PodDisruptionBudget. Status may trail the actual state of a system.
 type PodDisruptionBudgetStatus struct {
-	// Number of pod disruptions that are currently allowed.
-	PodDisruptionsAllowed int32 `json:"disruptionsAllowed"`
-
-	// current number of healthy pods
-	CurrentHealthy int32 `json:"currentHealthy"`
-
-	// minimum desired number of healthy pods
-	DesiredHealthy int32 `json:"desiredHealthy"`
-
-	// total number of pods counted by this disruption budget
-	ExpectedPods int32 `json:"expectedPods"`
+	// Most recent generation observed when updating this PDB status. PodDisruptionsAllowed and other
+	// status informatio is valid only if observedGeneration equals to PDB's object generation.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// DisruptedPods contains information about pods whose eviction was
 	// processed by the API server eviction subresource handler but has not
@@ -64,6 +57,18 @@ type PodDisruptionBudgetStatus struct {
 	// If everything goes smooth this map should be empty for the most of the time.
 	// Large number of entries in the map may indicate problems with pod deletions.
 	DisruptedPods map[string]unversioned.Time `json:"disruptedPods" protobuf:"bytes,5,rep,name=disruptedPods"`
+
+	// Number of pod disruptions that are currently allowed.
+	PodDisruptionsAllowed int32 `json:"disruptionsAllowed"`
+
+	// current number of healthy pods
+	CurrentHealthy int32 `json:"currentHealthy"`
+
+	// minimum desired number of healthy pods
+	DesiredHealthy int32 `json:"desiredHealthy"`
+
+	// total number of pods counted by this disruption budget
+	ExpectedPods int32 `json:"expectedPods"`
 }
 
 // +genclient=true

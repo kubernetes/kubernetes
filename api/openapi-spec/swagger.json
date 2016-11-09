@@ -33876,11 +33876,11 @@
    "v1beta1.PodDisruptionBudgetStatus": {
     "description": "PodDisruptionBudgetStatus represents information about the status of a PodDisruptionBudget. Status may trail the actual state of a system.",
     "required": [
+     "disruptedPods",
      "disruptionsAllowed",
      "currentHealthy",
      "desiredHealthy",
-     "expectedPods",
-     "disruptedPods"
+     "expectedPods"
     ],
     "properties": {
      "currentHealthy": {
@@ -33909,6 +33909,11 @@
       "description": "total number of pods counted by this disruption budget",
       "type": "integer",
       "format": "int32"
+     },
+     "observedGeneration": {
+      "description": "Most recent generation observed when updating this PDB status. PodDisruptionsAllowed and other status informatio is valid only if observedGeneration equals to PDB's object generation.",
+      "type": "integer",
+      "format": "int64"
      }
     }
    },
