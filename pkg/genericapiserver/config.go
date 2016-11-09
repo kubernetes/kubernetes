@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	apiserverfilters "k8s.io/kubernetes/pkg/apiserver/filters"
 	apiserveropenapi "k8s.io/kubernetes/pkg/apiserver/openapi"
 	"k8s.io/kubernetes/pkg/apiserver/request"
@@ -515,7 +516,7 @@ func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
 				glog.Warningf("Unable to obtain external host address from cloud provider: %v", err)
 			} else {
 				for _, addr := range addrs {
-					if addr.Type == api.NodeExternalIP {
+					if addr.Type == v1.NodeExternalIP {
 						options.ExternalHost = addr.Address
 					}
 				}

@@ -165,7 +165,7 @@ func NewPodNodeSelector(client clientset.Interface, clusterNodeSelectors map[str
 }
 
 func (p *podNodeSelector) SetInformerFactory(f informers.SharedInformerFactory) {
-	p.namespaceInformer = f.Namespaces().Informer()
+	p.namespaceInformer = f.InternalNamespaces().Informer()
 	p.SetReadyFunc(p.namespaceInformer.HasSynced)
 }
 

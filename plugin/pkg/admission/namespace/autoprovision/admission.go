@@ -88,7 +88,7 @@ func NewProvision(c clientset.Interface) admission.Interface {
 }
 
 func (p *provision) SetInformerFactory(f informers.SharedInformerFactory) {
-	p.namespaceInformer = f.Namespaces().Informer()
+	p.namespaceInformer = f.InternalNamespaces().Informer()
 	p.SetReadyFunc(p.namespaceInformer.HasSynced)
 }
 

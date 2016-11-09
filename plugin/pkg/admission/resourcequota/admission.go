@@ -24,8 +24,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/quota"
-	"k8s.io/kubernetes/pkg/quota/install"
+	"k8s.io/kubernetes/pkg/quotainternal"
+	"k8s.io/kubernetes/pkg/quotainternal/install"
 )
 
 func init() {

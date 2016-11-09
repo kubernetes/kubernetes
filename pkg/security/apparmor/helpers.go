@@ -66,3 +66,12 @@ func SetProfileName(pod *v1.Pod, containerName, profileName string) error {
 	pod.Annotations[ContainerAnnotationKeyPrefix+containerName] = profileName
 	return nil
 }
+
+// Sets the name of the profile to use with the container.
+func SetProfileNameFromPodAnnotations(annotations map[string]string, containerName, profileName string) error {
+	if annotations == nil {
+		return nil
+	}
+	annotations[ContainerAnnotationKeyPrefix+containerName] = profileName
+	return nil
+}
