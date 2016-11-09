@@ -1,9 +1,3 @@
-approvers:
-- bgrant0607
-- erictune
-- lavalamp
-- smarterclayton
-- thockin
 reviewers:
 - thockin
 - lavalamp
@@ -28,20 +22,20 @@ reviewers:
 - quinton-hoole
 - kargakis
 - dchen1107
-- saad-ali
 - zmerlynn
-- luxas
 - janetkuo
 - justinsb
 - pwittrock
 - roberthbailey
-- ncdc
 - timstclair
-- yifan-gu
 - eparis
-- mwielgus
-- timothysc
 - soltysh
 - piosz
 - jsafrane
 - jbeda
+- dims
+- fejta
+- krousey
+- rootfs
+- markturansky
+- vmarmol
