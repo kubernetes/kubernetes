@@ -202,9 +202,9 @@ func Run(s *options.ServerRunOptions) error {
 	}
 
 	// Default to the private server key for service account token signing
-	if len(s.ServiceAccountKeyFiles) == 0 && s.GenericServerRunOptions.TLSPrivateKeyFile != "" {
-		if authenticator.IsValidServiceAccountKeyFile(s.GenericServerRunOptions.TLSPrivateKeyFile) {
-			s.ServiceAccountKeyFiles = []string{s.GenericServerRunOptions.TLSPrivateKeyFile}
+	if len(s.ServiceAccountKeyFiles) == 0 && s.GenericServerRunOptions.SecureServingOptions.ServerCert.CertKey.KeyFile != "" {
+		if authenticator.IsValidServiceAccountKeyFile(s.GenericServerRunOptions.SecureServingOptions.ServerCert.CertKey.KeyFile) {
+			s.ServiceAccountKeyFiles = []string{s.GenericServerRunOptions.SecureServingOptions.ServerCert.CertKey.KeyFile}
 		} else {
 			glog.Warning("No TLS key provided, service account token authentication disabled")
 		}
@@ -225,7 +225,7 @@ func Run(s *options.ServerRunOptions) error {
 		Anonymous:                   s.GenericServerRunOptions.AnonymousAuth,
 		AnyToken:                    s.GenericServerRunOptions.EnableAnyToken,
 		BasicAuthFile:               s.GenericServerRunOptions.BasicAuthFile,
-		ClientCAFile:                s.GenericServerRunOptions.ClientCAFile,
+		ClientCAFile:                s.GenericServerRunOptions.SecureServingOptions.ClientCA,
 		TokenAuthFile:               s.GenericServerRunOptions.TokenAuthFile,
 		OIDCIssuerURL:               s.GenericServerRunOptions.OIDCIssuerURL,
 		OIDCClientID:                s.GenericServerRunOptions.OIDCClientID,
