@@ -55,7 +55,7 @@ func newStorageFactory() genericapiserver.StorageFactory {
 }
 
 func NewServerRunOptions() *genericoptions.ServerRunOptions {
-	serverOptions := genericoptions.NewServerRunOptions().WithEtcdOptions()
+	serverOptions := genericoptions.NewServerRunOptions().WithEtcdOptions().WithSecureServingOptions()
 	serverOptions.InsecurePort = InsecurePort
 	return serverOptions
 }
