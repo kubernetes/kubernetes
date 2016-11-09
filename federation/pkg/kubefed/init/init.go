@@ -120,6 +120,7 @@ func NewCmdInit(cmdOut io.Writer, config util.AdminConfig) *cobra.Command {
 	cmd.Flags().String("image", defaultImage, "Image to use for federation API server and controller manager binaries.")
 	cmd.Flags().String("etcd-pv-capacity", "10Gi", "Size of persistent volume claim to be used for etcd.")
 	cmd.Flags().Bool("dry-run", false, "dry run without sending commands to server.")
+	cmd.Flags().String("dns-provider", "google-clouddns", "Dns provider to be used for this deployment.")
 	return cmd
 }
 
@@ -146,6 +147,7 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	image := cmdutil.GetFlagString(cmd, "image")
 	etcdPVCapacity := cmdutil.GetFlagString(cmd, "etcd-pv-capacity")
 	dryRun := cmdutil.GetDryRunFlag(cmd)
+	dnsProvider := cmdutil.GetFlagString(cmd, "dns-provider")
 
 	hostFactory := config.HostFactory(initFlags.Host, initFlags.Kubeconfig)
 	hostClientset, err := hostFactory.ClientSet()
@@ -222,7 +224,7 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	}
 
 	// 7. Create federation controller manager
-	_, err = createControllerManager(hostClientset, initFlags.FederationSystemNamespace, initFlags.Name, cmName, image, cmKubeconfigName, dnsZoneName, dryRun)
+	_, err = createControllerManager(hostClientset, initFlags.FederationSystemNamespace, initFlags.Name, cmName, image, cmKubeconfigName, dnsZoneName, dnsProvider, dryRun)
 	if err != nil {
 		return err
 	}
@@ -521,7 +523,7 @@ func createAPIServer(clientset *client.Clientset, namespace, name, image, creden
 	}
 }
 
-func createControllerManager(clientset *client.Clientset, namespace, name, cmName, image, kubeconfigName, dnsZoneName string, dryRun bool) (*extensions.Deployment, error) {
+func createControllerManager(clientset *client.Clientset, namespace, name, cmName, image, kubeconfigName, dnsZoneName, dnsProvider string, dryRun bool) (*extensions.Deployment, error) {
 	dep := &extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name:      cmName,
@@ -545,7 +547,7 @@ func createControllerManager(clientset *client.Clientset, namespace, name, cmNam
 								"federation-controller-manager",
 								"--master=https://federation-apiserver",
 								"--kubeconfig=/etc/federation/controller-manager/kubeconfig",
-								"--dns-provider=gce",
+								fmt.Sprintf("--dns-provider=%s", dnsProvider),
 								"--dns-provider-config=",
 								fmt.Sprintf("--federation-name=%s", name),
 								fmt.Sprintf("--zone-name=%s", dnsZoneName),
