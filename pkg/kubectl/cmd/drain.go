@@ -82,6 +82,7 @@ const (
 	kLocalStorageWarning = "Deleting pods with local storage"
 	kUnmanagedFatal      = "pods not managed by ReplicationController, ReplicaSet, Job, or DaemonSet (use --force to override)"
 	kUnmanagedWarning    = "Deleting pods not managed by ReplicationController, ReplicaSet, Job, or DaemonSet"
+	kMaxNodeUpdateRetry  = 10
 )
 
 var (
@@ -551,7 +552,21 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 		} else {
 			helper := resource.NewHelper(o.restClient, o.nodeInfo.Mapping)
 			unsched.SetBool(desired)
-			_, err := helper.Replace(cmdNamespace, o.nodeInfo.Name, true, o.nodeInfo.Object)
+			var err error
+			for i := 0; i < kMaxNodeUpdateRetry; i++ {
+				// We don't care about what previous versions may exist, we always want
+				// to overwrite, and Replace always sets current ResourceVersion if version is "".
+				helper.Versioner.SetResourceVersion(o.nodeInfo.Object, "")
+				_, err = helper.Replace(cmdNamespace, o.nodeInfo.Name, true, o.nodeInfo.Object)
+				if err != nil {
+					if !apierrors.IsConflict(err) {
+						return err
+					}
+				} else {
+					break
+				}
+				// It's a race, no need to sleep
+			}
 			if err != nil {
 				return err
 			}
