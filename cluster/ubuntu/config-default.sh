@@ -29,6 +29,12 @@ export roles_array=($roles)
 
 # Define minion numbers
 export NUM_NODES=${NUM_NODES:-3}
+
+# Define master of cluster when "a" or "ai" is not appear in $roles
+# Note: this will be ignore when "a" or "ai" exist in $roles
+MASTER=${MASTER:-"vcap@10.10.103.250"}
+MASTER_IP="${MASTER#*@}"
+
 # define the IP range used for service cluster IPs.
 # according to rfc 1918 ref: https://tools.ietf.org/html/rfc1918 choose a private ip range here.
 export SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-192.168.3.0/24}  # formerly PORTAL_NET
