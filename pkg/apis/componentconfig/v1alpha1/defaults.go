@@ -340,7 +340,7 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		obj.SerializeImagePulls = boolVar(true)
 	}
 	if obj.SeccompProfileRoot == "" {
-		filepath.Join(defaultRootDir, "seccomp")
+		obj.SeccompProfileRoot = filepath.Join(defaultRootDir, "seccomp")
 	}
 	if obj.StreamingConnectionIdleTimeout == zeroDuration {
 		obj.StreamingConnectionIdleTimeout = unversioned.Duration{Duration: 4 * time.Hour}
