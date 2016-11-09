@@ -29,6 +29,7 @@ go_library(
         "//pkg/auth/authorizer/union:go_default_library",
         "//pkg/auth/user:go_default_library",
         "//pkg/capabilities:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers:go_default_library",
         "//pkg/controller/informers:go_default_library",

@@ -54,7 +54,6 @@ import (
 	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
 	"k8s.io/kubernetes/pkg/runtime"
 	certutil "k8s.io/kubernetes/pkg/util/cert"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/version"
 )
@@ -230,6 +229,59 @@ func NewConfig() *Config {
 	return config.ApplyOptions(defaultOptions)
 }
 
+func (c *Config) ApplySecureServingOptions(secureServing *options.SecureServingOptions) *Config {
+	if secureServing == nil || secureServing.ServingOptions.BindPort <= 0 {
+		return c
+	}
+
+	secureServingInfo := &SecureServingInfo{
+		ServingInfo: ServingInfo{
+			BindAddress: net.JoinHostPort(secureServing.ServingOptions.BindAddress.String(), strconv.Itoa(secureServing.ServingOptions.BindPort)),
+		},
+		ServerCert: GeneratableKeyCert{
+			CertKey: CertKey{
+				CertFile: secureServing.ServerCert.CertKey.CertFile,
+				KeyFile:  secureServing.ServerCert.CertKey.KeyFile,
+			},
+		},
+		SNICerts: []NamedCertKey{},
+		ClientCA: secureServing.ClientCA,
+	}
+	if secureServing.ServerCert.CertKey.CertFile == "" && secureServing.ServerCert.CertKey.KeyFile == "" {
+		secureServingInfo.ServerCert.Generate = true
+		secureServingInfo.ServerCert.CertFile = path.Join(secureServing.ServerCert.CertDirectory, secureServing.ServerCert.PairName+".crt")
+		secureServingInfo.ServerCert.KeyFile = path.Join(secureServing.ServerCert.CertDirectory, secureServing.ServerCert.PairName+".key")
+	}
+
+	secureServingInfo.SNICerts = nil
+	for _, nkc := range secureServing.SNICertKeys {
+		secureServingInfo.SNICerts = append(secureServingInfo.SNICerts, NamedCertKey{
+			CertKey: CertKey{
+				KeyFile:  nkc.KeyFile,
+				CertFile: nkc.CertFile,
+			},
+			Names: nkc.Names,
+		})
+	}
+
+	c.SecureServingInfo = secureServingInfo
+	c.ReadWritePort = secureServing.ServingOptions.BindPort
+
+	return c
+}
+
+func (c *Config) ApplyInsecureServingOptions(insecureServing *options.ServingOptions) *Config {
+	if insecureServing == nil || insecureServing.BindPort <= 0 {
+		return c
+	}
+
+	c.InsecureServingInfo = &ServingInfo{
+		BindAddress: net.JoinHostPort(insecureServing.BindAddress.String(), strconv.Itoa(insecureServing.BindPort)),
+	}
+
+	return c
+}
+
 // ApplyOptions applies the run options to the method receiver and returns self
 func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 	if len(options.AuditLogPath) != 0 {
@@ -239,48 +291,6 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 			MaxBackups: options.AuditLogMaxBackups,
 			MaxSize:    options.AuditLogMaxSize,
 		}
-	}
-
-	if options.SecureServing != nil && options.SecureServing.ServingOptions.BindPort > 0 {
-		secureServingInfo := &SecureServingInfo{
-			ServingInfo: ServingInfo{
-				BindAddress: net.JoinHostPort(options.SecureServing.ServingOptions.BindAddress.String(), strconv.Itoa(options.SecureServing.ServingOptions.BindPort)),
-			},
-			ServerCert: GeneratableKeyCert{
-				CertKey: CertKey{
-					CertFile: options.SecureServing.ServerCert.CertKey.CertFile,
-					KeyFile:  options.SecureServing.ServerCert.CertKey.KeyFile,
-				},
-			},
-			SNICerts: []NamedCertKey{},
-			ClientCA: options.SecureServing.ClientCA,
-		}
-		if options.SecureServing.ServerCert.CertKey.CertFile == "" && options.SecureServing.ServerCert.CertKey.KeyFile == "" {
-			secureServingInfo.ServerCert.Generate = true
-			secureServingInfo.ServerCert.CertFile = path.Join(options.SecureServing.ServerCert.CertDirectory, options.SecureServing.ServerCert.PairName+".crt")
-			secureServingInfo.ServerCert.KeyFile = path.Join(options.SecureServing.ServerCert.CertDirectory, options.SecureServing.ServerCert.PairName+".key")
-		}
-
-		secureServingInfo.SNICerts = nil
-		for _, nkc := range options.SecureServing.SNICertKeys {
-			secureServingInfo.SNICerts = append(secureServingInfo.SNICerts, NamedCertKey{
-				CertKey: CertKey{
-					KeyFile:  nkc.KeyFile,
-					CertFile: nkc.CertFile,
-				},
-				Names: nkc.Names,
-			})
-		}
-
-		c.SecureServingInfo = secureServingInfo
-		c.ReadWritePort = options.SecureServing.ServingOptions.BindPort
-	}
-
-	if options.InsecureServing != nil && options.InsecureServing.BindPort > 0 {
-		insecureServingInfo := &ServingInfo{
-			BindAddress: net.JoinHostPort(options.InsecureServing.BindAddress.String(), strconv.Itoa(options.InsecureServing.BindPort)),
-		}
-		c.InsecureServingInfo = insecureServingInfo
 	}
 
 	c.AuthorizerRBACSuperUser = options.AuthorizationRBACSuperUser
@@ -483,17 +493,6 @@ func (s *GenericAPIServer) installAPI(c *Config) {
 func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
 	genericvalidation.ValidateRunOptions(options)
 
-	// If advertise-address is not specified, use bind-address. If bind-address
-	// is not usable (unset, 0.0.0.0, or loopback), we will use the host's default
-	// interface as valid public addr for master (see: util/net#ValidPublicAddrForMaster)
-	if options.SecureServing != nil && (options.AdvertiseAddress == nil || options.AdvertiseAddress.IsUnspecified()) {
-		hostIP, err := utilnet.ChooseBindAddress(options.SecureServing.ServingOptions.BindAddress)
-		if err != nil {
-			glog.Fatalf("Unable to find suitable network address.error='%v' . "+
-				"Try to set the AdvertiseAddress directly or provide a valid BindAddress to fix this.", err)
-		}
-		options.AdvertiseAddress = hostIP
-	}
 	glog.Infof("Will report %v as public IP address.", options.AdvertiseAddress)
 
 	// Set default value for ExternalAddress if not specified.

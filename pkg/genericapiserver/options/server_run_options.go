@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
 	"net"
 	"strings"
 	"time"
@@ -24,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/util/config"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -51,10 +51,6 @@ var AuthorizationModeChoices = []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABA
 
 // ServerRunOptions contains the options while running a generic api server.
 type ServerRunOptions struct {
-	Etcd            *EtcdOptions
-	SecureServing   *SecureServingOptions
-	InsecureServing *ServingOptions
-
 	AdmissionControl           string
 	AdmissionControlConfigFile string
 	AdvertiseAddress           net.IP
@@ -140,19 +136,28 @@ func NewServerRunOptions() *ServerRunOptions {
 	}
 }
 
-func (o *ServerRunOptions) WithEtcdOptions() *ServerRunOptions {
-	o.Etcd = NewDefaultEtcdOptions()
-	return o
-}
+func (s *ServerRunOptions) DefaultExternalAddress(secure *SecureServingOptions, insecure *ServingOptions) error {
+	if s.AdvertiseAddress == nil || s.AdvertiseAddress.IsUnspecified() {
+		switch {
+		case secure != nil:
+			hostIP, err := secure.ServingOptions.DefaultExternalAddress()
+			if err != nil {
+				return fmt.Errorf("Unable to find suitable network address.error='%v'. "+
+					"Try to set the AdvertiseAddress directly or provide a valid BindAddress to fix this.", err)
+			}
+			s.AdvertiseAddress = hostIP
 
-func (o *ServerRunOptions) WithSecureServingOptions() *ServerRunOptions {
-	o.SecureServing = NewDefaultSecureServingOptions()
-	return o
-}
+		case insecure != nil:
+			hostIP, err := insecure.DefaultExternalAddress()
+			if err != nil {
+				return fmt.Errorf("Unable to find suitable network address.error='%v'. "+
+					"Try to set the AdvertiseAddress directly or provide a valid BindAddress to fix this.", err)
+			}
+			s.AdvertiseAddress = hostIP
+		}
+	}
 
-func (o *ServerRunOptions) WithInsecureServingOptions() *ServerRunOptions {
-	o.InsecureServing = NewDefaultInsecureServingOptions()
-	return o
+	return nil
 }
 
 // StorageGroupsToEncodingVersion returns a map from group name to group version,
@@ -199,15 +204,6 @@ func mergeGroupVersionIntoMap(gvList string, dest map[string]schema.GroupVersion
 	}
 
 	return nil
-}
-
-// Returns a clientset which can be used to talk to this apiserver.
-func (s *ServerRunOptions) NewSelfClient(token string) (clientset.Interface, error) {
-	clientConfig, err := NewSelfClientConfig(s.SecureServing, s.InsecureServing, token)
-	if err != nil {
-		return nil, err
-	}
-	return clientset.NewForConfig(clientConfig)
 }
 
 // AddFlags adds flags for a specific APIServer to the specified FlagSet

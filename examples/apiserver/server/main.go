@@ -30,10 +30,14 @@ func main() {
 
 	// Parse command line flags.
 	serverRunOptions.AddUniversalFlags(pflag.CommandLine)
-	serverRunOptions.AddEtcdStorageFlags(pflag.CommandLine)
+	serverRunOptions.Etcd.AddFlags(pflag.CommandLine)
+	serverRunOptions.SecureServing.AddFlags(pflag.CommandLine)
+	serverRunOptions.SecureServing.AddDeprecatedFlags(pflag.CommandLine)
+	serverRunOptions.InsecureServing.AddFlags(pflag.CommandLine)
+	serverRunOptions.InsecureServing.AddDeprecatedFlags(pflag.CommandLine)
 	flag.InitFlags()
 
-	if err := apiserver.Run(serverRunOptions, wait.NeverStop); err != nil {
+	if err := serverRunOptions.Run(wait.NeverStop); err != nil {
 		glog.Fatalf("Error in bringing up the server: %v", err)
 	}
 }
