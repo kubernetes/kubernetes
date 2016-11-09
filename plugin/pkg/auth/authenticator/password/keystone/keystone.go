@@ -85,6 +85,7 @@ func NewKeystoneAuthenticator(authURL string, caFile string) (*KeystoneAuthentic
 		transport := netutil.SetOldTransportDefaults(&http.Transport{TLSClientConfig: config})
 		return &KeystoneAuthenticator{authURL, transport}, nil
 	}
+
 	return &KeystoneAuthenticator{authURL: authURL}, nil
 }
 
