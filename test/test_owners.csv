@@ -676,6 +676,7 @@ k8s.io/kubernetes/pkg/proxy/config,ixdy,1
 k8s.io/kubernetes/pkg/proxy/healthcheck,ghodss,1
 k8s.io/kubernetes/pkg/proxy/iptables,freehan,0
 k8s.io/kubernetes/pkg/proxy/userspace,luxas,1
+k8s.io/kubernetes/pkg/proxy/winuserspace,jbhurat,0
 k8s.io/kubernetes/pkg/quota,sttts,1
 k8s.io/kubernetes/pkg/quota/evaluator/core,yifan-gu,1
 k8s.io/kubernetes/pkg/registry/apps/petset,kevin-wangzefeng,1
