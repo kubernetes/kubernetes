@@ -50,11 +50,11 @@ import (
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
-	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/serviceaccount"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
@@ -80,7 +80,9 @@ cluster's shared state through which all other components interact.`,
 
 // Run runs the specified APIServer.  This should never exit.
 func Run(s *options.ServerRunOptions) error {
-	genericvalidation.VerifyEtcdServersList(s.GenericServerRunOptions)
+	if errs := s.GenericServerRunOptions.Etcd.Validate(); len(errs) > 0 {
+		return utilerrors.NewAggregate(errs)
+	}
 	genericapiserver.DefaultAndValidateRunOptions(s.GenericServerRunOptions)
 	genericConfig := genericapiserver.NewConfig(). // create the new config
 							ApplyOptions(s.GenericServerRunOptions). // apply the options selected
@@ -142,7 +144,7 @@ func Run(s *options.ServerRunOptions) error {
 	// Proxying to pods and services is IP-based... don't expect to be able to verify the hostname
 	proxyTLSClientConfig := &tls.Config{InsecureSkipVerify: true}
 
-	if s.GenericServerRunOptions.StorageConfig.DeserializationCacheSize == 0 {
+	if s.GenericServerRunOptions.Etcd.StorageConfig.DeserializationCacheSize == 0 {
 		// When size of cache is not explicitly set, estimate its size based on
 		// target memory usage.
 		glog.V(2).Infof("Initalizing deserialization cache size based on %dMB limit", s.GenericServerRunOptions.TargetRAMMB)
@@ -158,9 +160,9 @@ func Run(s *options.ServerRunOptions) error {
 		// size to compute its size. We may even go further and measure
 		// collective sizes of the objects in the cache.
 		clusterSize := s.GenericServerRunOptions.TargetRAMMB / 60
-		s.GenericServerRunOptions.StorageConfig.DeserializationCacheSize = 25 * clusterSize
-		if s.GenericServerRunOptions.StorageConfig.DeserializationCacheSize < 1000 {
-			s.GenericServerRunOptions.StorageConfig.DeserializationCacheSize = 1000
+		s.GenericServerRunOptions.Etcd.StorageConfig.DeserializationCacheSize = 25 * clusterSize
+		if s.GenericServerRunOptions.Etcd.StorageConfig.DeserializationCacheSize < 1000 {
+			s.GenericServerRunOptions.Etcd.StorageConfig.DeserializationCacheSize = 1000
 		}
 	}
 
@@ -169,7 +171,7 @@ func Run(s *options.ServerRunOptions) error {
 		glog.Fatalf("error generating storage version map: %s", err)
 	}
 	storageFactory, err := genericapiserver.BuildDefaultStorageFactory(
-		s.GenericServerRunOptions.StorageConfig, s.GenericServerRunOptions.DefaultStorageMediaType, api.Codecs,
+		s.GenericServerRunOptions.Etcd.StorageConfig, s.GenericServerRunOptions.DefaultStorageMediaType, api.Codecs,
 		genericapiserver.NewDefaultResourceEncodingConfig(), storageGroupsToEncodingVersion,
 		// FIXME: this GroupVersionResource override should be configurable
 		[]schema.GroupVersionResource{batch.Resource("cronjobs").WithVersion("v2alpha1")},
@@ -179,7 +181,7 @@ func Run(s *options.ServerRunOptions) error {
 	}
 	storageFactory.AddCohabitatingResources(batch.Resource("jobs"), extensions.Resource("jobs"))
 	storageFactory.AddCohabitatingResources(autoscaling.Resource("horizontalpodautoscalers"), extensions.Resource("horizontalpodautoscalers"))
-	for _, override := range s.GenericServerRunOptions.EtcdServersOverrides {
+	for _, override := range s.GenericServerRunOptions.Etcd.EtcdServersOverrides {
 		tokens := strings.Split(override, "#")
 		if len(tokens) != 2 {
 			glog.Errorf("invalid value of etcd server overrides: %s", override)

@@ -29,7 +29,6 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/util/config"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 
@@ -55,6 +54,8 @@ var AuthorizationModeChoices = []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABA
 
 // ServerRunOptions contains the options while running a generic api server.
 type ServerRunOptions struct {
+	Etcd *EtcdOptions
+
 	AdmissionControl           string
 	AdmissionControlConfigFile string
 	AdvertiseAddress           net.IP
@@ -86,8 +87,6 @@ type ServerRunOptions struct {
 	EnableContentionProfiling    bool
 	EnableSwaggerUI              bool
 	EnableWatchCache             bool
-	EtcdServersOverrides         []string
-	StorageConfig                storagebackend.Config
 	ExternalHost                 string
 	InsecureBindAddress          net.IP
 	InsecurePort                 int
@@ -157,12 +156,7 @@ func NewServerRunOptions() *ServerRunOptions {
 }
 
 func (o *ServerRunOptions) WithEtcdOptions() *ServerRunOptions {
-	o.StorageConfig = storagebackend.Config{
-		Prefix: DefaultEtcdPathPrefix,
-		// Default cache size to 0 - if unset, its size will be set based on target
-		// memory usage.
-		DeserializationCacheSize: 0,
-	}
+	o.Etcd = NewDefaultEtcdOptions()
 	return o
 }
 
@@ -471,12 +465,6 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"Example: '30000-32767'. Inclusive at both ends of the range.")
 	fs.Var(&s.ServiceNodePortRange, "service-node-ports", "DEPRECATED: see --service-node-port-range instead")
 	fs.MarkDeprecated("service-node-ports", "see --service-node-port-range instead")
-
-	fs.StringVar(&s.StorageConfig.Type, "storage-backend", s.StorageConfig.Type,
-		"The storage backend for persistence. Options: 'etcd2' (default), 'etcd3'.")
-
-	fs.IntVar(&s.StorageConfig.DeserializationCacheSize, "deserialization-cache-size", s.StorageConfig.DeserializationCacheSize,
-		"Number of deserialized json objects to cache in memory.")
 
 	deprecatedStorageVersion := ""
 	fs.StringVar(&deprecatedStorageVersion, "storage-version", deprecatedStorageVersion,
