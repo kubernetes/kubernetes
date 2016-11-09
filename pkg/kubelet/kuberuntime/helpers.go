@@ -130,22 +130,6 @@ func (m *kubeGenericRuntimeManager) sandboxToKubeContainer(s *runtimeapi.PodSand
 	}, nil
 }
 
-// getContainerSpec gets the container spec by containerName.
-func getContainerSpec(pod *v1.Pod, containerName string) *v1.Container {
-	for i, c := range pod.Spec.Containers {
-		if containerName == c.Name {
-			return &pod.Spec.Containers[i]
-		}
-	}
-	for i, c := range pod.Spec.InitContainers {
-		if containerName == c.Name {
-			return &pod.Spec.InitContainers[i]
-		}
-	}
-
-	return nil
-}
-
 // getImageUser gets uid or user name that will run the command(s) from image. The function
 // guarantees that only one of them is set.
 func (m *kubeGenericRuntimeManager) getImageUser(image string) (*int64, *string, error) {

@@ -719,7 +719,7 @@ message ExecRequest {
     optional string container_id = 1;
     // Command to execute.
     repeated string cmd = 2;
-    // Whether use tty.
+    // Whether to exec the command in a TTY.
     optional bool tty = 3;
     // Whether to stream stdin.
     optional bool stdin = 4;
@@ -735,6 +735,9 @@ message AttachRequest {
     optional string container_id = 1;
     // Whether to stream stdin.
     optional bool stdin = 2;
+    // Whether the process being attached is running in a TTY.
+    // This must match the TTY setting in the ContainerConfig.
+    optional bool tty = 3;
 }
 
 message AttachResponse {
