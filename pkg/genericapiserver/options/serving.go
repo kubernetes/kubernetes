@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/util/config"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
 type ServingOptions struct {
@@ -66,7 +67,7 @@ type GeneratableKeyCert struct {
 	PairName string
 }
 
-func NewDefaultSecureServingOptions() *SecureServingOptions {
+func NewSecureServingOptions() *SecureServingOptions {
 	return &SecureServingOptions{
 		ServingOptions: ServingOptions{
 			BindAddress: net.ParseIP("0.0.0.0"),
@@ -80,9 +81,10 @@ func NewDefaultSecureServingOptions() *SecureServingOptions {
 }
 
 func (s *SecureServingOptions) NewSelfClientConfig(token string) *restclient.Config {
-	if s == nil || s.ServingOptions.BindPort <= 0 && len(s.ServerCA) == 0 {
+	if s == nil || s.ServingOptions.BindPort <= 0 || len(s.ServerCA) == 0 {
 		return nil
 	}
+
 	clientConfig := &restclient.Config{
 		// Increase QPS limits. The client is currently passed to all admission plugins,
 		// and those can be throttled in case of higher load on apiserver - see #22340 and #22422
@@ -113,7 +115,7 @@ func (s *SecureServingOptions) Validate() []error {
 	return errors
 }
 
-func (s *SecureServingOptions) AddSecureServingFlags(fs *pflag.FlagSet) {
+func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IPVar(&s.ServingOptions.BindAddress, "bind-address", s.ServingOptions.BindAddress, ""+
 		"The IP address on which to listen for the --secure-port port. The "+
 		"associated interface(s) must be reachable by the rest of the cluster, and by CLI/web "+
@@ -156,14 +158,14 @@ func (s *SecureServingOptions) AddSecureServingFlags(fs *pflag.FlagSet) {
 
 }
 
-func (s *SecureServingOptions) AddDeprecatedSecureServingFlags(fs *pflag.FlagSet) {
+func (s *SecureServingOptions) AddDeprecatedFlags(fs *pflag.FlagSet) {
 	fs.IPVar(&s.ServingOptions.BindAddress, "public-address-override", s.ServingOptions.BindAddress,
 		"DEPRECATED: see --bind-address instead.")
 	fs.MarkDeprecated("public-address-override", "see --bind-address instead.")
 
 }
 
-func NewDefaultInsecureServingOptions() *ServingOptions {
+func NewInsecureServingOptions() *ServingOptions {
 	return &ServingOptions{
 		BindAddress: net.ParseIP("127.0.0.1"),
 		BindPort:    8080,
@@ -197,7 +199,11 @@ func (s *ServingOptions) NewSelfClientConfig(token string) *restclient.Config {
 	return clientConfig
 }
 
-func (s *ServingOptions) AddInsecureServingFlags(fs *pflag.FlagSet) {
+func (s *ServingOptions) DefaultExternalAddress() (net.IP, error) {
+	return utilnet.ChooseBindAddress(s.BindAddress)
+}
+
+func (s *ServingOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IPVar(&s.BindAddress, "insecure-bind-address", s.BindAddress, ""+
 		"The IP address on which to serve the --insecure-port (set to 0.0.0.0 for all interfaces). "+
 		"Defaults to localhost.")
@@ -209,7 +215,7 @@ func (s *ServingOptions) AddInsecureServingFlags(fs *pflag.FlagSet) {
 		"port. This is performed by nginx in the default setup.")
 }
 
-func (s *ServingOptions) AddDeprecatedInsecureServingFlags(fs *pflag.FlagSet) {
+func (s *ServingOptions) AddDeprecatedFlags(fs *pflag.FlagSet) {
 	fs.IPVar(&s.BindAddress, "address", s.BindAddress,
 		"DEPRECATED: see --insecure-bind-address instead.")
 	fs.MarkDeprecated("address", "see --insecure-bind-address instead.")
