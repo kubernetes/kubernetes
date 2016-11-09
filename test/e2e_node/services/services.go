@@ -207,9 +207,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		"--feature-gates", framework.TestContext.FeatureGates,
 		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
 
-		// Temporarily disabled:
-		// "--experimental-mounter-path", framework.TestContext.MounterPath,
-		// "--experimental-mounter-rootfs-path", framework.TestContext.MounterRootfsPath,
+		"--experimental-mounter-path", framework.TestContext.MounterPath,
 	)
 
 	if framework.TestContext.EnableCRI {

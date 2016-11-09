@@ -98,13 +98,20 @@ function split-commas {
   echo $1 | tr "," "\n"
 }
 
-function install-rkt {
-    local -r rkt_binary="rkt-v1.18.0"
-    local -r rkt_sha1="75fc8f29c79bc9e505f3e7f6e8fadf2425c21967"
-    download-or-bust "${rkt_sha1}" "https://storage.googleapis.com/kubernetes-release/rkt/${rkt_binary}"
-    local -r rkt_dst="${KUBE_HOME}/bin/rkt"
-    mv "${KUBE_HOME}/${rkt_binary}" "${rkt_dst}"
-    chmod a+x "${rkt_dst}"
+function install-gci-mounter-tools {
+    local -r rkt_version="v1.18.0"
+    local -r gci_mounter_version="v2"
+    local -r rkt_binary_sha1="75fc8f29c79bc9e505f3e7f6e8fadf2425c21967"
+    local -r rkt_stage1_fly_sha1="474df5a1f934960ba669b360ab713d0a54283091"
+    local -r gci_mounter_sha1="851e841d8640d6a05e64e22c493f5ac3c4cba561"
+    download-or-bust "${rkt_binary_sha1}" "https://storage.googleapis.com/kubernetes-release/rkt/${rkt_version}/rkt"
+    download-or-bust "${rkt_stage1_fly_sha1}" "https://storage.googleapis.com/kubernetes-release/rkt/${rkt_version}/stage1-fly.aci"
+    download-or-bust "${gci_mounter_sha1}" "https://storage.googleapis.com/kubernetes-release/gci-mounter/gci-mounter-${gci_mounter_version}.aci"
+    local -r rkt_dst="${KUBE_HOME}/bin/"
+    mv "${KUBE_HOME}/rkt" "${rkt_dst}/rkt"
+    mv "${KUBE_HOME}/stage1-fly.aci" "${rkt_dst}/stage1-fly.aci"
+    mv "${KUBE_HOME}/gci-mounter-${gci_mounter_version}.aci" "${rkt_dst}/gci-mounter-${gci_mounter_version}.aci"
+    chmod a+x "${rkt_dst}/rkt"
 }
 
 # Downloads kubernetes binaries and kube-system manifest tarball, unpacks them,
@@ -184,8 +191,8 @@ function install-kube-binary-config {
   cp "${dst_dir}/kubernetes/gci-trusty/health-monitor.sh" "${KUBE_HOME}/bin/health-monitor.sh"
   chmod -R 755 "${kube_bin}"
 
-  # Install rkt binary to allow mounting storage volumes in GCI
-  install-rkt
+  # Install gci mounter related artifacts to allow mounting storage volumes in GCI
+  install-gci-mounter-tools
   
   # Clean up.
   rm -rf "${KUBE_HOME}/kubernetes"

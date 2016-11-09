@@ -45,8 +45,6 @@ const (
 	archiveName  = "e2e_node_test.tar.gz"
 	CNIRelease   = "07a8a28637e97b22eb8dfe710eeae1344f69d16e"
 	CNIDirectory = "cni"
-	// Note: This path needs to be in sync with the "target" path for `/` in cluster/gce/gci/mounter/mounter
-	mounterRootfsPath string = "/media/root"
 )
 
 var CNIURL = fmt.Sprintf("https://storage.googleapis.com/kubernetes-release/network-plugins/cni-%s.tar.gz", CNIRelease)
@@ -115,7 +113,7 @@ func CreateTestArchive() (string, error) {
 		}
 	}
 
-	// Include the GCI mounter in the deployed tarball
+	// Include the GCI mounter artifacts in the deployed tarball
 	k8sDir, err := builder.GetK8sRootDir()
 	if err != nil {
 		return "", fmt.Errorf("Could not find K8s root dir! Err: %v", err)
@@ -273,6 +271,7 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 		return "", false, fmt.Errorf("Issue detecting node's OS via node's /etc/os-release. Err: %v, Output:\n%s", err, output)
 	}
 	if strings.Contains(output, "ID=gci") {
+		glog.Infof("GCI node and GCI mounter both detected, modifying --experimental-mounter-path accordingly")
 		// Note this implicitly requires the script to be where we expect in the tarball, so if that location changes the error
 		// here will tell us to update the remote test runner.
 		mounterPath := filepath.Join(tmp, "cluster/gce/gci/mounter/mounter")
@@ -282,11 +281,7 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 			return "", false, err
 		}
 		// Insert args at beginning of testArgs, so any values from command line take precedence
-		testArgs = fmt.Sprintf("--experimental-mounter-rootfs-path=%s ", mounterRootfsPath) + testArgs
 		testArgs = fmt.Sprintf("--experimental-mounter-path=%s ", mounterPath) + testArgs
-
-		// Temporarily disabled (associated Kubelet flags commented out in k8s.io/kubernetes/test/e2e_node/services/services.go):
-		// glog.Infof("GCI node and GCI mounter both detected, setting --experimental-mounter-path=%q and --experimental-mounter-rootfs-path=%q accordingly", mounterPath, mounterRootfsPath)
 	}
 
 	// Run the tests
