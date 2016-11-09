@@ -1,3 +1,20 @@
-maintainers:
+approvers:
 - agonzalezro
 - simonswine
+reviewers:
+- thockin
+- pmorie
+- saad-ali
+- pwittrock
+- timstclair
+- jsafrane
+- dims
+- jdef
+- jingxu97
+- fabioy
+- resouer
+- david-mcmahon
+- swagiaal
+- chakri-nelluri
+- goltermann
+- ashcrow
