@@ -66,3 +66,24 @@ func TestValidNamespace(t *testing.T) {
 		t.Errorf("Expected the empty string")
 	}
 }
+
+//TestUserAgentContext validates that a useragent can be get/set on a context object
+func TestUserAgentContext(t *testing.T) {
+	ctx := api.NewContext()
+	_, ok := api.UserAgentFrom(ctx)
+	if ok {
+		t.Errorf("Should not be ok because there is no UserAgent on the context")
+	}
+
+	ctx = api.WithUserAgent(
+		ctx,
+		"TestUserAgent",
+	)
+	result, ok := api.UserAgentFrom(ctx)
+	if !ok {
+		t.Errorf("Error getting UserAgent")
+	}
+	if result != "TestUserAgent" {
+		t.Errorf("Expected: TestUserAgent, Actual: %v", result)
+	}
+}
