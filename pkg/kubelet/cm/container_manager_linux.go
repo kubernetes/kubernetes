@@ -448,7 +448,6 @@ func (cm *containerManagerImpl) setupNode() error {
 			return ensureSystemCgroups("/", manager)
 		}
 		systemContainers = append(systemContainers, cont)
-	} else {
 	}
 
 	if cm.KubeletCgroupsName != "" {

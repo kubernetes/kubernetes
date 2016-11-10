@@ -32,6 +32,8 @@ func GetPids(cgroupPath string) ([]int, error) {
 	return libcontainercgroups.GetPids(dir)
 }
 
+// getCgroupPath gets the file path to the "devices" subsystem of the desired cgroup.
+// cgroupPath is the path in the cgroup hierarchy.
 func getCgroupPath(cgroupPath string) (string, error) {
 	cgroupPath = libcontainerutils.CleanPath(cgroupPath)
 
@@ -55,6 +57,7 @@ func getCgroupPath(cgroupPath string) (string, error) {
 	return filepath.Join(parentPath, cgroupPath), nil
 }
 
+// getCgroupParentPath gets the parent filepath to this cgroup, for resolving relative cgroup paths.
 func getCgroupParentPath(mountpoint, root string) (string, error) {
 	// Use GetThisCgroupDir instead of GetInitCgroupDir, because the creating
 	// process could in container and shared pid namespace with host, and
