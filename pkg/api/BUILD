@@ -104,6 +104,7 @@ go_test(
         "//pkg/runtime:go_default_library",
         "//pkg/runtime/serializer/protobuf:go_default_library",
         "//pkg/runtime/serializer/streaming:go_default_library",
+        "//pkg/auth/user:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util/diff:go_default_library",
         "//pkg/util/sets:go_default_library",
