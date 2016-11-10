@@ -30,6 +30,8 @@ type event struct {
 	isCreated bool
 }
 
+// parseKV converts a KeyValue and previous value to a synthetic event.
+// isCreated is true if kv.ModRevision == kv.CreateRevision OR if prevVal is nil.
 func parseKV(kv *mvccpb.KeyValue, prevVal []byte) *event {
 	return &event{
 		key:       string(kv.Key),
@@ -37,7 +39,7 @@ func parseKV(kv *mvccpb.KeyValue, prevVal []byte) *event {
 		prevValue: prevVal,
 		rev:       kv.ModRevision,
 		isDeleted: false,
-		isCreated: kv.ModRevision == kv.CreateRevision,
+		isCreated: kv.ModRevision == kv.CreateRevision || prevVal == nil,
 	}
 }
 
