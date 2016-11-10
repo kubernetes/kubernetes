@@ -39,6 +39,5 @@ go_test(
     deps = [
         "//pkg/auth/authorizer:go_default_library",
         "//pkg/auth/user:go_default_library",
-        "//pkg/genericapiserver/options:go_default_library",
     ],
 )
