@@ -19,7 +19,6 @@ package kuberuntime
 import (
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"time"
 
@@ -33,7 +32,6 @@ import (
 	internalApi "k8s.io/kubernetes/pkg/kubelet/api"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -114,8 +112,6 @@ type KubeGenericRuntime interface {
 	kubecontainer.Runtime
 	kubecontainer.IndirectStreamingRuntime
 	kubecontainer.ContainerCommandRunner
-	// TODO(timstclair): Remove this once the indirect path is fully functional.
-	kubecontainer.DirectStreamingRuntime
 }
 
 // NewKubeGenericRuntimeManager creates a new kubeGenericRuntimeManager
@@ -917,24 +913,6 @@ func (m *kubeGenericRuntimeManager) GetPodContainerID(pod *kubecontainer.Pod) (k
 
 	// return sandboxID of the first sandbox since it is the latest one
 	return pod.Sandboxes[0].ID, nil
-}
-
-// Forward the specified port from the specified pod to the stream.
-// TODO: Remove this method once the indirect streaming path is fully functional.
-func (m *kubeGenericRuntimeManager) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
-	formattedPod := kubecontainer.FormatPod(pod)
-	if len(pod.Sandboxes) == 0 {
-		glog.Errorf("No sandboxes are found for pod %q", formattedPod)
-		return fmt.Errorf("sandbox for pod %q not found", formattedPod)
-	}
-
-	// Use docker portforward directly for in-process docker integration
-	// now to unblock other tests.
-	if ds, ok := m.runtimeService.(dockershim.DockerLegacyService); ok {
-		return ds.LegacyPortForward(pod.Sandboxes[0].ID.ID, port, stream)
-	}
-
-	return fmt.Errorf("not implemented")
 }
 
 // UpdatePodCIDR is just a passthrough method to update the runtimeConfig of the shim
