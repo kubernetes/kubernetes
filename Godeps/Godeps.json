@@ -1485,6 +1485,10 @@
 			"Rev": "a0ff2567cfb70903282db057e799fd826784d41d"
 		},
 		{
+			"ImportPath": "github.com/juju/ratelimit",
+			"Rev": "77ed1c8a01217656d2080ad51981f6e99adaa177"
+		},
+		{
 			"ImportPath": "github.com/kardianos/osext",
 			"Rev": "8fef92e41e22a70e700a96b29f066cda30ea24ef"
 		},
