@@ -74,15 +74,23 @@ spec:
           initialDelaySeconds: 3
           timeoutSeconds: 5
         args:
-        # command = "/kube-dns"
         - --domain=$DNS_DOMAIN.
         - --dns-port=10053
+        # This should be set to v=2 only after the new image (cut from 1.5) has
+        # been released, otherwise we will flood the logs.
+        - --v=0
+        env:
+        - name: PROMETHEUS_PORT
+          value: "10055"
         ports:
         - containerPort: 10053
           name: dns-local
           protocol: UDP
         - containerPort: 10053
           name: dns-tcp-local
+          protocol: TCP
+        - containerPort: 10055
+          name: metrics
           protocol: TCP
       - name: dnsmasq
         image: gcr.io/google_containers/kube-dnsmasq-amd64:1.4
@@ -107,6 +115,32 @@ spec:
         - containerPort: 53
           name: dns-tcp
           protocol: TCP
+        # see: https://github.com/kubernetes/kubernetes/issues/29055 for details
+        resources:
+          requests:
+            cpu: 150m
+            memory: 10Mi
+      - name: dnsmasq-metrics
+        image: gcr.io/google_containers/dnsmasq-metrics-amd64:1.0
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: 10054
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
+        args:
+        - --v=2
+        - --logtostderr
+        ports:
+        - containerPort: 10054
+          name: metrics
+          protocol: TCP
+        resources:
+          requests:
+            memory: 10Mi
       - name: healthz
         image: gcr.io/google_containers/exechealthz-amd64:1.2
         resources:
