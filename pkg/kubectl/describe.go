@@ -1803,6 +1803,7 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings Descr
 func describeNode(node *api.Node, nodeNonTerminatedPodsList *api.PodList, events *api.EventList, canViewPods bool) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", node.Name)
+		fmt.Fprintf(out, "Role:\t%s\n", findNodeRole(node))
 		printLabelsMultiline(out, "Labels", node.Labels)
 		printTaintsInAnnotationMultiline(out, "Taints", node.Annotations)
 		fmt.Fprintf(out, "CreationTimestamp:\t%s\n", node.CreationTimestamp.Time.Format(time.RFC1123Z))

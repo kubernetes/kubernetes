@@ -679,6 +679,36 @@ func TestPrintNodeStatus(t *testing.T) {
 			},
 			status: "Unknown,SchedulingDisabled",
 		},
+		{
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo10",
+					Labels: map[string]string{"kubernetes.io/role": "master"},
+				},
+				Status: api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionTrue}}},
+			},
+			status: "Ready,master",
+		},
+		{
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo11",
+					Labels: map[string]string{"kubernetes.io/role": "node"},
+				},
+				Status: api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionTrue}}},
+			},
+			status: "Ready,node",
+		},
+		{
+			node: api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo12",
+					Labels: map[string]string{"kubeadm.alpha.kubernetes.io/role": "node"},
+				},
+				Status: api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionTrue}}},
+			},
+			status: "Ready,node",
+		},
 	}
 
 	for _, test := range table {
