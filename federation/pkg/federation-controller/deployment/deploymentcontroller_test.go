@@ -31,6 +31,8 @@ import (
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	fake_kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -135,6 +137,10 @@ func TestDeploymentController(t *testing.T) {
 		}
 	}
 	assert.NoError(t, CheckObjectFromChan(cluster1CreateChan, checkDeployment(dep1, *dep1.Spec.Replicas)))
+	err := WaitForStoreUpdate(
+		deploymentController.fedDeploymentInformer.GetTargetStore(),
+		cluster1.Name, types.NamespacedName{Namespace: dep1.Namespace, Name: dep1.Name}.String(), wait.ForeverTestTimeout)
+	assert.Nil(t, err, "deployment should have appeared in the informer store")
 
 	// Increase replica count. Expect to see the update in cluster1.
 	newRep := int32(8)
