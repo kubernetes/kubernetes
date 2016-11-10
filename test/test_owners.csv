@@ -329,6 +329,7 @@ PetSet Deploy clustered applications should creating a working zookeeper cluster
 Pod garbage collector should handle the creation of 1000 pods,wojtek-t,1
 Pods should *not* be restarted with a /healthz http liveness probe,cjcullen,1
 "Pods should *not* be restarted with a docker exec ""cat /tmp/health"" liveness probe",vishh,0
+Pods Delete Grace Period should be submitted and removed,bdbauer,0
 Pods should allow activeDeadlineSeconds to be updated,derekwaynecarr,0
 Pods should be restarted with a /healthz http liveness probe,girishkalele,1
 "Pods should be restarted with a docker exec ""cat /tmp/health"" liveness probe",bgrant0607,1

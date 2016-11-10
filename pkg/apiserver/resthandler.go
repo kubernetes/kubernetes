@@ -739,7 +739,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 }
 
 // DeleteResource returns a function that will handle a resource deletion
-func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, admit admission.Interface) restful.RouteFunction {
+func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestScope, admit admission.Interface) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		// For performance tracking purposes.
 		trace := util.NewTrace("Delete " + req.Request.URL.Path)
@@ -759,7 +759,7 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 		ctx = api.WithNamespace(ctx, namespace)
 
 		options := &api.DeleteOptions{}
-		if checkBody {
+		if allowsOptions {
 			body, err := readBody(req.Request)
 			if err != nil {
 				scope.err(err, res.ResponseWriter, req.Request)
@@ -780,6 +780,13 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 				if obj != options {
 					scope.err(fmt.Errorf("decoded object cannot be converted to DeleteOptions"), res.ResponseWriter, req.Request)
 					return
+				}
+			} else {
+				if values := req.Request.URL.Query(); len(values) > 0 {
+					if err := scope.ParameterCodec.DecodeParameters(values, scope.Kind.GroupVersion(), options); err != nil {
+						scope.err(err, res.ResponseWriter, req.Request)
+						return
+					}
 				}
 			}
 		}
