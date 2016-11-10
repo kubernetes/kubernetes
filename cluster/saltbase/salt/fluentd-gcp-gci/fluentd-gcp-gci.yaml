@@ -11,14 +11,14 @@ spec:
   dnsPolicy: Default
   containers:
   - name: fluentd-cloud-logging
-    image: gcr.io/google_containers/fluentd-gcp:1.25
+    image: gcr.io/google_containers/fluentd-gcp:1.26
     command:
       - '/bin/sh'
       - '-c'
       # This is pretty hacky, but ruby relies on libsystemd's native code, and
       # the ubuntu:16.04 libsystemd doesn't play nice with the journal on GCI
       # hosts. Work around the problem by copying in the host's libsystemd.
-      - 'rm /lib/x86_64-linux-gnu/libsystemd* && cp /host/lib/libsystemd* /lib/x86_64-linux-gnu/ && /usr/sbin/google-fluentd -q -c /etc/google-fluentd/google-fluentd-journal.conf'
+      - 'rm /lib/x86_64-linux-gnu/libsystemd* && cp /host/lib/libsystemd* /lib/x86_64-linux-gnu/ && /usr/sbin/td-agent -q -c /etc/td-agent/td-agent-journal.conf'
     resources:
       limits:
         memory: 200Mi
@@ -27,6 +27,15 @@ spec:
         # requests of other per-node add-ons (e.g. kube-proxy).
         cpu: 100m
         memory: 200Mi
+    env:
+    # Jemalloc is a widely used way to decrease memory consumption
+    # in Ruby world. It's a better implementation of malloc(3).
+    - name: "LD_PRELOAD"
+      value: "/opt/td-agent/embedded/lib/libjemalloc.so"
+    # This is quite hacky, but forces Ruby GC to be ivoked more often
+    # resulting in lower memory consumption, which is important for us.
+    - name: "RUBY_GC_HEAP_OLDOBJECT_LIMIT_FACTOR"
+      value: "0.9"
     volumeMounts:
     - name: varlog
       mountPath: /var/log
