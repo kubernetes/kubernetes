@@ -56,6 +56,8 @@ go_test(
         "//pkg/client/clientset_generated/release_1_5:go_default_library",
         "//pkg/client/clientset_generated/release_1_5/fake:go_default_library",
         "//pkg/runtime:go_default_library",
+        "//pkg/types:go_default_library",
+        "//pkg/util/wait:go_default_library",
         "//vendor:github.com/stretchr/testify/assert",
     ],
 )
