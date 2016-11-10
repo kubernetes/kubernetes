@@ -301,6 +301,7 @@ func (dc *DeploymentController) handleErr(err error, key interface{}) {
 	}
 
 	utilruntime.HandleError(err)
+	glog.V(2).Infof("Dropping deployment %q out of the queue: %v", key, err)
 	dc.queue.Forget(key)
 }
 
