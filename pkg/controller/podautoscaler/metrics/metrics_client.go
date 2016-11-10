@@ -88,7 +88,7 @@ func (h *HeapsterMetricsClient) GetResourceMetric(resource api.ResourceName, nam
 		ProxyGet(h.heapsterScheme, h.heapsterService, h.heapsterPort, metricPath, params).
 		DoRaw()
 	if err != nil {
-		return nil, time.Time{}, fmt.Errorf("failed to get pod resource metrics: %v", err)
+		return nil, time.Time{}, fmt.Errorf("failed to get heapster service: %v", err)
 	}
 
 	glog.V(4).Infof("Heapster metrics result: %s", string(resultRaw))
@@ -158,7 +158,7 @@ func (h *HeapsterMetricsClient) GetRawMetric(metricName string, namespace string
 		ProxyGet(h.heapsterScheme, h.heapsterService, h.heapsterPort, metricPath, map[string]string{"start": startTime.Format(time.RFC3339)}).
 		DoRaw()
 	if err != nil {
-		return nil, time.Time{}, fmt.Errorf("failed to get pod metrics: %v", err)
+		return nil, time.Time{}, fmt.Errorf("failed to get heapster service: %v", err)
 	}
 
 	var metrics heapster.MetricResultList

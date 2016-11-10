@@ -116,7 +116,7 @@ func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUti
 			for podName := range missingPods {
 				metrics[podName] = requests[podName]
 			}
-		} else {
+		} else if usageRatio > 1.0 {
 			// on a scale-up, treat missing pods as using 0% of the resource request
 			for podName := range missingPods {
 				metrics[podName] = 0
