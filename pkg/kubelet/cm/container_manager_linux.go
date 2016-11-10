@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/util"
+	utilcgroups "k8s.io/kubernetes/pkg/util/cgroups"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
@@ -443,16 +444,11 @@ func (cm *containerManagerImpl) setupNode() error {
 			return fmt.Errorf("system container cannot be root (\"/\")")
 		}
 		cont := newSystemCgroups(cm.SystemCgroupsName)
-		rootContainer := &fs.Manager{
-			Cgroups: &configs.Cgroup{
-				Parent: "/",
-				Name:   "/",
-			},
-		}
 		cont.ensureStateFunc = func(manager *fs.Manager) error {
-			return ensureSystemCgroups(rootContainer, manager)
+			return ensureSystemCgroups("/", manager)
 		}
 		systemContainers = append(systemContainers, cont)
+	} else {
 	}
 
 	if cm.KubeletCgroupsName != "" {
@@ -747,7 +743,7 @@ func getContainer(pid int) (string, error) {
 // The reason of leaving kernel threads at root cgroup is that we don't want to tie the
 // execution of these threads with to-be defined /system quota and create priority inversions.
 //
-func ensureSystemCgroups(rootContainer *fs.Manager, manager *fs.Manager) error {
+func ensureSystemCgroups(rootCgroupPath string, manager *fs.Manager) error {
 	// Move non-kernel PIDs to the system container.
 	attemptsRemaining := 10
 	var errs []error
@@ -756,7 +752,7 @@ func ensureSystemCgroups(rootContainer *fs.Manager, manager *fs.Manager) error {
 		errs = []error{}
 		attemptsRemaining--
 
-		allPids, err := rootContainer.GetPids()
+		allPids, err := utilcgroups.GetPids(rootCgroupPath)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to list PIDs for root: %v", err))
 			continue
