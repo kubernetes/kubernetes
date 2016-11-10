@@ -332,3 +332,17 @@ func ChooseZoneForVolume(zones sets.String, pvcName string) string {
 	glog.V(2).Infof("Creating volume for PVC %q; chose zone=%q from zones=%q", pvcName, zone, zoneSlice)
 	return zone
 }
+
+// Zones2Set converts a string containing a comma separated list of zones to set
+func Zones2Set(zonesString string) (sets.String, error) {
+	zonesSlice := strings.Split(zonesString, ",")
+	zonesSet := make(sets.String)
+	for _, zone := range zonesSlice {
+		trimmedZone := strings.TrimSpace(zone)
+		if trimmedZone == "" {
+			return make(sets.String), fmt.Errorf("comma separated list of zones must not contain an empty zone")
+		}
+		zonesSet.Insert(trimmedZone)
+	}
+	return zonesSet, nil
+}
