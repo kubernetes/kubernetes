@@ -357,8 +357,10 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 	createdRS, err := dc.client.Extensions().ReplicaSets(namespace).Create(&newRS)
 	switch {
 	// We may end up hitting this due to a slow cache or a fast resync of the deployment.
-	case errors.IsAlreadyExists(err):
-		return dc.rsLister.ReplicaSets(namespace).Get(newRS.Name)
+	// TODO: Restore once https://github.com/kubernetes/kubernetes/issues/29735 is fixed
+	// ie. we start using a new hashing algorithm.
+	// case errors.IsAlreadyExists(err):
+	//	return dc.rsLister.ReplicaSets(namespace).Get(newRS.Name)
 	case err != nil:
 		msg := fmt.Sprintf("Failed to create new replica set %q: %v", newRS.Name, err)
 		if deployment.Spec.ProgressDeadlineSeconds != nil {
