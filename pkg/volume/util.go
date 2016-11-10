@@ -410,3 +410,17 @@ func JoinMountOptions(userOptions []string, systemOptions []string) []string {
 	}
 	return allMountOptions.UnsortedList()
 }
+
+// ZonesToSet converts a string containing a comma separated list of zones to set
+func ZonesToSet(zonesString string) (sets.String, error) {
+	zonesSlice := strings.Split(zonesString, ",")
+	zonesSet := make(sets.String)
+	for _, zone := range zonesSlice {
+		trimmedZone := strings.TrimSpace(zone)
+		if trimmedZone == "" {
+			return make(sets.String), fmt.Errorf("comma separated list of zones (%q) must not contain an empty zone", zonesString)
+		}
+		zonesSet.Insert(trimmedZone)
+	}
+	return zonesSet, nil
+}
