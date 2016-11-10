@@ -36,6 +36,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/cobra"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
@@ -50,9 +51,6 @@ import (
 	triple "k8s.io/kubernetes/pkg/util/cert/triple"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/version"
-
-	"github.com/spf13/cobra"
 )
 
 const (
@@ -95,8 +93,8 @@ var (
 		"app":    "federated-cluster",
 		"module": "federation-controller-manager",
 	}
-
-	hyperkubeImageName = "gcr.io/google_containers/hyperkube-amd64"
+	//TODO: which image tag to be used should be relooked into
+	hyperkubeImageName = "gcr.io/google_containers/hyperkube-amd64:v1.5.0-beta.0"
 )
 
 // NewCmdInit defines the `init` command that bootstraps a federation
@@ -113,7 +111,7 @@ func NewCmdInit(cmdOut io.Writer, config util.AdminConfig) *cobra.Command {
 		},
 	}
 
-	defaultImage := fmt.Sprintf("%s:%s", hyperkubeImageName, version.Get())
+	defaultImage := fmt.Sprintf("%s", hyperkubeImageName)
 
 	util.AddSubcommandFlags(cmd)
 	cmd.Flags().String("dns-zone-name", "", "DNS suffix for this federation. Federated Service DNS names are published with this suffix.")
@@ -501,7 +499,7 @@ func createControllerManager(clientset *client.Clientset, namespace, name, cmNam
 							Command: []string{
 								"/hyperkube",
 								"federation-controller-manager",
-								"--master=https://federation-apiserver",
+								fmt.Sprintf("--master=https://%s-apiserver", name),
 								"--kubeconfig=/etc/federation/controller-manager/kubeconfig",
 								"--dns-provider=gce",
 								"--dns-provider-config=",
