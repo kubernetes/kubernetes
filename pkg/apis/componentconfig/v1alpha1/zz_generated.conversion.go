@@ -407,6 +407,7 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	out.FeatureGates = in.FeatureGates
 	out.EnableCRI = in.EnableCRI
 	out.ExperimentalFailSwapOn = in.ExperimentalFailSwapOn
+	out.ExperimentalCheckNodeCapabilitiesBeforeMount = in.ExperimentalCheckNodeCapabilitiesBeforeMount
 	return nil
 }
 
@@ -575,6 +576,7 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	out.FeatureGates = in.FeatureGates
 	out.EnableCRI = in.EnableCRI
 	out.ExperimentalFailSwapOn = in.ExperimentalFailSwapOn
+	out.ExperimentalCheckNodeCapabilitiesBeforeMount = in.ExperimentalCheckNodeCapabilitiesBeforeMount
 	return nil
 }
 

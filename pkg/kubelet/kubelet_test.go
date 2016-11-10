@@ -239,7 +239,8 @@ func newTestKubeletWithImageList(
 		fakeRuntime,
 		kubelet.mounter,
 		kubelet.getPodsDir(),
-		kubelet.recorder)
+		kubelet.recorder,
+		false /* experimentalCheckNodeCapabilitiesBeforeMount*/)
 	require.NoError(t, err, "Failed to initialize volume manager")
 
 	// enable active deadline handler
