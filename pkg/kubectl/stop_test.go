@@ -18,6 +18,7 @@ package kubectl
 
 import (
 	"fmt"
+	"hash/adler32"
 	"reflect"
 	"strings"
 	"testing"
@@ -31,8 +32,9 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	testcore "k8s.io/kubernetes/pkg/client/testing/core"
-	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/runtime"
+	hashutil "k8s.io/kubernetes/pkg/util/hash"
+	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -438,7 +440,7 @@ func TestDeploymentStop(t *testing.T) {
 			Replicas: 0,
 		},
 	}
-	template := deploymentutil.GetNewReplicaSetTemplate(&deployment)
+	template := getNewReplicaSetTemplate(&deployment)
 	tests := []struct {
 		Name            string
 		Objs            []runtime.Object
@@ -659,6 +661,24 @@ func TestSimpleStop(t *testing.T) {
 	}
 }
 
+func getPodTemplateSpecHash(template api.PodTemplateSpec) uint32 {
+	podTemplateSpecHasher := adler32.New()
+	hashutil.DeepHashObject(podTemplateSpecHasher, template)
+	return podTemplateSpecHasher.Sum32()
+}
+func getNewReplicaSetTemplate(deployment *extensions.Deployment) api.PodTemplateSpec {
+	// newRS will have the same template as in deployment spec, plus a unique label in some cases.
+	newRSTemplate := api.PodTemplateSpec{
+		ObjectMeta: deployment.Spec.Template.ObjectMeta,
+		Spec:       deployment.Spec.Template.Spec,
+	}
+	newRSTemplate.ObjectMeta.Labels = labelsutil.CloneAndAddLabel(
+		deployment.Spec.Template.ObjectMeta.Labels,
+		extensions.DefaultDeploymentUniqueLabelKey,
+		getPodTemplateSpecHash(newRSTemplate))
+	return newRSTemplate
+}
+
 func TestDeploymentNotFoundError(t *testing.T) {
 	name := "foo"
 	ns := "default"
@@ -675,7 +695,7 @@ func TestDeploymentNotFoundError(t *testing.T) {
 			Replicas: 0,
 		},
 	}
-	template := deploymentutil.GetNewReplicaSetTemplate(deployment)
+	template := getNewReplicaSetTemplate(deployment)
 
 	fake := fake.NewSimpleClientset(
 		deployment,

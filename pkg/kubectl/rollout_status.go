@@ -43,6 +43,16 @@ type DeploymentStatusViewer struct {
 	c extensionsclient.DeploymentsGetter
 }
 
+func getDeploymentCondition(status extensions.DeploymentStatus, condType extensions.DeploymentConditionType) *extensions.DeploymentCondition {
+	for i := range status.Conditions {
+		c := status.Conditions[i]
+		if c.Type == condType {
+			return &c
+		}
+	}
+	return nil
+}
+
 // Status returns a message describing deployment status, and a bool value indicating if the status is considered done
 func (s *DeploymentStatusViewer) Status(namespace, name string, revision int64) (string, bool, error) {
 	deployment, err := s.c.Deployments(namespace).Get(name)
@@ -59,7 +69,7 @@ func (s *DeploymentStatusViewer) Status(namespace, name string, revision int64) 
 		}
 	}
 	if deployment.Generation <= deployment.Status.ObservedGeneration {
-		cond := util.GetDeploymentCondition(deployment.Status, extensions.DeploymentProgressing)
+		cond := getDeploymentCondition(deployment.Status, extensions.DeploymentProgressing)
 		if cond != nil && cond.Reason == util.TimedOutReason {
 			return "", false, fmt.Errorf("deployment %q exceeded its progress deadline", name)
 		}

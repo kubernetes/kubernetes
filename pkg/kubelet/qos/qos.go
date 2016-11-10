@@ -109,7 +109,7 @@ func GetPodQOS(pod *v1.Pod) QOSClass {
 	return Burstable
 }
 
-// GetPodQOS returns the QoS class of a pod.
+// InternalGetPodQOS returns the QoS class of a pod.
 // A pod is besteffort if none of its containers have specified any requests or limits.
 // A pod is guaranteed only when requests and limits are specified for all the containers and they are equal.
 // A pod is burstable if limits and requests do not match across all containers.

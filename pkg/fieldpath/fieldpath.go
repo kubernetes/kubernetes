@@ -123,6 +123,31 @@ func ExtractContainerResourceValue(fs *v1.ResourceFieldSelector, container *v1.C
 	return "", fmt.Errorf("Unsupported container resource : %v", fs.Resource)
 }
 
+// TODO: remove this duplicate
+// InternalExtractContainerResourceValue extracts the value of a resource
+// in an already known container
+func InternalExtractContainerResourceValue(fs *api.ResourceFieldSelector, container *api.Container) (string, error) {
+	divisor := resource.Quantity{}
+	if divisor.Cmp(fs.Divisor) == 0 {
+		divisor = resource.MustParse("1")
+	} else {
+		divisor = fs.Divisor
+	}
+
+	switch fs.Resource {
+	case "limits.cpu":
+		return convertResourceCPUToString(container.Resources.Limits.Cpu(), divisor)
+	case "limits.memory":
+		return convertResourceMemoryToString(container.Resources.Limits.Memory(), divisor)
+	case "requests.cpu":
+		return convertResourceCPUToString(container.Resources.Requests.Cpu(), divisor)
+	case "requests.memory":
+		return convertResourceMemoryToString(container.Resources.Requests.Memory(), divisor)
+	}
+
+	return "", fmt.Errorf("Unsupported container resource : %v", fs.Resource)
+}
+
 // findContainerInPod finds a container by its name in the provided pod
 func findContainerInPod(pod *v1.Pod, containerName string) (*v1.Container, error) {
 	for _, container := range pod.Spec.Containers {
