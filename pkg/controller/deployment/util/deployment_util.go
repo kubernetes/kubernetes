@@ -832,12 +832,14 @@ func IsRollingUpdate(deployment *extensions.Deployment) bool {
 // updatedReplicas and it doesn't violate minimum availability.
 func DeploymentComplete(deployment *extensions.Deployment, newStatus *extensions.DeploymentStatus) bool {
 	return newStatus.UpdatedReplicas == *(deployment.Spec.Replicas) &&
-		newStatus.AvailableReplicas >= *(deployment.Spec.Replicas)-MaxUnavailable(*deployment)
+		newStatus.AvailableReplicas >= *(deployment.Spec.Replicas)-MaxUnavailable(*deployment) &&
+		newStatus.ObservedGeneration >= deployment.Generation
 }
 
 // DeploymentProgressing reports progress for a deployment. Progress is estimated by comparing the
-// current with the new status of the deployment that the controller is observing. The following
-// algorithm is already used in the kubectl rolling updater to report lack of progress.
+// current with the new status of the deployment that the controller is observing. More specifically,
+// when new pods are scaled up or become available, or old pods are scaled down, then we consider the
+// deployment is progressing.
 func DeploymentProgressing(deployment *extensions.Deployment, newStatus *extensions.DeploymentStatus) bool {
 	oldStatus := deployment.Status
 
@@ -845,7 +847,9 @@ func DeploymentProgressing(deployment *extensions.Deployment, newStatus *extensi
 	oldStatusOldReplicas := oldStatus.Replicas - oldStatus.UpdatedReplicas
 	newStatusOldReplicas := newStatus.Replicas - newStatus.UpdatedReplicas
 
-	return (newStatus.UpdatedReplicas > oldStatus.UpdatedReplicas) || (newStatusOldReplicas < oldStatusOldReplicas)
+	return (newStatus.UpdatedReplicas > oldStatus.UpdatedReplicas) ||
+		(newStatusOldReplicas < oldStatusOldReplicas) ||
+		newStatus.AvailableReplicas > deployment.Status.AvailableReplicas
 }
 
 // used for unit testing
