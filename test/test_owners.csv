@@ -45,6 +45,7 @@ CronJob should replace jobs when ReplaceConcurrent,soltysh,1
 CronJob should schedule multiple jobs concurrently,soltysh,1
 DNS horizontal autoscaling kube-dns-autoscaler should scale kube-dns pods in both nonfaulty and faulty scenarios,MrHohn,0
 DNS horizontal autoscaling kube-dns-autoscaler should scale kube-dns pods when cluster size changed,MrHohn,0
+ContainerLogPath Pod with a container printed log to stdout should print log to correct log path,resouer,0
 DNS should provide DNS for ExternalName services,rmmh,1
 DNS should provide DNS for pods for Hostname and Subdomain Annotation,mtaufen,1
 DNS should provide DNS for services,roberthbailey,1
