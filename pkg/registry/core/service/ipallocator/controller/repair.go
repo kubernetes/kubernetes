@@ -67,6 +67,7 @@ func NewRepair(interval time.Duration, registry service.Registry, network *net.I
 // RunUntil starts the controller until the provided ch is closed.
 func (c *Repair) RunUntil(ch chan struct{}) {
 	wait.Until(func() {
+		time.Sleep(5*time.Second)
 		if err := c.RunOnce(); err != nil {
 			runtime.HandleError(err)
 		}

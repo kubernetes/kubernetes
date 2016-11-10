@@ -47,6 +47,7 @@ import (
 type Controller struct {
 	NamespaceRegistry namespace.Registry
 	ServiceRegistry   service.Registry
+	ServiceRest       *service.REST
 
 	ServiceClusterIPRegistry rangeallocation.RangeRegistry
 	ServiceClusterIPInterval time.Duration
@@ -79,6 +80,7 @@ func (c *Config) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTSto
 	return &Controller{
 		NamespaceRegistry: legacyRESTStorage.NamespaceRegistry,
 		ServiceRegistry:   legacyRESTStorage.ServiceRegistry,
+		ServiceRest:       legacyRESTStorage.ServiceRest,
 
 		EndpointReconciler: c.EndpointReconcilerConfig.Reconciler,
 		EndpointInterval:   c.EndpointReconcilerConfig.Interval,
@@ -245,7 +247,7 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 		if reconcile {
 			if svc, updated := getMasterServiceUpdateIfNeeded(s, servicePorts, serviceType); updated {
 				glog.Warningf("Resetting master service %q to %#v", serviceName, svc)
-				_, err := c.ServiceRegistry.UpdateService(ctx, svc)
+				_, _, err := c.ServiceRest.Update(ctx, serviceName, rest.DefaultUpdatedObjectInfo(svc, api.Scheme))
 				return err
 			}
 		}
@@ -270,7 +272,7 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 		return err
 	}
 
-	_, err := c.ServiceRegistry.CreateService(ctx, svc)
+	_, err := c.ServiceRest.Create(ctx, svc)
 	if err != nil && errors.IsAlreadyExists(err) {
 		err = nil
 	}

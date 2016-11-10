@@ -89,6 +89,7 @@ type LegacyRESTStorage struct {
 	NodeRegistry              node.Registry
 	NamespaceRegistry         namespace.Registry
 	ServiceRegistry           service.Registry
+	ServiceRest               *service.REST
 	EndpointRegistry          endpoint.Registry
 	ServiceClusterIPAllocator rangeallocation.RangeRegistry
 	ServiceNodePortAllocator  rangeallocation.RangeRegistry
@@ -186,6 +187,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	controllerStorage := controlleretcd.NewStorage(restOptionsGetter(api.Resource("replicationControllers")))
 
 	serviceRest := service.NewStorage(restStorage.ServiceRegistry, restStorage.EndpointRegistry, ServiceClusterIPAllocator, ServiceNodePortAllocator, c.ProxyTransport)
+	restStorage.ServiceRest = serviceRest.Service
 
 	restStorageMap := map[string]rest.Storage{
 		"pods":             podStorage.Pod,
