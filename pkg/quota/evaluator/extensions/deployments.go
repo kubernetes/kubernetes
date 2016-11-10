@@ -19,16 +19,22 @@ package extensions
 import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	extensionsapi "k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // NewDeploymentEvaluator returns an evaluator that can evaluate deployments
-func NewDeploymentEvaluator(kubeClient clientset.Interface) quota.Evaluator {
+func NewDeploymentEvaluator(kubeClient clientset.Interface, f informers.SharedInformerFactory) quota.Evaluator {
 	allResources := []api.ResourceName{extensionsapi.ResourceDeployments}
+	listFuncByNamespace := listDeploymentsByNamespaceFuncUsingClient(kubeClient)
+	if f != nil {
+		listFuncByNamespace = generic.ListResourceUsingInformerFunc(f, unversioned.GroupResource{Group: "extensions", Resource: "deployments"})
+	}
 	return &generic.GenericEvaluator{
 		Name:              "Evaluator.Deployment",
 		InternalGroupKind: extensionsapi.Kind("Deployment"),
@@ -39,8 +45,19 @@ func NewDeploymentEvaluator(kubeClient clientset.Interface) quota.Evaluator {
 		MatchesScopeFunc:     generic.MatchesNoScopeFunc,
 		ConstraintsFunc:      generic.ObjectCountConstraintsFunc(extensionsapi.ResourceDeployments),
 		UsageFunc:            generic.ObjectCountUsageFunc(extensionsapi.ResourceDeployments),
-		ListFuncByNamespace: func(namespace string, options api.ListOptions) (runtime.Object, error) {
-			return kubeClient.Extensions().Deployments(namespace).List(options)
-		},
+		ListFuncByNamespace:  listFuncByNamespace,
+	}
+}
+func listDeploymentsByNamespaceFuncUsingClient(kubeClient clientset.Interface) generic.ListFuncByNamespace {
+	return func(namespace string, options api.ListOptions) ([]runtime.Object, error) {
+		itemList, err := kubeClient.Extensions().Deployments(namespace).List(options)
+		if err != nil {
+			return nil, err
+		}
+		results := make([]runtime.Object, 0, len(itemList.Items))
+		for i := range itemList.Items {
+			results = append(results, &itemList.Items[i])
+		}
+		return results, nil
 	}
 }

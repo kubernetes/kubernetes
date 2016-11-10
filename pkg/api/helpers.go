@@ -182,9 +182,6 @@ func AddStandardQuotaResourceNames(names ...ResourceName) {
 	}
 }
 
-// standardResources is populated in addKnownTypes
-var standardResources = sets.NewString()
-
 // IsStandardResourceName returns true if the resource is known to the system
 func IsStandardResourceName(str string) bool {
 	return standardResources.Has(str)

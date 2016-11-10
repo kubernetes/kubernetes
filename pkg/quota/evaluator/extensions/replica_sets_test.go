@@ -28,7 +28,7 @@ import (
 
 func TestReplicaSetEvaluatorMatchesResources(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset()
-	evaluator := NewReplicaSetEvaluator(kubeClient)
+	evaluator := NewReplicaSetEvaluator(kubeClient, nil)
 	expected := quota.ToSet([]api.ResourceName{
 		extensionsapi.ResourceReplicaSets,
 	})
@@ -40,7 +40,7 @@ func TestReplicaSetEvaluatorMatchesResources(t *testing.T) {
 
 func TestReplicaSetEvaluatorUsage(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset()
-	evaluator := NewReplicaSetEvaluator(kubeClient)
+	evaluator := NewReplicaSetEvaluator(kubeClient, nil)
 	testCases := map[string]struct {
 		rs    *extensionsapi.ReplicaSet
 		usage api.ResourceList
