@@ -24,8 +24,10 @@ import (
 	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensions_v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
@@ -91,6 +93,8 @@ type IngressController struct {
 
 	// For events
 	eventRecorder record.EventRecorder
+
+	deletionHelper *deletionhelper.DeletionHelper
 
 	ingressReviewDelay    time.Duration
 	configMapReviewDelay  time.Duration
@@ -275,7 +279,70 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 			err := client.Core().ConfigMaps(configMap.Namespace).Delete(configMap.Name, &v1.DeleteOptions{})
 			return err
 		})
+
+	ic.deletionHelper = deletionhelper.NewDeletionHelper(
+		ic.hasFinalizerFunc,
+		ic.removeFinalizerFunc,
+		ic.addFinalizerFunc,
+		// objNameFunc
+		func(obj pkg_runtime.Object) string {
+			ingress := obj.(*extensions_v1beta1.Ingress)
+			return ingress.Name
+		},
+		ic.updateTimeout,
+		ic.eventRecorder,
+		ic.ingressFederatedInformer,
+		ic.federatedIngressUpdater,
+	)
 	return ic
+}
+
+// Returns true if the given object has the given finalizer in its ObjectMeta.
+func (ic *IngressController) hasFinalizerFunc(obj pkg_runtime.Object, finalizer string) bool {
+	ingress := obj.(*extensions_v1beta1.Ingress)
+	for i := range ingress.ObjectMeta.Finalizers {
+		if string(ingress.ObjectMeta.Finalizers[i]) == finalizer {
+			return true
+		}
+	}
+	return false
+}
+
+// Removes the finalizer from the given objects ObjectMeta.
+// Assumes that the given object is a ingress.
+func (ic *IngressController) removeFinalizerFunc(obj pkg_runtime.Object, finalizer string) (pkg_runtime.Object, error) {
+	ingress := obj.(*extensions_v1beta1.Ingress)
+	newFinalizers := []string{}
+	hasFinalizer := false
+	for i := range ingress.ObjectMeta.Finalizers {
+		if string(ingress.ObjectMeta.Finalizers[i]) != finalizer {
+			newFinalizers = append(newFinalizers, ingress.ObjectMeta.Finalizers[i])
+		} else {
+			hasFinalizer = true
+		}
+	}
+	if !hasFinalizer {
+		// Nothing to do.
+		return obj, nil
+	}
+	ingress.ObjectMeta.Finalizers = newFinalizers
+	ingress, err := ic.federatedApiClient.Extensions().Ingresses(ingress.Namespace).Update(ingress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to remove finalizer %s from ingress %s: %v", finalizer, ingress.Name, err)
+	}
+	return ingress, nil
+}
+
+// Adds the given finalizer to the given objects ObjectMeta.
+// Assumes that the given object is a ingress.
+func (ic *IngressController) addFinalizerFunc(obj pkg_runtime.Object, finalizer string) (pkg_runtime.Object, error) {
+	ingress := obj.(*extensions_v1beta1.Ingress)
+	ingress.ObjectMeta.Finalizers = append(ingress.ObjectMeta.Finalizers, finalizer)
+	ingress, err := ic.federatedApiClient.Extensions().Ingresses(ingress.Namespace).Update(ingress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to add finalizer %s to ingress %s: %v", finalizer, ingress.Name, err)
+	}
+	return ingress, nil
 }
 
 func (ic *IngressController) Run(stopChan <-chan struct{}) {
@@ -584,7 +651,7 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 	}
 
 	key := ingress.String()
-	baseIngressObj, exist, err := ic.ingressInformerStore.GetByKey(key)
+	baseIngressObjFromStore, exist, err := ic.ingressInformerStore.GetByKey(key)
 	if err != nil {
 		glog.Errorf("Failed to query main ingress store for %v: %v", ingress, err)
 		ic.deliverIngress(ingress, 0, true)
@@ -595,12 +662,37 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 		glog.V(4).Infof("Ingress %q is not federated.  Ignoring.", ingress)
 		return
 	}
+	baseIngressObj, err := conversion.NewCloner().DeepCopy(baseIngressObjFromStore)
 	baseIngress, ok := baseIngressObj.(*extensions_v1beta1.Ingress)
-	if !ok {
-		glog.Errorf("Internal Error: Object retrieved from ingressInformerStore with key %q is not of correct type *extensions_v1beta1.Ingress: %v", key, baseIngressObj)
+	if err != nil || !ok {
+		glog.Errorf("Internal Error %v : Object retrieved from ingressInformerStore with key %q is not of correct type *extensions_v1beta1.Ingress: %v", err, key, baseIngressObj)
 	} else {
 		glog.V(4).Infof("Base (federated) ingress: %v", baseIngress)
 	}
+
+	if baseIngress.DeletionTimestamp != nil {
+		if err := ic.delete(baseIngress); err != nil {
+			glog.Errorf("Failed to delete %s: %v", ingress, err)
+			ic.eventRecorder.Eventf(baseIngress, api.EventTypeNormal, "DeleteFailed",
+				"Ingress delete failed: %v", err)
+			ic.deliverIngress(ingress, 0, true)
+		}
+		return
+	}
+
+	glog.V(3).Infof("Ensuring delete object from underlying clusters finalizer for ingress: %s",
+		baseIngress.Name)
+	// Add the required finalizers before creating a ingress in underlying clusters.
+	updatedIngressObj, err := ic.deletionHelper.EnsureFinalizers(baseIngress)
+	if err != nil {
+		glog.Errorf("Failed to ensure delete object from underlying clusters finalizer in ingress %s: %v",
+			baseIngress.Name, err)
+		ic.deliverIngress(ingress, 0, false)
+		return
+	}
+	baseIngress = updatedIngressObj.(*extensions_v1beta1.Ingress)
+
+	glog.V(3).Infof("Syncing ingress %s in underlying clusters", baseIngress.Name)
 
 	clusters, err := ic.ingressFederatedInformer.GetReadyClusters()
 	if err != nil {
@@ -636,7 +728,7 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 		}
 		desiredIngress.Spec = objSpec.(extensions_v1beta1.IngressSpec)
 		if !ok {
-			glog.Errorf("Internal error: Failed to cast to extensions_v1beta1.IngressSpec: %v", objSpec)
+			glog.Errorf("Internal error: Failed to cast to extensions_v1beta1.Ingressespec: %v", objSpec)
 		}
 		glog.V(4).Infof("Desired Ingress: %v", desiredIngress)
 
@@ -771,4 +863,24 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 	}
 	// Schedule another periodic reconciliation, only to account for possible bugs in watch processing.
 	ic.deliverIngress(ingress, ic.ingressReviewDelay, false)
+}
+
+// delete deletes the given ingress or returns error if the deletion was not complete.
+func (ic *IngressController) delete(ingress *extensions_v1beta1.Ingress) error {
+	glog.V(3).Infof("Handling deletion of ingress: %v", *ingress)
+	_, err := ic.deletionHelper.HandleObjectInUnderlyingClusters(ingress)
+	if err != nil {
+		return err
+	}
+
+	err = ic.federatedApiClient.Extensions().Ingresses(ingress.Namespace).Delete(ingress.Name, nil)
+	if err != nil {
+		// Its all good if the error is not found error. That means it is deleted already and we do not have to do anything.
+		// This is expected when we are processing an update as a result of ingress finalizer deletion.
+		// The process that deleted the last finalizer is also going to delete the ingress and we do not have to do anything.
+		if !errors.IsNotFound(err) {
+			return fmt.Errorf("failed to delete ingress: %v", err)
+		}
+	}
+	return nil
 }
