@@ -292,6 +292,8 @@ type VolumeSource struct {
 	AzureDisk *AzureDiskVolumeSource
 	// PhotonPersistentDisk represents a Photon Controller persistent disk attached and mounted on kubelets host machine
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource
+	// Items for all in one resources secrets, configmaps, and downward API
+	Projected *Projections
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -724,6 +726,10 @@ type SecretVolumeSource struct {
 	// Name of the secret in the pod's namespace to use.
 	// +optional
 	SecretName string
+	// same as above, just matches configmap naming for consistency
+	// +optional
+	LocalObjectReference
+
 	// If unspecified, each key-value pair in the Data field of the referenced
 	// Secret will be projected into the volume as a file whose name is the
 	// key and content is the value. If specified, the listed keys will be
@@ -1009,6 +1015,17 @@ type ConfigMapVolumeSource struct {
 	// Specify whether the ConfigMap or it's keys must be defined
 	// +optional
 	Optional *bool
+}
+
+type Projections struct {
+	Sources     []VolumeProjection
+	DefaultMode *int32
+}
+
+type VolumeProjection struct {
+	Secret      *SecretVolumeSource
+	DownwardAPI *DownwardAPIVolumeSource
+	ConfigMap   *ConfigMapVolumeSource
 }
 
 // Maps a string key to a path within a volume.

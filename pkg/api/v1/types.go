@@ -326,6 +326,8 @@ type VolumeSource struct {
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty" protobuf:"bytes,22,opt,name=azureDisk"`
 	// PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource `json:"photonPersistentDisk,omitempty" protobuf:"bytes,23,opt,name=photonPersistentDisk"`
+	// Items for all in one resources secrets, configmaps, and downward API
+	Projected *Projections `json:"projected,omitempty"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -919,6 +921,9 @@ type SecretVolumeSource struct {
 	// More info: http://kubernetes.io/docs/user-guide/volumes#secrets
 	// +optional
 	SecretName string `json:"secretName,omitempty" protobuf:"bytes,1,opt,name=secretName"`
+	// same as above, just matches configmap naming for consistency
+	// +optional
+	LocalObjectReference `json:"name,omitempty"`
 	// If unspecified, each key-value pair in the Data field of the referenced
 	// Secret will be projected into the volume as a file whose name is the
 	// key and content is the value. If specified, the listed keys will be
@@ -1102,6 +1107,21 @@ type ConfigMapVolumeSource struct {
 
 const (
 	ConfigMapVolumeSourceDefaultMode int32 = 0644
+)
+
+type Projections struct {
+	Sources     []VolumeProjection `json:"sources"`
+	DefaultMode *int32             `json:"defaultMode,omitempty"`
+}
+
+type VolumeProjection struct {
+	Secret      *SecretVolumeSource      `json:"secret,omitempty"`
+	DownwardAPI *DownwardAPIVolumeSource `json:"downwardAPI,omitempty"`
+	ConfigMap   *ConfigMapVolumeSource   `json:"configMap,omitempty"`
+}
+
+const (
+	ProjectionsVolumeSourceDefaultMode int32 = 0644
 )
 
 // Maps a string key to a path within a volume.

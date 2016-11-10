@@ -215,7 +215,7 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		len(secret.Data),
 		totalBytes)
 
-	payload, err := makePayload(b.source.Items, secret, b.source.DefaultMode, optional)
+	payload, err := MakePayload(b.source.Items, secret, b.source.DefaultMode, optional)
 	if err != nil {
 		return err
 	}
@@ -242,7 +242,7 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	return nil
 }
 
-func makePayload(mappings []v1.KeyToPath, secret *v1.Secret, defaultMode *int32, optional bool) (map[string]volumeutil.FileProjection, error) {
+func MakePayload(mappings []v1.KeyToPath, secret *v1.Secret, defaultMode *int32, optional bool) (map[string]volumeutil.FileProjection, error) {
 	if defaultMode == nil {
 		return nil, fmt.Errorf("No defaultMode used, not even the default value for it")
 	}

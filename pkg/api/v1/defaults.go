@@ -39,6 +39,7 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 		SetDefaults_SecretVolumeSource,
 		SetDefaults_ConfigMapVolumeSource,
 		SetDefaults_DownwardAPIVolumeSource,
+		SetDefaults_Projections,
 		SetDefaults_Secret,
 		SetDefaults_PersistentVolume,
 		SetDefaults_PersistentVolumeClaim,
@@ -216,6 +217,12 @@ func SetDefaults_DownwardAPIVolumeSource(obj *DownwardAPIVolumeSource) {
 func SetDefaults_Secret(obj *Secret) {
 	if obj.Type == "" {
 		obj.Type = SecretTypeOpaque
+	}
+}
+func SetDefaults_Projections(obj *Projections) {
+	if obj.DefaultMode == nil {
+		perm := int32(ProjectionsVolumeSourceDefaultMode)
+		obj.DefaultMode = &perm
 	}
 }
 func SetDefaults_PersistentVolume(obj *PersistentVolume) {

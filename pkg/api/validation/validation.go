@@ -518,6 +518,14 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path) field.E
 		numVolumes++
 		allErrs = append(allErrs, validateAzureDisk(source.AzureDisk, fldPath.Child("azureDisk"))...)
 	}
+	if source.Projected != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("projected"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validateProjectionsVolumeSource(source.Projected, fldPath.Child("projected"))...)
+		}
+	}
 
 	if numVolumes == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, "must specify a volume type"))
@@ -750,6 +758,88 @@ func validateDownwardAPIVolumeSource(downwardAPIVolume *api.DownwardAPIVolumeSou
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("mode"), *file.Mode, volumeModeErrorMsg))
 		}
 	}
+	return allErrs
+}
+
+func validateProjectionsVolumeSource(projection *api.Projections, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allPaths := sets.String{}
+
+	projectionMode := projection.DefaultMode
+	if projectionMode != nil && (*projectionMode > 0777 || *projectionMode < 0) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("defaultMode"), *projectionMode, volumeModeErrorMsg))
+	}
+
+	for _, source := range projection.Sources {
+		numSources := 0
+		if source.Secret != nil {
+			if numSources > 0 {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("secret"), "may not specify more than 1 volume type"))
+			} else {
+				if source.Secret.DefaultMode == nil {
+					source.Secret.DefaultMode = projectionMode
+				}
+				numSources++
+				allErrs = append(allErrs, validateSecretVolumeSource(source.Secret, fldPath.Child("secret"))...)
+			}
+			for _, kp := range source.Secret.Items {
+				if len(kp.Path) > 0 {
+					curPath := kp.Path
+					if !allPaths.Has(curPath) {
+						allPaths.Insert(curPath)
+					} else {
+						allErrs = append(allErrs, field.Invalid(fldPath, source.Secret.SecretName, "conflicting duplicate paths"))
+					}
+				}
+			}
+		}
+		if source.ConfigMap != nil {
+			if numSources > 0 {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("configMap"), "may not specify more than 1 volume type"))
+			} else {
+				if source.ConfigMap.DefaultMode == nil {
+					source.ConfigMap.DefaultMode = projectionMode
+				}
+				numSources++
+				allErrs = append(allErrs, validateConfigMapVolumeSource(source.ConfigMap, fldPath.Child("configMap"))...)
+			}
+			for _, kp := range source.ConfigMap.Items {
+				if len(kp.Path) > 0 {
+					curPath := kp.Path
+					if !allPaths.Has(curPath) {
+						allPaths.Insert(curPath)
+					} else {
+						allErrs = append(allErrs, field.Invalid(fldPath, source.ConfigMap.Name, "conflicting duplicate paths"))
+					}
+
+				}
+			}
+		}
+		if source.DownwardAPI != nil {
+			if numSources > 0 {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("downwardAPI"), "may not specify more than 1 volume type"))
+			} else {
+				if source.DownwardAPI.DefaultMode == nil {
+					source.DownwardAPI.DefaultMode = projectionMode
+				}
+				numSources++
+				allErrs = append(allErrs, validateDownwardAPIVolumeSource(source.DownwardAPI, fldPath.Child("downwardAPI"))...)
+			}
+			for _, file := range source.DownwardAPI.Items {
+				if len(file.Path) > 0 {
+					curPath := file.Path
+					if !allPaths.Has(curPath) {
+						allPaths.Insert(curPath)
+					} else {
+						// JPEELER: DownwardAPI doesn't have a name reference
+						allErrs = append(allErrs, field.Invalid(fldPath, curPath, "conflicting duplicate paths"))
+					}
+
+				}
+			}
+		}
+	}
+
 	return allErrs
 }
 
