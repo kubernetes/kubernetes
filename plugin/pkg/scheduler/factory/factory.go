@@ -111,7 +111,7 @@ func NewConfigFactory(client clientset.Interface, schedulerName string, hardPodA
 	schedulerCache := schedulercache.New(30*time.Second, stopEverything)
 
 	// TODO: pass this in as an argument...
-	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	informerFactory := informers.NewSharedInformerFactory(client, nil, 0)
 	pvcInformer := informerFactory.PersistentVolumeClaims()
 
 	c := &ConfigFactory{
