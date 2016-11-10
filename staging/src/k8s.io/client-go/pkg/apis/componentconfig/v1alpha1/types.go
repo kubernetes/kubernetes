@@ -74,9 +74,13 @@ type KubeProxyConfiguration struct {
 	// conntrackMin is the minimum value of connect-tracking records to allocate,
 	// regardless of conntrackMaxPerCore (set conntrackMaxPerCore=0 to leave the limit as-is).
 	ConntrackMin int32 `json:"conntrackMin"`
-	// conntrackTCPEstablishedTimeout is how long an idle TCP connection will be kept open
-	// (e.g. '250ms', '2s').  Must be greater than 0.
+	// conntrackTCPEstablishedTimeout is how long an idle TCP connection
+	// will be kept open (e.g. '2s').  Must be greater than 0.
 	ConntrackTCPEstablishedTimeout unversioned.Duration `json:"conntrackTCPEstablishedTimeout"`
+	// conntrackTCPCloseWaitTimeout is how long an idle conntrack entry
+	// in CLOSE_WAIT state will remain in the conntrack
+	// table. (e.g. '60s'). Must be greater than 0 to set.
+	ConntrackTCPCloseWaitTimeout unversioned.Duration `json:"conntrackTCPCloseWaitTimeout"`
 }
 
 // Currently two modes of proxying are available: 'userspace' (older, stable) or 'iptables'
@@ -494,10 +498,15 @@ type KubeletConfiguration struct {
 	// Resource isolation might be lacking and pod might influence each other on the same node.
 	// +optional
 	AllowedUnsafeSysctls []string `json:"allowedUnsafeSysctls,omitempty"`
-	// How to integrate with runtime. If set to CRI, kubelet will switch to
-	// using the new Container Runtine Interface.
+	// featureGates is a string of comma-separated key=value pairs that describe feature
+	// gates for alpha/experimental features.
+	FeatureGates string `json:"featureGates,omitempty"`
+	// Enable Container Runtime Interface (CRI) integration.
 	// +optional
-	ExperimentalRuntimeIntegrationType string `json:"experimentalRuntimeIntegrationType,omitempty"`
+	EnableCRI bool `json:"enableCRI,omitempty"`
+	// TODO(#34726:1.8.0): Remove the opt-in for failing when swap is enabled.
+	// Tells the Kubelet to fail to start if swap is enabled on the node.
+	ExperimentalFailSwapOn bool `json:"experimentalFailSwapOn,omitempty"`
 }
 
 type KubeletAuthorizationMode string

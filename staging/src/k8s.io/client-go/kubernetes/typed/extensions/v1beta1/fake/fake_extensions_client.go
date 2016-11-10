@@ -22,45 +22,45 @@ import (
 	testing "k8s.io/client-go/testing"
 )
 
-type FakeExtensions struct {
+type FakeExtensionsV1beta1 struct {
 	*testing.Fake
 }
 
-func (c *FakeExtensions) DaemonSets(namespace string) v1beta1.DaemonSetInterface {
+func (c *FakeExtensionsV1beta1) DaemonSets(namespace string) v1beta1.DaemonSetInterface {
 	return &FakeDaemonSets{c, namespace}
 }
 
-func (c *FakeExtensions) Deployments(namespace string) v1beta1.DeploymentInterface {
+func (c *FakeExtensionsV1beta1) Deployments(namespace string) v1beta1.DeploymentInterface {
 	return &FakeDeployments{c, namespace}
 }
 
-func (c *FakeExtensions) Ingresses(namespace string) v1beta1.IngressInterface {
+func (c *FakeExtensionsV1beta1) Ingresses(namespace string) v1beta1.IngressInterface {
 	return &FakeIngresses{c, namespace}
 }
 
-func (c *FakeExtensions) Jobs(namespace string) v1beta1.JobInterface {
+func (c *FakeExtensionsV1beta1) Jobs(namespace string) v1beta1.JobInterface {
 	return &FakeJobs{c, namespace}
 }
 
-func (c *FakeExtensions) PodSecurityPolicies() v1beta1.PodSecurityPolicyInterface {
+func (c *FakeExtensionsV1beta1) PodSecurityPolicies() v1beta1.PodSecurityPolicyInterface {
 	return &FakePodSecurityPolicies{c}
 }
 
-func (c *FakeExtensions) ReplicaSets(namespace string) v1beta1.ReplicaSetInterface {
+func (c *FakeExtensionsV1beta1) ReplicaSets(namespace string) v1beta1.ReplicaSetInterface {
 	return &FakeReplicaSets{c, namespace}
 }
 
-func (c *FakeExtensions) Scales(namespace string) v1beta1.ScaleInterface {
+func (c *FakeExtensionsV1beta1) Scales(namespace string) v1beta1.ScaleInterface {
 	return &FakeScales{c, namespace}
 }
 
-func (c *FakeExtensions) ThirdPartyResources() v1beta1.ThirdPartyResourceInterface {
+func (c *FakeExtensionsV1beta1) ThirdPartyResources() v1beta1.ThirdPartyResourceInterface {
 	return &FakeThirdPartyResources{c}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeExtensions) RESTClient() rest.Interface {
+func (c *FakeExtensionsV1beta1) RESTClient() rest.Interface {
 	var ret *rest.RESTClient
 	return ret
 }

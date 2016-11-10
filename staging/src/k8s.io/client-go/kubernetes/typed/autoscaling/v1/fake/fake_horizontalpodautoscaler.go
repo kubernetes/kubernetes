@@ -28,7 +28,7 @@ import (
 
 // FakeHorizontalPodAutoscalers implements HorizontalPodAutoscalerInterface
 type FakeHorizontalPodAutoscalers struct {
-	Fake *FakeAutoscaling
+	Fake *FakeAutoscalingV1
 	ns   string
 }
 

@@ -47,19 +47,16 @@ func objBody(object interface{}) io.ReadCloser {
 func TestNegotiateVersion(t *testing.T) {
 	tests := []struct {
 		name            string
-		version         *uapi.GroupVersion
+		requiredVersion *uapi.GroupVersion
 		expectedVersion *uapi.GroupVersion
 		serverVersions  []string
 		clientVersions  []uapi.GroupVersion
-		config          *rest.Config
 		expectErr       func(err error) bool
 		sendErr         error
 		statusCode      int
 	}{
 		{
 			name:            "server supports client default",
-			version:         &uapi.GroupVersion{Version: "version1"},
-			config:          &rest.Config{},
 			serverVersions:  []string{"version1", registered.GroupOrDie(api.GroupName).GroupVersion.String()},
 			clientVersions:  []uapi.GroupVersion{{Version: "version1"}, registered.GroupOrDie(api.GroupName).GroupVersion},
 			expectedVersion: &uapi.GroupVersion{Version: "version1"},
@@ -67,8 +64,6 @@ func TestNegotiateVersion(t *testing.T) {
 		},
 		{
 			name:            "server falls back to client supported",
-			version:         &registered.GroupOrDie(api.GroupName).GroupVersion,
-			config:          &rest.Config{},
 			serverVersions:  []string{"version1"},
 			clientVersions:  []uapi.GroupVersion{{Version: "version1"}, registered.GroupOrDie(api.GroupName).GroupVersion},
 			expectedVersion: &uapi.GroupVersion{Version: "version1"},
@@ -76,23 +71,30 @@ func TestNegotiateVersion(t *testing.T) {
 		},
 		{
 			name:            "explicit version supported",
-			config:          &rest.Config{ContentConfig: rest.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}},
+			requiredVersion: &uapi.GroupVersion{Version: "v1"},
 			serverVersions:  []string{"/version1", registered.GroupOrDie(api.GroupName).GroupVersion.String()},
 			clientVersions:  []uapi.GroupVersion{{Version: "version1"}, registered.GroupOrDie(api.GroupName).GroupVersion},
-			expectedVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
+			expectedVersion: &uapi.GroupVersion{Version: "v1"},
 			statusCode:      http.StatusOK,
 		},
 		{
-			name:           "explicit version not supported",
-			config:         &rest.Config{ContentConfig: rest.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}},
-			serverVersions: []string{"version1"},
-			clientVersions: []uapi.GroupVersion{{Version: "version1"}, registered.GroupOrDie(api.GroupName).GroupVersion},
-			expectErr:      func(err error) bool { return strings.Contains(err.Error(), `server does not support API version "v1"`) },
-			statusCode:     http.StatusOK,
+			name:            "explicit version not supported on server",
+			requiredVersion: &uapi.GroupVersion{Version: "v1"},
+			serverVersions:  []string{"version1"},
+			clientVersions:  []uapi.GroupVersion{{Version: "version1"}, registered.GroupOrDie(api.GroupName).GroupVersion},
+			expectErr:       func(err error) bool { return strings.Contains(err.Error(), `server does not support API version "v1"`) },
+			statusCode:      http.StatusOK,
+		},
+		{
+			name:            "explicit version not supported on client",
+			requiredVersion: &uapi.GroupVersion{Version: "v1"},
+			serverVersions:  []string{"v1"},
+			clientVersions:  []uapi.GroupVersion{{Version: "version1"}},
+			expectErr:       func(err error) bool { return strings.Contains(err.Error(), `client does not support API version "v1"`) },
+			statusCode:      http.StatusOK,
 		},
 		{
 			name:           "connection refused error",
-			config:         &rest.Config{ContentConfig: rest.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}},
 			serverVersions: []string{"version1"},
 			clientVersions: []uapi.GroupVersion{{Version: "version1"}, registered.GroupOrDie(api.GroupName).GroupVersion},
 			sendErr:        errors.New("connection refused"),
@@ -101,25 +103,21 @@ func TestNegotiateVersion(t *testing.T) {
 		},
 		{
 			name:            "discovery fails due to 403 Forbidden errors and thus serverVersions is empty, use default GroupVersion",
-			config:          &rest.Config{ContentConfig: rest.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}},
 			clientVersions:  []uapi.GroupVersion{{Version: "version1"}, registered.GroupOrDie(api.GroupName).GroupVersion},
-			expectedVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
+			expectedVersion: &uapi.GroupVersion{Version: "version1"},
 			statusCode:      http.StatusForbidden,
 		},
 		{
 			name:            "discovery fails due to 404 Not Found errors and thus serverVersions is empty, use requested GroupVersion",
-			version:         &uapi.GroupVersion{Version: "version1"},
-			config:          &rest.Config{ContentConfig: rest.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}},
+			requiredVersion: &uapi.GroupVersion{Version: "version1"},
 			clientVersions:  []uapi.GroupVersion{{Version: "version1"}, registered.GroupOrDie(api.GroupName).GroupVersion},
 			expectedVersion: &uapi.GroupVersion{Version: "version1"},
 			statusCode:      http.StatusNotFound,
 		},
 		{
-			name:           "discovery fails due to 403 Forbidden errors and thus serverVersions is empty, no fallback GroupVersion",
-			config:         &rest.Config{},
-			clientVersions: []uapi.GroupVersion{{Version: "version1"}, registered.GroupOrDie(api.GroupName).GroupVersion},
-			expectErr:      func(err error) bool { return strings.Contains(err.Error(), "failed to negotiate an api version;") },
-			statusCode:     http.StatusForbidden,
+			name:       "discovery fails due to 403 Forbidden errors and thus serverVersions is empty, no fallback GroupVersion",
+			expectErr:  func(err error) bool { return strings.Contains(err.Error(), "failed to negotiate an api version;") },
+			statusCode: http.StatusForbidden,
 		},
 	}
 
@@ -139,9 +137,9 @@ func TestNegotiateVersion(t *testing.T) {
 				return &http.Response{StatusCode: test.statusCode, Header: header, Body: objBody(&uapi.APIVersions{Versions: test.serverVersions})}, nil
 			}),
 		}
-		c := discovery.NewDiscoveryClientForConfigOrDie(test.config)
+		c := discovery.NewDiscoveryClientForConfigOrDie(&rest.Config{})
 		c.RESTClient().(*rest.RESTClient).Client = fakeClient.Client
-		response, err := discovery.NegotiateVersion(c, test.config, test.version, test.clientVersions)
+		response, err := discovery.NegotiateVersion(c, test.requiredVersion, test.clientVersions)
 		if err == nil && test.expectErr != nil {
 			t.Errorf("expected error, got nil for [%s].", test.name)
 		}
