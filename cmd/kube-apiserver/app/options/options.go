@@ -31,24 +31,32 @@ import (
 
 // ServerRunOptions runs a kubernetes api server.
 type ServerRunOptions struct {
-	GenericServerRunOptions     *genericoptions.ServerRunOptions
-	AllowPrivileged             bool
-	EventTTL                    time.Duration
-	KubeletConfig               kubeletclient.KubeletClientConfig
-	MaxConnectionBytesPerSec    int64
-	SSHKeyfile                  string
-	SSHUser                     string
-	ServiceAccountKeyFiles      []string
-	ServiceAccountLookup        bool
-	WebhookTokenAuthnConfigFile string
-	WebhookTokenAuthnCacheTTL   time.Duration
+	GenericServerRunOptions *genericoptions.ServerRunOptions
+	Etcd                    *genericoptions.EtcdOptions
+	SecureServing           *genericoptions.SecureServingOptions
+	InsecureServing         *genericoptions.ServingOptions
+	Authentication          *genericoptions.BuiltInAuthenticationOptions
+	Authorization           *genericoptions.BuiltInAuthorizationOptions
+
+	AllowPrivileged          bool
+	EventTTL                 time.Duration
+	KubeletConfig            kubeletclient.KubeletClientConfig
+	MaxConnectionBytesPerSec int64
+	SSHKeyfile               string
+	SSHUser                  string
 }
 
 // NewServerRunOptions creates a new ServerRunOptions object with default parameters
 func NewServerRunOptions() *ServerRunOptions {
 	s := ServerRunOptions{
-		GenericServerRunOptions: genericoptions.NewServerRunOptions().WithEtcdOptions(),
-		EventTTL:                1 * time.Hour,
+		GenericServerRunOptions: genericoptions.NewServerRunOptions(),
+		Etcd:            genericoptions.NewEtcdOptions(),
+		SecureServing:   genericoptions.NewSecureServingOptions(),
+		InsecureServing: genericoptions.NewInsecureServingOptions(),
+		Authentication:  genericoptions.NewBuiltInAuthenticationOptions().WithAll(),
+		Authorization:   genericoptions.NewBuiltInAuthorizationOptions(),
+
+		EventTTL: 1 * time.Hour,
 		KubeletConfig: kubeletclient.KubeletClientConfig{
 			Port: ports.KubeletPort,
 			PreferredAddressTypes: []string{
@@ -60,7 +68,6 @@ func NewServerRunOptions() *ServerRunOptions {
 			EnableHttps: true,
 			HTTPTimeout: time.Duration(5) * time.Second,
 		},
-		WebhookTokenAuthnCacheTTL: 2 * time.Minute,
 	}
 	return &s
 }
@@ -69,28 +76,20 @@ func NewServerRunOptions() *ServerRunOptions {
 func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	// Add the generic flags.
 	s.GenericServerRunOptions.AddUniversalFlags(fs)
-	//Add etcd specific flags.
-	s.GenericServerRunOptions.AddEtcdStorageFlags(fs)
+
+	s.Etcd.AddFlags(fs)
+	s.SecureServing.AddFlags(fs)
+	s.SecureServing.AddDeprecatedFlags(fs)
+	s.InsecureServing.AddFlags(fs)
+	s.InsecureServing.AddDeprecatedFlags(fs)
+	s.Authentication.AddFlags(fs)
+	s.Authorization.AddFlags(fs)
+
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.
 
 	fs.DurationVar(&s.EventTTL, "event-ttl", s.EventTTL,
 		"Amount of time to retain events. Default is 1h.")
-
-	fs.StringArrayVar(&s.ServiceAccountKeyFiles, "service-account-key-file", s.ServiceAccountKeyFiles, ""+
-		"File containing PEM-encoded x509 RSA or ECDSA private or public keys, used to verify "+
-		"ServiceAccount tokens. If unspecified, --tls-private-key-file is used. "+
-		"The specified file can contain multiple keys, and the flag can be specified multiple times with different files.")
-
-	fs.BoolVar(&s.ServiceAccountLookup, "service-account-lookup", s.ServiceAccountLookup,
-		"If true, validate ServiceAccount tokens exist in etcd as part of authentication.")
-
-	fs.StringVar(&s.WebhookTokenAuthnConfigFile, "authentication-token-webhook-config-file", s.WebhookTokenAuthnConfigFile, ""+
-		"File with webhook configuration for token authentication in kubeconfig format. "+
-		"The API server will query the remote service to determine authentication for bearer tokens.")
-
-	fs.DurationVar(&s.WebhookTokenAuthnCacheTTL, "authentication-token-webhook-cache-ttl", s.WebhookTokenAuthnCacheTTL,
-		"The duration to cache responses from the webhook token authenticator. Default is 2m.")
 
 	fs.BoolVar(&s.AllowPrivileged, "allow-privileged", s.AllowPrivileged,
 		"If true, allow privileged containers.")
