@@ -46,8 +46,11 @@ func addControllerRole(role rbac.ClusterRole) {
 	}
 
 	controllerRoles = append(controllerRoles, role)
+	addClusterRoleLabel(controllerRoles)
+
 	controllerRoleBindings = append(controllerRoleBindings,
 		rbac.NewClusterBinding(role.Name).SAs("kube-system", role.Name[len(saRolePrefix):]).BindingOrDie())
+	addClusterRoleBindingLabel(controllerRoleBindings)
 }
 
 func eventsRule() rbac.PolicyRule {
