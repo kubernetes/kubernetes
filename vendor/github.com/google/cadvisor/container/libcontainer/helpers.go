@@ -45,7 +45,7 @@ type CgroupSubsystems struct {
 // Get information about the cgroup subsystems.
 func GetCgroupSubsystems() (CgroupSubsystems, error) {
 	// Get all cgroup mounts.
-	allCgroups, err := cgroups.GetCgroupMounts()
+	allCgroups, err := cgroups.GetCgroupMounts(true)
 	if err != nil {
 		return CgroupSubsystems{}, err
 	}

@@ -25,8 +25,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/meta/metatypes"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/uuid"
 )
@@ -111,8 +111,9 @@ func TestAccessOwnerReferences(t *testing.T) {
 }
 
 func TestAccessorImplementations(t *testing.T) {
-	for _, group := range testapi.Groups {
-		for _, gv := range []unversioned.GroupVersion{*group.GroupVersion(), group.InternalGroupVersion()} {
+	for _, gv := range registered.EnabledVersions() {
+		internalGV := unversioned.GroupVersion{Group: gv.Group, Version: runtime.APIVersionInternal}
+		for _, gv := range []unversioned.GroupVersion{gv, internalGV} {
 			for kind, knownType := range api.Scheme.KnownTypes(gv) {
 				value := reflect.New(knownType)
 				obj := value.Interface()

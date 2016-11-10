@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 )
 
 func TestEventSearch(t *testing.T) {
@@ -37,12 +38,12 @@ func TestEventSearch(t *testing.T) {
 			Method: "GET",
 			Path:   testapi.Default.ResourcePath("events", "baz", ""),
 			Query: url.Values{
-				unversioned.FieldSelectorQueryParam(testapi.Default.GroupVersion().String()): []string{
-					GetInvolvedObjectNameFieldLabel(testapi.Default.GroupVersion().String()) + "=foo,",
+				unversioned.FieldSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String()): []string{
+					GetInvolvedObjectNameFieldLabel(registered.GroupOrDie(api.GroupName).GroupVersion.String()) + "=foo,",
 					"involvedObject.namespace=baz,",
 					"involvedObject.kind=Pod",
 				},
-				unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String()): []string{},
+				unversioned.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String()): []string{},
 			},
 		},
 		Response: simple.Response{StatusCode: 200, Body: &api.EventList{}},

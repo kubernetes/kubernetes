@@ -27,12 +27,15 @@ import (
 // Describes a certificate signing request
 type CertificateSigningRequest struct {
 	unversioned.TypeMeta `json:",inline"`
-	api.ObjectMeta       `json:"metadata,omitempty"`
+	// +optional
+	api.ObjectMeta `json:"metadata,omitempty"`
 
 	// The certificate request itself and any additional information.
+	// +optional
 	Spec CertificateSigningRequestSpec `json:"spec,omitempty"`
 
 	// Derived information about the request.
+	// +optional
 	Status CertificateSigningRequestStatus `json:"status,omitempty"`
 }
 
@@ -45,16 +48,21 @@ type CertificateSigningRequestSpec struct {
 
 	// Information about the requesting user (if relevant)
 	// See user.Info interface for details
-	Username string   `json:"username,omitempty"`
-	UID      string   `json:"uid,omitempty"`
-	Groups   []string `json:"groups,omitempty"`
+	// +optional
+	Username string `json:"username,omitempty"`
+	// +optional
+	UID string `json:"uid,omitempty"`
+	// +optional
+	Groups []string `json:"groups,omitempty"`
 }
 
 type CertificateSigningRequestStatus struct {
 	// Conditions applied to the request, such as approval or denial.
+	// +optional
 	Conditions []CertificateSigningRequestCondition `json:"conditions,omitempty"`
 
 	// If request was approved, the controller will place the issued certificate here.
+	// +optional
 	Certificate []byte `json:"certificate,omitempty"`
 }
 
@@ -70,16 +78,21 @@ type CertificateSigningRequestCondition struct {
 	// request approval state, currently Approved or Denied.
 	Type RequestConditionType `json:"type"`
 	// brief reason for the request state
+	// +optional
 	Reason string `json:"reason,omitempty"`
 	// human readable message with details about the request state
+	// +optional
 	Message string `json:"message,omitempty"`
 	// timestamp for the last update to this condition
+	// +optional
 	LastUpdateTime unversioned.Time `json:"lastUpdateTime,omitempty"`
 }
 
 type CertificateSigningRequestList struct {
 	unversioned.TypeMeta `json:",inline"`
+	// +optional
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
+	// +optional
 	Items []CertificateSigningRequest `json:"items,omitempty"`
 }

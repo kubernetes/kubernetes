@@ -20,31 +20,31 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 var (
-	explainExamples = dedent.Dedent(`
+	explainLong = templates.LongDesc(`
+		Documentation of resources.
+
+		` + valid_resources)
+
+	explainExamples = templates.Examples(`
 		# Get the documentation of the resource and its fields
 		kubectl explain pods
 
 		# Get the documentation of a specific field of a resource
 		kubectl explain pods.spec.containers`)
-
-	explainLong = dedent.Dedent(`
-		Documentation of resources.
-
-		`) + valid_resources
 )
 
 // NewCmdExplain returns a cobra command for swagger docs
-func NewCmdExplain(f *cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
+func NewCmdExplain(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "explain RESOURCE",
 		Short:   "Documentation of resources",
@@ -61,7 +61,7 @@ func NewCmdExplain(f *cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 }
 
 // RunExplain executes the appropriate steps to print a model's documentation
-func RunExplain(f *cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, args []string) error {
+func RunExplain(f cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		fmt.Fprint(cmdErr, "You must specify the type of resource to explain. ", valid_resources)
 		return cmdutil.UsageError(cmd, "Required resource not specified.")

@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
 	v1alpha1 "k8s.io/kubernetes/pkg/apis/policy/v1alpha1"
 	watch "k8s.io/kubernetes/pkg/watch"
 )
@@ -33,11 +34,11 @@ type PodDisruptionBudgetInterface interface {
 	Create(*v1alpha1.PodDisruptionBudget) (*v1alpha1.PodDisruptionBudget, error)
 	Update(*v1alpha1.PodDisruptionBudget) (*v1alpha1.PodDisruptionBudget, error)
 	UpdateStatus(*v1alpha1.PodDisruptionBudget) (*v1alpha1.PodDisruptionBudget, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string) (*v1alpha1.PodDisruptionBudget, error)
-	List(opts api.ListOptions) (*v1alpha1.PodDisruptionBudgetList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
+	List(opts v1.ListOptions) (*v1alpha1.PodDisruptionBudgetList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1alpha1.PodDisruptionBudget, err error)
 	PodDisruptionBudgetExpansion
 }
@@ -95,7 +96,7 @@ func (c *podDisruptionBudgets) UpdateStatus(podDisruptionBudget *v1alpha1.PodDis
 }
 
 // Delete takes name of the podDisruptionBudget and deletes it. Returns an error if one occurs.
-func (c *podDisruptionBudgets) Delete(name string, options *api.DeleteOptions) error {
+func (c *podDisruptionBudgets) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("poddisruptionbudgets").
@@ -106,7 +107,7 @@ func (c *podDisruptionBudgets) Delete(name string, options *api.DeleteOptions) e
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *podDisruptionBudgets) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *podDisruptionBudgets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("poddisruptionbudgets").
@@ -129,7 +130,7 @@ func (c *podDisruptionBudgets) Get(name string) (result *v1alpha1.PodDisruptionB
 }
 
 // List takes label and field selectors, and returns the list of PodDisruptionBudgets that match those selectors.
-func (c *podDisruptionBudgets) List(opts api.ListOptions) (result *v1alpha1.PodDisruptionBudgetList, err error) {
+func (c *podDisruptionBudgets) List(opts v1.ListOptions) (result *v1alpha1.PodDisruptionBudgetList, err error) {
 	result = &v1alpha1.PodDisruptionBudgetList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -141,7 +142,7 @@ func (c *podDisruptionBudgets) List(opts api.ListOptions) (result *v1alpha1.PodD
 }
 
 // Watch returns a watch.Interface that watches the requested podDisruptionBudgets.
-func (c *podDisruptionBudgets) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *podDisruptionBudgets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

@@ -79,3 +79,12 @@ func (s *storage) DeleteClusterRole(ctx api.Context, name string) error {
 	_, err := s.Delete(ctx, name, nil)
 	return err
 }
+
+// AuthorizerAdapter adapts the registry to the authorizer interface
+type AuthorizerAdapter struct {
+	Registry Registry
+}
+
+func (a AuthorizerAdapter) GetClusterRole(name string) (*rbac.ClusterRole, error) {
+	return a.Registry.GetClusterRole(api.NewContext(), name)
+}

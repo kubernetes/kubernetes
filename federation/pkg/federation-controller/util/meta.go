@@ -20,6 +20,7 @@ import (
 	"reflect"
 
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // Copies cluster-independent, user provided data from the given ObjectMeta struct. If in
@@ -54,7 +55,7 @@ func DeepCopyObjectMeta(obj api_v1.ObjectMeta) api_v1.ObjectMeta {
 	return copyMeta
 }
 
-// Checks if cluster-independed, user provided data in two given ObjectMeta are eqaul. If in
+// Checks if cluster-independent, user provided data in two given ObjectMeta are equal. If in
 // the future the ObjectMeta structure is expanded then any field that is not populated
 // by the api server should be included here.
 func ObjectMetaEquivalent(a, b api_v1.ObjectMeta) bool {
@@ -71,4 +72,14 @@ func ObjectMetaEquivalent(a, b api_v1.ObjectMeta) bool {
 		return false
 	}
 	return true
+}
+
+// Checks if cluster-independent, user provided data in ObjectMeta and Spec in two given top
+// level api objects are equivalent.
+func ObjectMetaAndSpecEquivalent(a, b runtime.Object) bool {
+	objectMetaA := reflect.ValueOf(a).Elem().FieldByName("ObjectMeta").Interface().(api_v1.ObjectMeta)
+	objectMetaB := reflect.ValueOf(b).Elem().FieldByName("ObjectMeta").Interface().(api_v1.ObjectMeta)
+	specA := reflect.ValueOf(a).Elem().FieldByName("Spec").Interface()
+	specB := reflect.ValueOf(b).Elem().FieldByName("Spec").Interface()
+	return ObjectMetaEquivalent(objectMetaA, objectMetaB) && reflect.DeepEqual(specA, specB)
 }

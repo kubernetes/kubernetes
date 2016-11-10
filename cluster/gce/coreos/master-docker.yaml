@@ -122,7 +122,6 @@ coreos:
         --cluster-domain=${DNS_DOMAIN} \
         --logtostderr=true \
         --container-runtime=docker \
-        --configure-cbr0=${KUBERNETES_CONFIGURE_CBR0} \
         --pod-cidr=${MASTER_IP_RANGE} \
         --register-schedulable=false \
         --reconcile-cidr=false

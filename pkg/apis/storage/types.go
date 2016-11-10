@@ -32,7 +32,8 @@ import (
 // The name of a StorageClass object is significant, and is how users can request a particular class.
 type StorageClass struct {
 	unversioned.TypeMeta `json:",inline"`
-	api.ObjectMeta       `json:"metadata,omitempty"`
+	// +optional
+	api.ObjectMeta `json:"metadata,omitempty"`
 
 	// provisioner is the driver expected to handle this StorageClass.
 	// This is an optionally-prefixed name, like a label key.
@@ -45,6 +46,7 @@ type StorageClass struct {
 	// to the provisioner.  The only validation done on keys is that they are
 	// not empty.  The maximum number of parameters is
 	// 512, with a cumulative max size of 256K
+	// +optional
 	Parameters map[string]string `json:"parameters,omitempty"`
 }
 
@@ -53,6 +55,7 @@ type StorageClassList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// +optional
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// Items is the list of StorageClasses

@@ -23,12 +23,13 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
+	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
 func TestCreateSecretGeneric(t *testing.T) {
 	secretObject := &api.Secret{}
 	secretObject.Name = "my-secret"
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -56,7 +57,7 @@ func TestCreateSecretGeneric(t *testing.T) {
 func TestCreateSecretDockerRegistry(t *testing.T) {
 	secretObject := &api.Secret{}
 	secretObject.Name = "my-secret"
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,

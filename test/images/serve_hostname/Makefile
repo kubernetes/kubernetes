@@ -90,9 +90,9 @@ container: .container-$(ARCH)
 
 push: .push-$(ARCH)
 .push-$(ARCH): .container-$(ARCH)
-	gcloud docker push $(IMAGE):$(TAG)
+	gcloud docker -- push $(IMAGE):$(TAG)
 	if [ -n "$(TEST_REGISTRY)" ]; then \
-		gcloud docker push $(TEST_IMAGE):$(TAG) ;\
+		gcloud docker -- push $(TEST_IMAGE):$(TAG) ;\
 	fi
 
 clean:

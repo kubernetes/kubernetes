@@ -17,6 +17,7 @@ limitations under the License.
 package admission
 
 import (
+	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/controller/informers"
 )
 
@@ -29,5 +30,11 @@ type Validator interface {
 // WantsInformerFactory defines a function which sets InformerFactory for admission plugins that need it
 type WantsInformerFactory interface {
 	SetInformerFactory(informers.SharedInformerFactory)
+	Validator
+}
+
+// WantsAuthorizer defines a function which sets Authorizer for admission plugins that need it.
+type WantsAuthorizer interface {
+	SetAuthorizer(authorizer.Authorizer)
 	Validator
 }

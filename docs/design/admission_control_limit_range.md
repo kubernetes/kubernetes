@@ -47,6 +47,7 @@ as part of admission control.
 4. Ability to specify default resource limits for a container
 5. Ability to specify default resource requests for a container
 6. Ability to enforce a ratio between request and limit for a resource.
+7. Ability to enforce min/max storage requests for persistent volume claims
 
 ## Data Model
 
@@ -208,6 +209,23 @@ Across all containers in pod, the following must hold true
 | Min | Min <= Request (required) <= Limit (optional) |
 | Max | Limit (required) <= Max |
 | LimitRequestRatio | LimitRequestRatio <= ( Limit (required, non-zero) / Request (non-zero) ) |
+
+**Type: PersistentVolumeClaim**
+
+Supported Resources:
+
+1. storage
+
+Supported Constraints:
+
+Across all claims in a namespace, the following must hold true:
+
+| Constraint | Behavior |
+| ---------- | -------- |
+| Min | Min >= Request (required) |
+| Max | Max <= Request (required) |
+
+Supported Defaults: None. Storage is a required field in `PersistentVolumeClaim`, so defaults are not applied at this time.
 
 ## Run-time configuration
 

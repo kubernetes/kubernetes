@@ -20,6 +20,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"k8s.io/kubernetes/pkg/api"
+	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/security/apparmor"
 )
 
 func TestLabelsAndAnnotationsRoundTrip(t *testing.T) {
@@ -31,4 +35,115 @@ func TestLabelsAndAnnotationsRoundTrip(t *testing.T) {
 	actualLabels, actualAnnotations := extractLabels(dockerLabels)
 	assert.Equal(t, expectedLabels, actualLabels)
 	assert.Equal(t, expectedAnnotations, actualAnnotations)
+}
+
+// TestGetContainerSecurityOpts tests the logic of generating container security options from sandbox annotations.
+// The actual profile loading logic is tested in dockertools.
+// TODO: Migrate the corresponding test to dockershim.
+func TestGetContainerSecurityOpts(t *testing.T) {
+	containerName := "bar"
+	makeConfig := func(annotations map[string]string) *runtimeApi.PodSandboxConfig {
+		return makeSandboxConfigWithLabelsAndAnnotations("pod", "ns", "1234", 1, nil, annotations)
+	}
+
+	tests := []struct {
+		msg          string
+		config       *runtimeApi.PodSandboxConfig
+		expectedOpts []string
+	}{{
+		msg:          "No security annotations",
+		config:       makeConfig(nil),
+		expectedOpts: []string{"seccomp=unconfined"},
+	}, {
+		msg: "Seccomp unconfined",
+		config: makeConfig(map[string]string{
+			api.SeccompContainerAnnotationKeyPrefix + containerName: "unconfined",
+		}),
+		expectedOpts: []string{"seccomp=unconfined"},
+	}, {
+		msg: "Seccomp default",
+		config: makeConfig(map[string]string{
+			api.SeccompContainerAnnotationKeyPrefix + containerName: "docker/default",
+		}),
+		expectedOpts: nil,
+	}, {
+		msg: "Seccomp pod default",
+		config: makeConfig(map[string]string{
+			api.SeccompPodAnnotationKey: "docker/default",
+		}),
+		expectedOpts: nil,
+	}, {
+		msg: "AppArmor runtime/default",
+		config: makeConfig(map[string]string{
+			apparmor.ContainerAnnotationKeyPrefix + containerName: apparmor.ProfileRuntimeDefault,
+		}),
+		expectedOpts: []string{"seccomp=unconfined"},
+	}, {
+		msg: "AppArmor local profile",
+		config: makeConfig(map[string]string{
+			apparmor.ContainerAnnotationKeyPrefix + containerName: apparmor.ProfileNamePrefix + "foo",
+		}),
+		expectedOpts: []string{"seccomp=unconfined", "apparmor=foo"},
+	}, {
+		msg: "AppArmor and seccomp profile",
+		config: makeConfig(map[string]string{
+			api.SeccompContainerAnnotationKeyPrefix + containerName: "docker/default",
+			apparmor.ContainerAnnotationKeyPrefix + containerName:   apparmor.ProfileNamePrefix + "foo",
+		}),
+		expectedOpts: []string{"apparmor=foo"},
+	}}
+
+	for i, test := range tests {
+		opts, err := getContainerSecurityOpts(containerName, test.config, "test/seccomp/profile/root")
+		assert.NoError(t, err, "TestCase[%d]: %s", i, test.msg)
+		assert.Len(t, opts, len(test.expectedOpts), "TestCase[%d]: %s", i, test.msg)
+		for _, opt := range test.expectedOpts {
+			assert.Contains(t, opts, opt, "TestCase[%d]: %s", i, test.msg)
+		}
+	}
+}
+
+// TestGetSandboxSecurityOpts tests the logic of generating sandbox security options from sandbox annotations.
+func TestGetSandboxSecurityOpts(t *testing.T) {
+	makeConfig := func(annotations map[string]string) *runtimeApi.PodSandboxConfig {
+		return makeSandboxConfigWithLabelsAndAnnotations("pod", "ns", "1234", 1, nil, annotations)
+	}
+
+	tests := []struct {
+		msg          string
+		config       *runtimeApi.PodSandboxConfig
+		expectedOpts []string
+	}{{
+		msg:          "No security annotations",
+		config:       makeConfig(nil),
+		expectedOpts: []string{"seccomp=unconfined"},
+	}, {
+		msg: "Seccomp default",
+		config: makeConfig(map[string]string{
+			api.SeccompPodAnnotationKey: "docker/default",
+		}),
+		expectedOpts: nil,
+	}, {
+		msg: "Seccomp unconfined",
+		config: makeConfig(map[string]string{
+			api.SeccompPodAnnotationKey: "unconfined",
+		}),
+		expectedOpts: []string{"seccomp=unconfined"},
+	}, {
+		msg: "Seccomp pod and container profile",
+		config: makeConfig(map[string]string{
+			api.SeccompContainerAnnotationKeyPrefix + "test-container": "unconfined",
+			api.SeccompPodAnnotationKey:                                "docker/default",
+		}),
+		expectedOpts: nil,
+	}}
+
+	for i, test := range tests {
+		opts, err := getSandboxSecurityOpts(test.config, "test/seccomp/profile/root")
+		assert.NoError(t, err, "TestCase[%d]: %s", i, test.msg)
+		assert.Len(t, opts, len(test.expectedOpts), "TestCase[%d]: %s", i, test.msg)
+		for _, opt := range test.expectedOpts {
+			assert.Contains(t, opts, opt, "TestCase[%d]: %s", i, test.msg)
+		}
+	}
 }

@@ -32,13 +32,16 @@ import (
 // and subject to change without notice.
 type PetSet struct {
 	unversioned.TypeMeta `json:",inline"`
-	v1.ObjectMeta        `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	// +optional
+	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec defines the desired identities of pets in this set.
+	// +optional
 	Spec PetSetSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// Status is the current status of Pets in this PetSet. This data
 	// may be out of date by some window of time.
+	// +optional
 	Status PetSetStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
@@ -49,11 +52,13 @@ type PetSetSpec struct {
 	// same Template, but individual replicas also have a consistent identity.
 	// If unspecified, defaults to 1.
 	// TODO: Consider a rename of this field.
+	// +optional
 	Replicas *int32 `json:"replicas,omitempty" protobuf:"varint,1,opt,name=replicas"`
 
 	// Selector is a label query over pods that should match the replica count.
 	// If empty, defaulted to labels on the pod template.
 	// More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
+	// +optional
 	Selector *unversioned.LabelSelector `json:"selector,omitempty" protobuf:"bytes,2,opt,name=selector"`
 
 	// Template is the object that describes the pod that will be created if
@@ -69,6 +74,7 @@ type PetSetSpec struct {
 	// container in the template. A claim in this list takes precedence over
 	// any volumes in the template, with the same name.
 	// TODO: Define the behavior if a claim already exists with the same name.
+	// +optional
 	VolumeClaimTemplates []v1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty" protobuf:"bytes,4,rep,name=volumeClaimTemplates"`
 
 	// ServiceName is the name of the service that governs this PetSet.
@@ -82,6 +88,7 @@ type PetSetSpec struct {
 // PetSetStatus represents the current state of a PetSet.
 type PetSetStatus struct {
 	// most recent generation observed by this autoscaler.
+	// +optional
 	ObservedGeneration *int64 `json:"observedGeneration,omitempty" protobuf:"varint,1,opt,name=observedGeneration"`
 
 	// Replicas is the number of actual replicas.
@@ -91,6 +98,7 @@ type PetSetStatus struct {
 // PetSetList is a collection of PetSets.
 type PetSetList struct {
 	unversioned.TypeMeta `json:",inline"`
+	// +optional
 	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	Items                []PetSet `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

@@ -452,9 +452,6 @@ func (plugin *flockerPlugin) newDeleterInternal(spec *volume.Spec, manager volum
 }
 
 func (plugin *flockerPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	if len(options.AccessModes) == 0 {
-		options.AccessModes = plugin.GetAccessModes()
-	}
 	return plugin.newProvisionerInternal(options, &FlockerUtil{})
 }
 

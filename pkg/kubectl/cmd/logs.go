@@ -23,20 +23,20 @@ import (
 	"os"
 	"time"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
 var (
-	logs_example = dedent.Dedent(`
+	logs_example = templates.Examples(`
 		# Return snapshot logs from pod nginx with only one container
 		kubectl logs nginx
 
@@ -74,7 +74,7 @@ type LogsOptions struct {
 }
 
 // NewCmdLog creates a new pod logs command
-func NewCmdLogs(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdLogs(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	o := &LogsOptions{}
 	cmd := &cobra.Command{
 		Use:     "logs [-f] [-p] POD [-c CONTAINER]",
@@ -111,7 +111,7 @@ func NewCmdLogs(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func (o *LogsOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+func (o *LogsOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	containerName := cmdutil.GetFlagString(cmd, "container")
 	switch len(args) {
 	case 0:

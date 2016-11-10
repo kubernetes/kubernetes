@@ -24,10 +24,10 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	"k8s.io/kubernetes/pkg/util/flag"
 )
 
@@ -43,9 +43,11 @@ type setOptions struct {
 	setRawBytes   flag.Tristate
 }
 
-var set_long = dedent.Dedent(`
+var set_long = templates.LongDesc(`
 	Sets an individual value in a kubeconfig file
+
 	PROPERTY_NAME is a dot delimited name where each token represents either an attribute name or a map key.  Map keys may not contain dots.
+
 	PROPERTY_VALUE is the new value you wish to set. Binary fields such as 'certificate-authority-data' expect a base64 encoded string unless the --set-raw-bytes flag is used.`)
 
 func NewCmdConfigSet(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {

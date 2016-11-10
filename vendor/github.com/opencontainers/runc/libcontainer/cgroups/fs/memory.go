@@ -16,9 +16,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
 
-const (
-	cgroupKernelMemoryLimit = "memory.kmem.limit_in_bytes"
-)
+const cgroupKernelMemoryLimit = "memory.kmem.limit_in_bytes"
 
 type MemoryGroup struct {
 }
@@ -38,8 +36,10 @@ func (s *MemoryGroup) Apply(d *cgroupData) (err error) {
 				return err
 			}
 		}
-		if err := EnableKernelMemoryAccounting(path); err != nil {
-			return err
+		if d.config.KernelMemory != 0 {
+			if err := EnableKernelMemoryAccounting(path); err != nil {
+				return err
+			}
 		}
 	}
 	defer func() {
@@ -62,13 +62,10 @@ func EnableKernelMemoryAccounting(path string) error {
 	// We have to limit the kernel memory here as it won't be accounted at all
 	// until a limit is set on the cgroup and limit cannot be set once the
 	// cgroup has children, or if there are already tasks in the cgroup.
-	kernelMemoryLimit := int64(1)
-	if err := setKernelMemory(path, kernelMemoryLimit); err != nil {
-		return err
-	}
-	kernelMemoryLimit = int64(-1)
-	if err := setKernelMemory(path, kernelMemoryLimit); err != nil {
-		return err
+	for _, i := range []int64{1, -1} {
+		if err := setKernelMemory(path, i); err != nil {
+			return err
+		}
 	}
 	return nil
 }

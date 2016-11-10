@@ -17,6 +17,7 @@ limitations under the License.
 package container
 
 import (
+	"fmt"
 	"hash/adler32"
 	"strings"
 
@@ -213,4 +214,12 @@ func SandboxToContainerState(state runtimeApi.PodSandBoxState) ContainerState {
 		return ContainerStateExited
 	}
 	return ContainerStateUnknown
+}
+
+// FormatPod returns a string representing a pod in a human readable format,
+// with pod UID as part of the string.
+func FormatPod(pod *Pod) string {
+	// Use underscore as the delimiter because it is not allowed in pod name
+	// (DNS subdomain format), while allowed in the container name format.
+	return fmt.Sprintf("%s_%s(%s)", pod.Name, pod.Namespace, pod.ID)
 }

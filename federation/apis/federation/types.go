@@ -42,6 +42,7 @@ type ClusterSpec struct {
 	// Admin needs to ensure that the required secret exists. Secret should be in the same namespace where federation control plane is hosted and it should have kubeconfig in its data with key "kubeconfig".
 	// This will later be changed to a reference to secret in federation control plane when the federation control plane supports secrets.
 	// This can be left empty if the cluster allows insecure access.
+	// +optional
 	SecretRef *api.LocalObjectReference `json:"secretRef,omitempty"`
 }
 
@@ -62,23 +63,30 @@ type ClusterCondition struct {
 	// Status of the condition, one of True, False, Unknown.
 	Status api.ConditionStatus `json:"status"`
 	// Last time the condition was checked.
+	// +optional
 	LastProbeTime unversioned.Time `json:"lastProbeTime,omitempty"`
 	// Last time the condition transit from one status to another.
+	// +optional
 	LastTransitionTime unversioned.Time `json:"lastTransitionTime,omitempty"`
 	// (brief) reason for the condition's last transition.
+	// +optional
 	Reason string `json:"reason,omitempty"`
 	// Human readable message indicating details about last transition.
+	// +optional
 	Message string `json:"message,omitempty"`
 }
 
 // ClusterStatus is information about the current status of a cluster updated by cluster controller peridocally.
 type ClusterStatus struct {
 	// Conditions is an array of current cluster conditions.
+	// +optional
 	Conditions []ClusterCondition `json:"conditions,omitempty"`
 	// Zones is the list of availability zones in which the nodes of the cluster exist, e.g. 'us-east1-a'.
 	// These will always be in the same region.
+	// +optional
 	Zones []string `json:"zones,omitempty"`
 	// Region is the name of the region in which all of the nodes in the cluster exist.  e.g. 'us-east1'.
+	// +optional
 	Region string `json:"region,omitempty"`
 }
 
@@ -90,11 +98,14 @@ type Cluster struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// +optional
 	api.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec defines the behavior of the Cluster.
+	// +optional
 	Spec ClusterSpec `json:"spec,omitempty"`
 	// Status describes the current status of a Cluster
+	// +optional
 	Status ClusterStatus `json:"status,omitempty"`
 }
 
@@ -103,6 +114,7 @@ type ClusterList struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	// +optional
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	// List of Cluster objects.
@@ -118,20 +130,24 @@ type FederatedReplicaSetPreferences struct {
 	// If set to true then already scheduled and running replicas may be moved to other clusters to
 	// in order to bring cluster replicasets towards a desired state. Otherwise, if set to false,
 	// up and running replicas will not be moved.
+	// +optional
 	Rebalance bool `json:"rebalance,omitempty"`
 
 	// A mapping between cluser names and preferences regarding local replicasets in these clusters.
 	// "*" (if provided) applies to all clusters if an explicit mapping is not provided. If there is no
 	// "*" that clusters without explicit preferences should not have any replicas scheduled.
+	// +optional
 	Clusters map[string]ClusterReplicaSetPreferences `json:"clusters,omitempty"`
 }
 
 // Preferences regarding number of replicas assigned to a cluster replicaset within a federated replicaset.
 type ClusterReplicaSetPreferences struct {
 	// Minimum number of replicas that should be assigned to this Local ReplicaSet. 0 by default.
+	// +optional
 	MinReplicas int64 `json:"minReplicas,omitempty"`
 
 	// Maximum number of replicas that should be assigned to this Local ReplicaSet. Unbounded if no value provided (default).
+	// +optional
 	MaxReplicas *int64 `json:"maxReplicas,omitempty"`
 
 	// A number expressing the preference to put an additional replica to this LocalReplicaSet. 0 by default.

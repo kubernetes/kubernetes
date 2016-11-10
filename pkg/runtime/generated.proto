@@ -94,8 +94,10 @@ message RawExtension {
 // +protobuf=true
 // +k8s:openapi-gen=true
 message TypeMeta {
+  // +optional
   optional string apiVersion = 1;
 
+  // +optional
   optional string kind = 2;
 }
 

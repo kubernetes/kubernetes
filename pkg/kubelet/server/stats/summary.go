@@ -146,7 +146,11 @@ func (sb *summaryBuilder) build() (*stats.Summary, error) {
 	}
 	for sys, name := range systemContainers {
 		if info, ok := sb.infos[name]; ok {
-			nodeStats.SystemContainers = append(nodeStats.SystemContainers, sb.containerInfoV2ToStats(sys, &info))
+			sysCont := sb.containerInfoV2ToStats(sys, &info)
+			// System containers don't have a filesystem associated with them.
+			sysCont.Rootfs = nil
+			sysCont.Logs = nil
+			nodeStats.SystemContainers = append(nodeStats.SystemContainers, sysCont)
 		}
 	}
 

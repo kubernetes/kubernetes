@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	kubeExternal "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
+	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -389,15 +389,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 
 	oomWatcher := NewOOMWatcher(kubeDeps.CAdvisorInterface, kubeDeps.Recorder)
 
-	// TODO(mtaufen): remove when internal cbr0 implementation gets removed in favor
-	//                of the kubenet network plugin
-	var myConfigureCBR0 bool = kubeCfg.ConfigureCBR0
-	var myFlannelExperimentalOverlay bool = kubeCfg.ExperimentalFlannelOverlay
-	if kubeCfg.NetworkPluginName == "kubenet" {
-		myConfigureCBR0 = false
-		myFlannelExperimentalOverlay = false
-	}
-
 	klet := &Kubelet{
 		hostname:                       hostname,
 		nodeName:                       nodeName,
@@ -422,31 +413,28 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		cadvisor:                       kubeDeps.CAdvisorInterface,
 		diskSpaceManager:               diskSpaceManager,
 		cloud:                          kubeDeps.Cloud,
-		autoDetectCloudProvider:   (kubeExternal.AutoDetectCloudProvider == kubeCfg.CloudProvider),
+		autoDetectCloudProvider:   (componentconfigv1alpha1.AutoDetectCloudProvider == kubeCfg.CloudProvider),
 		nodeRef:                   nodeRef,
 		nodeLabels:                kubeCfg.NodeLabels,
 		nodeStatusUpdateFrequency: kubeCfg.NodeStatusUpdateFrequency.Duration,
-		os:                         kubeDeps.OSInterface,
-		oomWatcher:                 oomWatcher,
-		cgroupsPerQOS:              kubeCfg.CgroupsPerQOS,
-		cgroupRoot:                 kubeCfg.CgroupRoot,
-		mounter:                    kubeDeps.Mounter,
-		writer:                     kubeDeps.Writer,
-		configureCBR0:              myConfigureCBR0,
-		nonMasqueradeCIDR:          kubeCfg.NonMasqueradeCIDR,
-		reconcileCIDR:              kubeCfg.ReconcileCIDR,
-		maxPods:                    int(kubeCfg.MaxPods),
-		podsPerCore:                int(kubeCfg.PodsPerCore),
-		nvidiaGPUs:                 int(kubeCfg.NvidiaGPUs),
-		syncLoopMonitor:            atomic.Value{},
-		resolverConfig:             kubeCfg.ResolverConfig,
-		cpuCFSQuota:                kubeCfg.CPUCFSQuota,
-		daemonEndpoints:            daemonEndpoints,
-		containerManager:           kubeDeps.ContainerManager,
-		flannelExperimentalOverlay: myFlannelExperimentalOverlay,
-		flannelHelper:              nil,
-		nodeIP:                     net.ParseIP(kubeCfg.NodeIP),
-		clock:                      clock.RealClock{},
+		os:                kubeDeps.OSInterface,
+		oomWatcher:        oomWatcher,
+		cgroupsPerQOS:     kubeCfg.CgroupsPerQOS,
+		cgroupRoot:        kubeCfg.CgroupRoot,
+		mounter:           kubeDeps.Mounter,
+		writer:            kubeDeps.Writer,
+		nonMasqueradeCIDR: kubeCfg.NonMasqueradeCIDR,
+		reconcileCIDR:     kubeCfg.ReconcileCIDR,
+		maxPods:           int(kubeCfg.MaxPods),
+		podsPerCore:       int(kubeCfg.PodsPerCore),
+		nvidiaGPUs:        int(kubeCfg.NvidiaGPUs),
+		syncLoopMonitor:   atomic.Value{},
+		resolverConfig:    kubeCfg.ResolverConfig,
+		cpuCFSQuota:       kubeCfg.CPUCFSQuota,
+		daemonEndpoints:   daemonEndpoints,
+		containerManager:  kubeDeps.ContainerManager,
+		nodeIP:            net.ParseIP(kubeCfg.NodeIP),
+		clock:             clock.RealClock{},
 		outOfDiskTransitionFrequency: kubeCfg.OutOfDiskTransitionFrequency.Duration,
 		reservation:                  *reservation,
 		enableCustomMetrics:          kubeCfg.EnableCustomMetrics,
@@ -458,12 +446,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		iptablesDropBit:              int(kubeCfg.IPTablesDropBit),
 	}
 
-	if klet.flannelExperimentalOverlay {
-		klet.flannelHelper = NewFlannelHelper()
-		glog.Infof("Flannel is in charge of podCIDR and overlay networking.")
-	}
-
-	if mode, err := effectiveHairpinMode(componentconfig.HairpinMode(kubeCfg.HairpinMode), kubeCfg.ContainerRuntime, kubeCfg.ConfigureCBR0, kubeCfg.NetworkPluginName); err != nil {
+	if mode, err := effectiveHairpinMode(componentconfig.HairpinMode(kubeCfg.HairpinMode), kubeCfg.ContainerRuntime, kubeCfg.NetworkPluginName); err != nil {
 		// This is a non-recoverable error. Returning it up the callstack will just
 		// lead to retries of the same failure, so just fail hard.
 		glog.Fatalf("Invalid hairpin mode: %v", err)
@@ -507,7 +490,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		case "cri":
 			// Use the new CRI shim for docker. This is need for testing the
 			// docker integration through CRI, and may be removed in the future.
-			dockerService := dockershim.NewDockerService(klet.dockerClient)
+			dockerService := dockershim.NewDockerService(klet.dockerClient, kubeCfg.SeccompProfileRoot, kubeCfg.PodInfraContainerImage)
 			klet.containerRuntime, err = kuberuntime.NewKubeGenericRuntimeManager(
 				kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
 				klet.livenessManager,
@@ -923,7 +906,6 @@ type Kubelet struct {
 
 	// Whether or not kubelet should take responsibility for keeping cbr0 in
 	// the correct state.
-	configureCBR0 bool
 	reconcileCIDR bool
 
 	// Traffic to IPs outside this range will use IP masquerade.
@@ -964,15 +946,6 @@ type Kubelet struct {
 
 	// oneTimeInitializer is used to initialize modules that are dependent on the runtime to be up.
 	oneTimeInitializer sync.Once
-
-	// flannelExperimentalOverlay determines whether the experimental flannel
-	// network overlay is active.
-	flannelExperimentalOverlay bool
-
-	// TODO: Flannelhelper doesn't store any state, we can instantiate it
-	// on the fly if we're confident the dbus connetions it opens doesn't
-	// put the system under duress.
-	flannelHelper *FlannelHelper
 
 	// If non-nil, use this IP address for the node
 	nodeIP net.IP
@@ -1063,6 +1036,7 @@ func (kl *Kubelet) StartGarbageCollection() {
 	go wait.Until(func() {
 		if err := kl.containerGC.GarbageCollect(kl.sourcesReady.AllReady()); err != nil {
 			glog.Errorf("Container garbage collection failed: %v", err)
+			kl.recorder.Eventf(kl.nodeRef, api.EventTypeWarning, events.ContainerGCFailed, err.Error())
 			loggedContainerGCFailure = true
 		} else {
 			var vLevel glog.Level = 4
@@ -1079,6 +1053,7 @@ func (kl *Kubelet) StartGarbageCollection() {
 	go wait.Until(func() {
 		if err := kl.imageManager.GarbageCollect(); err != nil {
 			glog.Errorf("Image garbage collection failed: %v", err)
+			kl.recorder.Eventf(kl.nodeRef, api.EventTypeWarning, events.ImageGCFailed, err.Error())
 			loggedImageGCFailure = true
 		} else {
 			var vLevel glog.Level = 4

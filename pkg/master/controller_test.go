@@ -23,6 +23,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
@@ -40,6 +42,7 @@ func TestReconcileEndpoints(t *testing.T) {
 		additionalMasters int
 		endpoints         *api.EndpointsList
 		expectUpdate      *api.Endpoints // nil means none expected
+		expectCreate      *api.Endpoints // nil means none expected
 	}{
 		{
 			testName:      "no existing endpoints",
@@ -47,7 +50,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			ip:            "1.2.3.4",
 			endpointPorts: []api.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpoints:     nil,
-			expectUpdate: &api.Endpoints{
+			expectCreate: &api.Endpoints{
 				ObjectMeta: om("foo"),
 				Subsets: []api.EndpointSubset{{
 					Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
@@ -222,7 +225,7 @@ func TestReconcileEndpoints(t *testing.T) {
 					}},
 				}},
 			},
-			expectUpdate: &api.Endpoints{
+			expectCreate: &api.Endpoints{
 				ObjectMeta: om("foo"),
 				Subsets: []api.EndpointSubset{{
 					Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
@@ -371,24 +374,52 @@ func TestReconcileEndpoints(t *testing.T) {
 		},
 	}
 	for _, test := range reconcile_tests {
-		registry := &registrytest.EndpointRegistry{
-			Endpoints: test.endpoints,
+		fakeClient := fake.NewSimpleClientset()
+		if test.endpoints != nil {
+			fakeClient = fake.NewSimpleClientset(test.endpoints)
 		}
-		reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, registry)
+		reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, fakeClient.Core())
 		err := reconciler.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, true)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
 		}
+
+		updates := []core.UpdateAction{}
+		for _, action := range fakeClient.Actions() {
+			if action.GetVerb() != "update" {
+				continue
+			}
+			updates = append(updates, action.(core.UpdateAction))
+		}
 		if test.expectUpdate != nil {
-			if len(registry.Updates) != 1 {
-				t.Errorf("case %q: unexpected updates: %v", test.testName, registry.Updates)
-			} else if e, a := test.expectUpdate, &registry.Updates[0]; !reflect.DeepEqual(e, a) {
+			if len(updates) != 1 {
+				t.Errorf("case %q: unexpected updates: %v", test.testName, updates)
+			} else if e, a := test.expectUpdate, updates[0].GetObject(); !reflect.DeepEqual(e, a) {
 				t.Errorf("case %q: expected update:\n%#v\ngot:\n%#v\n", test.testName, e, a)
 			}
 		}
-		if test.expectUpdate == nil && len(registry.Updates) > 0 {
-			t.Errorf("case %q: no update expected, yet saw: %v", test.testName, registry.Updates)
+		if test.expectUpdate == nil && len(updates) > 0 {
+			t.Errorf("case %q: no update expected, yet saw: %v", test.testName, updates)
 		}
+
+		creates := []core.CreateAction{}
+		for _, action := range fakeClient.Actions() {
+			if action.GetVerb() != "create" {
+				continue
+			}
+			creates = append(creates, action.(core.CreateAction))
+		}
+		if test.expectCreate != nil {
+			if len(creates) != 1 {
+				t.Errorf("case %q: unexpected creates: %v", test.testName, creates)
+			} else if e, a := test.expectCreate, creates[0].GetObject(); !reflect.DeepEqual(e, a) {
+				t.Errorf("case %q: expected create:\n%#v\ngot:\n%#v\n", test.testName, e, a)
+			}
+		}
+		if test.expectCreate == nil && len(creates) > 0 {
+			t.Errorf("case %q: no create expected, yet saw: %v", test.testName, creates)
+		}
+
 	}
 
 	non_reconcile_tests := []struct {
@@ -399,6 +430,7 @@ func TestReconcileEndpoints(t *testing.T) {
 		additionalMasters int
 		endpoints         *api.EndpointsList
 		expectUpdate      *api.Endpoints // nil means none expected
+		expectCreate      *api.Endpoints // nil means none expected
 	}{
 		{
 			testName:    "existing endpoints extra service ports missing port no update",
@@ -450,7 +482,7 @@ func TestReconcileEndpoints(t *testing.T) {
 			ip:            "1.2.3.4",
 			endpointPorts: []api.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpoints:     nil,
-			expectUpdate: &api.Endpoints{
+			expectCreate: &api.Endpoints{
 				ObjectMeta: om("foo"),
 				Subsets: []api.EndpointSubset{{
 					Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
@@ -460,24 +492,52 @@ func TestReconcileEndpoints(t *testing.T) {
 		},
 	}
 	for _, test := range non_reconcile_tests {
-		registry := &registrytest.EndpointRegistry{
-			Endpoints: test.endpoints,
+		fakeClient := fake.NewSimpleClientset()
+		if test.endpoints != nil {
+			fakeClient = fake.NewSimpleClientset(test.endpoints)
 		}
-		reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, registry)
+		reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, fakeClient.Core())
 		err := reconciler.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, false)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
 		}
+
+		updates := []core.UpdateAction{}
+		for _, action := range fakeClient.Actions() {
+			if action.GetVerb() != "update" {
+				continue
+			}
+			updates = append(updates, action.(core.UpdateAction))
+		}
 		if test.expectUpdate != nil {
-			if len(registry.Updates) != 1 {
-				t.Errorf("case %q: unexpected updates: %v", test.testName, registry.Updates)
-			} else if e, a := test.expectUpdate, &registry.Updates[0]; !reflect.DeepEqual(e, a) {
+			if len(updates) != 1 {
+				t.Errorf("case %q: unexpected updates: %v", test.testName, updates)
+			} else if e, a := test.expectUpdate, updates[0].GetObject(); !reflect.DeepEqual(e, a) {
 				t.Errorf("case %q: expected update:\n%#v\ngot:\n%#v\n", test.testName, e, a)
 			}
 		}
-		if test.expectUpdate == nil && len(registry.Updates) > 0 {
-			t.Errorf("case %q: no update expected, yet saw: %v", test.testName, registry.Updates)
+		if test.expectUpdate == nil && len(updates) > 0 {
+			t.Errorf("case %q: no update expected, yet saw: %v", test.testName, updates)
 		}
+
+		creates := []core.CreateAction{}
+		for _, action := range fakeClient.Actions() {
+			if action.GetVerb() != "create" {
+				continue
+			}
+			creates = append(creates, action.(core.CreateAction))
+		}
+		if test.expectCreate != nil {
+			if len(creates) != 1 {
+				t.Errorf("case %q: unexpected creates: %v", test.testName, creates)
+			} else if e, a := test.expectCreate, creates[0].GetObject(); !reflect.DeepEqual(e, a) {
+				t.Errorf("case %q: expected create:\n%#v\ngot:\n%#v\n", test.testName, e, a)
+			}
+		}
+		if test.expectCreate == nil && len(creates) > 0 {
+			t.Errorf("case %q: no create expected, yet saw: %v", test.testName, creates)
+		}
+
 	}
 
 }

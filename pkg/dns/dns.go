@@ -225,6 +225,8 @@ func (kd *KubeDNS) setEndpointsStore() {
 				// TODO: Avoid unwanted updates.
 				kd.handleEndpointAdd(newObj)
 			},
+			// No DeleteFunc for EndpointsStore because endpoint object will be deleted
+			// when corresponding service is deleted.
 		},
 	)
 }

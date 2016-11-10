@@ -125,6 +125,10 @@ func (c *PodClient) mungeSpec(pod *api.Pod) {
 	if TestContext.NodeName != "" {
 		Expect(pod.Spec.NodeName).To(Or(BeZero(), Equal(TestContext.NodeName)), "Test misconfigured")
 		pod.Spec.NodeName = TestContext.NodeName
+		// Node e2e does not support the default DNSClusterFirst policy. Set
+		// the policy to DNSDefault, which is configured per node.
+		pod.Spec.DNSPolicy = api.DNSDefault
+
 		if !TestContext.PrepullImages {
 			return
 		}

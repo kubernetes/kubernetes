@@ -25,12 +25,56 @@ if [[ -z "${TEST_ETCD_VERSION}" ]]; then
   TEST_ETCD_VERSION="2.2.1"
 fi
 
-retry() {
+function retry() {
 	for i in {1..4}; do
 		"$@" && return 0 || sleep $i
 	done
 	"$@"
 }
+
+function mount-master-pd() {
+	if [[ ! -e /dev/disk/by-id/google-master-pd ]]; then
+		echo "Can't find master-pd. Skipping mount."
+		return
+	fi
+	device_info=$(ls -l "/dev/disk/by-id/google-master-pd")
+	relative_path=${device_info##* }
+	pd_device="/dev/disk/by-id/${relative_path}"
+
+	echo "Mounting master-pd"
+	local -r pd_path="/dev/disk/by-id/google-master-pd"
+	local -r mount_point="/mnt/disks/master-pd"
+	# Format and mount the disk, create directories on it for all of the master's
+	# persistent data, and link them to where they're used.
+	mkdir -p "${mount_point}"
+
+	# Format only if the disk is not already formatted.
+	if ! tune2fs -l "${pd_path}" ; then
+		echo "Formatting '${pd_path}'"
+		mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0,discard "${pd_path}"
+	fi
+
+	echo "Mounting '${pd_path}' at '${mount_point}'"
+	mount -o discard,defaults "${pd_path}" "${mount_point}"
+	echo "Mounted master-pd '${pd_path}' at '${mount_point}'"
+
+	# Contains all the data stored in etcd.
+	mkdir -m 700 -p "${mount_point}/var/etcd"
+	ln -s -f "${mount_point}/var/etcd" /var/etcd
+	mkdir -p /etc/srv
+	# Contains the dynamically generated apiserver auth certs and keys.
+	mkdir -p "${mount_point}/srv/kubernetes"
+	ln -s -f "${mount_point}/srv/kubernetes" /etc/srv/kubernetes
+	# Directory for kube-apiserver to store SSH key (if necessary).
+	mkdir -p "${mount_point}/srv/sshproxy"
+	ln -s -f "${mount_point}/srv/sshproxy" /etc/srv/sshproxy
+
+	if ! id etcd &>/dev/null; then
+		useradd -s /sbin/nologin -d /var/etcd etcd
+	fi
+}
+
+mount-master-pd
 
 if [ "${EVENT_STORE_IP}" == "127.0.0.1" ]; then
 	# Retry starting etcd to avoid pulling image errors.

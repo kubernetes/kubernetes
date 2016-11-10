@@ -33,6 +33,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
@@ -90,10 +91,10 @@ func newRBACAuthorizer(t *testing.T, superUser string, config *master.Config) au
 		return generic.RESTOptions{StorageConfig: storageConfig, Decorator: generic.UndecoratedStorage, ResourcePrefix: resource}
 	}
 
-	roleRegistry := role.NewRegistry(roleetcd.NewREST(newRESTOptions("roles")))
-	roleBindingRegistry := rolebinding.NewRegistry(rolebindingetcd.NewREST(newRESTOptions("rolebindings")))
-	clusterRoleRegistry := clusterrole.NewRegistry(clusterroleetcd.NewREST(newRESTOptions("clusterroles")))
-	clusterRoleBindingRegistry := clusterrolebinding.NewRegistry(clusterrolebindingetcd.NewREST(newRESTOptions("clusterrolebindings")))
+	roleRegistry := role.AuthorizerAdapter{Registry: role.NewRegistry(roleetcd.NewREST(newRESTOptions("roles")))}
+	roleBindingRegistry := rolebinding.AuthorizerAdapter{Registry: rolebinding.NewRegistry(rolebindingetcd.NewREST(newRESTOptions("rolebindings")))}
+	clusterRoleRegistry := clusterrole.AuthorizerAdapter{Registry: clusterrole.NewRegistry(clusterroleetcd.NewREST(newRESTOptions("clusterroles")))}
+	clusterRoleBindingRegistry := clusterrolebinding.AuthorizerAdapter{Registry: clusterrolebinding.NewRegistry(clusterrolebindingetcd.NewREST(newRESTOptions("clusterrolebindings")))}
 	return rbac.New(roleRegistry, roleBindingRegistry, clusterRoleRegistry, clusterRoleBindingRegistry, superUser)
 }
 
@@ -204,7 +205,7 @@ var (
 `
 	podNamespace = `
 {
-  "apiVersion": "` + testapi.Default.GroupVersion().String() + `",
+  "apiVersion": "` + registered.GroupOrDie(api.GroupName).GroupVersion.String() + `",
   "kind": "Namespace",
   "metadata": {
 	"name": "pod-namespace"%s
@@ -213,7 +214,7 @@ var (
 `
 	jobNamespace = `
 {
-  "apiVersion": "` + testapi.Default.GroupVersion().String() + `",
+  "apiVersion": "` + registered.GroupOrDie(api.GroupName).GroupVersion.String() + `",
   "kind": "Namespace",
   "metadata": {
 	"name": "job-namespace"%s
@@ -222,7 +223,7 @@ var (
 `
 	forbiddenNamespace = `
 {
-  "apiVersion": "` + testapi.Default.GroupVersion().String() + `",
+  "apiVersion": "` + registered.GroupOrDie(api.GroupName).GroupVersion.String() + `",
   "kind": "Namespace",
   "metadata": {
 	"name": "forbidden-namespace"%s
@@ -443,7 +444,7 @@ func TestBootstrapping(t *testing.T) {
 	_, s := framework.RunAMaster(masterConfig)
 	defer s.Close()
 
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
 
 	watcher, err := clientset.Rbac().ClusterRoles().Watch(api.ListOptions{ResourceVersion: "0"})
 	if err != nil {

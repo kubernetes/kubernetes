@@ -55,7 +55,6 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 }
 
 func autoConvert_v1_Job_To_batch_Job(in *Job, out *batch.Job, s conversion.Scope) error {
-	SetDefaults_Job(in)
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}

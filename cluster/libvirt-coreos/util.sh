@@ -152,7 +152,7 @@ function initialize-pool {
       virsh pool-create-as $POOL dir --target "$POOL_PATH"
   fi
 
-  wget -N -P "$ROOT" http://${COREOS_CHANNEL:-alpha}.release.core-os.net/amd64-usr/current/coreos_production_qemu_image.img.bz2
+  wget -N -P "$ROOT" https://${COREOS_CHANNEL:-alpha}.release.core-os.net/amd64-usr/current/coreos_production_qemu_image.img.bz2
   if [[ "$ROOT/coreos_production_qemu_image.img.bz2" -nt "$POOL_PATH/coreos_base.img" ]]; then
       bunzip2 -f -k "$ROOT/coreos_production_qemu_image.img.bz2"
       virsh vol-delete coreos_base.img --pool $POOL 2> /dev/null || true

@@ -84,7 +84,7 @@ func (c *FakeEndpoints) List(opts api.ListOptions) (result *api.EndpointsList, e
 		return nil, err
 	}
 
-	label := opts.LabelSelector
+	label, _, _ := core.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}

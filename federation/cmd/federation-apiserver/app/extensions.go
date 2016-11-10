@@ -24,19 +24,30 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	daemonsetetcd "k8s.io/kubernetes/pkg/registry/extensions/daemonset/etcd"
+	deploymentetcd "k8s.io/kubernetes/pkg/registry/extensions/deployment/etcd"
 	ingressetcd "k8s.io/kubernetes/pkg/registry/extensions/ingress/etcd"
 	replicasetetcd "k8s.io/kubernetes/pkg/registry/extensions/replicaset/etcd"
 )
 
 func installExtensionsAPIs(g *genericapiserver.GenericAPIServer, restOptionsFactory restOptionsFactory) {
 	replicaSetStorage := replicasetetcd.NewStorage(restOptionsFactory.NewFor(extensions.Resource("replicasets")))
+	deploymentStorage := deploymentetcd.NewStorage(restOptionsFactory.NewFor(extensions.Resource("deployments")))
 	ingressStorage, ingressStatusStorage := ingressetcd.NewREST(restOptionsFactory.NewFor(extensions.Resource("ingresses")))
+	daemonSetStorage, daemonSetStatusStorage := daemonsetetcd.NewREST(restOptionsFactory.NewFor(extensions.Resource("daemonsets")))
+
 	extensionsResources := map[string]rest.Storage{
-		"replicasets":        replicaSetStorage.ReplicaSet,
-		"replicasets/status": replicaSetStorage.Status,
-		"replicasets/scale":  replicaSetStorage.Scale,
-		"ingresses":          ingressStorage,
-		"ingresses/status":   ingressStatusStorage,
+		"replicasets":          replicaSetStorage.ReplicaSet,
+		"replicasets/status":   replicaSetStorage.Status,
+		"replicasets/scale":    replicaSetStorage.Scale,
+		"ingresses":            ingressStorage,
+		"ingresses/status":     ingressStatusStorage,
+		"daemonsets":           daemonSetStorage,
+		"daemonsets/status":    daemonSetStatusStorage,
+		"deployments":          deploymentStorage.Deployment,
+		"deployments/status":   deploymentStorage.Status,
+		"deployments/scale":    deploymentStorage.Scale,
+		"deployments/rollback": deploymentStorage.Rollback,
 	}
 	extensionsGroupMeta := registered.GroupOrDie(extensions.GroupName)
 	apiGroupInfo := genericapiserver.APIGroupInfo{

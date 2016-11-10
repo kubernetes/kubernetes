@@ -17,8 +17,10 @@ limitations under the License.
 package genericapiserver
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"sync/atomic"
@@ -43,6 +45,25 @@ type Tunneler interface {
 	Dial(net, addr string) (net.Conn, error)
 	SecondsSinceSync() int64
 	SecondsSinceSSHKeySync() int64
+}
+
+// TunnelSyncHealthChecker returns a health func that indicates if a tunneler is healthy.
+// It's compatible with healthz.NamedCheck
+func TunnelSyncHealthChecker(tunneler Tunneler) func(req *http.Request) error {
+	return func(req *http.Request) error {
+		if tunneler == nil {
+			return nil
+		}
+		lag := tunneler.SecondsSinceSync()
+		if lag > 600 {
+			return fmt.Errorf("Tunnel sync is taking to long: %d", lag)
+		}
+		sshKeyLag := tunneler.SecondsSinceSSHKeySync()
+		if sshKeyLag > 600 {
+			return fmt.Errorf("SSHKey sync is taking to long: %d", sshKeyLag)
+		}
+		return nil
+	}
 }
 
 type SSHTunneler struct {

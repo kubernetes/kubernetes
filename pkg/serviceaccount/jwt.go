@@ -21,6 +21,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rsa"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -80,37 +81,60 @@ func ReadPrivateKeyFromPEM(data []byte) (interface{}, error) {
 	return nil, fmt.Errorf("data does not contain a valid RSA or ECDSA private key")
 }
 
-// ReadPublicKey is a helper function for reading an rsa.PublicKey or ecdsa.PublicKey from a PEM-encoded file.
+// ReadPublicKeys is a helper function for reading an array of rsa.PublicKey or ecdsa.PublicKey from a PEM-encoded file.
 // Reads public keys from both public and private key files.
-func ReadPublicKey(file string) (interface{}, error) {
+func ReadPublicKeys(file string) ([]interface{}, error) {
 	data, err := ioutil.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
-	key, err := ReadPublicKeyFromPEM(data)
+	keys, err := ReadPublicKeysFromPEM(data)
 	if err != nil {
 		return nil, fmt.Errorf("error reading public key file %s: %v", file, err)
 	}
-	return key, nil
+	return keys, nil
 }
 
-// ReadPublicKeyFromPEM is a helper function for reading an rsa.PublicKey or ecdsa.PublicKey from a PEM-encoded byte array.
+// ReadPublicKeysFromPEM is a helper function for reading an array of rsa.PublicKey or ecdsa.PublicKey from a PEM-encoded byte array.
 // Reads public keys from both public and private key files.
-func ReadPublicKeyFromPEM(data []byte) (interface{}, error) {
-	if privateKey, err := jwt.ParseRSAPrivateKeyFromPEM(data); err == nil {
-		return &privateKey.PublicKey, nil
-	}
-	if publicKey, err := jwt.ParseRSAPublicKeyFromPEM(data); err == nil {
-		return publicKey, nil
+func ReadPublicKeysFromPEM(data []byte) ([]interface{}, error) {
+	var block *pem.Block
+	keys := []interface{}{}
+	for {
+		// read the next block
+		block, data = pem.Decode(data)
+		if block == nil {
+			break
+		}
+
+		// get PEM bytes for just this block
+		blockData := pem.EncodeToMemory(block)
+		if privateKey, err := jwt.ParseRSAPrivateKeyFromPEM(blockData); err == nil {
+			keys = append(keys, &privateKey.PublicKey)
+			continue
+		}
+		if publicKey, err := jwt.ParseRSAPublicKeyFromPEM(blockData); err == nil {
+			keys = append(keys, publicKey)
+			continue
+		}
+
+		if privateKey, err := jwt.ParseECPrivateKeyFromPEM(blockData); err == nil {
+			keys = append(keys, &privateKey.PublicKey)
+			continue
+		}
+		if publicKey, err := jwt.ParseECPublicKeyFromPEM(blockData); err == nil {
+			keys = append(keys, publicKey)
+			continue
+		}
+
+		// tolerate non-key PEM blocks for backwards compatibility
+		// originally, only the first PEM block was parsed and expected to be a key block
 	}
 
-	if privateKey, err := jwt.ParseECPrivateKeyFromPEM(data); err == nil {
-		return &privateKey.PublicKey, nil
+	if len(keys) == 0 {
+		return nil, fmt.Errorf("data does not contain a valid RSA or ECDSA key")
 	}
-	if publicKey, err := jwt.ParseECPublicKeyFromPEM(data); err == nil {
-		return publicKey, nil
-	}
-	return nil, fmt.Errorf("data does not contain a valid RSA or ECDSA key")
+	return keys, nil
 }
 
 // JWTTokenGenerator returns a TokenGenerator that generates signed JWT tokens, using the given privateKey.

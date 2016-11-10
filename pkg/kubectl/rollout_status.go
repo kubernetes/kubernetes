@@ -23,11 +23,12 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
+	"k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
-// StatusViewer provides an interface for resources that provides rollout status.
+// StatusViewer provides an interface for resources that have rollout status.
 type StatusViewer interface {
-	Status(namespace, name string) (string, bool, error)
+	Status(namespace, name string, revision int64) (string, bool, error)
 }
 
 func StatusViewerFor(kind unversioned.GroupKind, c internalclientset.Interface) (StatusViewer, error) {
@@ -43,10 +44,19 @@ type DeploymentStatusViewer struct {
 }
 
 // Status returns a message describing deployment status, and a bool value indicating if the status is considered done
-func (s *DeploymentStatusViewer) Status(namespace, name string) (string, bool, error) {
+func (s *DeploymentStatusViewer) Status(namespace, name string, revision int64) (string, bool, error) {
 	deployment, err := s.c.Deployments(namespace).Get(name)
 	if err != nil {
 		return "", false, err
+	}
+	if revision > 0 {
+		deploymentRev, err := util.Revision(deployment)
+		if err != nil {
+			return "", false, fmt.Errorf("cannot get the revision of deployment %q: %v", deployment.Name, err)
+		}
+		if revision != deploymentRev {
+			return "", false, fmt.Errorf("desired revision (%d) is different from the running revision (%d)", revision, deploymentRev)
+		}
 	}
 	if deployment.Generation <= deployment.Status.ObservedGeneration {
 		if deployment.Status.UpdatedReplicas < deployment.Spec.Replicas {
@@ -58,7 +68,7 @@ func (s *DeploymentStatusViewer) Status(namespace, name string) (string, bool, e
 		if deployment.Status.AvailableReplicas < deployment.Status.UpdatedReplicas {
 			return fmt.Sprintf("Waiting for rollout to finish: %d of %d updated replicas are available...\n", deployment.Status.AvailableReplicas, deployment.Status.UpdatedReplicas), false, nil
 		}
-		return fmt.Sprintf("deployment %s successfully rolled out\n", name), true, nil
+		return fmt.Sprintf("deployment %q successfully rolled out\n", name), true, nil
 	}
 	return fmt.Sprintf("Waiting for deployment spec update to be observed...\n"), false, nil
 }

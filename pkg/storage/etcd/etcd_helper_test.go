@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -45,7 +46,7 @@ const validEtcdVersion = "etcd 2.0.9"
 func testScheme(t *testing.T) (*runtime.Scheme, runtime.Codec) {
 	scheme := runtime.NewScheme()
 	scheme.Log(t)
-	scheme.AddKnownTypes(*testapi.Default.GroupVersion(), &storagetesting.TestResource{})
+	scheme.AddKnownTypes(registered.GroupOrDie(api.GroupName).GroupVersion, &storagetesting.TestResource{})
 	scheme.AddKnownTypes(testapi.Default.InternalGroupVersion(), &storagetesting.TestResource{})
 	if err := scheme.AddConversionFuncs(
 		func(in *storagetesting.TestResource, out *storagetesting.TestResource, s conversion.Scope) error {
@@ -59,7 +60,7 @@ func testScheme(t *testing.T) (*runtime.Scheme, runtime.Codec) {
 	); err != nil {
 		panic(err)
 	}
-	codec := serializer.NewCodecFactory(scheme).LegacyCodec(*testapi.Default.GroupVersion())
+	codec := serializer.NewCodecFactory(scheme).LegacyCodec(registered.GroupOrDie(api.GroupName).GroupVersion)
 	return scheme, codec
 }
 

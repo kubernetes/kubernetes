@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
 	k8syaml "k8s.io/kubernetes/pkg/util/yaml"
@@ -35,7 +36,7 @@ import (
 )
 
 func readPod(filename string) ([]byte, error) {
-	data, err := ioutil.ReadFile("testdata/" + testapi.Default.GroupVersion().Version + "/" + filename)
+	data, err := ioutil.ReadFile("testdata/" + registered.GroupOrDie(api.GroupName).GroupVersion.Version + "/" + filename)
 	if err != nil {
 		return nil, err
 	}
@@ -305,6 +306,121 @@ func TestTypeAny(t *testing.T) {
 		err = schema.ValidateBytes(podBytes)
 		if err != nil {
 			t.Errorf("unexpected error: %s, for pod %s", err, string(podBytes))
+		}
+	}
+}
+
+func TestValidateDuplicateLabelsFailCases(t *testing.T) {
+	strs := []string{
+		`{
+	"metadata": {
+		"labels": {
+			"foo": "bar",
+			"foo": "baz"
+		}
+	}
+}`,
+		`{
+	"metadata": {
+		"annotations": {
+			"foo": "bar",
+			"foo": "baz"
+		}
+	}
+}`,
+		`{
+	"metadata": {
+		"labels": {
+			"foo": "blah"
+		},
+		"annotations": {
+			"foo": "bar",
+			"foo": "baz"
+		}
+	}
+}`,
+	}
+	schema := NoDoubleKeySchema{}
+	for _, str := range strs {
+		err := schema.ValidateBytes([]byte(str))
+		if err == nil {
+			t.Errorf("Unexpected non-error %s", str)
+		}
+	}
+}
+
+func TestValidateDuplicateLabelsPassCases(t *testing.T) {
+	strs := []string{
+		`{
+	"metadata": {
+		"labels": {
+			"foo": "bar"
+		},
+		"annotations": {
+			"foo": "baz"
+		}
+	}
+}`,
+		`{
+	"metadata": {}
+}`,
+		`{
+	"metadata": {
+		"labels": {}
+	}
+}`,
+	}
+	schema := NoDoubleKeySchema{}
+	for _, str := range strs {
+		err := schema.ValidateBytes([]byte(str))
+		if err != nil {
+			t.Errorf("Unexpected error: %v %s", err, str)
+		}
+	}
+}
+
+type AlwaysInvalidSchema struct{}
+
+func (AlwaysInvalidSchema) ValidateBytes([]byte) error {
+	return fmt.Errorf("Always invalid!")
+}
+
+func TestConjunctiveSchema(t *testing.T) {
+	tests := []struct {
+		schemas    []Schema
+		shouldPass bool
+		name       string
+	}{
+		{
+			schemas:    []Schema{NullSchema{}, NullSchema{}},
+			shouldPass: true,
+			name:       "all pass",
+		},
+		{
+			schemas:    []Schema{NullSchema{}, AlwaysInvalidSchema{}},
+			shouldPass: false,
+			name:       "one fail",
+		},
+		{
+			schemas:    []Schema{AlwaysInvalidSchema{}, AlwaysInvalidSchema{}},
+			shouldPass: false,
+			name:       "all fail",
+		},
+		{
+			schemas:    []Schema{},
+			shouldPass: true,
+			name:       "empty",
+		},
+	}
+
+	for _, test := range tests {
+		schema := ConjunctiveSchema(test.schemas)
+		err := schema.ValidateBytes([]byte{})
+		if err != nil && test.shouldPass {
+			t.Errorf("Unexpected error: %v in %s", err, test.name)
+		}
+		if err == nil && !test.shouldPass {
+			t.Errorf("Unexpected non-error: %s", test.name)
 		}
 	}
 }

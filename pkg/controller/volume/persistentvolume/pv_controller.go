@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -110,20 +111,6 @@ const annBindCompleted = "pv.kubernetes.io/bind-completed"
 // pre-bound). Value of this annotation does not matter.
 const annBoundByController = "pv.kubernetes.io/bound-by-controller"
 
-// annClass annotation represents the storage class associated with a resource:
-// - in PersistentVolumeClaim it represents required class to match.
-//   Only PersistentVolumes with the same class (i.e. annotation with the same
-//   value) can be bound to the claim. In case no such volume exists, the
-//   controller will provision a new one using StorageClass instance with
-//   the same name as the annotation value.
-// - in PersistentVolume it represents storage class to which the persistent
-//   volume belongs.
-const annClass = "volume.beta.kubernetes.io/storage-class"
-
-// alphaAnnClass annotation represents the previous alpha storage class
-// annotation.  it's no longer used and held here for posterity.
-const annAlphaClass = "volume.alpha.kubernetes.io/storage-class"
-
 // This annotation is added to a PV that has been dynamically provisioned by
 // Kubernetes. Its value is name of volume plugin that created the volume.
 // It serves both user (to show where a PV comes from) and Kubernetes (to
@@ -199,7 +186,7 @@ type PersistentVolumeController struct {
 func (ctrl *PersistentVolumeController) syncClaim(claim *api.PersistentVolumeClaim) error {
 	glog.V(4).Infof("synchronizing PersistentVolumeClaim[%s]: %s", claimToClaimKey(claim), getClaimStatusForLogging(claim))
 
-	if !hasAnnotation(claim.ObjectMeta, annBindCompleted) {
+	if !api.HasAnnotation(claim.ObjectMeta, annBindCompleted) {
 		return ctrl.syncUnboundClaim(claim)
 	} else {
 		return ctrl.syncBoundClaim(claim)
@@ -224,8 +211,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *api.PersistentVo
 			glog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: no volume found", claimToClaimKey(claim))
 			// No PV could be found
 			// OBSERVATION: pvc is "Pending", will retry
-			// TODO: remove Alpha check in 1.5
-			if getClaimClass(claim) != "" || hasAnnotation(claim.ObjectMeta, annAlphaClass) {
+			if storageutil.GetClaimStorageClass(claim) != "" || api.HasAnnotation(claim.ObjectMeta, storageutil.AlphaStorageClassAnnotation) {
 				if err = ctrl.provisionClaim(claim); err != nil {
 					return err
 				}
@@ -297,7 +283,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *api.PersistentVo
 			} else {
 				// User asked for a PV that is claimed by someone else
 				// OBSERVATION: pvc is "Pending", pv is "Bound"
-				if !hasAnnotation(claim.ObjectMeta, annBoundByController) {
+				if !api.HasAnnotation(claim.ObjectMeta, annBoundByController) {
 					glog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume already bound to different claim by user, will retry later", claimToClaimKey(claim))
 					// User asked for a specific PV, retry later
 					if _, err = ctrl.updateClaimStatus(claim, api.ClaimPending, nil); err != nil {
@@ -318,7 +304,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *api.PersistentVo
 // syncBoundClaim is the main controller method to decide what to do with a
 // bound claim.
 func (ctrl *PersistentVolumeController) syncBoundClaim(claim *api.PersistentVolumeClaim) error {
-	// hasAnnotation(pvc, annBindCompleted)
+	// HasAnnotation(pvc, annBindCompleted)
 	// This PVC has previously been bound
 	// OBSERVATION: pvc is not "Pending"
 	// [Unit test set 3]
@@ -462,7 +448,7 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *api.PersistentVolume)
 			}
 			return nil
 		} else if claim.Spec.VolumeName == "" {
-			if hasAnnotation(volume.ObjectMeta, annBoundByController) {
+			if api.HasAnnotation(volume.ObjectMeta, annBoundByController) {
 				// The binding is not completed; let PVC sync handle it
 				glog.V(4).Infof("synchronizing PersistentVolume[%s]: volume not bound yet, waiting for syncClaim to fix it", volume.Name)
 			} else {
@@ -497,7 +483,7 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *api.PersistentVolume)
 			return nil
 		} else {
 			// Volume is bound to a claim, but the claim is bound elsewhere
-			if hasAnnotation(volume.ObjectMeta, annDynamicallyProvisioned) && volume.Spec.PersistentVolumeReclaimPolicy == api.PersistentVolumeReclaimDelete {
+			if api.HasAnnotation(volume.ObjectMeta, annDynamicallyProvisioned) && volume.Spec.PersistentVolumeReclaimPolicy == api.PersistentVolumeReclaimDelete {
 				// This volume was dynamically provisioned for this claim. The
 				// claim got bound elsewhere, and thus this volume is not
 				// needed. Delete it.
@@ -510,7 +496,7 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *api.PersistentVolume)
 			} else {
 				// Volume is bound to a claim, but the claim is bound elsewhere
 				// and it's not dynamically provisioned.
-				if hasAnnotation(volume.ObjectMeta, annBoundByController) {
+				if api.HasAnnotation(volume.ObjectMeta, annBoundByController) {
 					// This is part of the normal operation of the controller; the
 					// controller tried to use this volume for a claim but the claim
 					// was fulfilled by another volume. We did this; fix it.
@@ -734,8 +720,8 @@ func (ctrl *PersistentVolumeController) bindVolumeToClaim(volume *api.Persistent
 	}
 
 	// Set annBoundByController if it is not set yet
-	if shouldSetBoundByController && !hasAnnotation(volumeClone.ObjectMeta, annBoundByController) {
-		setAnnotation(&volumeClone.ObjectMeta, annBoundByController, "yes")
+	if shouldSetBoundByController && !api.HasAnnotation(volumeClone.ObjectMeta, annBoundByController) {
+		api.SetMetaDataAnnotation(&volumeClone.ObjectMeta, annBoundByController, "yes")
 		dirty = true
 	}
 
@@ -791,14 +777,14 @@ func (ctrl *PersistentVolumeController) bindClaimToVolume(claim *api.PersistentV
 	}
 
 	// Set annBoundByController if it is not set yet
-	if shouldSetBoundByController && !hasAnnotation(claimClone.ObjectMeta, annBoundByController) {
-		setAnnotation(&claimClone.ObjectMeta, annBoundByController, "yes")
+	if shouldSetBoundByController && !api.HasAnnotation(claimClone.ObjectMeta, annBoundByController) {
+		api.SetMetaDataAnnotation(&claimClone.ObjectMeta, annBoundByController, "yes")
 		dirty = true
 	}
 
 	// Set annBindCompleted if it is not set yet
-	if !hasAnnotation(claimClone.ObjectMeta, annBindCompleted) {
-		setAnnotation(&claimClone.ObjectMeta, annBindCompleted, "yes")
+	if !api.HasAnnotation(claimClone.ObjectMeta, annBindCompleted) {
+		api.SetMetaDataAnnotation(&claimClone.ObjectMeta, annBindCompleted, "yes")
 		dirty = true
 	}
 
@@ -884,7 +870,7 @@ func (ctrl *PersistentVolumeController) unbindVolume(volume *api.PersistentVolum
 		return fmt.Errorf("Unexpected volume cast error : %v", volumeClone)
 	}
 
-	if hasAnnotation(volume.ObjectMeta, annBoundByController) {
+	if api.HasAnnotation(volume.ObjectMeta, annBoundByController) {
 		// The volume was bound by the controller.
 		volumeClone.Spec.ClaimRef = nil
 		delete(volumeClone.Annotations, annBoundByController)
@@ -1208,7 +1194,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 		return
 	}
 
-	claimClass := getClaimClass(claim)
+	claimClass := storageutil.GetClaimStorageClass(claim)
 	glog.V(4).Infof("provisionClaimOperation [%s] started, class: %q", claimToClaimKey(claim), claimClass)
 
 	//  A previous doProvisionClaim may just have finished while we were waiting for
@@ -1260,15 +1246,12 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 	tags[cloudVolumeCreatedForVolumeNameTag] = pvName
 
 	options := vol.VolumeOptions{
-		Capacity:                      claim.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)],
-		AccessModes:                   claim.Spec.AccessModes,
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
 		CloudTags:                     &tags,
 		ClusterName:                   ctrl.clusterName,
 		PVName:                        pvName,
-		PVCName:                       claim.Name,
+		PVC:                           claim,
 		Parameters:                    storageClass.Parameters,
-		Selector:                      claim.Spec.Selector,
 	}
 
 	// Provision the volume
@@ -1297,13 +1280,13 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 	volume.Status.Phase = api.VolumeBound
 
 	// Add annBoundByController (used in deleting the volume)
-	setAnnotation(&volume.ObjectMeta, annBoundByController, "yes")
-	setAnnotation(&volume.ObjectMeta, annDynamicallyProvisioned, plugin.GetPluginName())
-	// For Alpha provisioning behavior, do not add annClass for volumes created
-	// by annAlphaClass
-	// TODO: remove this check in 1.5, annClass will be always non-empty there.
+	api.SetMetaDataAnnotation(&volume.ObjectMeta, annBoundByController, "yes")
+	api.SetMetaDataAnnotation(&volume.ObjectMeta, annDynamicallyProvisioned, plugin.GetPluginName())
+	// For Alpha provisioning behavior, do not add storage.BetaStorageClassAnnotations for volumes created
+	// by storage.AlphaStorageClassAnnotation
+	// TODO: remove this check in 1.5, storage.StorageClassAnnotation will be always non-empty there.
 	if claimClass != "" {
-		setAnnotation(&volume.ObjectMeta, annClass, claimClass)
+		api.SetMetaDataAnnotation(&volume.ObjectMeta, storageutil.StorageClassAnnotation, claimClass)
 	}
 
 	// Try to create the PV object several times
@@ -1405,12 +1388,12 @@ func (ctrl *PersistentVolumeController) newRecyclerEventRecorder(volume *api.Per
 // provisioner is requested.
 func (ctrl *PersistentVolumeController) findProvisionablePlugin(claim *api.PersistentVolumeClaim) (vol.ProvisionableVolumePlugin, *storage.StorageClass, error) {
 	// TODO: remove this alpha behavior in 1.5
-	alpha := hasAnnotation(claim.ObjectMeta, annAlphaClass)
-	beta := hasAnnotation(claim.ObjectMeta, annClass)
+	alpha := api.HasAnnotation(claim.ObjectMeta, storageutil.AlphaStorageClassAnnotation)
+	beta := api.HasAnnotation(claim.ObjectMeta, storageutil.BetaStorageClassAnnotation)
 	if alpha && beta {
 		// Both Alpha and Beta annotations are set. Do beta.
 		alpha = false
-		msg := fmt.Sprintf("both %q and %q annotations are present, using %q", annAlphaClass, annClass, annClass)
+		msg := fmt.Sprintf("both %q and %q annotations are present, using %q", storageutil.AlphaStorageClassAnnotation, storageutil.BetaStorageClassAnnotation, storageutil.BetaStorageClassAnnotation)
 		ctrl.eventRecorder.Event(claim, api.EventTypeNormal, "ProvisioningIgnoreAlpha", msg)
 	}
 	if alpha {
@@ -1420,7 +1403,7 @@ func (ctrl *PersistentVolumeController) findProvisionablePlugin(claim *api.Persi
 
 	// provisionClaim() which leads here is never called with claimClass=="", we
 	// can save some checks.
-	claimClass := getClaimClass(claim)
+	claimClass := storageutil.GetClaimStorageClass(claim)
 	classObj, found, err := ctrl.classes.GetByKey(claimClass)
 	if err != nil {
 		return nil, nil, err
@@ -1472,7 +1455,7 @@ func (ctrl *PersistentVolumeController) findAlphaProvisionablePlugin() (vol.Prov
 func (ctrl *PersistentVolumeController) findDeletablePlugin(volume *api.PersistentVolume) (vol.DeletableVolumePlugin, error) {
 	// Find a plugin. Try to find the same plugin that provisioned the volume
 	var plugin vol.DeletableVolumePlugin
-	if hasAnnotation(volume.ObjectMeta, annDynamicallyProvisioned) {
+	if api.HasAnnotation(volume.ObjectMeta, annDynamicallyProvisioned) {
 		provisionPluginName := volume.Annotations[annDynamicallyProvisioned]
 		if provisionPluginName != "" {
 			plugin, err := ctrl.volumePluginMgr.FindDeletablePluginByName(provisionPluginName)

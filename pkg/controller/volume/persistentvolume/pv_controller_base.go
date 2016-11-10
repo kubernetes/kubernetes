@@ -496,27 +496,15 @@ func (ctrl *PersistentVolumeController) upgradeVolumeFrom1_2(volume *api.Persist
 
 // Stateless functions
 
-func hasAnnotation(obj api.ObjectMeta, ann string) bool {
-	_, found := obj.Annotations[ann]
-	return found
-}
-
-func setAnnotation(obj *api.ObjectMeta, ann string, value string) {
-	if obj.Annotations == nil {
-		obj.Annotations = make(map[string]string)
-	}
-	obj.Annotations[ann] = value
-}
-
 func getClaimStatusForLogging(claim *api.PersistentVolumeClaim) string {
-	bound := hasAnnotation(claim.ObjectMeta, annBindCompleted)
-	boundByController := hasAnnotation(claim.ObjectMeta, annBoundByController)
+	bound := api.HasAnnotation(claim.ObjectMeta, annBindCompleted)
+	boundByController := api.HasAnnotation(claim.ObjectMeta, annBoundByController)
 
 	return fmt.Sprintf("phase: %s, bound to: %q, bindCompleted: %v, boundByController: %v", claim.Status.Phase, claim.Spec.VolumeName, bound, boundByController)
 }
 
 func getVolumeStatusForLogging(volume *api.PersistentVolume) string {
-	boundByController := hasAnnotation(volume.ObjectMeta, annBoundByController)
+	boundByController := api.HasAnnotation(volume.ObjectMeta, annBoundByController)
 	claimName := ""
 	if volume.Spec.ClaimRef != nil {
 		claimName = fmt.Sprintf("%s/%s (uid: %s)", volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name, volume.Spec.ClaimRef.UID)
@@ -591,30 +579,4 @@ func storeObjectUpdate(store cache.Store, obj interface{}, className string) (bo
 		return false, fmt.Errorf("Error updating %s %q in controller cache: %v", className, objName, err)
 	}
 	return true, nil
-}
-
-// getVolumeClass returns value of annClass annotation or empty string in case
-// the annotation does not exist.
-// TODO: change to PersistentVolume.Spec.Class value when this attribute is
-// introduced.
-func getVolumeClass(volume *api.PersistentVolume) string {
-	if class, found := volume.Annotations[annClass]; found {
-		return class
-	}
-
-	// 'nil' is interpreted as "", i.e. the volume does not belong to any class.
-	return ""
-}
-
-// getClaimClass returns name of class that is requested by given claim.
-// Request for `nil` class is interpreted as request for class "",
-// i.e. for a classless PV.
-func getClaimClass(claim *api.PersistentVolumeClaim) string {
-	// TODO: change to PersistentVolumeClaim.Spec.Class value when this
-	// attribute is introduced.
-	if class, found := claim.Annotations[annClass]; found {
-		return class
-	}
-
-	return ""
 }

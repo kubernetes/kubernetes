@@ -25,6 +25,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
@@ -65,6 +66,7 @@ type LogSizeGatherer struct {
 // It oversees a <workersNo> workers which do the gathering.
 type LogsSizeVerifier struct {
 	client      *client.Client
+	clientset   clientset.Interface
 	stopChannel chan bool
 	// data stores LogSizeData groupped per IP and log_path
 	data          *LogsSizeData
@@ -142,8 +144,8 @@ func (d *LogsSizeData) AddNewData(ip, path string, timestamp time.Time, size int
 }
 
 // NewLogsVerifier creates a new LogsSizeVerifier which will stop when stopChannel is closed
-func NewLogsVerifier(c *client.Client, stopChannel chan bool) *LogsSizeVerifier {
-	nodeAddresses, err := NodeSSHHosts(c)
+func NewLogsVerifier(c *client.Client, cs clientset.Interface, stopChannel chan bool) *LogsSizeVerifier {
+	nodeAddresses, err := NodeSSHHosts(cs)
 	ExpectNoError(err)
 	masterAddress := GetMasterHost() + ":22"
 
@@ -152,6 +154,7 @@ func NewLogsVerifier(c *client.Client, stopChannel chan bool) *LogsSizeVerifier 
 
 	verifier := &LogsSizeVerifier{
 		client:        c,
+		clientset:     cs,
 		stopChannel:   stopChannel,
 		data:          prepareData(masterAddress, nodeAddresses),
 		masterAddress: masterAddress,

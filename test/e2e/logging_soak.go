@@ -85,7 +85,7 @@ var _ = framework.KubeDescribe("Logging soak [Performance] [Slow] [Disruptive]",
 // was produced in each and every pod at least once.  The final arg is the timeout for the test to verify all the pods got logs.
 func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname string, timeout time.Duration) {
 
-	nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
+	nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 	totalPods := len(nodes.Items)
 	Expect(totalPods).NotTo(Equal(0))
 

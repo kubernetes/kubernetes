@@ -32,11 +32,11 @@ type EndpointsGetter interface {
 type EndpointsInterface interface {
 	Create(*v1.Endpoints) (*v1.Endpoints, error)
 	Update(*v1.Endpoints) (*v1.Endpoints, error)
-	Delete(name string, options *api.DeleteOptions) error
-	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
+	Delete(name string, options *v1.DeleteOptions) error
+	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string) (*v1.Endpoints, error)
-	List(opts api.ListOptions) (*v1.EndpointsList, error)
-	Watch(opts api.ListOptions) (watch.Interface, error)
+	List(opts v1.ListOptions) (*v1.EndpointsList, error)
+	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *v1.Endpoints, err error)
 	EndpointsExpansion
 }
@@ -81,7 +81,7 @@ func (c *endpoints) Update(endpoints *v1.Endpoints) (result *v1.Endpoints, err e
 }
 
 // Delete takes name of the endpoints and deletes it. Returns an error if one occurs.
-func (c *endpoints) Delete(name string, options *api.DeleteOptions) error {
+func (c *endpoints) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("endpoints").
@@ -92,7 +92,7 @@ func (c *endpoints) Delete(name string, options *api.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *endpoints) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *endpoints) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("endpoints").
@@ -115,7 +115,7 @@ func (c *endpoints) Get(name string) (result *v1.Endpoints, err error) {
 }
 
 // List takes label and field selectors, and returns the list of Endpoints that match those selectors.
-func (c *endpoints) List(opts api.ListOptions) (result *v1.EndpointsList, err error) {
+func (c *endpoints) List(opts v1.ListOptions) (result *v1.EndpointsList, err error) {
 	result = &v1.EndpointsList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -127,7 +127,7 @@ func (c *endpoints) List(opts api.ListOptions) (result *v1.EndpointsList, err er
 }
 
 // Watch returns a watch.Interface that watches the requested endpoints.
-func (c *endpoints) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *endpoints) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.client.Get().
 		Prefix("watch").
 		Namespace(c.ns).

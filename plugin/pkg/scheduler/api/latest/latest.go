@@ -43,7 +43,7 @@ var Codec runtime.Codec
 
 func init() {
 	jsonSerializer := json.NewSerializer(json.DefaultMetaFactory, api.Scheme, api.Scheme, true)
-	Codec = versioning.NewCodecForScheme(
+	Codec = versioning.NewDefaultingCodecForScheme(
 		api.Scheme,
 		jsonSerializer,
 		jsonSerializer,

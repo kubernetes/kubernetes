@@ -97,7 +97,7 @@ type OperationExecutor interface {
 	// If the volume is found, the actual state of the world is updated to mark
 	// the volume as attached.
 	// If the volume does not implement the attacher interface, it is assumed to
-	// be attached and the the actual state of the world is updated accordingly.
+	// be attached and the actual state of the world is updated accordingly.
 	// If the volume is not found or there is an error (fetching the node
 	// object, for example) then an error is returned which triggers exponential
 	// back off on retries.
@@ -1006,7 +1006,7 @@ func (oe *operationExecutor) generateVerifyControllerAttachedVolumeFunc(
 	return func() error {
 		if !volumeToMount.PluginIsAttachable {
 			// If the volume does not implement the attacher interface, it is
-			// assumed to be attached and the the actual state of the world is
+			// assumed to be attached and the actual state of the world is
 			// updated accordingly.
 
 			addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(

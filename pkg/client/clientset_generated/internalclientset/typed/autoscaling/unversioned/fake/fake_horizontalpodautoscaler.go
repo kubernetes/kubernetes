@@ -95,7 +95,7 @@ func (c *FakeHorizontalPodAutoscalers) List(opts api.ListOptions) (result *autos
 		return nil, err
 	}
 
-	label := opts.LabelSelector
+	label, _, _ := core.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}

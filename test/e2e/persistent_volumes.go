@@ -25,8 +25,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -277,7 +277,7 @@ func testPodSuccessOrFail(f *framework.Framework, c *client.Client, ns string, p
 
 	By("Pod should terminate with exitcode 0 (success)")
 
-	err := framework.WaitForPodSuccessInNamespace(c, pod.Name, pod.Spec.Containers[0].Name, ns)
+	err := framework.WaitForPodSuccessInNamespace(c, pod.Name, ns)
 	if err != nil {
 		return fmt.Errorf("Pod %v returned non-zero exitcode: %+v", pod.Name, err)
 	}
@@ -625,7 +625,7 @@ func makeWritePod(ns string, pvcName string) *api.Pod {
 	return &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: testapi.Default.GroupVersion().String(),
+			APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 		},
 		ObjectMeta: api.ObjectMeta{
 			GenerateName: "write-pod-",
@@ -649,6 +649,7 @@ func makeWritePod(ns string, pvcName string) *api.Pod {
 					},
 				},
 			},
+			RestartPolicy: api.RestartPolicyOnFailure,
 			Volumes: []api.Volume{
 				{
 					Name: "nfs-pvc",

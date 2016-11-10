@@ -108,7 +108,7 @@ func (l *linuxStandardInit) Init() error {
 		}
 	}
 	for _, path := range l.config.Config.MaskPaths {
-		if err := maskFile(path); err != nil {
+		if err := maskPath(path); err != nil {
 			return err
 		}
 	}

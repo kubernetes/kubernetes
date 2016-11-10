@@ -79,3 +79,21 @@ func (s *storage) DeleteClusterRoleBinding(ctx api.Context, name string) error {
 	_, err := s.Delete(ctx, name, nil)
 	return err
 }
+
+// AuthorizerAdapter adapts the registry to the authorizer interface
+type AuthorizerAdapter struct {
+	Registry Registry
+}
+
+func (a AuthorizerAdapter) ListClusterRoleBindings() ([]*rbac.ClusterRoleBinding, error) {
+	list, err := a.Registry.ListClusterRoleBindings(api.NewContext(), &api.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	ret := []*rbac.ClusterRoleBinding{}
+	for i := range list.Items {
+		ret = append(ret, &list.Items[i])
+	}
+	return ret, nil
+}

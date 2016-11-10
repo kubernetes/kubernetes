@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	uclient "k8s.io/kubernetes/pkg/client/unversioned"
@@ -40,7 +41,7 @@ func TestDynamicClient(t *testing.T) {
 	ns := framework.CreateTestingNamespace("dynamic-client", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	gv := testapi.Default.GroupVersion()
+	gv := &registered.GroupOrDie(api.GroupName).GroupVersion
 	config := &restclient.Config{
 		Host:          s.URL,
 		ContentConfig: restclient.ContentConfig{GroupVersion: gv},

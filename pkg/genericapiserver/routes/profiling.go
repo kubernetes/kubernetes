@@ -17,18 +17,17 @@ limitations under the License.
 package routes
 
 import (
-	"github.com/emicklei/go-restful"
-
-	"k8s.io/kubernetes/pkg/apiserver"
 	"net/http/pprof"
+
+	"k8s.io/kubernetes/pkg/genericapiserver/mux"
 )
 
 // Profiling adds handlers for pprof under /debug/pprof.
 type Profiling struct{}
 
 // Install adds the Profiling webservice to the given mux.
-func (d Profiling) Install(mux *apiserver.PathRecorderMux, c *restful.Container) {
-	mux.BaseMux().HandleFunc("/debug/pprof/", pprof.Index)
-	mux.BaseMux().HandleFunc("/debug/pprof/profile", pprof.Profile)
-	mux.BaseMux().HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+func (d Profiling) Install(c *mux.APIContainer) {
+	c.SecretRoutes.HandleFunc("/debug/pprof/", pprof.Index)
+	c.SecretRoutes.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	c.SecretRoutes.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 }

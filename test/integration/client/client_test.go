@@ -29,9 +29,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
@@ -47,7 +47,7 @@ func TestClient(t *testing.T) {
 	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
-	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
 
 	ns := framework.CreateTestingNamespace("client", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -119,7 +119,7 @@ func TestAtomicPut(t *testing.T) {
 	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
-	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
 
 	ns := framework.CreateTestingNamespace("atomic-put", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -211,7 +211,7 @@ func TestPatch(t *testing.T) {
 	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
-	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
 
 	ns := framework.CreateTestingNamespace("patch", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -320,7 +320,7 @@ func TestPatchWithCreateOnUpdate(t *testing.T) {
 	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
-	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
 
 	ns := framework.CreateTestingNamespace("patch-with-create", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -431,7 +431,7 @@ func TestAPIVersions(t *testing.T) {
 	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
-	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
 
 	clientVersion := c.APIVersion().String()
 	g, err := c.ServerGroups()
@@ -456,7 +456,7 @@ func TestSingleWatch(t *testing.T) {
 	ns := framework.CreateTestingNamespace("single-watch", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
 
 	mkEvent := func(i int) *api.Event {
 		name := fmt.Sprintf("event-%v", i)
@@ -541,7 +541,7 @@ func TestMultiWatch(t *testing.T) {
 	ns := framework.CreateTestingNamespace("multi-watch", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
 
 	dummyEvent := func(i int) *api.Event {
 		name := fmt.Sprintf("unrelated-%v", i)
@@ -797,7 +797,7 @@ func TestSelfLinkOnNamespace(t *testing.T) {
 	ns := framework.CreateTestingNamespace("selflink", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	c := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
 
 	runSelfLinkTestOnNamespace(t, c, ns.Name)
 }

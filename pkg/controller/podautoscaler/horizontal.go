@@ -48,7 +48,14 @@ const (
 
 	HpaCustomMetricsTargetAnnotationName = "alpha/target.custom-metrics.podautoscaler.kubernetes.io"
 	HpaCustomMetricsStatusAnnotationName = "alpha/status.custom-metrics.podautoscaler.kubernetes.io"
+
+	scaleUpLimitFactor  = 2
+	scaleUpLimitMinimum = 4
 )
+
+func calculateScaleUpLimit(currentReplicas int32) int32 {
+	return int32(math.Max(scaleUpLimitFactor*float64(currentReplicas), scaleUpLimitMinimum))
+}
 
 type HorizontalController struct {
 	scaleNamespacer unversionedextensions.ScalesGetter
@@ -148,7 +155,7 @@ func (a *HorizontalController) computeReplicasForCPUUtilization(hpa *autoscaling
 		a.eventRecorder.Event(hpa, api.EventTypeWarning, "InvalidSelector", errMsg)
 		return 0, nil, time.Time{}, fmt.Errorf(errMsg)
 	}
-	currentUtilization, timestamp, err := a.metricsClient.GetCPUUtilization(hpa.Namespace, selector)
+	currentUtilization, numRunningPods, timestamp, err := a.metricsClient.GetCPUUtilization(hpa.Namespace, selector)
 
 	// TODO: what to do on partial errors (like metrics obtained for 75% of pods).
 	if err != nil {
@@ -159,11 +166,17 @@ func (a *HorizontalController) computeReplicasForCPUUtilization(hpa *autoscaling
 	utilization := int32(*currentUtilization)
 
 	usageRatio := float64(utilization) / float64(targetUtilization)
-	if math.Abs(1.0-usageRatio) > tolerance {
-		return int32(math.Ceil(usageRatio * float64(currentReplicas))), &utilization, timestamp, nil
+	if math.Abs(1.0-usageRatio) <= tolerance {
+		return currentReplicas, &utilization, timestamp, nil
 	}
 
-	return currentReplicas, &utilization, timestamp, nil
+	desiredReplicas := math.Ceil(usageRatio * float64(numRunningPods))
+
+	a.eventRecorder.Eventf(hpa, api.EventTypeNormal, "DesiredReplicasComputed",
+		"Computed the desired num of replicas: %d, on a base of %d report(s) (avgCPUutil: %d, current replicas: %d)",
+		int32(desiredReplicas), numRunningPods, utilization, scale.Status.Replicas)
+
+	return int32(desiredReplicas), &utilization, timestamp, nil
 }
 
 // Computes the desired number of replicas based on the CustomMetrics passed in cmAnnotation as json-serialized
@@ -328,6 +341,12 @@ func (a *HorizontalController) reconcileAutoscaler(hpa *autoscaling.HorizontalPo
 
 		if desiredReplicas > hpa.Spec.MaxReplicas {
 			desiredReplicas = hpa.Spec.MaxReplicas
+		}
+
+		// Do not upscale too much to prevent incorrect rapid increase of the number of master replicas caused by
+		// bogus CPU usage report from heapster/kubelet (like in issue #32304).
+		if desiredReplicas > calculateScaleUpLimit(currentReplicas) {
+			desiredReplicas = calculateScaleUpLimit(currentReplicas)
 		}
 	}
 

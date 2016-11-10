@@ -48,7 +48,7 @@ type hostPathPlugin struct {
 	// decouple creating Recyclers/Deleters/Provisioners by deferring to a function.  Allows for easier testing.
 	newRecyclerFunc    func(pvName string, spec *volume.Spec, eventRecorder volume.RecycleEventRecorder, host volume.VolumeHost, volumeConfig volume.VolumeConfig) (volume.Recycler, error)
 	newDeleterFunc     func(spec *volume.Spec, host volume.VolumeHost) (volume.Deleter, error)
-	newProvisionerFunc func(options volume.VolumeOptions, host volume.VolumeHost) (volume.Provisioner, error)
+	newProvisionerFunc func(options volume.VolumeOptions, host volume.VolumeHost, plugin *hostPathPlugin) (volume.Provisioner, error)
 	config             volume.VolumeConfig
 }
 
@@ -124,10 +124,7 @@ func (plugin *hostPathPlugin) NewProvisioner(options volume.VolumeOptions) (volu
 	if !plugin.config.ProvisioningEnabled {
 		return nil, fmt.Errorf("Provisioning in volume plugin %q is disabled", plugin.GetPluginName())
 	}
-	if len(options.AccessModes) == 0 {
-		options.AccessModes = plugin.GetAccessModes()
-	}
-	return plugin.newProvisionerFunc(options, plugin.host)
+	return plugin.newProvisionerFunc(options, plugin.host, plugin)
 }
 
 func (plugin *hostPathPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
@@ -166,8 +163,8 @@ func newDeleter(spec *volume.Spec, host volume.VolumeHost) (volume.Deleter, erro
 	return &hostPathDeleter{name: spec.Name(), path: path, host: host}, nil
 }
 
-func newProvisioner(options volume.VolumeOptions, host volume.VolumeHost) (volume.Provisioner, error) {
-	return &hostPathProvisioner{options: options, host: host}, nil
+func newProvisioner(options volume.VolumeOptions, host volume.VolumeHost, plugin *hostPathPlugin) (volume.Provisioner, error) {
+	return &hostPathProvisioner{options: options, host: host, plugin: plugin}, nil
 }
 
 // HostPath volumes represent a bare host file or directory mount.
@@ -263,6 +260,7 @@ func (r *hostPathRecycler) Recycle() error {
 type hostPathProvisioner struct {
 	host    volume.VolumeHost
 	options volume.VolumeOptions
+	plugin  *hostPathPlugin
 }
 
 // Create for hostPath simply creates a local /tmp/hostpath_pv/%s directory as a new PersistentVolume.
@@ -270,6 +268,7 @@ type hostPathProvisioner struct {
 func (r *hostPathProvisioner) Provision() (*api.PersistentVolume, error) {
 	fullpath := fmt.Sprintf("/tmp/hostpath_pv/%s", uuid.NewUUID())
 
+	capacity := r.options.PVC.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
 	pv := &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{
 			Name: r.options.PVName,
@@ -279,9 +278,9 @@ func (r *hostPathProvisioner) Provision() (*api.PersistentVolume, error) {
 		},
 		Spec: api.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: r.options.PersistentVolumeReclaimPolicy,
-			AccessModes:                   r.options.AccessModes,
+			AccessModes:                   r.options.PVC.Spec.AccessModes,
 			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): r.options.Capacity,
+				api.ResourceName(api.ResourceStorage): capacity,
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				HostPath: &api.HostPathVolumeSource{
@@ -289,6 +288,9 @@ func (r *hostPathProvisioner) Provision() (*api.PersistentVolume, error) {
 				},
 			},
 		},
+	}
+	if len(r.options.PVC.Spec.AccessModes) == 0 {
+		pv.Spec.AccessModes = r.plugin.GetAccessModes()
 	}
 
 	return pv, os.MkdirAll(pv.Spec.HostPath.Path, 0750)

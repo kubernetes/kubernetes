@@ -76,7 +76,6 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 				},
 			},
 		}
-		defer podClient.Delete(pod.Name, nil)
 		startedPod := podClient.Create(pod)
 		w, err := podClient.Watch(api.SingleObject(startedPod.ObjectMeta))
 		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
@@ -140,7 +139,6 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 				},
 			},
 		}
-		defer podClient.Delete(pod.Name, nil)
 		startedPod := podClient.Create(pod)
 		w, err := podClient.Watch(api.SingleObject(startedPod.ObjectMeta))
 		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
@@ -204,7 +202,6 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 				},
 			},
 		}
-		defer podClient.Delete(pod.Name, nil)
 		startedPod := podClient.Create(pod)
 		w, err := podClient.Watch(api.SingleObject(startedPod.ObjectMeta))
 		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
@@ -316,8 +313,8 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 				},
 			},
 		}
-		defer podClient.Delete(pod.Name, nil)
 		startedPod := podClient.Create(pod)
+
 		w, err := podClient.Watch(api.SingleObject(startedPod.ObjectMeta))
 		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
 

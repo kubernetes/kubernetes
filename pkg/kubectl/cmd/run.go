@@ -22,30 +22,35 @@ import (
 	"os"
 	"time"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/distribution/reference"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
+	conditions "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	uexec "k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util/interrupt"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 var (
-	run_long = dedent.Dedent(`
+	run_long = templates.LongDesc(`
 		Create and run a particular image, possibly replicated.
+
 		Creates a deployment or job to manage the created container(s).`)
-	run_example = dedent.Dedent(`
+
+	run_example = templates.Examples(`
 		# Start a single instance of nginx.
 		kubectl run nginx --image=nginx
 
@@ -80,7 +85,7 @@ var (
 		kubectl run pi --schedule="0/5 * * * ?" --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'`)
 )
 
-func NewCmdRun(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
+func NewCmdRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "run NAME --image=image [--env=\"key=value\"] [--port=port] [--replicas=replicas] [--dry-run=bool] [--overrides=inline-json] [--command] -- [COMMAND] [args...]",
 		// run-container is deprecated
@@ -104,7 +109,7 @@ func NewCmdRun(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *c
 
 func addRunFlags(cmd *cobra.Command) {
 	cmdutil.AddDryRunFlag(cmd)
-	cmd.Flags().String("generator", "", "The name of the API generator to use.  Default is 'deployment/v1beta1' if --restart=Always, 'job/v1' for OnFailure and 'run-pod/v1' for Never.  This will happen only for cluster version at least 1.3, for 1.2 we will fallback to 'deployment/v1beta1' for --restart=Always, 'job/v1' for others, for olders we will fallback to 'run/v1' for --restart=Always, 'run-pod/v1' for others.")
+	cmd.Flags().String("generator", "", "The name of the API generator to use, see http://kubernetes.io/docs/user-guide/kubectl-conventions/#generators for a list.")
 	cmd.Flags().String("image", "", "The image for the container to run.")
 	cmd.MarkFlagRequired("image")
 	cmd.Flags().String("image-pull-policy", "", "The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server")
@@ -119,7 +124,7 @@ func addRunFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolP("tty", "t", false, "Allocated a TTY for each container in the pod.")
 	cmd.Flags().Bool("attach", false, "If true, wait for the Pod to start running, and then attach to the Pod as if 'kubectl attach ...' were called.  Default false, unless '-i/--stdin' is set, in which case the default is true. With '--restart=Never' the exit code of the container process is returned.")
 	cmd.Flags().Bool("leave-stdin-open", false, "If the pod is started in interactive mode or with stdin, leave stdin open after the first attach completes. By default, stdin will be closed after the first attach completes.")
-	cmd.Flags().String("restart", "Always", "The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a deployment is created for this pod, if set to 'OnFailure', a job is created for this pod, if set to 'Never', a regular pod is created. For the latter two --replicas must be 1.  Default 'Always'")
+	cmd.Flags().String("restart", "Always", "The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a deployment is created, if set to 'OnFailure' a job is created, if set to 'Never', a regular pod is created. For the latter two --replicas must be 1.  Default 'Always', for ScheduledJobs `Never`.")
 	cmd.Flags().Bool("command", false, "If true and extra arguments are present, use them as the 'command' field in the container, rather than the 'args' field which is the default.")
 	cmd.Flags().String("requests", "", "The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges.")
 	cmd.Flags().String("limits", "", "The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges.")
@@ -130,7 +135,7 @@ func addRunFlags(cmd *cobra.Command) {
 	cmd.Flags().String("schedule", "", "A schedule in the Cron format the job should be run with.")
 }
 
-func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobra.Command, args []string, argsLenAtDash int) error {
+func Run(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobra.Command, args []string, argsLenAtDash int) error {
 	if len(os.Args) > 1 && os.Args[1] == "run-container" {
 		printDeprecationWarning("run", "run-container")
 	}
@@ -372,90 +377,90 @@ func contains(resourcesList map[string]*unversioned.APIResourceList, resource un
 
 // waitForPod watches the given pod until the exitCondition is true. Each two seconds
 // the tick function is called e.g. for progress output.
-func waitForPod(podClient coreclient.PodsGetter, ns, name string, exitCondition func(*api.Pod) bool, tick func(*api.Pod)) (*api.Pod, error) {
-	pod, err := podClient.Pods(ns).Get(name)
-	if err != nil {
-		return nil, err
-	}
-	if exitCondition(pod) {
-		return pod, nil
-	}
-
-	tick(pod)
-
-	w, err := podClient.Pods(ns).Watch(api.SingleObject(api.ObjectMeta{Name: pod.Name, ResourceVersion: pod.ResourceVersion}))
+func waitForPod(podClient coreclient.PodsGetter, ns, name string, exitCondition watch.ConditionFunc, tick func(*api.Pod)) (*api.Pod, error) {
+	w, err := podClient.Pods(ns).Watch(api.SingleObject(api.ObjectMeta{Name: name}))
 	if err != nil {
 		return nil, err
 	}
 
-	t := time.NewTicker(2 * time.Second)
-	defer t.Stop()
+	pods := make(chan *api.Pod) // observed pods passed to the exitCondition
+	defer close(pods)
+
+	// wait for the first event, then start the 2 sec ticker and loop
 	go func() {
-		for range t.C {
-			tick(pod)
+		pod := <-pods
+		if pod == nil {
+			return
+		}
+		tick(pod)
+
+		t := time.NewTicker(2 * time.Second)
+		defer t.Stop()
+
+		for {
+			select {
+			case pod = <-pods:
+				if pod == nil {
+					return
+				}
+			case _, ok := <-t.C:
+				if !ok {
+					return
+				}
+				tick(pod)
+			}
 		}
 	}()
 
-	err = nil
-	result := pod
-	kubectl.WatchLoop(w, func(ev watch.Event) error {
-		switch ev.Type {
-		case watch.Added, watch.Modified:
-			pod = ev.Object.(*api.Pod)
-			if exitCondition(pod) {
-				result = pod
-				w.Stop()
+	intr := interrupt.New(nil, w.Stop)
+	var result *api.Pod
+	err = intr.Run(func() error {
+		ev, err := watch.Until(0, w, func(ev watch.Event) (bool, error) {
+			c, err := exitCondition(ev)
+			if c == false && err == nil {
+				pods <- ev.Object.(*api.Pod) // send to ticker
 			}
-		case watch.Deleted:
-			w.Stop()
-		case watch.Error:
-			result = nil
-			err = fmt.Errorf("failed to watch pod %s/%s", ns, name)
-			w.Stop()
-		}
-		return nil
+			return c, err
+		})
+		result = ev.Object.(*api.Pod)
+		return err
 	})
-
 	return result, err
 }
 
 func waitForPodRunning(podClient coreclient.PodsGetter, ns, name string, out io.Writer, quiet bool) (*api.Pod, error) {
-	exitCondition := func(pod *api.Pod) bool {
-		switch pod.Status.Phase {
-		case api.PodRunning:
-			for _, status := range pod.Status.ContainerStatuses {
-				if !status.Ready {
-					return false
-				}
-			}
-			return true
-		case api.PodSucceeded, api.PodFailed:
-			return true
-		default:
-			return false
-		}
-	}
-	return waitForPod(podClient, ns, name, exitCondition, func(pod *api.Pod) {
+	pod, err := waitForPod(podClient, ns, name, conditions.PodRunningAndReady, func(pod *api.Pod) {
 		if !quiet {
 			fmt.Fprintf(out, "Waiting for pod %s/%s to be running, status is %s, pod ready: false\n", pod.Namespace, pod.Name, pod.Status.Phase)
 		}
 	})
+
+	// fix generic not found error with empty name in PodRunningAndReady
+	if err != nil && errors.IsNotFound(err) {
+		return nil, errors.NewNotFound(api.Resource("pods"), name)
+	}
+
+	return pod, err
 }
 
 func waitForPodTerminated(podClient coreclient.PodsGetter, ns, name string, out io.Writer, quiet bool) (*api.Pod, error) {
-	exitCondition := func(pod *api.Pod) bool {
-		return pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed
-	}
-	return waitForPod(podClient, ns, name, exitCondition, func(pod *api.Pod) {
+	pod, err := waitForPod(podClient, ns, name, conditions.PodCompleted, func(pod *api.Pod) {
 		if !quiet {
 			fmt.Fprintf(out, "Waiting for pod %s/%s to terminate, status is %s\n", pod.Namespace, pod.Name, pod.Status.Phase)
 		}
 	})
+
+	// fix generic not found error with empty name in PodCompleted
+	if err != nil && errors.IsNotFound(err) {
+		return nil, errors.NewNotFound(api.Resource("pods"), name)
+	}
+
+	return pod, err
 }
 
-func handleAttachPod(f *cmdutil.Factory, podClient coreclient.PodsGetter, ns, name string, opts *AttachOptions, quiet bool) error {
+func handleAttachPod(f cmdutil.Factory, podClient coreclient.PodsGetter, ns, name string, opts *AttachOptions, quiet bool) error {
 	pod, err := waitForPodRunning(podClient, ns, name, opts.Out, quiet)
-	if err != nil {
+	if err != nil && err != conditions.ErrPodCompleted {
 		return err
 	}
 	ctrName, err := opts.GetContainerName(pod)
@@ -532,7 +537,7 @@ func verifyImagePullPolicy(cmd *cobra.Command) error {
 	}
 }
 
-func generateService(f *cmdutil.Factory, cmd *cobra.Command, args []string, serviceGenerator string, paramsIn map[string]interface{}, namespace string, out io.Writer) error {
+func generateService(f cmdutil.Factory, cmd *cobra.Command, args []string, serviceGenerator string, paramsIn map[string]interface{}, namespace string, out io.Writer) error {
 	generators := f.Generators("expose")
 	generator, found := generators[serviceGenerator]
 	if !found {
@@ -580,7 +585,7 @@ func generateService(f *cmdutil.Factory, cmd *cobra.Command, args []string, serv
 	return nil
 }
 
-func createGeneratedObject(f *cmdutil.Factory, cmd *cobra.Command, generator kubectl.Generator, names []kubectl.GeneratorParam, params map[string]interface{}, overrides, namespace string) (runtime.Object, string, meta.RESTMapper, *meta.RESTMapping, error) {
+func createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator kubectl.Generator, names []kubectl.GeneratorParam, params map[string]interface{}, overrides, namespace string) (runtime.Object, string, meta.RESTMapper, *meta.RESTMapping, error) {
 	err := kubectl.ValidateParams(names, params)
 	if err != nil {
 		return nil, "", nil, nil, err

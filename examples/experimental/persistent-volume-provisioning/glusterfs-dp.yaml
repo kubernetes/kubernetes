@@ -4,7 +4,6 @@ metadata:
   name: slow
 provisioner: kubernetes.io/glusterfs
 parameters:
-  endpoint: "glusterfs-cluster"
   resturl: "http://127.0.0.1:8081"
   restuser: "admin"
   secretNamespace: "default"

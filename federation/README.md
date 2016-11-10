@@ -35,7 +35,7 @@ make push
 
 To initialize the deployment run:
 
-(This pull the installer images)
+(This pulls the installer images)
 
 ```shell
 make init
@@ -57,22 +57,7 @@ make destroy
 
 # Ideas for improvement
 
-1. Split the `build` phase (make recipe) into multiple phases:
-    1. `init`: pull installer images
-    2. `build-binaries`
-    3. `build-docker`
-    4. `build`: build-binary + build-docker
-    5. `push`: to push the built images
-    6. `genconfig`
-    7. `deploy-clusters`
-    8. `deploy-federation`
-    9. `deploy`: deploy-clusters + deploy-federation
-    10. `destroy-federation`
-    11. `destroy-clusters`
-    12. `destroy`: destroy-federation + destroy-clusters
-    13. `redeploy-federation`: just redeploys the federation components.
-
-2. Continue with `destroy` phase even in the face of errors.
+1. Continue with `destroy` phase even in the face of errors.
 
    The bash script sets `set -e errexit` which causes the script to exit
    at the very first error. This should be the default mode for deploying

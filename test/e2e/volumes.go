@@ -319,7 +319,7 @@ func injectHtml(client *client.Client, config VolumeTestConfig, volume api.Volum
 
 	injectPod, err := podClient.Create(injectPod)
 	framework.ExpectNoError(err, "Failed to create injector pod: %v", err)
-	err = framework.WaitForPodSuccessInNamespace(client, injectPod.Name, injectPod.Spec.Containers[0].Name, injectPod.Namespace)
+	err = framework.WaitForPodSuccessInNamespace(client, injectPod.Name, injectPod.Namespace)
 	Expect(err).NotTo(HaveOccurred())
 }
 

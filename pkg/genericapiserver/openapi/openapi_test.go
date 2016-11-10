@@ -28,9 +28,9 @@ import (
 )
 
 // setUp is a convenience function for setting up for (most) tests.
-func setUp(t *testing.T, fullMethods bool) (openAPI, *assert.Assertions) {
+func setUp(t *testing.T, fullMethods bool) (openAPI, *restful.Container, *assert.Assertions) {
 	assert := assert.New(t)
-	config := getConfig(fullMethods)
+	config, container := getConfig(fullMethods)
 	return openAPI{
 		config: config,
 		swagger: &spec.Swagger{
@@ -41,7 +41,7 @@ func setUp(t *testing.T, fullMethods bool) (openAPI, *assert.Assertions) {
 				Info:        config.Info,
 			},
 		},
-	}, assert
+	}, container, assert
 }
 
 func noOp(request *restful.Request, response *restful.Response) {}
@@ -130,11 +130,11 @@ func (_ TestOutput) OpenAPIDefinition() *common.OpenAPIDefinition {
 var _ common.OpenAPIDefinitionGetter = TestInput{}
 var _ common.OpenAPIDefinitionGetter = TestOutput{}
 
-func getTestRoute(ws *restful.WebService, method string, additionalParams bool) *restful.RouteBuilder {
+func getTestRoute(ws *restful.WebService, method string, additionalParams bool, opPrefix string) *restful.RouteBuilder {
 	ret := ws.Method(method).
 		Path("/test/{path:*}").
 		Doc(fmt.Sprintf("%s test input", method)).
-		Operation(fmt.Sprintf("%sTestInput", method)).
+		Operation(fmt.Sprintf("%s%sTestInput", method, opPrefix)).
 		Produces(restful.MIME_JSON).
 		Consumes(restful.MIME_JSON).
 		Param(ws.PathParameter("path", "path to the resource").DataType("string")).
@@ -150,52 +150,50 @@ func getTestRoute(ws *restful.WebService, method string, additionalParams bool) 
 	return ret
 }
 
-func getConfig(fullMethods bool) *Config {
+func getConfig(fullMethods bool) (*common.Config, *restful.Container) {
 	mux := http.NewServeMux()
 	container := restful.NewContainer()
 	container.ServeMux = mux
 	ws := new(restful.WebService)
 	ws.Path("/foo")
-	ws.Route(getTestRoute(ws, "get", true))
+	ws.Route(getTestRoute(ws, "get", true, "foo"))
 	if fullMethods {
-		ws.Route(getTestRoute(ws, "post", false)).
-			Route(getTestRoute(ws, "put", false)).
-			Route(getTestRoute(ws, "head", false)).
-			Route(getTestRoute(ws, "patch", false)).
-			Route(getTestRoute(ws, "options", false)).
-			Route(getTestRoute(ws, "delete", false))
+		ws.Route(getTestRoute(ws, "post", false, "foo")).
+			Route(getTestRoute(ws, "put", false, "foo")).
+			Route(getTestRoute(ws, "head", false, "foo")).
+			Route(getTestRoute(ws, "patch", false, "foo")).
+			Route(getTestRoute(ws, "options", false, "foo")).
+			Route(getTestRoute(ws, "delete", false, "foo"))
 
 	}
 	ws.Path("/bar")
-	ws.Route(getTestRoute(ws, "get", true))
+	ws.Route(getTestRoute(ws, "get", true, "bar"))
 	if fullMethods {
-		ws.Route(getTestRoute(ws, "post", false)).
-			Route(getTestRoute(ws, "put", false)).
-			Route(getTestRoute(ws, "head", false)).
-			Route(getTestRoute(ws, "patch", false)).
-			Route(getTestRoute(ws, "options", false)).
-			Route(getTestRoute(ws, "delete", false))
+		ws.Route(getTestRoute(ws, "post", false, "bar")).
+			Route(getTestRoute(ws, "put", false, "bar")).
+			Route(getTestRoute(ws, "head", false, "bar")).
+			Route(getTestRoute(ws, "patch", false, "bar")).
+			Route(getTestRoute(ws, "options", false, "bar")).
+			Route(getTestRoute(ws, "delete", false, "bar"))
 
 	}
 	container.Add(ws)
-	return &Config{
-		WebServices:      container.RegisteredWebServices(),
-		ProtocolList:     []string{"https"},
-		OpenAPIServePath: "/swagger.json",
+	return &common.Config{
+		ProtocolList: []string{"https"},
 		Info: &spec.Info{
 			InfoProps: spec.InfoProps{
 				Title:       "TestAPI",
 				Description: "Test API",
 			},
 		},
-		OpenAPIDefinitions: &common.OpenAPIDefinitions{
+		Definitions: &common.OpenAPIDefinitions{
 			"openapi.TestInput":  *TestInput{}.OpenAPIDefinition(),
 			"openapi.TestOutput": *TestOutput{}.OpenAPIDefinition(),
 		},
-	}
+	}, container
 }
 
-func getTestOperation(method string) *spec.Operation {
+func getTestOperation(method string, opPrefix string) *spec.Operation {
 	return &spec.Operation{
 		OperationProps: spec.OperationProps{
 			Description: fmt.Sprintf("%s test input", method),
@@ -204,25 +202,26 @@ func getTestOperation(method string) *spec.Operation {
 			Schemes:     []string{"https"},
 			Parameters:  []spec.Parameter{},
 			Responses:   getTestResponses(),
+			ID:          fmt.Sprintf("%s%sTestInput", method, opPrefix),
 		},
 	}
 }
 
-func getTestPathItem(allMethods bool) spec.PathItem {
+func getTestPathItem(allMethods bool, opPrefix string) spec.PathItem {
 	ret := spec.PathItem{
 		PathItemProps: spec.PathItemProps{
-			Get:        getTestOperation("get"),
+			Get:        getTestOperation("get", opPrefix),
 			Parameters: getTestCommonParameters(),
 		},
 	}
 	ret.Get.Parameters = getAdditionalTestParameters()
 	if allMethods {
-		ret.PathItemProps.Put = getTestOperation("put")
-		ret.PathItemProps.Post = getTestOperation("post")
-		ret.PathItemProps.Head = getTestOperation("head")
-		ret.PathItemProps.Patch = getTestOperation("patch")
-		ret.PathItemProps.Delete = getTestOperation("delete")
-		ret.PathItemProps.Options = getTestOperation("options")
+		ret.PathItemProps.Put = getTestOperation("put", opPrefix)
+		ret.PathItemProps.Post = getTestOperation("post", opPrefix)
+		ret.PathItemProps.Head = getTestOperation("head", opPrefix)
+		ret.PathItemProps.Patch = getTestOperation("patch", opPrefix)
+		ret.PathItemProps.Delete = getTestOperation("delete", opPrefix)
+		ret.PathItemProps.Options = getTestOperation("options", opPrefix)
 	}
 	return ret
 }
@@ -380,7 +379,7 @@ func getTestOutputDefinition() spec.Schema {
 }
 
 func TestBuildSwaggerSpec(t *testing.T) {
-	o, assert := setUp(t, true)
+	o, container, assert := setUp(t, true)
 	expected := &spec.Swagger{
 		SwaggerProps: spec.SwaggerProps{
 			Info: &spec.Info{
@@ -392,8 +391,8 @@ func TestBuildSwaggerSpec(t *testing.T) {
 			Swagger: "2.0",
 			Paths: &spec.Paths{
 				Paths: map[string]spec.PathItem{
-					"/foo/test/{path}": getTestPathItem(true),
-					"/bar/test/{path}": getTestPathItem(true),
+					"/foo/test/{path}": getTestPathItem(true, "foo"),
+					"/bar/test/{path}": getTestPathItem(true, "bar"),
 				},
 			},
 			Definitions: spec.Definitions{
@@ -402,7 +401,7 @@ func TestBuildSwaggerSpec(t *testing.T) {
 			},
 		},
 	}
-	err := o.init()
+	err := o.init(container.RegisteredWebServices())
 	if assert.NoError(err) {
 		assert.Equal(expected, o.swagger)
 	}

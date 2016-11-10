@@ -19,6 +19,7 @@ package dockershim
 import (
 	"testing"
 
+	dockertypes "github.com/docker/engine-api/types"
 	"github.com/stretchr/testify/assert"
 
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
@@ -37,6 +38,34 @@ func TestConvertDockerStatusToRuntimeAPIState(t *testing.T) {
 
 	for _, test := range testCases {
 		actual := toRuntimeAPIContainerState(test.input)
+		assert.Equal(t, test.expected, actual)
+	}
+}
+
+func TestConvertToPullableImageID(t *testing.T) {
+	testCases := []struct {
+		id       string
+		image    *dockertypes.ImageInspect
+		expected string
+	}{
+		{
+			id: "image-1",
+			image: &dockertypes.ImageInspect{
+				RepoDigests: []string{"digest-1"},
+			},
+			expected: DockerPullableImageIDPrefix + "digest-1",
+		},
+		{
+			id: "image-2",
+			image: &dockertypes.ImageInspect{
+				RepoDigests: []string{},
+			},
+			expected: DockerImageIDPrefix + "image-2",
+		},
+	}
+
+	for _, test := range testCases {
+		actual := toPullableImageID(test.id, test.image)
 		assert.Equal(t, test.expected, actual)
 	}
 }

@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
@@ -48,12 +47,9 @@ func newTestableProvisioner(assert *assert.Assertions, options volume.VolumeOpti
 func TestProvision(t *testing.T) {
 	assert := assert.New(t)
 
-	cap := resource.MustParse("3Gi")
+	pvc := volumetest.CreateTestPVC("3Gi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce})
 	options := volume.VolumeOptions{
-		Capacity: cap,
-		AccessModes: []api.PersistentVolumeAccessMode{
-			api.ReadWriteOnce,
-		},
+		PVC: pvc,
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
 	}
 
@@ -62,7 +58,7 @@ func TestProvision(t *testing.T) {
 	persistentSpec, err := provisioner.Provision()
 	assert.NoError(err, "Provision() failed: ", err)
 
-	cap = persistentSpec.Spec.Capacity[api.ResourceStorage]
+	cap := persistentSpec.Spec.Capacity[api.ResourceStorage]
 
 	assert.Equal(int64(3*1024*1024*1024), cap.Value())
 
@@ -78,10 +74,7 @@ func TestProvision(t *testing.T) {
 
 	// parameters are not supported
 	options = volume.VolumeOptions{
-		Capacity: cap,
-		AccessModes: []api.PersistentVolumeAccessMode{
-			api.ReadWriteOnce,
-		},
+		PVC: pvc,
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
 		Parameters: map[string]string{
 			"not-supported-params": "test123",
@@ -93,13 +86,10 @@ func TestProvision(t *testing.T) {
 	assert.Error(err, "Provision() did not fail with Parameters specified")
 
 	// selectors are not supported
+	pvc.Spec.Selector = &unversioned.LabelSelector{MatchLabels: map[string]string{"key": "value"}}
 	options = volume.VolumeOptions{
-		Capacity: cap,
-		AccessModes: []api.PersistentVolumeAccessMode{
-			api.ReadWriteOnce,
-		},
+		PVC: pvc,
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
-		Selector:                      &unversioned.LabelSelector{MatchLabels: map[string]string{"key": "value"}},
 	}
 
 	provisioner = newTestableProvisioner(assert, options)

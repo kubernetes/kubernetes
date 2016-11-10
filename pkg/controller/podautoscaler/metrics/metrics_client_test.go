@@ -69,6 +69,7 @@ type testCase struct {
 	desiredValue          float64
 	desiredRequest        *float64
 	desiredError          error
+	desiredRunningPods    int
 	targetResource        string
 	targetTimestamp       int
 	reportedMetricsPoints [][]metricPoint
@@ -184,7 +185,7 @@ func buildPod(namespace, podName string, podLabels map[string]string, phase api.
 	}
 }
 
-func (tc *testCase) verifyResults(t *testing.T, val *float64, req *float64, timestamp time.Time, err error) {
+func (tc *testCase) verifyResults(t *testing.T, val *float64, req *float64, pods int, timestamp time.Time, err error) {
 	if tc.desiredError != nil {
 		assert.Error(t, err)
 		assert.Contains(t, fmt.Sprintf("%v", err), fmt.Sprintf("%v", tc.desiredError))
@@ -194,6 +195,7 @@ func (tc *testCase) verifyResults(t *testing.T, val *float64, req *float64, time
 	assert.NotNil(t, val)
 	assert.True(t, tc.desiredValue-0.001 < *val)
 	assert.True(t, tc.desiredValue+0.001 > *val)
+	assert.Equal(t, tc.desiredRunningPods, pods)
 
 	if tc.desiredRequest != nil {
 		assert.True(t, *tc.desiredRequest-0.001 < *req)
@@ -208,13 +210,13 @@ func (tc *testCase) runTest(t *testing.T) {
 	testClient := tc.prepareTestClient(t)
 	metricsClient := NewHeapsterMetricsClient(testClient, DefaultHeapsterNamespace, DefaultHeapsterScheme, DefaultHeapsterService, DefaultHeapsterPort)
 	if tc.targetResource == "cpu-usage" {
-		val, req, timestamp, err := metricsClient.GetCpuConsumptionAndRequestInMillis(tc.namespace, tc.selector)
+		val, req, pods, timestamp, err := metricsClient.GetCpuConsumptionAndRequestInMillis(tc.namespace, tc.selector)
 		fval := float64(val)
 		freq := float64(req)
-		tc.verifyResults(t, &fval, &freq, timestamp, err)
+		tc.verifyResults(t, &fval, &freq, pods, timestamp, err)
 	} else {
 		val, timestamp, err := metricsClient.GetCustomMetric(tc.targetResource, tc.namespace, tc.selector)
-		tc.verifyResults(t, val, nil, timestamp, err)
+		tc.verifyResults(t, val, nil, 0, timestamp, err)
 	}
 }
 
@@ -222,6 +224,7 @@ func TestCPU(t *testing.T) {
 	tc := testCase{
 		replicas:           3,
 		desiredValue:       5000,
+		desiredRunningPods: 3,
 		targetResource:     "cpu-usage",
 		targetTimestamp:    1,
 		reportedPodMetrics: [][]int64{{5000}, {5000}, {5000}},
@@ -236,6 +239,7 @@ func TestCPUPending(t *testing.T) {
 		replicas:           5,
 		desiredValue:       5000,
 		desiredRequest:     &desiredRequest,
+		desiredRunningPods: 3,
 		targetResource:     "cpu-usage",
 		targetTimestamp:    1,
 		reportedPodMetrics: [][]int64{{5000}, {5000}, {5000}},
@@ -339,6 +343,7 @@ func TestCPUSumEqualZero(t *testing.T) {
 	tc := testCase{
 		replicas:           3,
 		desiredValue:       0,
+		desiredRunningPods: 3,
 		targetResource:     "cpu-usage",
 		targetTimestamp:    0,
 		reportedPodMetrics: [][]int64{{0}, {0}, {0}},
@@ -362,6 +367,7 @@ func TestCPUMoreMetrics(t *testing.T) {
 	tc := testCase{
 		replicas:           5,
 		desiredValue:       5000,
+		desiredRunningPods: 5,
 		targetResource:     "cpu-usage",
 		targetTimestamp:    10,
 		reportedPodMetrics: [][]int64{{1000, 2000, 2000}, {5000}, {1000, 1000, 1000, 2000}, {4000, 1000}, {5000}},

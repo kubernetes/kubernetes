@@ -4,20 +4,18 @@ Building Kubernetes is easy if you take advantage of the containerized build env
 
 ## Requirements
 
-1. Docker, using one of the two following configurations:
-  1. **Mac OS X** You can either use docker-machine or boot2docker. See installation instructions [here](https://docs.docker.com/installation/mac/).  
-     **Note**: You will want to set the boot2docker vm to have at least 3GB of initial memory or building will likely fail. (See: [#11852]( http://issue.k8s.io/11852)) and do not `make quick-release` from `/tmp/` (See: [#14773]( https://github.com/kubernetes/kubernetes/issues/14773))
-  2. **Linux with local Docker**  Install Docker according to the [instructions](https://docs.docker.com/installation/#installation) for your OS.  The scripts here assume that they are using a local Docker server and that they can "reach around" docker and grab results directly from the file system.
-2. [Python](https://www.python.org)
-3. **Optional** [Google Cloud SDK](https://developers.google.com/cloud/sdk/)
+1. Docker, using one of the following configurations:
+  1. **Mac OS X** You can either use Docker for Mac or docker-machine. See installation instructions [here](https://docs.docker.com/installation/mac/).
+     **Note**: You will want to set the Docker VM to have at least 3GB of initial memory or building will likely fail. (See: [#11852]( http://issue.k8s.io/11852)).
+  2. **Linux with local Docker**  Install Docker according to the [instructions](https://docs.docker.com/installation/#installation) for your OS.
+  3. **Remote Docker engine** Use a big machine in the cloud to build faster. This is a little trickier so look at the section later on.
+2. **Optional** [Google Cloud SDK](https://developers.google.com/cloud/sdk/)
 
 You must install and configure Google Cloud SDK if you want to upload your release to Google Cloud Storage and may safely omit this otherwise.
 
 ## Overview
 
 While it is possible to build Kubernetes using a local golang installation, we have a build process that runs in a Docker container.  This simplifies initial set up and provides for a very consistent build and test environment.
-
-There is also early support for building Docker "run" containers
 
 ## Key scripts
 
@@ -29,54 +27,25 @@ The following scripts are found in the `build/` directory. Note that all scripts
   *  `build/run.sh make test`: Run all unit tests
   *  `build/run.sh make test-integration`: Run integration test
   *  `build/run.sh make test-cmd`: Run CLI tests
-* `build/copy-output.sh`: This will copy the contents of `_output/dockerized/bin` from any remote Docker container to the local `_output/dockerized/bin`.  Right now this is only necessary on Mac OS X with `boot2docker` when your git repo isn't under `/Users`.
-* `build/make-clean.sh`: Clean out the contents of `_output/dockerized` and remove any local built container images.
-* `build/shell.sh`: Drop into a `bash` shell in a build container with a snapshot of the current repo code.
-* `build/release.sh`: Build everything, test it, and (optionally) upload the results to a GCS bucket.
-
-## Releasing
-
-The `build/release.sh` script will build a release.  It will build binaries, run tests, (optionally) build runtime Docker images and then (optionally) upload all build artifacts to a GCS bucket.
-
-The main output is a tar file: `kubernetes.tar.gz`.  This includes:
-* Cross compiled client utilities.
-* Script (`kubectl`) for picking and running the right client binary based on platform.
-* Examples
-* Cluster deployment scripts for various clouds
-* Tar file containing all server binaries
-* Tar file containing salt deployment tree shared across multiple cloud deployments.
-
-In addition, there are some other tar files that are created:
-* `kubernetes-client-*.tar.gz` Client binaries for a specific platform.
-* `kubernetes-server-*.tar.gz` Server binaries for a specific platform.
-* `kubernetes-salt.tar.gz` The salt script/tree shared across multiple deployment scripts.
-
-The release utilities grab a set of environment variables to modify behavior.  Arguably, these should be command line flags:
-
-Env Variable | Default | Description
--------------|---------|------------
-`KUBE_SKIP_CONFIRMATIONS` | `n` | If `y` then no questions are asked and the scripts just continue.
-`KUBE_GCS_UPLOAD_RELEASE` | `n` | Upload release artifacts to GCS
-`KUBE_GCS_RELEASE_BUCKET` | `kubernetes-releases-${project_hash}` | The bucket to upload releases to
-`KUBE_GCS_RELEASE_PREFIX` | `devel` | The path under the release bucket to put releases
-`KUBE_GCS_MAKE_PUBLIC` | `y` | Make GCS links readable from anywhere
-`KUBE_GCS_NO_CACHING` | `y` | Disable HTTP caching of GCS release artifacts.  By default GCS will cache public objects for up to an hour.  When doing "devel" releases this can cause problems.
-`KUBE_GCS_DOCKER_REG_PREFIX` | `docker-reg` | *Experimental* When uploading docker images, the bucket that backs the registry.
+* `build/copy-output.sh`: This will copy the contents of `_output/dockerized/bin` from the Docker container to the local `_output/dockerized/bin`. It will also copy out specific file patterns that are generated as part of the build process. This is run automatically as part of `build/run.sh`.
+* `build/make-clean.sh`: Clean out the contents of `_output`, remove any locally built container images and remove the data container.
+* `/build/shell.sh`: Drop into a `bash` shell in a build container with a snapshot of the current repo code.
 
 ## Basic Flow
 
-The scripts directly under `build/` are used to build and test.  They will ensure that the `kube-build` Docker image is built (based on `build/build-image/Dockerfile`) and then execute the appropriate command in that container.  If necessary (for Mac OS X), the scripts will also copy results out.
+The scripts directly under `build/` are used to build and test.  They will ensure that the `kube-build` Docker image is built (based on `build/build-image/Dockerfile`) and then execute the appropriate command in that container.  These scripts will both ensure that the right data is cached from run to run for incremental builds and will copy the results back out of the container.
 
 The `kube-build` container image is built by first creating a "context" directory in `_output/images/build-image`.  It is done there instead of at the root of the Kubernetes repo to minimize the amount of data we need to package up when building the image.
 
-Everything in `build/build-image/` is meant to be run inside of the container.  If it doesn't think it is running in the container it'll throw a warning.  While you can run some of that stuff outside of the container, it wasn't built to do so.
+There are 3 different containers instances that are run from this image.  The first is a "data" container to store all data that needs to persist across to support incremental builds. Next there is an "rsync" container that is used to transfer data in and out to the data container.  Lastly there is a "build" container that is used for actually doing build actions.  The data container persists across runs while the rsync and build containers are deleted after each use.
 
-When building final release tars, they are first staged into `_output/release-stage` before being tar'd up and put into `_output/release-tars`.
+`rsync` is used transparently behind the scenes to efficiently move data in and and of the container.  This will use an ephemeral port picked by Docker.  You can modify this by setting the `KUBE_RSYNC_PORT` env variable.
+
+All Docker names are suffixed with a hash derived from the file path (to allow concurrent usage on things like CI machines) and a version number.  When the version number changes all state is cleared and clean build is started.  This allows the build infrastructure to be changed and signal to CI systems that old artifacts need to be deleted.
 
 ## Proxy Settings
 
-
-If you are behind a proxy, you need to export proxy settings for kubernetes build, the following environment variables should be defined.
+If you are behind a proxy and you are letting these scripts use `docker-machine` to set up your local VM for you on macOS, you need to export proxy settings for kubernetes build, the following environment variables should be defined.
 
 ```
 export KUBERNETES_HTTP_PROXY=http://username:password@proxyaddr:proxyport
@@ -91,13 +60,53 @@ export KUBERNETES_NO_PROXY=127.0.0.1
 
 If you are using sudo to make kubernetes build for example make quick-release, you need run `sudo -E make quick-release` to pass the environment variables.
 
-## TODOs
+## Really Remote Docker Engine
 
-These are in no particular order
+It is possible to use a Docker Engine that is running remotely (under your desk or in the cloud).  Docker must be configured to connect to that machine and the local rsync port must be forwarded (via SSH or nc) from localhost to the remote machine.
 
-* [X] Harmonize with scripts in `hack/`.  How much do we support building outside of Docker and these scripts?
-* [X] Deprecate/replace most of the stuff in the hack/
-* [ ] Finish support for the Dockerized runtime. Issue [#19](http://issue.k8s.io/19).  A key issue here is to make this fast/light enough that we can use it for development workflows.
+To do this easily with GCE and `docker-machine`, do something like this:
+```
+# Create the remote docker machine on GCE.  This is a pretty beefy machine with SSD disk.
+KUBE_BUILD_VM=k8s-build
+KUBE_BUILD_GCE_PROJECT=<project>
+docker-machine create \
+  --driver=google \
+  --google-project=${KUBE_BUILD_GCE_PROJECT} \
+  --google-zone=us-west1-a \
+  --google-machine-type=n1-standard-8 \
+  --google-disk-size=50 \
+  --google-disk-type=pd-ssd \
+  ${KUBE_BUILD_VM}
 
+# Set up local docker to talk to that machine
+eval $(docker-machine env ${KUBE_BUILD_VM})
+
+# Pin down the port that rsync will be exposed on on the remote machine
+export KUBE_RSYNC_PORT=8370
+
+# forward local 8730 to that machine so that rsync works
+docker-machine ssh ${KUBE_BUILD_VM} -L ${KUBE_RSYNC_PORT}:localhost:8730 -N &
+```
+
+Look at `docker-machine stop`, `docker-machine start` and `docker-machine rm` to manage this VM.
+
+## Releasing
+
+The `build/release.sh` script will build a release.  It will build binaries, run tests, (optionally) build runtime Docker images.
+
+The main output is a tar file: `kubernetes.tar.gz`.  This includes:
+* Cross compiled client utilities.
+* Script (`kubectl`) for picking and running the right client binary based on platform.
+* Examples
+* Cluster deployment scripts for various clouds
+* Tar file containing all server binaries
+* Tar file containing salt deployment tree shared across multiple cloud deployments.
+
+In addition, there are some other tar files that are created:
+* `kubernetes-client-*.tar.gz` Client binaries for a specific platform.
+* `kubernetes-server-*.tar.gz` Server binaries for a specific platform.
+* `kubernetes-salt.tar.gz` The salt script/tree shared across multiple deployment scripts.
+
+When building final release tars, they are first staged into `_output/release-stage` before being tar'd up and put into `_output/release-tars`.
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/build/README.md?pixel)]()

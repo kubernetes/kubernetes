@@ -29,4 +29,4 @@ build: clean
 	rm -rf etcdctl etcd-v$(ETCD_VERSION)-linux-amd64 etcd-v$(ETCD_VERSION)-linux-amd64.tar.gz
 
 push: build
-	gcloud docker push $(IMAGE):$(TAG)
+	gcloud docker -- push $(IMAGE):$(TAG)

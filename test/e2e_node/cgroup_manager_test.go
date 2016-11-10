@@ -68,7 +68,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager [Skip]", func() {
 				}
 				podClient := f.PodClient()
 				podClient.Create(pod)
-				err := framework.WaitForPodSuccessInNamespace(f.Client, podName, contName, f.Namespace.Name)
+				err := framework.WaitForPodSuccessInNamespace(f.Client, podName, f.Namespace.Name)
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})

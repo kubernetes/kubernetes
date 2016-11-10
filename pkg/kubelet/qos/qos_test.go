@@ -136,9 +136,22 @@ func TestGetPodQOS(t *testing.T) {
 			expected: Burstable,
 		},
 		{
+			pod: newPod("burstable-no-limits", []api.Container{
+				newContainer("burstable", getResourceList("100m", "100Mi"), getResourceList("", "")),
+			}),
+			expected: Burstable,
+		},
+		{
 			pod: newPod("burstable-guaranteed", []api.Container{
 				newContainer("burstable", getResourceList("1", "100Mi"), getResourceList("2", "100Mi")),
 				newContainer("guaranteed", getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
+			}),
+			expected: Burstable,
+		},
+		{
+			pod: newPod("burstable-unbounded-but-requests-match-limits", []api.Container{
+				newContainer("burstable", getResourceList("100m", "100Mi"), getResourceList("200m", "200Mi")),
+				newContainer("burstable-unbounded", getResourceList("100m", "100Mi"), getResourceList("", "")),
 			}),
 			expected: Burstable,
 		},

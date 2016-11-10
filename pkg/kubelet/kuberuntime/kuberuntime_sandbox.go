@@ -101,7 +101,6 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *api.Pod, attem
 				HostPort:      &hostPort,
 				ContainerPort: &containerPort,
 				Protocol:      &protocol,
-				Name:          &port.Name,
 			})
 		}
 

@@ -88,7 +88,7 @@ func (c *FakeClusters) List(opts api.ListOptions) (result *federation.ClusterLis
 		return nil, err
 	}
 
-	label := opts.LabelSelector
+	label, _, _ := core.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}

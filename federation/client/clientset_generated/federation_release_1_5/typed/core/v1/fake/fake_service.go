@@ -63,14 +63,14 @@ func (c *FakeServices) UpdateStatus(service *v1.Service) (*v1.Service, error) {
 	return obj.(*v1.Service), err
 }
 
-func (c *FakeServices) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeServices) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewDeleteAction(servicesResource, c.ns, name), &v1.Service{})
 
 	return err
 }
 
-func (c *FakeServices) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakeServices) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewDeleteCollectionAction(servicesResource, c.ns, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1.ServiceList{})
@@ -87,7 +87,7 @@ func (c *FakeServices) Get(name string) (result *v1.Service, err error) {
 	return obj.(*v1.Service), err
 }
 
-func (c *FakeServices) List(opts api.ListOptions) (result *v1.ServiceList, err error) {
+func (c *FakeServices) List(opts v1.ListOptions) (result *v1.ServiceList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewListAction(servicesResource, c.ns, opts), &v1.ServiceList{})
 
@@ -95,7 +95,7 @@ func (c *FakeServices) List(opts api.ListOptions) (result *v1.ServiceList, err e
 		return nil, err
 	}
 
-	label := opts.LabelSelector
+	label, _, _ := core.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -109,7 +109,7 @@ func (c *FakeServices) List(opts api.ListOptions) (result *v1.ServiceList, err e
 }
 
 // Watch returns a watch.Interface that watches the requested services.
-func (c *FakeServices) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeServices) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(servicesResource, c.ns, opts))
 

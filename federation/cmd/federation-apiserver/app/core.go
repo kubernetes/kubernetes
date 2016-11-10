@@ -61,12 +61,11 @@ func installCoreAPIs(s *options.ServerRunOptions, g *genericapiserver.GenericAPI
 			v1.SchemeGroupVersion.Version: coreResources,
 		},
 		OptionsExternalVersion: &registered.GroupOrDie(core.GroupName).GroupVersion,
-		IsLegacyGroup:          true,
 		Scheme:                 core.Scheme,
 		ParameterCodec:         core.ParameterCodec,
 		NegotiatedSerializer:   core.Codecs,
 	}
-	if err := g.InstallAPIGroup(&apiGroupInfo); err != nil {
+	if err := g.InstallLegacyAPIGroup(genericapiserver.DefaultLegacyAPIPrefix, &apiGroupInfo); err != nil {
 		glog.Fatalf("Error in registering group version: %+v.\n Error: %v\n", apiGroupInfo, err)
 	}
 }

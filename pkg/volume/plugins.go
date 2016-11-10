@@ -24,8 +24,6 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
@@ -41,25 +39,22 @@ type VolumeOptions struct {
 	// TODO: refactor all of this out of volumes when an admin can configure
 	// many kinds of provisioners.
 
-	// Capacity is the size of a volume.
-	Capacity resource.Quantity
-	// AccessModes of a volume
-	AccessModes []api.PersistentVolumeAccessMode
 	// Reclamation policy for a persistent volume
 	PersistentVolumeReclaimPolicy api.PersistentVolumeReclaimPolicy
 	// PV.Name of the appropriate PersistentVolume. Used to generate cloud
 	// volume name.
 	PVName string
-	// PVC.Name of the PersistentVolumeClaim; only set during dynamic provisioning.
-	PVCName string
+	// PVC is reference to the claim that lead to provisioning of a new PV.
+	// Provisioners *must* create a PV that would be matched by this PVC,
+	// i.e. with required capacity, accessMode, labels matching PVC.Selector and
+	// so on.
+	PVC *api.PersistentVolumeClaim
 	// Unique name of Kubernetes cluster.
 	ClusterName string
 	// Tags to attach to the real volume in the cloud provider - e.g. AWS EBS
 	CloudTags *map[string]string
 	// Volume provisioning parameters from StorageClass
 	Parameters map[string]string
-	// Volume selector from PersistentVolumeClaim
-	Selector *unversioned.LabelSelector
 }
 
 // VolumePlugin is an interface to volume plugins that can be used on a

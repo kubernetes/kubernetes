@@ -21,21 +21,21 @@ import (
 
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 )
 
 // TopOptions contains all the options for running the top cli command.
 type TopOptions struct{}
 
 var (
-	topLong = dedent.Dedent(`
+	topLong = templates.LongDesc(`
 		Display Resource (CPU/Memory/Storage) usage.
 
 		The top command allows you to see the resource consumption for nodes or pods.`)
 )
 
-func NewCmdTop(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdTop(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &TopOptions{}
 
 	cmd := &cobra.Command{
@@ -55,6 +55,6 @@ func NewCmdTop(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func (o TopOptions) RunTop(f *cmdutil.Factory, cmd *cobra.Command, args []string, out io.Writer) error {
+func (o TopOptions) RunTop(f cmdutil.Factory, cmd *cobra.Command, args []string, out io.Writer) error {
 	return cmd.Help()
 }

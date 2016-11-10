@@ -112,6 +112,10 @@ func (gcc *PodGCController) Run(stop <-chan struct{}) {
 }
 
 func (gcc *PodGCController) gc() {
+	if !gcc.podController.HasSynced() || !gcc.nodeController.HasSynced() {
+		glog.V(2).Infof("PodGCController is waiting for informer sync...")
+		return
+	}
 	pods, err := gcc.podStore.List(labels.Everything())
 	if err != nil {
 		glog.Errorf("Error while listing all Pods: %v", err)

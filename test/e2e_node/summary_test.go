@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -31,8 +32,7 @@ import (
 	"github.com/onsi/gomega/types"
 )
 
-// TODO(timstclair): Move this test out of the flaky suite once it has demonstrated stability.
-var _ = framework.KubeDescribe("Summary API [Flaky]", func() {
+var _ = framework.KubeDescribe("Summary API", func() {
 	f := framework.NewDefaultFramework("summary-test")
 	Context("when querying /stats/summary", func() {
 		It("should report resource usage through the stats api", func() {
@@ -68,15 +68,14 @@ var _ = framework.KubeDescribe("Summary API [Flaky]", func() {
 					"Time": recent(maxStatsAge),
 					// We don't limit system container memory.
 					"AvailableBytes":  BeNil(),
-					"UsageBytes":      bounded(5*mb, 1*gb),
-					"WorkingSetBytes": bounded(5*mb, 1*gb),
-					"RSSBytes":        bounded(5*mb, 1*gb),
+					"UsageBytes":      bounded(1*mb, 1*gb),
+					"WorkingSetBytes": bounded(1*mb, 1*gb),
+					"RSSBytes":        bounded(1*mb, 1*gb),
 					"PageFaults":      bounded(1000, 1E9),
 					"MajorPageFaults": bounded(0, 100000),
 				}),
-				// TODO(#31999): Don't report FS stats for system containers.
-				"Rootfs":             gstruct.Ignore(),
-				"Logs":               gstruct.Ignore(),
+				"Rootfs":             BeNil(),
+				"Logs":               BeNil(),
 				"UserDefinedMetrics": BeEmpty(),
 			})
 			// Expectations for pods.
@@ -95,7 +94,7 @@ var _ = framework.KubeDescribe("Summary API [Flaky]", func() {
 						"Memory": ptrMatchAllFields(gstruct.Fields{
 							"Time":            recent(maxStatsAge),
 							"AvailableBytes":  bounded(1*mb, 10*mb),
-							"UsageBytes":      bounded(10*kb, mb),
+							"UsageBytes":      bounded(10*kb, 5*mb),
 							"WorkingSetBytes": bounded(10*kb, mb),
 							"RSSBytes":        bounded(1*kb, mb),
 							"PageFaults":      bounded(100, 100000),
@@ -272,8 +271,10 @@ func bounded(lower, upper interface{}) types.GomegaMatcher {
 }
 
 func recent(d time.Duration) types.GomegaMatcher {
-	return And(
+	return WithTransform(func(t unversioned.Time) time.Time {
+		return t.Time
+	}, And(
 		BeTemporally(">=", time.Now().Add(-d)),
 		// Now() is the test start time, not the match time, so permit a few extra minutes.
-		BeTemporally("<", time.Now().Add(2*time.Minute)))
+		BeTemporally("<", time.Now().Add(2*time.Minute))))
 }

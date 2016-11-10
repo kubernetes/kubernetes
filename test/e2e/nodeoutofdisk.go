@@ -24,6 +24,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -67,13 +68,15 @@ const (
 // Flaky issue #20015.  We have no clear path for how to test this functionality in a non-flaky way.
 var _ = framework.KubeDescribe("NodeOutOfDisk [Serial] [Flaky] [Disruptive]", func() {
 	var c *client.Client
+	var cs clientset.Interface
 	var unfilledNodeName, recoveredNodeName string
 	f := framework.NewDefaultFramework("node-outofdisk")
 
 	BeforeEach(func() {
 		c = f.Client
+		cs = f.ClientSet
 
-		nodelist := framework.GetReadySchedulableNodesOrDie(c)
+		nodelist := framework.GetReadySchedulableNodesOrDie(cs)
 
 		// Skip this test on small clusters.  No need to fail since it is not a use
 		// case that any cluster of small size needs to support.
@@ -87,7 +90,7 @@ var _ = framework.KubeDescribe("NodeOutOfDisk [Serial] [Flaky] [Disruptive]", fu
 
 	AfterEach(func() {
 
-		nodelist := framework.GetReadySchedulableNodesOrDie(c)
+		nodelist := framework.GetReadySchedulableNodesOrDie(cs)
 		Expect(len(nodelist.Items)).ToNot(BeZero())
 		for _, node := range nodelist.Items {
 			if unfilledNodeName == node.Name || recoveredNodeName == node.Name {
@@ -150,7 +153,7 @@ var _ = framework.KubeDescribe("NodeOutOfDisk [Serial] [Flaky] [Disruptive]", fu
 			}
 		})
 
-		nodelist := framework.GetReadySchedulableNodesOrDie(c)
+		nodelist := framework.GetReadySchedulableNodesOrDie(cs)
 		Expect(len(nodelist.Items)).To(BeNumerically(">", 1))
 
 		nodeToRecover := nodelist.Items[1]

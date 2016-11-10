@@ -98,7 +98,7 @@ func testCreateDeleteNodePool(f *framework.Framework, poolName string) {
 // label with the given node pool name.
 func nodesWithPoolLabel(f *framework.Framework, poolName string) int {
 	nodeCount := 0
-	nodeList := framework.GetReadySchedulableNodesOrDie(f.Client)
+	nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 	for _, node := range nodeList.Items {
 		if poolLabel := node.Labels["cloud.google.com/gke-nodepool"]; poolLabel == poolName {
 			nodeCount++

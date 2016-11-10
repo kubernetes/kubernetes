@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
@@ -212,6 +213,71 @@ func describeNamespace(namespace *api.Namespace, resourceQuotaList *api.Resource
 	})
 }
 
+func describeLimitRangeSpec(spec api.LimitRangeSpec, prefix string, w io.Writer) {
+	for i := range spec.Limits {
+		item := spec.Limits[i]
+		maxResources := item.Max
+		minResources := item.Min
+		defaultLimitResources := item.Default
+		defaultRequestResources := item.DefaultRequest
+		ratio := item.MaxLimitRequestRatio
+
+		set := map[api.ResourceName]bool{}
+		for k := range maxResources {
+			set[k] = true
+		}
+		for k := range minResources {
+			set[k] = true
+		}
+		for k := range defaultLimitResources {
+			set[k] = true
+		}
+		for k := range defaultRequestResources {
+			set[k] = true
+		}
+		for k := range ratio {
+			set[k] = true
+		}
+
+		for k := range set {
+			// if no value is set, we output -
+			maxValue := "-"
+			minValue := "-"
+			defaultLimitValue := "-"
+			defaultRequestValue := "-"
+			ratioValue := "-"
+
+			maxQuantity, maxQuantityFound := maxResources[k]
+			if maxQuantityFound {
+				maxValue = maxQuantity.String()
+			}
+
+			minQuantity, minQuantityFound := minResources[k]
+			if minQuantityFound {
+				minValue = minQuantity.String()
+			}
+
+			defaultLimitQuantity, defaultLimitQuantityFound := defaultLimitResources[k]
+			if defaultLimitQuantityFound {
+				defaultLimitValue = defaultLimitQuantity.String()
+			}
+
+			defaultRequestQuantity, defaultRequestQuantityFound := defaultRequestResources[k]
+			if defaultRequestQuantityFound {
+				defaultRequestValue = defaultRequestQuantity.String()
+			}
+
+			ratioQuantity, ratioQuantityFound := ratio[k]
+			if ratioQuantityFound {
+				ratioValue = ratioQuantity.String()
+			}
+
+			msg := "%s%s\t%v\t%v\t%v\t%v\t%v\t%v\n"
+			fmt.Fprintf(w, msg, prefix, item.Type, k, minValue, maxValue, defaultRequestValue, defaultLimitValue, ratioValue)
+		}
+	}
+}
+
 // DescribeLimitRanges merges a set of limit range items into a single tabular description
 func DescribeLimitRanges(limitRanges *api.LimitRangeList, w io.Writer) {
 	if len(limitRanges.Items) == 0 {
@@ -221,68 +287,7 @@ func DescribeLimitRanges(limitRanges *api.LimitRangeList, w io.Writer) {
 	fmt.Fprintf(w, "Resource Limits\n Type\tResource\tMin\tMax\tDefault Request\tDefault Limit\tMax Limit/Request Ratio\n")
 	fmt.Fprintf(w, " ----\t--------\t---\t---\t---------------\t-------------\t-----------------------\n")
 	for _, limitRange := range limitRanges.Items {
-		for i := range limitRange.Spec.Limits {
-			item := limitRange.Spec.Limits[i]
-			maxResources := item.Max
-			minResources := item.Min
-			defaultLimitResources := item.Default
-			defaultRequestResources := item.DefaultRequest
-			ratio := item.MaxLimitRequestRatio
-
-			set := map[api.ResourceName]bool{}
-			for k := range maxResources {
-				set[k] = true
-			}
-			for k := range minResources {
-				set[k] = true
-			}
-			for k := range defaultLimitResources {
-				set[k] = true
-			}
-			for k := range defaultRequestResources {
-				set[k] = true
-			}
-			for k := range ratio {
-				set[k] = true
-			}
-
-			for k := range set {
-				// if no value is set, we output -
-				maxValue := "-"
-				minValue := "-"
-				defaultLimitValue := "-"
-				defaultRequestValue := "-"
-				ratioValue := "-"
-
-				maxQuantity, maxQuantityFound := maxResources[k]
-				if maxQuantityFound {
-					maxValue = maxQuantity.String()
-				}
-
-				minQuantity, minQuantityFound := minResources[k]
-				if minQuantityFound {
-					minValue = minQuantity.String()
-				}
-
-				defaultLimitQuantity, defaultLimitQuantityFound := defaultLimitResources[k]
-				if defaultLimitQuantityFound {
-					defaultLimitValue = defaultLimitQuantity.String()
-				}
-
-				defaultRequestQuantity, defaultRequestQuantityFound := defaultRequestResources[k]
-				if defaultRequestQuantityFound {
-					defaultRequestValue = defaultRequestQuantity.String()
-				}
-
-				ratioQuantity, ratioQuantityFound := ratio[k]
-				if ratioQuantityFound {
-					ratioValue = ratioQuantity.String()
-				}
-
-				msg := " %s\t%v\t%v\t%v\t%v\t%v\t%v\n"
-				fmt.Fprintf(w, msg, item.Type, k, minValue, maxValue, defaultRequestValue, defaultLimitValue, ratioValue)
-			}
-		}
+		describeLimitRangeSpec(limitRange.Spec, " ", w)
 	}
 }
 
@@ -350,68 +355,7 @@ func describeLimitRange(limitRange *api.LimitRange) (string, error) {
 		fmt.Fprintf(out, "Namespace:\t%s\n", limitRange.Namespace)
 		fmt.Fprintf(out, "Type\tResource\tMin\tMax\tDefault Request\tDefault Limit\tMax Limit/Request Ratio\n")
 		fmt.Fprintf(out, "----\t--------\t---\t---\t---------------\t-------------\t-----------------------\n")
-		for i := range limitRange.Spec.Limits {
-			item := limitRange.Spec.Limits[i]
-			maxResources := item.Max
-			minResources := item.Min
-			defaultLimitResources := item.Default
-			defaultRequestResources := item.DefaultRequest
-			ratio := item.MaxLimitRequestRatio
-
-			set := map[api.ResourceName]bool{}
-			for k := range maxResources {
-				set[k] = true
-			}
-			for k := range minResources {
-				set[k] = true
-			}
-			for k := range defaultLimitResources {
-				set[k] = true
-			}
-			for k := range defaultRequestResources {
-				set[k] = true
-			}
-			for k := range ratio {
-				set[k] = true
-			}
-
-			for k := range set {
-				// if no value is set, we output -
-				maxValue := "-"
-				minValue := "-"
-				defaultLimitValue := "-"
-				defaultRequestValue := "-"
-				ratioValue := "-"
-
-				maxQuantity, maxQuantityFound := maxResources[k]
-				if maxQuantityFound {
-					maxValue = maxQuantity.String()
-				}
-
-				minQuantity, minQuantityFound := minResources[k]
-				if minQuantityFound {
-					minValue = minQuantity.String()
-				}
-
-				defaultLimitQuantity, defaultLimitQuantityFound := defaultLimitResources[k]
-				if defaultLimitQuantityFound {
-					defaultLimitValue = defaultLimitQuantity.String()
-				}
-
-				defaultRequestQuantity, defaultRequestQuantityFound := defaultRequestResources[k]
-				if defaultRequestQuantityFound {
-					defaultRequestValue = defaultRequestQuantity.String()
-				}
-
-				ratioQuantity, ratioQuantityFound := ratio[k]
-				if ratioQuantityFound {
-					ratioValue = ratioQuantity.String()
-				}
-
-				msg := "%v\t%v\t%v\t%v\t%v\t%v\t%v\n"
-				fmt.Fprintf(out, msg, item.Type, k, minValue, maxValue, defaultRequestValue, defaultLimitValue, ratioValue)
-			}
-		}
+		describeLimitRangeSpec(limitRange.Spec, "", out)
 		return nil
 	})
 }
@@ -791,6 +735,7 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", pv.Name)
 		printLabelsMultiline(out, "Labels", pv.Labels)
+		fmt.Fprintf(out, "StorageClass:\t%s\n", storageutil.GetStorageClassAnnotation(pv.ObjectMeta))
 		fmt.Fprintf(out, "Status:\t%s\n", pv.Status.Phase)
 		if pv.Spec.ClaimRef != nil {
 			fmt.Fprintf(out, "Claim:\t%s\n", pv.Spec.ClaimRef.Namespace+"/"+pv.Spec.ClaimRef.Name)
@@ -860,6 +805,7 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", pvc.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", pvc.Namespace)
+		fmt.Fprintf(out, "StorageClass:\t%s\n", storageutil.GetStorageClassAnnotation(pvc.ObjectMeta))
 		fmt.Fprintf(out, "Status:\t%v\n", pvc.Status.Phase)
 		fmt.Fprintf(out, "Volume:\t%s\n", pvc.Spec.VolumeName)
 		printLabelsMultiline(out, "Labels", pvc.Labels)
@@ -1193,20 +1139,17 @@ func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings
 		return "", err
 	}
 
-	running, waiting, succeeded, failed, err := getPodStatusForController(pc, selector)
-	if err != nil {
-		return "", err
-	}
+	running, waiting, succeeded, failed, getPodErr := getPodStatusForController(pc, selector)
 
 	var events *api.EventList
 	if describerSettings.ShowEvents {
 		events, _ = d.Core().Events(namespace).Search(rs)
 	}
 
-	return describeReplicaSet(rs, events, running, waiting, succeeded, failed)
+	return describeReplicaSet(rs, events, running, waiting, succeeded, failed, getPodErr)
 }
 
-func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, running, waiting, succeeded, failed int) (string, error) {
+func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, running, waiting, succeeded, failed int, getPodErr error) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", rs.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", rs.Namespace)
@@ -1214,7 +1157,12 @@ func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, runnin
 		fmt.Fprintf(out, "Selector:\t%s\n", unversioned.FormatLabelSelector(rs.Spec.Selector))
 		printLabelsMultiline(out, "Labels", rs.Labels)
 		fmt.Fprintf(out, "Replicas:\t%d current / %d desired\n", rs.Status.Replicas, rs.Spec.Replicas)
-		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
+		fmt.Fprintf(out, "Pods Status:\t")
+		if getPodErr != nil {
+			fmt.Fprintf(out, "error in fetching pods: %s\n", getPodErr)
+		} else {
+			fmt.Fprintf(out, "%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
+		}
 		describeVolumes(rs.Spec.Template.Spec.Volumes, out, "")
 		if events != nil {
 			DescribeEvents(events, out)
@@ -2420,6 +2368,7 @@ func (s *StorageClassDescriber) Describe(namespace, name string, describerSettin
 	}
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", sc.Name)
+		fmt.Fprintf(out, "IsDefaultClass:\t%s\n", storageutil.IsDefaultAnnotationText(sc.ObjectMeta))
 		fmt.Fprintf(out, "Annotations:\t%s\n", labels.FormatLabels(sc.Annotations))
 		fmt.Fprintf(out, "Provisioner:\t%s\n", sc.Provisioner)
 		fmt.Fprintf(out, "Parameters:\t%s\n", labels.FormatLabels(sc.Parameters))

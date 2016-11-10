@@ -66,7 +66,9 @@ func TestParseThresholdConfig(t *testing.T) {
 					Value: ThresholdValue{
 						Quantity: quantityMustParse("150Mi"),
 					},
-					MinReclaim: quantityMustParse("0"),
+					MinReclaim: &ThresholdValue{
+						Quantity: quantityMustParse("0"),
+					},
 				},
 				{
 					Signal:   SignalMemoryAvailable,
@@ -75,7 +77,9 @@ func TestParseThresholdConfig(t *testing.T) {
 						Quantity: quantityMustParse("300Mi"),
 					},
 					GracePeriod: gracePeriod,
-					MinReclaim:  quantityMustParse("0"),
+					MinReclaim: &ThresholdValue{
+						Quantity: quantityMustParse("0"),
+					},
 				},
 			},
 		},
@@ -83,7 +87,7 @@ func TestParseThresholdConfig(t *testing.T) {
 			evictionHard:            "memory.available<10%",
 			evictionSoft:            "memory.available<30%",
 			evictionSoftGracePeriod: "memory.available=30s",
-			evictionMinReclaim:      "memory.available=0",
+			evictionMinReclaim:      "memory.available=5%",
 			expectErr:               false,
 			expectThresholds: []Threshold{
 				{
@@ -92,7 +96,9 @@ func TestParseThresholdConfig(t *testing.T) {
 					Value: ThresholdValue{
 						Percentage: 0.1,
 					},
-					MinReclaim: quantityMustParse("0"),
+					MinReclaim: &ThresholdValue{
+						Percentage: 0.05,
+					},
 				},
 				{
 					Signal:   SignalMemoryAvailable,
@@ -101,7 +107,9 @@ func TestParseThresholdConfig(t *testing.T) {
 						Percentage: 0.3,
 					},
 					GracePeriod: gracePeriod,
-					MinReclaim:  quantityMustParse("0"),
+					MinReclaim: &ThresholdValue{
+						Percentage: 0.05,
+					},
 				},
 			},
 		},
@@ -118,7 +126,9 @@ func TestParseThresholdConfig(t *testing.T) {
 					Value: ThresholdValue{
 						Quantity: quantityMustParse("150Mi"),
 					},
-					MinReclaim: quantityMustParse("2Gi"),
+					MinReclaim: &ThresholdValue{
+						Quantity: quantityMustParse("2Gi"),
+					},
 				},
 				{
 					Signal:   SignalNodeFsAvailable,
@@ -126,7 +136,9 @@ func TestParseThresholdConfig(t *testing.T) {
 					Value: ThresholdValue{
 						Quantity: quantityMustParse("100Mi"),
 					},
-					MinReclaim: quantityMustParse("1Gi"),
+					MinReclaim: &ThresholdValue{
+						Quantity: quantityMustParse("1Gi"),
+					},
 				},
 				{
 					Signal:   SignalImageFsAvailable,
@@ -135,7 +147,9 @@ func TestParseThresholdConfig(t *testing.T) {
 						Quantity: quantityMustParse("300Mi"),
 					},
 					GracePeriod: gracePeriod,
-					MinReclaim:  quantityMustParse("2Gi"),
+					MinReclaim: &ThresholdValue{
+						Quantity: quantityMustParse("2Gi"),
+					},
 				},
 				{
 					Signal:   SignalNodeFsAvailable,
@@ -144,7 +158,9 @@ func TestParseThresholdConfig(t *testing.T) {
 						Quantity: quantityMustParse("200Mi"),
 					},
 					GracePeriod: gracePeriod,
-					MinReclaim:  quantityMustParse("1Gi"),
+					MinReclaim: &ThresholdValue{
+						Quantity: quantityMustParse("1Gi"),
+					},
 				},
 			},
 		},
@@ -152,7 +168,7 @@ func TestParseThresholdConfig(t *testing.T) {
 			evictionHard:            "imagefs.available<15%,nodefs.available<10.5%",
 			evictionSoft:            "imagefs.available<30%,nodefs.available<20.5%",
 			evictionSoftGracePeriod: "imagefs.available=30s,nodefs.available=30s",
-			evictionMinReclaim:      "imagefs.available=2Gi,nodefs.available=1Gi",
+			evictionMinReclaim:      "imagefs.available=10%,nodefs.available=5%",
 			expectErr:               false,
 			expectThresholds: []Threshold{
 				{
@@ -161,7 +177,9 @@ func TestParseThresholdConfig(t *testing.T) {
 					Value: ThresholdValue{
 						Percentage: 0.15,
 					},
-					MinReclaim: quantityMustParse("2Gi"),
+					MinReclaim: &ThresholdValue{
+						Percentage: 0.1,
+					},
 				},
 				{
 					Signal:   SignalNodeFsAvailable,
@@ -169,7 +187,9 @@ func TestParseThresholdConfig(t *testing.T) {
 					Value: ThresholdValue{
 						Percentage: 0.105,
 					},
-					MinReclaim: quantityMustParse("1Gi"),
+					MinReclaim: &ThresholdValue{
+						Percentage: 0.05,
+					},
 				},
 				{
 					Signal:   SignalImageFsAvailable,
@@ -178,7 +198,9 @@ func TestParseThresholdConfig(t *testing.T) {
 						Percentage: 0.3,
 					},
 					GracePeriod: gracePeriod,
-					MinReclaim:  quantityMustParse("2Gi"),
+					MinReclaim: &ThresholdValue{
+						Percentage: 0.1,
+					},
 				},
 				{
 					Signal:   SignalNodeFsAvailable,
@@ -187,7 +209,9 @@ func TestParseThresholdConfig(t *testing.T) {
 						Percentage: 0.205,
 					},
 					GracePeriod: gracePeriod,
-					MinReclaim:  quantityMustParse("1Gi"),
+					MinReclaim: &ThresholdValue{
+						Percentage: 0.05,
+					},
 				},
 			},
 		},
@@ -204,7 +228,9 @@ func TestParseThresholdConfig(t *testing.T) {
 					Value: ThresholdValue{
 						Quantity: quantityMustParse("150Mi"),
 					},
-					MinReclaim: quantityMustParse("2Gi"),
+					MinReclaim: &ThresholdValue{
+						Quantity: quantityMustParse("2Gi"),
+					},
 				},
 				{
 					Signal:   SignalNodeFsInodesFree,
@@ -212,7 +238,9 @@ func TestParseThresholdConfig(t *testing.T) {
 					Value: ThresholdValue{
 						Quantity: quantityMustParse("100Mi"),
 					},
-					MinReclaim: quantityMustParse("1Gi"),
+					MinReclaim: &ThresholdValue{
+						Quantity: quantityMustParse("1Gi"),
+					},
 				},
 				{
 					Signal:   SignalImageFsInodesFree,
@@ -221,7 +249,9 @@ func TestParseThresholdConfig(t *testing.T) {
 						Quantity: quantityMustParse("300Mi"),
 					},
 					GracePeriod: gracePeriod,
-					MinReclaim:  quantityMustParse("2Gi"),
+					MinReclaim: &ThresholdValue{
+						Quantity: quantityMustParse("2Gi"),
+					},
 				},
 				{
 					Signal:   SignalNodeFsInodesFree,
@@ -230,7 +260,9 @@ func TestParseThresholdConfig(t *testing.T) {
 						Quantity: quantityMustParse("200Mi"),
 					},
 					GracePeriod: gracePeriod,
-					MinReclaim:  quantityMustParse("1Gi"),
+					MinReclaim: &ThresholdValue{
+						Quantity: quantityMustParse("1Gi"),
+					},
 				},
 			},
 		},
@@ -359,7 +391,7 @@ func thresholdEqual(a Threshold, b Threshold) bool {
 	return a.GracePeriod == b.GracePeriod &&
 		a.Operator == b.Operator &&
 		a.Signal == b.Signal &&
-		a.MinReclaim.Cmp(*b.MinReclaim) == 0 &&
+		compareThresholdValue(*a.MinReclaim, *b.MinReclaim) &&
 		compareThresholdValue(a.Value, b.Value)
 }
 
@@ -766,7 +798,9 @@ func TestThresholdsMet(t *testing.T) {
 		Value: ThresholdValue{
 			Quantity: quantityMustParse("1Gi"),
 		},
-		MinReclaim: quantityMustParse("500Mi"),
+		MinReclaim: &ThresholdValue{
+			Quantity: quantityMustParse("500Mi"),
+		},
 	}
 	testCases := map[string]struct {
 		enforceMinReclaim bool
@@ -829,13 +863,106 @@ func TestThresholdsMet(t *testing.T) {
 	}
 }
 
+func TestThresholdsUpdatedStats(t *testing.T) {
+	updatedThreshold := Threshold{
+		Signal: SignalMemoryAvailable,
+	}
+	locationUTC, err := time.LoadLocation("UTC")
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	testCases := map[string]struct {
+		thresholds   []Threshold
+		observations signalObservations
+		last         signalObservations
+		result       []Threshold
+	}{
+		"empty": {
+			thresholds:   []Threshold{},
+			observations: signalObservations{},
+			last:         signalObservations{},
+			result:       []Threshold{},
+		},
+		"no-time": {
+			thresholds: []Threshold{updatedThreshold},
+			observations: signalObservations{
+				SignalMemoryAvailable: signalObservation{},
+			},
+			last:   signalObservations{},
+			result: []Threshold{updatedThreshold},
+		},
+		"no-last-observation": {
+			thresholds: []Threshold{updatedThreshold},
+			observations: signalObservations{
+				SignalMemoryAvailable: signalObservation{
+					time: unversioned.Date(2016, 1, 1, 0, 0, 0, 0, locationUTC),
+				},
+			},
+			last:   signalObservations{},
+			result: []Threshold{updatedThreshold},
+		},
+		"time-machine": {
+			thresholds: []Threshold{updatedThreshold},
+			observations: signalObservations{
+				SignalMemoryAvailable: signalObservation{
+					time: unversioned.Date(2016, 1, 1, 0, 0, 0, 0, locationUTC),
+				},
+			},
+			last: signalObservations{
+				SignalMemoryAvailable: signalObservation{
+					time: unversioned.Date(2016, 1, 1, 0, 1, 0, 0, locationUTC),
+				},
+			},
+			result: []Threshold{},
+		},
+		"same-observation": {
+			thresholds: []Threshold{updatedThreshold},
+			observations: signalObservations{
+				SignalMemoryAvailable: signalObservation{
+					time: unversioned.Date(2016, 1, 1, 0, 0, 0, 0, locationUTC),
+				},
+			},
+			last: signalObservations{
+				SignalMemoryAvailable: signalObservation{
+					time: unversioned.Date(2016, 1, 1, 0, 0, 0, 0, locationUTC),
+				},
+			},
+			result: []Threshold{},
+		},
+		"new-observation": {
+			thresholds: []Threshold{updatedThreshold},
+			observations: signalObservations{
+				SignalMemoryAvailable: signalObservation{
+					time: unversioned.Date(2016, 1, 1, 0, 1, 0, 0, locationUTC),
+				},
+			},
+			last: signalObservations{
+				SignalMemoryAvailable: signalObservation{
+					time: unversioned.Date(2016, 1, 1, 0, 0, 0, 0, locationUTC),
+				},
+			},
+			result: []Threshold{updatedThreshold},
+		},
+	}
+	for testName, testCase := range testCases {
+		actual := thresholdsUpdatedStats(testCase.thresholds, testCase.observations, testCase.last)
+		if !thresholdList(actual).Equal(thresholdList(testCase.result)) {
+			t.Errorf("Test case: %s, expected: %v, actual: %v", testName, testCase.result, actual)
+		}
+	}
+}
+
 func TestPercentageThresholdsMet(t *testing.T) {
-	specifiecThresholds := []Threshold{
+	specificThresholds := []Threshold{
 		{
 			Signal:   SignalMemoryAvailable,
 			Operator: OpLessThan,
 			Value: ThresholdValue{
 				Percentage: 0.2,
+			},
+			MinReclaim: &ThresholdValue{
+				Percentage: 0.05,
 			},
 		},
 		{
@@ -848,12 +975,14 @@ func TestPercentageThresholdsMet(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		thresholds   []Threshold
-		observations signalObservations
-		result       []Threshold
+		enforceMinRelaim bool
+		thresholds       []Threshold
+		observations     signalObservations
+		result           []Threshold
 	}{
 		"BothMet": {
-			thresholds: specifiecThresholds,
+			enforceMinRelaim: false,
+			thresholds:       specificThresholds,
 			observations: signalObservations{
 				SignalMemoryAvailable: signalObservation{
 					available: quantityMustParse("100Mi"),
@@ -864,10 +993,11 @@ func TestPercentageThresholdsMet(t *testing.T) {
 					capacity:  quantityMustParse("1000Gi"),
 				},
 			},
-			result: specifiecThresholds,
+			result: specificThresholds,
 		},
 		"NoneMet": {
-			thresholds: specifiecThresholds,
+			enforceMinRelaim: false,
+			thresholds:       specificThresholds,
 			observations: signalObservations{
 				SignalMemoryAvailable: signalObservation{
 					available: quantityMustParse("300Mi"),
@@ -881,7 +1011,8 @@ func TestPercentageThresholdsMet(t *testing.T) {
 			result: []Threshold{},
 		},
 		"DiskMet": {
-			thresholds: specifiecThresholds,
+			enforceMinRelaim: false,
+			thresholds:       specificThresholds,
 			observations: signalObservations{
 				SignalMemoryAvailable: signalObservation{
 					available: quantityMustParse("300Mi"),
@@ -892,10 +1023,11 @@ func TestPercentageThresholdsMet(t *testing.T) {
 					capacity:  quantityMustParse("1000Gi"),
 				},
 			},
-			result: []Threshold{specifiecThresholds[1]},
+			result: []Threshold{specificThresholds[1]},
 		},
 		"MemoryMet": {
-			thresholds: specifiecThresholds,
+			enforceMinRelaim: false,
+			thresholds:       specificThresholds,
 			observations: signalObservations{
 				SignalMemoryAvailable: signalObservation{
 					available: quantityMustParse("100Mi"),
@@ -906,11 +1038,33 @@ func TestPercentageThresholdsMet(t *testing.T) {
 					capacity:  quantityMustParse("1000Gi"),
 				},
 			},
-			result: []Threshold{specifiecThresholds[0]},
+			result: []Threshold{specificThresholds[0]},
+		},
+		"MemoryMetWithMinReclaim": {
+			enforceMinRelaim: true,
+			thresholds:       specificThresholds,
+			observations: signalObservations{
+				SignalMemoryAvailable: signalObservation{
+					available: quantityMustParse("225Mi"),
+					capacity:  quantityMustParse("1000Mi"),
+				},
+			},
+			result: []Threshold{specificThresholds[0]},
+		},
+		"MemoryNotMetWithMinReclaim": {
+			enforceMinRelaim: true,
+			thresholds:       specificThresholds,
+			observations: signalObservations{
+				SignalMemoryAvailable: signalObservation{
+					available: quantityMustParse("300Mi"),
+					capacity:  quantityMustParse("1000Mi"),
+				},
+			},
+			result: []Threshold{},
 		},
 	}
 	for testName, testCase := range testCases {
-		actual := thresholdsMet(testCase.thresholds, testCase.observations, false)
+		actual := thresholdsMet(testCase.thresholds, testCase.observations, testCase.enforceMinRelaim)
 		if !thresholdList(actual).Equal(thresholdList(testCase.result)) {
 			t.Errorf("Test case: %s, expected: %v, actual: %v", testName, testCase.result, actual)
 		}

@@ -188,7 +188,11 @@ function update_job_result_cache() {
   local -r version=$(find_version)
   local -r job_results=${gcs_job_path}/jobResultsCache.json
   local -r tmp_results="${WORKSPACE}/_tmp/jobResultsCache.tmp"
-  local -r cache_size=200
+  # TODO: This constraint is insufficient.  The boundary for secondary
+  #       job cache should be date based on the last primary build.
+  #       The issue is we are trying to find a matched green set of results
+  #       at a given hash, but all of the jobs run at wildly different lengths.
+  local -r cache_size=300
   local upload_attempt
 
   if [[ -n "${version}" ]]; then

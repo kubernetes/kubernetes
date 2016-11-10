@@ -21,6 +21,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getCoreAPIVersions",
      "responses": {
       "200": {
        "description": "OK",
@@ -47,6 +48,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getCoreV1APIResources",
      "responses": {
       "200": {
        "description": "OK",
@@ -71,7 +73,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listComponentStatus",
+     "operationId": "listCoreV1ComponentStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -140,7 +142,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readComponentStatus",
+     "operationId": "readCoreV1ComponentStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -182,7 +184,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listConfigMapForAllNamespaces",
+     "operationId": "listCoreV1ConfigMapForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -251,7 +253,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listEndpointsForAllNamespaces",
+     "operationId": "listCoreV1EndpointsForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -320,7 +322,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listEventForAllNamespaces",
+     "operationId": "listCoreV1EventForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -389,7 +391,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listLimitRangeForAllNamespaces",
+     "operationId": "listCoreV1LimitRangeForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -458,7 +460,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNamespace",
+     "operationId": "listCoreV1Namespace",
      "parameters": [
       {
        "uniqueItems": true,
@@ -518,7 +520,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespace",
+     "operationId": "createCoreV1Namespace",
      "parameters": [
       {
        "name": "body",
@@ -551,7 +553,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionNamespace",
+     "operationId": "deleteCoreV1CollectionNamespace",
      "parameters": [
       {
        "uniqueItems": true,
@@ -622,7 +624,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedBinding",
+     "operationId": "createCoreV1NamespacedBinding",
      "responses": {
       "200": {
        "description": "OK",
@@ -672,7 +674,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNamespacedConfigMap",
+     "operationId": "listCoreV1NamespacedConfigMap",
      "parameters": [
       {
        "uniqueItems": true,
@@ -732,7 +734,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedConfigMap",
+     "operationId": "createCoreV1NamespacedConfigMap",
      "parameters": [
       {
        "name": "body",
@@ -765,7 +767,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionNamespacedConfigMap",
+     "operationId": "deleteCoreV1CollectionNamespacedConfigMap",
      "parameters": [
       {
        "uniqueItems": true,
@@ -844,7 +846,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedConfigMap",
+     "operationId": "readCoreV1NamespacedConfigMap",
      "parameters": [
       {
        "uniqueItems": true,
@@ -883,7 +885,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedConfigMap",
+     "operationId": "replaceCoreV1NamespacedConfigMap",
      "parameters": [
       {
        "name": "body",
@@ -916,7 +918,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteNamespacedConfigMap",
+     "operationId": "deleteCoreV1NamespacedConfigMap",
      "parameters": [
       {
        "name": "body",
@@ -951,7 +953,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedConfigMap",
+     "operationId": "patchCoreV1NamespacedConfigMap",
      "parameters": [
       {
        "name": "body",
@@ -1011,7 +1013,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNamespacedEndpoints",
+     "operationId": "listCoreV1NamespacedEndpoints",
      "parameters": [
       {
        "uniqueItems": true,
@@ -1071,7 +1073,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedEndpoints",
+     "operationId": "createCoreV1NamespacedEndpoints",
      "parameters": [
       {
        "name": "body",
@@ -1104,7 +1106,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionNamespacedEndpoints",
+     "operationId": "deleteCoreV1CollectionNamespacedEndpoints",
      "parameters": [
       {
        "uniqueItems": true,
@@ -1183,7 +1185,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedEndpoints",
+     "operationId": "readCoreV1NamespacedEndpoints",
      "parameters": [
       {
        "uniqueItems": true,
@@ -1222,7 +1224,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedEndpoints",
+     "operationId": "replaceCoreV1NamespacedEndpoints",
      "parameters": [
       {
        "name": "body",
@@ -1255,7 +1257,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteNamespacedEndpoints",
+     "operationId": "deleteCoreV1NamespacedEndpoints",
      "parameters": [
       {
        "name": "body",
@@ -1290,7 +1292,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedEndpoints",
+     "operationId": "patchCoreV1NamespacedEndpoints",
      "parameters": [
       {
        "name": "body",
@@ -1350,7 +1352,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNamespacedEvent",
+     "operationId": "listCoreV1NamespacedEvent",
      "parameters": [
       {
        "uniqueItems": true,
@@ -1410,7 +1412,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedEvent",
+     "operationId": "createCoreV1NamespacedEvent",
      "parameters": [
       {
        "name": "body",
@@ -1443,7 +1445,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionNamespacedEvent",
+     "operationId": "deleteCoreV1CollectionNamespacedEvent",
      "parameters": [
       {
        "uniqueItems": true,
@@ -1522,7 +1524,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedEvent",
+     "operationId": "readCoreV1NamespacedEvent",
      "parameters": [
       {
        "uniqueItems": true,
@@ -1561,7 +1563,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedEvent",
+     "operationId": "replaceCoreV1NamespacedEvent",
      "parameters": [
       {
        "name": "body",
@@ -1594,7 +1596,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteNamespacedEvent",
+     "operationId": "deleteCoreV1NamespacedEvent",
      "parameters": [
       {
        "name": "body",
@@ -1629,7 +1631,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedEvent",
+     "operationId": "patchCoreV1NamespacedEvent",
      "parameters": [
       {
        "name": "body",
@@ -1689,7 +1691,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNamespacedLimitRange",
+     "operationId": "listCoreV1NamespacedLimitRange",
      "parameters": [
       {
        "uniqueItems": true,
@@ -1749,7 +1751,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedLimitRange",
+     "operationId": "createCoreV1NamespacedLimitRange",
      "parameters": [
       {
        "name": "body",
@@ -1782,7 +1784,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionNamespacedLimitRange",
+     "operationId": "deleteCoreV1CollectionNamespacedLimitRange",
      "parameters": [
       {
        "uniqueItems": true,
@@ -1861,7 +1863,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedLimitRange",
+     "operationId": "readCoreV1NamespacedLimitRange",
      "parameters": [
       {
        "uniqueItems": true,
@@ -1900,7 +1902,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedLimitRange",
+     "operationId": "replaceCoreV1NamespacedLimitRange",
      "parameters": [
       {
        "name": "body",
@@ -1933,7 +1935,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteNamespacedLimitRange",
+     "operationId": "deleteCoreV1NamespacedLimitRange",
      "parameters": [
       {
        "name": "body",
@@ -1968,7 +1970,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedLimitRange",
+     "operationId": "patchCoreV1NamespacedLimitRange",
      "parameters": [
       {
        "name": "body",
@@ -2028,7 +2030,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNamespacedPersistentVolumeClaim",
+     "operationId": "listCoreV1NamespacedPersistentVolumeClaim",
      "parameters": [
       {
        "uniqueItems": true,
@@ -2088,7 +2090,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedPersistentVolumeClaim",
+     "operationId": "createCoreV1NamespacedPersistentVolumeClaim",
      "parameters": [
       {
        "name": "body",
@@ -2121,7 +2123,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionNamespacedPersistentVolumeClaim",
+     "operationId": "deleteCoreV1CollectionNamespacedPersistentVolumeClaim",
      "parameters": [
       {
        "uniqueItems": true,
@@ -2200,7 +2202,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedPersistentVolumeClaim",
+     "operationId": "readCoreV1NamespacedPersistentVolumeClaim",
      "parameters": [
       {
        "uniqueItems": true,
@@ -2239,7 +2241,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedPersistentVolumeClaim",
+     "operationId": "replaceCoreV1NamespacedPersistentVolumeClaim",
      "parameters": [
       {
        "name": "body",
@@ -2272,7 +2274,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteNamespacedPersistentVolumeClaim",
+     "operationId": "deleteCoreV1NamespacedPersistentVolumeClaim",
      "parameters": [
       {
        "name": "body",
@@ -2307,7 +2309,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedPersistentVolumeClaim",
+     "operationId": "patchCoreV1NamespacedPersistentVolumeClaim",
      "parameters": [
       {
        "name": "body",
@@ -2367,7 +2369,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedPersistentVolumeClaimStatus",
+     "operationId": "readCoreV1NamespacedPersistentVolumeClaimStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -2390,7 +2392,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedPersistentVolumeClaimStatus",
+     "operationId": "replaceCoreV1NamespacedPersistentVolumeClaimStatus",
      "parameters": [
       {
        "name": "body",
@@ -2425,7 +2427,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedPersistentVolumeClaimStatus",
+     "operationId": "patchCoreV1NamespacedPersistentVolumeClaimStatus",
      "parameters": [
       {
        "name": "body",
@@ -2485,7 +2487,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNamespacedPod",
+     "operationId": "listCoreV1NamespacedPod",
      "parameters": [
       {
        "uniqueItems": true,
@@ -2545,7 +2547,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedPod",
+     "operationId": "createCoreV1NamespacedPod",
      "parameters": [
       {
        "name": "body",
@@ -2578,7 +2580,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionNamespacedPod",
+     "operationId": "deleteCoreV1CollectionNamespacedPod",
      "parameters": [
       {
        "uniqueItems": true,
@@ -2657,7 +2659,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedPod",
+     "operationId": "readCoreV1NamespacedPod",
      "parameters": [
       {
        "uniqueItems": true,
@@ -2696,7 +2698,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedPod",
+     "operationId": "replaceCoreV1NamespacedPod",
      "parameters": [
       {
        "name": "body",
@@ -2729,7 +2731,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteNamespacedPod",
+     "operationId": "deleteCoreV1NamespacedPod",
      "parameters": [
       {
        "name": "body",
@@ -2764,7 +2766,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedPod",
+     "operationId": "patchCoreV1NamespacedPod",
      "parameters": [
       {
        "name": "body",
@@ -2822,7 +2824,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectGetNamespacedPodAttach",
+     "operationId": "connectCoreV1GetNamespacedPodAttach",
      "responses": {
       "200": {
        "description": "OK",
@@ -2843,7 +2845,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectPostNamespacedPodAttach",
+     "operationId": "connectCoreV1PostNamespacedPodAttach",
      "responses": {
       "200": {
        "description": "OK",
@@ -2921,7 +2923,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedBindingBinding",
+     "operationId": "createCoreV1NamespacedBindingBinding",
      "responses": {
       "200": {
        "description": "OK",
@@ -2979,7 +2981,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedEvictionEviction",
+     "operationId": "createCoreV1NamespacedEvictionEviction",
      "responses": {
       "200": {
        "description": "OK",
@@ -3035,7 +3037,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectGetNamespacedPodExec",
+     "operationId": "connectCoreV1GetNamespacedPodExec",
      "responses": {
       "200": {
        "description": "OK",
@@ -3056,7 +3058,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectPostNamespacedPodExec",
+     "operationId": "connectCoreV1PostNamespacedPodExec",
      "responses": {
       "200": {
        "description": "OK",
@@ -3142,7 +3144,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedPodLog",
+     "operationId": "readCoreV1NamespacedPodLog",
      "responses": {
       "200": {
        "description": "OK",
@@ -3246,7 +3248,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectGetNamespacedPodPortforward",
+     "operationId": "connectCoreV1GetNamespacedPodPortforward",
      "responses": {
       "200": {
        "description": "OK",
@@ -3267,7 +3269,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectPostNamespacedPodPortforward",
+     "operationId": "connectCoreV1PostNamespacedPodPortforward",
      "responses": {
       "200": {
        "description": "OK",
@@ -3308,7 +3310,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectGetNamespacedPodProxy",
+     "operationId": "connectCoreV1GetNamespacedPodProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -3329,7 +3331,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectPutNamespacedPodProxy",
+     "operationId": "connectCoreV1PutNamespacedPodProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -3350,7 +3352,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectPostNamespacedPodProxy",
+     "operationId": "connectCoreV1PostNamespacedPodProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -3371,7 +3373,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectDeleteNamespacedPodProxy",
+     "operationId": "connectCoreV1DeleteNamespacedPodProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -3392,7 +3394,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectOptionsNamespacedPodProxy",
+     "operationId": "connectCoreV1OptionsNamespacedPodProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -3413,7 +3415,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectHeadNamespacedPodProxy",
+     "operationId": "connectCoreV1HeadNamespacedPodProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -3461,7 +3463,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectGetNamespacedPodProxyWithPath",
+     "operationId": "connectCoreV1GetNamespacedPodProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -3482,7 +3484,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectPutNamespacedPodProxyWithPath",
+     "operationId": "connectCoreV1PutNamespacedPodProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -3503,7 +3505,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectPostNamespacedPodProxyWithPath",
+     "operationId": "connectCoreV1PostNamespacedPodProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -3524,7 +3526,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectDeleteNamespacedPodProxyWithPath",
+     "operationId": "connectCoreV1DeleteNamespacedPodProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -3545,7 +3547,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectOptionsNamespacedPodProxyWithPath",
+     "operationId": "connectCoreV1OptionsNamespacedPodProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -3566,7 +3568,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectHeadNamespacedPodProxyWithPath",
+     "operationId": "connectCoreV1HeadNamespacedPodProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -3624,7 +3626,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedPodStatus",
+     "operationId": "readCoreV1NamespacedPodStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -3647,7 +3649,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedPodStatus",
+     "operationId": "replaceCoreV1NamespacedPodStatus",
      "parameters": [
       {
        "name": "body",
@@ -3682,7 +3684,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedPodStatus",
+     "operationId": "patchCoreV1NamespacedPodStatus",
      "parameters": [
       {
        "name": "body",
@@ -3742,7 +3744,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNamespacedPodTemplate",
+     "operationId": "listCoreV1NamespacedPodTemplate",
      "parameters": [
       {
        "uniqueItems": true,
@@ -3802,7 +3804,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedPodTemplate",
+     "operationId": "createCoreV1NamespacedPodTemplate",
      "parameters": [
       {
        "name": "body",
@@ -3835,7 +3837,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionNamespacedPodTemplate",
+     "operationId": "deleteCoreV1CollectionNamespacedPodTemplate",
      "parameters": [
       {
        "uniqueItems": true,
@@ -3914,7 +3916,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedPodTemplate",
+     "operationId": "readCoreV1NamespacedPodTemplate",
      "parameters": [
       {
        "uniqueItems": true,
@@ -3953,7 +3955,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedPodTemplate",
+     "operationId": "replaceCoreV1NamespacedPodTemplate",
      "parameters": [
       {
        "name": "body",
@@ -3986,7 +3988,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteNamespacedPodTemplate",
+     "operationId": "deleteCoreV1NamespacedPodTemplate",
      "parameters": [
       {
        "name": "body",
@@ -4021,7 +4023,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedPodTemplate",
+     "operationId": "patchCoreV1NamespacedPodTemplate",
      "parameters": [
       {
        "name": "body",
@@ -4081,7 +4083,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNamespacedReplicationController",
+     "operationId": "listCoreV1NamespacedReplicationController",
      "parameters": [
       {
        "uniqueItems": true,
@@ -4141,7 +4143,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedReplicationController",
+     "operationId": "createCoreV1NamespacedReplicationController",
      "parameters": [
       {
        "name": "body",
@@ -4174,7 +4176,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionNamespacedReplicationController",
+     "operationId": "deleteCoreV1CollectionNamespacedReplicationController",
      "parameters": [
       {
        "uniqueItems": true,
@@ -4253,7 +4255,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedReplicationController",
+     "operationId": "readCoreV1NamespacedReplicationController",
      "parameters": [
       {
        "uniqueItems": true,
@@ -4292,7 +4294,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedReplicationController",
+     "operationId": "replaceCoreV1NamespacedReplicationController",
      "parameters": [
       {
        "name": "body",
@@ -4325,7 +4327,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteNamespacedReplicationController",
+     "operationId": "deleteCoreV1NamespacedReplicationController",
      "parameters": [
       {
        "name": "body",
@@ -4360,7 +4362,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedReplicationController",
+     "operationId": "patchCoreV1NamespacedReplicationController",
      "parameters": [
       {
        "name": "body",
@@ -4420,6 +4422,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "readCoreV1NamespacedScaleScale",
      "responses": {
       "200": {
        "description": "OK",
@@ -4442,6 +4445,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "replaceCoreV1NamespacedScaleScale",
      "parameters": [
       {
        "name": "body",
@@ -4476,6 +4480,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "patchCoreV1NamespacedScaleScale",
      "parameters": [
       {
        "name": "body",
@@ -4535,7 +4540,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedReplicationControllerStatus",
+     "operationId": "readCoreV1NamespacedReplicationControllerStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -4558,7 +4563,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedReplicationControllerStatus",
+     "operationId": "replaceCoreV1NamespacedReplicationControllerStatus",
      "parameters": [
       {
        "name": "body",
@@ -4593,7 +4598,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedReplicationControllerStatus",
+     "operationId": "patchCoreV1NamespacedReplicationControllerStatus",
      "parameters": [
       {
        "name": "body",
@@ -4653,7 +4658,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNamespacedResourceQuota",
+     "operationId": "listCoreV1NamespacedResourceQuota",
      "parameters": [
       {
        "uniqueItems": true,
@@ -4713,7 +4718,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedResourceQuota",
+     "operationId": "createCoreV1NamespacedResourceQuota",
      "parameters": [
       {
        "name": "body",
@@ -4746,7 +4751,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionNamespacedResourceQuota",
+     "operationId": "deleteCoreV1CollectionNamespacedResourceQuota",
      "parameters": [
       {
        "uniqueItems": true,
@@ -4825,7 +4830,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedResourceQuota",
+     "operationId": "readCoreV1NamespacedResourceQuota",
      "parameters": [
       {
        "uniqueItems": true,
@@ -4864,7 +4869,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedResourceQuota",
+     "operationId": "replaceCoreV1NamespacedResourceQuota",
      "parameters": [
       {
        "name": "body",
@@ -4897,7 +4902,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteNamespacedResourceQuota",
+     "operationId": "deleteCoreV1NamespacedResourceQuota",
      "parameters": [
       {
        "name": "body",
@@ -4932,7 +4937,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedResourceQuota",
+     "operationId": "patchCoreV1NamespacedResourceQuota",
      "parameters": [
       {
        "name": "body",
@@ -4992,7 +4997,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedResourceQuotaStatus",
+     "operationId": "readCoreV1NamespacedResourceQuotaStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -5015,7 +5020,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedResourceQuotaStatus",
+     "operationId": "replaceCoreV1NamespacedResourceQuotaStatus",
      "parameters": [
       {
        "name": "body",
@@ -5050,7 +5055,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedResourceQuotaStatus",
+     "operationId": "patchCoreV1NamespacedResourceQuotaStatus",
      "parameters": [
       {
        "name": "body",
@@ -5110,7 +5115,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNamespacedSecret",
+     "operationId": "listCoreV1NamespacedSecret",
      "parameters": [
       {
        "uniqueItems": true,
@@ -5170,7 +5175,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedSecret",
+     "operationId": "createCoreV1NamespacedSecret",
      "parameters": [
       {
        "name": "body",
@@ -5203,7 +5208,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionNamespacedSecret",
+     "operationId": "deleteCoreV1CollectionNamespacedSecret",
      "parameters": [
       {
        "uniqueItems": true,
@@ -5282,7 +5287,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedSecret",
+     "operationId": "readCoreV1NamespacedSecret",
      "parameters": [
       {
        "uniqueItems": true,
@@ -5321,7 +5326,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedSecret",
+     "operationId": "replaceCoreV1NamespacedSecret",
      "parameters": [
       {
        "name": "body",
@@ -5354,7 +5359,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteNamespacedSecret",
+     "operationId": "deleteCoreV1NamespacedSecret",
      "parameters": [
       {
        "name": "body",
@@ -5389,7 +5394,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedSecret",
+     "operationId": "patchCoreV1NamespacedSecret",
      "parameters": [
       {
        "name": "body",
@@ -5449,7 +5454,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNamespacedServiceAccount",
+     "operationId": "listCoreV1NamespacedServiceAccount",
      "parameters": [
       {
        "uniqueItems": true,
@@ -5509,7 +5514,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedServiceAccount",
+     "operationId": "createCoreV1NamespacedServiceAccount",
      "parameters": [
       {
        "name": "body",
@@ -5542,7 +5547,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionNamespacedServiceAccount",
+     "operationId": "deleteCoreV1CollectionNamespacedServiceAccount",
      "parameters": [
       {
        "uniqueItems": true,
@@ -5621,7 +5626,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedServiceAccount",
+     "operationId": "readCoreV1NamespacedServiceAccount",
      "parameters": [
       {
        "uniqueItems": true,
@@ -5660,7 +5665,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedServiceAccount",
+     "operationId": "replaceCoreV1NamespacedServiceAccount",
      "parameters": [
       {
        "name": "body",
@@ -5693,7 +5698,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteNamespacedServiceAccount",
+     "operationId": "deleteCoreV1NamespacedServiceAccount",
      "parameters": [
       {
        "name": "body",
@@ -5728,7 +5733,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedServiceAccount",
+     "operationId": "patchCoreV1NamespacedServiceAccount",
      "parameters": [
       {
        "name": "body",
@@ -5788,7 +5793,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNamespacedService",
+     "operationId": "listCoreV1NamespacedService",
      "parameters": [
       {
        "uniqueItems": true,
@@ -5848,7 +5853,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedService",
+     "operationId": "createCoreV1NamespacedService",
      "parameters": [
       {
        "name": "body",
@@ -5900,7 +5905,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedService",
+     "operationId": "readCoreV1NamespacedService",
      "parameters": [
       {
        "uniqueItems": true,
@@ -5939,7 +5944,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedService",
+     "operationId": "replaceCoreV1NamespacedService",
      "parameters": [
       {
        "name": "body",
@@ -5972,7 +5977,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteNamespacedService",
+     "operationId": "deleteCoreV1NamespacedService",
      "responses": {
       "200": {
        "description": "OK",
@@ -5997,7 +6002,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedService",
+     "operationId": "patchCoreV1NamespacedService",
      "parameters": [
       {
        "name": "body",
@@ -6055,7 +6060,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectGetNamespacedServiceProxy",
+     "operationId": "connectCoreV1GetNamespacedServiceProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -6076,7 +6081,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectPutNamespacedServiceProxy",
+     "operationId": "connectCoreV1PutNamespacedServiceProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -6097,7 +6102,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectPostNamespacedServiceProxy",
+     "operationId": "connectCoreV1PostNamespacedServiceProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -6118,7 +6123,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectDeleteNamespacedServiceProxy",
+     "operationId": "connectCoreV1DeleteNamespacedServiceProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -6139,7 +6144,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectOptionsNamespacedServiceProxy",
+     "operationId": "connectCoreV1OptionsNamespacedServiceProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -6160,7 +6165,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectHeadNamespacedServiceProxy",
+     "operationId": "connectCoreV1HeadNamespacedServiceProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -6208,7 +6213,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectGetNamespacedServiceProxyWithPath",
+     "operationId": "connectCoreV1GetNamespacedServiceProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -6229,7 +6234,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectPutNamespacedServiceProxyWithPath",
+     "operationId": "connectCoreV1PutNamespacedServiceProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -6250,7 +6255,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectPostNamespacedServiceProxyWithPath",
+     "operationId": "connectCoreV1PostNamespacedServiceProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -6271,7 +6276,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectDeleteNamespacedServiceProxyWithPath",
+     "operationId": "connectCoreV1DeleteNamespacedServiceProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -6292,7 +6297,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectOptionsNamespacedServiceProxyWithPath",
+     "operationId": "connectCoreV1OptionsNamespacedServiceProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -6313,7 +6318,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectHeadNamespacedServiceProxyWithPath",
+     "operationId": "connectCoreV1HeadNamespacedServiceProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -6371,7 +6376,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedServiceStatus",
+     "operationId": "readCoreV1NamespacedServiceStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -6394,7 +6399,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedServiceStatus",
+     "operationId": "replaceCoreV1NamespacedServiceStatus",
      "parameters": [
       {
        "name": "body",
@@ -6429,7 +6434,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedServiceStatus",
+     "operationId": "patchCoreV1NamespacedServiceStatus",
      "parameters": [
       {
        "name": "body",
@@ -6489,7 +6494,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespace",
+     "operationId": "readCoreV1Namespace",
      "parameters": [
       {
        "uniqueItems": true,
@@ -6528,7 +6533,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespace",
+     "operationId": "replaceCoreV1Namespace",
      "parameters": [
       {
        "name": "body",
@@ -6561,7 +6566,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteNamespace",
+     "operationId": "deleteCoreV1Namespace",
      "parameters": [
       {
        "name": "body",
@@ -6596,7 +6601,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespace",
+     "operationId": "patchCoreV1Namespace",
      "parameters": [
       {
        "name": "body",
@@ -6648,7 +6653,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespaceFinalize",
+     "operationId": "replaceCoreV1NamespaceFinalize",
      "responses": {
       "200": {
        "description": "OK",
@@ -6698,7 +6703,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespaceStatus",
+     "operationId": "readCoreV1NamespaceStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -6721,7 +6726,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespaceStatus",
+     "operationId": "replaceCoreV1NamespaceStatus",
      "parameters": [
       {
        "name": "body",
@@ -6756,7 +6761,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespaceStatus",
+     "operationId": "patchCoreV1NamespaceStatus",
      "parameters": [
       {
        "name": "body",
@@ -6808,7 +6813,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNode",
+     "operationId": "listCoreV1Node",
      "parameters": [
       {
        "uniqueItems": true,
@@ -6868,7 +6873,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNode",
+     "operationId": "createCoreV1Node",
      "parameters": [
       {
        "name": "body",
@@ -6901,7 +6906,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionNode",
+     "operationId": "deleteCoreV1CollectionNode",
      "parameters": [
       {
        "uniqueItems": true,
@@ -6972,7 +6977,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNode",
+     "operationId": "readCoreV1Node",
      "parameters": [
       {
        "uniqueItems": true,
@@ -7011,7 +7016,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNode",
+     "operationId": "replaceCoreV1Node",
      "parameters": [
       {
        "name": "body",
@@ -7044,7 +7049,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteNode",
+     "operationId": "deleteCoreV1Node",
      "parameters": [
       {
        "name": "body",
@@ -7079,7 +7084,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNode",
+     "operationId": "patchCoreV1Node",
      "parameters": [
       {
        "name": "body",
@@ -7129,7 +7134,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectGetNodeProxy",
+     "operationId": "connectCoreV1GetNodeProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -7150,7 +7155,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectPutNodeProxy",
+     "operationId": "connectCoreV1PutNodeProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -7171,7 +7176,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectPostNodeProxy",
+     "operationId": "connectCoreV1PostNodeProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -7192,7 +7197,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectDeleteNodeProxy",
+     "operationId": "connectCoreV1DeleteNodeProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -7213,7 +7218,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectOptionsNodeProxy",
+     "operationId": "connectCoreV1OptionsNodeProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -7234,7 +7239,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectHeadNodeProxy",
+     "operationId": "connectCoreV1HeadNodeProxy",
      "responses": {
       "200": {
        "description": "OK",
@@ -7274,7 +7279,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectGetNodeProxyWithPath",
+     "operationId": "connectCoreV1GetNodeProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -7295,7 +7300,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectPutNodeProxyWithPath",
+     "operationId": "connectCoreV1PutNodeProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -7316,7 +7321,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectPostNodeProxyWithPath",
+     "operationId": "connectCoreV1PostNodeProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -7337,7 +7342,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectDeleteNodeProxyWithPath",
+     "operationId": "connectCoreV1DeleteNodeProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -7358,7 +7363,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectOptionsNodeProxyWithPath",
+     "operationId": "connectCoreV1OptionsNodeProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -7379,7 +7384,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "connectHeadNodeProxyWithPath",
+     "operationId": "connectCoreV1HeadNodeProxyWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -7429,7 +7434,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNodeStatus",
+     "operationId": "readCoreV1NodeStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -7452,7 +7457,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNodeStatus",
+     "operationId": "replaceCoreV1NodeStatus",
      "parameters": [
       {
        "name": "body",
@@ -7487,7 +7492,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNodeStatus",
+     "operationId": "patchCoreV1NodeStatus",
      "parameters": [
       {
        "name": "body",
@@ -7539,7 +7544,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listPersistentVolumeClaimForAllNamespaces",
+     "operationId": "listCoreV1PersistentVolumeClaimForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -7608,7 +7613,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listPersistentVolume",
+     "operationId": "listCoreV1PersistentVolume",
      "parameters": [
       {
        "uniqueItems": true,
@@ -7668,7 +7673,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createPersistentVolume",
+     "operationId": "createCoreV1PersistentVolume",
      "parameters": [
       {
        "name": "body",
@@ -7701,7 +7706,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionPersistentVolume",
+     "operationId": "deleteCoreV1CollectionPersistentVolume",
      "parameters": [
       {
        "uniqueItems": true,
@@ -7772,7 +7777,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readPersistentVolume",
+     "operationId": "readCoreV1PersistentVolume",
      "parameters": [
       {
        "uniqueItems": true,
@@ -7811,7 +7816,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replacePersistentVolume",
+     "operationId": "replaceCoreV1PersistentVolume",
      "parameters": [
       {
        "name": "body",
@@ -7844,7 +7849,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletePersistentVolume",
+     "operationId": "deleteCoreV1PersistentVolume",
      "parameters": [
       {
        "name": "body",
@@ -7879,7 +7884,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchPersistentVolume",
+     "operationId": "patchCoreV1PersistentVolume",
      "parameters": [
       {
        "name": "body",
@@ -7931,7 +7936,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readPersistentVolumeStatus",
+     "operationId": "readCoreV1PersistentVolumeStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -7954,7 +7959,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replacePersistentVolumeStatus",
+     "operationId": "replaceCoreV1PersistentVolumeStatus",
      "parameters": [
       {
        "name": "body",
@@ -7989,7 +7994,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchPersistentVolumeStatus",
+     "operationId": "patchCoreV1PersistentVolumeStatus",
      "parameters": [
       {
        "name": "body",
@@ -8041,7 +8046,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listPodForAllNamespaces",
+     "operationId": "listCoreV1PodForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -8110,7 +8115,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listPodTemplateForAllNamespaces",
+     "operationId": "listCoreV1PodTemplateForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -8177,7 +8182,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyGETNamespacedPod",
+     "operationId": "proxyCoreV1GETNamespacedPod",
      "responses": {
       "200": {
        "description": "OK",
@@ -8198,7 +8203,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyPUTNamespacedPod",
+     "operationId": "proxyCoreV1PUTNamespacedPod",
      "responses": {
       "200": {
        "description": "OK",
@@ -8219,7 +8224,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyPOSTNamespacedPod",
+     "operationId": "proxyCoreV1POSTNamespacedPod",
      "responses": {
       "200": {
        "description": "OK",
@@ -8240,7 +8245,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyDELETENamespacedPod",
+     "operationId": "proxyCoreV1DELETENamespacedPod",
      "responses": {
       "200": {
        "description": "OK",
@@ -8261,7 +8266,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyOPTIONSNamespacedPod",
+     "operationId": "proxyCoreV1OPTIONSNamespacedPod",
      "responses": {
       "200": {
        "description": "OK",
@@ -8282,7 +8287,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyHEADNamespacedPod",
+     "operationId": "proxyCoreV1HEADNamespacedPod",
      "responses": {
       "200": {
        "description": "OK",
@@ -8323,7 +8328,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyGETNamespacedPodWithPath",
+     "operationId": "proxyCoreV1GETNamespacedPodWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -8344,7 +8349,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyPUTNamespacedPodWithPath",
+     "operationId": "proxyCoreV1PUTNamespacedPodWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -8365,7 +8370,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyPOSTNamespacedPodWithPath",
+     "operationId": "proxyCoreV1POSTNamespacedPodWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -8386,7 +8391,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyDELETENamespacedPodWithPath",
+     "operationId": "proxyCoreV1DELETENamespacedPodWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -8407,7 +8412,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyOPTIONSNamespacedPodWithPath",
+     "operationId": "proxyCoreV1OPTIONSNamespacedPodWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -8428,7 +8433,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyHEADNamespacedPodWithPath",
+     "operationId": "proxyCoreV1HEADNamespacedPodWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -8477,7 +8482,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyGETNamespacedService",
+     "operationId": "proxyCoreV1GETNamespacedService",
      "responses": {
       "200": {
        "description": "OK",
@@ -8498,7 +8503,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyPUTNamespacedService",
+     "operationId": "proxyCoreV1PUTNamespacedService",
      "responses": {
       "200": {
        "description": "OK",
@@ -8519,7 +8524,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyPOSTNamespacedService",
+     "operationId": "proxyCoreV1POSTNamespacedService",
      "responses": {
       "200": {
        "description": "OK",
@@ -8540,7 +8545,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyDELETENamespacedService",
+     "operationId": "proxyCoreV1DELETENamespacedService",
      "responses": {
       "200": {
        "description": "OK",
@@ -8561,7 +8566,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyOPTIONSNamespacedService",
+     "operationId": "proxyCoreV1OPTIONSNamespacedService",
      "responses": {
       "200": {
        "description": "OK",
@@ -8582,7 +8587,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyHEADNamespacedService",
+     "operationId": "proxyCoreV1HEADNamespacedService",
      "responses": {
       "200": {
        "description": "OK",
@@ -8623,7 +8628,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyGETNamespacedServiceWithPath",
+     "operationId": "proxyCoreV1GETNamespacedServiceWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -8644,7 +8649,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyPUTNamespacedServiceWithPath",
+     "operationId": "proxyCoreV1PUTNamespacedServiceWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -8665,7 +8670,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyPOSTNamespacedServiceWithPath",
+     "operationId": "proxyCoreV1POSTNamespacedServiceWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -8686,7 +8691,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyDELETENamespacedServiceWithPath",
+     "operationId": "proxyCoreV1DELETENamespacedServiceWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -8707,7 +8712,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyOPTIONSNamespacedServiceWithPath",
+     "operationId": "proxyCoreV1OPTIONSNamespacedServiceWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -8728,7 +8733,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyHEADNamespacedServiceWithPath",
+     "operationId": "proxyCoreV1HEADNamespacedServiceWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -8777,7 +8782,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyGETNode",
+     "operationId": "proxyCoreV1GETNode",
      "responses": {
       "200": {
        "description": "OK",
@@ -8798,7 +8803,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyPUTNode",
+     "operationId": "proxyCoreV1PUTNode",
      "responses": {
       "200": {
        "description": "OK",
@@ -8819,7 +8824,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyPOSTNode",
+     "operationId": "proxyCoreV1POSTNode",
      "responses": {
       "200": {
        "description": "OK",
@@ -8840,7 +8845,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyDELETENode",
+     "operationId": "proxyCoreV1DELETENode",
      "responses": {
       "200": {
        "description": "OK",
@@ -8861,7 +8866,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyOPTIONSNode",
+     "operationId": "proxyCoreV1OPTIONSNode",
      "responses": {
       "200": {
        "description": "OK",
@@ -8882,7 +8887,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyHEADNode",
+     "operationId": "proxyCoreV1HEADNode",
      "responses": {
       "200": {
        "description": "OK",
@@ -8915,7 +8920,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyGETNodeWithPath",
+     "operationId": "proxyCoreV1GETNodeWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -8936,7 +8941,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyPUTNodeWithPath",
+     "operationId": "proxyCoreV1PUTNodeWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -8957,7 +8962,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyPOSTNodeWithPath",
+     "operationId": "proxyCoreV1POSTNodeWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -8978,7 +8983,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyDELETENodeWithPath",
+     "operationId": "proxyCoreV1DELETENodeWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -8999,7 +9004,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyOPTIONSNodeWithPath",
+     "operationId": "proxyCoreV1OPTIONSNodeWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -9020,7 +9025,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "proxyHEADNodeWithPath",
+     "operationId": "proxyCoreV1HEADNodeWithPath",
      "responses": {
       "200": {
        "description": "OK",
@@ -9063,7 +9068,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listReplicationControllerForAllNamespaces",
+     "operationId": "listCoreV1ReplicationControllerForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -9132,7 +9137,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listResourceQuotaForAllNamespaces",
+     "operationId": "listCoreV1ResourceQuotaForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -9201,7 +9206,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listSecretForAllNamespaces",
+     "operationId": "listCoreV1SecretForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -9270,7 +9275,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listServiceAccountForAllNamespaces",
+     "operationId": "listCoreV1ServiceAccountForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -9339,7 +9344,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listServiceForAllNamespaces",
+     "operationId": "listCoreV1ServiceForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -9409,7 +9414,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchConfigMapListForAllNamespaces",
+     "operationId": "watchCoreV1ConfigMapListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -9479,7 +9484,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchEndpointsListForAllNamespaces",
+     "operationId": "watchCoreV1EndpointsListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -9549,7 +9554,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchEventListForAllNamespaces",
+     "operationId": "watchCoreV1EventListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -9619,7 +9624,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchLimitRangeListForAllNamespaces",
+     "operationId": "watchCoreV1LimitRangeListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -9689,7 +9694,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespaceList",
+     "operationId": "watchCoreV1NamespaceList",
      "responses": {
       "200": {
        "description": "OK",
@@ -9759,7 +9764,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedConfigMapList",
+     "operationId": "watchCoreV1NamespacedConfigMapList",
      "responses": {
       "200": {
        "description": "OK",
@@ -9837,7 +9842,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedConfigMap",
+     "operationId": "watchCoreV1NamespacedConfigMap",
      "responses": {
       "200": {
        "description": "OK",
@@ -9923,7 +9928,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedEndpointsList",
+     "operationId": "watchCoreV1NamespacedEndpointsList",
      "responses": {
       "200": {
        "description": "OK",
@@ -10001,7 +10006,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedEndpoints",
+     "operationId": "watchCoreV1NamespacedEndpoints",
      "responses": {
       "200": {
        "description": "OK",
@@ -10087,7 +10092,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedEventList",
+     "operationId": "watchCoreV1NamespacedEventList",
      "responses": {
       "200": {
        "description": "OK",
@@ -10165,7 +10170,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedEvent",
+     "operationId": "watchCoreV1NamespacedEvent",
      "responses": {
       "200": {
        "description": "OK",
@@ -10251,7 +10256,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedLimitRangeList",
+     "operationId": "watchCoreV1NamespacedLimitRangeList",
      "responses": {
       "200": {
        "description": "OK",
@@ -10329,7 +10334,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedLimitRange",
+     "operationId": "watchCoreV1NamespacedLimitRange",
      "responses": {
       "200": {
        "description": "OK",
@@ -10415,7 +10420,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedPersistentVolumeClaimList",
+     "operationId": "watchCoreV1NamespacedPersistentVolumeClaimList",
      "responses": {
       "200": {
        "description": "OK",
@@ -10493,7 +10498,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedPersistentVolumeClaim",
+     "operationId": "watchCoreV1NamespacedPersistentVolumeClaim",
      "responses": {
       "200": {
        "description": "OK",
@@ -10579,7 +10584,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedPodList",
+     "operationId": "watchCoreV1NamespacedPodList",
      "responses": {
       "200": {
        "description": "OK",
@@ -10657,7 +10662,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedPod",
+     "operationId": "watchCoreV1NamespacedPod",
      "responses": {
       "200": {
        "description": "OK",
@@ -10743,7 +10748,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedPodTemplateList",
+     "operationId": "watchCoreV1NamespacedPodTemplateList",
      "responses": {
       "200": {
        "description": "OK",
@@ -10821,7 +10826,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedPodTemplate",
+     "operationId": "watchCoreV1NamespacedPodTemplate",
      "responses": {
       "200": {
        "description": "OK",
@@ -10907,7 +10912,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedReplicationControllerList",
+     "operationId": "watchCoreV1NamespacedReplicationControllerList",
      "responses": {
       "200": {
        "description": "OK",
@@ -10985,7 +10990,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedReplicationController",
+     "operationId": "watchCoreV1NamespacedReplicationController",
      "responses": {
       "200": {
        "description": "OK",
@@ -11071,7 +11076,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedResourceQuotaList",
+     "operationId": "watchCoreV1NamespacedResourceQuotaList",
      "responses": {
       "200": {
        "description": "OK",
@@ -11149,7 +11154,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedResourceQuota",
+     "operationId": "watchCoreV1NamespacedResourceQuota",
      "responses": {
       "200": {
        "description": "OK",
@@ -11235,7 +11240,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedSecretList",
+     "operationId": "watchCoreV1NamespacedSecretList",
      "responses": {
       "200": {
        "description": "OK",
@@ -11313,7 +11318,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedSecret",
+     "operationId": "watchCoreV1NamespacedSecret",
      "responses": {
       "200": {
        "description": "OK",
@@ -11399,7 +11404,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedServiceAccountList",
+     "operationId": "watchCoreV1NamespacedServiceAccountList",
      "responses": {
       "200": {
        "description": "OK",
@@ -11477,7 +11482,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedServiceAccount",
+     "operationId": "watchCoreV1NamespacedServiceAccount",
      "responses": {
       "200": {
        "description": "OK",
@@ -11563,7 +11568,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedServiceList",
+     "operationId": "watchCoreV1NamespacedServiceList",
      "responses": {
       "200": {
        "description": "OK",
@@ -11641,7 +11646,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedService",
+     "operationId": "watchCoreV1NamespacedService",
      "responses": {
       "200": {
        "description": "OK",
@@ -11727,7 +11732,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespace",
+     "operationId": "watchCoreV1Namespace",
      "responses": {
       "200": {
        "description": "OK",
@@ -11805,7 +11810,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNodeList",
+     "operationId": "watchCoreV1NodeList",
      "responses": {
       "200": {
        "description": "OK",
@@ -11875,7 +11880,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNode",
+     "operationId": "watchCoreV1Node",
      "responses": {
       "200": {
        "description": "OK",
@@ -11953,7 +11958,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchPersistentVolumeClaimListForAllNamespaces",
+     "operationId": "watchCoreV1PersistentVolumeClaimListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -12023,7 +12028,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchPersistentVolumeList",
+     "operationId": "watchCoreV1PersistentVolumeList",
      "responses": {
       "200": {
        "description": "OK",
@@ -12093,7 +12098,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchPersistentVolume",
+     "operationId": "watchCoreV1PersistentVolume",
      "responses": {
       "200": {
        "description": "OK",
@@ -12171,7 +12176,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchPodListForAllNamespaces",
+     "operationId": "watchCoreV1PodListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -12241,7 +12246,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchPodTemplateListForAllNamespaces",
+     "operationId": "watchCoreV1PodTemplateListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -12311,7 +12316,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchReplicationControllerListForAllNamespaces",
+     "operationId": "watchCoreV1ReplicationControllerListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -12381,7 +12386,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchResourceQuotaListForAllNamespaces",
+     "operationId": "watchCoreV1ResourceQuotaListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -12451,7 +12456,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchSecretListForAllNamespaces",
+     "operationId": "watchCoreV1SecretListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -12521,7 +12526,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchServiceAccountListForAllNamespaces",
+     "operationId": "watchCoreV1ServiceAccountListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -12591,7 +12596,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchServiceListForAllNamespaces",
+     "operationId": "watchCoreV1ServiceListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -12662,6 +12667,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getAPIVersions",
      "responses": {
       "200": {
        "description": "OK",
@@ -12688,6 +12694,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getAppsAPIGroup",
      "responses": {
       "200": {
        "description": "OK",
@@ -12714,6 +12721,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getAppsV1alpha1APIResources",
      "responses": {
       "200": {
        "description": "OK",
@@ -12738,7 +12746,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNamespacedPetSet",
+     "operationId": "listAppsV1alpha1NamespacedPetSet",
      "parameters": [
       {
        "uniqueItems": true,
@@ -12798,7 +12806,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedPetSet",
+     "operationId": "createAppsV1alpha1NamespacedPetSet",
      "parameters": [
       {
        "name": "body",
@@ -12831,7 +12839,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionNamespacedPetSet",
+     "operationId": "deleteAppsV1alpha1CollectionNamespacedPetSet",
      "parameters": [
       {
        "uniqueItems": true,
@@ -12910,7 +12918,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedPetSet",
+     "operationId": "readAppsV1alpha1NamespacedPetSet",
      "parameters": [
       {
        "uniqueItems": true,
@@ -12949,7 +12957,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedPetSet",
+     "operationId": "replaceAppsV1alpha1NamespacedPetSet",
      "parameters": [
       {
        "name": "body",
@@ -12982,7 +12990,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteNamespacedPetSet",
+     "operationId": "deleteAppsV1alpha1NamespacedPetSet",
      "parameters": [
       {
        "name": "body",
@@ -13017,7 +13025,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedPetSet",
+     "operationId": "patchAppsV1alpha1NamespacedPetSet",
      "parameters": [
       {
        "name": "body",
@@ -13077,7 +13085,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedPetSetStatus",
+     "operationId": "readAppsV1alpha1NamespacedPetSetStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -13100,7 +13108,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedPetSetStatus",
+     "operationId": "replaceAppsV1alpha1NamespacedPetSetStatus",
      "parameters": [
       {
        "name": "body",
@@ -13135,7 +13143,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedPetSetStatus",
+     "operationId": "patchAppsV1alpha1NamespacedPetSetStatus",
      "parameters": [
       {
        "name": "body",
@@ -13195,7 +13203,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listPetSetForAllNamespaces",
+     "operationId": "listAppsV1alpha1PetSetForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -13265,7 +13273,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedPetSetList",
+     "operationId": "watchAppsV1alpha1NamespacedPetSetList",
      "responses": {
       "200": {
        "description": "OK",
@@ -13343,7 +13351,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedPetSet",
+     "operationId": "watchAppsV1alpha1NamespacedPetSet",
      "responses": {
       "200": {
        "description": "OK",
@@ -13429,7 +13437,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchPetSetListForAllNamespaces",
+     "operationId": "watchAppsV1alpha1PetSetListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -13500,6 +13508,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getAuthenticationAPIGroup",
      "responses": {
       "200": {
        "description": "OK",
@@ -13526,6 +13535,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getAuthenticationV1beta1APIResources",
      "responses": {
       "200": {
        "description": "OK",
@@ -13550,7 +13560,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createTokenReview",
+     "operationId": "createAuthenticationV1beta1TokenReview",
      "responses": {
       "200": {
        "description": "OK",
@@ -13594,6 +13604,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getAuthorizationAPIGroup",
      "responses": {
       "200": {
        "description": "OK",
@@ -13620,6 +13631,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getAuthorizationV1beta1APIResources",
      "responses": {
       "200": {
        "description": "OK",
@@ -13644,7 +13656,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedLocalSubjectAccessReview",
+     "operationId": "createAuthorizationV1beta1NamespacedLocalSubjectAccessReview",
      "responses": {
       "200": {
        "description": "OK",
@@ -13694,7 +13706,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createSelfSubjectAccessReview",
+     "operationId": "createAuthorizationV1beta1SelfSubjectAccessReview",
      "responses": {
       "200": {
        "description": "OK",
@@ -13736,7 +13748,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createSubjectAccessReview",
+     "operationId": "createAuthorizationV1beta1SubjectAccessReview",
      "responses": {
       "200": {
        "description": "OK",
@@ -13780,6 +13792,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getAutoscalingAPIGroup",
      "responses": {
       "200": {
        "description": "OK",
@@ -13806,6 +13819,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getAutoscalingV1APIResources",
      "responses": {
       "200": {
        "description": "OK",
@@ -13830,6 +13844,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "listAutoscalingV1HorizontalPodAutoscalerForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -13898,6 +13913,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "listAutoscalingV1NamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
        "uniqueItems": true,
@@ -13957,6 +13973,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "createAutoscalingV1NamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
        "name": "body",
@@ -13989,6 +14006,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "deleteAutoscalingV1CollectionNamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
        "uniqueItems": true,
@@ -14067,6 +14085,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "readAutoscalingV1NamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
        "uniqueItems": true,
@@ -14105,6 +14124,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "replaceAutoscalingV1NamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
        "name": "body",
@@ -14137,6 +14157,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "deleteAutoscalingV1NamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
        "name": "body",
@@ -14171,6 +14192,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "patchAutoscalingV1NamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
        "name": "body",
@@ -14230,6 +14252,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "readAutoscalingV1NamespacedHorizontalPodAutoscalerStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -14252,6 +14275,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "replaceAutoscalingV1NamespacedHorizontalPodAutoscalerStatus",
      "parameters": [
       {
        "name": "body",
@@ -14286,6 +14310,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "patchAutoscalingV1NamespacedHorizontalPodAutoscalerStatus",
      "parameters": [
       {
        "name": "body",
@@ -14346,6 +14371,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "watchAutoscalingV1HorizontalPodAutoscalerListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -14415,6 +14441,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "watchAutoscalingV1NamespacedHorizontalPodAutoscalerList",
      "responses": {
       "200": {
        "description": "OK",
@@ -14492,6 +14519,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "watchAutoscalingV1NamespacedHorizontalPodAutoscaler",
      "responses": {
       "200": {
        "description": "OK",
@@ -14578,6 +14606,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getBatchAPIGroup",
      "responses": {
       "200": {
        "description": "OK",
@@ -14604,6 +14633,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getBatchV1APIResources",
      "responses": {
       "200": {
        "description": "OK",
@@ -14628,6 +14658,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "listBatchV1JobForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -14696,6 +14727,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "listBatchV1NamespacedJob",
      "parameters": [
       {
        "uniqueItems": true,
@@ -14755,6 +14787,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "createBatchV1NamespacedJob",
      "parameters": [
       {
        "name": "body",
@@ -14787,6 +14820,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "deleteBatchV1CollectionNamespacedJob",
      "parameters": [
       {
        "uniqueItems": true,
@@ -14865,6 +14899,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "readBatchV1NamespacedJob",
      "parameters": [
       {
        "uniqueItems": true,
@@ -14903,6 +14938,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "replaceBatchV1NamespacedJob",
      "parameters": [
       {
        "name": "body",
@@ -14935,6 +14971,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "deleteBatchV1NamespacedJob",
      "parameters": [
       {
        "name": "body",
@@ -14969,6 +15006,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "patchBatchV1NamespacedJob",
      "parameters": [
       {
        "name": "body",
@@ -15028,6 +15066,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "readBatchV1NamespacedJobStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -15050,6 +15089,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "replaceBatchV1NamespacedJobStatus",
      "parameters": [
       {
        "name": "body",
@@ -15084,6 +15124,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "patchBatchV1NamespacedJobStatus",
      "parameters": [
       {
        "name": "body",
@@ -15144,6 +15185,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "watchBatchV1JobListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -15213,6 +15255,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "watchBatchV1NamespacedJobList",
      "responses": {
       "200": {
        "description": "OK",
@@ -15290,6 +15333,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "watchBatchV1NamespacedJob",
      "responses": {
       "200": {
        "description": "OK",
@@ -15376,6 +15420,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getBatchV2alpha1APIResources",
      "responses": {
       "200": {
        "description": "OK",
@@ -15402,6 +15447,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getCertificatesAPIGroup",
      "responses": {
       "200": {
        "description": "OK",
@@ -15428,6 +15474,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getCertificatesV1alpha1APIResources",
      "responses": {
       "200": {
        "description": "OK",
@@ -15452,7 +15499,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listCertificateSigningRequest",
+     "operationId": "listCertificatesV1alpha1CertificateSigningRequest",
      "parameters": [
       {
        "uniqueItems": true,
@@ -15512,7 +15559,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createCertificateSigningRequest",
+     "operationId": "createCertificatesV1alpha1CertificateSigningRequest",
      "parameters": [
       {
        "name": "body",
@@ -15545,7 +15592,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionCertificateSigningRequest",
+     "operationId": "deleteCertificatesV1alpha1CollectionCertificateSigningRequest",
      "parameters": [
       {
        "uniqueItems": true,
@@ -15616,7 +15663,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readCertificateSigningRequest",
+     "operationId": "readCertificatesV1alpha1CertificateSigningRequest",
      "parameters": [
       {
        "uniqueItems": true,
@@ -15655,7 +15702,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceCertificateSigningRequest",
+     "operationId": "replaceCertificatesV1alpha1CertificateSigningRequest",
      "parameters": [
       {
        "name": "body",
@@ -15688,7 +15735,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteCertificateSigningRequest",
+     "operationId": "deleteCertificatesV1alpha1CertificateSigningRequest",
      "parameters": [
       {
        "name": "body",
@@ -15723,7 +15770,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchCertificateSigningRequest",
+     "operationId": "patchCertificatesV1alpha1CertificateSigningRequest",
      "parameters": [
       {
        "name": "body",
@@ -15775,7 +15822,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceCertificateSigningRequestApproval",
+     "operationId": "replaceCertificatesV1alpha1CertificateSigningRequestApproval",
      "responses": {
       "200": {
        "description": "OK",
@@ -15825,7 +15872,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceCertificateSigningRequestStatus",
+     "operationId": "replaceCertificatesV1alpha1CertificateSigningRequestStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -15876,7 +15923,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchCertificateSigningRequestList",
+     "operationId": "watchCertificatesV1alpha1CertificateSigningRequestList",
      "responses": {
       "200": {
        "description": "OK",
@@ -15946,7 +15993,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchCertificateSigningRequest",
+     "operationId": "watchCertificatesV1alpha1CertificateSigningRequest",
      "responses": {
       "200": {
        "description": "OK",
@@ -16025,6 +16072,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getExtensionsAPIGroup",
      "responses": {
       "200": {
        "description": "OK",
@@ -16051,6 +16099,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getExtensionsV1beta1APIResources",
      "responses": {
       "200": {
        "description": "OK",
@@ -16075,7 +16124,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listDaemonSetForAllNamespaces",
+     "operationId": "listExtensionsV1beta1DaemonSetForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -16144,7 +16193,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listDeploymentForAllNamespaces",
+     "operationId": "listExtensionsV1beta1DeploymentForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -16213,6 +16262,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "listExtensionsV1beta1HorizontalPodAutoscalerForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -16281,7 +16331,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listIngressForAllNamespaces",
+     "operationId": "listExtensionsV1beta1IngressForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -16350,6 +16400,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "listExtensionsV1beta1JobForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -16418,7 +16469,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNamespacedDaemonSet",
+     "operationId": "listExtensionsV1beta1NamespacedDaemonSet",
      "parameters": [
       {
        "uniqueItems": true,
@@ -16478,7 +16529,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedDaemonSet",
+     "operationId": "createExtensionsV1beta1NamespacedDaemonSet",
      "parameters": [
       {
        "name": "body",
@@ -16511,7 +16562,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionNamespacedDaemonSet",
+     "operationId": "deleteExtensionsV1beta1CollectionNamespacedDaemonSet",
      "parameters": [
       {
        "uniqueItems": true,
@@ -16590,7 +16641,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedDaemonSet",
+     "operationId": "readExtensionsV1beta1NamespacedDaemonSet",
      "parameters": [
       {
        "uniqueItems": true,
@@ -16629,7 +16680,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedDaemonSet",
+     "operationId": "replaceExtensionsV1beta1NamespacedDaemonSet",
      "parameters": [
       {
        "name": "body",
@@ -16662,7 +16713,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteNamespacedDaemonSet",
+     "operationId": "deleteExtensionsV1beta1NamespacedDaemonSet",
      "parameters": [
       {
        "name": "body",
@@ -16697,7 +16748,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedDaemonSet",
+     "operationId": "patchExtensionsV1beta1NamespacedDaemonSet",
      "parameters": [
       {
        "name": "body",
@@ -16757,7 +16808,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedDaemonSetStatus",
+     "operationId": "readExtensionsV1beta1NamespacedDaemonSetStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -16780,7 +16831,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedDaemonSetStatus",
+     "operationId": "replaceExtensionsV1beta1NamespacedDaemonSetStatus",
      "parameters": [
       {
        "name": "body",
@@ -16815,7 +16866,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedDaemonSetStatus",
+     "operationId": "patchExtensionsV1beta1NamespacedDaemonSetStatus",
      "parameters": [
       {
        "name": "body",
@@ -16875,7 +16926,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNamespacedDeployment",
+     "operationId": "listExtensionsV1beta1NamespacedDeployment",
      "parameters": [
       {
        "uniqueItems": true,
@@ -16935,7 +16986,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedDeployment",
+     "operationId": "createExtensionsV1beta1NamespacedDeployment",
      "parameters": [
       {
        "name": "body",
@@ -16968,7 +17019,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionNamespacedDeployment",
+     "operationId": "deleteExtensionsV1beta1CollectionNamespacedDeployment",
      "parameters": [
       {
        "uniqueItems": true,
@@ -17047,7 +17098,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedDeployment",
+     "operationId": "readExtensionsV1beta1NamespacedDeployment",
      "parameters": [
       {
        "uniqueItems": true,
@@ -17086,7 +17137,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedDeployment",
+     "operationId": "replaceExtensionsV1beta1NamespacedDeployment",
      "parameters": [
       {
        "name": "body",
@@ -17119,7 +17170,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteNamespacedDeployment",
+     "operationId": "deleteExtensionsV1beta1NamespacedDeployment",
      "parameters": [
       {
        "name": "body",
@@ -17154,7 +17205,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedDeployment",
+     "operationId": "patchExtensionsV1beta1NamespacedDeployment",
      "parameters": [
       {
        "name": "body",
@@ -17214,7 +17265,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedDeploymentRollbackRollback",
+     "operationId": "createExtensionsV1beta1NamespacedDeploymentRollbackRollback",
      "responses": {
       "200": {
        "description": "OK",
@@ -17272,6 +17323,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "readExtensionsV1beta1NamespacedDeploymentsScale",
      "responses": {
       "200": {
        "description": "OK",
@@ -17294,6 +17346,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "replaceExtensionsV1beta1NamespacedDeploymentsScale",
      "parameters": [
       {
        "name": "body",
@@ -17328,6 +17381,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "patchExtensionsV1beta1NamespacedDeploymentsScale",
      "parameters": [
       {
        "name": "body",
@@ -17387,7 +17441,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedDeploymentStatus",
+     "operationId": "readExtensionsV1beta1NamespacedDeploymentStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -17410,7 +17464,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedDeploymentStatus",
+     "operationId": "replaceExtensionsV1beta1NamespacedDeploymentStatus",
      "parameters": [
       {
        "name": "body",
@@ -17445,7 +17499,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedDeploymentStatus",
+     "operationId": "patchExtensionsV1beta1NamespacedDeploymentStatus",
      "parameters": [
       {
        "name": "body",
@@ -17505,6 +17559,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "listExtensionsV1beta1NamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
        "uniqueItems": true,
@@ -17564,6 +17619,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "createExtensionsV1beta1NamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
        "name": "body",
@@ -17596,6 +17652,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "deleteExtensionsV1beta1CollectionNamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
        "uniqueItems": true,
@@ -17674,6 +17731,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "readExtensionsV1beta1NamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
        "uniqueItems": true,
@@ -17712,6 +17770,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "replaceExtensionsV1beta1NamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
        "name": "body",
@@ -17744,6 +17803,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "deleteExtensionsV1beta1NamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
        "name": "body",
@@ -17778,6 +17838,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "patchExtensionsV1beta1NamespacedHorizontalPodAutoscaler",
      "parameters": [
       {
        "name": "body",
@@ -17837,6 +17898,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "readExtensionsV1beta1NamespacedHorizontalPodAutoscalerStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -17859,6 +17921,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "replaceExtensionsV1beta1NamespacedHorizontalPodAutoscalerStatus",
      "parameters": [
       {
        "name": "body",
@@ -17893,6 +17956,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "patchExtensionsV1beta1NamespacedHorizontalPodAutoscalerStatus",
      "parameters": [
       {
        "name": "body",
@@ -17952,7 +18016,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNamespacedIngress",
+     "operationId": "listExtensionsV1beta1NamespacedIngress",
      "parameters": [
       {
        "uniqueItems": true,
@@ -18012,7 +18076,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedIngress",
+     "operationId": "createExtensionsV1beta1NamespacedIngress",
      "parameters": [
       {
        "name": "body",
@@ -18045,7 +18109,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionNamespacedIngress",
+     "operationId": "deleteExtensionsV1beta1CollectionNamespacedIngress",
      "parameters": [
       {
        "uniqueItems": true,
@@ -18124,7 +18188,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedIngress",
+     "operationId": "readExtensionsV1beta1NamespacedIngress",
      "parameters": [
       {
        "uniqueItems": true,
@@ -18163,7 +18227,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedIngress",
+     "operationId": "replaceExtensionsV1beta1NamespacedIngress",
      "parameters": [
       {
        "name": "body",
@@ -18196,7 +18260,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteNamespacedIngress",
+     "operationId": "deleteExtensionsV1beta1NamespacedIngress",
      "parameters": [
       {
        "name": "body",
@@ -18231,7 +18295,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedIngress",
+     "operationId": "patchExtensionsV1beta1NamespacedIngress",
      "parameters": [
       {
        "name": "body",
@@ -18291,7 +18355,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedIngressStatus",
+     "operationId": "readExtensionsV1beta1NamespacedIngressStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -18314,7 +18378,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedIngressStatus",
+     "operationId": "replaceExtensionsV1beta1NamespacedIngressStatus",
      "parameters": [
       {
        "name": "body",
@@ -18349,7 +18413,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedIngressStatus",
+     "operationId": "patchExtensionsV1beta1NamespacedIngressStatus",
      "parameters": [
       {
        "name": "body",
@@ -18409,6 +18473,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "listExtensionsV1beta1NamespacedJob",
      "parameters": [
       {
        "uniqueItems": true,
@@ -18468,6 +18533,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "createExtensionsV1beta1NamespacedJob",
      "parameters": [
       {
        "name": "body",
@@ -18500,6 +18566,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "deleteExtensionsV1beta1CollectionNamespacedJob",
      "parameters": [
       {
        "uniqueItems": true,
@@ -18578,6 +18645,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "readExtensionsV1beta1NamespacedJob",
      "parameters": [
       {
        "uniqueItems": true,
@@ -18616,6 +18684,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "replaceExtensionsV1beta1NamespacedJob",
      "parameters": [
       {
        "name": "body",
@@ -18648,6 +18717,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "deleteExtensionsV1beta1NamespacedJob",
      "parameters": [
       {
        "name": "body",
@@ -18682,6 +18752,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "patchExtensionsV1beta1NamespacedJob",
      "parameters": [
       {
        "name": "body",
@@ -18741,6 +18812,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "readExtensionsV1beta1NamespacedJobStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -18763,6 +18835,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "replaceExtensionsV1beta1NamespacedJobStatus",
      "parameters": [
       {
        "name": "body",
@@ -18797,6 +18870,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "patchExtensionsV1beta1NamespacedJobStatus",
      "parameters": [
       {
        "name": "body",
@@ -18856,7 +18930,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNamespacedNetworkPolicy",
+     "operationId": "listExtensionsV1beta1NamespacedNetworkPolicy",
      "parameters": [
       {
        "uniqueItems": true,
@@ -18916,7 +18990,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedNetworkPolicy",
+     "operationId": "createExtensionsV1beta1NamespacedNetworkPolicy",
      "parameters": [
       {
        "name": "body",
@@ -18949,7 +19023,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionNamespacedNetworkPolicy",
+     "operationId": "deleteExtensionsV1beta1CollectionNamespacedNetworkPolicy",
      "parameters": [
       {
        "uniqueItems": true,
@@ -19028,7 +19102,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedNetworkPolicy",
+     "operationId": "readExtensionsV1beta1NamespacedNetworkPolicy",
      "parameters": [
       {
        "uniqueItems": true,
@@ -19067,7 +19141,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedNetworkPolicy",
+     "operationId": "replaceExtensionsV1beta1NamespacedNetworkPolicy",
      "parameters": [
       {
        "name": "body",
@@ -19100,7 +19174,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteNamespacedNetworkPolicy",
+     "operationId": "deleteExtensionsV1beta1NamespacedNetworkPolicy",
      "parameters": [
       {
        "name": "body",
@@ -19135,7 +19209,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedNetworkPolicy",
+     "operationId": "patchExtensionsV1beta1NamespacedNetworkPolicy",
      "parameters": [
       {
        "name": "body",
@@ -19195,7 +19269,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNamespacedReplicaSet",
+     "operationId": "listExtensionsV1beta1NamespacedReplicaSet",
      "parameters": [
       {
        "uniqueItems": true,
@@ -19255,7 +19329,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedReplicaSet",
+     "operationId": "createExtensionsV1beta1NamespacedReplicaSet",
      "parameters": [
       {
        "name": "body",
@@ -19288,7 +19362,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionNamespacedReplicaSet",
+     "operationId": "deleteExtensionsV1beta1CollectionNamespacedReplicaSet",
      "parameters": [
       {
        "uniqueItems": true,
@@ -19367,7 +19441,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedReplicaSet",
+     "operationId": "readExtensionsV1beta1NamespacedReplicaSet",
      "parameters": [
       {
        "uniqueItems": true,
@@ -19406,7 +19480,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedReplicaSet",
+     "operationId": "replaceExtensionsV1beta1NamespacedReplicaSet",
      "parameters": [
       {
        "name": "body",
@@ -19439,7 +19513,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteNamespacedReplicaSet",
+     "operationId": "deleteExtensionsV1beta1NamespacedReplicaSet",
      "parameters": [
       {
        "name": "body",
@@ -19474,7 +19548,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedReplicaSet",
+     "operationId": "patchExtensionsV1beta1NamespacedReplicaSet",
      "parameters": [
       {
        "name": "body",
@@ -19534,6 +19608,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "readExtensionsV1beta1NamespacedReplicasetsScale",
      "responses": {
       "200": {
        "description": "OK",
@@ -19556,6 +19631,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "replaceExtensionsV1beta1NamespacedReplicasetsScale",
      "parameters": [
       {
        "name": "body",
@@ -19590,6 +19666,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "patchExtensionsV1beta1NamespacedReplicasetsScale",
      "parameters": [
       {
        "name": "body",
@@ -19649,7 +19726,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedReplicaSetStatus",
+     "operationId": "readExtensionsV1beta1NamespacedReplicaSetStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -19672,7 +19749,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedReplicaSetStatus",
+     "operationId": "replaceExtensionsV1beta1NamespacedReplicaSetStatus",
      "parameters": [
       {
        "name": "body",
@@ -19707,7 +19784,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedReplicaSetStatus",
+     "operationId": "patchExtensionsV1beta1NamespacedReplicaSetStatus",
      "parameters": [
       {
        "name": "body",
@@ -19767,6 +19844,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "readExtensionsV1beta1NamespacedReplicationcontrollersScale",
      "responses": {
       "200": {
        "description": "OK",
@@ -19789,6 +19867,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "replaceExtensionsV1beta1NamespacedReplicationcontrollersScale",
      "parameters": [
       {
        "name": "body",
@@ -19823,6 +19902,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "patchExtensionsV1beta1NamespacedReplicationcontrollersScale",
      "parameters": [
       {
        "name": "body",
@@ -19882,7 +19962,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNetworkPolicyForAllNamespaces",
+     "operationId": "listExtensionsV1beta1NetworkPolicyForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -19951,7 +20031,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listReplicaSetForAllNamespaces",
+     "operationId": "listExtensionsV1beta1ReplicaSetForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -20020,7 +20100,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listThirdPartyResource",
+     "operationId": "listExtensionsV1beta1ThirdPartyResource",
      "parameters": [
       {
        "uniqueItems": true,
@@ -20080,7 +20160,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createThirdPartyResource",
+     "operationId": "createExtensionsV1beta1ThirdPartyResource",
      "parameters": [
       {
        "name": "body",
@@ -20113,7 +20193,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionThirdPartyResource",
+     "operationId": "deleteExtensionsV1beta1CollectionThirdPartyResource",
      "parameters": [
       {
        "uniqueItems": true,
@@ -20184,7 +20264,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readThirdPartyResource",
+     "operationId": "readExtensionsV1beta1ThirdPartyResource",
      "parameters": [
       {
        "uniqueItems": true,
@@ -20223,7 +20303,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceThirdPartyResource",
+     "operationId": "replaceExtensionsV1beta1ThirdPartyResource",
      "parameters": [
       {
        "name": "body",
@@ -20256,7 +20336,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteThirdPartyResource",
+     "operationId": "deleteExtensionsV1beta1ThirdPartyResource",
      "parameters": [
       {
        "name": "body",
@@ -20291,7 +20371,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchThirdPartyResource",
+     "operationId": "patchExtensionsV1beta1ThirdPartyResource",
      "parameters": [
       {
        "name": "body",
@@ -20344,7 +20424,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchDaemonSetListForAllNamespaces",
+     "operationId": "watchExtensionsV1beta1DaemonSetListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -20414,7 +20494,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchDeploymentListForAllNamespaces",
+     "operationId": "watchExtensionsV1beta1DeploymentListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -20484,6 +20564,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "watchExtensionsV1beta1HorizontalPodAutoscalerListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -20553,7 +20634,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchIngressListForAllNamespaces",
+     "operationId": "watchExtensionsV1beta1IngressListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -20623,6 +20704,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "watchExtensionsV1beta1JobListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -20692,7 +20774,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedDaemonSetList",
+     "operationId": "watchExtensionsV1beta1NamespacedDaemonSetList",
      "responses": {
       "200": {
        "description": "OK",
@@ -20770,7 +20852,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedDaemonSet",
+     "operationId": "watchExtensionsV1beta1NamespacedDaemonSet",
      "responses": {
       "200": {
        "description": "OK",
@@ -20856,7 +20938,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedDeploymentList",
+     "operationId": "watchExtensionsV1beta1NamespacedDeploymentList",
      "responses": {
       "200": {
        "description": "OK",
@@ -20934,7 +21016,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedDeployment",
+     "operationId": "watchExtensionsV1beta1NamespacedDeployment",
      "responses": {
       "200": {
        "description": "OK",
@@ -21020,6 +21102,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "watchExtensionsV1beta1NamespacedHorizontalPodAutoscalerList",
      "responses": {
       "200": {
        "description": "OK",
@@ -21097,6 +21180,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "watchExtensionsV1beta1NamespacedHorizontalPodAutoscaler",
      "responses": {
       "200": {
        "description": "OK",
@@ -21182,7 +21266,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedIngressList",
+     "operationId": "watchExtensionsV1beta1NamespacedIngressList",
      "responses": {
       "200": {
        "description": "OK",
@@ -21260,7 +21344,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedIngress",
+     "operationId": "watchExtensionsV1beta1NamespacedIngress",
      "responses": {
       "200": {
        "description": "OK",
@@ -21346,6 +21430,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "watchExtensionsV1beta1NamespacedJobList",
      "responses": {
       "200": {
        "description": "OK",
@@ -21423,6 +21508,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "watchExtensionsV1beta1NamespacedJob",
      "responses": {
       "200": {
        "description": "OK",
@@ -21508,7 +21594,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedNetworkPolicyList",
+     "operationId": "watchExtensionsV1beta1NamespacedNetworkPolicyList",
      "responses": {
       "200": {
        "description": "OK",
@@ -21586,7 +21672,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedNetworkPolicy",
+     "operationId": "watchExtensionsV1beta1NamespacedNetworkPolicy",
      "responses": {
       "200": {
        "description": "OK",
@@ -21672,7 +21758,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedReplicaSetList",
+     "operationId": "watchExtensionsV1beta1NamespacedReplicaSetList",
      "responses": {
       "200": {
        "description": "OK",
@@ -21750,7 +21836,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedReplicaSet",
+     "operationId": "watchExtensionsV1beta1NamespacedReplicaSet",
      "responses": {
       "200": {
        "description": "OK",
@@ -21836,7 +21922,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNetworkPolicyListForAllNamespaces",
+     "operationId": "watchExtensionsV1beta1NetworkPolicyListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -21906,7 +21992,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchReplicaSetListForAllNamespaces",
+     "operationId": "watchExtensionsV1beta1ReplicaSetListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -21976,7 +22062,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchThirdPartyResourceList",
+     "operationId": "watchExtensionsV1beta1ThirdPartyResourceList",
      "responses": {
       "200": {
        "description": "OK",
@@ -22046,7 +22132,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchThirdPartyResource",
+     "operationId": "watchExtensionsV1beta1ThirdPartyResource",
      "responses": {
       "200": {
        "description": "OK",
@@ -22125,6 +22211,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getPolicyAPIGroup",
      "responses": {
       "200": {
        "description": "OK",
@@ -22151,6 +22238,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getPolicyV1alpha1APIResources",
      "responses": {
       "200": {
        "description": "OK",
@@ -22175,7 +22263,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNamespacedPodDisruptionBudget",
+     "operationId": "listPolicyV1alpha1NamespacedPodDisruptionBudget",
      "parameters": [
       {
        "uniqueItems": true,
@@ -22235,7 +22323,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedPodDisruptionBudget",
+     "operationId": "createPolicyV1alpha1NamespacedPodDisruptionBudget",
      "parameters": [
       {
        "name": "body",
@@ -22268,7 +22356,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionNamespacedPodDisruptionBudget",
+     "operationId": "deletePolicyV1alpha1CollectionNamespacedPodDisruptionBudget",
      "parameters": [
       {
        "uniqueItems": true,
@@ -22347,7 +22435,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedPodDisruptionBudget",
+     "operationId": "readPolicyV1alpha1NamespacedPodDisruptionBudget",
      "parameters": [
       {
        "uniqueItems": true,
@@ -22386,7 +22474,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedPodDisruptionBudget",
+     "operationId": "replacePolicyV1alpha1NamespacedPodDisruptionBudget",
      "parameters": [
       {
        "name": "body",
@@ -22419,7 +22507,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteNamespacedPodDisruptionBudget",
+     "operationId": "deletePolicyV1alpha1NamespacedPodDisruptionBudget",
      "parameters": [
       {
        "name": "body",
@@ -22454,7 +22542,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedPodDisruptionBudget",
+     "operationId": "patchPolicyV1alpha1NamespacedPodDisruptionBudget",
      "parameters": [
       {
        "name": "body",
@@ -22514,7 +22602,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedPodDisruptionBudgetStatus",
+     "operationId": "readPolicyV1alpha1NamespacedPodDisruptionBudgetStatus",
      "responses": {
       "200": {
        "description": "OK",
@@ -22537,7 +22625,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedPodDisruptionBudgetStatus",
+     "operationId": "replacePolicyV1alpha1NamespacedPodDisruptionBudgetStatus",
      "parameters": [
       {
        "name": "body",
@@ -22572,7 +22660,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedPodDisruptionBudgetStatus",
+     "operationId": "patchPolicyV1alpha1NamespacedPodDisruptionBudgetStatus",
      "parameters": [
       {
        "name": "body",
@@ -22632,7 +22720,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listPodDisruptionBudgetForAllNamespaces",
+     "operationId": "listPolicyV1alpha1PodDisruptionBudgetForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -22702,7 +22790,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedPodDisruptionBudgetList",
+     "operationId": "watchPolicyV1alpha1NamespacedPodDisruptionBudgetList",
      "responses": {
       "200": {
        "description": "OK",
@@ -22780,7 +22868,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedPodDisruptionBudget",
+     "operationId": "watchPolicyV1alpha1NamespacedPodDisruptionBudget",
      "responses": {
       "200": {
        "description": "OK",
@@ -22866,7 +22954,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchPodDisruptionBudgetListForAllNamespaces",
+     "operationId": "watchPolicyV1alpha1PodDisruptionBudgetListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -22937,6 +23025,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getRbacAuthorizationAPIGroup",
      "responses": {
       "200": {
        "description": "OK",
@@ -22963,6 +23052,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getRbacAuthorizationV1alpha1APIResources",
      "responses": {
       "200": {
        "description": "OK",
@@ -22987,7 +23077,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listClusterRoleBinding",
+     "operationId": "listRbacAuthorizationV1alpha1ClusterRoleBinding",
      "parameters": [
       {
        "uniqueItems": true,
@@ -23047,7 +23137,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createClusterRoleBinding",
+     "operationId": "createRbacAuthorizationV1alpha1ClusterRoleBinding",
      "parameters": [
       {
        "name": "body",
@@ -23080,7 +23170,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionClusterRoleBinding",
+     "operationId": "deleteRbacAuthorizationV1alpha1CollectionClusterRoleBinding",
      "parameters": [
       {
        "uniqueItems": true,
@@ -23151,7 +23241,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readClusterRoleBinding",
+     "operationId": "readRbacAuthorizationV1alpha1ClusterRoleBinding",
      "responses": {
       "200": {
        "description": "OK",
@@ -23174,7 +23264,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceClusterRoleBinding",
+     "operationId": "replaceRbacAuthorizationV1alpha1ClusterRoleBinding",
      "parameters": [
       {
        "name": "body",
@@ -23207,7 +23297,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteClusterRoleBinding",
+     "operationId": "deleteRbacAuthorizationV1alpha1ClusterRoleBinding",
      "parameters": [
       {
        "name": "body",
@@ -23242,7 +23332,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchClusterRoleBinding",
+     "operationId": "patchRbacAuthorizationV1alpha1ClusterRoleBinding",
      "parameters": [
       {
        "name": "body",
@@ -23294,7 +23384,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listClusterRole",
+     "operationId": "listRbacAuthorizationV1alpha1ClusterRole",
      "parameters": [
       {
        "uniqueItems": true,
@@ -23354,7 +23444,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createClusterRole",
+     "operationId": "createRbacAuthorizationV1alpha1ClusterRole",
      "parameters": [
       {
        "name": "body",
@@ -23387,7 +23477,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionClusterRole",
+     "operationId": "deleteRbacAuthorizationV1alpha1CollectionClusterRole",
      "parameters": [
       {
        "uniqueItems": true,
@@ -23458,7 +23548,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readClusterRole",
+     "operationId": "readRbacAuthorizationV1alpha1ClusterRole",
      "responses": {
       "200": {
        "description": "OK",
@@ -23481,7 +23571,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceClusterRole",
+     "operationId": "replaceRbacAuthorizationV1alpha1ClusterRole",
      "parameters": [
       {
        "name": "body",
@@ -23514,7 +23604,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteClusterRole",
+     "operationId": "deleteRbacAuthorizationV1alpha1ClusterRole",
      "parameters": [
       {
        "name": "body",
@@ -23549,7 +23639,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchClusterRole",
+     "operationId": "patchRbacAuthorizationV1alpha1ClusterRole",
      "parameters": [
       {
        "name": "body",
@@ -23601,7 +23691,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNamespacedRoleBinding",
+     "operationId": "listRbacAuthorizationV1alpha1NamespacedRoleBinding",
      "parameters": [
       {
        "uniqueItems": true,
@@ -23661,7 +23751,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedRoleBinding",
+     "operationId": "createRbacAuthorizationV1alpha1NamespacedRoleBinding",
      "parameters": [
       {
        "name": "body",
@@ -23694,7 +23784,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionNamespacedRoleBinding",
+     "operationId": "deleteRbacAuthorizationV1alpha1CollectionNamespacedRoleBinding",
      "parameters": [
       {
        "uniqueItems": true,
@@ -23773,7 +23863,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedRoleBinding",
+     "operationId": "readRbacAuthorizationV1alpha1NamespacedRoleBinding",
      "responses": {
       "200": {
        "description": "OK",
@@ -23796,7 +23886,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedRoleBinding",
+     "operationId": "replaceRbacAuthorizationV1alpha1NamespacedRoleBinding",
      "parameters": [
       {
        "name": "body",
@@ -23829,7 +23919,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteNamespacedRoleBinding",
+     "operationId": "deleteRbacAuthorizationV1alpha1NamespacedRoleBinding",
      "parameters": [
       {
        "name": "body",
@@ -23864,7 +23954,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedRoleBinding",
+     "operationId": "patchRbacAuthorizationV1alpha1NamespacedRoleBinding",
      "parameters": [
       {
        "name": "body",
@@ -23924,7 +24014,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listNamespacedRole",
+     "operationId": "listRbacAuthorizationV1alpha1NamespacedRole",
      "parameters": [
       {
        "uniqueItems": true,
@@ -23984,7 +24074,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createNamespacedRole",
+     "operationId": "createRbacAuthorizationV1alpha1NamespacedRole",
      "parameters": [
       {
        "name": "body",
@@ -24017,7 +24107,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionNamespacedRole",
+     "operationId": "deleteRbacAuthorizationV1alpha1CollectionNamespacedRole",
      "parameters": [
       {
        "uniqueItems": true,
@@ -24096,7 +24186,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readNamespacedRole",
+     "operationId": "readRbacAuthorizationV1alpha1NamespacedRole",
      "responses": {
       "200": {
        "description": "OK",
@@ -24119,7 +24209,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceNamespacedRole",
+     "operationId": "replaceRbacAuthorizationV1alpha1NamespacedRole",
      "parameters": [
       {
        "name": "body",
@@ -24152,7 +24242,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteNamespacedRole",
+     "operationId": "deleteRbacAuthorizationV1alpha1NamespacedRole",
      "parameters": [
       {
        "name": "body",
@@ -24187,7 +24277,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchNamespacedRole",
+     "operationId": "patchRbacAuthorizationV1alpha1NamespacedRole",
      "parameters": [
       {
        "name": "body",
@@ -24247,7 +24337,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listRoleBindingForAllNamespaces",
+     "operationId": "listRbacAuthorizationV1alpha1RoleBindingForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -24316,7 +24406,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listRoleForAllNamespaces",
+     "operationId": "listRbacAuthorizationV1alpha1RoleForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -24386,7 +24476,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchClusterRoleBindingList",
+     "operationId": "watchRbacAuthorizationV1alpha1ClusterRoleBindingList",
      "responses": {
       "200": {
        "description": "OK",
@@ -24456,7 +24546,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchClusterRoleBinding",
+     "operationId": "watchRbacAuthorizationV1alpha1ClusterRoleBinding",
      "responses": {
       "200": {
        "description": "OK",
@@ -24534,7 +24624,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchClusterRoleList",
+     "operationId": "watchRbacAuthorizationV1alpha1ClusterRoleList",
      "responses": {
       "200": {
        "description": "OK",
@@ -24604,7 +24694,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchClusterRole",
+     "operationId": "watchRbacAuthorizationV1alpha1ClusterRole",
      "responses": {
       "200": {
        "description": "OK",
@@ -24682,7 +24772,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedRoleBindingList",
+     "operationId": "watchRbacAuthorizationV1alpha1NamespacedRoleBindingList",
      "responses": {
       "200": {
        "description": "OK",
@@ -24760,7 +24850,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedRoleBinding",
+     "operationId": "watchRbacAuthorizationV1alpha1NamespacedRoleBinding",
      "responses": {
       "200": {
        "description": "OK",
@@ -24846,7 +24936,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedRoleList",
+     "operationId": "watchRbacAuthorizationV1alpha1NamespacedRoleList",
      "responses": {
       "200": {
        "description": "OK",
@@ -24924,7 +25014,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchNamespacedRole",
+     "operationId": "watchRbacAuthorizationV1alpha1NamespacedRole",
      "responses": {
       "200": {
        "description": "OK",
@@ -25010,7 +25100,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchRoleBindingListForAllNamespaces",
+     "operationId": "watchRbacAuthorizationV1alpha1RoleBindingListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -25080,7 +25170,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchRoleListForAllNamespaces",
+     "operationId": "watchRbacAuthorizationV1alpha1RoleListForAllNamespaces",
      "responses": {
       "200": {
        "description": "OK",
@@ -25151,6 +25241,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getStorageAPIGroup",
      "responses": {
       "200": {
        "description": "OK",
@@ -25177,6 +25268,7 @@
      "schemes": [
       "https"
      ],
+     "operationId": "getStorageV1beta1APIResources",
      "responses": {
       "200": {
        "description": "OK",
@@ -25201,7 +25293,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "listStorageClass",
+     "operationId": "listStorageV1beta1StorageClass",
      "parameters": [
       {
        "uniqueItems": true,
@@ -25261,7 +25353,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "createStorageClass",
+     "operationId": "createStorageV1beta1StorageClass",
      "parameters": [
       {
        "name": "body",
@@ -25294,7 +25386,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deletecollectionStorageClass",
+     "operationId": "deleteStorageV1beta1CollectionStorageClass",
      "parameters": [
       {
        "uniqueItems": true,
@@ -25365,7 +25457,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "readStorageClass",
+     "operationId": "readStorageV1beta1StorageClass",
      "parameters": [
       {
        "uniqueItems": true,
@@ -25404,7 +25496,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "replaceStorageClass",
+     "operationId": "replaceStorageV1beta1StorageClass",
      "parameters": [
       {
        "name": "body",
@@ -25437,7 +25529,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "deleteStorageClass",
+     "operationId": "deleteStorageV1beta1StorageClass",
      "parameters": [
       {
        "name": "body",
@@ -25472,7 +25564,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "patchStorageClass",
+     "operationId": "patchStorageV1beta1StorageClass",
      "parameters": [
       {
        "name": "body",
@@ -25525,7 +25617,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchStorageClassList",
+     "operationId": "watchStorageV1beta1StorageClassList",
      "responses": {
       "200": {
        "description": "OK",
@@ -25595,7 +25687,7 @@
      "schemes": [
       "https"
      ],
-     "operationId": "watchStorageClass",
+     "operationId": "watchStorageV1beta1StorageClass",
      "responses": {
       "200": {
        "description": "OK",
@@ -28176,6 +28268,39 @@
      }
     }
    },
+   "v1.ReplicationControllerCondition": {
+    "description": "ReplicationControllerCondition describes the state of a replication controller at a certain point.",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "lastProbeTime": {
+      "description": "Last time we probed the condition.",
+      "$ref": "#/definitions/unversioned.Time"
+     },
+     "lastTransitionTime": {
+      "description": "The last time the condition transitioned from one status to another.",
+      "$ref": "#/definitions/unversioned.Time"
+     },
+     "message": {
+      "description": "A human readable message indicating details about the transition.",
+      "type": "string"
+     },
+     "reason": {
+      "description": "The reason for the condition's last transition.",
+      "type": "string"
+     },
+     "status": {
+      "description": "Status of the condition, one of True, False, Unknown.",
+      "type": "string"
+     },
+     "type": {
+      "description": "Type of replication controller condition.",
+      "type": "string"
+     }
+    }
+   },
    "v1.ReplicationControllerList": {
     "description": "ReplicationControllerList is a collection of replication controllers.",
     "required": [
@@ -28231,6 +28356,13 @@
       "description": "The number of available replicas (ready for at least minReadySeconds) for this replication controller.",
       "type": "integer",
       "format": "int32"
+     },
+     "conditions": {
+      "description": "Represents the latest available observations of a replication controller's current state.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1.ReplicationControllerCondition"
+      }
      },
      "fullyLabeledReplicas": {
       "description": "The number of pods that have labels matching the labels of the pod template of the replication controller.",
@@ -29065,7 +29197,7 @@
     "description": "PodDisruptionBudgetSpec is a description of a PodDisruptionBudget.",
     "properties": {
      "minAvailable": {
-      "description": "The minimum number of pods that must be available simultaneously.  This can be either an integer or a string specifying a percentage, e.g. \"28%\".",
+      "description": "An eviction is allowed if at least \"minAvailable\" pods selected by \"selector\" will still be available after the eviction, i.e. even in the absence of the evicted pod.  So for example you can prevent all voluntary evictions by specifying \"100%\".",
       "$ref": "#/definitions/intstr.IntOrString"
      },
      "selector": {
@@ -29357,7 +29489,8 @@
     "required": [
      "currentNumberScheduled",
      "numberMisscheduled",
-     "desiredNumberScheduled"
+     "desiredNumberScheduled",
+     "numberReady"
     ],
     "properties": {
      "currentNumberScheduled": {
@@ -29372,6 +29505,11 @@
      },
      "numberMisscheduled": {
       "description": "NumberMisscheduled is the number of nodes that are running the daemon pod, but are not supposed to run the daemon pod. More info: http://releases.k8s.io/HEAD/docs/admin/daemons.md",
+      "type": "integer",
+      "format": "int32"
+     },
+     "numberReady": {
+      "description": "NumberReady is the number of nodes that should be running the daemon pod and have one or more of the daemon pod running and ready.",
       "type": "integer",
       "format": "int32"
      }
@@ -30052,6 +30190,39 @@
      }
     }
    },
+   "v1beta1.ReplicaSetCondition": {
+    "description": "ReplicaSetCondition describes the state of a replica set at a certain point.",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "lastProbeTime": {
+      "description": "Last time we probed the condition.",
+      "$ref": "#/definitions/unversioned.Time"
+     },
+     "lastTransitionTime": {
+      "description": "The last time the condition transitioned from one status to another.",
+      "$ref": "#/definitions/unversioned.Time"
+     },
+     "message": {
+      "description": "A human readable message indicating details about the transition.",
+      "type": "string"
+     },
+     "reason": {
+      "description": "The reason for the condition's last transition.",
+      "type": "string"
+     },
+     "status": {
+      "description": "Status of the condition, one of True, False, Unknown.",
+      "type": "string"
+     },
+     "type": {
+      "description": "Type of replica set condition.",
+      "type": "string"
+     }
+    }
+   },
    "v1beta1.ReplicaSetList": {
     "description": "ReplicaSetList is a collection of ReplicaSets.",
     "required": [
@@ -30104,6 +30275,13 @@
       "description": "The number of available replicas (ready for at least minReadySeconds) for this replica set.",
       "type": "integer",
       "format": "int32"
+     },
+     "conditions": {
+      "description": "Represents the latest available observations of a replica set's current state.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1beta1.ReplicaSetCondition"
+      }
      },
      "fullyLabeledReplicas": {
       "description": "The number of pods that have labels matching the labels of the pod template of the replicaset.",

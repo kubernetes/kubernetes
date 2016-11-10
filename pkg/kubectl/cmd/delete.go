@@ -21,19 +21,19 @@ import (
 	"io"
 	"time"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
 var (
-	delete_long = dedent.Dedent(`
+	delete_long = templates.LongDesc(`
 		Delete resources by filenames, stdin, resources and names, or by resources and label selector.
 
 		JSON and YAML formats are accepted.
@@ -43,7 +43,8 @@ var (
 		Note that the delete command does NOT do resource version checks, so if someone
 		submits an update to a resource right when you submit a delete, their update
 		will be lost along with the rest of the resource.`)
-	delete_example = dedent.Dedent(`
+
+	delete_example = templates.Examples(`
 		# Delete a pod using the type and name specified in pod.json.
 		kubectl delete -f ./pod.json
 
@@ -66,7 +67,7 @@ var (
 		kubectl delete pods --all`)
 )
 
-func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdDelete(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 
 	// retrieve a list of handled resources from printer as valid args
@@ -108,7 +109,7 @@ func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunDelete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
+func RunDelete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -158,7 +159,7 @@ func RunDelete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	return DeleteResult(r, out, ignoreNotFound, shortOutput, mapper)
 }
 
-func ReapResult(r *resource.Result, f *cmdutil.Factory, out io.Writer, isDefaultDelete, ignoreNotFound bool, timeout time.Duration, gracePeriod int, shortOutput bool, mapper meta.RESTMapper, quiet bool) error {
+func ReapResult(r *resource.Result, f cmdutil.Factory, out io.Writer, isDefaultDelete, ignoreNotFound bool, timeout time.Duration, gracePeriod int, shortOutput bool, mapper meta.RESTMapper, quiet bool) error {
 	found := 0
 	if ignoreNotFound {
 		r = r.IgnoreErrors(errors.IsNotFound)

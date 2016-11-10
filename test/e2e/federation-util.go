@@ -23,11 +23,11 @@ import (
 	"k8s.io/kubernetes/pkg/util/intstr"
 
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
+	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
+	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
@@ -53,7 +53,7 @@ in the federation
 */
 type cluster struct {
 	name string
-	*release_1_3.Clientset
+	*kubeclientset.Clientset
 	namespaceCreated bool    // Did we need to create a new namespace in this cluster?  If so, we should delete it.
 	backendPod       *v1.Pod // The backend pod, if one's been created.
 }
@@ -79,18 +79,18 @@ func createClusterObjectOrFail(f *framework.Framework, context *framework.E2ECon
 			},
 		},
 	}
-	_, err := f.FederationClientset_1_4.Federation().Clusters().Create(&cluster)
+	_, err := f.FederationClientset_1_5.Federation().Clusters().Create(&cluster)
 	framework.ExpectNoError(err, fmt.Sprintf("creating cluster: %+v", err))
 	framework.Logf("Successfully created cluster object: %s (%s, secret: %s)", context.Name, context.Cluster.Cluster.Server, context.Name)
 }
 
 func clusterIsReadyOrFail(f *framework.Framework, context *framework.E2EContext) {
-	c, err := f.FederationClientset_1_4.Federation().Clusters().Get(context.Name)
+	c, err := f.FederationClientset_1_5.Federation().Clusters().Get(context.Name)
 	framework.ExpectNoError(err, fmt.Sprintf("get cluster: %+v", err))
 	if c.ObjectMeta.Name != context.Name {
 		framework.Failf("cluster name does not match input context: actual=%+v, expected=%+v", c, context)
 	}
-	err = isReady(context.Name, f.FederationClientset_1_4)
+	err = isReady(context.Name, f.FederationClientset_1_5)
 	framework.ExpectNoError(err, fmt.Sprintf("unexpected error in verifying if cluster %s is ready: %+v", context.Name, err))
 	framework.Logf("Cluster %s is Ready", context.Name)
 }
@@ -101,7 +101,7 @@ func waitForAllClustersReady(f *framework.Framework, clusterCount int) *federati
 	var clusterList *federationapi.ClusterList
 	if err := wait.PollImmediate(framework.Poll, FederatedServiceTimeout, func() (bool, error) {
 		var err error
-		clusterList, err = f.FederationClientset_1_4.Federation().Clusters().List(api.ListOptions{})
+		clusterList, err = f.FederationClientset_1_5.Federation().Clusters().List(v1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -116,7 +116,7 @@ func waitForAllClustersReady(f *framework.Framework, clusterCount int) *federati
 	return clusterList
 }
 
-func createClientsetForCluster(c federationapi.Cluster, i int, userAgentName string) *release_1_3.Clientset {
+func createClientsetForCluster(c federationapi.Cluster, i int, userAgentName string) *kubeclientset.Clientset {
 	kubecfg, err := clientcmd.LoadFromFile(framework.TestContext.KubeConfig)
 	framework.ExpectNoError(err, "error loading KubeConfig: %v", err)
 
@@ -131,7 +131,7 @@ func createClientsetForCluster(c federationapi.Cluster, i int, userAgentName str
 
 	cfg.QPS = KubeAPIQPS
 	cfg.Burst = KubeAPIBurst
-	return release_1_3.NewForConfigOrDie(restclient.AddUserAgent(cfg, userAgentName))
+	return kubeclientset.NewForConfigOrDie(restclient.AddUserAgent(cfg, userAgentName))
 }
 
 // Creates the federation namespace in all underlying clusters.
@@ -165,7 +165,7 @@ func unregisterClusters(clusters map[string]*cluster, f *framework.Framework) {
 	for name, c := range clusters {
 		if c.namespaceCreated {
 			if _, err := c.Clientset.Core().Namespaces().Get(nsName); !errors.IsNotFound(err) {
-				err := c.Clientset.Core().Namespaces().Delete(nsName, &api.DeleteOptions{})
+				err := c.Clientset.Core().Namespaces().Delete(nsName, &v1.DeleteOptions{})
 				framework.ExpectNoError(err, "Couldn't delete the namespace %s in cluster %q: %v", nsName, name, err)
 			}
 			framework.Logf("Namespace %s deleted in cluster %q", nsName, name)
@@ -173,10 +173,10 @@ func unregisterClusters(clusters map[string]*cluster, f *framework.Framework) {
 	}
 
 	// Delete the registered clusters in the federation API server.
-	clusterList, err := f.FederationClientset_1_4.Federation().Clusters().List(api.ListOptions{})
+	clusterList, err := f.FederationClientset_1_5.Federation().Clusters().List(v1.ListOptions{})
 	framework.ExpectNoError(err, "Error listing clusters")
 	for _, cluster := range clusterList.Items {
-		err := f.FederationClientset_1_4.Federation().Clusters().Delete(cluster.Name, &api.DeleteOptions{})
+		err := f.FederationClientset_1_5.Federation().Clusters().Delete(cluster.Name, &v1.DeleteOptions{})
 		framework.ExpectNoError(err, "Error deleting cluster %q", cluster.Name)
 	}
 }
@@ -213,7 +213,7 @@ func registerClusters(clusters map[string]*cluster, userAgentName, federationNam
    waitForServiceOrFail waits until a service is either present or absent in the cluster specified by clientset.
    If the condition is not met within timout, it fails the calling test.
 */
-func waitForServiceOrFail(clientset *release_1_3.Clientset, namespace string, service *v1.Service, present bool, timeout time.Duration) {
+func waitForServiceOrFail(clientset *kubeclientset.Clientset, namespace string, service *v1.Service, present bool, timeout time.Duration) {
 	By(fmt.Sprintf("Fetching a federated service shard of service %q in namespace %q from cluster", service.Name, namespace))
 	var clusterService *v1.Service
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
@@ -246,7 +246,7 @@ func waitForServiceShardsOrFail(namespace string, service *v1.Service, clusters 
 	}
 }
 
-func createService(clientset *federation_release_1_4.Clientset, namespace, name string) (*v1.Service, error) {
+func createService(clientset *fedclientset.Clientset, namespace, name string) (*v1.Service, error) {
 	if clientset == nil || len(namespace) == 0 {
 		return nil, fmt.Errorf("Internal error: invalid parameters passed to createService: clientset: %v, namespace: %v", clientset, namespace)
 	}
@@ -273,18 +273,18 @@ func createService(clientset *federation_release_1_4.Clientset, namespace, name 
 	return clientset.Services(namespace).Create(service)
 }
 
-func createServiceOrFail(clientset *federation_release_1_4.Clientset, namespace, name string) *v1.Service {
+func createServiceOrFail(clientset *fedclientset.Clientset, namespace, name string) *v1.Service {
 	service, err := createService(clientset, namespace, name)
 	framework.ExpectNoError(err, "Creating service %q in namespace %q", service.Name, namespace)
 	By(fmt.Sprintf("Successfully created federated service %q in namespace %q", name, namespace))
 	return service
 }
 
-func deleteServiceOrFail(clientset *federation_release_1_4.Clientset, namespace string, serviceName string) {
+func deleteServiceOrFail(clientset *fedclientset.Clientset, namespace string, serviceName string) {
 	if clientset == nil || len(namespace) == 0 || len(serviceName) == 0 {
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to deleteServiceOrFail: clientset: %v, namespace: %v, service: %v", clientset, namespace, serviceName))
 	}
-	err := clientset.Services(namespace).Delete(serviceName, api.NewDeleteOptions(0))
+	err := clientset.Services(namespace).Delete(serviceName, v1.NewDeleteOptions(0))
 	framework.ExpectNoError(err, "Error deleting service %q from namespace %q", serviceName, namespace)
 }
 
@@ -325,9 +325,9 @@ func cleanupServiceShardsAndProviderResources(namespace string, service *v1.Serv
 	}
 }
 
-func cleanupServiceShard(clientset *release_1_3.Clientset, clusterName, namespace string, service *v1.Service, timeout time.Duration) error {
+func cleanupServiceShard(clientset *kubeclientset.Clientset, clusterName, namespace string, service *v1.Service, timeout time.Duration) error {
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		err := clientset.Services(namespace).Delete(service.Name, &api.DeleteOptions{})
+		err := clientset.Services(namespace).Delete(service.Name, &v1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			// Deletion failed with an error, try again.
 			framework.Logf("Failed to delete service %q in namespace %q, in cluster %q", service.Name, namespace, clusterName)
@@ -488,7 +488,7 @@ The test fails if there are any errors.
 func deleteOneBackendPodOrFail(c *cluster) {
 	pod := c.backendPod
 	Expect(pod).ToNot(BeNil())
-	err := c.Clientset.Core().Pods(pod.Namespace).Delete(pod.Name, api.NewDeleteOptions(0))
+	err := c.Clientset.Core().Pods(pod.Namespace).Delete(pod.Name, v1.NewDeleteOptions(0))
 	if errors.IsNotFound(err) {
 		By(fmt.Sprintf("Pod %q in namespace %q in cluster %q does not exist.  No need to delete it.", pod.Name, pod.Namespace, c.name))
 	} else {

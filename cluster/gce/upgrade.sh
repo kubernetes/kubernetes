@@ -125,6 +125,7 @@ function wait-for-master() {
 function prepare-upgrade() {
   ensure-temp-dir
   detect-project
+  detect-node-names # sets INSTANCE_GROUPS
   write-cluster-name
   tars_from_version
 }
@@ -175,6 +176,16 @@ function upgrade-nodes() {
   do-node-upgrade
 }
 
+function setup-base-image() {
+  if [[ "${env_os_distro}" == "false" ]]; then
+    echo "== Ensuring that new Node base OS image matched the existing Node base OS image"
+    NODE_OS_DISTRIBUTION=$(get-node-os "${NODE_NAMES[0]}")
+    source "${KUBE_ROOT}/cluster/gce/${NODE_OS_DISTRIBUTION}/node-helper.sh"
+    # Reset the node image based on current os distro
+    set-node-image
+fi
+}
+
 # prepare-node-upgrade creates a new instance template suitable for upgrading
 # to KUBE_VERSION and echos a single line with the name of the new template.
 #
@@ -196,9 +207,9 @@ function upgrade-nodes() {
 #   KUBELET_KEY_BASE64
 function prepare-node-upgrade() {
   echo "== Preparing node upgrade (to ${KUBE_VERSION}). ==" >&2
-  SANITIZED_VERSION=$(echo ${KUBE_VERSION} | sed 's/[\.\+]/-/g')
+  setup-base-image
 
-  detect-node-names # sets INSTANCE_GROUPS
+  SANITIZED_VERSION=$(echo ${KUBE_VERSION} | sed 's/[\.\+]/-/g')
 
   # TODO(zmerlynn): Refactor setting scope flags.
   local scope_flags=
@@ -220,13 +231,6 @@ function prepare-node-upgrade() {
   # TODO(zmerlynn): How do we ensure kube-env is written in a ${version}-
   #                 compatible way?
   write-node-env
-
-  if [[ "${env_os_distro}" == "false" ]]; then
-    NODE_OS_DISTRIBUTION=$(get-node-os "${NODE_NAMES[0]}")
-    source "${KUBE_ROOT}/cluster/gce/${NODE_OS_DISTRIBUTION}/node-helper.sh"
-    # Reset the node image based on current os distro
-    set-node-image
-  fi
 
   # TODO(zmerlynn): Get configure-vm script from ${version}. (Must plumb this
   #                 through all create-node-instance-template implementations).

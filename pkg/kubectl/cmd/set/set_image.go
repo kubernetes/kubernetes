@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -57,14 +57,15 @@ type ImageOptions struct {
 
 var (
 	image_resources = `
-  pod (po), replicationcontroller (rc), deployment (deploy), daemonset (ds), job, replicaset (rs)`
+  	pod (po), replicationcontroller (rc), deployment (deploy), daemonset (ds), job, replicaset (rs)`
 
-	image_long = dedent.Dedent(`
+	image_long = templates.LongDesc(`
 		Update existing container image(s) of resources.
 
-		Possible resources include (case insensitive):`) + image_resources
+		Possible resources include (case insensitive):
+		` + image_resources)
 
-	image_example = dedent.Dedent(`
+	image_example = templates.Examples(`
 		# Set a deployment's nginx container image to 'nginx:1.9.1', and its busybox container image to 'busybox'.
 		kubectl set image deployment/nginx busybox=busybox nginx=nginx:1.9.1
 
@@ -74,13 +75,14 @@ var (
 		# Update image of all containers of daemonset abc to 'nginx:1.9.1'
 		kubectl set image daemonset abc *=nginx:1.9.1
 
-		# Print result (in yaml format) of updating nginx container image from local file, without hitting the server 
+		# Print result (in yaml format) of updating nginx container image from local file, without hitting the server
 		kubectl set image -f path/to/file.yaml nginx=nginx:1.9.1 --local -o yaml`)
 )
 
-func NewCmdImage(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdImage(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	options := &ImageOptions{
 		Out: out,
+		Err: err,
 	}
 
 	cmd := &cobra.Command{
@@ -105,7 +107,7 @@ func NewCmdImage(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func (o *ImageOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.Mapper, o.Typer = f.Object()
 	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
 	o.Encoder = f.JSONEncoder()
@@ -197,7 +199,6 @@ func (o *ImageOptions) Run() error {
 		}
 
 		if o.Local {
-			fmt.Fprintln(o.Out, "running in local mode...")
 			return o.PrintObject(o.Cmd, o.Mapper, info.Object, o.Out)
 		}
 

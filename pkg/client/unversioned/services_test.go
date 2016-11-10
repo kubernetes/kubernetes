@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -63,7 +64,7 @@ func TestListServices(t *testing.T) {
 
 func TestListServicesLabels(t *testing.T) {
 	ns := api.NamespaceDefault
-	labelSelectorQueryParamName := unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String())
+	labelSelectorQueryParamName := unversioned.LabelSelectorQueryParam(registered.GroupOrDie(api.GroupName).GroupVersion.String())
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",

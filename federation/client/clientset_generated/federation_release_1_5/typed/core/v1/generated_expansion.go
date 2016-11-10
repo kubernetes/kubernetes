@@ -16,6 +16,8 @@ limitations under the License.
 
 package v1
 
+type ConfigMapExpansion interface{}
+
 type EventExpansion interface{}
 
 type SecretExpansion interface{}

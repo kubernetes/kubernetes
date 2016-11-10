@@ -319,7 +319,7 @@ func TestValidateAdds(t *testing.T) {
 			continue
 		}
 		if !v.shouldPass && len(errs) == 0 {
-			t.Errorf("%s should have failed but recieved no errors", k)
+			t.Errorf("%s should have failed but received no errors", k)
 		}
 	}
 }
@@ -382,7 +382,7 @@ func TestValidateDrops(t *testing.T) {
 			continue
 		}
 		if !v.shouldPass && len(errs) == 0 {
-			t.Errorf("%s should have failed but recieved no errors", k)
+			t.Errorf("%s should have failed but received no errors", k)
 		}
 	}
 }

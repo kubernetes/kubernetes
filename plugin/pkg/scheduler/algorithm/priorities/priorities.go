@@ -48,7 +48,7 @@ func calculateUnusedScore(requested int64, capacity int64, node string) int64 {
 		return 0
 	}
 	if requested > capacity {
-		glog.V(2).Infof("Combined requested resources %d from existing pods exceeds capacity %d on node %s",
+		glog.V(4).Infof("Combined requested resources %d from existing pods exceeds capacity %d on node %s",
 			requested, capacity, node)
 		return 0
 	}
@@ -67,7 +67,7 @@ func calculateUsedScore(requested int64, capacity int64, node string) int64 {
 		return 0
 	}
 	if requested > capacity {
-		glog.V(2).Infof("Combined requested resources %d from existing pods exceeds capacity %d on node %s",
+		glog.V(4).Infof("Combined requested resources %d from existing pods exceeds capacity %d on node %s",
 			requested, capacity, node)
 		return 0
 	}
@@ -297,7 +297,7 @@ func calculateBalancedResourceAllocation(pod *api.Pod, podRequests *schedulercac
 	memoryFraction := fractionOfCapacity(totalResources.Memory, allocatableResources.Memory)
 	score := int(0)
 	if cpuFraction >= 1 || memoryFraction >= 1 {
-		// if requested >= capacity, the corresponding host should never be preferrred.
+		// if requested >= capacity, the corresponding host should never be preferred.
 		score = 0
 	} else {
 		// Upper and lower boundary of difference between cpuFraction and memoryFraction are -1 and 1

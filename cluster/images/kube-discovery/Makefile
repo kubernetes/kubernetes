@@ -48,6 +48,6 @@ build:
 	rm -rf "${TEMP_DIR}"
 
 push: build
-	gcloud docker push ${REGISTRY}/kube-discovery-${ARCH}:${VERSION}
+	gcloud docker -- push ${REGISTRY}/kube-discovery-${ARCH}:${VERSION}
 
 .PHONY: all

@@ -97,6 +97,7 @@ run-gcloud-compute-with-retries instances create "${MASTER_NAME}" \
   --tags "${MASTER_TAG}" \
   --network "${NETWORK}" \
   --scopes "storage-ro,compute-rw,logging-write" \
+  --boot-disk-size "${MASTER_ROOT_DISK_SIZE}" \
   --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no"
 
 run-gcloud-compute-with-retries firewall-rules create "${INSTANCE_PREFIX}-kubemark-master-https" \

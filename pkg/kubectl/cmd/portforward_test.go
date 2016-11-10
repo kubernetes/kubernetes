@@ -26,8 +26,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
+	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
 type fakePortForwarder struct {
@@ -42,8 +43,8 @@ func (f *fakePortForwarder) ForwardPorts(method string, url *url.URL, opts PortF
 	return f.pfErr
 }
 
-func TestPortForward(t *testing.T) {
-	version := testapi.Default.GroupVersion().Version
+func testPortForward(t *testing.T, flags map[string]string, args []string) {
+	version := registered.GroupOrDie(api.GroupName).GroupVersion.Version
 
 	tests := []struct {
 		name                       string
@@ -67,7 +68,7 @@ func TestPortForward(t *testing.T) {
 	}
 	for _, test := range tests {
 		var err error
-		f, tf, codec, ns := NewAPIFactory()
+		f, tf, codec, ns := cmdtesting.NewAPIFactory()
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -102,7 +103,10 @@ func TestPortForward(t *testing.T) {
 			err = opts.RunPortForward()
 		}
 
-		cmd.Run(cmd, []string{"foo", ":5000", ":1000"})
+		for name, value := range flags {
+			cmd.Flags().Set(name, value)
+		}
+		cmd.Run(cmd, args)
 
 		if test.pfErr && err != ff.pfErr {
 			t.Errorf("%s: Unexpected port-forward error: %v", test.name, err)
@@ -123,83 +127,10 @@ func TestPortForward(t *testing.T) {
 	}
 }
 
+func TestPortForward(t *testing.T) {
+	testPortForward(t, nil, []string{"foo", ":5000", ":1000"})
+}
+
 func TestPortForwardWithPFlag(t *testing.T) {
-	version := testapi.Default.GroupVersion().Version
-
-	tests := []struct {
-		name, podPath, pfPath, container string
-		pod                              *api.Pod
-		pfErr                            bool
-	}{
-		{
-			name:    "pod portforward",
-			podPath: "/api/" + version + "/namespaces/test/pods/foo",
-			pfPath:  "/api/" + version + "/namespaces/test/pods/foo/portforward",
-			pod:     execPod(),
-		},
-		{
-			name:    "pod portforward error",
-			podPath: "/api/" + version + "/namespaces/test/pods/foo",
-			pfPath:  "/api/" + version + "/namespaces/test/pods/foo/portforward",
-			pod:     execPod(),
-			pfErr:   true,
-		},
-	}
-	for _, test := range tests {
-		var err error
-		f, tf, codec, ns := NewAPIFactory()
-		tf.Client = &fake.RESTClient{
-			NegotiatedSerializer: ns,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-				switch p, m := req.URL.Path, req.Method; {
-				case p == test.podPath && m == "GET":
-					body := objBody(codec, test.pod)
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
-				default:
-					// Ensures no GET is performed when deleting by name
-					t.Errorf("%s: unexpected request: %#v\n%#v", test.name, req.URL, req)
-					return nil, nil
-				}
-			}),
-		}
-		tf.Namespace = "test"
-		tf.ClientConfig = defaultClientConfig()
-		ff := &fakePortForwarder{}
-		if test.pfErr {
-			ff.pfErr = fmt.Errorf("pf error")
-		}
-
-		opts := &PortForwardOptions{}
-		cmd := NewCmdPortForward(f, os.Stdout, os.Stderr)
-		cmd.Run = func(cmd *cobra.Command, args []string) {
-			if err = opts.Complete(f, cmd, args, os.Stdout, os.Stderr); err != nil {
-				return
-			}
-			opts.PortForwarder = ff
-			if err = opts.Validate(); err != nil {
-				return
-			}
-			err = opts.RunPortForward()
-		}
-		cmd.Flags().Set("pod", "foo")
-
-		cmd.Run(cmd, []string{":5000", ":1000"})
-
-		if test.pfErr && err != ff.pfErr {
-			t.Errorf("%s: Unexpected port-forward error: %v", test.name, err)
-		}
-		if !test.pfErr && err != nil {
-			t.Errorf("%s: Unexpected error: %v", test.name, err)
-		}
-		if test.pfErr {
-			continue
-		}
-
-		if ff.url.Path != test.pfPath {
-			t.Errorf("%s: Did not get expected path for portforward request", test.name)
-		}
-		if ff.method != "POST" {
-			t.Errorf("%s: Did not get method for attach request: %s", test.name, ff.method)
-		}
-	}
+	testPortForward(t, map[string]string{"pod": "foo"}, []string{":5000", ":1000"})
 }

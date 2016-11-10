@@ -212,7 +212,12 @@ func TestKubernetes(t *testing.T) {
 	  "items":[
 		{
 		  "kind":"None",
-		  "metadata":{"name":"127.0.0.1"},
+		  "metadata":{
+		    "name":"127.0.0.1",
+			"labels":{
+			  "kubernetes.io/hostname":"127.0.0.1"
+			}
+		  },
 		  "status":{
 			"capacity":{"cpu":"4"},
 			"addresses":[{"type": "LegacyHostIP", "address":"127.0.0.1"}]
@@ -220,7 +225,12 @@ func TestKubernetes(t *testing.T) {
 		},
 		{
 		  "kind":"None",
-		  "metadata":{"name":"127.0.0.2"},
+		  "metadata":{
+			"name":"127.0.0.2",
+			"labels":{
+			  "kubernetes.io/hostname":"127.0.0.2"
+			}
+		  },
 		  "status":{
 			"capacity":{"cpu":"8"},
 			"addresses":[
@@ -260,6 +270,8 @@ func TestKubernetes(t *testing.T) {
 		{"range nodes capacity", `{range .items[*]}[{.metadata.name}, {.status.capacity}] {end}`, nodesData,
 			"[127.0.0.1, map[cpu:4]] [127.0.0.2, map[cpu:8]] "},
 		{"user password", `{.users[?(@.name=="e2e")].user.password}`, &nodesData, "secret"},
+		{"hostname", `{.items[0].metadata.labels.kubernetes\.io/hostname}`, &nodesData, "127.0.0.1"},
+		{"hostname filter", `{.items[?(@.metadata.labels.kubernetes\.io/hostname=="127.0.0.1")].kind}`, &nodesData, "None"},
 	}
 	testJSONPath(nodesTests, false, t)
 

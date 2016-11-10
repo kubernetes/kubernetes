@@ -43,6 +43,9 @@
       { "name": "TARGET_STORAGE",
         "value": "{{ storage_backend }}"
       },
+      { "name": "TARGET_VERSION",
+        "value": "{{ pillar.get('etcd_docker_tag', '2.2.1') }}"
+      },
       { "name": "DATA_DIRECTORY",
         "value": "/var/etcd/data{{ suffix }}"
       }

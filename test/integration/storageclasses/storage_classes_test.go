@@ -25,9 +25,10 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -40,7 +41,7 @@ func TestStorageClasses(t *testing.T) {
 	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
-	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
 
 	ns := framework.CreateTestingNamespace("storageclass", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -72,7 +73,7 @@ func DoTestStorageClasses(t *testing.T, client *client.Client, ns *api.Namespace
 			Name:      "XXX",
 			Namespace: ns.Name,
 			Annotations: map[string]string{
-				"volume.beta.kubernetes.io/storage-class": "gold",
+				storageutil.StorageClassAnnotation: "gold",
 			},
 		},
 		Spec: api.PersistentVolumeClaimSpec{

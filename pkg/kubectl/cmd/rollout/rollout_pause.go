@@ -19,11 +19,11 @@ package rollout
 import (
 	"io"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -44,21 +44,21 @@ type PauseConfig struct {
 }
 
 var (
-	pause_long = dedent.Dedent(`
+	pause_long = templates.LongDesc(`
 		Mark the provided resource as paused
 
 		Paused resources will not be reconciled by a controller.
 		Use \"kubectl rollout resume\" to resume a paused resource.
 		Currently only deployments support being paused.`)
 
-	pause_example = dedent.Dedent(`
+	pause_example = templates.Examples(`
 		# Mark the nginx deployment as paused. Any current state of
 		# the deployment will continue its function, new updates to the deployment will not
 		# have an effect as long as the deployment is paused.
 		kubectl rollout pause deployment/nginx`)
 )
 
-func NewCmdRolloutPause(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdRolloutPause(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &PauseConfig{}
 
 	validArgs := []string{"deployment"}
@@ -90,7 +90,7 @@ func NewCmdRolloutPause(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func (o *PauseConfig) CompletePause(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string) error {
+func (o *PauseConfig) CompletePause(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string) error {
 	if len(args) == 0 && cmdutil.IsFilenameEmpty(o.Filenames) {
 		return cmdutil.UsageError(cmd, cmd.Use)
 	}

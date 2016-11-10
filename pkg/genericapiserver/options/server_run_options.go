@@ -37,10 +37,8 @@ import (
 )
 
 const (
-	DefaultDeserializationCacheSize = 50000
-
 	// TODO: This can be tightened up. It still matches objects named watch or proxy.
-	defaultLongRunningRequestRE = "(/|^)((watch|proxy)(/|$)|(logs?|portforward|exec|attach)/?$)"
+	DefaultLongRunningRequestRE = "(/|^)((watch|proxy)(/|$)|(logs?|portforward|exec|attach)/?$)"
 )
 
 var DefaultServiceNodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
@@ -57,8 +55,6 @@ var AuthorizationModeChoices = []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABA
 
 // ServerRunOptions contains the options while running a generic api server.
 type ServerRunOptions struct {
-	APIGroupPrefix             string
-	APIPrefix                  string
 	AdmissionControl           string
 	AdmissionControlConfigFile string
 	AdvertiseAddress           net.IP
@@ -126,8 +122,6 @@ type ServerRunOptions struct {
 
 func NewServerRunOptions() *ServerRunOptions {
 	return &ServerRunOptions{
-		APIGroupPrefix:                           "/apis",
-		APIPrefix:                                "/api",
 		AdmissionControl:                         "AlwaysAdmit",
 		AnonymousAuth:                            true,
 		AuthorizationMode:                        "AlwaysAllow",
@@ -143,7 +137,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		EnableWatchCache:                         true,
 		InsecureBindAddress:                      net.ParseIP("127.0.0.1"),
 		InsecurePort:                             8080,
-		LongRunningRequestRE:                     defaultLongRunningRequestRE,
+		LongRunningRequestRE:                     DefaultLongRunningRequestRE,
 		MasterCount:                              1,
 		MasterServiceNamespace:                   api.NamespaceDefault,
 		MaxRequestsInFlight:                      400,
@@ -158,7 +152,9 @@ func NewServerRunOptions() *ServerRunOptions {
 func (o *ServerRunOptions) WithEtcdOptions() *ServerRunOptions {
 	o.StorageConfig = storagebackend.Config{
 		Prefix: DefaultEtcdPathPrefix,
-		DeserializationCacheSize: DefaultDeserializationCacheSize,
+		// Default cache size to 0 - if unset, its size will be set based on target
+		// memory usage.
+		DeserializationCacheSize: 0,
 	}
 	return o
 }
@@ -227,8 +223,14 @@ func (s *ServerRunOptions) NewSelfClientConfig(token string) (*restclient.Config
 		QPS:   50,
 		Burst: 100,
 	}
+
+	// Use secure port if the TLSCAFile is specified
 	if s.SecurePort > 0 && len(s.TLSCAFile) > 0 {
-		clientConfig.Host = "https://" + net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.SecurePort))
+		host := s.BindAddress.String()
+		if host == "0.0.0.0" {
+			host = "localhost"
+		}
+		clientConfig.Host = "https://" + net.JoinHostPort(host, strconv.Itoa(s.SecurePort))
 		clientConfig.CAFile = s.TLSCAFile
 		clientConfig.BearerToken = token
 	} else if s.InsecurePort > 0 {

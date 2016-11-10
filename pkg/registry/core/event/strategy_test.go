@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/util/diff"
 )
@@ -51,7 +51,7 @@ func TestGetAttrs(t *testing.T) {
 			Name:            "foo",
 			Namespace:       "baz",
 			UID:             "long uid string",
-			APIVersion:      testapi.Default.GroupVersion().String(),
+			APIVersion:      registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 			ResourceVersion: "0",
 			FieldPath:       "",
 		},
@@ -67,7 +67,7 @@ func TestGetAttrs(t *testing.T) {
 		"involvedObject.name":            "foo",
 		"involvedObject.namespace":       "baz",
 		"involvedObject.uid":             "long uid string",
-		"involvedObject.apiVersion":      testapi.Default.GroupVersion().String(),
+		"involvedObject.apiVersion":      registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 		"involvedObject.resourceVersion": "0",
 		"involvedObject.fieldPath":       "",
 		"reason":                         "ForTesting",
@@ -82,7 +82,7 @@ func TestGetAttrs(t *testing.T) {
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	fset := EventToSelectableFields(&api.Event{})
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		testapi.Default.GroupVersion().String(),
+		registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 		"Event",
 		fset,
 		nil,

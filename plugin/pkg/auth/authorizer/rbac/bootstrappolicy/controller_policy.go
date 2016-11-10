@@ -25,14 +25,18 @@ import (
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
 )
 
+const saRolePrefix = "system:controller:"
+
 var (
 	// controllerRoles is a slice of roles used for controllers
 	controllerRoles = []rbac.ClusterRole{}
+	// controllerRoleBindings is a slice of roles used for controllers
+	controllerRoleBindings = []rbac.ClusterRoleBinding{}
 )
 
 func addControllerRole(role rbac.ClusterRole) {
-	if !strings.HasPrefix(role.Name, "system:controller:") {
-		glog.Fatalf(`role %q must start with "system:controller:"`, role.Name)
+	if !strings.HasPrefix(role.Name, saRolePrefix) {
+		glog.Fatalf(`role %q must start with %q`, role.Name, saRolePrefix)
 	}
 
 	for _, existingRole := range controllerRoles {
@@ -42,6 +46,8 @@ func addControllerRole(role rbac.ClusterRole) {
 	}
 
 	controllerRoles = append(controllerRoles, role)
+	controllerRoleBindings = append(controllerRoleBindings,
+		rbac.NewClusterBinding(role.Name).SAs("kube-system", role.Name[len(saRolePrefix):]).BindingOrDie())
 }
 
 func eventsRule() rbac.PolicyRule {
@@ -50,8 +56,9 @@ func eventsRule() rbac.PolicyRule {
 
 func init() {
 	addControllerRole(rbac.ClusterRole{
-		ObjectMeta: api.ObjectMeta{Name: "system:controller:replication-controller"},
+		ObjectMeta: api.ObjectMeta{Name: saRolePrefix + "replication-controller"},
 		Rules: []rbac.PolicyRule{
+			// 1.0 controllers needed get, update, so without these old controllers break on new servers
 			rbac.NewRule("get", "list", "watch", "update").Groups(legacyGroup).Resources("replicationcontrollers").RuleOrDie(),
 			rbac.NewRule("update").Groups(legacyGroup).Resources("replicationcontrollers/status").RuleOrDie(),
 			rbac.NewRule("list", "watch", "create", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
@@ -63,4 +70,9 @@ func init() {
 // ControllerRoles returns the cluster roles used by controllers
 func ControllerRoles() []rbac.ClusterRole {
 	return controllerRoles
+}
+
+// ControllerRoleBindings returns the role bindings used by controllers
+func ControllerRoleBindings() []rbac.ClusterRoleBinding {
+	return controllerRoleBindings
 }

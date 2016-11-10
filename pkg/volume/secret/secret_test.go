@@ -252,7 +252,8 @@ func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.Vo
 
 func TestCanSupport(t *testing.T) {
 	pluginMgr := volume.VolumePluginMgr{}
-	_, host := newTestHost(t, nil)
+	tempDir, host := newTestHost(t, nil)
+	defer os.RemoveAll(tempDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 
 	plugin, err := pluginMgr.FindPluginByName(secretPluginName)
@@ -283,7 +284,7 @@ func TestPlugin(t *testing.T) {
 		pluginMgr     = volume.VolumePluginMgr{}
 		rootDir, host = newTestHost(t, client)
 	)
-
+	defer os.RemoveAll(rootDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 
 	plugin, err := pluginMgr.FindPluginByName(secretPluginName)
@@ -356,7 +357,7 @@ func TestPluginReboot(t *testing.T) {
 		pluginMgr     = volume.VolumePluginMgr{}
 		rootDir, host = newTestHost(t, client)
 	)
-
+	defer os.RemoveAll(rootDir)
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
 
 	plugin, err := pluginMgr.FindPluginByName(secretPluginName)

@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -31,14 +30,14 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-func getOrphanOptions() *api.DeleteOptions {
+func getOrphanOptions() *v1.DeleteOptions {
 	var trueVar = true
-	return &api.DeleteOptions{OrphanDependents: &trueVar}
+	return &v1.DeleteOptions{OrphanDependents: &trueVar}
 }
 
-func getNonOrphanOptions() *api.DeleteOptions {
+func getNonOrphanOptions() *v1.DeleteOptions {
 	var falseVar = false
-	return &api.DeleteOptions{OrphanDependents: &falseVar}
+	return &v1.DeleteOptions{OrphanDependents: &falseVar}
 }
 
 func newOwnerRC(f *framework.Framework, name string) *v1.ReplicationController {
@@ -78,7 +77,7 @@ func newOwnerRC(f *framework.Framework, name string) *v1.ReplicationController {
 // communication with the API server fails.
 func verifyRemainingObjects(f *framework.Framework, clientSet clientset.Interface, rcNum, podNum int) (bool, error) {
 	rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
-	pods, err := clientSet.Core().Pods(f.Namespace.Name).List(api.ListOptions{})
+	pods, err := clientSet.Core().Pods(f.Namespace.Name).List(v1.ListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("Failed to list pods: %v", err)
 	}
@@ -87,7 +86,7 @@ func verifyRemainingObjects(f *framework.Framework, clientSet clientset.Interfac
 		ret = false
 		By(fmt.Sprintf("expected %d pods, got %d pods", podNum, len(pods.Items)))
 	}
-	rcs, err := rcClient.List(api.ListOptions{})
+	rcs, err := rcClient.List(v1.ListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("Failed to list replication controllers: %v", err)
 	}
@@ -130,7 +129,7 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 		}
 		// wait for rc to create some pods
 		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
-			pods, err := podClient.List(api.ListOptions{})
+			pods, err := podClient.List(v1.ListOptions{})
 			if err != nil {
 				return false, fmt.Errorf("Failed to list pods: %v", err)
 			}
@@ -148,7 +147,7 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 		}
 		By("delete the rc")
 		deleteOptions := getNonOrphanOptions()
-		deleteOptions.Preconditions = api.NewUIDPreconditions(string(rc.UID))
+		deleteOptions.Preconditions = v1.NewUIDPreconditions(string(rc.UID))
 		if err := rcClient.Delete(rc.ObjectMeta.Name, deleteOptions); err != nil {
 			framework.Failf("failed to delete the rc: %v", err)
 		}
@@ -158,7 +157,7 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 			return verifyRemainingObjects(f, clientSet, 0, 0)
 		}); err != nil {
 			framework.Failf("failed to wait for all pods to be deleted: %v", err)
-			remainingPods, err := podClient.List(api.ListOptions{})
+			remainingPods, err := podClient.List(v1.ListOptions{})
 			if err != nil {
 				framework.Failf("failed to list pods post mortem: %v", err)
 			} else {
@@ -197,13 +196,13 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 		}
 		By("delete the rc")
 		deleteOptions := getOrphanOptions()
-		deleteOptions.Preconditions = api.NewUIDPreconditions(string(rc.UID))
+		deleteOptions.Preconditions = v1.NewUIDPreconditions(string(rc.UID))
 		if err := rcClient.Delete(rc.ObjectMeta.Name, deleteOptions); err != nil {
 			framework.Failf("failed to delete the rc: %v", err)
 		}
 		By("wait for the rc to be deleted")
 		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
-			rcs, err := rcClient.List(api.ListOptions{})
+			rcs, err := rcClient.List(v1.ListOptions{})
 			if err != nil {
 				return false, fmt.Errorf("Failed to list rcs: %v", err)
 			}
@@ -216,7 +215,7 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 		}
 		By("wait for 30 seconds to see if the garbage collector mistakenly deletes the pods")
 		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
-			pods, err := podClient.List(api.ListOptions{})
+			pods, err := podClient.List(v1.ListOptions{})
 			if err != nil {
 				return false, fmt.Errorf("Failed to list pods: %v", err)
 			}
@@ -256,14 +255,14 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 			framework.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
 		}
 		By("delete the rc")
-		deleteOptions := &api.DeleteOptions{}
-		deleteOptions.Preconditions = api.NewUIDPreconditions(string(rc.UID))
+		deleteOptions := &v1.DeleteOptions{}
+		deleteOptions.Preconditions = v1.NewUIDPreconditions(string(rc.UID))
 		if err := rcClient.Delete(rc.ObjectMeta.Name, deleteOptions); err != nil {
 			framework.Failf("failed to delete the rc: %v", err)
 		}
 		By("wait for 30 seconds to see if the garbage collector mistakenly deletes the pods")
 		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
-			pods, err := podClient.List(api.ListOptions{})
+			pods, err := podClient.List(v1.ListOptions{})
 			if err != nil {
 				return false, fmt.Errorf("Failed to list pods: %v", err)
 			}

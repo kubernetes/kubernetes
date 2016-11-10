@@ -43,15 +43,13 @@ var _ = framework.KubeDescribe("Networking IPerf [Experimental] [Slow] [Feature:
 
 	// A few simple bandwidth tests which are capped by nodes.
 	// TODO replace the 1 with the scale option implementation
-	runClientServerBandwidthMeasurement(f, 1, gceBandwidthBitsEstimate)
-})
-
-func runClientServerBandwidthMeasurement(f *framework.Framework, numClient int, maxBandwidthBits int64) {
 	// TODO: Make this a function parameter, once we distribute iperf endpoints, possibly via session affinity.
+	numClient := 1
 	numServer := 1
+	maxBandwidthBits := gceBandwidthBitsEstimate
 
 	It(fmt.Sprintf("should transfer ~ 1GB onto the service endpoint %v servers (maximum of %v clients)", numServer, numClient), func() {
-		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
+		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		totalPods := len(nodes.Items)
 		// for a single service, we expect to divide bandwidth between the network.  Very crude estimate.
 		expectedBandwidth := int(float64(maxBandwidthBits) / float64(totalPods))
@@ -112,7 +110,7 @@ func runClientServerBandwidthMeasurement(f *framework.Framework, numClient int, 
 
 		// Calculate expected number of clients based on total nodes.
 		expectedCli := func() int {
-			nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
+			nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 			return int(math.Min(float64(len(nodes.Items)), float64(numClient)))
 		}()
 
@@ -153,4 +151,4 @@ func runClientServerBandwidthMeasurement(f *framework.Framework, numClient int, 
 			framework.Logf("%v had bandwidth %v.  Ratio to expected (%v) was %f", ipClient, bandwidth, expectedBandwidth, float64(bandwidth)/float64(expectedBandwidth))
 		}
 	})
-}
+})

@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -47,7 +48,7 @@ var _ = framework.KubeDescribe("Kubernetes Dashboard", func() {
 
 		By("Checking to make sure the kubernetes-dashboard pods are running")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": uiAppName}))
-		err = framework.WaitForPodsWithLabelRunning(f.Client, uiNamespace, selector)
+		err = testutils.WaitForPodsWithLabelRunning(f.Client, uiNamespace, selector)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Checking to make sure we get a response from the kubernetes-dashboard.")

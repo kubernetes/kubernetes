@@ -35,9 +35,11 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/types"
+	kubetypes "k8s.io/kubernetes/pkg/types"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/term"
 )
 
@@ -114,7 +116,7 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 }
 
 // getContainerLogsPath gets log path for container.
-func getContainerLogsPath(containerName string, podUID types.UID) string {
+func getContainerLogsPath(containerName string, podUID kubetypes.UID) string {
 	return path.Join(podLogsRootDirectory, string(podUID), fmt.Sprintf("%s.log", containerName))
 }
 
@@ -248,7 +250,6 @@ func makeMounts(opts *kubecontainer.RunContainerOptions, container *api.Containe
 	for idx := range opts.Mounts {
 		v := opts.Mounts[idx]
 		m := &runtimeApi.Mount{
-			Name:          &v.Name,
 			HostPath:      &v.HostPath,
 			ContainerPath: &v.ContainerPath,
 			Readonly:      &v.ReadOnly,
@@ -345,10 +346,11 @@ func getTerminationMessage(status *runtimeApi.ContainerStatus, kubeStatus *kubec
 	return message
 }
 
-// getKubeletContainerStatuses gets all containers' status for the pod sandbox.
-func (m *kubeGenericRuntimeManager) getKubeletContainerStatuses(podSandboxID string) ([]*kubecontainer.ContainerStatus, error) {
+// getPodContainerStatuses gets all containers' statuses for the pod.
+func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, name, namespace string) ([]*kubecontainer.ContainerStatus, error) {
+	// Select all containers of the given pod.
 	containers, err := m.runtimeService.ListContainers(&runtimeApi.ContainerFilter{
-		PodSandboxId: &podSandboxID,
+		LabelSelector: map[string]string{types.KubernetesPodUIDLabel: string(uid)},
 	})
 	if err != nil {
 		glog.Errorf("ListContainers error: %v", err)
@@ -377,16 +379,16 @@ func (m *kubeGenericRuntimeManager) getKubeletContainerStatuses(podSandboxID str
 			Hash:         annotatedInfo.Hash,
 			RestartCount: annotatedInfo.RestartCount,
 			State:        toKubeContainerState(c.GetState()),
-			CreatedAt:    time.Unix(status.GetCreatedAt(), 0),
+			CreatedAt:    time.Unix(0, status.GetCreatedAt()),
 		}
 
 		if c.GetState() == runtimeApi.ContainerState_RUNNING {
-			cStatus.StartedAt = time.Unix(status.GetStartedAt(), 0)
+			cStatus.StartedAt = time.Unix(0, status.GetStartedAt())
 		} else {
 			cStatus.Reason = status.GetReason()
 			cStatus.Message = status.GetMessage()
 			cStatus.ExitCode = int(status.GetExitCode())
-			cStatus.FinishedAt = time.Unix(status.GetFinishedAt(), 0)
+			cStatus.FinishedAt = time.Unix(0, status.GetFinishedAt())
 		}
 
 		tMessage := getTerminationMessage(status, cStatus, annotatedInfo.TerminationMessagePath)
@@ -486,12 +488,7 @@ func (m *kubeGenericRuntimeManager) restoreSpecsFromContainerLabels(containerID 
 func (m *kubeGenericRuntimeManager) killContainer(pod *api.Pod, containerID kubecontainer.ContainerID, containerName string, reason string, gracePeriodOverride *int64) error {
 	var containerSpec *api.Container
 	if pod != nil {
-		for i, c := range pod.Spec.Containers {
-			if containerName == c.Name {
-				containerSpec = &pod.Spec.Containers[i]
-				break
-			}
-		}
+		containerSpec = getContainerSpec(pod, containerName)
 	} else {
 		// Restore necessary information if one of the specs is nil.
 		restoredPod, restoredContainer, err := m.restoreSpecsFromContainerLabels(containerID)
@@ -551,6 +548,7 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(pod *api.Pod, r
 		go func(container *kubecontainer.Container) {
 			defer utilruntime.HandleCrash()
 			defer wg.Done()
+
 			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, container.Name)
 			if err := m.killContainer(pod, container.ID, container.Name, "Need to kill Pod", gracePeriodOverride); err != nil {
 				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
@@ -565,6 +563,94 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(pod *api.Pod, r
 		syncResults = append(syncResults, containerResult)
 	}
 	return
+}
+
+// pruneInitContainers ensures that before we begin creating init containers, we have reduced the number
+// of outstanding init containers still present. This reduces load on the container garbage collector
+// by only preserving the most recent terminated init container.
+func (m *kubeGenericRuntimeManager) pruneInitContainersBeforeStart(pod *api.Pod, podStatus *kubecontainer.PodStatus, initContainersToKeep map[kubecontainer.ContainerID]int) {
+	// only the last execution of each init container should be preserved, and only preserve it if it is in the
+	// list of init containers to keep.
+	initContainerNames := sets.NewString()
+	for _, container := range pod.Spec.InitContainers {
+		initContainerNames.Insert(container.Name)
+	}
+	for name := range initContainerNames {
+		count := 0
+		for _, status := range podStatus.ContainerStatuses {
+			if status.Name != name || !initContainerNames.Has(status.Name) || status.State != kubecontainer.ContainerStateExited {
+				continue
+			}
+			count++
+			// keep the first init container for this name
+			if count == 1 {
+				continue
+			}
+			// if there is a reason to preserve the older container, do so
+			if _, ok := initContainersToKeep[status.ID]; ok {
+				continue
+			}
+
+			// prune all other init containers that match this container name
+			glog.V(4).Infof("Removing init container %q instance %q %d", status.Name, status.ID.ID, count)
+			if err := m.runtimeService.RemoveContainer(status.ID.ID); err != nil {
+				utilruntime.HandleError(fmt.Errorf("failed to remove pod init container %q: %v; Skipping pod %q", status.Name, err, format.Pod(pod)))
+				continue
+			}
+
+			// remove any references to this container
+			if _, ok := m.containerRefManager.GetRef(status.ID); ok {
+				m.containerRefManager.ClearRef(status.ID)
+			} else {
+				glog.Warningf("No ref for container %q", status.ID)
+			}
+		}
+	}
+}
+
+// findNextInitContainerToRun returns the status of the last failed container, the
+// next init container to start, or done if there are no further init containers.
+// Status is only returned if an init container is failed, in which case next will
+// point to the current container.
+func findNextInitContainerToRun(pod *api.Pod, podStatus *kubecontainer.PodStatus) (status *kubecontainer.ContainerStatus, next *api.Container, done bool) {
+	if len(pod.Spec.InitContainers) == 0 {
+		return nil, nil, true
+	}
+
+	// If there are failed containers, return the status of the last failed one.
+	for i := len(pod.Spec.InitContainers) - 1; i >= 0; i-- {
+		container := &pod.Spec.InitContainers[i]
+		status := podStatus.FindContainerStatusByName(container.Name)
+		if status != nil && isContainerFailed(status) {
+			return status, container, false
+		}
+	}
+
+	// There are no failed containers now.
+	for i := len(pod.Spec.InitContainers) - 1; i >= 0; i-- {
+		container := &pod.Spec.InitContainers[i]
+		status := podStatus.FindContainerStatusByName(container.Name)
+		if status == nil {
+			continue
+		}
+
+		// container is still running, return not done.
+		if status.State == kubecontainer.ContainerStateRunning {
+			return nil, nil, false
+		}
+
+		if status.State == kubecontainer.ContainerStateExited {
+			// all init containers successful
+			if i == (len(pod.Spec.InitContainers) - 1) {
+				return nil, nil, true
+			}
+
+			// all containers up to i successful, go to i+1
+			return nil, &pod.Spec.InitContainers[i+1], false
+		}
+	}
+
+	return nil, &pod.Spec.InitContainers[0], false
 }
 
 // AttachContainer attaches to the container's console

@@ -24,7 +24,7 @@ import (
 	"path"
 	"strings"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -53,36 +53,37 @@ const (
 
 // WriteStaticPodManifests builds manifest objects based on user provided configuration and then dumps it to disk
 // where kubelet will pick and schedule them.
-func WriteStaticPodManifests(s *kubeadmapi.KubeadmConfig) error {
+func WriteStaticPodManifests(cfg *kubeadmapi.MasterConfiguration) error {
+	envParams := kubeadmapi.GetEnvParams()
 	// Prepare static pod specs
 	staticPodSpecs := map[string]api.Pod{
 		kubeAPIServer: componentPod(api.Container{
 			Name:          kubeAPIServer,
-			Image:         images.GetCoreImage(images.KubeAPIServerImage, s, s.EnvParams["hyperkube_image"]),
-			Command:       getComponentCommand(apiServer, s),
+			Image:         images.GetCoreImage(images.KubeAPIServerImage, cfg, envParams["hyperkube_image"]),
+			Command:       getComponentCommand(apiServer, cfg),
 			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), k8sVolumeMount()},
 			LivenessProbe: componentProbe(8080, "/healthz"),
 			Resources:     componentResources("250m"),
-		}, certsVolume(s), k8sVolume(s)),
+		}, certsVolume(cfg), k8sVolume(cfg)),
 		kubeControllerManager: componentPod(api.Container{
 			Name:          kubeControllerManager,
-			Image:         images.GetCoreImage(images.KubeControllerManagerImage, s, s.EnvParams["hyperkube_image"]),
-			Command:       getComponentCommand(controllerManager, s),
+			Image:         images.GetCoreImage(images.KubeControllerManagerImage, cfg, envParams["hyperkube_image"]),
+			Command:       getComponentCommand(controllerManager, cfg),
 			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), k8sVolumeMount()},
 			LivenessProbe: componentProbe(10252, "/healthz"),
 			Resources:     componentResources("200m"),
-		}, certsVolume(s), k8sVolume(s)),
+		}, certsVolume(cfg), k8sVolume(cfg)),
 		kubeScheduler: componentPod(api.Container{
 			Name:          kubeScheduler,
-			Image:         images.GetCoreImage(images.KubeSchedulerImage, s, s.EnvParams["hyperkube_image"]),
-			Command:       getComponentCommand(scheduler, s),
+			Image:         images.GetCoreImage(images.KubeSchedulerImage, cfg, envParams["hyperkube_image"]),
+			Command:       getComponentCommand(scheduler, cfg),
 			LivenessProbe: componentProbe(10251, "/healthz"),
 			Resources:     componentResources("100m"),
 		}),
 	}
 
 	// Add etcd static pod spec only if external etcd is not configured
-	if len(s.InitFlags.API.Etcd.ExternalEndpoints) == 0 {
+	if len(cfg.Etcd.Endpoints) == 0 {
 		staticPodSpecs[etcd] = componentPod(api.Container{
 			Name: etcd,
 			Command: []string{
@@ -92,7 +93,7 @@ func WriteStaticPodManifests(s *kubeadmapi.KubeadmConfig) error {
 				"--data-dir=/var/etcd/data",
 			},
 			VolumeMounts:  []api.VolumeMount{certsVolumeMount(), etcdVolumeMount(), k8sVolumeMount()},
-			Image:         images.GetCoreImage(images.KubeEtcdImage, s, s.EnvParams["etcd_image"]),
+			Image:         images.GetCoreImage(images.KubeEtcdImage, cfg, envParams["etcd_image"]),
 			LivenessProbe: componentProbe(2379, "/health"),
 			Resources:     componentResources("200m"),
 			SecurityContext: &api.SecurityContext{
@@ -104,10 +105,10 @@ func WriteStaticPodManifests(s *kubeadmapi.KubeadmConfig) error {
 					Type: "unconfined_t",
 				},
 			},
-		}, certsVolume(s), etcdVolume(s), k8sVolume(s))
+		}, certsVolume(cfg), etcdVolume(cfg), k8sVolume(cfg))
 	}
 
-	manifestsPath := path.Join(s.EnvParams["kubernetes_dir"], "manifests")
+	manifestsPath := path.Join(envParams["kubernetes_dir"], "manifests")
 	if err := os.MkdirAll(manifestsPath, 0700); err != nil {
 		return fmt.Errorf("<master/manifests> failed to create directory %q [%v]", manifestsPath, err)
 	}
@@ -125,11 +126,12 @@ func WriteStaticPodManifests(s *kubeadmapi.KubeadmConfig) error {
 }
 
 // etcdVolume exposes a path on the host in order to guarantee data survival during reboot.
-func etcdVolume(s *kubeadmapi.KubeadmConfig) api.Volume {
+func etcdVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
+	envParams := kubeadmapi.GetEnvParams()
 	return api.Volume{
 		Name: "etcd",
 		VolumeSource: api.VolumeSource{
-			HostPath: &api.HostPathVolumeSource{Path: s.EnvParams["host_etcd_path"]},
+			HostPath: &api.HostPathVolumeSource{Path: envParams["host_etcd_path"]},
 		},
 	}
 }
@@ -142,7 +144,7 @@ func etcdVolumeMount() api.VolumeMount {
 }
 
 // certsVolume exposes host SSL certificates to pod containers.
-func certsVolume(s *kubeadmapi.KubeadmConfig) api.Volume {
+func certsVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
 	return api.Volume{
 		Name: "certs",
 		VolumeSource: api.VolumeSource{
@@ -159,11 +161,12 @@ func certsVolumeMount() api.VolumeMount {
 	}
 }
 
-func k8sVolume(s *kubeadmapi.KubeadmConfig) api.Volume {
+func k8sVolume(cfg *kubeadmapi.MasterConfiguration) api.Volume {
+	envParams := kubeadmapi.GetEnvParams()
 	return api.Volume{
 		Name: "pki",
 		VolumeSource: api.VolumeSource{
-			HostPath: &api.HostPathVolumeSource{Path: s.EnvParams["kubernetes_dir"]},
+			HostPath: &api.HostPathVolumeSource{Path: envParams["kubernetes_dir"]},
 		},
 	}
 }
@@ -218,19 +221,18 @@ func componentPod(container api.Container, volumes ...api.Volume) api.Pod {
 	}
 }
 
-func getComponentCommand(component string, s *kubeadmapi.KubeadmConfig) (command []string) {
+func getComponentCommand(component string, cfg *kubeadmapi.MasterConfiguration) (command []string) {
 	baseFlags := map[string][]string{
 		apiServer: {
 			"--insecure-bind-address=127.0.0.1",
-			"--etcd-servers=http://127.0.0.1:2379",
 			"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
-			"--service-cluster-ip-range=" + s.InitFlags.Services.CIDR.String(),
+			"--service-cluster-ip-range=" + cfg.Networking.ServiceSubnet,
 			"--service-account-key-file=" + pkiDir + "/apiserver-key.pem",
 			"--client-ca-file=" + pkiDir + "/ca.pem",
 			"--tls-cert-file=" + pkiDir + "/apiserver.pem",
 			"--tls-private-key-file=" + pkiDir + "/apiserver-key.pem",
 			"--token-auth-file=" + pkiDir + "/tokens.csv",
-			"--secure-port=443",
+			fmt.Sprintf("--secure-port=%d", cfg.API.BindPort),
 			"--allow-privileged",
 		},
 		controllerManager: {
@@ -252,37 +254,42 @@ func getComponentCommand(component string, s *kubeadmapi.KubeadmConfig) (command
 		proxy: {},
 	}
 
-	if s.EnvParams["hyperkube_image"] != "" {
+	envParams := kubeadmapi.GetEnvParams()
+	if envParams["hyperkube_image"] != "" {
 		command = []string{"/hyperkube", component}
 	} else {
 		command = []string{"/usr/local/bin/kube-" + component}
 	}
 
-	command = append(command, s.EnvParams["component_loglevel"])
+	command = append(command, envParams["component_loglevel"])
 	command = append(command, baseFlags[component]...)
 
 	if component == apiServer {
+		// Use first address we are given
+		if len(cfg.API.AdvertiseAddresses) > 0 {
+			command = append(command, fmt.Sprintf("--advertise-address=%s", cfg.API.AdvertiseAddresses[0]))
+		}
 		// Check if the user decided to use an external etcd cluster
-		if len(s.InitFlags.API.Etcd.ExternalEndpoints) > 0 {
-			command = append(command, fmt.Sprintf("--etcd-servers=%s", strings.Join(s.InitFlags.API.Etcd.ExternalEndpoints, ",")))
+		if len(cfg.Etcd.Endpoints) > 0 {
+			command = append(command, fmt.Sprintf("--etcd-servers=%s", strings.Join(cfg.Etcd.Endpoints, ",")))
 		} else {
 			command = append(command, "--etcd-servers=http://127.0.0.1:2379")
 		}
 
 		// Is etcd secured?
-		if s.InitFlags.API.Etcd.ExternalCAFile != "" {
-			command = append(command, fmt.Sprintf("--etcd-cafile=%s", s.InitFlags.API.Etcd.ExternalCAFile))
+		if cfg.Etcd.CAFile != "" {
+			command = append(command, fmt.Sprintf("--etcd-cafile=%s", cfg.Etcd.CAFile))
 		}
-		if s.InitFlags.API.Etcd.ExternalCertFile != "" && s.InitFlags.API.Etcd.ExternalKeyFile != "" {
-			etcdClientFileArg := fmt.Sprintf("--etcd-certfile=%s", s.InitFlags.API.Etcd.ExternalCertFile)
-			etcdKeyFileArg := fmt.Sprintf("--etcd-keyfile=%s", s.InitFlags.API.Etcd.ExternalKeyFile)
+		if cfg.Etcd.CertFile != "" && cfg.Etcd.KeyFile != "" {
+			etcdClientFileArg := fmt.Sprintf("--etcd-certfile=%s", cfg.Etcd.CertFile)
+			etcdKeyFileArg := fmt.Sprintf("--etcd-keyfile=%s", cfg.Etcd.KeyFile)
 			command = append(command, etcdClientFileArg, etcdKeyFileArg)
 		}
 	}
 
 	if component == controllerManager {
-		if s.InitFlags.CloudProvider != "" {
-			command = append(command, "--cloud-provider="+s.InitFlags.CloudProvider)
+		if cfg.CloudProvider != "" {
+			command = append(command, "--cloud-provider="+cfg.CloudProvider)
 
 			// Only append the --cloud-config option if there's a such file
 			// TODO(phase1+) this won't work unless it's in one of the few directories we bind-mount
@@ -290,11 +297,10 @@ func getComponentCommand(component string, s *kubeadmapi.KubeadmConfig) (command
 				command = append(command, "--cloud-config="+DefaultCloudConfigPath)
 			}
 		}
-
-		if s.InitFlags.PodNetwork.CIDR.IP != nil {
-			// Let the controller-manager allocate Node CIDRs for the Pod network.
-			// Each node will get a subspace of the address CIDR provided with --pod-network-cidr.
-			command = append(command, "--allocate-node-cidrs=true", "--cluster-cidr="+s.InitFlags.PodNetwork.CIDR.String())
+		// Let the controller-manager allocate Node CIDRs for the Pod network.
+		// Each node will get a subspace of the address CIDR provided with --pod-network-cidr.
+		if cfg.Networking.PodSubnet != "" {
+			command = append(command, "--allocate-node-cidrs=true", "--cluster-cidr="+cfg.Networking.PodSubnet)
 		}
 	}
 

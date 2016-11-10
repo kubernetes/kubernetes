@@ -22,13 +22,12 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/client-go/1.5/kubernetes"
-	apiapi "k8s.io/client-go/1.5/pkg/api"
-	"k8s.io/client-go/1.5/pkg/api/unversioned"
-	api "k8s.io/client-go/1.5/pkg/api/v1"
-	extensions "k8s.io/client-go/1.5/pkg/apis/extensions/v1beta1"
-	policy "k8s.io/client-go/1.5/pkg/apis/policy/v1alpha1"
-	"k8s.io/client-go/1.5/pkg/util/intstr"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/pkg/api/unversioned"
+	api "k8s.io/client-go/pkg/api/v1"
+	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	policy "k8s.io/client-go/pkg/apis/policy/v1alpha1"
+	"k8s.io/client-go/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -62,6 +61,7 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 		createPodDisruptionBudgetOrDie(cs, ns, intstr.FromInt(2))
 
 		createPodsOrDie(cs, ns, 3)
+		waitForPodsOrDie(cs, ns, 3)
 
 		// Since disruptionAllowed starts out false, if we see it ever become true,
 		// that means the controller is working.
@@ -132,7 +132,7 @@ var _ = framework.KubeDescribe("DisruptionController", func() {
 			// Locate a running pod.
 			var pod api.Pod
 			err := wait.PollImmediate(framework.Poll, schedulingTimeout, func() (bool, error) {
-				podList, err := cs.Pods(ns).List(apiapi.ListOptions{})
+				podList, err := cs.Pods(ns).List(api.ListOptions{})
 				if err != nil {
 					return false, err
 				}
@@ -217,6 +217,35 @@ func createPodsOrDie(cs *kubernetes.Clientset, ns string, n int) {
 		_, err := cs.Pods(ns).Create(pod)
 		framework.ExpectNoError(err, "Creating pod %q in namespace %q", pod.Name, ns)
 	}
+}
+
+func waitForPodsOrDie(cs *kubernetes.Clientset, ns string, n int) {
+	By("Waiting for all pods to be running")
+	err := wait.PollImmediate(framework.Poll, schedulingTimeout, func() (bool, error) {
+		pods, err := cs.Core().Pods(ns).List(api.ListOptions{LabelSelector: "foo=bar"})
+		if err != nil {
+			return false, err
+		}
+		if pods == nil {
+			return false, fmt.Errorf("pods is nil")
+		}
+		if len(pods.Items) < n {
+			framework.Logf("pods: %v < %v", len(pods.Items), n)
+			return false, nil
+		}
+		ready := 0
+		for i := 0; i < n; i++ {
+			if pods.Items[i].Status.Phase == api.PodRunning {
+				ready++
+			}
+		}
+		if ready < n {
+			framework.Logf("running pods: %v < %v", ready, n)
+			return false, nil
+		}
+		return true, nil
+	})
+	framework.ExpectNoError(err, "Waiting for pods in namespace %q to be ready", ns)
 }
 
 func createReplicaSetOrDie(cs *kubernetes.Clientset, ns string, size int32, exclusive bool) {

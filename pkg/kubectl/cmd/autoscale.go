@@ -20,9 +20,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/renstrom/dedent"
-
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -31,13 +30,13 @@ import (
 )
 
 var (
-	autoscaleLong = dedent.Dedent(`
+	autoscaleLong = templates.LongDesc(`
 		Creates an autoscaler that automatically chooses and sets the number of pods that run in a kubernetes cluster.
 
 		Looks up a Deployment, ReplicaSet, or ReplicationController by name and creates an autoscaler that uses the given resource as a reference.
 		An autoscaler can automatically increase or decrease number of pods deployed within the system as needed.`)
 
-	autoscaleExample = dedent.Dedent(`
+	autoscaleExample = templates.Examples(`
 		# Auto scale a deployment "foo", with the number of pods between 2 and 10, target CPU utilization specified so a default autoscaling policy will be used:
 		kubectl autoscale deployment foo --min=2 --max=10
 
@@ -45,7 +44,7 @@ var (
 		kubectl autoscale rc foo --max=5 --cpu-percent=80`)
 )
 
-func NewCmdAutoscale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdAutoscale(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 
 	validArgs := []string{"deployment", "replicaset", "replicationcontroller"}
@@ -79,7 +78,7 @@ func NewCmdAutoscale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunAutoscale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
+func RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
 	namespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err

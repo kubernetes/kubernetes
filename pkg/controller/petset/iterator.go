@@ -111,7 +111,7 @@ type petSetIterator struct {
 	// errs is a list because we always want the iterator to drain.
 	errs []error
 	// petCount is the number of pets iterated over.
-	petCount int
+	petCount int32
 }
 
 // Next returns true for as long as there are elements in the underlying queue.

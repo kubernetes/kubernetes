@@ -40,6 +40,7 @@ func NonResourceAttributesFrom(user user.Info, in authorizationapi.NonResourceAt
 		User:            user,
 		ResourceRequest: false,
 		Path:            in.Path,
+		Verb:            in.Verb,
 	}
 }
 

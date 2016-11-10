@@ -72,7 +72,7 @@ function cluster::mesos::docker::docker_compose_lazy_pull {
 }
 
 # Run kubernetes scripts inside docker.
-# This bypasses the need to set up network routing when running docker in a VM (e.g. boot2docker).
+# This bypasses the need to set up network routing when running docker in a VM (e.g. docker-machine).
 # Trap signals and kills the docker container for better signal handing
 function cluster::mesos::docker::run_in_docker_test {
   local entrypoint="$1"

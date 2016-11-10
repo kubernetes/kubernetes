@@ -20,6 +20,8 @@ import (
 	"errors"
 	"math/rand"
 	"time"
+
+	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 // For any test of the style:
@@ -81,6 +83,7 @@ func JitterUntil(f func(), period time.Duration, jitterFactor float64, sliding b
 		}
 
 		func() {
+			defer runtime.HandleCrash()
 			f()
 		}()
 

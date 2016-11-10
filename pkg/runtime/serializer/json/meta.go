@@ -47,8 +47,10 @@ type SimpleMetaFactory struct {
 // encoding of an object, or an error.
 func (SimpleMetaFactory) Interpret(data []byte) (*unversioned.GroupVersionKind, error) {
 	findKind := struct {
+		// +optional
 		APIVersion string `json:"apiVersion,omitempty"`
-		Kind       string `json:"kind,omitempty"`
+		// +optional
+		Kind string `json:"kind,omitempty"`
 	}{}
 	if err := json.Unmarshal(data, &findKind); err != nil {
 		return nil, fmt.Errorf("couldn't get version/kind; json parse error: %v", err)

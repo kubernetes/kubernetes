@@ -120,14 +120,7 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 				},
 			},
 		}
-
-		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
-		if err != nil {
-			framework.Failf("unable to create pod %v: %v", pod.Name, err)
-		}
-
-		err = f.WaitForPodRunning(pod.Name)
-		Expect(err).NotTo(HaveOccurred(), "Failed waiting for pod %s to enter running state", pod.Name)
+		pod = f.PodClient().CreateSync(pod)
 
 		defer func() {
 			By("Cleaning up the secret")
@@ -139,8 +132,6 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 				framework.Failf("unable to delete git vol pod %v: %v", pod.Name, err)
 			}
 		}()
-
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, pod))
 	})
 
 	// The following two tests check for the problem fixed in #29641.
@@ -204,10 +195,7 @@ func createGitServer(f *framework.Framework) (gitURL string, gitRepo string, cle
 			},
 		},
 	}
-
-	if gitServerPod, err = f.Client.Pods(f.Namespace.Name).Create(gitServerPod); err != nil {
-		framework.Failf("unable to create test git server pod %s: %v", gitServerPod.Name, err)
-	}
+	f.PodClient().CreateSync(gitServerPod)
 
 	// Portal IP and port
 	httpPort := 2345
@@ -321,7 +309,7 @@ func makeConfigMapVolumes(configMapNames []string) (volumes []api.Volume, volume
 
 func testNoWrappedVolumeRace(f *framework.Framework, volumes []api.Volume, volumeMounts []api.VolumeMount, podCount int32) {
 	rcName := wrappedVolumeRaceRCNamePrefix + string(uuid.NewUUID())
-	nodeList := framework.GetReadySchedulableNodesOrDie(f.Client)
+	nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 	Expect(len(nodeList.Items)).To(BeNumerically(">", 0))
 	targetNode := nodeList.Items[0]
 

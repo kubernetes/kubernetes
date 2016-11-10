@@ -23,7 +23,6 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -174,12 +173,8 @@ func TestPlugin(t *testing.T) {
 	}
 
 	// Test Provisioner
-	cap := resource.MustParse("100Mi")
 	options := volume.VolumeOptions{
-		Capacity: cap,
-		AccessModes: []api.PersistentVolumeAccessMode{
-			api.ReadWriteOnce,
-		},
+		PVC: volumetest.CreateTestPVC("100Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
 	}
 	provisioner, err := plug.(*gcePersistentDiskPlugin).newProvisionerInternal(options, &fakePDManager{})
@@ -191,7 +186,7 @@ func TestPlugin(t *testing.T) {
 	if persistentSpec.Spec.PersistentVolumeSource.GCEPersistentDisk.PDName != "test-gce-volume-name" {
 		t.Errorf("Provision() returned unexpected volume ID: %s", persistentSpec.Spec.PersistentVolumeSource.GCEPersistentDisk.PDName)
 	}
-	cap = persistentSpec.Spec.Capacity[api.ResourceStorage]
+	cap := persistentSpec.Spec.Capacity[api.ResourceStorage]
 	size := cap.Value()
 	if size != 100*1024*1024*1024 {
 		t.Errorf("Provision() returned unexpected volume size: %v", size)

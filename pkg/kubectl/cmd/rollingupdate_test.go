@@ -19,10 +19,12 @@ package cmd
 import (
 	"bytes"
 	"testing"
+
+	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
 func TestValidateArgs(t *testing.T) {
-	f, _, _, _ := NewAPIFactory()
+	f, _, _, _ := cmdtesting.NewAPIFactory()
 
 	tests := []struct {
 		flags     map[string]string

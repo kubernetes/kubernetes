@@ -120,7 +120,10 @@ func Create(dirpath string, metadata []byte) (*WAL, error) {
 	w := &WAL{
 		dir:      dirpath,
 		metadata: metadata,
-		encoder:  newEncoder(f, 0),
+	}
+	w.encoder, err = newFileEncoder(f.File, 0)
+	if err != nil {
+		return nil, err
 	}
 	w.locks = append(w.locks, f)
 	if err = w.saveCrc(0); err != nil {
@@ -341,7 +344,10 @@ func (w *WAL) ReadAll() (metadata []byte, state raftpb.HardState, ents []raftpb.
 
 	if w.tail() != nil {
 		// create encoder (chain crc with the decoder), enable appending
-		w.encoder = newEncoder(w.tail(), w.decoder.lastCRC())
+		w.encoder, err = newFileEncoder(w.tail().File, w.decoder.lastCRC())
+		if err != nil {
+			return
+		}
 	}
 	w.decoder = nil
 
@@ -375,7 +381,10 @@ func (w *WAL) cut() error {
 	// update writer and save the previous crc
 	w.locks = append(w.locks, newTail)
 	prevCrc := w.encoder.crc.Sum32()
-	w.encoder = newEncoder(w.tail(), prevCrc)
+	w.encoder, err = newFileEncoder(w.tail().File, prevCrc)
+	if err != nil {
+		return err
+	}
 	if err = w.saveCrc(prevCrc); err != nil {
 		return err
 	}
@@ -414,7 +423,10 @@ func (w *WAL) cut() error {
 	w.locks[len(w.locks)-1] = newTail
 
 	prevCrc = w.encoder.crc.Sum32()
-	w.encoder = newEncoder(w.tail(), prevCrc)
+	w.encoder, err = newFileEncoder(w.tail().File, prevCrc)
+	if err != nil {
+		return err
+	}
 
 	plog.Infof("segmented wal file %v is created", fpath)
 	return nil

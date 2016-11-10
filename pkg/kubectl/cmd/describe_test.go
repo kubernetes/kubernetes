@@ -23,16 +23,17 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
+	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestDescribeUnknownSchemaObject(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	f, tf, codec, ns := NewTestFactory()
+	f, tf, codec, ns := cmdtesting.NewTestFactory()
 	tf.Describer = d
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &internalType{Name: "foo"})},
+		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalType("", "", "foo"))},
 	}
 	tf.Namespace = "non-default"
 	buf := bytes.NewBuffer([]byte{})
@@ -51,7 +52,7 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 
 func TestDescribeObject(t *testing.T) {
 	_, _, rc := testData()
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
 	tf.Client = &fake.RESTClient{
@@ -84,7 +85,7 @@ func TestDescribeObject(t *testing.T) {
 
 func TestDescribeListObjects(t *testing.T) {
 	pods, _, _ := testData()
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
 	tf.Client = &fake.RESTClient{
@@ -104,7 +105,7 @@ func TestDescribeListObjects(t *testing.T) {
 
 func TestDescribeObjectShowEvents(t *testing.T) {
 	pods, _, _ := testData()
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
 	tf.Client = &fake.RESTClient{
@@ -125,7 +126,7 @@ func TestDescribeObjectShowEvents(t *testing.T) {
 
 func TestDescribeObjectSkipEvents(t *testing.T) {
 	pods, _, _ := testData()
-	f, tf, codec, ns := NewAPIFactory()
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
 	tf.Client = &fake.RESTClient{

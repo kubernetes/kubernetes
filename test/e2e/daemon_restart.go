@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -175,7 +176,7 @@ func getContainerRestarts(c *client.Client, ns string, labelSelector labels.Sele
 	failedContainers := 0
 	containerRestartNodes := sets.NewString()
 	for _, p := range pods.Items {
-		for _, v := range framework.FailedContainers(&p) {
+		for _, v := range testutils.FailedContainers(&p) {
 			failedContainers = failedContainers + v.Restarts
 			containerRestartNodes.Insert(p.Spec.NodeName)
 		}
@@ -190,7 +191,7 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 	labelSelector := labels.Set(map[string]string{"name": rcName}).AsSelector()
 	existingPods := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	var ns string
-	var config framework.RCConfig
+	var config testutils.RCConfig
 	var controller *cache.Controller
 	var newPods cache.Store
 	var stopCh chan struct{}
@@ -203,7 +204,7 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 
 		// All the restart tests need an rc and a watch on pods of the rc.
 		// Additionally some of them might scale the rc during the test.
-		config = framework.RCConfig{
+		config = testutils.RCConfig{
 			Client:      f.Client,
 			Name:        rcName,
 			Namespace:   ns,
@@ -299,7 +300,7 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 
 	It("Kubelet should not restart containers across restart", func() {
 
-		nodeIPs, err := getNodePublicIps(f.Client)
+		nodeIPs, err := getNodePublicIps(f.ClientSet)
 		framework.ExpectNoError(err)
 		preRestarts, badNodes := getContainerRestarts(f.Client, ns, labelSelector)
 		if preRestarts != 0 {
@@ -312,7 +313,7 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 		}
 		postRestarts, badNodes := getContainerRestarts(f.Client, ns, labelSelector)
 		if postRestarts != preRestarts {
-			framework.DumpNodeDebugInfo(f.Client, badNodes)
+			framework.DumpNodeDebugInfo(f.Client, badNodes, framework.Logf)
 			framework.Failf("Net container restart count went from %v -> %v after kubelet restart on nodes %v \n\n %+v", preRestarts, postRestarts, badNodes, tracker)
 		}
 	})

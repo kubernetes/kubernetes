@@ -105,7 +105,13 @@ func (p *petSyncer) Sync(pet *pcb) error {
 	if err := p.SyncPVCs(pet); err != nil {
 		return err
 	}
-	if exists {
+	// if pet failed - we need to remove old one because of consistent naming
+	if exists && realPet.pod.Status.Phase == api.PodFailed {
+		glog.V(4).Infof("Delete evicted pod %v", realPet.pod.Name)
+		if err := p.petClient.Delete(realPet); err != nil {
+			return err
+		}
+	} else if exists {
 		if !p.isHealthy(realPet.pod) {
 			glog.Infof("PetSet %v waiting on unhealthy pet %v", pet.parent.Name, realPet.pod.Name)
 		}

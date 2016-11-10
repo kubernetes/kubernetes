@@ -67,13 +67,13 @@ var namespaceSubresources = sets.NewString("status", "finalize")
 // NamespaceSubResourcesForTest exports namespaceSubresources for testing in pkg/master/master_test.go, so we never drift
 var NamespaceSubResourcesForTest = sets.NewString(namespaceSubresources.List()...)
 
-type RequestInfoResolver struct {
+type RequestInfoFactory struct {
 	APIPrefixes          sets.String // without leading and trailing slashes
 	GrouplessAPIPrefixes sets.String // without leading and trailing slashes
 }
 
 // TODO write an integration test against the swagger doc to test the RequestInfo and match up behavior to responses
-// GetRequestInfo returns the information from the http request.  If error is not nil, RequestInfo holds the information as best it is known before the failure
+// NewRequestInfo returns the information from the http request.  If error is not nil, RequestInfo holds the information as best it is known before the failure
 // It handles both resource and non-resource requests and fills in all the pertinent information for each.
 // Valid Inputs:
 // Resource paths
@@ -103,7 +103,7 @@ type RequestInfoResolver struct {
 // /api
 // /healthz
 // /
-func (r *RequestInfoResolver) GetRequestInfo(req *http.Request) (*RequestInfo, error) {
+func (r *RequestInfoFactory) NewRequestInfo(req *http.Request) (*RequestInfo, error) {
 	// start with a non-resource request until proven otherwise
 	requestInfo := RequestInfo{
 		IsResourceRequest: false,

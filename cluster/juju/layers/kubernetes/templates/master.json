@@ -38,7 +38,7 @@
               "--etcd-certfile={{ etcd_cert }}",
               {%- endif %}
               "--etcd-servers={{ connection_string }}",
-              "--admission-control=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,DefaultStorageClass,ResourceQuota",
+              "--admission-control=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota",
               "--client-ca-file=/srv/kubernetes/ca.crt",
               "--basic-auth-file=/srv/kubernetes/basic_auth.csv",
               "--min-request-timeout=300",

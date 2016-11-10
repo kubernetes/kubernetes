@@ -33,7 +33,8 @@ type quobyteVolumeManager struct {
 }
 
 func (manager *quobyteVolumeManager) createVolume(provisioner *quobyteVolumeProvisioner) (quobyte *api.QuobyteVolumeSource, size int, err error) {
-	volumeSize := int(volume.RoundUpSize(provisioner.options.Capacity.Value(), 1024*1024*1024))
+	capacity := provisioner.options.PVC.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
+	volumeSize := int(volume.RoundUpSize(capacity.Value(), 1024*1024*1024))
 	// Quobyte has the concept of Volumes which doen't have a specific size (they can grow unlimited)
 	// to simulate a size constraint we could set here a Quota
 	volumeRequest := &quobyte_api.CreateVolumeRequest{

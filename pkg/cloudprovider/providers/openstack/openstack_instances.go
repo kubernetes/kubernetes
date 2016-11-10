@@ -113,8 +113,13 @@ func (i *Instances) List(name_filter string) ([]types.NodeName, error) {
 }
 
 // Implementation of Instances.CurrentNodeName
+// Note this is *not* necessarily the same as hostname.
 func (i *Instances) CurrentNodeName(hostname string) (types.NodeName, error) {
-	return types.NodeName(hostname), nil
+	md, err := getMetadata()
+	if err != nil {
+		return "", err
+	}
+	return types.NodeName(md.Name), nil
 }
 
 func (i *Instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {

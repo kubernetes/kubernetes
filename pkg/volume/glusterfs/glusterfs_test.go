@@ -19,10 +19,13 @@ package glusterfs
 import (
 	"fmt"
 	"os"
+	"reflect"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -237,62 +240,133 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	}
 }
 
-func TestAnnotations(t *testing.T) {
-	// Pass a provisioningConfigs through paramToAnnotations and back through
-	// annotationsToParam and check it did not change in the process.
-	tests := []provisioningConfig{
-		{
-		// Everything empty
-		},
-		{
-			// Everything with a value
-			url:             "http://localhost",
-			user:            "admin",
-			secretNamespace: "default",
-			secretName:      "gluster-secret",
-			userKey:         "mykey",
-		},
-		{
-			// No secret
-			url:             "http://localhost",
-			user:            "admin",
-			secretNamespace: "",
-			secretName:      "",
-			userKey:         "",
+func TestParseClassParameters(t *testing.T) {
+	secret := api.Secret{
+		Data: map[string][]byte{
+			"data": []byte("mypassword"),
 		},
 	}
 
-	for i, test := range tests {
-		provisioner := &glusterfsVolumeProvisioner{
-			provisioningConfig: test,
-		}
-		deleter := &glusterfsVolumeDeleter{}
-
-		pv := &api.PersistentVolume{
-			ObjectMeta: api.ObjectMeta{
-				Name: "pv",
+	tests := []struct {
+		name         string
+		parameters   map[string]string
+		secret       *api.Secret
+		expectError  bool
+		expectConfig *provisioningConfig
+	}{
+		{
+			"password",
+			map[string]string{
+				"resturl":     "https://localhost:8080",
+				"restuser":    "admin",
+				"restuserkey": "password",
 			},
-		}
+			nil,   // secret
+			false, // expect error
+			&provisioningConfig{
+				url:         "https://localhost:8080",
+				user:        "admin",
+				userKey:     "password",
+				secretValue: "password",
+			},
+		},
+		{
+			"secret",
+			map[string]string{
+				"resturl":         "https://localhost:8080",
+				"restuser":        "admin",
+				"secretname":      "mysecret",
+				"secretnamespace": "default",
+			},
+			&secret,
+			false, // expect error
+			&provisioningConfig{
+				url:             "https://localhost:8080",
+				user:            "admin",
+				secretName:      "mysecret",
+				secretNamespace: "default",
+				secretValue:     "mypassword",
+			},
+		},
+		{
+			"no authentication",
+			map[string]string{
+				"resturl":         "https://localhost:8080",
+				"restauthenabled": "false",
+			},
+			&secret,
+			false, // expect error
+			&provisioningConfig{
+				url: "https://localhost:8080",
+			},
+		},
+		{
+			"missing secret",
+			map[string]string{
+				"resturl":         "https://localhost:8080",
+				"secretname":      "mysecret",
+				"secretnamespace": "default",
+			},
+			nil,  // secret
+			true, // expect error
+			nil,
+		},
+		{
+			"secret with no namespace",
+			map[string]string{
+				"resturl":    "https://localhost:8080",
+				"secretname": "mysecret",
+			},
+			&secret,
+			true, // expect error
+			nil,
+		},
+		{
+			"missing url",
+			map[string]string{
+				"restuser":    "admin",
+				"restuserkey": "password",
+			},
+			nil,  // secret
+			true, // expect error
+			nil,
+		},
+		{
+			"unknown parameter",
+			map[string]string{
+				"unknown":     "yes",
+				"resturl":     "https://localhost:8080",
+				"restuser":    "admin",
+				"restuserkey": "password",
+			},
+			nil,  // secret
+			true, // expect error
+			nil,
+		},
+	}
 
-		provisioner.paramToAnnotations(pv)
-		err := deleter.annotationsToParam(pv)
-		if err != nil {
-			t.Errorf("test %d failed: %v", i, err)
+	for _, test := range tests {
+
+		client := &fake.Clientset{}
+		client.AddReactor("get", "secrets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+			if test.secret != nil {
+				return true, test.secret, nil
+			}
+			return true, nil, fmt.Errorf("Test %s did not set a secret", test.name)
+		})
+
+		cfg, err := parseClassParameters(test.parameters, client)
+
+		if err != nil && !test.expectError {
+			t.Errorf("Test %s got unexpected error %v", test.name, err)
 		}
-		if test.url != deleter.url {
-			t.Errorf("test %d failed: expected url %q, got %q", i, test.url, deleter.url)
+		if err == nil && test.expectError {
+			t.Errorf("test %s expected error and got none", test.name)
 		}
-		if test.user != deleter.user {
-			t.Errorf("test %d failed: expected user %q, got %q", i, test.user, deleter.user)
-		}
-		if test.userKey != deleter.userKey {
-			t.Errorf("test %d failed: expected userKey %q, got %q", i, test.userKey, deleter.userKey)
-		}
-		if test.secretNamespace != deleter.secretNamespace {
-			t.Errorf("test %d failed: expected secretNamespace %q, got %q", i, test.secretNamespace, deleter.secretNamespace)
-		}
-		if test.secretName != deleter.secretName {
-			t.Errorf("test %d failed: expected secretName %q, got %q", i, test.secretName, deleter.secretName)
+		if test.expectConfig != nil {
+			if !reflect.DeepEqual(cfg, test.expectConfig) {
+				t.Errorf("Test %s returned unexpected data, expected: %+v, got: %+v", test.name, test.expectConfig, cfg)
+			}
 		}
 	}
 }

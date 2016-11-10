@@ -78,7 +78,6 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_JobStatus, InType: reflect.TypeOf(&JobStatus{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_LabelSelector, InType: reflect.TypeOf(&LabelSelector{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_LabelSelectorRequirement, InType: reflect.TypeOf(&LabelSelectorRequirement{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ListOptions, InType: reflect.TypeOf(&ListOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_NetworkPolicy, InType: reflect.TypeOf(&NetworkPolicy{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_NetworkPolicyIngressRule, InType: reflect.TypeOf(&NetworkPolicyIngressRule{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_NetworkPolicyList, InType: reflect.TypeOf(&NetworkPolicyList{})},
@@ -89,6 +88,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_PodSecurityPolicyList, InType: reflect.TypeOf(&PodSecurityPolicyList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_PodSecurityPolicySpec, InType: reflect.TypeOf(&PodSecurityPolicySpec{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ReplicaSet, InType: reflect.TypeOf(&ReplicaSet{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ReplicaSetCondition, InType: reflect.TypeOf(&ReplicaSetCondition{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ReplicaSetList, InType: reflect.TypeOf(&ReplicaSetList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ReplicaSetSpec, InType: reflect.TypeOf(&ReplicaSetSpec{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ReplicaSetStatus, InType: reflect.TypeOf(&ReplicaSetStatus{})},
@@ -249,6 +249,7 @@ func DeepCopy_v1beta1_DaemonSetStatus(in interface{}, out interface{}, c *conver
 		out.CurrentNumberScheduled = in.CurrentNumberScheduled
 		out.NumberMisscheduled = in.NumberMisscheduled
 		out.DesiredNumberScheduled = in.DesiredNumberScheduled
+		out.NumberReady = in.NumberReady
 		return nil
 	}
 }
@@ -881,26 +882,6 @@ func DeepCopy_v1beta1_LabelSelectorRequirement(in interface{}, out interface{}, 
 	}
 }
 
-func DeepCopy_v1beta1_ListOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ListOptions)
-		out := out.(*ListOptions)
-		out.TypeMeta = in.TypeMeta
-		out.LabelSelector = in.LabelSelector
-		out.FieldSelector = in.FieldSelector
-		out.Watch = in.Watch
-		out.ResourceVersion = in.ResourceVersion
-		if in.TimeoutSeconds != nil {
-			in, out := &in.TimeoutSeconds, &out.TimeoutSeconds
-			*out = new(int64)
-			**out = **in
-		} else {
-			out.TimeoutSeconds = nil
-		}
-		return nil
-	}
-}
-
 func DeepCopy_v1beta1_NetworkPolicy(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*NetworkPolicy)
@@ -1154,7 +1135,23 @@ func DeepCopy_v1beta1_ReplicaSet(in interface{}, out interface{}, c *conversion.
 		if err := DeepCopy_v1beta1_ReplicaSetSpec(&in.Spec, &out.Spec, c); err != nil {
 			return err
 		}
+		if err := DeepCopy_v1beta1_ReplicaSetStatus(&in.Status, &out.Status, c); err != nil {
+			return err
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1beta1_ReplicaSetCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ReplicaSetCondition)
+		out := out.(*ReplicaSetCondition)
+		out.Type = in.Type
 		out.Status = in.Status
+		out.LastProbeTime = in.LastProbeTime.DeepCopy()
+		out.LastTransitionTime = in.LastTransitionTime.DeepCopy()
+		out.Reason = in.Reason
+		out.Message = in.Message
 		return nil
 	}
 }
@@ -1217,6 +1214,17 @@ func DeepCopy_v1beta1_ReplicaSetStatus(in interface{}, out interface{}, c *conve
 		out.ReadyReplicas = in.ReadyReplicas
 		out.AvailableReplicas = in.AvailableReplicas
 		out.ObservedGeneration = in.ObservedGeneration
+		if in.Conditions != nil {
+			in, out := &in.Conditions, &out.Conditions
+			*out = make([]ReplicaSetCondition, len(*in))
+			for i := range *in {
+				if err := DeepCopy_v1beta1_ReplicaSetCondition(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		} else {
+			out.Conditions = nil
+		}
 		return nil
 	}
 }

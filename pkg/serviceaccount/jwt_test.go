@@ -98,8 +98,8 @@ func getPrivateKey(data string) interface{} {
 }
 
 func getPublicKey(data string) interface{} {
-	key, _ := serviceaccount.ReadPublicKeyFromPEM([]byte(data))
-	return key
+	keys, _ := serviceaccount.ReadPublicKeysFromPEM([]byte(data))
+	return keys[0]
 }
 func TestReadPrivateKey(t *testing.T) {
 	f, err := ioutil.TempFile("", "")
@@ -123,7 +123,7 @@ func TestReadPrivateKey(t *testing.T) {
 	}
 }
 
-func TestReadPublicKey(t *testing.T) {
+func TestReadPublicKeys(t *testing.T) {
 	f, err := ioutil.TempFile("", "")
 	if err != nil {
 		t.Fatalf("error creating tmpfile: %v", err)
@@ -133,16 +133,30 @@ func TestReadPublicKey(t *testing.T) {
 	if err := ioutil.WriteFile(f.Name(), []byte(rsaPublicKey), os.FileMode(0600)); err != nil {
 		t.Fatalf("error writing public key to tmpfile: %v", err)
 	}
-	if _, err := serviceaccount.ReadPublicKey(f.Name()); err != nil {
+	if keys, err := serviceaccount.ReadPublicKeys(f.Name()); err != nil {
 		t.Fatalf("error reading RSA public key: %v", err)
+	} else if len(keys) != 1 {
+		t.Fatalf("expected 1 key, got %d", len(keys))
 	}
 
 	if err := ioutil.WriteFile(f.Name(), []byte(ecdsaPublicKey), os.FileMode(0600)); err != nil {
 		t.Fatalf("error writing public key to tmpfile: %v", err)
 	}
-	if _, err := serviceaccount.ReadPublicKey(f.Name()); err != nil {
+	if keys, err := serviceaccount.ReadPublicKeys(f.Name()); err != nil {
 		t.Fatalf("error reading ECDSA public key: %v", err)
+	} else if len(keys) != 1 {
+		t.Fatalf("expected 1 key, got %d", len(keys))
 	}
+
+	if err := ioutil.WriteFile(f.Name(), []byte(rsaPublicKey+"\n"+ecdsaPublicKey), os.FileMode(0600)); err != nil {
+		t.Fatalf("error writing public key to tmpfile: %v", err)
+	}
+	if keys, err := serviceaccount.ReadPublicKeys(f.Name()); err != nil {
+		t.Fatalf("error reading combined RSA/ECDSA public key file: %v", err)
+	} else if len(keys) != 2 {
+		t.Fatalf("expected 2 keys, got %d", len(keys))
+	}
+
 }
 
 func TestTokenGenerateAndValidate(t *testing.T) {

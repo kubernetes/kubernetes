@@ -24,7 +24,7 @@ image: portforwardtester
 	docker build -t $(PREFIX)/portforwardtester:$(TAG) .
 
 push: image
-	gcloud docker push $(PREFIX)/portforwardtester:$(TAG)
+	gcloud docker -- push $(PREFIX)/portforwardtester:$(TAG)
 
 clean:
 	rm -f portforwardtester

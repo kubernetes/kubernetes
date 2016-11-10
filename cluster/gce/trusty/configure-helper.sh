@@ -176,9 +176,6 @@ assemble_kubelet_flags() {
   if [ -n "${NODE_LABELS:-}" ]; then
     KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --node-labels=${NODE_LABELS}"
   fi
-  if [ "${ALLOCATE_NODE_CIDRS:-}" = "true" ]; then
-     KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --configure-cbr0=${ALLOCATE_NODE_CIDRS}"
-  fi
   # Add the unconditional flags
   KUBELET_CMD_FLAGS="${KUBELET_CMD_FLAGS} --cloud-provider=gce --allow-privileged=true --cgroup-root=/ --system-cgroups=/system --kubelet-cgroups=/kubelet --babysit-daemons=true --config=/etc/kubernetes/manifests --cluster-dns=${DNS_SERVER_IP} --cluster-domain=${DNS_DOMAIN}"
   echo "KUBELET_OPTS=\"${KUBELET_CMD_FLAGS}\"" > /etc/default/kubelet

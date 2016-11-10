@@ -25,7 +25,6 @@ import (
 
 	"github.com/golang/glog"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -33,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -40,16 +40,16 @@ import (
 )
 
 var (
-	rollingUpdate_long = dedent.Dedent(`
+	rollingUpdate_long = templates.LongDesc(`
 		Perform a rolling update of the given ReplicationController.
 
 		Replaces the specified replication controller with a new replication controller by updating one pod at a time to use the
 		new PodTemplate. The new-controller.json must specify the same namespace as the
 		existing replication controller and overwrite at least one (common) label in its replicaSelector.
 
-		![Workflow](http://kubernetes.io/images/docs/kubectl_rollingupdate.svg)
-`)
-	rollingUpdate_example = dedent.Dedent(`
+		![Workflow](http://kubernetes.io/images/docs/kubectl_rollingupdate.svg)`)
+
+	rollingUpdate_example = templates.Examples(`
 		# Update pods of frontend-v1 using new replication controller data in frontend-v2.json.
 		kubectl rolling-update frontend-v1 -f frontend-v2.json
 
@@ -64,8 +64,7 @@ var (
 		kubectl rolling-update frontend --image=image:v2
 
 		# Abort and reverse an existing rollout in progress (from frontend-v1 to frontend-v2).
-		kubectl rolling-update frontend-v1 frontend-v2 --rollback
-		`)
+		kubectl rolling-update frontend-v1 frontend-v2 --rollback`)
 )
 
 var (
@@ -74,7 +73,7 @@ var (
 	pollInterval, _ = time.ParseDuration("3s")
 )
 
-func NewCmdRollingUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdRollingUpdate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 
 	cmd := &cobra.Command{
@@ -141,7 +140,7 @@ func validateArguments(cmd *cobra.Command, filenames, args []string) error {
 	return utilerrors.NewAggregate(errors)
 }
 
-func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
+func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
 	if len(os.Args) > 1 && os.Args[1] == "rollingupdate" {
 		printDeprecationWarning("rolling-update", "rollingupdate")
 	}

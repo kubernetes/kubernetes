@@ -80,17 +80,12 @@ func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pul
 
 // IsImagePresent checks whether the container image is already in the local storage.
 func (m *kubeGenericRuntimeManager) IsImagePresent(image kubecontainer.ImageSpec) (bool, error) {
-	images, err := m.imageService.ListImages(&runtimeApi.ImageFilter{
-		Image: &runtimeApi.ImageSpec{
-			Image: &image.Image,
-		},
-	})
+	status, err := m.imageService.ImageStatus(&runtimeApi.ImageSpec{Image: &image.Image})
 	if err != nil {
-		glog.Errorf("ListImages failed: %v", err)
+		glog.Errorf("ImageStatus for image %q failed: %v", image, err)
 		return false, err
 	}
-
-	return len(images) > 0, nil
+	return status != nil, nil
 }
 
 // ListImages gets all images currently on the machine.
@@ -127,8 +122,18 @@ func (m *kubeGenericRuntimeManager) RemoveImage(image kubecontainer.ImageSpec) e
 }
 
 // ImageStats returns the statistics of the image.
-// TODO: Implement this function.
+// Notice that current logic doesn't really work for images which share layers (e.g. docker image),
+// this is a known issue, and we'll address this by getting imagefs stats directly from CRI.
+// TODO: Get imagefs stats directly from CRI.
 func (m *kubeGenericRuntimeManager) ImageStats() (*kubecontainer.ImageStats, error) {
-	var usageBytes uint64 = 0
-	return &kubecontainer.ImageStats{TotalStorageBytes: usageBytes}, nil
+	allImages, err := m.imageService.ListImages(nil)
+	if err != nil {
+		glog.Errorf("ListImages failed: %v", err)
+		return nil, err
+	}
+	stats := &kubecontainer.ImageStats{}
+	for _, img := range allImages {
+		stats.TotalStorageBytes += img.GetSize_()
+	}
+	return stats, nil
 }

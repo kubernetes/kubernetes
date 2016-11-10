@@ -24,15 +24,32 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 var (
-	default_port  = 8001
-	proxy_example = dedent.Dedent(`
+	default_port = 8001
+	proxy_long   = templates.LongDesc(`
+		To proxy all of the kubernetes api and nothing else, use:
+
+		    $ kubectl proxy --api-prefix=/
+
+		To proxy only part of the kubernetes api and also some static files:
+
+		    $ kubectl proxy --www=/my/files --www-prefix=/static/ --api-prefix=/api/
+
+		The above lets you 'curl localhost:8001/api/v1/pods'.
+
+		To proxy the entire kubernetes api at a different root, use:
+
+		    $ kubectl proxy --api-prefix=/custom/
+
+		The above lets you 'curl localhost:8001/custom/api/v1/pods'`)
+
+	proxy_example = templates.Examples(`
 		# Run a proxy to kubernetes apiserver on port 8011, serving static content from ./local/www/
 		kubectl proxy --port=8011 --www=./local/www/
 
@@ -45,27 +62,11 @@ var (
 		kubectl proxy --api-prefix=/k8s-api`)
 )
 
-func NewCmdProxy(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdProxy(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "proxy [--port=PORT] [--www=static-dir] [--www-prefix=prefix] [--api-prefix=prefix]",
-		Short: "Run a proxy to the Kubernetes API server",
-		Long: dedent.Dedent(`
-			To proxy all of the kubernetes api and nothing else, use:
-
-			kubectl proxy --api-prefix=/
-
-			To proxy only part of the kubernetes api and also some static files:
-
-			kubectl proxy --www=/my/files --www-prefix=/static/ --api-prefix=/api/
-
-			The above lets you 'curl localhost:8001/api/v1/pods'.
-
-			To proxy the entire kubernetes api at a different root, use:
-
-			kubectl proxy --api-prefix=/custom/
-
-			The above lets you 'curl localhost:8001/custom/api/v1/pods'
-			`),
+		Use:     "proxy [--port=PORT] [--www=static-dir] [--www-prefix=prefix] [--api-prefix=prefix]",
+		Short:   "Run a proxy to the Kubernetes API server",
+		Long:    proxy_long,
 		Example: proxy_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunProxy(f, out, cmd)
@@ -86,7 +87,7 @@ func NewCmdProxy(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunProxy(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
+func RunProxy(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 	path := cmdutil.GetFlagString(cmd, "unix-socket")
 	port := cmdutil.GetFlagInt(cmd, "port")
 	address := cmdutil.GetFlagString(cmd, "address")

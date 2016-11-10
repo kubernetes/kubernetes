@@ -21,7 +21,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
@@ -29,12 +28,11 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
 	pkgstorage "k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/types"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
@@ -156,7 +154,16 @@ func MatchNode(label labels.Selector, field fields.Selector) pkgstorage.Selectio
 			if !ok {
 				return nil, nil, fmt.Errorf("not a node")
 			}
-			return labels.Set(nodeObj.ObjectMeta.Labels), NodeToSelectableFields(nodeObj), nil
+
+			// Compute fields only if field selectors is non-empty
+			// (otherwise those won't be used).
+			// Those are generally also not needed if label selector does
+			// not match labels, but additional computation of it is expensive.
+			var nodeFields fields.Set
+			if !field.Empty() {
+				nodeFields = NodeToSelectableFields(nodeObj)
+			}
+			return labels.Set(nodeObj.ObjectMeta.Labels), nodeFields, nil
 		},
 		IndexFields: []string{"metadata.name"},
 	}
@@ -175,39 +182,23 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid node request %q", id))
 	}
 
-	nodeObj, err := getter.Get(ctx, name)
+	info, err := connection.GetConnectionInfo(ctx, types.NodeName(name))
 	if err != nil {
 		return nil, nil, err
 	}
-	node := nodeObj.(*api.Node)
-	hostIP, err := nodeutil.GetNodeHostIP(node)
-	if err != nil {
-		return nil, nil, err
-	}
-	host := hostIP.String()
 
 	// We check if we want to get a default Kubelet's transport. It happens if either:
-	// - no port is specified in request (Kubelet's port is default),
-	// - we're using Port stored as a DaemonEndpoint and requested port is a Kubelet's port stored in the DaemonEndpoint,
-	// - there's no information in the API about DaemonEnpoint (legacy cluster) and requested port is equal to ports.KubeletPort (cluster-wide config)
-	kubeletPort := node.Status.DaemonEndpoints.KubeletEndpoint.Port
-	if kubeletPort == 0 {
-		kubeletPort = ports.KubeletPort
-	}
-	if portReq == "" || strconv.Itoa(int(kubeletPort)) == portReq {
-		scheme, port, kubeletTransport, err := connection.GetConnectionInfo(ctx, node.Name)
-		if err != nil {
-			return nil, nil, err
-		}
+	// - no port is specified in request (Kubelet's port is default)
+	// - the requested port matches the kubelet port for this node
+	if portReq == "" || portReq == info.Port {
 		return &url.URL{
-				Scheme: scheme,
-				Host: net.JoinHostPort(
-					host,
-					strconv.FormatUint(uint64(port), 10),
-				),
+				Scheme: info.Scheme,
+				Host:   net.JoinHostPort(info.Hostname, info.Port),
 			},
-			kubeletTransport,
+			info.Transport,
 			nil
 	}
-	return &url.URL{Scheme: schemeReq, Host: net.JoinHostPort(host, portReq)}, proxyTransport, nil
+
+	// Otherwise, return the requested scheme and port, and the proxy transport
+	return &url.URL{Scheme: schemeReq, Host: net.JoinHostPort(info.Hostname, portReq)}, proxyTransport, nil
 }

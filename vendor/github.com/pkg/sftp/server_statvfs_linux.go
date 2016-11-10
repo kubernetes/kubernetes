@@ -15,9 +15,8 @@ func statvfsFromStatfst(stat *syscall.Statfs_t) (*StatVFS, error) {
 		Bavail:  stat.Bavail,
 		Files:   stat.Files,
 		Ffree:   stat.Ffree,
-		Favail:  stat.Ffree,                                                            // not sure how to calculate Favail
-		Fsid:    uint64(uint64(stat.Fsid.X__val[1])<<32 | uint64(stat.Fsid.X__val[0])), // endianness?
-		Flag:    uint64(stat.Flags),                                                    // assuming POSIX?
+		Favail:  stat.Ffree,         // not sure how to calculate Favail
+		Flag:    uint64(stat.Flags), // assuming POSIX?
 		Namemax: uint64(stat.Namelen),
 	}, nil
 }

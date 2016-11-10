@@ -46,11 +46,16 @@ type Server struct {
 }
 
 type ServerStatus struct {
-	Component  string       `json:"component,omitempty"`
-	Health     string       `json:"health,omitempty"`
+	// +optional
+	Component string `json:"component,omitempty"`
+	// +optional
+	Health string `json:"health,omitempty"`
+	// +optional
 	HealthCode probe.Result `json:"healthCode,omitempty"`
-	Msg        string       `json:"msg,omitempty"`
-	Err        string       `json:"err,omitempty"`
+	// +optional
+	Msg string `json:"msg,omitempty"`
+	// +optional
+	Err string `json:"err,omitempty"`
 }
 
 func (server *Server) DoServerCheck(prober httpprober.HTTPProber) (probe.Result, string, error) {

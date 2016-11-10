@@ -17,12 +17,12 @@ limitations under the License.
 package etcd
 
 import (
-	"net/http"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/fields"
+	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -30,17 +30,13 @@ import (
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 )
 
-type fakeConnectionInfoGetter struct {
-}
-
-func (fakeConnectionInfoGetter) GetConnectionInfo(ctx api.Context, nodeName string) (string, uint, http.RoundTripper, error) {
-	return "http", 12345, nil, nil
-}
-
 func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1}
-	storage := NewStorage(restOptions, fakeConnectionInfoGetter{}, nil)
+	storage, err := NewStorage(restOptions, kubeletclient.KubeletClientConfig{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	return storage.Node, server
 }
 

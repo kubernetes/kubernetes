@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -68,7 +69,7 @@ func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames 
 	rcName := fmt.Sprintf("resource%d-%s", totalPods, string(uuid.NewUUID()))
 
 	// TODO: Use a more realistic workload
-	Expect(framework.RunRC(framework.RCConfig{
+	Expect(framework.RunRC(testutils.RCConfig{
 		Client:    f.Client,
 		Name:      rcName,
 		Namespace: f.Namespace.Name,
@@ -200,9 +201,9 @@ var _ = framework.KubeDescribe("Kubelet [Serial] [Slow]", func() {
 		// affect the runtime cpu usage. Fail the test if prepulling cannot
 		// finish in time.
 		if err := framework.WaitForPodsSuccess(f.Client, api.NamespaceSystem, framework.ImagePullerLabels, imagePrePullingLongTimeout); err != nil {
-			framework.Failf("Image puller didn't complete in %v, not running resource usage test since the metrics might be adultrated", imagePrePullingLongTimeout)
+			framework.Failf("Image puller didn't complete in %v, not running resource usage test since the metrics might be adulterated", imagePrePullingLongTimeout)
 		}
-		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
+		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		nodeNames = sets.NewString()
 		for _, node := range nodes.Items {
 			nodeNames.Insert(node.Name)

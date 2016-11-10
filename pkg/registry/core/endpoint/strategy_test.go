@@ -20,19 +20,15 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 )
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
-	_, fieldsSet, err := EndpointsAttributes(&api.Endpoints{})
-	if err != nil {
-		t.Fatal(err)
-	}
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		testapi.Default.GroupVersion().String(),
+		registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 		"Endpoints",
-		fieldsSet,
+		EndpointsToSelectableFields(&api.Endpoints{}),
 		nil,
 	)
 }

@@ -19,6 +19,7 @@ package fake
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
 	v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 	labels "k8s.io/kubernetes/pkg/labels"
@@ -50,13 +51,13 @@ func (c *FakeThirdPartyResources) Update(thirdPartyResource *v1beta1.ThirdPartyR
 	return obj.(*v1beta1.ThirdPartyResource), err
 }
 
-func (c *FakeThirdPartyResources) Delete(name string, options *api.DeleteOptions) error {
+func (c *FakeThirdPartyResources) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(core.NewRootDeleteAction(thirdpartyresourcesResource, name), &v1beta1.ThirdPartyResource{})
 	return err
 }
 
-func (c *FakeThirdPartyResources) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+func (c *FakeThirdPartyResources) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := core.NewRootDeleteCollectionAction(thirdpartyresourcesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.ThirdPartyResourceList{})
@@ -72,14 +73,14 @@ func (c *FakeThirdPartyResources) Get(name string) (result *v1beta1.ThirdPartyRe
 	return obj.(*v1beta1.ThirdPartyResource), err
 }
 
-func (c *FakeThirdPartyResources) List(opts api.ListOptions) (result *v1beta1.ThirdPartyResourceList, err error) {
+func (c *FakeThirdPartyResources) List(opts v1.ListOptions) (result *v1beta1.ThirdPartyResourceList, err error) {
 	obj, err := c.Fake.
 		Invokes(core.NewRootListAction(thirdpartyresourcesResource, opts), &v1beta1.ThirdPartyResourceList{})
 	if obj == nil {
 		return nil, err
 	}
 
-	label := opts.LabelSelector
+	label, _, _ := core.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
@@ -93,7 +94,7 @@ func (c *FakeThirdPartyResources) List(opts api.ListOptions) (result *v1beta1.Th
 }
 
 // Watch returns a watch.Interface that watches the requested thirdPartyResources.
-func (c *FakeThirdPartyResources) Watch(opts api.ListOptions) (watch.Interface, error) {
+func (c *FakeThirdPartyResources) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewRootWatchAction(thirdpartyresourcesResource, opts))
 }

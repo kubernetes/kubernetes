@@ -92,7 +92,7 @@ func testWatch(t *testing.T, recursive bool) {
 		},
 	}}
 	for i, tt := range tests {
-		w, err := store.watch(ctx, tt.key, "0", storage.SimpleFilter(tt.pred), recursive)
+		w, err := store.watch(ctx, tt.key, "0", tt.pred, recursive)
 		if err != nil {
 			t.Fatalf("Watch failed: %v", err)
 		}
@@ -176,13 +176,13 @@ func TestWatchFromNoneZero(t *testing.T) {
 func TestWatchError(t *testing.T) {
 	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
 	defer cluster.Terminate(t)
-	invalidStore := newStore(cluster.RandClient(), &testCodec{testapi.Default.Codec()}, "")
+	invalidStore := newStore(cluster.RandClient(), false, &testCodec{testapi.Default.Codec()}, "")
 	ctx := context.Background()
 	w, err := invalidStore.Watch(ctx, "/abc", "0", storage.Everything)
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	validStore := newStore(cluster.RandClient(), testapi.Default.Codec(), "")
+	validStore := newStore(cluster.RandClient(), false, testapi.Default.Codec(), "")
 	validStore.GuaranteedUpdate(ctx, "/abc", &api.Pod{}, true, nil, storage.SimpleUpdate(
 		func(runtime.Object) (runtime.Object, error) {
 			return &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}, nil
@@ -197,7 +197,7 @@ func TestWatchContextCancel(t *testing.T) {
 	cancel()
 	// When we watch with a canceled context, we should detect that it's context canceled.
 	// We won't take it as error and also close the watcher.
-	w, err := store.watcher.Watch(canceledCtx, "/abc", 0, false, storage.SimpleFilter(storage.Everything))
+	w, err := store.watcher.Watch(canceledCtx, "/abc", 0, false, storage.Everything)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,7 +216,7 @@ func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
 	origCtx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
 	ctx, cancel := context.WithCancel(origCtx)
-	w := store.watcher.createWatchChan(ctx, "/abc", 0, false, storage.SimpleFilter(storage.Everything))
+	w := store.watcher.createWatchChan(ctx, "/abc", 0, false, storage.Everything)
 	// make resutlChan and errChan blocking to ensure ordering.
 	w.resultChan = make(chan watch.Event)
 	w.errChan = make(chan error)

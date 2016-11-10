@@ -206,7 +206,7 @@ var _ = framework.KubeDescribe("Addon update", func() {
 
 		var err error
 		sshClient, err = getMasterSSHClient()
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "Failed to get the master SSH client.")
 	})
 
 	AfterEach(func() {
@@ -252,7 +252,7 @@ var _ = framework.KubeDescribe("Addon update", func() {
 
 		for _, p := range remoteFiles {
 			err := writeRemoteFile(sshClient, p.data, temporaryRemotePath, p.fileName, 0644)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred(), "Failed to write file %q at remote path %q with ssh client %+v", p.fileName, temporaryRemotePath, sshClient)
 		}
 
 		// directory on kubernetes-master
@@ -261,7 +261,7 @@ var _ = framework.KubeDescribe("Addon update", func() {
 
 		// cleanup from previous tests
 		_, _, _, err := sshExec(sshClient, fmt.Sprintf("sudo rm -rf %s", destinationDirPrefix))
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "Failed to remove remote dir %q with ssh client %+v", destinationDirPrefix, sshClient)
 
 		defer sshExec(sshClient, fmt.Sprintf("sudo rm -rf %s", destinationDirPrefix)) // ignore result in cleanup
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo mkdir -p %s", destinationDir))
@@ -352,7 +352,7 @@ func getMasterSSHClient() (*ssh.Client, error) {
 
 func sshExecAndVerify(client *ssh.Client, cmd string) {
 	_, _, rc, err := sshExec(client, cmd)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "Failed to execute %q with ssh client %+v", cmd, client)
 	Expect(rc).To(Equal(0), "error return code from executing command on the cluster: %s", cmd)
 }
 

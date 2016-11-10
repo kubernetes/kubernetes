@@ -76,7 +76,7 @@ func (f FakeServiceLister) List(labels.Selector) ([]*api.Service, error) {
 	return f, nil
 }
 
-// GetPodServices gets the services that have the selector that match the labels on the given pod
+// GetPodServices gets the services that have the selector that match the labels on the given pod.
 func (f FakeServiceLister) GetPodServices(pod *api.Pod) (services []*api.Service, err error) {
 	var selector labels.Selector
 
@@ -91,10 +91,6 @@ func (f FakeServiceLister) GetPodServices(pod *api.Pod) (services []*api.Service
 			services = append(services, service)
 		}
 	}
-	if len(services) == 0 {
-		err = fmt.Errorf("Could not find service for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
-	}
-
 	return
 }
 
@@ -150,35 +146,23 @@ func (f FakeControllerLister) GetPodControllers(pod *api.Pod) (controllers []*ap
 
 // ReplicaSetLister interface represents anything that can produce a list of ReplicaSet; the list is consumed by a scheduler.
 type ReplicaSetLister interface {
-	// Lists all the replicasets
-	List() ([]extensions.ReplicaSet, error)
 	// Gets the replicasets for the given pod
-	GetPodReplicaSets(*api.Pod) ([]extensions.ReplicaSet, error)
+	GetPodReplicaSets(*api.Pod) ([]*extensions.ReplicaSet, error)
 }
 
 // EmptyReplicaSetLister implements ReplicaSetLister on []extensions.ReplicaSet returning empty data
 type EmptyReplicaSetLister struct{}
 
-// List returns nil
-func (f EmptyReplicaSetLister) List() ([]extensions.ReplicaSet, error) {
-	return nil, nil
-}
-
 // GetPodReplicaSets returns nil
-func (f EmptyReplicaSetLister) GetPodReplicaSets(pod *api.Pod) (rss []extensions.ReplicaSet, err error) {
+func (f EmptyReplicaSetLister) GetPodReplicaSets(pod *api.Pod) (rss []*extensions.ReplicaSet, err error) {
 	return nil, nil
 }
 
 // FakeReplicaSetLister implements ControllerLister on []extensions.ReplicaSet for test purposes.
-type FakeReplicaSetLister []extensions.ReplicaSet
-
-// List returns []extensions.ReplicaSet, the list of all ReplicaSets.
-func (f FakeReplicaSetLister) List() ([]extensions.ReplicaSet, error) {
-	return f, nil
-}
+type FakeReplicaSetLister []*extensions.ReplicaSet
 
 // GetPodReplicaSets gets the ReplicaSets that have the selector that match the labels on the given pod
-func (f FakeReplicaSetLister) GetPodReplicaSets(pod *api.Pod) (rss []extensions.ReplicaSet, err error) {
+func (f FakeReplicaSetLister) GetPodReplicaSets(pod *api.Pod) (rss []*extensions.ReplicaSet, err error) {
 	var selector labels.Selector
 
 	for _, rs := range f {

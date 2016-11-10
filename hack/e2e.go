@@ -25,6 +25,8 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/signal"
+	"os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -51,11 +53,13 @@ var (
 	verbose              = flag.Bool("v", false, "If true, print all command output.")
 
 	// kops specific flags.
-	kopsPath    = flag.String("kops", "", "(kops only) Path to the kops binary. Must be set for kops.")
-	kopsCluster = flag.String("kops-cluster", "", "(kops only) Cluster name. Must be set for kops.")
-	kopsState   = flag.String("kops-state", os.Getenv("KOPS_STATE_STORE"), "(kops only) s3:// path to kops state store. Must be set. (This flag defaults to $KOPS_STATE_STORE, and overrides it if set.)")
-	kopsZones   = flag.String("kops-zones", "us-west-2a", "(kops AWS only) AWS zones for kops deployment, comma delimited.")
-	kopsNodes   = flag.Int("kops-nodes", 2, "(kops only) Number of nodes to create.")
+	kopsPath        = flag.String("kops", "", "(kops only) Path to the kops binary. Must be set for kops.")
+	kopsCluster     = flag.String("kops-cluster", "", "(kops only) Cluster name. Must be set for kops.")
+	kopsState       = flag.String("kops-state", os.Getenv("KOPS_STATE_STORE"), "(kops only) s3:// path to kops state store. Must be set. (This flag defaults to $KOPS_STATE_STORE, and overrides it if set.)")
+	kopsSSHKey      = flag.String("kops-ssh-key", os.Getenv("AWS_SSH_KEY"), "(kops only) Path to ssh key-pair for each node. (Defaults to $AWS_SSH_KEY or '~/.ssh/kube_aws_rsa'.)")
+	kopsKubeVersion = flag.String("kops-kubernetes-version", "", "(kops only) If set, the version of Kubernetes to deploy (can be a URL to a GCS path where the release is stored) (Defaults to kops default, latest stable release.).")
+	kopsZones       = flag.String("kops-zones", "us-west-2a", "(kops AWS only) AWS zones for kops deployment, comma delimited.")
+	kopsNodes       = flag.Int("kops-nodes", 2, "(kops only) Number of nodes to create.")
 
 	// Deprecated flags.
 	deprecatedPush   = flag.Bool("push", false, "Deprecated. Does nothing.")
@@ -156,6 +160,21 @@ func main() {
 		log.Fatalf("Error creating deployer: %v", err)
 	}
 
+	if *down {
+		// listen for signals such as ^C and gracefully attempt to clean up
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt)
+		go func() {
+			for range c {
+				log.Print("Captured ^C, gracefully attempting to cleanup resources..")
+				if err := deploy.Down(); err != nil {
+					log.Printf("Tearing down deployment failed: %v", err)
+					os.Exit(1)
+				}
+			}
+		}()
+	}
+
 	if err := run(deploy); err != nil {
 		log.Fatalf("Something went wrong: %s", err)
 	}
@@ -204,9 +223,32 @@ func run(deploy deployer) error {
 	}
 
 	if *up {
+		// If we tried to bring the cluster up, make a courtesy
+		// attempt to bring it down so we're not leaving resources around.
+		//
+		// TODO: We should try calling deploy.Down exactly once. Though to
+		// stop the leaking resources for now, we want to be on the safe side
+		// and call it explictly in defer if the other one is not called.
+		if *down {
+			defer xmlWrap("Deferred TearDown", deploy.Down)
+		}
 		// Start the cluster using this version.
 		if err := xmlWrap("Up", deploy.Up); err != nil {
 			return fmt.Errorf("starting e2e cluster: %s", err)
+		}
+		if *dump != "" {
+			cmd := exec.Command("./cluster/kubectl.sh", "--match-server-version=false", "get", "nodes", "-oyaml")
+			b, err := cmd.CombinedOutput()
+			if *verbose {
+				log.Printf("kubectl get nodes:\n%s", string(b))
+			}
+			if err == nil {
+				if err := ioutil.WriteFile(filepath.Join(*dump, "nodes.yaml"), b, 0644); err != nil {
+					errs = appendError(errs, fmt.Errorf("error writing nodes.yaml: %v", err))
+				}
+			} else {
+				errs = appendError(errs, fmt.Errorf("error running get nodes: %v", err))
+			}
 		}
 	}
 
@@ -390,11 +432,13 @@ func (b bash) Down() error {
 }
 
 type kops struct {
-	path    string
-	zones   []string
-	nodes   int
-	cluster string
-	kubecfg string
+	path        string
+	kubeVersion string
+	sshKey      string
+	zones       []string
+	nodes       int
+	cluster     string
+	kubecfg     string
 }
 
 func NewKops() (*kops, error) {
@@ -406,6 +450,14 @@ func NewKops() (*kops, error) {
 	}
 	if *kopsState == "" {
 		return nil, fmt.Errorf("--kops-state must be set to a valid S3 path for kops deployment.")
+	}
+	sshKey := *kopsSSHKey
+	if sshKey == "" {
+		usr, err := user.Current()
+		if err != nil {
+			return nil, err
+		}
+		sshKey = filepath.Join(usr.HomeDir, ".ssh/kube_aws_rsa")
 	}
 	if err := os.Setenv("KOPS_STATE_STORE", *kopsState); err != nil {
 		return nil, err
@@ -432,26 +484,38 @@ func NewKops() (*kops, error) {
 	if err := os.Setenv("KUBERNETES_CONFORMANCE_PROVIDER", "aws"); err != nil {
 		return nil, err
 	}
-	// ZONE is required by the AWS e2e tests
+	// AWS_SSH_KEY is required by the AWS e2e tests.
+	if err := os.Setenv("AWS_SSH_KEY", sshKey); err != nil {
+		return nil, err
+	}
+	// ZONE is required by the AWS e2e tests.
 	zones := strings.Split(*kopsZones, ",")
 	if err := os.Setenv("ZONE", zones[0]); err != nil {
 		return nil, err
 	}
 	return &kops{
-		path:    *kopsPath,
-		zones:   zones,
-		nodes:   *kopsNodes,
-		cluster: *kopsCluster,
-		kubecfg: kubecfg,
+		path:        *kopsPath,
+		kubeVersion: *kopsKubeVersion,
+		sshKey:      sshKey + ".pub", // kops only needs the public key, e2es need the private key.
+		zones:       zones,
+		nodes:       *kopsNodes,
+		cluster:     *kopsCluster,
+		kubecfg:     kubecfg,
 	}, nil
 }
 
 func (k kops) Up() error {
-	if err := finishRunning("kops config", exec.Command(
-		k.path, "create", "cluster",
+	createArgs := []string{
+		"create", "cluster",
 		"--name", k.cluster,
+		"--ssh-public-key", k.sshKey,
 		"--node-count", strconv.Itoa(k.nodes),
-		"--zones", strings.Join(k.zones, ","))); err != nil {
+		"--zones", strings.Join(k.zones, ","),
+	}
+	if k.kubeVersion != "" {
+		createArgs = append(createArgs, "--kubernetes-version", k.kubeVersion)
+	}
+	if err := finishRunning("kops config", exec.Command(k.path, createArgs...)); err != nil {
 		return fmt.Errorf("kops configuration failed: %v", err)
 	}
 	if err := finishRunning("kops update", exec.Command(k.path, "update", "cluster", k.cluster, "--yes")); err != nil {
@@ -538,6 +602,15 @@ func KubemarkTest() error {
 	if err != nil {
 		return err
 	}
+	// If we tried to bring the Kubemark cluster up, make a courtesy
+	// attempt to bring it down so we're not leaving resources around.
+	//
+	// TODO: We should try calling stop-kubemark exactly once. Though to
+	// stop the leaking resources for now, we want to be on the safe side
+	// and call it explictly in defer if the other one is not called.
+	defer xmlWrap("Deferred Stop kubemark", func() error {
+		return finishRunning("Stop kubemark", exec.Command("./test/kubemark/stop-kubemark.sh"))
+	})
 
 	// Start new run
 	backups := []string{"NUM_NODES", "MASTER_SIZE"}
@@ -551,7 +624,9 @@ func KubemarkTest() error {
 	}
 	os.Setenv("NUM_NODES", os.Getenv("KUBEMARK_NUM_NODES"))
 	os.Setenv("MASTER_SIZE", os.Getenv("KUBEMARK_MASTER_SIZE"))
-	err = finishRunning("Start Kubemark", exec.Command("./test/kubemark/start-kubemark.sh"))
+	err = xmlWrap("Start kubemark", func() error {
+		return finishRunning("Start kubemark", exec.Command("./test/kubemark/start-kubemark.sh"))
+	})
 	if err != nil {
 		return err
 	}
@@ -568,7 +643,9 @@ func KubemarkTest() error {
 		return err
 	}
 
-	err = finishRunning("Stop kubemark", exec.Command("./test/kubemark/stop-kubemark.sh"))
+	err = xmlWrap("Stop kubemark", func() error {
+		return finishRunning("Stop kubemark", exec.Command("./test/kubemark/stop-kubemark.sh"))
+	})
 	if err != nil {
 		return err
 	}

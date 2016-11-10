@@ -36,13 +36,12 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 const (
@@ -67,34 +66,28 @@ type DeploymentController struct {
 	syncHandler func(dKey string) error
 
 	// A store of deployments, populated by the dController
-	dStore cache.StoreToDeploymentLister
-	// Watches changes to all deployments
-	dController *cache.Controller
+	dLister *cache.StoreToDeploymentLister
 	// A store of ReplicaSets, populated by the rsController
-	rsStore cache.StoreToReplicaSetLister
-	// Watches changes to all ReplicaSets
-	rsController *cache.Controller
+	rsLister *cache.StoreToReplicaSetLister
 	// A store of pods, populated by the podController
-	podStore cache.StoreToPodLister
-	// Watches changes to all pods
-	podController *cache.Controller
+	podLister *cache.StoreToPodLister
 
-	// dStoreSynced returns true if the Deployment store has been synced at least once.
+	// dListerSynced returns true if the Deployment store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
-	dStoreSynced func() bool
-	// rsStoreSynced returns true if the ReplicaSet store has been synced at least once.
+	dListerSynced cache.InformerSynced
+	// rsListerSynced returns true if the ReplicaSet store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
-	rsStoreSynced func() bool
-	// podStoreSynced returns true if the pod store has been synced at least once.
+	rsListerSynced cache.InformerSynced
+	// podListerSynced returns true if the pod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
-	podStoreSynced func() bool
+	podListerSynced cache.InformerSynced
 
 	// Deployments that need to be synced
 	queue workqueue.RateLimitingInterface
 }
 
 // NewDeploymentController creates a new DeploymentController.
-func NewDeploymentController(client clientset.Interface, resyncPeriod controller.ResyncPeriodFunc) *DeploymentController {
+func NewDeploymentController(dInformer informers.DeploymentInformer, rsInformer informers.ReplicaSetInformer, podInformer informers.PodInformer, client clientset.Interface) *DeploymentController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
@@ -109,84 +102,36 @@ func NewDeploymentController(client clientset.Interface, resyncPeriod controller
 		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "deployment"),
 	}
 
-	dc.dStore.Indexer, dc.dController = cache.NewIndexerInformer(
-		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return dc.client.Extensions().Deployments(api.NamespaceAll).List(options)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return dc.client.Extensions().Deployments(api.NamespaceAll).Watch(options)
-			},
-		},
-		&extensions.Deployment{},
-		FullDeploymentResyncPeriod,
-		cache.ResourceEventHandlerFuncs{
-			AddFunc:    dc.addDeploymentNotification,
-			UpdateFunc: dc.updateDeploymentNotification,
-			// This will enter the sync loop and no-op, because the deployment has been deleted from the store.
-			DeleteFunc: dc.deleteDeploymentNotification,
-		},
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
-	)
-
-	dc.rsStore.Store, dc.rsController = cache.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return dc.client.Extensions().ReplicaSets(api.NamespaceAll).List(options)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return dc.client.Extensions().ReplicaSets(api.NamespaceAll).Watch(options)
-			},
-		},
-		&extensions.ReplicaSet{},
-		resyncPeriod(),
-		cache.ResourceEventHandlerFuncs{
-			AddFunc:    dc.addReplicaSet,
-			UpdateFunc: dc.updateReplicaSet,
-			DeleteFunc: dc.deleteReplicaSet,
-		},
-	)
-
-	dc.podStore.Indexer, dc.podController = cache.NewIndexerInformer(
-		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return dc.client.Core().Pods(api.NamespaceAll).List(options)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return dc.client.Core().Pods(api.NamespaceAll).Watch(options)
-			},
-		},
-		&api.Pod{},
-		resyncPeriod(),
-		cache.ResourceEventHandlerFuncs{
-			AddFunc:    dc.addPod,
-			UpdateFunc: dc.updatePod,
-			DeleteFunc: dc.deletePod,
-		},
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
-	)
+	dInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    dc.addDeploymentNotification,
+		UpdateFunc: dc.updateDeploymentNotification,
+		// This will enter the sync loop and no-op, because the deployment has been deleted from the store.
+		DeleteFunc: dc.deleteDeploymentNotification,
+	})
+	rsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    dc.addReplicaSet,
+		UpdateFunc: dc.updateReplicaSet,
+		DeleteFunc: dc.deleteReplicaSet,
+	})
 
 	dc.syncHandler = dc.syncDeployment
-	dc.dStoreSynced = dc.dController.HasSynced
-	dc.rsStoreSynced = dc.rsController.HasSynced
-	dc.podStoreSynced = dc.podController.HasSynced
+	dc.dLister = dInformer.Lister()
+	dc.rsLister = rsInformer.Lister()
+	dc.podLister = podInformer.Lister()
+	dc.dListerSynced = dInformer.Informer().HasSynced
+	dc.rsListerSynced = dInformer.Informer().HasSynced
+	dc.podListerSynced = dInformer.Informer().HasSynced
 	return dc
 }
 
 // Run begins watching and syncing.
 func (dc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
+	defer dc.queue.ShutDown()
 
-	go dc.dController.Run(stopCh)
-	go dc.rsController.Run(stopCh)
-	go dc.podController.Run(stopCh)
+	glog.Infof("Starting deployment controller")
 
-	// Wait for the rc and dc stores to sync before starting any work in this controller.
-	ready := make(chan struct{})
-	go dc.waitForSyncedStores(ready, stopCh)
-	select {
-	case <-ready:
-	case <-stopCh:
+	if !cache.WaitForCacheSync(stopCh, dc.dListerSynced, dc.rsListerSynced, dc.podListerSynced) {
 		return
 	}
 
@@ -196,21 +141,6 @@ func (dc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
 
 	<-stopCh
 	glog.Infof("Shutting down deployment controller")
-	dc.queue.ShutDown()
-}
-
-func (dc *DeploymentController) waitForSyncedStores(ready chan<- struct{}, stopCh <-chan struct{}) {
-	defer utilruntime.HandleCrash()
-
-	for !dc.dStoreSynced() || !dc.rsStoreSynced() || !dc.podStoreSynced() {
-		select {
-		case <-time.After(StoreSyncedPollPeriod):
-		case <-stopCh:
-			return
-		}
-	}
-
-	close(ready)
 }
 
 func (dc *DeploymentController) addDeploymentNotification(obj interface{}) {
@@ -255,7 +185,7 @@ func (dc *DeploymentController) addReplicaSet(obj interface{}) {
 
 // getDeploymentForReplicaSet returns the deployment managing the given ReplicaSet.
 func (dc *DeploymentController) getDeploymentForReplicaSet(rs *extensions.ReplicaSet) *extensions.Deployment {
-	deployments, err := dc.dStore.GetDeploymentsForReplicaSet(rs)
+	deployments, err := dc.dLister.GetDeploymentsForReplicaSet(rs)
 	if err != nil || len(deployments) == 0 {
 		glog.V(4).Infof("Error: %v. No deployment found for ReplicaSet %v, deployment controller will avoid syncing.", err, rs.Name)
 		return nil
@@ -268,7 +198,7 @@ func (dc *DeploymentController) getDeploymentForReplicaSet(rs *extensions.Replic
 		sort.Sort(util.BySelectorLastUpdateTime(deployments))
 		glog.Errorf("user error! more than one deployment is selecting replica set %s/%s with labels: %#v, returning %s/%s", rs.Namespace, rs.Name, rs.Labels, deployments[0].Namespace, deployments[0].Name)
 	}
-	return &deployments[0]
+	return deployments[0]
 }
 
 // updateReplicaSet figures out what deployment(s) manage a ReplicaSet when the ReplicaSet
@@ -321,83 +251,6 @@ func (dc *DeploymentController) deleteReplicaSet(obj interface{}) {
 	}
 	glog.V(4).Infof("ReplicaSet %s deleted.", rs.Name)
 	if d := dc.getDeploymentForReplicaSet(rs); d != nil {
-		dc.enqueueDeployment(d)
-	}
-}
-
-// getDeploymentForPod returns the deployment that manages the given Pod.
-// If there are multiple deployments for a given Pod, only return the oldest one.
-func (dc *DeploymentController) getDeploymentForPod(pod *api.Pod) *extensions.Deployment {
-	deployments, err := dc.dStore.GetDeploymentsForPod(pod)
-	if err != nil || len(deployments) == 0 {
-		glog.V(4).Infof("Error: %v. No deployment found for Pod %v, deployment controller will avoid syncing.", err, pod.Name)
-		return nil
-	}
-
-	if len(deployments) > 1 {
-		sort.Sort(util.BySelectorLastUpdateTime(deployments))
-		glog.Errorf("user error! more than one deployment is selecting pod %s/%s with labels: %#v, returning %s/%s", pod.Namespace, pod.Name, pod.Labels, deployments[0].Namespace, deployments[0].Name)
-	}
-	return &deployments[0]
-}
-
-// When a pod is created, ensure its controller syncs
-func (dc *DeploymentController) addPod(obj interface{}) {
-	pod, ok := obj.(*api.Pod)
-	if !ok {
-		return
-	}
-	glog.V(4).Infof("Pod %s created: %#v.", pod.Name, pod)
-	if d := dc.getDeploymentForPod(pod); d != nil {
-		dc.enqueueDeployment(d)
-	}
-}
-
-// updatePod figures out what deployment(s) manage the ReplicaSet that manages the Pod when the Pod
-// is updated and wake them up. If anything of the Pods have changed, we need to awaken both
-// the old and new deployments. old and cur must be *api.Pod types.
-func (dc *DeploymentController) updatePod(old, cur interface{}) {
-	curPod := cur.(*api.Pod)
-	oldPod := old.(*api.Pod)
-	if curPod.ResourceVersion == oldPod.ResourceVersion {
-		// Periodic resync will send update events for all known pods.
-		// Two different versions of the same pod will always have different RVs.
-		return
-	}
-	glog.V(4).Infof("Pod %s updated %#v -> %#v.", curPod.Name, oldPod, curPod)
-	if d := dc.getDeploymentForPod(curPod); d != nil {
-		dc.enqueueDeployment(d)
-	}
-	if !api.Semantic.DeepEqual(oldPod, curPod) {
-		if oldD := dc.getDeploymentForPod(oldPod); oldD != nil {
-			dc.enqueueDeployment(oldD)
-		}
-	}
-}
-
-// When a pod is deleted, ensure its controller syncs.
-// obj could be an *api.Pod, or a DeletionFinalStateUnknown marker item.
-func (dc *DeploymentController) deletePod(obj interface{}) {
-	pod, ok := obj.(*api.Pod)
-	// When a delete is dropped, the relist will notice a pod in the store not
-	// in the list, leading to the insertion of a tombstone object which contains
-	// the deleted key/value. Note that this value might be stale. If the pod
-	// changed labels the new ReplicaSet will not be woken up till the periodic
-	// resync.
-	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			glog.Errorf("Couldn't get object from tombstone %#v", obj)
-			return
-		}
-		pod, ok = tombstone.Obj.(*api.Pod)
-		if !ok {
-			glog.Errorf("Tombstone contained object that is not a pod %#v", obj)
-			return
-		}
-	}
-	glog.V(4).Infof("Pod %s deleted: %#v.", pod.Name, pod)
-	if d := dc.getDeploymentForPod(pod); d != nil {
 		dc.enqueueDeployment(d)
 	}
 }
@@ -478,7 +331,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		glog.V(4).Infof("Finished syncing deployment %q (%v)", key, time.Now().Sub(startTime))
 	}()
 
-	obj, exists, err := dc.dStore.Indexer.GetByKey(key)
+	obj, exists, err := dc.dLister.Indexer.GetByKey(key)
 	if err != nil {
 		glog.Errorf("Unable to retrieve deployment %v from store: %v", key, err)
 		return err
@@ -548,24 +401,27 @@ func (dc *DeploymentController) handleOverlap(d *extensions.Deployment) error {
 	if err != nil {
 		return fmt.Errorf("deployment %s/%s has invalid label selector: %v", d.Namespace, d.Name, err)
 	}
-	deployments, err := dc.dStore.Deployments(d.Namespace).List(labels.Everything())
+	deployments, err := dc.dLister.Deployments(d.Namespace).List(labels.Everything())
 	if err != nil {
 		return fmt.Errorf("error listing deployments in namespace %s: %v", d.Namespace, err)
 	}
 	overlapping := false
-	for i := range deployments {
-		other := &deployments[i]
+	for _, other := range deployments {
 		if !selector.Empty() && selector.Matches(labels.Set(other.Spec.Template.Labels)) && d.UID != other.UID {
+			deploymentCopy, err := util.DeploymentDeepCopy(other)
+			if err != nil {
+				return err
+			}
 			overlapping = true
 			// We don't care if the overlapping annotation update failed or not (we don't make decision on it)
 			d, _ = dc.markDeploymentOverlap(d, other.Name)
-			other, _ = dc.markDeploymentOverlap(other, d.Name)
+			deploymentCopy, _ = dc.markDeploymentOverlap(deploymentCopy, d.Name)
 			// Skip syncing this one if older overlapping one is found
 			// TODO: figure out a better way to determine which deployment to skip,
 			// either with controller reference, or with validation.
 			// Using oldest active replica set to determine which deployment to skip wouldn't make much difference,
 			// since new replica set hasn't been created after selector update
-			if util.SelectorUpdatedBefore(other, d) {
+			if util.SelectorUpdatedBefore(deploymentCopy, d) {
 				return fmt.Errorf("found deployment %s/%s has overlapping selector with an older deployment %s/%s, skip syncing it", d.Namespace, d.Name, other.Namespace, other.Name)
 			}
 		}

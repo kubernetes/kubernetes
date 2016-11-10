@@ -39,24 +39,29 @@ message CrossVersionObjectReference {
   optional string name = 2;
 
   // API version of the referent
+  // +optional
   optional string apiVersion = 3;
 }
 
 // configuration of a horizontal pod autoscaler.
 message HorizontalPodAutoscaler {
   // Standard object metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+  // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
   // behaviour of autoscaler. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
+  // +optional
   optional HorizontalPodAutoscalerSpec spec = 2;
 
   // current information about the autoscaler.
+  // +optional
   optional HorizontalPodAutoscalerStatus status = 3;
 }
 
 // list of horizontal pod autoscaler objects.
 message HorizontalPodAutoscalerList {
   // Standard list metadata.
+  // +optional
   optional k8s.io.kubernetes.pkg.api.unversioned.ListMeta metadata = 1;
 
   // list of horizontal pod autoscaler objects.
@@ -70,6 +75,7 @@ message HorizontalPodAutoscalerSpec {
   optional CrossVersionObjectReference scaleTargetRef = 1;
 
   // lower limit for the number of pods that can be set by the autoscaler, default 1.
+  // +optional
   optional int32 minReplicas = 2;
 
   // upper limit for the number of pods that can be set by the autoscaler; cannot be smaller than MinReplicas.
@@ -77,16 +83,19 @@ message HorizontalPodAutoscalerSpec {
 
   // target average CPU utilization (represented as a percentage of requested CPU) over all the pods;
   // if not specified the default autoscaling policy will be used.
+  // +optional
   optional int32 targetCPUUtilizationPercentage = 4;
 }
 
 // current status of a horizontal pod autoscaler
 message HorizontalPodAutoscalerStatus {
   // most recent generation observed by this autoscaler.
+  // +optional
   optional int64 observedGeneration = 1;
 
   // last time the HorizontalPodAutoscaler scaled the number of pods;
   // used by the autoscaler to control how often the number of pods is changed.
+  // +optional
   optional k8s.io.kubernetes.pkg.api.unversioned.Time lastScaleTime = 2;
 
   // current number of replicas of pods managed by this autoscaler.
@@ -97,24 +106,29 @@ message HorizontalPodAutoscalerStatus {
 
   // current average CPU utilization over all pods, represented as a percentage of requested CPU,
   // e.g. 70 means that an average pod is using now 70% of its requested CPU.
+  // +optional
   optional int32 currentCPUUtilizationPercentage = 5;
 }
 
 // Scale represents a scaling request for a resource.
 message Scale {
   // Standard object metadata; More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata.
+  // +optional
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
   // defines the behavior of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status.
+  // +optional
   optional ScaleSpec spec = 2;
 
   // current status of the scale. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status. Read-only.
+  // +optional
   optional ScaleStatus status = 3;
 }
 
 // ScaleSpec describes the attributes of a scale subresource.
 message ScaleSpec {
   // desired number of instances for the scaled object.
+  // +optional
   optional int32 replicas = 1;
 }
 
@@ -127,6 +141,7 @@ message ScaleStatus {
   // as the label selector but in the string format to avoid introspection
   // by clients. The string will be in the same format as the query-param syntax.
   // More info about label selectors: http://kubernetes.io/docs/user-guide/labels#label-selectors
+  // +optional
   optional string selector = 2;
 }
 

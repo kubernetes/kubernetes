@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/conversion"
 )
 
@@ -36,7 +37,7 @@ func TestAdmission(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name: "default1",
 			Annotations: map[string]string{
-				isDefaultAnnotation: "true",
+				storageutil.IsDefaultStorageClassAnnotation: "true",
 			},
 		},
 		Provisioner: "default1",
@@ -48,7 +49,7 @@ func TestAdmission(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name: "default2",
 			Annotations: map[string]string{
-				isDefaultAnnotation: "true",
+				storageutil.IsDefaultStorageClassAnnotation: "true",
 			},
 		},
 		Provisioner: "default2",
@@ -61,7 +62,7 @@ func TestAdmission(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name: "nondefault1",
 			Annotations: map[string]string{
-				isDefaultAnnotation: "false",
+				storageutil.IsDefaultStorageClassAnnotation: "false",
 			},
 		},
 		Provisioner: "nondefault1",
@@ -84,7 +85,7 @@ func TestAdmission(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name: "nondefault2",
 			Annotations: map[string]string{
-				isDefaultAnnotation: "",
+				storageutil.IsDefaultStorageClassAnnotation: "",
 			},
 		},
 		Provisioner: "nondefault1",
@@ -98,7 +99,7 @@ func TestAdmission(t *testing.T) {
 			Name:      "claimWithClass",
 			Namespace: "ns",
 			Annotations: map[string]string{
-				classAnnotation: "foo",
+				storageutil.StorageClassAnnotation: "foo",
 			},
 		},
 	}
@@ -110,7 +111,7 @@ func TestAdmission(t *testing.T) {
 			Name:      "claimWithEmptyClass",
 			Namespace: "ns",
 			Annotations: map[string]string{
-				classAnnotation: "",
+				storageutil.StorageClassAnnotation: "",
 			},
 		},
 	}
@@ -218,7 +219,7 @@ func TestAdmission(t *testing.T) {
 
 		class := ""
 		if claim.Annotations != nil {
-			if value, ok := claim.Annotations[classAnnotation]; ok {
+			if value, ok := claim.Annotations[storageutil.StorageClassAnnotation]; ok {
 				class = value
 			}
 		}

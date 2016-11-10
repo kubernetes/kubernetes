@@ -81,6 +81,15 @@ func TestCodec(t *testing.T) {
 			name: "basic",
 		},
 		{
+			into: &extensions.ThirdPartyResourceData{},
+			obj: &Foo{
+				ObjectMeta: api.ObjectMeta{Name: "bar"},
+				TypeMeta:   unversioned.TypeMeta{Kind: "ThirdPartyResourceData"},
+			},
+			expectErr: true,
+			name:      "broken kind",
+		},
+		{
 			obj: &Foo{
 				ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "baz"},
 				TypeMeta:   unversioned.TypeMeta{APIVersion: "company.com/v1", Kind: "Foo"},

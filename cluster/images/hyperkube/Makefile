@@ -74,6 +74,7 @@ endif
 	cd ${TEMP_DIR} && sed -i.back "s|ARCH|${ARCH}|g" addons/singlenode/*.yaml addons/multinode/*.yaml static-pods/*.json
 	cd ${TEMP_DIR} && sed -i.back "s|ARCH|${QEMUARCH}|g" Dockerfile
 	cd ${TEMP_DIR} && sed -i.back "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
+	cd ${TEMP_DIR} && sed -i.back "s|CACHEBUST|$(shell uuidgen)|g" Dockerfile
 	cd ${TEMP_DIR} && sed -i.back "s|-amd64|-${ARCH}|g" addons/singlenode/*.yaml addons/multinode/*.yaml
 	cd ${TEMP_DIR} && sed -i.back "s|__PILLAR__DNS__REPLICAS__|1|g;s|__PILLAR__DNS__SERVER__|10.0.0.10|g;" addons/singlenode/skydns*.yaml addons/multinode/skydns*.yaml
 	cd ${TEMP_DIR} && sed -i.back "s|__PILLAR__DNS__DOMAIN__|cluster.local|g;s|__PILLAR__FEDERATIONS__DOMAIN__MAP__||g;" addons/singlenode/skydns*.yaml addons/multinode/skydns*.yaml
@@ -105,10 +106,11 @@ endif
 	rm -rf "${TEMP_DIR}"
 
 push: build
-	gcloud docker push ${REGISTRY}/hyperkube-${ARCH}:${VERSION}
+	gcloud docker -- push ${REGISTRY}/hyperkube-${ARCH}:${VERSION}
 ifeq ($(ARCH),amd64)
-	docker tag -f ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${REGISTRY}/hyperkube:${VERSION}
-	gcloud docker push ${REGISTRY}/hyperkube:${VERSION}
+	docker rmi ${REGISTRY}/hyperkube:${VERSION} || true
+	docker tag ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${REGISTRY}/hyperkube:${VERSION}
+	gcloud docker -- push ${REGISTRY}/hyperkube:${VERSION}
 endif
 
 .PHONY: all

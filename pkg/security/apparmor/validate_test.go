@@ -18,6 +18,7 @@ package apparmor
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -73,7 +74,7 @@ func TestValidateProfile(t *testing.T) {
 		if test.expectValid {
 			assert.NoError(t, err, "Profile %s should be valid", test.profile)
 		} else {
-			assert.Error(t, err, "Profile %s should not be valid", test.profile)
+			assert.Error(t, err, fmt.Sprintf("Profile %s should not be valid", test.profile))
 		}
 	}
 }
@@ -127,7 +128,7 @@ func TestValidateValidHost(t *testing.T) {
 		if test.expectValid {
 			assert.NoError(t, err, "Pod with profile %q should be valid", test.profile)
 		} else {
-			assert.Error(t, err, "Pod with profile %q should trigger a validation error", test.profile)
+			assert.Error(t, err, fmt.Sprintf("Pod with profile %q should trigger a validation error", test.profile))
 		}
 	}
 
@@ -154,7 +155,7 @@ func TestValidateValidHost(t *testing.T) {
 	assert.NoError(t, v.Validate(pod), "Multi-container pod should validate")
 	for k, val := range pod.Annotations {
 		pod.Annotations[k] = val + "-bad"
-		assert.Error(t, v.Validate(pod), "Multi-container pod with invalid profile %s:%s", k, pod.Annotations[k])
+		assert.Error(t, v.Validate(pod), fmt.Sprintf("Multi-container pod with invalid profile %s:%s", k, pod.Annotations[k]))
 		pod.Annotations[k] = val // Restore.
 	}
 }

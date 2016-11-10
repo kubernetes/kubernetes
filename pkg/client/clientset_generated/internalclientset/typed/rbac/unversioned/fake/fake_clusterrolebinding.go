@@ -79,7 +79,7 @@ func (c *FakeClusterRoleBindings) List(opts api.ListOptions) (result *rbac.Clust
 		return nil, err
 	}
 
-	label := opts.LabelSelector
+	label, _, _ := core.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}

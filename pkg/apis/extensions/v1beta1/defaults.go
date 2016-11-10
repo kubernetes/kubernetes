@@ -23,6 +23,7 @@ import (
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
+	RegisterDefaults(scheme)
 	return scheme.AddDefaultingFuncs(
 		SetDefaults_DaemonSet,
 		SetDefaults_Deployment,
@@ -71,7 +72,7 @@ func SetDefaults_Deployment(obj *Deployment) {
 	if strategy.Type == "" {
 		strategy.Type = RollingUpdateDeploymentStrategyType
 	}
-	if strategy.Type == RollingUpdateDeploymentStrategyType {
+	if strategy.Type == RollingUpdateDeploymentStrategyType || strategy.RollingUpdate != nil {
 		if strategy.RollingUpdate == nil {
 			rollingUpdate := RollingUpdateDeployment{}
 			strategy.RollingUpdate = &rollingUpdate

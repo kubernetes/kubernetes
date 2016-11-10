@@ -19,7 +19,7 @@
 # KUBE_IMAGE, KUBE_MASTER_FLAVOR, KUBE_NODE_FLAVOR, NUM_NODES, NOVA_NETWORK and SSH_KEY_NAME
 
 # Shared
-KUBE_IMAGE="${KUBE_IMAGE-f2a71670-ced3-4274-80b6-0efcd0f8f91b}" # CoreOS(Beta)
+KUBE_IMAGE="${KUBE_IMAGE-3eba4fbb-51da-4233-b699-8a4030561add}" # CoreOS (Stable)
 SSH_KEY_NAME="${SSH_KEY_NAME-id_kubernetes}"
 NOVA_NETWORK_LABEL="kubernetes-pool-net"
 NOVA_NETWORK_CIDR="${NOVA_NETWORK-192.168.0.0/24}"
@@ -47,8 +47,8 @@ ENABLE_CLUSTER_LOGGING=false
 ELASTICSEARCH_LOGGING_REPLICAS=1
 
 # Optional: Cluster monitoring to setup as part of the cluster bring up:
-#   none     - No cluster monitoring setup 
-#   influxdb - Heapster, InfluxDB, and Grafana 
+#   none     - No cluster monitoring setup
+#   influxdb - Heapster, InfluxDB, and Grafana
 #   google   - Heapster, Google Cloud Monitoring, and Google Cloud Logging
 ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
 

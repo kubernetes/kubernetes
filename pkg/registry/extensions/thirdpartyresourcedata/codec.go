@@ -418,7 +418,7 @@ func (t *thirdPartyResourceDataDecoder) Decode(data []byte, gvk *unversioned.Gro
 			return nil, nil, fmt.Errorf("unexpected object for 'kind': %v", kindObj)
 		}
 		if len(t.kind) > 0 && kindStr != t.kind {
-			return nil, nil, fmt.Errorf("kind doesn't match, expecting: %s, got %s", gvk.Kind, kindStr)
+			return nil, nil, fmt.Errorf("kind doesn't match, expecting: %s, got %s", t.kind, kindStr)
 		}
 		actual.Kind = kindStr
 	}
@@ -522,10 +522,13 @@ func (t *thirdPartyResourceDataEncoder) Encode(obj runtime.Object, stream io.Wri
 		}
 
 		encMap := struct {
-			Kind       string               `json:"kind,omitempty"`
-			Items      []json.RawMessage    `json:"items"`
-			Metadata   unversioned.ListMeta `json:"metadata,omitempty"`
-			APIVersion string               `json:"apiVersion,omitempty"`
+			// +optional
+			Kind  string            `json:"kind,omitempty"`
+			Items []json.RawMessage `json:"items"`
+			// +optional
+			Metadata unversioned.ListMeta `json:"metadata,omitempty"`
+			// +optional
+			APIVersion string `json:"apiVersion,omitempty"`
 		}{
 			Kind:       t.gvk.Kind + "List",
 			Items:      listItems,

@@ -176,6 +176,7 @@ function create-kubeconfig-for-federation() {
 
 function tear_down_alive_resources() {
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+  "${kubectl}" delete deployments --all || true
   "${kubectl}" delete rc --all || true
   "${kubectl}" delete pods --all || true
   "${kubectl}" delete svc --all || true
@@ -496,7 +497,8 @@ function stage-images() {
     local docker_tag="$(cat ${temp_dir}/kubernetes/server/bin/${binary}.docker_tag)"
     (
       "${docker_cmd[@]}" load -i "${temp_dir}/kubernetes/server/bin/${binary}.tar"
-      "${docker_cmd[@]}" tag -f "gcr.io/google_containers/${binary}:${docker_tag}" "${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_IMAGE_TAG}"
+	  docker rmi "${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_IMAGE_TAG}" || true
+	  "${docker_cmd[@]}" tag "gcr.io/google_containers/${binary}:${docker_tag}" "${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_IMAGE_TAG}"
       "${docker_push_cmd[@]}" push "${KUBE_DOCKER_REGISTRY}/${binary}:${KUBE_IMAGE_TAG}"
     ) &> "${temp_dir}/${binary}-push.log" &
   done
@@ -770,7 +772,6 @@ KUBERNETES_CONTAINER_RUNTIME: $(yaml-quote ${CONTAINER_RUNTIME:-rkt})
 RKT_VERSION: $(yaml-quote ${RKT_VERSION:-})
 RKT_PATH: $(yaml-quote ${RKT_PATH:-})
 RKT_STAGE1_IMAGE: $(yaml-quote ${RKT_STAGE1_IMAGE:-})
-KUBERNETES_CONFIGURE_CBR0: $(yaml-quote ${KUBERNETES_CONFIGURE_CBR0:-true})
 EOF
   fi
   if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then

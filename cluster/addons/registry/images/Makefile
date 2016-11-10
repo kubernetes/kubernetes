@@ -21,4 +21,4 @@ build:
 	docker build -t $(REPO):$(TAG) .
 
 push:
-	gcloud docker push $(REPO):$(TAG)
+	gcloud docker -- push $(REPO):$(TAG)

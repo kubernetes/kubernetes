@@ -23,11 +23,12 @@ import (
 
 type TestStruct struct {
 	unversioned.TypeMeta `json:",inline"`
-	api.ObjectMeta       `json:"metadata,omitempty"`
-	Key                  string         `json:"Key"`
-	Map                  map[string]int `json:"Map"`
-	StringList           []string       `json:"StringList"`
-	IntList              []int          `json:"IntList"`
+	// +optional
+	api.ObjectMeta `json:"metadata,omitempty"`
+	Key            string         `json:"Key"`
+	Map            map[string]int `json:"Map"`
+	StringList     []string       `json:"StringList"`
+	IntList        []int          `json:"IntList"`
 }
 
 func (obj *TestStruct) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }

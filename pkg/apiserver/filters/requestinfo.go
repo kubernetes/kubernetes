@@ -26,7 +26,7 @@ import (
 )
 
 // WithRequestInfo attaches a RequestInfo to the context.
-func WithRequestInfo(handler http.Handler, resolver *request.RequestInfoResolver, requestContextMapper api.RequestContextMapper) http.Handler {
+func WithRequestInfo(handler http.Handler, resolver *request.RequestInfoFactory, requestContextMapper api.RequestContextMapper) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		ctx, ok := requestContextMapper.Get(req)
 		if !ok {
@@ -34,7 +34,7 @@ func WithRequestInfo(handler http.Handler, resolver *request.RequestInfoResolver
 			return
 		}
 
-		info, err := resolver.GetRequestInfo(req)
+		info, err := resolver.NewRequestInfo(req)
 		if err != nil {
 			internalError(w, req, fmt.Errorf("failed to create RequestInfo: %v", err))
 			return

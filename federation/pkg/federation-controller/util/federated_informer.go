@@ -156,10 +156,12 @@ func NewFederatedInformer(
 	federatedInformer.clusterInformer.store, federatedInformer.clusterInformer.controller = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-				return federationClient.Federation().Clusters().List(options)
+				versionedOptions := VersionizeV1ListOptions(options)
+				return federationClient.Federation().Clusters().List(versionedOptions)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return federationClient.Federation().Clusters().Watch(options)
+				versionedOptions := VersionizeV1ListOptions(options)
+				return federationClient.Federation().Clusters().Watch(versionedOptions)
 			},
 		},
 		&federation_api.Cluster{},

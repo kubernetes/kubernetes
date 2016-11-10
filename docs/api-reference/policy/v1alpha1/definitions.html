@@ -1243,7 +1243,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">minAvailable</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The minimum number of pods that must be available simultaneously.  This can be either an integer or a string specifying a percentage, e.g. "28%".</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">An eviction is allowed if at least "minAvailable" pods selected by "selector" will still be available after the eviction, i.e. even in the absence of the evicted pod.  So for example you can prevent all voluntary evictions by specifying "100%".</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -1388,7 +1388,7 @@ Examples:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-09-28 00:00:25 UTC
+Last updated 2016-10-10 18:01:55 UTC
 </div>
 </div>
 </body>

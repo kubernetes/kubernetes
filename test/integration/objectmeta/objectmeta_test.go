@@ -23,6 +23,7 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/genericapiserver"
@@ -37,7 +38,7 @@ func TestIgnoreClusterName(t *testing.T) {
 	_, s := framework.RunAMaster(config)
 	defer s.Close()
 
-	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
 	etcdClient := framework.NewEtcdClient()
 	etcdStorage := etcdstorage.NewEtcdStorage(etcdClient, testapi.Default.Codec(),
 		prefix+"/namespaces/", false, etcdtest.DeserializationCacheSize)

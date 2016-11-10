@@ -252,18 +252,11 @@ func (kl *Kubelet) getPodVolumeNameListFromDisk(podUID types.UID) ([]string, err
 	for _, volumePluginDir := range volumePluginDirs {
 		volumePluginName := volumePluginDir.Name()
 		volumePluginPath := path.Join(podVolDir, volumePluginName)
-		volumeDirs, volumeDirsStatErrs, err := util.ReadDirNoExit(volumePluginPath)
+		volumeDirs, err := util.ReadDirNoStat(volumePluginPath)
 		if err != nil {
-			return volumes, fmt.Errorf("Could not read directory %s: %v", volumePluginPath, err)
+			return volumes, err
 		}
-		for i, volumeDir := range volumeDirs {
-			if volumeDir != nil {
-				volumes = append(volumes, volumeDir.Name())
-				continue
-			}
-			glog.Errorf("Could not read directory %s: %v", podVolDir, volumeDirsStatErrs[i])
-
-		}
+		volumes = append(volumes, volumeDirs...)
 	}
 	return volumes, nil
 }

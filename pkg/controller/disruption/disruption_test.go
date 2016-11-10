@@ -22,8 +22,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/client/cache"
@@ -80,7 +80,7 @@ func newFakeDisruptionController() (*DisruptionController, *pdbStates) {
 		pdbLister:   cache.StoreToPodDisruptionBudgetLister{Store: cache.NewStore(controller.KeyFunc)},
 		podLister:   cache.StoreToPodLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{})},
 		rcLister:    cache.StoreToReplicationControllerLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})},
-		rsLister:    cache.StoreToReplicaSetLister{Store: cache.NewStore(controller.KeyFunc)},
+		rsLister:    cache.StoreToReplicaSetLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})},
 		dLister:     cache.StoreToDeploymentLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{})},
 		getUpdater:  func() updater { return ps.Set },
 		broadcaster: record.NewBroadcaster(),
@@ -106,7 +106,7 @@ func newSelFooBar() *unversioned.LabelSelector {
 func newPodDisruptionBudget(t *testing.T, minAvailable intstr.IntOrString) (*policy.PodDisruptionBudget, string) {
 
 	pdb := &policy.PodDisruptionBudget{
-		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
+		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String()},
 		ObjectMeta: api.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            "foobar",
@@ -129,7 +129,7 @@ func newPodDisruptionBudget(t *testing.T, minAvailable intstr.IntOrString) (*pol
 
 func newPod(t *testing.T, name string) (*api.Pod, string) {
 	pod := &api.Pod{
-		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
+		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String()},
 		ObjectMeta: api.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Annotations:     make(map[string]string),
@@ -156,7 +156,7 @@ func newPod(t *testing.T, name string) (*api.Pod, string) {
 
 func newReplicationController(t *testing.T, size int32) (*api.ReplicationController, string) {
 	rc := &api.ReplicationController{
-		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
+		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String()},
 		ObjectMeta: api.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            "foobar",
@@ -180,7 +180,7 @@ func newReplicationController(t *testing.T, size int32) (*api.ReplicationControl
 
 func newDeployment(t *testing.T, size int32) (*extensions.Deployment, string) {
 	d := &extensions.Deployment{
-		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
+		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String()},
 		ObjectMeta: api.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            "foobar",
@@ -204,7 +204,7 @@ func newDeployment(t *testing.T, size int32) (*extensions.Deployment, string) {
 
 func newReplicaSet(t *testing.T, size int32) (*extensions.ReplicaSet, string) {
 	rs := &extensions.ReplicaSet{
-		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
+		TypeMeta: unversioned.TypeMeta{APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String()},
 		ObjectMeta: api.ObjectMeta{
 			UID:             uuid.NewUUID(),
 			Name:            "foobar",
@@ -310,7 +310,7 @@ func TestReplicaSet(t *testing.T) {
 	add(t, dc.pdbLister.Store, pdb)
 
 	rs, _ := newReplicaSet(t, 10)
-	add(t, dc.rsLister.Store, rs)
+	add(t, dc.rsLister.Indexer, rs)
 
 	pod, _ := newPod(t, "pod")
 	add(t, dc.podLister.Indexer, pod)
@@ -459,7 +459,7 @@ func TestTwoControllers(t *testing.T) {
 	rs, _ := newReplicaSet(t, collectionSize)
 	rs.Spec.Selector = newSel(dLabels)
 	rs.Labels = dLabels
-	add(t, dc.rsLister.Store, rs)
+	add(t, dc.rsLister.Indexer, rs)
 	dc.sync(pdbName)
 	ps.VerifyPdbStatus(t, pdbName, true, minimumOne+1, minimumOne, collectionSize)
 

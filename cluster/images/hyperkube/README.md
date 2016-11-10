@@ -2,7 +2,7 @@
 
 `hyperkube` is an all-in-one binary for the Kubernetes server components
 Also, it's very easy to run this `hyperkube` setup dockerized.
-See http://kubernetes.io/docs/getting-started-guides/docker/ for up-to-date commands.
+See https://github.com/kubernetes/kubernetes/blob/master/docs/devel/local-cluster/docker.md for up-to-date commands.
 
 `hyperkube` is built for multiple architectures and _pushed automatically on every release._
 

@@ -20,6 +20,7 @@ NETWORK=${KUBE_GKE_NETWORK:-e2e}
 NODE_TAG="k8s-${CLUSTER_NAME}-node"
 IMAGE_TYPE="${KUBE_GKE_IMAGE_TYPE:-container_vm}"
 
+KUBE_DELETE_NETWORK=${KUBE_DELETE_NETWORK:-true}
 
 # For ease of maintenance, extract any pieces that do not vary between default
 # and test in a common config.

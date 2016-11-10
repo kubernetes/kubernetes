@@ -79,7 +79,7 @@ func (c *FakeStorageClasses) List(opts api.ListOptions) (result *storage.Storage
 		return nil, err
 	}
 
-	label := opts.LabelSelector
+	label, _, _ := core.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}

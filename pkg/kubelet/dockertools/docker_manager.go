@@ -397,11 +397,26 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 		parseTimestampError("FinishedAt", iResult.State.FinishedAt)
 	}
 
+	// default to the image ID, but try and inspect for the RepoDigests
+	imageID := DockerPrefix + iResult.Image
+	imgInspectResult, err := dm.client.InspectImageByID(iResult.Image)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("unable to inspect docker image %q while inspecting docker container %q: %v", iResult.Image, containerName, err))
+	} else {
+		if len(imgInspectResult.RepoDigests) > 1 {
+			glog.V(4).Infof("Container %q had more than one associated RepoDigest (%v), only using the first", containerName, imgInspectResult.RepoDigests)
+		}
+
+		if len(imgInspectResult.RepoDigests) > 0 {
+			imageID = DockerPullablePrefix + imgInspectResult.RepoDigests[0]
+		}
+	}
+
 	status := kubecontainer.ContainerStatus{
 		Name:         containerName,
 		RestartCount: containerInfo.RestartCount,
 		Image:        iResult.Config.Image,
-		ImageID:      DockerPrefix + iResult.Image,
+		ImageID:      imageID,
 		ID:           kubecontainer.DockerID(id).ContainerID(),
 		ExitCode:     iResult.State.ExitCode,
 		CreatedAt:    createdAt,
@@ -913,7 +928,7 @@ func (dm *DockerManager) IsImagePresent(image kubecontainer.ImageSpec) (bool, er
 // Removes the specified image.
 func (dm *DockerManager) RemoveImage(image kubecontainer.ImageSpec) error {
 	// If the image has multiple tags, we need to remove all the tags
-	if inspectImage, err := dm.client.InspectImage(image.Image); err == nil && len(inspectImage.RepoTags) > 1 {
+	if inspectImage, err := dm.client.InspectImageByID(image.Image); err == nil && len(inspectImage.RepoTags) > 1 {
 		for _, tag := range inspectImage.RepoTags {
 			if _, err := dm.client.RemoveImage(tag, dockertypes.ImageRemoveOptions{PruneChildren: true}); err != nil {
 				return err
@@ -1126,6 +1141,11 @@ type dockerOpt struct {
 	msg string
 }
 
+// Expose key/value from dockertools
+func (d dockerOpt) GetKV() (string, string) {
+	return d.key, d.value
+}
+
 // Get the docker security options for seccomp.
 func (dm *DockerManager) getSeccompOpts(pod *api.Pod, ctrName string) ([]dockerOpt, error) {
 	version, err := dm.APIVersion()
@@ -1140,10 +1160,16 @@ func (dm *DockerManager) getSeccompOpts(pod *api.Pod, ctrName string) ([]dockerO
 		return nil, nil // return early for Docker < 1.10
 	}
 
-	profile, profileOK := pod.ObjectMeta.Annotations[api.SeccompContainerAnnotationKeyPrefix+ctrName]
+	return GetSeccompOpts(pod.ObjectMeta.Annotations, ctrName, dm.seccompProfileRoot)
+}
+
+// Temporarily export this function to share with dockershim.
+// TODO: clean this up.
+func GetSeccompOpts(annotations map[string]string, ctrName, profileRoot string) ([]dockerOpt, error) {
+	profile, profileOK := annotations[api.SeccompContainerAnnotationKeyPrefix+ctrName]
 	if !profileOK {
 		// try the pod profile
-		profile, profileOK = pod.ObjectMeta.Annotations[api.SeccompPodAnnotationKey]
+		profile, profileOK = annotations[api.SeccompPodAnnotationKey]
 		if !profileOK {
 			// return early the default
 			return defaultSeccompOpt, nil
@@ -1165,7 +1191,7 @@ func (dm *DockerManager) getSeccompOpts(pod *api.Pod, ctrName string) ([]dockerO
 	}
 
 	name := strings.TrimPrefix(profile, "localhost/") // by pod annotation validation, name is a valid subpath
-	fname := filepath.Join(dm.seccompProfileRoot, filepath.FromSlash(name))
+	fname := filepath.Join(profileRoot, filepath.FromSlash(name))
 	file, err := ioutil.ReadFile(fname)
 	if err != nil {
 		return nil, fmt.Errorf("cannot load seccomp profile %q: %v", name, err)
@@ -1183,7 +1209,13 @@ func (dm *DockerManager) getSeccompOpts(pod *api.Pod, ctrName string) ([]dockerO
 
 // Get the docker security options for AppArmor.
 func (dm *DockerManager) getAppArmorOpts(pod *api.Pod, ctrName string) ([]dockerOpt, error) {
-	profile := apparmor.GetProfileName(pod, ctrName)
+	return GetAppArmorOpts(pod.Annotations, ctrName)
+}
+
+// Temporarily export this function to share with dockershim.
+// TODO: clean this up.
+func GetAppArmorOpts(annotations map[string]string, ctrName string) ([]dockerOpt, error) {
+	profile := apparmor.GetProfileNameFromPodAnnotations(annotations, ctrName)
 	if profile == "" || profile == apparmor.ProfileRuntimeDefault {
 		// The docker applies the default profile by default.
 		return nil, nil
@@ -1273,16 +1305,17 @@ func noPodInfraContainerError(podName, podNamespace string) error {
 //  - should we support nsenter + socat on the host? (current impl)
 //  - should we support nsenter + socat in a container, running with elevated privs and --pid=host?
 func (dm *DockerManager) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
-	return PortForward(dm.client, pod, port, stream)
-}
-
-// Temporarily export this function to share with dockershim.
-func PortForward(client DockerInterface, pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
 	podInfraContainer := pod.FindContainerByName(PodInfraContainerName)
 	if podInfraContainer == nil {
 		return noPodInfraContainerError(pod.Name, pod.Namespace)
 	}
-	container, err := client.InspectContainer(podInfraContainer.ID.ID)
+
+	return PortForward(dm.client, podInfraContainer.ID.ID, port, stream)
+}
+
+// Temporarily export this function to share with dockershim.
+func PortForward(client DockerInterface, podInfraContainerID string, port uint16, stream io.ReadWriteCloser) error {
+	container, err := client.InspectContainer(podInfraContainerID)
 	if err != nil {
 		return err
 	}
@@ -1511,6 +1544,8 @@ func (dm *DockerManager) killContainer(containerID kubecontainer.ContainerID, co
 		select {
 		case <-time.After(time.Duration(gracePeriod) * time.Second):
 			glog.Warningf("preStop hook for container %q did not complete in %d seconds", name, gracePeriod)
+			message := fmt.Sprintf("preStop hook for container %q did not complete in %d seconds", name, gracePeriod)
+			dm.generateFailedContainerEvent(containerID, pod.Name, events.UnfinishedPreStopHook, message)
 		case <-done:
 			glog.V(4).Infof("preStop hook for container %q completed", name)
 		}
@@ -2396,7 +2431,7 @@ func (dm *DockerManager) verifyNonRoot(container *api.Container) error {
 // or the user is set to root.  If there is an error inspecting the image this method will return
 // false and return the error.
 func (dm *DockerManager) isImageRoot(image string) (bool, error) {
-	img, err := dm.client.InspectImage(image)
+	img, err := dm.client.InspectImageByRef(image)
 	if err != nil {
 		return false, err
 	}

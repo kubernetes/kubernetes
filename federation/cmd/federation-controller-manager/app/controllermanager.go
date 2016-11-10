@@ -30,6 +30,8 @@ import (
 	"k8s.io/kubernetes/federation/cmd/federation-controller-manager/app/options"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	clustercontroller "k8s.io/kubernetes/federation/pkg/federation-controller/cluster"
+	daemonset "k8s.io/kubernetes/federation/pkg/federation-controller/daemonset"
+	deploymentcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/deployment"
 	ingresscontroller "k8s.io/kubernetes/federation/pkg/federation-controller/ingress"
 	namespacecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/namespace"
 	replicasetcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/replicaset"
@@ -156,9 +158,18 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 	secretcontroller := secretcontroller.NewSecretController(secretcontrollerClientset)
 	secretcontroller.Run(wait.NeverStop)
 
+	daemonsetcontrollerClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "daemonset-controller"))
+	daemonsetcontroller := daemonset.NewDaemonSetController(daemonsetcontrollerClientset)
+	daemonsetcontroller.Run(wait.NeverStop)
+
 	replicaSetClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, replicasetcontroller.UserAgentName))
 	replicaSetController := replicasetcontroller.NewReplicaSetController(replicaSetClientset)
 	go replicaSetController.Run(s.ConcurrentReplicaSetSyncs, wait.NeverStop)
+
+	deploymentClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, deploymentcontroller.UserAgentName))
+	deploymentController := deploymentcontroller.NewDeploymentController(deploymentClientset)
+	// TODO: rename s.ConcurentReplicaSetSyncs
+	go deploymentController.Run(s.ConcurrentReplicaSetSyncs, wait.NeverStop)
 
 	glog.Infof("Loading client config for ingress controller %q", "ingress-controller")
 	ingClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "ingress-controller"))

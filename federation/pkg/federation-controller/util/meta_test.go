@@ -65,3 +65,38 @@ func TestObjectMeta(t *testing.T) {
 	assert.True(t, ObjectMetaEquivalent(o5, o6))
 	assert.True(t, ObjectMetaEquivalent(o3, o5))
 }
+
+func TestObjectMetaAndSpec(t *testing.T) {
+	s1 := api_v1.Service{
+		ObjectMeta: api_v1.ObjectMeta{
+			Namespace: "ns1",
+			Name:      "s1",
+		},
+		Spec: api_v1.ServiceSpec{
+			ExternalName: "Service1",
+		},
+	}
+	s1b := s1
+	s2 := api_v1.Service{
+		ObjectMeta: api_v1.ObjectMeta{
+			Namespace: "ns1",
+			Name:      "s2",
+		},
+		Spec: api_v1.ServiceSpec{
+			ExternalName: "Service1",
+		},
+	}
+	s3 := api_v1.Service{
+		ObjectMeta: api_v1.ObjectMeta{
+			Namespace: "ns1",
+			Name:      "s1",
+		},
+		Spec: api_v1.ServiceSpec{
+			ExternalName: "Service2",
+		},
+	}
+	assert.True(t, ObjectMetaAndSpecEquivalent(&s1, &s1b))
+	assert.False(t, ObjectMetaAndSpecEquivalent(&s1, &s2))
+	assert.False(t, ObjectMetaAndSpecEquivalent(&s1, &s3))
+	assert.False(t, ObjectMetaAndSpecEquivalent(&s2, &s3))
+}

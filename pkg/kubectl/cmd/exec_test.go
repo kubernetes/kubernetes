@@ -30,9 +30,10 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
+	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/util/term"
 )
 
@@ -126,7 +127,7 @@ func TestPodAndContainer(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		f, tf, _, ns := NewAPIFactory()
+		f, tf, _, ns := cmdtesting.NewAPIFactory()
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: ns,
 			Client:               fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) { return nil, nil }),
@@ -159,7 +160,7 @@ func TestPodAndContainer(t *testing.T) {
 }
 
 func TestExec(t *testing.T) {
-	version := testapi.Default.GroupVersion().Version
+	version := registered.GroupOrDie(api.GroupName).GroupVersion.Version
 	tests := []struct {
 		name, podPath, execPath, container string
 		pod                                *api.Pod
@@ -180,7 +181,7 @@ func TestExec(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		f, tf, codec, ns := NewAPIFactory()
+		f, tf, codec, ns := cmdtesting.NewAPIFactory()
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {

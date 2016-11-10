@@ -22,6 +22,6 @@ image:
 	docker build -t $(PREFIX)/jessie-dnsutils .
 
 push: image
-	gcloud docker push $(PREFIX)/jessie-dnsutils
+	gcloud docker -- push $(PREFIX)/jessie-dnsutils
 
 clean:

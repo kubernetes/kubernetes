@@ -25,11 +25,11 @@ import (
 )
 
 var (
-	influxdbHost = flag.String("ir-influxdb-host", "localhost:8080/api/v1/proxy/namespaces/kube-system/services/monitoring-influxdb:api", "Address of InfluxDB which contains metrics requred by InitialResources")
+	influxdbHost = flag.String("ir-influxdb-host", "localhost:8080/api/v1/proxy/namespaces/kube-system/services/monitoring-influxdb:api", "Address of InfluxDB which contains metrics required by InitialResources")
 	user         = flag.String("ir-user", "root", "User used for connecting to InfluxDB")
 	// TODO: figure out how to better pass password here
 	password       = flag.String("ir-password", "root", "Password used for connecting to InfluxDB")
-	db             = flag.String("ir-dbname", "k8s", "InfluxDB database name which contains metrics requred by InitialResources")
+	db             = flag.String("ir-dbname", "k8s", "InfluxDB database name which contains metrics required by InitialResources")
 	hawkularConfig = flag.String("ir-hawkular", "", "Hawkular configuration URL")
 )
 
@@ -37,7 +37,7 @@ var (
 // that dataSource will be moved to Heapster some time in the future and possibly rewritten.
 type dataSource interface {
 	// Returns <perc>th of sample values which represent usage of <kind> for containers running <image>,
-	// withing time range (start, end), number of samples considered and error if occured.
+	// within time range (start, end), number of samples considered and error if occurred.
 	// If <exactMatch> then take only samples that concern the same image (both name and take are the same),
 	// otherwise consider also samples with the same image a possibly different tag.
 	GetUsagePercentile(kind api.ResourceName, perc int64, image, namespace string, exactMatch bool, start, end time.Time) (usage int64, samples int64, err error)

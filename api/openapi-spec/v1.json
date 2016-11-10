@@ -14679,6 +14679,39 @@
      }
     }
    },
+   "v1.ReplicationControllerCondition": {
+    "description": "ReplicationControllerCondition describes the state of a replication controller at a certain point.",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "lastProbeTime": {
+      "description": "Last time we probed the condition.",
+      "$ref": "#/definitions/unversioned.Time"
+     },
+     "lastTransitionTime": {
+      "description": "The last time the condition transitioned from one status to another.",
+      "$ref": "#/definitions/unversioned.Time"
+     },
+     "message": {
+      "description": "A human readable message indicating details about the transition.",
+      "type": "string"
+     },
+     "reason": {
+      "description": "The reason for the condition's last transition.",
+      "type": "string"
+     },
+     "status": {
+      "description": "Status of the condition, one of True, False, Unknown.",
+      "type": "string"
+     },
+     "type": {
+      "description": "Type of replication controller condition.",
+      "type": "string"
+     }
+    }
+   },
    "v1.ReplicationControllerList": {
     "description": "ReplicationControllerList is a collection of replication controllers.",
     "required": [
@@ -14734,6 +14767,13 @@
       "description": "The number of available replicas (ready for at least minReadySeconds) for this replication controller.",
       "type": "integer",
       "format": "int32"
+     },
+     "conditions": {
+      "description": "Represents the latest available observations of a replication controller's current state.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1.ReplicationControllerCondition"
+      }
      },
      "fullyLabeledReplicas": {
       "description": "The number of pods that have labels matching the labels of the pod template of the replication controller.",

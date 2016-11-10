@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/security/apparmor"
+	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/validation/field"
@@ -44,6 +45,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					CurrentNumberScheduled: 1,
 					NumberMisscheduled:     2,
 					DesiredNumberScheduled: 3,
+					NumberReady:            1,
 				},
 			},
 			update: extensions.DaemonSet{
@@ -52,6 +54,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					CurrentNumberScheduled: 1,
 					NumberMisscheduled:     1,
 					DesiredNumberScheduled: 3,
+					NumberReady:            1,
 				},
 			},
 		},
@@ -76,6 +79,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					CurrentNumberScheduled: 1,
 					NumberMisscheduled:     2,
 					DesiredNumberScheduled: 3,
+					NumberReady:            1,
 				},
 			},
 			update: extensions.DaemonSet{
@@ -88,6 +92,7 @@ func TestValidateDaemonSetStatusUpdate(t *testing.T) {
 					CurrentNumberScheduled: -1,
 					NumberMisscheduled:     -1,
 					DesiredNumberScheduled: -3,
+					NumberReady:            -1,
 				},
 			},
 		},
@@ -1600,6 +1605,15 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	invalidSysctlPattern := validPSP()
 	invalidSysctlPattern.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey] = "a.*.b"
 
+	invalidSeccompDefault := validPSP()
+	invalidSeccompDefault.Annotations = map[string]string{
+		seccomp.DefaultProfileAnnotationKey: "not-good",
+	}
+	invalidSeccompAllowed := validPSP()
+	invalidSeccompAllowed.Annotations = map[string]string{
+		seccomp.AllowedProfilesAnnotationKey: "docker/default,not-good",
+	}
+
 	type testCase struct {
 		psp         *extensions.PodSecurityPolicy
 		errorType   field.ErrorType
@@ -1696,6 +1710,16 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			errorType:   field.ErrorTypeInvalid,
 			errorDetail: fmt.Sprintf("must have at most 253 characters and match regex %s", SysctlPatternFmt),
 		},
+		"invalid seccomp default profile": {
+			psp:         invalidSeccompDefault,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "must be a valid seccomp profile",
+		},
+		"invalid seccomp allowed profile": {
+			psp:         invalidSeccompAllowed,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "must be a valid seccomp profile",
+		},
 	}
 
 	for k, v := range errorCases {
@@ -1764,6 +1788,12 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	withSysctl := validPSP()
 	withSysctl.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey] = "net.*"
 
+	validSeccomp := validPSP()
+	validSeccomp.Annotations = map[string]string{
+		seccomp.DefaultProfileAnnotationKey:  "docker/default",
+		seccomp.AllowedProfilesAnnotationKey: "docker/default,unconfined,localhost/foo",
+	}
+
 	successCases := map[string]struct {
 		psp *extensions.PodSecurityPolicy
 	}{
@@ -1787,6 +1817,9 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		},
 		"with network sysctls": {
 			psp: withSysctl,
+		},
+		"valid seccomp annotations": {
+			psp: validSeccomp,
 		},
 	}
 

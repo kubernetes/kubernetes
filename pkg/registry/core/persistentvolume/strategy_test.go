@@ -20,13 +20,13 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 )
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		testapi.Default.GroupVersion().String(),
+		registered.GroupOrDie(api.GroupName).GroupVersion.String(),
 		"PersistentVolume",
 		PersistentVolumeToSelectableFields(&api.PersistentVolume{}),
 		map[string]string{"name": "metadata.name"},

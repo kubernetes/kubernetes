@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/volume"
+	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -31,11 +31,9 @@ func TestFlockerUtil_CreateVolume(t *testing.T) {
 	assert := assert.New(t)
 
 	// test CreateVolume happy path
+	pvc := volumetest.CreateTestPVC("3Gi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce})
 	options := volume.VolumeOptions{
-		Capacity: resource.MustParse("3Gi"),
-		AccessModes: []api.PersistentVolumeAccessMode{
-			api.ReadWriteOnce,
-		},
+		PVC: pvc,
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
 	}
 

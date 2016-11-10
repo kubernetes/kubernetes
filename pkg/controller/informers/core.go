@@ -139,7 +139,7 @@ func (f *nodeInformer) Lister() *cache.StoreToNodeLister {
 // Interface provides constructor for informer and lister for persistent volume claims
 type PVCInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() *cache.StoreToPVCFetcher
+	Lister() *cache.StoreToPersistentVolumeClaimLister
 }
 
 type pvcInformer struct {
@@ -164,9 +164,9 @@ func (f *pvcInformer) Informer() cache.SharedIndexInformer {
 }
 
 // Lister returns lister for pvcInformer
-func (f *pvcInformer) Lister() *cache.StoreToPVCFetcher {
+func (f *pvcInformer) Lister() *cache.StoreToPersistentVolumeClaimLister {
 	informer := f.Informer()
-	return &cache.StoreToPVCFetcher{Store: informer.GetStore()}
+	return &cache.StoreToPersistentVolumeClaimLister{Indexer: informer.GetIndexer()}
 }
 
 //*****************************************************************************
@@ -203,6 +203,42 @@ func (f *pvInformer) Informer() cache.SharedIndexInformer {
 func (f *pvInformer) Lister() *cache.StoreToPVFetcher {
 	informer := f.Informer()
 	return &cache.StoreToPVFetcher{Store: informer.GetStore()}
+}
+
+//*****************************************************************************
+
+// LimitRangeInformer is type of SharedIndexInformer which watches and lists all limit ranges.
+// Interface provides constructor for informer and lister for limit ranges.
+type LimitRangeInformer interface {
+	Informer() cache.SharedIndexInformer
+	Lister() *cache.StoreToLimitRangeLister
+}
+
+type limitRangeInformer struct {
+	*sharedInformerFactory
+}
+
+// Informer checks whether pvcInformer exists in sharedInformerFactory and if not, it creates new informer of type
+// limitRangeInformer and connects it to sharedInformerFactory
+func (f *limitRangeInformer) Informer() cache.SharedIndexInformer {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	informerType := reflect.TypeOf(&api.LimitRange{})
+	informer, exists := f.informers[informerType]
+	if exists {
+		return informer
+	}
+	informer = NewLimitRangeInformer(f.client, f.defaultResync)
+	f.informers[informerType] = informer
+
+	return informer
+}
+
+// Lister returns lister for limitRangeInformer
+func (f *limitRangeInformer) Lister() *cache.StoreToLimitRangeLister {
+	informer := f.Informer()
+	return &cache.StoreToLimitRangeLister{Indexer: informer.GetIndexer()}
 }
 
 // NewPodInformer returns a SharedIndexInformer that lists and watches all pods
@@ -255,7 +291,8 @@ func NewPVCInformer(client clientset.Interface, resyncPeriod time.Duration) cach
 		},
 		&api.PersistentVolumeClaim{},
 		resyncPeriod,
-		cache.Indexers{})
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+	)
 
 	return sharedIndexInformer
 }
@@ -292,6 +329,78 @@ func NewNamespaceInformer(client clientset.Interface, resyncPeriod time.Duration
 		&api.Namespace{},
 		resyncPeriod,
 		cache.Indexers{})
+
+	return sharedIndexInformer
+}
+
+// NewLimitRangeInformer returns a SharedIndexInformer that lists and watches all LimitRanges
+func NewLimitRangeInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	sharedIndexInformer := cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return client.Core().LimitRanges(api.NamespaceAll).List(options)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return client.Core().LimitRanges(api.NamespaceAll).Watch(options)
+			},
+		},
+		&api.LimitRange{},
+		resyncPeriod,
+		cache.Indexers{})
+
+	return sharedIndexInformer
+}
+
+/*****************************************************************************/
+
+// ServiceAccountInformer is type of SharedIndexInformer which watches and lists all ServiceAccounts.
+// Interface provides constructor for informer and lister for ServiceAccounts
+type ServiceAccountInformer interface {
+	Informer() cache.SharedIndexInformer
+	Lister() *cache.StoreToServiceAccountLister
+}
+
+type serviceAccountInformer struct {
+	*sharedInformerFactory
+}
+
+// Informer checks whether ServiceAccountInformer exists in sharedInformerFactory and if not, it creates new informer of type
+// ServiceAccountInformer and connects it to sharedInformerFactory
+func (f *serviceAccountInformer) Informer() cache.SharedIndexInformer {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	informerType := reflect.TypeOf(&api.ServiceAccount{})
+	informer, exists := f.informers[informerType]
+	if exists {
+		return informer
+	}
+	informer = NewServiceAccountInformer(f.client, f.defaultResync)
+	f.informers[informerType] = informer
+
+	return informer
+}
+
+// Lister returns lister for ServiceAccountInformer
+func (f *serviceAccountInformer) Lister() *cache.StoreToServiceAccountLister {
+	informer := f.Informer()
+	return &cache.StoreToServiceAccountLister{Indexer: informer.GetIndexer()}
+}
+
+// NewServiceAccountInformer returns a SharedIndexInformer that lists and watches all ServiceAccounts
+func NewServiceAccountInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	sharedIndexInformer := cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return client.Core().ServiceAccounts(api.NamespaceAll).List(options)
+			},
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return client.Core().ServiceAccounts(api.NamespaceAll).Watch(options)
+			},
+		},
+		&api.ServiceAccount{},
+		resyncPeriod,
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
 	return sharedIndexInformer
 }

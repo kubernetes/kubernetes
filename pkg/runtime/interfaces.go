@@ -169,6 +169,12 @@ type NestedObjectDecoder interface {
 ///////////////////////////////////////////////////////////////////////////////
 // Non-codec interfaces
 
+type ObjectDefaulter interface {
+	// Default takes an object (must be a pointer) and applies any default values.
+	// Defaulters may not error.
+	Default(in Object)
+}
+
 type ObjectVersioner interface {
 	ConvertToVersion(in Object, gv GroupVersioner) (out Object, err error)
 }

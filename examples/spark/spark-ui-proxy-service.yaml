@@ -1,0 +1,12 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: spark-ui-proxy
+  namespace: spark-cluster
+spec:
+  ports:
+    - port: 80
+      targetPort: 80
+  selector:
+    component: spark-ui-proxy
+  type: LoadBalancer

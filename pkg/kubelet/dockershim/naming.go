@@ -22,6 +22,8 @@ import (
 	"strings"
 
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/kubelet/leaky"
 )
 
 // Container "names" are implementation details that do not concern
@@ -44,9 +46,13 @@ const (
 	kubePrefix = "k8s"
 	// sandboxContainerName is a string to include in the docker container so
 	// that users can easily identify the sandboxes.
-	sandboxContainerName = "POD"
+	sandboxContainerName = leaky.PodInfraContainerName
 	// Delimiter used to construct docker container names.
 	nameDelimiter = "_"
+	// DockerImageIDPrefix is the prefix of image id in container status.
+	DockerImageIDPrefix = dockertools.DockerPrefix
+	// DockerPullableImageIDPrefix is the prefix of pullable image id in container status.
+	DockerPullableImageIDPrefix = dockertools.DockerPullablePrefix
 )
 
 func makeSandboxName(s *runtimeApi.PodSandboxConfig) string {

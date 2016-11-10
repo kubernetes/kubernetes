@@ -26,6 +26,7 @@ import (
 
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
@@ -45,15 +46,23 @@ const (
 // Note: docker doesn't use LogDirectory (yet).
 func (ds *dockerService) RunPodSandbox(config *runtimeApi.PodSandboxConfig) (string, error) {
 	// Step 1: Pull the image for the sandbox.
-	// TODO: How should we handle pulling custom pod infra container image
-	// (with credentials)?
 	image := defaultSandboxImage
+	podSandboxImage := ds.podSandboxImage
+	if len(podSandboxImage) != 0 {
+		image = podSandboxImage
+	}
+
+	// NOTE: To use a custom sandbox image in a private repository, users need to configure the nodes with credentials properly.
+	// see: http://kubernetes.io/docs/user-guide/images/#configuring-nodes-to-authenticate-to-a-private-repository
 	if err := ds.client.PullImage(image, dockertypes.AuthConfig{}, dockertypes.ImagePullOptions{}); err != nil {
 		return "", fmt.Errorf("unable to pull image for the sandbox container: %v", err)
 	}
 
 	// Step 2: Create the sandbox container.
-	createConfig := makeSandboxDockerConfig(config, image)
+	createConfig, err := ds.makeSandboxDockerConfig(config, image)
+	if err != nil {
+		return "", fmt.Errorf("failed to make sandbox docker config for pod %q: %v", config.Metadata.GetName(), err)
+	}
 	createResp, err := ds.client.CreateContainer(*createConfig)
 	if err != nil || createResp == nil {
 		return "", fmt.Errorf("failed to create a sandbox for pod %q: %v", config.Metadata.GetName(), err)
@@ -93,7 +102,7 @@ func (ds *dockerService) PodSandboxStatus(podSandboxID string) (*runtimeApi.PodS
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse timestamp for container %q: %v", podSandboxID, err)
 	}
-	ct := createdAt.Unix()
+	ct := createdAt.UnixNano()
 
 	// Translate container to sandbox state.
 	state := runtimeApi.PodSandBoxState_NOTREADY
@@ -194,11 +203,14 @@ func (ds *dockerService) ListPodSandbox(filter *runtimeApi.PodSandboxFilter) ([]
 	return result, nil
 }
 
-func makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig, image string) *dockertypes.ContainerCreateConfig {
+func (ds *dockerService) makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig, image string) (*dockertypes.ContainerCreateConfig, error) {
 	// Merge annotations and labels because docker supports only labels.
 	labels := makeLabels(c.GetLabels(), c.GetAnnotations())
 	// Apply a label to distinguish sandboxes from regular containers.
 	labels[containerTypeLabelKey] = containerTypeLabelSandbox
+	// Apply a container name label for infra container. This is used in summary api.
+	// TODO(random-liu): Deprecate this label once container metrics is directly got from CRI.
+	labels[types.KubernetesContainerNameLabel] = sandboxContainerName
 
 	hc := &dockercontainer.HostConfig{}
 	createConfig := &dockertypes.ContainerCreateConfig{
@@ -253,9 +265,12 @@ func makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig, image string) *dock
 	setSandboxResources(hc)
 
 	// Set security options.
-	hc.SecurityOpt = []string{getSeccompOpts()}
-
-	return createConfig
+	var err error
+	hc.SecurityOpt, err = getSandboxSecurityOpts(c, ds.seccompProfileRoot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate sandbox security options for sandbox %q: %v", c.Metadata.GetName(), err)
+	}
+	return createConfig, nil
 }
 
 func setSandboxResources(hc *dockercontainer.HostConfig) {

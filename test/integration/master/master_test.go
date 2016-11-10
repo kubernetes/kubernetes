@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -267,12 +268,12 @@ func TestBatchGroupBackwardCompatibility(t *testing.T) {
 		{"POST", batchPath("jobs", api.NamespaceDefault, ""), jobV1, integration.Code201, ""},
 		{"GET", batchPath("jobs", api.NamespaceDefault, "pi"), "", integration.Code200, testapi.Batch.GroupVersion().String()},
 		{"GET", extensionsPath("jobs", api.NamespaceDefault, "pi"), "", integration.Code200, testapi.Extensions.GroupVersion().String()},
-		{"DELETE", batchPath("jobs", api.NamespaceDefault, "pi"), "", integration.Code200, testapi.Default.GroupVersion().String()}, // status response
+		{"DELETE", batchPath("jobs", api.NamespaceDefault, "pi"), "", integration.Code200, registered.GroupOrDie(api.GroupName).GroupVersion.String()}, // status response
 		// Post a v1beta1 and get back both as v1beta1 and as v1.
 		{"POST", extensionsPath("jobs", api.NamespaceDefault, ""), jobV1beta1, integration.Code201, ""},
 		{"GET", batchPath("jobs", api.NamespaceDefault, "pi"), "", integration.Code200, testapi.Batch.GroupVersion().String()},
 		{"GET", extensionsPath("jobs", api.NamespaceDefault, "pi"), "", integration.Code200, testapi.Extensions.GroupVersion().String()},
-		{"DELETE", extensionsPath("jobs", api.NamespaceDefault, "pi"), "", integration.Code200, testapi.Default.GroupVersion().String()}, //status response
+		{"DELETE", extensionsPath("jobs", api.NamespaceDefault, "pi"), "", integration.Code200, registered.GroupOrDie(api.GroupName).GroupVersion.String()}, //status response
 	}
 
 	for _, r := range requests {
@@ -386,7 +387,7 @@ func TestMasterService(t *testing.T) {
 	_, s := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
 	defer s.Close()
 
-	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
 
 	err := wait.Poll(time.Second, time.Minute, func() (bool, error) {
 		svcList, err := client.Services(api.NamespaceDefault).List(api.ListOptions{})
@@ -428,7 +429,7 @@ func TestServiceAlloc(t *testing.T) {
 	_, s := framework.RunAMaster(cfg)
 	defer s.Close()
 
-	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(api.GroupName).GroupVersion}})
 
 	svc := func(i int) *api.Service {
 		return &api.Service{

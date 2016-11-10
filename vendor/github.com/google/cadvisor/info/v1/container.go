@@ -389,27 +389,27 @@ type NetworkStats struct {
 }
 
 type TcpStat struct {
-	//Count of TCP connections in state "Established"
+	// Count of TCP connections in state "Established"
 	Established uint64
-	//Count of TCP connections in state "Syn_Sent"
+	// Count of TCP connections in state "Syn_Sent"
 	SynSent uint64
-	//Count of TCP connections in state "Syn_Recv"
+	// Count of TCP connections in state "Syn_Recv"
 	SynRecv uint64
-	//Count of TCP connections in state "Fin_Wait1"
+	// Count of TCP connections in state "Fin_Wait1"
 	FinWait1 uint64
-	//Count of TCP connections in state "Fin_Wait2"
+	// Count of TCP connections in state "Fin_Wait2"
 	FinWait2 uint64
-	//Count of TCP connections in state "Time_Wait
+	// Count of TCP connections in state "Time_Wait
 	TimeWait uint64
-	//Count of TCP connections in state "Close"
+	// Count of TCP connections in state "Close"
 	Close uint64
-	//Count of TCP connections in state "Close_Wait"
+	// Count of TCP connections in state "Close_Wait"
 	CloseWait uint64
-	//Count of TCP connections in state "Listen_Ack"
+	// Count of TCP connections in state "Listen_Ack"
 	LastAck uint64
-	//Count of TCP connections in state "Listen"
+	// Count of TCP connections in state "Listen"
 	Listen uint64
-	//Count of TCP connections in state "Closing"
+	// Count of TCP connections in state "Closing"
 	Closing uint64
 }
 
@@ -511,7 +511,7 @@ type ContainerStats struct {
 	// Task load stats
 	TaskStats LoadStats `json:"task_stats,omitempty"`
 
-	//Custom metrics from all collectors
+	// Custom metrics from all collectors
 	CustomMetrics map[string][]MetricVal `json:"custom_metrics,omitempty"`
 }
 

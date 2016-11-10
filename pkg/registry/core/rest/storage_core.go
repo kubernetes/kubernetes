@@ -27,6 +27,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apiserver"
+	policyclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/core/componentstatus"
@@ -62,9 +64,9 @@ import (
 type LegacyRESTStorageProvider struct {
 	StorageFactory genericapiserver.StorageFactory
 	// Used for custom proxy dialing, and proxy TLS options
-	ProxyTransport http.RoundTripper
-	KubeletClient  kubeletclient.KubeletClient
-	EventTTL       time.Duration
+	ProxyTransport      http.RoundTripper
+	KubeletClientConfig kubeletclient.KubeletClientConfig
+	EventTTL            time.Duration
 
 	// ServiceClusterIPRange is used to build cluster IPs for discovery.
 	ServiceClusterIPRange *net.IPNet
@@ -72,6 +74,8 @@ type LegacyRESTStorageProvider struct {
 
 	// ComponentStatusServerFunc is a func used to locate servers to back component status
 	ComponentStatusServerFunc ComponentStatusServerFunc
+
+	LoopbackClientConfig *restclient.Config
 }
 
 type ComponentStatusServerFunc func() map[string]apiserver.Server
@@ -92,17 +96,24 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta:                    *registered.GroupOrDie(api.GroupName),
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{},
-		IsLegacyGroup:                true,
-		Scheme:                       api.Scheme,
-		ParameterCodec:               api.ParameterCodec,
-		NegotiatedSerializer:         api.Codecs,
-		SubresourceGroupVersionKind:  map[string]unversioned.GroupVersionKind{},
+		Scheme:                      api.Scheme,
+		ParameterCodec:              api.ParameterCodec,
+		NegotiatedSerializer:        api.Codecs,
+		SubresourceGroupVersionKind: map[string]unversioned.GroupVersionKind{},
 	}
 	if autoscalingGroupVersion := (unversioned.GroupVersion{Group: "autoscaling", Version: "v1"}); registered.IsEnabledVersion(autoscalingGroupVersion) {
 		apiGroupInfo.SubresourceGroupVersionKind["replicationcontrollers/scale"] = autoscalingGroupVersion.WithKind("Scale")
 	}
+
+	var podDisruptionClient policyclient.PodDisruptionBudgetsGetter
 	if policyGroupVersion := (unversioned.GroupVersion{Group: "policy", Version: "v1alpha1"}); registered.IsEnabledVersion(policyGroupVersion) {
 		apiGroupInfo.SubresourceGroupVersionKind["pods/eviction"] = policyGroupVersion.WithKind("Eviction")
+
+		var err error
+		podDisruptionClient, err = policyclient.NewForConfig(c.LoopbackClientConfig)
+		if err != nil {
+			return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+		}
 	}
 	restStorage := LegacyRESTStorage{}
 
@@ -124,13 +135,17 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	endpointsStorage := endpointsetcd.NewREST(restOptionsGetter(api.Resource("endpoints")))
 	restStorage.EndpointRegistry = endpoint.NewRegistry(endpointsStorage)
 
-	nodeStorage := nodeetcd.NewStorage(restOptionsGetter(api.Resource("nodes")), c.KubeletClient, c.ProxyTransport)
+	nodeStorage, err := nodeetcd.NewStorage(restOptionsGetter(api.Resource("nodes")), c.KubeletClientConfig, c.ProxyTransport)
+	if err != nil {
+		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+	}
 	restStorage.NodeRegistry = node.NewRegistry(nodeStorage.Node)
 
 	podStorage := podetcd.NewStorage(
 		restOptionsGetter(api.Resource("pods")),
-		kubeletclient.ConnectionInfoGetter(nodeStorage.Node),
+		nodeStorage.KubeletConnectionInfo,
 		c.ProxyTransport,
+		podDisruptionClient,
 	)
 
 	serviceRESTStorage, serviceStatusStorage := serviceetcd.NewREST(restOptionsGetter(api.Resource("services")))

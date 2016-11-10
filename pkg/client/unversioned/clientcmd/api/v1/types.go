@@ -27,12 +27,14 @@ import (
 type Config struct {
 	// Legacy field from pkg/api/types.go TypeMeta.
 	// TODO(jlowdermilk): remove this after eliminating downstream dependencies.
+	// +optional
 	Kind string `json:"kind,omitempty"`
 	// DEPRECATED: APIVersion is the preferred api version for communicating with the kubernetes cluster (v1, v2, etc).
 	// Because a cluster can run multiple API groups and potentially multiple versions of each, it no longer makes sense to specify
 	// a single value for the cluster version.
 	// This field isn't really needed anyway, so we are deprecating it without replacement.
 	// It will be ignored if it is present.
+	// +optional
 	APIVersion string `json:"apiVersion,omitempty"`
 	// Preferences holds general information to be use for cli interactions
 	Preferences Preferences `json:"preferences"`
@@ -45,12 +47,15 @@ type Config struct {
 	// CurrentContext is the name of the context that you would like to use by default
 	CurrentContext string `json:"current-context"`
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
+	// +optional
 	Extensions []NamedExtension `json:"extensions,omitempty"`
 }
 
 type Preferences struct {
+	// +optional
 	Colors bool `json:"colors,omitempty"`
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
+	// +optional
 	Extensions []NamedExtension `json:"extensions,omitempty"`
 }
 
@@ -59,40 +64,56 @@ type Cluster struct {
 	// Server is the address of the kubernetes cluster (https://hostname:port).
 	Server string `json:"server"`
 	// APIVersion is the preferred api version for communicating with the kubernetes cluster (v1, v2, etc).
+	// +optional
 	APIVersion string `json:"api-version,omitempty"`
 	// InsecureSkipTLSVerify skips the validity check for the server's certificate. This will make your HTTPS connections insecure.
+	// +optional
 	InsecureSkipTLSVerify bool `json:"insecure-skip-tls-verify,omitempty"`
 	// CertificateAuthority is the path to a cert file for the certificate authority.
+	// +optional
 	CertificateAuthority string `json:"certificate-authority,omitempty"`
 	// CertificateAuthorityData contains PEM-encoded certificate authority certificates. Overrides CertificateAuthority
+	// +optional
 	CertificateAuthorityData []byte `json:"certificate-authority-data,omitempty"`
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
+	// +optional
 	Extensions []NamedExtension `json:"extensions,omitempty"`
 }
 
 // AuthInfo contains information that describes identity information.  This is use to tell the kubernetes cluster who you are.
 type AuthInfo struct {
 	// ClientCertificate is the path to a client cert file for TLS.
+	// +optional
 	ClientCertificate string `json:"client-certificate,omitempty"`
 	// ClientCertificateData contains PEM-encoded data from a client cert file for TLS. Overrides ClientCertificate
+	// +optional
 	ClientCertificateData []byte `json:"client-certificate-data,omitempty"`
 	// ClientKey is the path to a client key file for TLS.
+	// +optional
 	ClientKey string `json:"client-key,omitempty"`
 	// ClientKeyData contains PEM-encoded data from a client key file for TLS. Overrides ClientKey
+	// +optional
 	ClientKeyData []byte `json:"client-key-data,omitempty"`
 	// Token is the bearer token for authentication to the kubernetes cluster.
+	// +optional
 	Token string `json:"token,omitempty"`
 	// TokenFile is a pointer to a file that contains a bearer token (as described above).  If both Token and TokenFile are present, Token takes precedence.
+	// +optional
 	TokenFile string `json:"tokenFile,omitempty"`
 	// Impersonate is the username to imperonate.  The name matches the flag.
+	// +optional
 	Impersonate string `json:"as,omitempty"`
 	// Username is the username for basic authentication to the kubernetes cluster.
+	// +optional
 	Username string `json:"username,omitempty"`
 	// Password is the password for basic authentication to the kubernetes cluster.
+	// +optional
 	Password string `json:"password,omitempty"`
 	// AuthProvider specifies a custom authentication plugin for the kubernetes cluster.
+	// +optional
 	AuthProvider *AuthProviderConfig `json:"auth-provider,omitempty"`
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
+	// +optional
 	Extensions []NamedExtension `json:"extensions,omitempty"`
 }
 
@@ -103,8 +124,10 @@ type Context struct {
 	// AuthInfo is the name of the authInfo for this context
 	AuthInfo string `json:"user"`
 	// Namespace is the default namespace to use on unspecified requests
+	// +optional
 	Namespace string `json:"namespace,omitempty"`
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
+	// +optional
 	Extensions []NamedExtension `json:"extensions,omitempty"`
 }
 

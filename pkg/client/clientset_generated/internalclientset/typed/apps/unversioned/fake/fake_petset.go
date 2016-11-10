@@ -95,7 +95,7 @@ func (c *FakePetSets) List(opts api.ListOptions) (result *apps.PetSetList, err e
 		return nil, err
 	}
 
-	label := opts.LabelSelector
+	label, _, _ := core.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}

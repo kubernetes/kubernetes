@@ -20,27 +20,27 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 var (
-	quotaLong = dedent.Dedent(`
+	quotaLong = templates.LongDesc(`
 		Create a resourcequota with the specified name, hard limits and optional scopes`)
 
-	quotaExample = dedent.Dedent(`  
-		// Create a new resourcequota named my-quota
+	quotaExample = templates.Examples(`
+		# Create a new resourcequota named my-quota
 		$ kubectl create quota my-quota --hard=cpu=1,memory=1G,pods=2,services=3,replicationcontrollers=2,resourcequotas=1,secrets=5,persistentvolumeclaims=10
-		
-		// Create a new resourcequota named best-effort
+
+		# Create a new resourcequota named best-effort
 		$ kubectl create quota best-effort --hard=pods=100 --scopes=BestEffort`)
 )
 
 // NewCmdCreateQuota is a macro command to create a new quota
-func NewCmdCreateQuota(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+func NewCmdCreateQuota(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "quota NAME [--hard=key1=value1,key2=value2] [--scopes=Scope1,Scope2] [--dry-run=bool]",
 		Aliases: []string{"resourcequota"},
@@ -63,7 +63,7 @@ func NewCmdCreateQuota(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 }
 
 // CreateQuota implements the behavior to run the create quota command
-func CreateQuota(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
+func CreateQuota(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err

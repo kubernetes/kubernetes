@@ -79,3 +79,12 @@ func (s *storage) DeleteRole(ctx api.Context, name string) error {
 	_, err := s.Delete(ctx, name, nil)
 	return err
 }
+
+// AuthorizerAdapter adapts the registry to the authorizer interface
+type AuthorizerAdapter struct {
+	Registry Registry
+}
+
+func (a AuthorizerAdapter) GetRole(namespace, name string) (*rbac.Role, error) {
+	return a.Registry.GetRole(api.WithNamespace(api.NewContext(), namespace), name)
+}

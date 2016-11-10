@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -94,10 +95,10 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			framework.RunKubectlOrDie("create", "-f", sentinelControllerYaml, nsFlag)
 			framework.RunKubectlOrDie("create", "-f", controllerYaml, nsFlag)
 			label := labels.SelectorFromSet(labels.Set(map[string]string{sentinelRC: "true"}))
-			err = framework.WaitForPodsWithLabelRunning(c, ns, label)
+			err = testutils.WaitForPodsWithLabelRunning(c, ns, label)
 			Expect(err).NotTo(HaveOccurred())
 			label = labels.SelectorFromSet(labels.Set(map[string]string{"name": redisRC}))
-			err = framework.WaitForPodsWithLabelRunning(c, ns, label)
+			err = testutils.WaitForPodsWithLabelRunning(c, ns, label)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("scaling up the deployment")
@@ -110,7 +111,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			checkAllLogs := func() {
 				selectorKey, selectorValue := "name", redisRC
 				label := labels.SelectorFromSet(labels.Set(map[string]string{selectorKey: selectorValue}))
-				err = framework.WaitForPodsWithLabelRunning(c, ns, label)
+				err = testutils.WaitForPodsWithLabelRunning(c, ns, label)
 				Expect(err).NotTo(HaveOccurred())
 				forEachPod(selectorKey, selectorValue, func(pod api.Pod) {
 					if pod.Name != bootstrapPodName {
@@ -120,7 +121,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 				})
 				selectorKey, selectorValue = sentinelRC, "true"
 				label = labels.SelectorFromSet(labels.Set(map[string]string{selectorKey: selectorValue}))
-				err = framework.WaitForPodsWithLabelRunning(c, ns, label)
+				err = testutils.WaitForPodsWithLabelRunning(c, ns, label)
 				Expect(err).NotTo(HaveOccurred())
 				forEachPod(selectorKey, selectorValue, func(pod api.Pod) {
 					if pod.Name != bootstrapPodName {
@@ -158,7 +159,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 				framework.RunKubectlOrDie("create", "-f", masterYaml, nsFlag)
 				selectorKey, selectorValue := "component", "spark-master"
 				label := labels.SelectorFromSet(labels.Set(map[string]string{selectorKey: selectorValue}))
-				err := framework.WaitForPodsWithLabelRunning(c, ns, label)
+				err := testutils.WaitForPodsWithLabelRunning(c, ns, label)
 				Expect(err).NotTo(HaveOccurred())
 
 				framework.Logf("Now polling for Master startup...")
@@ -185,7 +186,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 				framework.RunKubectlOrDie("create", "-f", workerControllerYaml, nsFlag)
 				selectorKey, selectorValue := "component", "spark-worker"
 				label := labels.SelectorFromSet(labels.Set(map[string]string{selectorKey: selectorValue}))
-				err := framework.WaitForPodsWithLabelRunning(c, ns, label)
+				err := testutils.WaitForPodsWithLabelRunning(c, ns, label)
 				Expect(err).NotTo(HaveOccurred())
 
 				// For now, scaling is orthogonal to the core test.
@@ -223,7 +224,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			By("Creating a Cassandra RC")
 			framework.RunKubectlOrDie("create", "-f", controllerYaml, nsFlag)
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"app": "cassandra"}))
-			err = framework.WaitForPodsWithLabelRunning(c, ns, label)
+			err = testutils.WaitForPodsWithLabelRunning(c, ns, label)
 			Expect(err).NotTo(HaveOccurred())
 			forEachPod("app", "cassandra", func(pod api.Pod) {
 				framework.Logf("Verifying pod %v ", pod.Name)
@@ -354,7 +355,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			By("starting workers")
 			framework.RunKubectlOrDie("create", "-f", workerControllerJson, nsFlag)
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": "storm-worker"}))
-			err = framework.WaitForPodsWithLabelRunning(c, ns, label)
+			err = testutils.WaitForPodsWithLabelRunning(c, ns, label)
 			Expect(err).NotTo(HaveOccurred())
 			forEachPod("name", "storm-worker", func(pod api.Pod) {
 				//do nothing, just wait for the pod to be running
@@ -490,7 +491,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			framework.RunKubectlOrDie("create", "-f", driverServiceYaml, nsFlag)
 			framework.RunKubectlOrDie("create", "-f", rethinkDbControllerYaml, nsFlag)
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"db": "rethinkdb"}))
-			err := framework.WaitForPodsWithLabelRunning(c, ns, label)
+			err := testutils.WaitForPodsWithLabelRunning(c, ns, label)
 			Expect(err).NotTo(HaveOccurred())
 			checkDbInstances := func() {
 				forEachPod("db", "rethinkdb", func(pod api.Pod) {
@@ -533,7 +534,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			framework.RunKubectlOrDie("create", "-f", serviceYaml, nsFlag)
 			framework.RunKubectlOrDie("create", "-f", controllerYaml, nsFlag)
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": "hazelcast"}))
-			err := framework.WaitForPodsWithLabelRunning(c, ns, label)
+			err := testutils.WaitForPodsWithLabelRunning(c, ns, label)
 			Expect(err).NotTo(HaveOccurred())
 			forEachPod("name", "hazelcast", func(pod api.Pod) {
 				_, err := framework.LookForStringInLog(ns, pod.Name, "hazelcast", "Members [1]", serverStartTimeout)

@@ -88,7 +88,7 @@ func scalePetSet(t *testing.T, ps *apps.PetSet, psc *PetSetController, fc *fakeP
 }
 
 func saturatePetSet(t *testing.T, ps *apps.PetSet, psc *PetSetController, fc *fakePetClient) {
-	err := scalePetSet(t, ps, psc, fc, ps.Spec.Replicas)
+	err := scalePetSet(t, ps, psc, fc, int(ps.Spec.Replicas))
 	if err != nil {
 		t.Errorf("Error scalePetSet: %v", err)
 	}
@@ -302,7 +302,7 @@ func (c *fakeApps) PetSets(namespace string) unversioned.PetSetInterface {
 type fakePetSetClient struct {
 	*fake.FakePetSets
 	Namespace string
-	replicas  int
+	replicas  int32
 }
 
 func (f *fakePetSetClient) UpdateStatus(petSet *apps.PetSet) (*apps.PetSet, error) {

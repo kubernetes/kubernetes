@@ -71,10 +71,10 @@ func (p *RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapi
 	newRuleValidator := func() rbacvalidation.AuthorizationRuleResolver {
 		once.Do(func() {
 			authorizationRuleResolver = rbacvalidation.NewDefaultRuleResolver(
-				role.NewRegistry(roleetcd.NewREST(restOptionsGetter(rbac.Resource("roles")))),
-				rolebinding.NewRegistry(rolebindingetcd.NewREST(restOptionsGetter(rbac.Resource("rolebindings")))),
-				clusterrole.NewRegistry(clusterroleetcd.NewREST(restOptionsGetter(rbac.Resource("clusterroles")))),
-				clusterrolebinding.NewRegistry(clusterrolebindingetcd.NewREST(restOptionsGetter(rbac.Resource("clusterrolebindings")))),
+				role.AuthorizerAdapter{Registry: role.NewRegistry(roleetcd.NewREST(restOptionsGetter(rbac.Resource("roles"))))},
+				rolebinding.AuthorizerAdapter{Registry: rolebinding.NewRegistry(rolebindingetcd.NewREST(restOptionsGetter(rbac.Resource("rolebindings"))))},
+				clusterrole.AuthorizerAdapter{Registry: clusterrole.NewRegistry(clusterroleetcd.NewREST(restOptionsGetter(rbac.Resource("clusterroles"))))},
+				clusterrolebinding.AuthorizerAdapter{Registry: clusterrolebinding.NewRegistry(clusterrolebindingetcd.NewREST(restOptionsGetter(rbac.Resource("clusterrolebindings"))))},
 			)
 		})
 		return authorizationRuleResolver
@@ -129,6 +129,26 @@ func PostStartHook(hookContext genericapiserver.PostStartHookContext) error {
 			continue
 		}
 		glog.Infof("Created clusterrole.%s/%s", rbac.GroupName, clusterRole.Name)
+	}
+
+	existingClusterRoleBindings, err := clientset.ClusterRoleBindings().List(api.ListOptions{})
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("unable to initialize clusterrolebindings: %v", err))
+		return nil
+	}
+	// if clusterrolebindings already exist, then assume we don't have work to do because we've already
+	// initialized or another API server has started this task
+	if len(existingClusterRoleBindings.Items) > 0 {
+		return nil
+	}
+
+	for _, clusterRoleBinding := range append(bootstrappolicy.ClusterRoleBindings(), bootstrappolicy.ControllerRoleBindings()...) {
+		if _, err := clientset.ClusterRoleBindings().Create(&clusterRoleBinding); err != nil {
+			// don't fail on failures, try to create as many as you can
+			utilruntime.HandleError(fmt.Errorf("unable to initialize clusterrolebindings: %v", err))
+			continue
+		}
+		glog.Infof("Created clusterrolebinding.%s/%s", rbac.GroupName, clusterRoleBinding.Name)
 	}
 
 	return nil

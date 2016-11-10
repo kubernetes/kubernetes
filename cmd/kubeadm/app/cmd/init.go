@@ -19,16 +19,20 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"net"
+	"io/ioutil"
 	"strings"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/api"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubemaster "k8s.io/kubernetes/cmd/kubeadm/app/master"
+	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/cloudprovider"
+	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
+	"k8s.io/kubernetes/pkg/runtime"
 	netutil "k8s.io/kubernetes/pkg/util/net"
 )
 
@@ -38,129 +42,166 @@ var (
 
 		You can now join any number of machines by running the following on each node:
 
-		kubeadm join --token %s %s
+		kubeadm join %s
 		`)
 )
 
 // NewCmdInit returns "kubeadm init" command.
-func NewCmdInit(out io.Writer, s *kubeadmapi.KubeadmConfig) *cobra.Command {
-	advertiseAddrs := &[]string{} // TODO(pahse1+) make it work somehow else, custom flag or whatever
+func NewCmdInit(out io.Writer) *cobra.Command {
+	cfg := &kubeadmapi.MasterConfiguration{}
+	var cfgPath string
+	var skipPreFlight bool
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Run this in order to set up the Kubernetes master.",
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunInit(out, cmd, args, s, advertiseAddrs)
-			cmdutil.CheckErr(err)
+			i, err := NewInit(cfgPath, cfg, skipPreFlight)
+			kubeadmutil.CheckErr(err)
+			kubeadmutil.CheckErr(i.Run(out))
 		},
 	}
 
 	cmd.PersistentFlags().StringVar(
-		&s.Secrets.GivenToken, "token", "",
+		&cfg.Secrets.GivenToken, "token", "",
 		"Shared secret used to secure cluster bootstrap; if none is provided, one will be generated for you",
 	)
 	cmd.PersistentFlags().StringSliceVar(
-		advertiseAddrs, "api-advertise-addresses", []string{},
+		&cfg.API.AdvertiseAddresses, "api-advertise-addresses", []string{},
 		"The IP addresses to advertise, in case autodetection fails",
 	)
 	cmd.PersistentFlags().StringSliceVar(
-		&s.InitFlags.API.ExternalDNSNames, "api-external-dns-names", []string{},
+		&cfg.API.ExternalDNSNames, "api-external-dns-names", []string{},
 		"The DNS names to advertise, in case you have configured them yourself",
 	)
-	cmd.PersistentFlags().IPNetVar(
-		&s.InitFlags.Services.CIDR, "service-cidr", *kubeadmapi.DefaultServicesCIDR,
-		`Use alterantive range of IP address for service VIPs, defaults to `+
-			kubeadmapi.DefaultServicesCIDRString,
+	cmd.PersistentFlags().StringVar(
+		&cfg.Networking.ServiceSubnet, "service-cidr", kubeadmapi.DefaultServicesSubnet,
+		"Use alternative range of IP address for service VIPs",
 	)
-	cmd.PersistentFlags().IPNetVar(
-		&s.InitFlags.PodNetwork.CIDR, "pod-network-cidr", net.IPNet{},
+	cmd.PersistentFlags().StringVar(
+		&cfg.Networking.PodSubnet, "pod-network-cidr", "",
 		"Specify range of IP addresses for the pod network; if set, the control plane will automatically allocate CIDRs for every node",
 	)
 	cmd.PersistentFlags().StringVar(
-		&s.InitFlags.Services.DNSDomain, "service-dns-domain", kubeadmapi.DefaultServiceDNSDomain,
+		&cfg.Networking.DNSDomain, "service-dns-domain", kubeadmapi.DefaultServiceDNSDomain,
 		`Use alternative domain for services, e.g. "myorg.internal"`,
 	)
 	cmd.PersistentFlags().StringVar(
-		&s.InitFlags.CloudProvider, "cloud-provider", "",
+		&cfg.CloudProvider, "cloud-provider", "",
 		`Enable cloud provider features (external load-balancers, storage, etc), e.g. "gce"`,
 	)
+
 	cmd.PersistentFlags().StringVar(
-		&s.InitFlags.Versions.Kubernetes, "use-kubernetes-version", kubeadmapi.DefaultKubernetesVersion,
+		&cfg.KubernetesVersion, "use-kubernetes-version", kubeadmapi.DefaultKubernetesVersion,
 		`Choose a specific Kubernetes version for the control plane`,
 	)
 
+	cmd.PersistentFlags().StringVar(&cfgPath, "config", "", "Path to kubeadm config file")
+
 	// TODO (phase1+) @errordeveloper make the flags below not show up in --help but rather on --advanced-help
 	cmd.PersistentFlags().StringSliceVar(
-		&s.InitFlags.API.Etcd.ExternalEndpoints, "external-etcd-endpoints", []string{},
+		&cfg.Etcd.Endpoints, "external-etcd-endpoints", []string{},
 		"etcd endpoints to use, in case you have an external cluster",
 	)
+	cmd.PersistentFlags().MarkDeprecated("external-etcd-endpoints", "this flag will be removed when componentconfig exists")
+
 	cmd.PersistentFlags().StringVar(
-		&s.InitFlags.API.Etcd.ExternalCAFile, "external-etcd-cafile", "",
+		&cfg.Etcd.CAFile, "external-etcd-cafile", "",
 		"etcd certificate authority certificate file. Note: The path must be in /etc/ssl/certs",
 	)
+	cmd.PersistentFlags().MarkDeprecated("external-etcd-cafile", "this flag will be removed when componentconfig exists")
+
 	cmd.PersistentFlags().StringVar(
-		&s.InitFlags.API.Etcd.ExternalCertFile, "external-etcd-certfile", "",
+		&cfg.Etcd.CertFile, "external-etcd-certfile", "",
 		"etcd client certificate file. Note: The path must be in /etc/ssl/certs",
 	)
+	cmd.PersistentFlags().MarkDeprecated("external-etcd-certfile", "this flag will be removed when componentconfig exists")
+
 	cmd.PersistentFlags().StringVar(
-		&s.InitFlags.API.Etcd.ExternalKeyFile, "external-etcd-keyfile", "",
+		&cfg.Etcd.KeyFile, "external-etcd-keyfile", "",
 		"etcd client key file. Note: The path must be in /etc/ssl/certs",
+	)
+	cmd.PersistentFlags().MarkDeprecated("external-etcd-keyfile", "this flag will be removed when componentconfig exists")
+
+	cmd.PersistentFlags().BoolVar(
+		&skipPreFlight, "skip-preflight-checks", false,
+		"skip preflight checks normally run before modifying the system",
+	)
+
+	cmd.PersistentFlags().Int32Var(
+		&cfg.API.BindPort, "api-port", kubeadmapi.DefaultAPIBindPort,
+		"Port for API to bind to",
+	)
+
+	cmd.PersistentFlags().Int32Var(
+		&cfg.Discovery.BindPort, "discovery-port", kubeadmapi.DefaultDiscoveryBindPort,
+		"Port for JWS discovery service to bind to",
 	)
 
 	return cmd
 }
 
-// RunInit executes master node provisioning, including certificates, needed static pod manifests, etc.
-func RunInit(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.KubeadmConfig, advertiseAddrs *[]string) error {
+type Init struct {
+	cfg *kubeadmapi.MasterConfiguration
+}
+
+func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight bool) (*Init, error) {
+	if cfgPath != "" {
+		b, err := ioutil.ReadFile(cfgPath)
+		if err != nil {
+			return nil, fmt.Errorf("unable to read config from %q [%v]", cfgPath, err)
+		}
+		if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), b, cfg); err != nil {
+			return nil, fmt.Errorf("unable to decode config from %q [%v]", cfgPath, err)
+		}
+	}
+
+	if !skipPreFlight {
+		fmt.Println("Running pre-flight checks")
+		err := preflight.RunInitMasterChecks(cfg)
+		if err != nil {
+			return nil, &preflight.PreFlightError{Msg: err.Error()}
+		}
+	} else {
+		fmt.Println("Skipping pre-flight checks")
+	}
+
 	// Auto-detect the IP
-	if len(*advertiseAddrs) == 0 {
+	if len(cfg.API.AdvertiseAddresses) == 0 {
 		// TODO(phase1+) perhaps we could actually grab eth0 and eth1
 		ip, err := netutil.ChooseHostInterface()
 		if err != nil {
-			return err
+			return nil, err
 		}
-		s.InitFlags.API.AdvertiseAddrs = []net.IP{ip}
-	} else {
-		for _, i := range *advertiseAddrs {
-			addr := net.ParseIP(i)
-			if addr == nil {
-				// TODO(phase1+) custom flag will help to get this error message into a better place
-				return fmt.Errorf("<cmd/init> failed to parse %q (in %q) as an IP address", i, "--api-advertise-addresses="+strings.Join(*advertiseAddrs, ","))
-			}
-			s.InitFlags.API.AdvertiseAddrs = append(s.InitFlags.API.AdvertiseAddrs, addr)
-		}
+		cfg.API.AdvertiseAddresses = []string{ip.String()}
 	}
 
 	// TODO(phase1+) create a custom flag
-	if s.InitFlags.CloudProvider != "" {
-		found := false
-		for _, provider := range kubeadmapi.ListOfCloudProviders {
-			if provider == s.InitFlags.CloudProvider {
-				found = true
-				break
-			}
-		}
-
-		if found {
-			fmt.Printf("<cmd/init> cloud provider %q initialized for the control plane. Remember to set the same cloud provider flag on the kubelet.\n", s.InitFlags.CloudProvider)
+	if cfg.CloudProvider != "" {
+		if cloudprovider.IsCloudProvider(cfg.CloudProvider) {
+			fmt.Printf("cloud provider %q initialized for the control plane. Remember to set the same cloud provider flag on the kubelet.\n", cfg.CloudProvider)
 		} else {
-			return fmt.Errorf("<cmd/init> cloud provider %q is not supported, you can use any of %v, or leave it unset.\n", s.InitFlags.CloudProvider, kubeadmapi.ListOfCloudProviders)
+			return nil, fmt.Errorf("cloud provider %q is not supported, you can use any of %v, or leave it unset.\n", cfg.CloudProvider, cloudprovider.CloudProviders())
 		}
 	}
+	return &Init{cfg: cfg}, nil
+}
 
-	if err := kubemaster.CreateTokenAuthFile(s); err != nil {
+// Run executes master node provisioning, including certificates, needed static pod manifests, etc.
+func (i *Init) Run(out io.Writer) error {
+	if err := kubemaster.CreateTokenAuthFile(&i.cfg.Secrets); err != nil {
 		return err
 	}
 
-	if err := kubemaster.WriteStaticPodManifests(s); err != nil {
+	if err := kubemaster.WriteStaticPodManifests(i.cfg); err != nil {
 		return err
 	}
 
-	caKey, caCert, err := kubemaster.CreatePKIAssets(s)
+	caKey, caCert, err := kubemaster.CreatePKIAssets(i.cfg)
 	if err != nil {
 		return err
 	}
 
-	kubeconfigs, err := kubemaster.CreateCertsAndConfigForClients(s, []string{"kubelet", "admin"}, caKey, caCert)
+	kubeconfigs, err := kubemaster.CreateCertsAndConfigForClients(i.cfg.API, []string{"kubelet", "admin"}, caKey, caCert)
 	if err != nil {
 		return err
 	}
@@ -175,7 +216,7 @@ func RunInit(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.Kub
 	// importing existing files, may be we could even make our command idempotant,
 	// or at least allow for external PKI and stuff)
 	for name, kubeconfig := range kubeconfigs {
-		if err := kubeadmutil.WriteKubeconfigIfNotExists(s, name, kubeconfig); err != nil {
+		if err := kubeadmutil.WriteKubeconfigIfNotExists(name, kubeconfig); err != nil {
 			return err
 		}
 	}
@@ -190,19 +231,24 @@ func RunInit(out io.Writer, cmd *cobra.Command, args []string, s *kubeadmapi.Kub
 		return err
 	}
 
-	if err := kubemaster.CreateDiscoveryDeploymentAndSecret(s, client, caCert); err != nil {
+	if err := kubemaster.CreateDiscoveryDeploymentAndSecret(i.cfg, client, caCert); err != nil {
 		return err
 	}
 
-	if err := kubemaster.CreateEssentialAddons(s, client); err != nil {
+	if err := kubemaster.CreateEssentialAddons(i.cfg, client); err != nil {
 		return err
 	}
 
-	// TODO(phase1+) use templates to reference struct fields directly as order of args is fragile
-	fmt.Fprintf(out, initDoneMsgf,
-		s.Secrets.GivenToken,
-		s.InitFlags.API.AdvertiseAddrs[0].String(),
-	)
+	// TODO(phase1+) we could probably use templates for this logic, and reference struct fields directly etc
+	joinArgs := []string{fmt.Sprintf("--token=%s", i.cfg.Secrets.GivenToken)}
+	if i.cfg.API.BindPort != kubeadmapi.DefaultAPIBindPort {
+		joinArgs = append(joinArgs, fmt.Sprintf("--api-port=%d", i.cfg.API.BindPort))
+	}
+	if i.cfg.Discovery.BindPort != kubeadmapi.DefaultDiscoveryBindPort {
+		joinArgs = append(joinArgs, fmt.Sprintf("--discovery-port=%d", i.cfg.Discovery.BindPort))
+	}
+	joinArgs = append(joinArgs, i.cfg.API.AdvertiseAddresses[0])
+	fmt.Fprintf(out, initDoneMsgf, strings.Join(joinArgs, " "))
 
 	return nil
 }

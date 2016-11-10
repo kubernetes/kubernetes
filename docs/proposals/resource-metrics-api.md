@@ -60,7 +60,7 @@ due to performance issues.
 #### Scheduler
 
 Scheduler in order to schedule best-effort pods requires node level resource usage metrics
-as an average aggreated across 1 minute (the window may change in the future).
+as an average aggregated across 1 minute (the window may change in the future).
 The metrics should be available for all resources supported in the scheduler.
 Currently the scheduler does not need this information, because it schedules best-effort pods
 without considering node usage. But having the metrics available in the API server is a blocker
@@ -98,7 +98,7 @@ it will be probably possible to provide a reasonable implementation of the featu
 #### Kubernetes dashboard
 
 [Kubernetes dashboard](https://github.com/kubernetes/dashboard) in order to draw graphs requires resource usage
-in timeseries format from relatively long period of time. The aggreations should be also possible on various levels
+in timeseries format from relatively long period of time. The aggregations should be also possible on various levels
 including replication controllers, deployments, services, etc.
 
 Since the use case is complicated it will not be supported initally in the API and they will query Heapster
@@ -168,7 +168,7 @@ The following query parameters are supported:
 - `labelSelector` - restrict the list of returned objects by labels (list endpoints only)
 
 In the future we may want to introduce the following params:
-`aggreator` (`max`, `min`, `95th`, etc.) and `window` (`1h`, `1d`, `1w`, etc.)
+`aggregator` (`max`, `min`, `95th`, etc.) and `window` (`1h`, `1d`, `1w`, etc.)
 which will allow to get the other aggregates over the custom time window.
 
 ## Further improvements
@@ -177,7 +177,7 @@ Depending on the further requirements the following features may be added:
 - support for more metrics
 - support for application level metrics
 - watch for metrics
-- possibility to query for window sizes and aggreation functions (though single window size/aggregation function per request)
+- possibility to query for window sizes and aggregation functions (though single window size/aggregation function per request)
 - cluster level metrics
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

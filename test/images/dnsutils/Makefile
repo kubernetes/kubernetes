@@ -22,6 +22,6 @@ image:
 	docker build -t $(PREFIX)/dnsutils .
 
 push: image
-	gcloud docker push $(PREFIX)/dnsutils
+	gcloud docker -- push $(PREFIX)/dnsutils
 
 clean:

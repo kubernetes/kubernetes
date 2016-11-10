@@ -21,13 +21,13 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/latest"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/flag"
 )
@@ -41,11 +41,12 @@ type ViewOptions struct {
 }
 
 var (
-	view_long = dedent.Dedent(`
+	view_long = templates.LongDesc(`
 		Display merged kubeconfig settings or a specified kubeconfig file.
 
 		You can use --output jsonpath={...} to extract specific values using a jsonpath expression.`)
-	view_example = dedent.Dedent(`
+
+	view_example = templates.Examples(`
 		# Show Merged kubeconfig settings.
 		kubectl config view
 

@@ -22,10 +22,10 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -33,12 +33,9 @@ import (
 )
 
 var (
-	expose_resources = dedent.Dedent(`
-		pod (po), service (svc), replicationcontroller (rc),
-		deployment (deploy), replicaset (rs)
-	`)
+	expose_resources = `pod (po), service (svc), replicationcontroller (rc), deployment (deploy), replicaset (rs)`
 
-	expose_long = dedent.Dedent(`
+	expose_long = templates.LongDesc(`
 		Expose a resource as a new Kubernetes service.
 
 		Looks up a deployment, service, replica set, replication controller or pod by name and uses the selector
@@ -48,9 +45,11 @@ var (
 		--port and the exposed resource has multiple ports, all will be re-used by the new service. Also if no
 		labels are specified, the new service will re-use the labels from the resource it exposes.
 
-		Possible resources include (case insensitive): `) + expose_resources
+		Possible resources include (case insensitive):
 
-	expose_example = dedent.Dedent(`
+		` + expose_resources)
+
+	expose_example = templates.Examples(`
 		# Create a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
 		kubectl expose rc nginx --port=80 --target-port=8000
 
@@ -73,7 +72,7 @@ var (
 		kubectl expose deployment nginx --port=80 --target-port=8000`)
 )
 
-func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdExposeService(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 
 	validArgs, argAliases := []string{}, []string{}
@@ -123,7 +122,7 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
+func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
 	namespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err

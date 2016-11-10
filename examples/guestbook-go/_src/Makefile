@@ -28,10 +28,10 @@ build:
 
 # push the image to an registry
 push:
-	gcloud docker push ${REGISTRY}/guestbook:${VERSION}
-	
+	gcloud docker -- push ${REGISTRY}/guestbook:${VERSION}
+
 # remove previous images and containers
-clean: 
+clean:
 	docker rm -f ${REGISTRY}/guestbook-builder 2> /dev/null || true
 	docker rmi -f ${REGISTRY}/guestbook-builder || true
 	docker rmi -f "${REGISTRY}/guestbook:${VERSION}" || true

@@ -29,6 +29,6 @@ build: kubernetes-cassandra.jar
 	docker build -t ${PROJECT}/cassandra:${VERSION} .
 
 push: build
-	gcloud docker push ${PROJECT}/cassandra:${VERSION}
+	gcloud docker -- push ${PROJECT}/cassandra:${VERSION}
 
 .PHONY: all build push

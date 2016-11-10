@@ -87,6 +87,7 @@ func startHTTPServer(httpPort int) {
 	http.HandleFunc("/shell", shellHandler)
 	http.HandleFunc("/upload", uploadHandler)
 	http.HandleFunc("/dial", dialHandler)
+	http.HandleFunc("/healthz", healthzHandler)
 	// older handlers
 	http.HandleFunc("/hostName", hostNameHandler)
 	http.HandleFunc("/shutdown", shutdownHandler)
@@ -120,13 +121,12 @@ func exitHandler(w http.ResponseWriter, r *http.Request) {
 func hostnameHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("GET /hostname")
 	fmt.Fprintf(w, getHostName())
-	http.HandleFunc("/healthz", healthzHandler)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", httpPort), nil))
 }
 
 // healthHandler response with a 200 if the UDP server is ready. It also serves
 // as a health check of the HTTP server by virtue of being a HTTP handler.
 func healthzHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("GET /healthz")
 	if serverReady.get() {
 		w.WriteHeader(200)
 		return
@@ -348,6 +348,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func hostNameHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("GET /hostName")
 	fmt.Fprintf(w, getHostName())
 }
 
