@@ -41,8 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
-	authorizerunion "k8s.io/kubernetes/pkg/auth/authorizer/union"
-	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -59,7 +57,6 @@ import (
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
-	authenticatorunion "k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
 )
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
@@ -94,8 +91,7 @@ func Run(s *options.ServerRunOptions) error {
 							ApplySecureServingOptions(s.SecureServing).
 							ApplyInsecureServingOptions(s.InsecureServing).
 							ApplyAuthenticationOptions(s.Authentication).
-							ApplyRBACSuperUser(s.Authorization.RBACSuperUser).
-							Complete() // set default values based on the known values
+							ApplyRBACSuperUser(s.Authorization.RBACSuperUser)
 
 	serviceIPRange, apiServerServiceIP, err := genericapiserver.DefaultServiceIPRange(s.GenericServerRunOptions.ServiceClusterIPRange)
 	if err != nil {
@@ -253,26 +249,7 @@ func Run(s *options.ServerRunOptions) error {
 	}
 
 	admissionControlPluginNames := strings.Split(s.GenericServerRunOptions.AdmissionControl, ",")
-
-	// TODO(dims): We probably need to add an option "EnableLoopbackToken"
-	if apiAuthenticator != nil {
-		var uid = uuid.NewRandom().String()
-		tokens := make(map[string]*user.DefaultInfo)
-		tokens[privilegedLoopbackToken] = &user.DefaultInfo{
-			Name:   user.APIServerUser,
-			UID:    uid,
-			Groups: []string{user.SystemPrivilegedGroup},
-		}
-
-		tokenAuthenticator := authenticator.NewAuthenticatorFromTokens(tokens)
-		apiAuthenticator = authenticatorunion.New(tokenAuthenticator, apiAuthenticator)
-
-		tokenAuthorizer := authorizer.NewPrivilegedGroups(user.SystemPrivilegedGroup)
-		apiAuthorizer = authorizerunion.New(tokenAuthorizer, apiAuthorizer)
-	}
-
 	pluginInitializer := admission.NewPluginInitializer(sharedInformers, apiAuthorizer)
-
 	admissionController, err := admission.NewFromPlugins(client, admissionControlPluginNames, s.GenericServerRunOptions.AdmissionControlConfigFile, pluginInitializer)
 	if err != nil {
 		glog.Fatalf("Failed to initialize plugins: %v", err)
@@ -297,7 +274,7 @@ func Run(s *options.ServerRunOptions) error {
 	genericConfig.OpenAPIConfig.SecurityDefinitions = securityDefinitions
 
 	config := &master.Config{
-		GenericConfig: genericConfig.Config,
+		GenericConfig: genericConfig,
 
 		StorageFactory:          storageFactory,
 		EnableWatchCache:        s.GenericServerRunOptions.EnableWatchCache,
