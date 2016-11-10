@@ -90,6 +90,12 @@ function generate_certs {
     echo "TLS assets generated..."
 }
 
+#Setup registry proxy
+function setup_registry_proxy {
+  if [[ "$ENABLE_CLUSTER_REGISTRY" == "true" ]]; then
+    cp "./cluster/saltbase/salt/kube-registry-proxy/kube-registry-proxy.yaml" "$POOL_PATH/kubernetes/manifests"
+  fi
+}
 
 # Verify prereqs on host machine
 function verify-prereqs {
@@ -225,8 +231,8 @@ function kube-up {
   detect-nodes
   initialize-pool keep_base_image
   generate_certs "${NODE_NAMES[@]}"
+  setup_registry_proxy
   initialize-network
-
 
   readonly ssh_keys="$(cat ~/.ssh/*.pub | sed 's/^/  - /')"
   readonly kubernetes_dir="$POOL_PATH/kubernetes"
@@ -279,6 +285,51 @@ function kube-up {
   echo
   echo "You can control the Kubernetes cluster with: 'cluster/kubectl.sh'"
   echo "You can connect on the master with: 'ssh core@${KUBE_MASTER_IP}'"
+
+  wait-registry-readiness
+
+}
+
+function create_registry_rc() {
+  echo " Create registry replication controller"
+  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+  "${kubectl}" create -f $ROOT/registry-rc.yaml
+  local timeout=120
+  while [[ $timeout -ne 0 ]]; do
+    phase=$("${kubectl}" get pods -n kube-system -lk8s-app=kube-registry --output='jsonpath={.items..status.phase}')
+    if [ "$phase" = "Running" ]; then
+      return 0
+    fi
+    timeout=$(($timeout-1))
+    sleep .5
+  done
+}
+
+
+function create_registry_svc() {
+  echo " Create registry service"
+  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+  "${kubectl}" create -f "${KUBE_ROOT}/cluster/addons/registry/registry-svc.yaml"
+}
+
+function wait-registry-readiness() {
+  if [[ "$ENABLE_CLUSTER_REGISTRY" == "true" ]]; then
+    echo "Wait for registry readiness..."
+    local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+
+    local timeout=120
+    while [[ $timeout -ne 0 ]]; do
+      phase=$("${kubectl}" get namespaces --output=jsonpath='{.items[?(@.metadata.name=="kube-system")].status.phase}')
+      if [ "$phase" = "Active" ]; then
+        create_registry_rc
+        create_registry_svc
+        return 0
+      fi
+      echo "waiting for namespace kube-system"
+      timeout=$(($timeout-1))
+      sleep .5
+    done
+  fi
 }
 
 # Delete a kubernetes cluster
