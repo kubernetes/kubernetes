@@ -58,6 +58,7 @@ const (
 
 func TestInitFederation(t *testing.T) {
 	cmdErrMsg := ""
+	dnsProvider := ""
 	cmdutil.BehaviorOnFatal(func(str string, code int) {
 		cmdErrMsg = str
 	})
@@ -76,6 +77,7 @@ func TestInitFederation(t *testing.T) {
 		lbIP               string
 		image              string
 		expectedErr        string
+		dnsProvider        string
 	}{
 		{
 			federation:         "union",
@@ -85,14 +87,31 @@ func TestInitFederation(t *testing.T) {
 			lbIP:               "10.20.30.40",
 			image:              "example.test/foo:bar",
 			expectedErr:        "",
+			dnsProvider:        "test-dns-provider",
+		},
+		{
+			federation:         "union",
+			kubeconfigGlobal:   fakeKubeFiles[0],
+			kubeconfigExplicit: "",
+			dnsZoneName:        "example.test.",
+			lbIP:               "10.20.30.40",
+			image:              "example.test/foo:bar",
+			expectedErr:        "",
+			dnsProvider:        "", //test for default value of dns provider
 		},
 	}
 
 	for i, tc := range testCases {
 		cmdErrMsg = ""
+		dnsProvider = ""
 		buf := bytes.NewBuffer([]byte{})
 
-		hostFactory, err := fakeInitHostFactory(tc.federation, util.DefaultFederationSystemNamespace, tc.lbIP, tc.dnsZoneName, tc.image)
+		if "" != tc.dnsProvider {
+			dnsProvider = tc.dnsProvider
+		} else {
+			dnsProvider = "google-clouddns" //default value of dns-provider
+		}
+		hostFactory, err := fakeInitHostFactory(tc.federation, util.DefaultFederationSystemNamespace, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -108,6 +127,9 @@ func TestInitFederation(t *testing.T) {
 		cmd.Flags().Set("host-cluster-context", "substrate")
 		cmd.Flags().Set("dns-zone-name", tc.dnsZoneName)
 		cmd.Flags().Set("image", tc.image)
+		if "" != tc.dnsProvider {
+			cmd.Flags().Set("dns-provider", tc.dnsProvider)
+		}
 		cmd.Run(cmd, []string{tc.federation})
 
 		if tc.expectedErr == "" {
@@ -370,7 +392,7 @@ func TestCertsHTTPS(t *testing.T) {
 	}
 }
 
-func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image string) (cmdutil.Factory, error) {
+func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, dnsProvider string) (cmdutil.Factory, error) {
 	svcName := federationName + "-apiserver"
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
@@ -597,7 +619,7 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image s
 								"federation-controller-manager",
 								"--master=https://federation-apiserver",
 								"--kubeconfig=/etc/federation/controller-manager/kubeconfig",
-								"--dns-provider=gce",
+								fmt.Sprintf("--dns-provider=%s", dnsProvider),
 								"--dns-provider-config=",
 								fmt.Sprintf("--federation-name=%s", federationName),
 								fmt.Sprintf("--zone-name=%s", dnsZoneName),
