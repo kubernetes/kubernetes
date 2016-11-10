@@ -156,17 +156,11 @@ func (wc *watchChan) sync() error {
 		return err
 	}
 	wc.initialRev = getResp.Header.Revision
-
 	for _, kv := range getResp.Kvs {
-		prevResp, err := wc.watcher.client.Get(wc.ctx, string(kv.Key), clientv3.WithRev(kv.ModRevision-1), clientv3.WithSerializable())
-		if err != nil {
-			return err
-		}
-		var prevVal []byte
-		if len(prevResp.Kvs) > 0 {
-			prevVal = prevResp.Kvs[0].Value
-		}
-		wc.sendEvent(parseKV(kv, prevVal))
+		// send a synthetic "created" event for each existing item
+		e := parseKV(kv, nil)
+		e.isCreated = true
+		wc.sendEvent(e)
 	}
 	return nil
 }
