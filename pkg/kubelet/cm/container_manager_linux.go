@@ -37,9 +37,9 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/util"
-	utilcgroups "k8s.io/kubernetes/pkg/util/cgroups"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
@@ -751,7 +751,7 @@ func ensureSystemCgroups(rootCgroupPath string, manager *fs.Manager) error {
 		errs = []error{}
 		attemptsRemaining--
 
-		allPids, err := utilcgroups.GetPids(rootCgroupPath)
+		allPids, err := cmutil.GetPids(rootCgroupPath)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to list PIDs for root: %v", err))
 			continue

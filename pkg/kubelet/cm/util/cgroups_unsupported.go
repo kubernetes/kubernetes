@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cgroups
+package util
 
 func GetPids(cgroupPath string) ([]int, error) {
 	return nil, nil

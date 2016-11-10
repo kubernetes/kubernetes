@@ -20,7 +20,7 @@ go_library(
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/util/cgroups:go_default_library",
+        "//pkg/kubelet/cm/util:go_default_library",
         "//vendor:github.com/golang/glog",
     ],
 )

@@ -26,7 +26,7 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"k8s.io/kubernetes/pkg/util/cgroups"
+	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 
 	"github.com/golang/glog"
 )
@@ -41,7 +41,7 @@ func NewOOMAdjuster() *OOMAdjuster {
 }
 
 func getPids(cgroupName string) ([]int, error) {
-	return cgroups.GetPids(filepath.Join("/", cgroupName))
+	return cmutil.GetPids(filepath.Join("/", cgroupName))
 }
 
 // Writes 'value' to /proc/<pid>/oom_score_adj. PID = 0 means self
