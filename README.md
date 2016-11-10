@@ -32,7 +32,7 @@ Kubernetes builds upon a [decade and a half of experience at Google running prod
 
 ### Kubernetes is ready for Production!
 
-With the [1.0.1 release](https://github.com/kubernetes/kubernetes/releases/tag/v1.0.1) Kubernetes is ready to serve your production workloads.
+Since the Kubernetes 1.0 release in July 2015 Kubernetes is ready for your production workloads.
 
 ### Kubernetes can run anywhere!
 
