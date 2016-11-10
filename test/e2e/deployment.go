@@ -1312,9 +1312,6 @@ func testFailedDeployment(f *framework.Framework) {
 	framework.Logf("Waiting for deployment %q to be observed by the controller", deploymentName)
 	Expect(framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)).NotTo(HaveOccurred())
 
-	framework.Logf("Waiting for deployment %q status", deploymentName)
-	Expect(framework.WaitForDeploymentStatus(c, deployment)).NotTo(HaveOccurred())
-
 	framework.Logf("Checking deployment %q for a timeout condition", deploymentName)
 	Expect(framework.WaitForDeploymentWithCondition(c, ns, deploymentName, deploymentutil.TimedOutReason, extensions.DeploymentProgressing)).NotTo(HaveOccurred())
 
@@ -1328,7 +1325,7 @@ func testFailedDeployment(f *framework.Framework) {
 	Expect(framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)).NotTo(HaveOccurred())
 
 	framework.Logf("Waiting for deployment %q status", deploymentName)
-	Expect(framework.WaitForDeploymentStatus(c, deployment)).NotTo(HaveOccurred())
+	Expect(framework.WaitForDeploymentStatusValid(c, deployment)).NotTo(HaveOccurred())
 
 	framework.Logf("Checking deployment %q for a complete condition", deploymentName)
 	Expect(framework.WaitForDeploymentWithCondition(c, ns, deploymentName, deploymentutil.NewRSAvailableReason, extensions.DeploymentProgressing)).NotTo(HaveOccurred())
