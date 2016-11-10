@@ -2642,6 +2642,36 @@ func WaitForRCPodsRunning(c clientset.Interface, ns, rcName string) error {
 	return nil
 }
 
+func ScaleDeployment(clientset clientset.Interface, ns, name string, size uint, wait bool) error {
+	By(fmt.Sprintf("Scaling Deployment %s in namespace %s to %d", name, ns, size))
+	scaler, err := kubectl.ScalerFor(extensions.Kind("Deployment"), clientset)
+	if err != nil {
+		return err
+	}
+	waitForScale := kubectl.NewRetryParams(5*time.Second, 1*time.Minute)
+	waitForReplicas := kubectl.NewRetryParams(5*time.Second, 5*time.Minute)
+	if err = scaler.Scale(ns, name, size, nil, waitForScale, waitForReplicas); err != nil {
+		return fmt.Errorf("error while scaling Deployment %s to %d replicas: %v", name, size, err)
+	}
+	if !wait {
+		return nil
+	}
+	return WaitForDeploymentPodsRunning(clientset, ns, name)
+}
+
+func WaitForDeploymentPodsRunning(c clientset.Interface, ns, name string) error {
+	deployment, err := c.Extensions().Deployments(ns).Get(name)
+	if err != nil {
+		return err
+	}
+	selector := labels.SelectorFromSet(labels.Set(deployment.Spec.Selector.MatchLabels))
+	err = testutils.WaitForPodsWithLabelRunning(c, ns, selector)
+	if err != nil {
+		return fmt.Errorf("Error while waiting for Deployment %s pods to be running: %v", name, err)
+	}
+	return nil
+}
+
 // Returns true if all the specified pods are scheduled, else returns false.
 func podsWithLabelScheduled(c clientset.Interface, ns string, label labels.Selector) (bool, error) {
 	PodStore := testutils.NewPodStore(c, ns, label, fields.Everything())

@@ -1,23 +1,23 @@
-apiVersion: v1
-kind: ReplicationController
+# Keep this file in sync with addons/dashboard/dashboard-controller.yaml
+apiVersion: extensions/v1beta1
+kind: Deployment
 metadata:
-  # Keep this file in sync with addons/dashboard/dashboard-controller.yaml
-  name: kubernetes-dashboard-v1.4.0
+  name: kubernetes-dashboard
   namespace: kube-system
   labels:
     k8s-app: kubernetes-dashboard
-    version: v1.4.0
     kubernetes.io/cluster-service: "true"
 spec:
-  replicas: 1
   selector:
-    k8s-app: kubernetes-dashboard
+    matchLabels:
+      k8s-app: kubernetes-dashboard
   template:
     metadata:
       labels:
         k8s-app: kubernetes-dashboard
-        version: v1.4.0
-        kubernetes.io/cluster-service: "true"
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
+        scheduler.alpha.kubernetes.io/tolerations: '[{"key":"CriticalAddonsOnly", "operator":"Exists"}]'
     spec:
       containers:
       - name: kubernetes-dashboard

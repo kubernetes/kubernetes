@@ -42,7 +42,7 @@ spec:
           - --configmap=kube-dns-autoscaler
           - --mode=linear
           # Should keep target in sync with cluster/addons/dns/skydns-rc.yaml.base
-          - --target=ReplicationController/kube-dns-v20
+          - --target=Deployment/kube-dns
           # When cluster is using large nodes(with more cores), "coresPerReplica" should dominate.
           # If using small nodes, "nodesPerReplica" should dominate.
           - --default-params={"linear":{"coresPerReplica":256,"nodesPerReplica":16,"min":1}}
