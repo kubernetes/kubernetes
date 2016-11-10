@@ -24,7 +24,7 @@ import (
 	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fake_fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5/fake"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
+	// "k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
@@ -55,7 +55,7 @@ func TestNamespaceController(t *testing.T) {
 	RegisterFakeList("clusters", &fakeClient.Fake, &federation_api.ClusterList{Items: []federation_api.Cluster{*cluster1}})
 	RegisterFakeList("namespaces", &fakeClient.Fake, &api_v1.NamespaceList{Items: []api_v1.Namespace{}})
 	namespaceWatch := RegisterFakeWatch("namespaces", &fakeClient.Fake)
-	namespaceCreateChan := RegisterFakeCopyOnCreate("namespaces", &fakeClient.Fake, namespaceWatch)
+	// namespaceCreateChan := RegisterFakeCopyOnCreate("namespaces", &fakeClient.Fake, namespaceWatch)
 	clusterWatch := RegisterFakeWatch("clusters", &fakeClient.Fake)
 
 	cluster1Client := &fake_kubeclientset.Clientset{}
@@ -114,12 +114,16 @@ func TestNamespaceController(t *testing.T) {
 
 	// Test add federated namespace.
 	namespaceWatch.Add(&ns1)
-	// Verify that the DeleteFromUnderlyingClusters finalizer is added to the namespace.
-	// Note: finalize invokes the create action in Fake client.
-	// TODO: Seems like a bug. Should invoke update. Fix it.
-	updatedNamespace := GetNamespaceFromChan(namespaceCreateChan)
-	assert.True(t, namespaceController.hasFinalizerFunc(updatedNamespace, deletionhelper.FinalizerDeleteFromUnderlyingClusters))
-	ns1 = *updatedNamespace
+	/*
+		// TODO: Uncomment this once we have figured out why this is flaky.
+		// Ref https://github.com/kubernetes/kubernetes/issues/36540
+		// Verify that the DeleteFromUnderlyingClusters finalizer is added to the namespace.
+		// Note: finalize invokes the create action in Fake client.
+		// TODO: Seems like a bug. Should invoke update. Fix it.
+		updatedNamespace := GetNamespaceFromChan(namespaceCreateChan)
+		assert.True(t, namespaceController.hasFinalizerFunc(updatedNamespace, deletionhelper.FinalizerDeleteFromUnderlyingClusters))
+		ns1 = *updatedNamespace
+	*/
 
 	// Verify that the namespace is created in underlying cluster1.
 	createdNamespace := GetNamespaceFromChan(cluster1CreateChan)
