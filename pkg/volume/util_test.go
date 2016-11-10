@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -302,4 +303,38 @@ func TestGenerateVolumeName(t *testing.T) {
 		t.Errorf("Expected %s, got %s", expect, v3)
 	}
 
+}
+
+func TestZones2Set(t *testing.T) {
+	functionUnderTest := "Zones2Set"
+	// First part: want an error
+	sliceOfZones := []string{"", ",", "us-east-1a, , us-east-1d", ", us-west-1b", "us-west-2b,"}
+	for _, zones := range sliceOfZones {
+		if got, err := Zones2Set(zones); err == nil {
+			t.Errorf("%v(%v) returned (%v), want (%v)", functionUnderTest, zones, got, "an error")
+		}
+	}
+
+	// Second part: want no error
+	tests := []struct {
+		zones string
+		want  sets.String
+	}{
+		{
+			zones: "us-east-1a",
+			want:  sets.String{"us-east-1a": sets.Empty{}},
+		},
+		{
+			zones: "us-east-1a, us-west-2a",
+			want: sets.String{
+				"us-east-1a": sets.Empty{},
+				"us-west-2a": sets.Empty{},
+			},
+		},
+	}
+	for _, tt := range tests {
+		if got, err := Zones2Set(tt.zones); err != nil || !got.Equal(tt.want) {
+			t.Errorf("%v(%v) returned (%v), want (%v)", functionUnderTest, tt.zones, got, tt.want)
+		}
+	}
 }
