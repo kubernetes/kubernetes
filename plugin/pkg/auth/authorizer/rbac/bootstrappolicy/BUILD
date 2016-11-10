@@ -27,12 +27,16 @@ go_library(
 
 go_test(
     name = "go_default_xtest",
-    srcs = ["policy_test.go"],
+    srcs = [
+        "controller_policy_test.go",
+        "policy_test.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//pkg/apis/rbac:go_default_library",
         "//pkg/apis/rbac/validation:go_default_library",
         "//pkg/util/sets:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac/bootstrappolicy:go_default_library",
+        "//pkg/api/meta:go_default_library",
     ],
 )

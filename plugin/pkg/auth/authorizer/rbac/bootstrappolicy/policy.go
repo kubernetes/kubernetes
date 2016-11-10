@@ -25,6 +25,8 @@ import (
 var (
 	ReadWrite = []string{"get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"}
 	Read      = []string{"get", "list", "watch"}
+
+	Label = map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"}
 )
 
 const (
@@ -41,9 +43,16 @@ const (
 	storageGroup        = "storage.k8s.io"
 )
 
+func addBootstrappingLabel(roles []rbac.ClusterRole) {
+	for i := range roles {
+		roles[i].ObjectMeta.Labels = Label
+	}
+	return
+}
+
 // ClusterRoles returns the cluster roles to bootstrap an API server with
 func ClusterRoles() []rbac.ClusterRole {
-	return []rbac.ClusterRole{
+	roles := []rbac.ClusterRole{
 		{
 			// a "root" role which can do absolutely anything
 			ObjectMeta: api.ObjectMeta{Name: "cluster-admin"},
@@ -195,6 +204,8 @@ func ClusterRoles() []rbac.ClusterRole {
 			},
 		},
 	}
+	addBootstrappingLabel(roles)
+	return roles
 }
 
 // ClusterRoleBindings return default rolebindings to the default roles

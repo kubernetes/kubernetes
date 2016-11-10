@@ -175,7 +175,7 @@ type ClusterRoleBindingBuilder struct {
 func NewClusterBinding(clusterRoleName string) *ClusterRoleBindingBuilder {
 	return &ClusterRoleBindingBuilder{
 		ClusterRoleBinding: ClusterRoleBinding{
-			ObjectMeta: api.ObjectMeta{Name: clusterRoleName},
+			ObjectMeta: api.ObjectMeta{Name: clusterRoleName, Labels: map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"}},
 			RoleRef: RoleRef{
 				APIGroup: GroupName,
 				Kind:     "ClusterRole",

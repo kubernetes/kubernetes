@@ -46,6 +46,8 @@ func addControllerRole(role rbac.ClusterRole) {
 	}
 
 	controllerRoles = append(controllerRoles, role)
+	addBootstrappingLabel(controllerRoles)
+
 	controllerRoleBindings = append(controllerRoleBindings,
 		rbac.NewClusterBinding(role.Name).SAs("kube-system", role.Name[len(saRolePrefix):]).BindingOrDie())
 }
