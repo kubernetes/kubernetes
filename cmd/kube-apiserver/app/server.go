@@ -246,8 +246,8 @@ func Run(s *options.ServerRunOptions) error {
 	}
 	sharedInformers := informers.NewSharedInformerFactory(nil, client, 10*time.Minute)
 
-	authorizerconfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
-	apiAuthorizer, err := authorizer.NewAuthorizerFromAuthorizationConfig(authorizerconfig)
+	authorizationConfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
+	apiAuthorizer, err := authorizer.NewAuthorizerFromAuthorizationConfig(authorizationConfig)
 	if err != nil {
 		glog.Fatalf("Invalid Authorization Config: %v", err)
 	}

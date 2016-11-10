@@ -22,6 +22,8 @@ import (
 
 	"github.com/spf13/pflag"
 
+	authorizationclient "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/authorization/v1beta1"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 )
@@ -39,7 +41,7 @@ type BuiltInAuthorizationOptions struct {
 
 func NewBuiltInAuthorizationOptions() *BuiltInAuthorizationOptions {
 	return &BuiltInAuthorizationOptions{
-		Mode: "AlwaysAllow",
+		Mode: authorizer.ModeAlwaysAllow,
 		WebhookCacheAuthorizedTTL:   5 * time.Minute,
 		WebhookCacheUnauthorizedTTL: 30 * time.Second,
 	}
@@ -86,4 +88,73 @@ func (s *BuiltInAuthorizationOptions) ToAuthorizationConfig(informerFactory info
 		RBACSuperUser:               s.RBACSuperUser,
 		InformerFactory:             informerFactory,
 	}
+}
+
+// DelegatingAuthorizationOptions provides an easy way for composing API servers to delegate their authorization to
+// the root kube API server
+type DelegatingAuthorizationOptions struct {
+	// RemoteKubeConfigFile is the file to use to connect to a "normal" kube API server which hosts the
+	// TokenAcessReview.authentication.k8s.io endpoint for checking tokens.
+	RemoteKubeConfigFile string
+
+	// AllowCacheTTL is the length of time that a successful authorization response will be cached
+	AllowCacheTTL time.Duration
+
+	// DenyCacheTTL is the length of time that an unsuccessful authorization response will be cached.
+	// You generally want more responsive, "deny, try again" flows.
+	DenyCacheTTL time.Duration
+}
+
+func NewDelegatingAuthorizationOptions() *DelegatingAuthorizationOptions {
+	return &DelegatingAuthorizationOptions{
+		AllowCacheTTL: 5 * time.Minute,
+		DenyCacheTTL:  30 * time.Second,
+	}
+}
+
+func (s *DelegatingAuthorizationOptions) Validate() []error {
+	allErrors := []error{}
+	return allErrors
+}
+
+func (s *DelegatingAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&s.RemoteKubeConfigFile, "authorization-kubeconfig", s.RemoteKubeConfigFile, ""+
+		"kubeconfig file pointing at the 'core' kubernetes server with enough rights to create "+
+		" subjectaccessreviews.authorization.k8s.io.")
+}
+
+func (s *DelegatingAuthorizationOptions) ToAuthorizationConfig() (authorizer.DelegatingAuthorizerConfig, error) {
+	tokenClient, err := s.newSubjectAccessReview()
+	if err != nil {
+		return authorizer.DelegatingAuthorizerConfig{}, err
+	}
+
+	ret := authorizer.DelegatingAuthorizerConfig{
+		SubjectAccessReviewClient: tokenClient,
+		AllowCacheTTL:             s.AllowCacheTTL,
+		DenyCacheTTL:              s.DenyCacheTTL,
+	}
+	return ret, nil
+}
+
+func (s *DelegatingAuthorizationOptions) newSubjectAccessReview() (authorizationclient.SubjectAccessReviewInterface, error) {
+	if len(s.RemoteKubeConfigFile) == 0 {
+		return nil, nil
+	}
+
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	loadingRules.ExplicitPath = s.RemoteKubeConfigFile
+	loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
+
+	clientConfig, err := loader.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := authorizationclient.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return client.SubjectAccessReviews(), nil
 }

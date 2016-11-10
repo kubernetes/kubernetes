@@ -98,7 +98,6 @@ go_library(
         "//pkg/volume/rbd:go_default_library",
         "//pkg/volume/secret:go_default_library",
         "//pkg/volume/vsphere_volume:go_default_library",
-        "//plugin/pkg/auth/authorizer/webhook:go_default_library",
         "//vendor:github.com/golang/glog",
         "//vendor:github.com/spf13/cobra",
         "//vendor:github.com/spf13/pflag",
