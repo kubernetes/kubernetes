@@ -242,11 +242,11 @@ func CompareObjectMeta(a, b api_v1.ObjectMeta) error {
 	if a.Name != b.Name {
 		return fmt.Errorf("Different name expected:%s observed:%s", a.Namespace, b.Namespace)
 	}
-	if !reflect.DeepEqual(a.Annotations, b.Annotations) {
-		return fmt.Errorf("Annotations are different expected:%v observerd:%v", a.Annotations, b.Annotations)
+	if !reflect.DeepEqual(a.Labels, b.Labels) && (len(a.Labels) != 0 || len(b.Labels) != 0) {
+		return fmt.Errorf("Labels are different expected:%v observerd:%v", a.Labels, b.Labels)
 	}
-	if !reflect.DeepEqual(a.Labels, b.Labels) {
-		return fmt.Errorf("Annotations are different expected:%v observerd:%v", a.Labels, b.Labels)
+	if !reflect.DeepEqual(a.Annotations, b.Annotations) && (len(a.Annotations) != 0 || len(b.Annotations) != 0) {
+		return fmt.Errorf("Annotations are different expected:%v observerd:%v", a.Annotations, b.Annotations)
 	}
 	return nil
 }
