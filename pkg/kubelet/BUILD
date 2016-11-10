@@ -77,6 +77,7 @@ go_library(
         "//pkg/kubelet/server:go_default_library",
         "//pkg/kubelet/server/remotecommand:go_default_library",
         "//pkg/kubelet/server/stats:go_default_library",
+        "//pkg/kubelet/server/streaming:go_default_library",
         "//pkg/kubelet/status:go_default_library",
         "//pkg/kubelet/sysctl:go_default_library",
         "//pkg/kubelet/types:go_default_library",

@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -42,7 +41,6 @@ import (
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/selinux"
 	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/term"
 )
 
 // startContainer starts a container and returns a message indicates why it is failed on error.
@@ -653,17 +651,6 @@ func findNextInitContainerToRun(pod *api.Pod, podStatus *kubecontainer.PodStatus
 	return nil, &pod.Spec.InitContainers[0], false
 }
 
-// AttachContainer attaches to the container's console
-// TODO: Remove this method once the indirect streaming path is fully functional.
-func (m *kubeGenericRuntimeManager) AttachContainer(id kubecontainer.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) (err error) {
-	// Use `docker attach` directly for in-process docker integration for
-	// now to unblock other tests.
-	if ds, ok := m.runtimeService.(dockershim.DockerLegacyService); ok {
-		return ds.LegacyAttach(id, stdin, stdout, stderr, tty, resize)
-	}
-	return fmt.Errorf("not implemented")
-}
-
 // GetContainerLogs returns logs of a specific container.
 func (m *kubeGenericRuntimeManager) GetContainerLogs(pod *api.Pod, containerID kubecontainer.ContainerID, logOptions *api.PodLogOptions, stdout, stderr io.Writer) (err error) {
 	status, err := m.runtimeService.ContainerStatus(containerID.ID)
@@ -712,19 +699,6 @@ func (m *kubeGenericRuntimeManager) RunInContainer(id kubecontainer.ContainerID,
 	// for logging purposes. A combined output option will need to be added to the ExecSyncRequest
 	// if more precise output ordering is ever required.
 	return append(stdout, stderr...), err
-}
-
-// Runs the command in the container of the specified pod using nsenter.
-// Attaches the processes stdin, stdout, and stderr. Optionally uses a
-// tty.
-// TODO: Remove this method once the indirect streaming path is fully functional.
-func (m *kubeGenericRuntimeManager) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size, timeout time.Duration) error {
-	// Use `docker exec` directly for in-process docker integration for
-	// now to unblock other tests.
-	if ds, ok := m.runtimeService.(dockershim.DockerLegacyService); ok {
-		return ds.LegacyExec(containerID, cmd, stdin, stdout, stderr, tty, resize)
-	}
-	return fmt.Errorf("not implemented")
 }
 
 // removeContainer removes the container and the container logs.

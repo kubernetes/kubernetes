@@ -118,9 +118,10 @@ func ListenAndServeKubeletServer(
 	tlsOptions *TLSOptions,
 	auth AuthInterface,
 	enableDebuggingHandlers bool,
-	runtime kubecontainer.Runtime) {
+	runtime kubecontainer.Runtime,
+	criHandler http.Handler) {
 	glog.Infof("Starting to listen on %s:%d", address, port)
-	handler := NewServer(host, resourceAnalyzer, auth, enableDebuggingHandlers, runtime)
+	handler := NewServer(host, resourceAnalyzer, auth, enableDebuggingHandlers, runtime, criHandler)
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
 		Handler:        &handler,
@@ -137,7 +138,7 @@ func ListenAndServeKubeletServer(
 // ListenAndServeKubeletReadOnlyServer initializes a server to respond to HTTP network requests on the Kubelet.
 func ListenAndServeKubeletReadOnlyServer(host HostInterface, resourceAnalyzer stats.ResourceAnalyzer, address net.IP, port uint, runtime kubecontainer.Runtime) {
 	glog.V(1).Infof("Starting to listen read-only on %s:%d", address, port)
-	s := NewServer(host, resourceAnalyzer, nil, false, runtime)
+	s := NewServer(host, resourceAnalyzer, nil, false, runtime, nil)
 
 	server := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
@@ -191,7 +192,8 @@ func NewServer(
 	resourceAnalyzer stats.ResourceAnalyzer,
 	auth AuthInterface,
 	enableDebuggingHandlers bool,
-	runtime kubecontainer.Runtime) Server {
+	runtime kubecontainer.Runtime,
+	criHandler http.Handler) Server {
 	server := Server{
 		host:             host,
 		resourceAnalyzer: resourceAnalyzer,
@@ -204,7 +206,7 @@ func NewServer(
 	}
 	server.InstallDefaultHandlers()
 	if enableDebuggingHandlers {
-		server.InstallDebuggingHandlers()
+		server.InstallDebuggingHandlers(criHandler)
 	}
 	return server
 }
@@ -282,7 +284,7 @@ func (s *Server) InstallDefaultHandlers() {
 const pprofBasePath = "/debug/pprof/"
 
 // InstallDeguggingHandlers registers the HTTP request patterns that serve logs or run commands/containers
-func (s *Server) InstallDebuggingHandlers() {
+func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
 	var ws *restful.WebService
 
 	ws = new(restful.WebService)
@@ -393,14 +395,10 @@ func (s *Server) InstallDebuggingHandlers() {
 		To(s.getRunningPods).
 		Operation("getRunningPods"))
 	s.restfulCont.Add(ws)
-}
 
-type httpHandler struct {
-	f func(w http.ResponseWriter, r *http.Request)
-}
-
-func (h *httpHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	h.f(w, r)
+	if criHandler != nil {
+		s.restfulCont.Handle("/cri/", criHandler)
+	}
 }
 
 // Checks if kubelet's sync loop  that updates containers is working.
@@ -701,8 +699,12 @@ func (s *Server) getPortForward(request *restful.Request, response *restful.Resp
 		response.WriteError(http.StatusNotFound, fmt.Errorf("pod does not exist"))
 		return
 	}
+	if len(params.podUID) > 0 && pod.UID != params.podUID {
+		response.WriteError(http.StatusNotFound, fmt.Errorf("pod not found"))
+		return
+	}
 
-	redirect, err := s.host.GetPortForward(params.podName, params.podNamespace, params.podUID)
+	redirect, err := s.host.GetPortForward(pod.Name, pod.Namespace, pod.UID)
 	if err != nil {
 		response.WriteError(streaming.HTTPStatus(err), err)
 		return
