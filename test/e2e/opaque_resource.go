@@ -47,7 +47,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 			nodes, err := f.ClientSet.Core().Nodes().List(api.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, n := range nodes.Items {
-				if !system.IsMasterNode(&n) {
+				if !system.IsMasterNode(n.Name) {
 					node = &n
 					break
 				}

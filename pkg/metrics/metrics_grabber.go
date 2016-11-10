@@ -61,7 +61,7 @@ func NewMetricsGrabber(c clientset.Interface, kubelets bool, scheduler bool, con
 		glog.Warning("Can't find any Nodes in the API server to grab metrics from")
 	}
 	for _, node := range nodeList.Items {
-		if system.IsMasterNode(&node) {
+		if system.IsMasterNode(node.Name) {
 			registeredMaster = true
 			masterName = node.Name
 			break

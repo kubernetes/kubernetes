@@ -136,7 +136,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			Expect(err).NotTo(HaveOccurred())
 			node = nil
 			for _, n := range nodes.Items {
-				if !system.IsMasterNode(&n) {
+				if !system.IsMasterNode(n.Name) {
 					node = &n
 					break
 				}

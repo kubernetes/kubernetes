@@ -464,7 +464,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 			continue
 		}
 		// We do not treat a master node as a part of the cluster for network disruption checking.
-		if !system.IsMasterNode(node) {
+		if !system.IsMasterNode(node.Name) {
 			zoneToNodeConditions[utilnode.GetZoneKey(node)] = append(zoneToNodeConditions[utilnode.GetZoneKey(node)], currentReadyCondition)
 		}
 

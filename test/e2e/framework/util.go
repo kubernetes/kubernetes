@@ -3741,7 +3741,7 @@ func WaitForAllNodesHealthy(c clientset.Interface, timeout time.Duration) error 
 		}
 		missingPodsPerNode = make(map[string][]string)
 		for _, node := range nodes.Items {
-			if !system.IsMasterNode(&node) {
+			if !system.IsMasterNode(node.Name) {
 				for _, requiredPod := range requiredPerNodePods {
 					foundRequired := false
 					for _, presentPod := range systemPodsPerNode[node.Name] {
@@ -4590,7 +4590,7 @@ func GetMasterAndWorkerNodesOrDie(c clientset.Interface) (sets.String, *api.Node
 	masters := sets.NewString()
 	all, _ := c.Core().Nodes().List(api.ListOptions{})
 	for _, n := range all.Items {
-		if system.IsMasterNode(&n) {
+		if system.IsMasterNode(n.Name) {
 			masters.Insert(n.Name)
 		} else if isNodeSchedulable(&n) && isNodeUntainted(&n) {
 			nodes.Items = append(nodes.Items, n)
