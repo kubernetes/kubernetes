@@ -25,8 +25,8 @@ import (
 	"time"
 
 	"golang.org/x/crypto/ssh"
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -183,7 +183,7 @@ spec:
 
 var addonTestPollInterval = 3 * time.Second
 var addonTestPollTimeout = 5 * time.Minute
-var defaultNsName = api.NamespaceDefault
+var defaultNsName = v1.NamespaceDefault
 
 type stringPair struct {
 	data, fileName string

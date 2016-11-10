@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
@@ -53,7 +54,7 @@ func (f *Framework) ExecCommandInContainerWithFullOutput(podName, containerName 
 		Namespace(f.Namespace.Name).
 		SubResource("exec").
 		Param("container", containerName)
-	req.VersionedParams(&api.PodExecOptions{
+	req.VersionedParams(&v1.PodExecOptions{
 		Container: containerName,
 		Command:   cmd,
 		Stdin:     stdin != nil,

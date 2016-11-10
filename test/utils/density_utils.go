@@ -23,7 +23,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 
 	"github.com/golang/glog"
 )
@@ -57,7 +58,7 @@ func AddLabelsToNode(c clientset.Interface, nodeName string, labels map[string]s
 // RemoveLabelOffNode is for cleaning up labels temporarily added to node,
 // won't fail if target label doesn't exist or has been removed.
 func RemoveLabelOffNode(c clientset.Interface, nodeName string, labelKeys []string) error {
-	var node *api.Node
+	var node *v1.Node
 	var err error
 	for attempt := 0; attempt < retries; attempt++ {
 		node, err = c.Core().Nodes().Get(nodeName)

@@ -21,8 +21,8 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -303,20 +303,20 @@ func (rc *ResourceConsumer) CleanUp() {
 	rc.stopCustomMetric <- 0
 	// Wait some time to ensure all child goroutines are finished.
 	time.Sleep(10 * time.Second)
-	framework.ExpectNoError(framework.DeleteRCAndPods(rc.framework.ClientSet, rc.framework.Namespace.Name, rc.name))
+	framework.ExpectNoError(framework.DeleteRCAndPods(rc.framework.ClientSet, rc.framework.InternalClientset, rc.framework.Namespace.Name, rc.name))
 	framework.ExpectNoError(rc.framework.ClientSet.Core().Services(rc.framework.Namespace.Name).Delete(rc.name, nil))
-	framework.ExpectNoError(framework.DeleteRCAndPods(rc.framework.ClientSet, rc.framework.Namespace.Name, rc.controllerName))
+	framework.ExpectNoError(framework.DeleteRCAndPods(rc.framework.ClientSet, rc.framework.InternalClientset, rc.framework.Namespace.Name, rc.controllerName))
 	framework.ExpectNoError(rc.framework.ClientSet.Core().Services(rc.framework.Namespace.Name).Delete(rc.controllerName, nil))
 }
 
 func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name, kind string, replicas int, cpuLimitMillis, memLimitMb int64) {
 	By(fmt.Sprintf("Running consuming RC %s via %s with %v replicas", name, kind, replicas))
-	_, err := c.Core().Services(ns).Create(&api.Service{
-		ObjectMeta: api.ObjectMeta{
+	_, err := c.Core().Services(ns).Create(&v1.Service{
+		ObjectMeta: v1.ObjectMeta{
 			Name: name,
 		},
-		Spec: api.ServiceSpec{
-			Ports: []api.ServicePort{{
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{{
 				Port:       port,
 				TargetPort: intstr.FromInt(targetPort),
 			}},
@@ -364,12 +364,12 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name, k
 
 	By(fmt.Sprintf("Running controller"))
 	controllerName := name + "-ctrl"
-	_, err = c.Core().Services(ns).Create(&api.Service{
-		ObjectMeta: api.ObjectMeta{
+	_, err = c.Core().Services(ns).Create(&v1.Service{
+		ObjectMeta: v1.ObjectMeta{
 			Name: controllerName,
 		},
-		Spec: api.ServiceSpec{
-			Ports: []api.ServicePort{{
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{{
 				Port:       port,
 				TargetPort: intstr.FromInt(targetPort),
 			}},
@@ -381,7 +381,7 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name, k
 	})
 	framework.ExpectNoError(err)
 
-	dnsClusterFirst := api.DNSClusterFirst
+	dnsClusterFirst := v1.DNSClusterFirst
 	controllerRcConfig := testutils.RCConfig{
 		Client:    c,
 		Image:     resourceConsumerControllerImage,

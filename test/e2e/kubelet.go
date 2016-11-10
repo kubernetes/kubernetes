@@ -21,8 +21,8 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -98,7 +98,7 @@ func waitTillNPodsRunningOnNodes(c clientset.Interface, nodeNames sets.String, p
 func updateNodeLabels(c clientset.Interface, nodeNames sets.String, toAdd, toRemove map[string]string) {
 	const maxRetries = 5
 	for nodeName := range nodeNames {
-		var node *api.Node
+		var node *v1.Node
 		var err error
 		for i := 0; i < maxRetries; i++ {
 			node, err = c.Core().Nodes().Get(nodeName)
@@ -206,7 +206,7 @@ var _ = framework.KubeDescribe("kubelet", func() {
 				}
 
 				By("Deleting the RC")
-				framework.DeleteRCAndPods(f.ClientSet, f.Namespace.Name, rcName)
+				framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, rcName)
 				// Check that the pods really are gone by querying /runningpods on the
 				// node. The /runningpods handler checks the container runtime (or its
 				// cache) and  returns a list of running pods. Some possible causes of

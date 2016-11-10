@@ -32,8 +32,9 @@ import (
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/apps"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/controller/petset"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -100,8 +101,8 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 
 		It("should provide basic identity [Feature:StatefulSet]", func() {
 			By("creating statefulset " + psName + " in namespace " + ns)
-			petMounts := []api.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
-			podMounts := []api.VolumeMount{{Name: "home", MountPath: "/home"}}
+			petMounts := []v1.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
+			podMounts := []v1.VolumeMount{{Name: "home", MountPath: "/home"}}
 			ps := newStatefulSet(psName, ns, headlessSvcName, 3, petMounts, podMounts, labels)
 			setInitializedAnnotation(ps, "false")
 
@@ -138,8 +139,8 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 		It("should handle healthy pet restarts during scale [Feature:PetSet]", func() {
 			By("creating statefulset " + psName + " in namespace " + ns)
 
-			petMounts := []api.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
-			podMounts := []api.VolumeMount{{Name: "home", MountPath: "/home"}}
+			petMounts := []v1.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
+			podMounts := []v1.VolumeMount{{Name: "home", MountPath: "/home"}}
 			ps := newStatefulSet(psName, ns, headlessSvcName, 2, petMounts, podMounts, labels)
 			setInitializedAnnotation(ps, "false")
 			_, err := c.Apps().StatefulSets(ns).Create(ps)
@@ -194,7 +195,7 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 			if restartCluster {
 				By("Restarting pet set " + ps.Name)
 				pst.restart(ps)
-				pst.waitForRunning(ps.Spec.Replicas, ps)
+				pst.waitForRunning(*(ps.Spec.Replicas), ps)
 			}
 
 			By("Reading value under foo from member with index 2")
@@ -215,7 +216,7 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 			if restartCluster {
 				By("Restarting pet set " + ps.Name)
 				pst.restart(ps)
-				pst.waitForRunning(ps.Spec.Replicas, ps)
+				pst.waitForRunning(*(ps.Spec.Replicas), ps)
 			}
 
 			By("Reading value under foo from member with index 2")
@@ -236,7 +237,7 @@ var _ = framework.KubeDescribe("StatefulSet [Slow] [Feature:PetSet]", func() {
 			if restartCluster {
 				By("Restarting pet set " + ps.Name)
 				pst.restart(ps)
-				pst.waitForRunning(ps.Spec.Replicas, ps)
+				pst.waitForRunning(*(ps.Spec.Replicas), ps)
 			}
 
 			By("Reading value under foo from member with index 2")
@@ -285,17 +286,17 @@ var _ = framework.KubeDescribe("Pet set recreate [Slow] [Feature:PetSet]", func(
 		node := nodes.Items[0]
 
 		By("creating pod with conflicting port in namespace " + f.Namespace.Name)
-		conflictingPort := api.ContainerPort{HostPort: 21017, ContainerPort: 21017, Name: "conflict"}
-		pod := &api.Pod{
-			ObjectMeta: api.ObjectMeta{
+		conflictingPort := v1.ContainerPort{HostPort: 21017, ContainerPort: 21017, Name: "conflict"}
+		pod := &v1.Pod{
+			ObjectMeta: v1.ObjectMeta{
 				Name: podName,
 			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
 					{
 						Name:  "nginx",
 						Image: "gcr.io/google_containers/nginx-slim:0.7",
-						Ports: []api.ContainerPort{conflictingPort},
+						Ports: []v1.ContainerPort{conflictingPort},
 					},
 				},
 				NodeName: node.Name,
@@ -319,11 +320,11 @@ var _ = framework.KubeDescribe("Pet set recreate [Slow] [Feature:PetSet]", func(
 
 		var initialPetPodUID types.UID
 		By("waiting until pet pod " + petPodName + " will be recreated and deleted at least once in namespace " + f.Namespace.Name)
-		w, err := f.ClientSet.Core().Pods(f.Namespace.Name).Watch(api.SingleObject(api.ObjectMeta{Name: petPodName}))
+		w, err := f.ClientSet.Core().Pods(f.Namespace.Name).Watch(v1.SingleObject(v1.ObjectMeta{Name: petPodName}))
 		framework.ExpectNoError(err)
 		// we need to get UID from pod in any state and wait until pet set controller will remove pod atleast once
 		_, err = watch.Until(petPodTimeout, w, func(event watch.Event) (bool, error) {
-			pod := event.Object.(*api.Pod)
+			pod := event.Object.(*v1.Pod)
 			switch event.Type {
 			case watch.Deleted:
 				framework.Logf("Observed delete event for pet pod %v in namespace %v", pod.Name, pod.Namespace)
@@ -342,7 +343,7 @@ var _ = framework.KubeDescribe("Pet set recreate [Slow] [Feature:PetSet]", func(
 		}
 
 		By("removing pod with conflicting port in namespace " + f.Namespace.Name)
-		err = f.ClientSet.Core().Pods(f.Namespace.Name).Delete(pod.Name, api.NewDeleteOptions(0))
+		err = f.ClientSet.Core().Pods(f.Namespace.Name).Delete(pod.Name, v1.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 
 		By("waiting when pet pod " + petPodName + " will be recreated in namespace " + f.Namespace.Name + " and will be in running state")
@@ -352,7 +353,7 @@ var _ = framework.KubeDescribe("Pet set recreate [Slow] [Feature:PetSet]", func(
 			if err != nil {
 				return err
 			}
-			if petPod.Status.Phase != api.PodRunning {
+			if petPod.Status.Phase != v1.PodRunning {
 				return fmt.Errorf("Pod %v is not in running phase: %v", petPod.Name, petPod.Status.Phase)
 			} else if petPod.UID == initialPetPodUID {
 				return fmt.Errorf("Pod %v wasn't recreated: %v == %v", petPod.Name, petPod.UID, initialPetPodUID)
@@ -363,7 +364,7 @@ var _ = framework.KubeDescribe("Pet set recreate [Slow] [Feature:PetSet]", func(
 })
 
 func dumpDebugInfo(c clientset.Interface, ns string) {
-	pl, _ := c.Core().Pods(ns).List(api.ListOptions{LabelSelector: labels.Everything()})
+	pl, _ := c.Core().Pods(ns).List(v1.ListOptions{LabelSelector: labels.Everything().String()})
 	for _, p := range pl.Items {
 		desc, _ := framework.RunKubectl("describe", "po", p.Name, fmt.Sprintf("--namespace=%v", ns))
 		framework.Logf("\nOutput of kubectl describe %v:\n%v", p.Name, desc)
@@ -533,9 +534,9 @@ func (p *statefulSetTester) createStatefulSet(manifestPath, ns string) *apps.Sta
 	framework.Logf(fmt.Sprintf("creating " + ps.Name + " service"))
 	framework.RunKubectlOrDie("create", "-f", mkpath("service.yaml"), fmt.Sprintf("--namespace=%v", ns))
 
-	framework.Logf(fmt.Sprintf("creating statefulset %v/%v with %d replicas and selector %+v", ps.Namespace, ps.Name, ps.Spec.Replicas, ps.Spec.Selector))
+	framework.Logf(fmt.Sprintf("creating statefulset %v/%v with %d replicas and selector %+v", ps.Namespace, ps.Name, *(ps.Spec.Replicas), ps.Spec.Selector))
 	framework.RunKubectlOrDie("create", "-f", mkpath("petset.yaml"), fmt.Sprintf("--namespace=%v", ns))
-	p.waitForRunning(ps.Spec.Replicas, ps)
+	p.waitForRunning(*(ps.Spec.Replicas), ps)
 	return ps
 }
 
@@ -584,7 +585,7 @@ func (p *statefulSetTester) checkHostname(ps *apps.StatefulSet) error {
 func (p *statefulSetTester) saturate(ps *apps.StatefulSet) {
 	// TODO: Watch events and check that creation timestamps don't overlap
 	var i int32
-	for i = 0; i < ps.Spec.Replicas; i++ {
+	for i = 0; i < *(ps.Spec.Replicas); i++ {
 		framework.Logf("Waiting for pet at index " + fmt.Sprintf("%v", i+1) + " to enter Running")
 		p.waitForRunning(i+1, ps)
 		framework.Logf("Marking pet at index " + fmt.Sprintf("%v", i) + " healthy")
@@ -597,7 +598,7 @@ func (p *statefulSetTester) deletePetAtIndex(index int, ps *apps.StatefulSet) {
 	// pull the name out from an identity mapper.
 	name := fmt.Sprintf("%v-%v", ps.Name, index)
 	noGrace := int64(0)
-	if err := p.c.Core().Pods(ps.Namespace).Delete(name, &api.DeleteOptions{GracePeriodSeconds: &noGrace}); err != nil {
+	if err := p.c.Core().Pods(ps.Namespace).Delete(name, &v1.DeleteOptions{GracePeriodSeconds: &noGrace}); err != nil {
 		framework.Failf("Failed to delete pet %v for StatefulSet %v: %v", name, ps.Name, ps.Namespace, err)
 	}
 }
@@ -605,9 +606,9 @@ func (p *statefulSetTester) deletePetAtIndex(index int, ps *apps.StatefulSet) {
 func (p *statefulSetTester) scale(ps *apps.StatefulSet, count int32) error {
 	name := ps.Name
 	ns := ps.Namespace
-	p.update(ns, name, func(ps *apps.StatefulSet) { ps.Spec.Replicas = count })
+	p.update(ns, name, func(ps *apps.StatefulSet) { *(ps.Spec.Replicas) = count })
 
-	var petList *api.PodList
+	var petList *v1.PodList
 	pollErr := wait.PollImmediate(statefulsetPoll, statefulsetTimeout, func() (bool, error) {
 		petList = p.getPodList(ps)
 		if int32(len(petList.Items)) == count {
@@ -618,8 +619,8 @@ func (p *statefulSetTester) scale(ps *apps.StatefulSet, count int32) error {
 	if pollErr != nil {
 		unhealthy := []string{}
 		for _, pet := range petList.Items {
-			delTs, phase, readiness := pet.DeletionTimestamp, pet.Status.Phase, api.IsPodReady(&pet)
-			if delTs != nil || phase != api.PodRunning || !readiness {
+			delTs, phase, readiness := pet.DeletionTimestamp, pet.Status.Phase, v1.IsPodReady(&pet)
+			if delTs != nil || phase != v1.PodRunning || !readiness {
 				unhealthy = append(unhealthy, fmt.Sprintf("%v: deletion %v, phase %v, readiness %v", pet.Name, delTs, phase, readiness))
 			}
 		}
@@ -629,9 +630,9 @@ func (p *statefulSetTester) scale(ps *apps.StatefulSet, count int32) error {
 }
 
 func (p *statefulSetTester) restart(ps *apps.StatefulSet) {
-	oldReplicas := ps.Spec.Replicas
+	oldReplicas := *(ps.Spec.Replicas)
 	ExpectNoError(p.scale(ps, 0))
-	p.update(ps.Namespace, ps.Name, func(ps *apps.StatefulSet) { ps.Spec.Replicas = oldReplicas })
+	p.update(ps.Namespace, ps.Name, func(ps *apps.StatefulSet) { *(ps.Spec.Replicas) = oldReplicas })
 }
 
 func (p *statefulSetTester) update(ns, name string, update func(ps *apps.StatefulSet)) {
@@ -652,10 +653,10 @@ func (p *statefulSetTester) update(ns, name string, update func(ps *apps.Statefu
 	framework.Failf("too many retries draining statefulset %q", name)
 }
 
-func (p *statefulSetTester) getPodList(ps *apps.StatefulSet) *api.PodList {
+func (p *statefulSetTester) getPodList(ps *apps.StatefulSet) *v1.PodList {
 	selector, err := unversioned.LabelSelectorAsSelector(ps.Spec.Selector)
 	ExpectNoError(err)
-	podList, err := p.c.Core().Pods(ps.Namespace).List(api.ListOptions{LabelSelector: selector})
+	podList, err := p.c.Core().Pods(ps.Namespace).List(v1.ListOptions{LabelSelector: selector.String()})
 	ExpectNoError(err)
 	return podList
 }
@@ -686,9 +687,9 @@ func (p *statefulSetTester) waitForRunning(numPets int32, ps *apps.StatefulSet) 
 				return false, fmt.Errorf("Too many pods scheduled, expected %d got %d", numPets, len(podList.Items))
 			}
 			for _, p := range podList.Items {
-				isReady := api.IsPodReady(&p)
-				if p.Status.Phase != api.PodRunning || !isReady {
-					framework.Logf("Waiting for pod %v to enter %v - Ready=True, currently %v - Ready=%v", p.Name, api.PodRunning, p.Status.Phase, isReady)
+				isReady := v1.IsPodReady(&p)
+				if p.Status.Phase != v1.PodRunning || !isReady {
+					framework.Logf("Waiting for pod %v to enter %v - Ready=True, currently %v - Ready=%v", p.Name, v1.PodRunning, p.Status.Phase, isReady)
 					return false, nil
 				}
 			}
@@ -705,7 +706,7 @@ func (p *statefulSetTester) setHealthy(ps *apps.StatefulSet) {
 	podList := p.getPodList(ps)
 	markedHealthyPod := ""
 	for _, pod := range podList.Items {
-		if pod.Status.Phase != api.PodRunning {
+		if pod.Status.Phase != v1.PodRunning {
 			framework.Failf("Found pod in %v cannot set health", pod.Status.Phase)
 		}
 		if isInitialized(pod) {
@@ -714,7 +715,7 @@ func (p *statefulSetTester) setHealthy(ps *apps.StatefulSet) {
 		if markedHealthyPod != "" {
 			framework.Failf("Found multiple non-healthy pets: %v and %v", pod.Name, markedHealthyPod)
 		}
-		p, err := framework.UpdatePodWithRetries(p.c, pod.Namespace, pod.Name, func(up *api.Pod) {
+		p, err := framework.UpdatePodWithRetries(p.c, pod.Namespace, pod.Name, func(up *v1.Pod) {
 			up.Annotations[petset.StatefulSetInitAnnotation] = "true"
 		})
 		ExpectNoError(err)
@@ -746,7 +747,7 @@ func (p *statefulSetTester) waitForStatus(ps *apps.StatefulSet, expectedReplicas
 
 func deleteAllStatefulSets(c clientset.Interface, ns string) {
 	pst := &statefulSetTester{c: c}
-	psList, err := c.Apps().StatefulSets(ns).List(api.ListOptions{LabelSelector: labels.Everything()})
+	psList, err := c.Apps().StatefulSets(ns).List(v1.ListOptions{LabelSelector: labels.Everything().String()})
 	ExpectNoError(err)
 
 	// Scale down each statefulset, then delete it completely.
@@ -768,7 +769,7 @@ func deleteAllStatefulSets(c clientset.Interface, ns string) {
 	pvNames := sets.NewString()
 	// TODO: Don't assume all pvcs in the ns belong to a statefulset
 	pvcPollErr := wait.PollImmediate(statefulsetPoll, statefulsetTimeout, func() (bool, error) {
-		pvcList, err := c.Core().PersistentVolumeClaims(ns).List(api.ListOptions{LabelSelector: labels.Everything()})
+		pvcList, err := c.Core().PersistentVolumeClaims(ns).List(v1.ListOptions{LabelSelector: labels.Everything().String()})
 		if err != nil {
 			framework.Logf("WARNING: Failed to list pvcs, retrying %v", err)
 			return false, nil
@@ -788,7 +789,7 @@ func deleteAllStatefulSets(c clientset.Interface, ns string) {
 	}
 
 	pollErr := wait.PollImmediate(statefulsetPoll, statefulsetTimeout, func() (bool, error) {
-		pvList, err := c.Core().PersistentVolumes().List(api.ListOptions{LabelSelector: labels.Everything()})
+		pvList, err := c.Core().PersistentVolumes().List(v1.ListOptions{LabelSelector: labels.Everything().String()})
 		if err != nil {
 			framework.Logf("WARNING: Failed to list pvs, retrying %v", err)
 			return false, nil
@@ -834,7 +835,7 @@ func pollReadWithTimeout(pet petTester, petNumber int, key, expectedVal string) 
 	return err
 }
 
-func isInitialized(pod api.Pod) bool {
+func isInitialized(pod v1.Pod) bool {
 	initialized, ok := pod.Annotations[petset.StatefulSetInitAnnotation]
 	if !ok {
 		return false
@@ -850,40 +851,40 @@ func dec(i int64, exponent int) *inf.Dec {
 	return inf.NewDec(i, inf.Scale(-exponent))
 }
 
-func newPVC(name string) api.PersistentVolumeClaim {
-	return api.PersistentVolumeClaim{
-		ObjectMeta: api.ObjectMeta{
+func newPVC(name string) v1.PersistentVolumeClaim {
+	return v1.PersistentVolumeClaim{
+		ObjectMeta: v1.ObjectMeta{
 			Name: name,
 			Annotations: map[string]string{
 				"volume.alpha.kubernetes.io/storage-class": "anything",
 			},
 		},
-		Spec: api.PersistentVolumeClaimSpec{
-			AccessModes: []api.PersistentVolumeAccessMode{
-				api.ReadWriteOnce,
+		Spec: v1.PersistentVolumeClaimSpec{
+			AccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteOnce,
 			},
-			Resources: api.ResourceRequirements{
-				Requests: api.ResourceList{
-					api.ResourceStorage: *resource.NewQuantity(1, resource.BinarySI),
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceStorage: *resource.NewQuantity(1, resource.BinarySI),
 				},
 			},
 		},
 	}
 }
 
-func newStatefulSet(name, ns, governingSvcName string, replicas int32, petMounts []api.VolumeMount, podMounts []api.VolumeMount, labels map[string]string) *apps.StatefulSet {
+func newStatefulSet(name, ns, governingSvcName string, replicas int32, petMounts []v1.VolumeMount, podMounts []v1.VolumeMount, labels map[string]string) *apps.StatefulSet {
 	mounts := append(petMounts, podMounts...)
-	claims := []api.PersistentVolumeClaim{}
+	claims := []v1.PersistentVolumeClaim{}
 	for _, m := range petMounts {
 		claims = append(claims, newPVC(m.Name))
 	}
 
-	vols := []api.Volume{}
+	vols := []v1.Volume{}
 	for _, m := range podMounts {
-		vols = append(vols, api.Volume{
+		vols = append(vols, v1.Volume{
 			Name: m.Name,
-			VolumeSource: api.VolumeSource{
-				HostPath: &api.HostPathVolumeSource{
+			VolumeSource: v1.VolumeSource{
+				HostPath: &v1.HostPathVolumeSource{
 					Path: fmt.Sprintf("/tmp/%v", m.Name),
 				},
 			},
@@ -895,7 +896,7 @@ func newStatefulSet(name, ns, governingSvcName string, replicas int32, petMounts
 			Kind:       "StatefulSet",
 			APIVersion: "apps/v1beta1",
 		},
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      name,
 			Namespace: ns,
 		},
@@ -903,14 +904,14 @@ func newStatefulSet(name, ns, governingSvcName string, replicas int32, petMounts
 			Selector: &unversioned.LabelSelector{
 				MatchLabels: labels,
 			},
-			Replicas: replicas,
-			Template: api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
+			Replicas: func(i int32) *int32 { return &i }(replicas),
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: v1.ObjectMeta{
 					Labels:      labels,
 					Annotations: map[string]string{},
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
 							Name:         "nginx",
 							Image:        "gcr.io/google_containers/nginx-slim:0.7",

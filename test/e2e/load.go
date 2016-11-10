@@ -27,8 +27,8 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/transport"
 	"k8s.io/kubernetes/pkg/labels"
@@ -62,7 +62,7 @@ const (
 // To run this suite you must explicitly ask for it by setting the
 // -t/--test flag or ginkgo.focus flag.
 var _ = framework.KubeDescribe("Load capacity", func() {
-	var clientset internalclientset.Interface
+	var clientset clientset.Interface
 	var nodeCount int
 	var ns string
 	var configs []*testutils.RCConfig
@@ -145,7 +145,7 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 
 			totalPods := itArg.podsPerNode * nodeCount
 			configs = generateRCConfigs(totalPods, itArg.image, itArg.command, namespaces)
-			var services []*api.Service
+			var services []*v1.Service
 			// Read the environment variable to see if we want to create services
 			createServices := os.Getenv("CREATE_SERVICES")
 			if createServices == "true" {
@@ -211,8 +211,8 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 	}
 })
 
-func createClients(numberOfClients int) ([]*internalclientset.Clientset, error) {
-	clients := make([]*internalclientset.Clientset, numberOfClients)
+func createClients(numberOfClients int) ([]*clientset.Clientset, error) {
+	clients := make([]*clientset.Clientset, numberOfClients)
 	for i := 0; i < numberOfClients; i++ {
 		config, err := framework.LoadConfig()
 		Expect(err).NotTo(HaveOccurred())
@@ -248,7 +248,7 @@ func createClients(numberOfClients int) ([]*internalclientset.Clientset, error) 
 		// Transport field.
 		config.TLSClientConfig = restclient.TLSClientConfig{}
 
-		c, err := internalclientset.NewForConfig(config)
+		c, err := clientset.NewForConfig(config)
 		if err != nil {
 			return nil, err
 		}
@@ -271,7 +271,7 @@ func computeRCCounts(total int) (int, int, int) {
 	return smallRCCount, mediumRCCount, bigRCCount
 }
 
-func generateRCConfigs(totalPods int, image string, command []string, nss []*api.Namespace) []*testutils.RCConfig {
+func generateRCConfigs(totalPods int, image string, command []string, nss []*v1.Namespace) []*testutils.RCConfig {
 	configs := make([]*testutils.RCConfig, 0)
 
 	smallRCCount, mediumRCCount, bigRCCount := computeRCCounts(totalPods)
@@ -293,7 +293,7 @@ func generateRCConfigs(totalPods int, image string, command []string, nss []*api
 }
 
 func generateRCConfigsForGroup(
-	nss []*api.Namespace, groupName string, size, count int, image string, command []string) []*testutils.RCConfig {
+	nss []*v1.Namespace, groupName string, size, count int, image string, command []string) []*testutils.RCConfig {
 	configs := make([]*testutils.RCConfig, 0, count)
 	for i := 1; i <= count; i++ {
 		config := &testutils.RCConfig{
@@ -312,19 +312,19 @@ func generateRCConfigsForGroup(
 	return configs
 }
 
-func generateServicesForConfigs(configs []*testutils.RCConfig) []*api.Service {
-	services := make([]*api.Service, 0, len(configs))
+func generateServicesForConfigs(configs []*testutils.RCConfig) []*v1.Service {
+	services := make([]*v1.Service, 0, len(configs))
 	for _, config := range configs {
 		serviceName := config.Name + "-svc"
 		labels := map[string]string{"name": config.Name}
-		service := &api.Service{
-			ObjectMeta: api.ObjectMeta{
+		service := &v1.Service{
+			ObjectMeta: v1.ObjectMeta{
 				Name:      serviceName,
 				Namespace: config.Namespace,
 			},
-			Spec: api.ServiceSpec{
+			Spec: v1.ServiceSpec{
 				Selector: labels,
-				Ports: []api.ServicePort{{
+				Ports: []v1.ServicePort{{
 					Port:       80,
 					TargetPort: intstr.FromInt(80),
 				}},
@@ -376,8 +376,8 @@ func scaleRC(wg *sync.WaitGroup, config *testutils.RCConfig, scalingTime time.Du
 	framework.ExpectNoError(framework.ScaleRC(config.Client, config.Namespace, config.Name, newSize, true),
 		fmt.Sprintf("scaling rc %s for the first time", config.Name))
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": config.Name}))
-	options := api.ListOptions{
-		LabelSelector:   selector,
+	options := v1.ListOptions{
+		LabelSelector:   selector.String(),
 		ResourceVersion: "0",
 	}
 	_, err := config.Client.Core().Pods(config.Namespace).List(options)
@@ -405,12 +405,12 @@ func deleteRC(wg *sync.WaitGroup, config *testutils.RCConfig, deletingTime time.
 	}
 }
 
-func CreateNamespaces(f *framework.Framework, namespaceCount int, namePrefix string) ([]*api.Namespace, error) {
-	namespaces := []*api.Namespace{}
+func CreateNamespaces(f *framework.Framework, namespaceCount int, namePrefix string) ([]*v1.Namespace, error) {
+	namespaces := []*v1.Namespace{}
 	for i := 1; i <= namespaceCount; i++ {
 		namespace, err := f.CreateNamespace(fmt.Sprintf("%v-%d", namePrefix, i), nil)
 		if err != nil {
-			return []*api.Namespace{}, err
+			return []*v1.Namespace{}, err
 		}
 		namespaces = append(namespaces, namespace)
 	}

@@ -347,7 +347,7 @@ func cleanupServiceShardLoadBalancer(clusterName string, service *v1.Service, ti
 		return fmt.Errorf("cloud provider undefined")
 	}
 
-	internalSvc := &api.Service{}
+	internalSvc := &v1.Service{}
 	err := api.Scheme.Convert(service, internalSvc, nil)
 	if err != nil {
 		return fmt.Errorf("failed to convert versioned service object to internal type: %v", err)
@@ -415,19 +415,19 @@ func discoverService(f *framework.Framework, name string, exists bool, podName s
 	command := []string{"sh", "-c", fmt.Sprintf("until nslookup '%s'; do sleep 10; done", name)}
 	By(fmt.Sprintf("Looking up %q", name))
 
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+	pod := &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name: podName,
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:    "federated-service-discovery-container",
 					Image:   "gcr.io/google_containers/busybox:1.24",
 					Command: command,
 				},
 			},
-			RestartPolicy: api.RestartPolicyOnFailure,
+			RestartPolicy: v1.RestartPolicyOnFailure,
 		},
 	}
 
@@ -438,7 +438,7 @@ func discoverService(f *framework.Framework, name string, exists bool, podName s
 	By(fmt.Sprintf("Successfully created pod %q in namespace %q", pod.Name, nsName))
 	defer func() {
 		By(fmt.Sprintf("Deleting pod %q from namespace %q", podName, nsName))
-		err := f.ClientSet.Core().Pods(nsName).Delete(podName, api.NewDeleteOptions(0))
+		err := f.ClientSet.Core().Pods(nsName).Delete(podName, v1.NewDeleteOptions(0))
 		framework.ExpectNoError(err, "Deleting pod %q from namespace %q", podName, nsName)
 		By(fmt.Sprintf("Deleted pod %q from namespace %q", podName, nsName))
 	}()
