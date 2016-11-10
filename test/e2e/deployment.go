@@ -63,9 +63,6 @@ var _ = framework.KubeDescribe("Deployment", func() {
 	It("RollingUpdateDeployment should delete old pods and create new ones", func() {
 		testRollingUpdateDeployment(f)
 	})
-	It("RollingUpdateDeployment should scale up and down in the right order", func() {
-		testRollingUpdateDeploymentEvents(f)
-	})
 	It("RecreateDeployment should delete old pods and create new ones", func() {
 		testRecreateDeployment(f)
 	})
@@ -344,114 +341,34 @@ func testRollingUpdateDeployment(f *framework.Framework) {
 	Expect(len(allOldRSs[0].Spec.Template.Labels[extensions.DefaultDeploymentUniqueLabelKey])).Should(BeNumerically(">", 0))
 }
 
-func testRollingUpdateDeploymentEvents(f *framework.Framework) {
-	ns := f.Namespace.Name
-	c := f.ClientSet
-	// Create nginx pods.
-	deploymentPodLabels := map[string]string{"name": "sample-pod-2"}
-	rsPodLabels := map[string]string{
-		"name": "sample-pod-2",
-		"pod":  nginxImageName,
-	}
-	rsName := "test-rolling-scale-controller"
-	replicas := int32(1)
-
-	rsRevision := "3546343826724305832"
-	annotations := make(map[string]string)
-	annotations[deploymentutil.RevisionAnnotation] = rsRevision
-	rs := newRS(rsName, replicas, rsPodLabels, nginxImageName, nginxImage)
-	rs.Annotations = annotations
-
-	_, err := c.Extensions().ReplicaSets(ns).Create(rs)
-	Expect(err).NotTo(HaveOccurred())
-	// Verify that the required pods have come up.
-	err = framework.VerifyPods(c, ns, "sample-pod-2", false, 1)
-	if err != nil {
-		framework.Logf("error in waiting for pods to come up: %s", err)
-		Expect(err).NotTo(HaveOccurred())
-	}
-
-	// Create a deployment to delete nginx pods and instead bring up redis pods.
-	deploymentName := "test-rolling-scale-deployment"
-	framework.Logf("Creating deployment %s", deploymentName)
-	deploy, err := c.Extensions().Deployments(ns).Create(newDeployment(deploymentName, replicas, deploymentPodLabels, redisImageName, redisImage, extensions.RollingUpdateDeploymentStrategyType, nil))
-	Expect(err).NotTo(HaveOccurred())
-
-	// Wait for it to be updated to revision 3546343826724305833
-	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "3546343826724305833", redisImage)
-	Expect(err).NotTo(HaveOccurred())
-
-	err = framework.WaitForDeploymentStatus(c, deploy)
-	Expect(err).NotTo(HaveOccurred())
-	// Verify that the pods were scaled up and down as expected. We use events to verify that.
-	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
-	Expect(err).NotTo(HaveOccurred())
-	framework.WaitForEvents(c, ns, deployment, 2)
-	events, err := c.Core().Events(ns).Search(deployment)
-	if err != nil {
-		framework.Logf("error in listing events: %s", err)
-		Expect(err).NotTo(HaveOccurred())
-	}
-	// There should be 2 events, one to scale up the new ReplicaSet and then to scale down
-	// the old ReplicaSet.
-	Expect(len(events.Items)).Should(Equal(2))
-	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(newRS).NotTo(Equal(nil))
-	Expect(events.Items[0].Message).Should(Equal(fmt.Sprintf("Scaled up replica set %s to 1", newRS.Name)))
-	Expect(events.Items[1].Message).Should(Equal(fmt.Sprintf("Scaled down replica set %s to 0", rsName)))
-}
-
 func testRecreateDeployment(f *framework.Framework) {
 	ns := f.Namespace.Name
 	c := f.ClientSet
-	// Create nginx pods.
-	deploymentPodLabels := map[string]string{"name": "sample-pod-3"}
-	rsPodLabels := map[string]string{
-		"name": "sample-pod-3",
-		"pod":  nginxImageName,
-	}
 
-	rsName := "test-recreate-controller"
-	replicas := int32(3)
-	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, replicas, rsPodLabels, nginxImageName, nginxImage))
-	Expect(err).NotTo(HaveOccurred())
-	// Verify that the required pods have come up.
-	err = framework.VerifyPods(c, ns, "sample-pod-3", false, 3)
-	if err != nil {
-		framework.Logf("error in waiting for pods to come up: %s", err)
-		Expect(err).NotTo(HaveOccurred())
-	}
-
-	// Create a deployment to delete nginx pods and instead bring up redis pods.
+	// Create a deployment that brings up redis pods.
 	deploymentName := "test-recreate-deployment"
-	framework.Logf("Creating deployment %s", deploymentName)
-	deploy, err := c.Extensions().Deployments(ns).Create(newDeployment(deploymentName, replicas, deploymentPodLabels, redisImageName, redisImage, extensions.RecreateDeploymentStrategyType, nil))
+	framework.Logf("Creating deployment %q", deploymentName)
+	deployment, err := c.Extensions().Deployments(ns).Create(newDeployment(deploymentName, int32(3), map[string]string{"name": "sample-pod-3"}, redisImageName, redisImage, extensions.RecreateDeploymentStrategyType, nil))
 	Expect(err).NotTo(HaveOccurred())
 
 	// Wait for it to be updated to revision 1
+	framework.Logf("Waiting deployment %q to be updated to revision 1", deploymentName)
 	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", redisImage)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = framework.WaitForDeploymentStatus(c, deploy)
+	framework.Logf("Waiting deployment %q to complete", deploymentName)
+	Expect(framework.WaitForDeploymentStatus(c, deployment)).NotTo(HaveOccurred())
+
+	// Update deployment to delete redis pods and bring up nginx pods.
+	framework.Logf("Triggering a new rollout for deployment %q", deploymentName)
+	deployment, err = framework.UpdateDeploymentWithRetries(c, ns, deploymentName, func(update *extensions.Deployment) {
+		update.Spec.Template.Spec.Containers[0].Name = nginxImageName
+		update.Spec.Template.Spec.Containers[0].Image = nginxImage
+	})
 	Expect(err).NotTo(HaveOccurred())
 
-	// Verify that the pods were scaled up and down as expected. We use events to verify that.
-	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
-	Expect(err).NotTo(HaveOccurred())
-	framework.WaitForEvents(c, ns, deployment, 2)
-	events, err := c.Core().Events(ns).Search(deployment)
-	if err != nil {
-		framework.Logf("error in listing events: %s", err)
-		Expect(err).NotTo(HaveOccurred())
-	}
-	// There should be 2 events, one to scale up the new ReplicaSet and then to scale down the old ReplicaSet.
-	Expect(len(events.Items)).Should(Equal(2))
-	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(newRS).NotTo(Equal(nil))
-	Expect(events.Items[0].Message).Should(Equal(fmt.Sprintf("Scaled down replica set %s to 0", rsName)))
-	Expect(events.Items[1].Message).Should(Equal(fmt.Sprintf("Scaled up replica set %s to 3", newRS.Name)))
+	framework.Logf("Watching deployment %q to verify that new pods will not run with olds pods", deploymentName)
+	Expect(framework.WatchRecreateDeployment(c, deployment)).NotTo(HaveOccurred())
 }
 
 // testDeploymentCleanUpPolicy tests that deployment supports cleanup policy
@@ -490,6 +407,7 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 	}
 	stopCh := make(chan struct{})
 	w, err := c.Core().Pods(ns).Watch(options)
+	Expect(err).NotTo(HaveOccurred())
 	go func() {
 		// There should be only one pod being created, which is the pod with the redis image.
 		// The old RS shouldn't create new pod when deployment controller adding pod template hash label to its selector.

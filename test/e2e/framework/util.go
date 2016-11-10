@@ -3094,6 +3094,62 @@ func WaitForDeploymentRollbackCleared(c clientset.Interface, ns, deploymentName 
 	return nil
 }
 
+// WatchRecreateDeployment wathces Recreate deployments and ensures no new pods will run at the same time with
+// old pods.
+func WatchRecreateDeployment(c clientset.Interface, d *extensions.Deployment) error {
+	if d.Spec.Strategy.Type != extensions.RecreateDeploymentStrategyType {
+		return fmt.Errorf("deployment %q does not use a Recreate strategy: %s", d.Name, d.Spec.Strategy.Type)
+	}
+
+	w, err := c.Extensions().Deployments(d.Namespace).Watch(api.SingleObject(api.ObjectMeta{Name: d.Name, ResourceVersion: d.ResourceVersion}))
+	if err != nil {
+		return err
+	}
+
+	var wg sync.WaitGroup
+
+	errCh := make(chan error, 1)
+	timeout := time.After(2 * time.Minute)
+
+	status := d.Status
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		for {
+			select {
+			case event, _ := <-w.ResultChan():
+				deployment := event.Object.(*extensions.Deployment)
+				status = deployment.Status
+
+				if deployment.Status.UpdatedReplicas > 0 && deployment.Status.Replicas != deployment.Status.UpdatedReplicas {
+					errCh <- fmt.Errorf("deployment %q is running new pods alongisde old pods: %#v", deployment.Name, status)
+					return
+				}
+
+				if deployment.Spec.Replicas == deployment.Status.Replicas &&
+					deployment.Spec.Replicas == deployment.Status.UpdatedReplicas &&
+					deployment.Generation <= deployment.Status.ObservedGeneration {
+					return
+				}
+
+			case <-timeout:
+				errCh <- fmt.Errorf("timed out waiting for deployment %q to complete: %#v", d.Name, status)
+				return
+			}
+		}
+	}()
+	wg.Wait()
+
+	select {
+	case err := <-errCh:
+		return err
+	default:
+	}
+	return nil
+}
+
 // WaitForDeploymentRevisionAndImage waits for the deployment's and its new RS's revision and container image to match the given revision and image.
 // Note that deployment revision and its new RS revision should be updated shortly, so we only wait for 1 minute here to fail early.
 func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName string, revision, image string) error {
