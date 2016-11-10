@@ -32,6 +32,7 @@ auth-provider
 auth-provider
 auth-provider-arg
 auth-provider-arg
+authentication-kubeconfig
 authentication-token-webhook
 authentication-token-webhook-cache-ttl
 authentication-token-webhook-config-file
