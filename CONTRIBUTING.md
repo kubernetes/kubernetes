@@ -82,6 +82,27 @@ some bugs or smaller features.  We have a [feature development
 process](https://github.com/kubernetes/features/blob/master/README.md), but
 navigating the Kubernetes system as a newcomer can be very challenging.
 
+### Building the project
+
+There are a few things you need to build and test Kubernetes:
+1. `make` - the human interface to the Kubernetes build is `make`, so you must
+   have this tool installed on your machine.  We try not to use too many crazy
+   features of `Makefile`s and other tools, so most commonly available versions
+   should work.
+1. `docker` - some parts of the build/test system depend on `docker`.  You
+   need a relatively recent version of Docker installed, and available to you.
+1. `go` - Kubernetes is written in Go (aka golang), so you need a relatively
+   recent version of the Go toolchain installed.
+
+To build Kubernetes, simply type `make`.  This should figure out what it needs
+to do and not need any input from you.  If you want to just build a subset of
+code, you can pass the `WHAT` variable to `make`: e.g. `make
+WHAT="pkg/kubelet"`.
+
+To run basic tests, simply type `make test`.  This will run all of the unit
+tests in the project.  If you want to just test a subset of the project, you
+can pass the `WHAT` variable to `make`: e.g. `make test WHAT=pkg/kubelet`.
+
 ### Protocols for Collaborative Development
 
 Please read [this doc](docs/devel/collab.md) for information on how we're
