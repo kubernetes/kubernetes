@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-MOUNTER_VERSION=v2
+MOUNTER_VERSION=v3
 MOUNTER_USER=root
 ROOT_DIR=/home/kubernetes/bin
 RKT_BINARY=${ROOT_DIR}/rkt
