@@ -494,6 +494,36 @@ func (ctrl *PersistentVolumeController) upgradeVolumeFrom1_2(volume *api.Persist
 	return true
 }
 
+// setClaimProvisioner saves
+// claim.Annotations[annStorageProvisioner] = class.Provisioner
+func (ctrl *PersistentVolumeController) setClaimProvisioner(claim *api.PersistentVolumeClaim, class *storage.StorageClass) (*api.PersistentVolumeClaim, error) {
+	if val, ok := claim.Annotations[annDynamicallyProvisioned]; ok && val == class.Provisioner {
+		// annotation is already set, nothing to do
+		return claim, nil
+	}
+
+	// The volume from method args can be pointing to watcher cache. We must not
+	// modify these, therefore create a copy.
+	clone, err := conversion.NewCloner().DeepCopy(claim)
+	if err != nil {
+		return nil, fmt.Errorf("Error cloning pv: %v", err)
+	}
+	claimClone, ok := clone.(*api.PersistentVolumeClaim)
+	if !ok {
+		return nil, fmt.Errorf("Unexpected claim cast error : %v", claimClone)
+	}
+	api.SetMetaDataAnnotation(&claimClone.ObjectMeta, annStorageProvisioner, class.Provisioner)
+	newClaim, err := ctrl.kubeClient.Core().PersistentVolumeClaims(claim.Namespace).Update(claimClone)
+	if err != nil {
+		return newClaim, err
+	}
+	_, err = ctrl.storeClaimUpdate(newClaim)
+	if err != nil {
+		return newClaim, err
+	}
+	return newClaim, nil
+}
+
 // Stateless functions
 
 func getClaimStatusForLogging(claim *api.PersistentVolumeClaim) string {

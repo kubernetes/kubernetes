@@ -148,6 +148,49 @@ func TestDeleteSync(t *testing.T) {
 				return testSyncVolume(ctrl, reactor, test)
 			},
 		},
+		{
+			// delete success - two PVs are provisioned for a single claim.
+			// One of the PVs is deleted.
+			"8-11 - two PVs provisioned for a single claim",
+			[]*api.PersistentVolume{
+				newVolume("volume8-11-1", "1Gi", "uid8-11", "claim8-11", api.VolumeBound, api.PersistentVolumeReclaimDelete, annDynamicallyProvisioned),
+				newVolume("volume8-11-2", "1Gi", "uid8-11", "claim8-11", api.VolumeBound, api.PersistentVolumeReclaimDelete, annDynamicallyProvisioned),
+			},
+			[]*api.PersistentVolume{
+				newVolume("volume8-11-2", "1Gi", "uid8-11", "claim8-11", api.VolumeBound, api.PersistentVolumeReclaimDelete, annDynamicallyProvisioned),
+			},
+			// the claim is bound to volume8-11-2 -> volume8-11-1 has lost the race and will be deleted
+			newClaimArray("claim8-11", "uid8-11", "10Gi", "volume8-11-2", api.ClaimBound),
+			newClaimArray("claim8-11", "uid8-11", "10Gi", "volume8-11-2", api.ClaimBound),
+			noevents, noerrors,
+			// Inject deleter into the controller and call syncVolume. The
+			// deleter simulates one delete() call that succeeds.
+			wrapTestWithReclaimCalls(operationDelete, []error{nil}, testSyncVolume),
+		},
+		{
+			// delete success - two PVs are externally provisioned for a single
+			// claim. One of the PVs is marked as Released to be deleted by the
+			// external provisioner.
+			"8-12 - two PVs externally provisioned for a single claim",
+			[]*api.PersistentVolume{
+				newVolume("volume8-12-1", "1Gi", "uid8-12", "claim8-12", api.VolumeBound, api.PersistentVolumeReclaimDelete, annDynamicallyProvisioned),
+				newVolume("volume8-12-2", "1Gi", "uid8-12", "claim8-12", api.VolumeBound, api.PersistentVolumeReclaimDelete, annDynamicallyProvisioned),
+			},
+			[]*api.PersistentVolume{
+				newVolume("volume8-12-1", "1Gi", "uid8-12", "claim8-12", api.VolumeReleased, api.PersistentVolumeReclaimDelete, annDynamicallyProvisioned),
+				newVolume("volume8-12-2", "1Gi", "uid8-12", "claim8-12", api.VolumeBound, api.PersistentVolumeReclaimDelete, annDynamicallyProvisioned),
+			},
+			// the claim is bound to volume8-12-2 -> volume8-12-1 has lost the race and will be "Released"
+			newClaimArray("claim8-12", "uid8-12", "10Gi", "volume8-12-2", api.ClaimBound),
+			newClaimArray("claim8-12", "uid8-12", "10Gi", "volume8-12-2", api.ClaimBound),
+			noevents, noerrors,
+			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
+				// Inject external deleter annotation
+				test.initialVolumes[0].Annotations[annDynamicallyProvisioned] = "external.io/test"
+				test.expectedVolumes[0].Annotations[annDynamicallyProvisioned] = "external.io/test"
+				return testSyncVolume(ctrl, reactor, test)
+			},
+		},
 	}
 	runSyncTests(t, tests, []*storage.StorageClass{})
 }
