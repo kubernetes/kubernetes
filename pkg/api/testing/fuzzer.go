@@ -267,6 +267,16 @@ func coreFuncs(t apitesting.TestingCommon) []interface{} {
 			mode &= 0777
 			d.DefaultMode = &mode
 		},
+		func(s *api.ProjectedVolumeSource, c fuzz.Continue) {
+			c.FuzzNoCustom(s) // fuzz self without calling this function again
+
+			// DefaultMode should always be set, it has a default
+			// value and it is expected to be between 0 and 0777
+			var mode int32
+			c.Fuzz(&mode)
+			mode &= 0777
+			s.DefaultMode = &mode
+		},
 		func(k *api.KeyToPath, c fuzz.Continue) {
 			c.FuzzNoCustom(k) // fuzz self without calling this function again
 			k.Key = c.RandString()

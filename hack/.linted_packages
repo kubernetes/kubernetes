@@ -243,6 +243,7 @@ pkg/util/yaml
 pkg/version/prometheus
 pkg/volume
 pkg/volume/downwardapi
+pkg/volume/projected
 pkg/volume/quobyte
 pkg/volume/util/nestedpendingoperations
 pkg/volume/util/operationexecutor
