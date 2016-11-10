@@ -99,7 +99,7 @@ type DeploymentController struct {
 func NewDeploymentController(federationClient fedclientset.Interface) *DeploymentController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(federationClient))
-	recorder := broadcaster.NewRecorder(api.EventSource{Component: "federated-deployment-controller"})
+	recorder := broadcaster.NewRecorder(apiv1.EventSource{Component: "federated-deployment-controller"})
 
 	fdc := &DeploymentController{
 		fedClient:           federationClient,
@@ -118,13 +118,11 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 	deploymentFedInformerFactory := func(cluster *fedv1.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
 		return cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-					versionedOptions := fedutil.VersionizeV1ListOptions(options)
-					return clientset.Extensions().Deployments(apiv1.NamespaceAll).List(versionedOptions)
+				ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
+					return clientset.Extensions().Deployments(apiv1.NamespaceAll).List(options)
 				},
-				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-					versionedOptions := fedutil.VersionizeV1ListOptions(options)
-					return clientset.Extensions().Deployments(apiv1.NamespaceAll).Watch(versionedOptions)
+				WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
+					return clientset.Extensions().Deployments(apiv1.NamespaceAll).Watch(options)
 				},
 			},
 			&extensionsv1.Deployment{},
@@ -147,13 +145,11 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 	podFedInformerFactory := func(cluster *fedv1.Cluster, clientset kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
 		return cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-					versionedOptions := fedutil.VersionizeV1ListOptions(options)
-					return clientset.Core().Pods(apiv1.NamespaceAll).List(versionedOptions)
+				ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
+					return clientset.Core().Pods(apiv1.NamespaceAll).List(options)
 				},
-				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-					versionedOptions := fedutil.VersionizeV1ListOptions(options)
-					return clientset.Core().Pods(apiv1.NamespaceAll).Watch(versionedOptions)
+				WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
+					return clientset.Core().Pods(apiv1.NamespaceAll).Watch(options)
 				},
 			},
 			&apiv1.Pod{},
@@ -169,13 +165,11 @@ func NewDeploymentController(federationClient fedclientset.Interface) *Deploymen
 
 	fdc.deploymentStore, fdc.deploymentController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				versionedOptions := fedutil.VersionizeV1ListOptions(options)
-				return fdc.fedClient.Extensions().Deployments(apiv1.NamespaceAll).List(versionedOptions)
+			ListFunc: func(options apiv1.ListOptions) (runtime.Object, error) {
+				return fdc.fedClient.Extensions().Deployments(apiv1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				versionedOptions := fedutil.VersionizeV1ListOptions(options)
-				return fdc.fedClient.Extensions().Deployments(apiv1.NamespaceAll).Watch(versionedOptions)
+			WatchFunc: func(options apiv1.ListOptions) (watch.Interface, error) {
+				return fdc.fedClient.Extensions().Deployments(apiv1.NamespaceAll).Watch(options)
 			},
 		},
 		&extensionsv1.Deployment{},

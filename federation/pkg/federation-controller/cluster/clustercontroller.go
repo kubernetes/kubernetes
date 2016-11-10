@@ -24,8 +24,6 @@ import (
 	federation_v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	cluster_cache "k8s.io/kubernetes/federation/client/cache"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
-	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/controller"
@@ -66,13 +64,11 @@ func NewclusterController(federationClient federationclientset.Interface, cluste
 	}
 	cc.clusterStore.Store, cc.clusterController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				versionedOptions := util.VersionizeV1ListOptions(options)
-				return cc.federationClient.Federation().Clusters().List(versionedOptions)
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				return cc.federationClient.Federation().Clusters().List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				versionedOptions := util.VersionizeV1ListOptions(options)
-				return cc.federationClient.Federation().Clusters().Watch(versionedOptions)
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return cc.federationClient.Federation().Clusters().Watch(options)
 			},
 		},
 		&federation_v1beta1.Cluster{},

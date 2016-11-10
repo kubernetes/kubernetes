@@ -24,7 +24,6 @@ import (
 
 	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_5"
-	api "k8s.io/kubernetes/pkg/api"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -161,13 +160,11 @@ func NewFederatedInformer(
 
 	federatedInformer.clusterInformer.store, federatedInformer.clusterInformer.controller = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-				versionedOptions := VersionizeV1ListOptions(options)
-				return federationClient.Federation().Clusters().List(versionedOptions)
+			ListFunc: func(options api_v1.ListOptions) (pkg_runtime.Object, error) {
+				return federationClient.Federation().Clusters().List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				versionedOptions := VersionizeV1ListOptions(options)
-				return federationClient.Federation().Clusters().Watch(versionedOptions)
+			WatchFunc: func(options api_v1.ListOptions) (watch.Interface, error) {
+				return federationClient.Federation().Clusters().Watch(options)
 			},
 		},
 		&federation_api.Cluster{},

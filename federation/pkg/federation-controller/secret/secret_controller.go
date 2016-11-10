@@ -85,7 +85,7 @@ type SecretController struct {
 func NewSecretController(client federationclientset.Interface) *SecretController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(client))
-	recorder := broadcaster.NewRecorder(api.EventSource{Component: "federated-secrets-controller"})
+	recorder := broadcaster.NewRecorder(api_v1.EventSource{Component: "federated-secrets-controller"})
 
 	secretcontroller := &SecretController{
 		federatedApiClient:    client,
@@ -104,13 +104,11 @@ func NewSecretController(client federationclientset.Interface) *SecretController
 	// Start informer in federated API servers on secrets that should be federated.
 	secretcontroller.secretInformerStore, secretcontroller.secretInformerController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-				versionedOptions := util.VersionizeV1ListOptions(options)
-				return client.Core().Secrets(api_v1.NamespaceAll).List(versionedOptions)
+			ListFunc: func(options api_v1.ListOptions) (pkg_runtime.Object, error) {
+				return client.Core().Secrets(api_v1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				versionedOptions := util.VersionizeV1ListOptions(options)
-				return client.Core().Secrets(api_v1.NamespaceAll).Watch(versionedOptions)
+			WatchFunc: func(options api_v1.ListOptions) (watch.Interface, error) {
+				return client.Core().Secrets(api_v1.NamespaceAll).Watch(options)
 			},
 		},
 		&api_v1.Secret{},
@@ -123,13 +121,11 @@ func NewSecretController(client federationclientset.Interface) *SecretController
 		func(cluster *federation_api.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
 			return cache.NewInformer(
 				&cache.ListWatch{
-					ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-						versionedOptions := util.VersionizeV1ListOptions(options)
-						return targetClient.Core().Secrets(api_v1.NamespaceAll).List(versionedOptions)
+					ListFunc: func(options api_v1.ListOptions) (pkg_runtime.Object, error) {
+						return targetClient.Core().Secrets(api_v1.NamespaceAll).List(options)
 					},
-					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-						versionedOptions := util.VersionizeV1ListOptions(options)
-						return targetClient.Core().Secrets(api_v1.NamespaceAll).Watch(versionedOptions)
+					WatchFunc: func(options api_v1.ListOptions) (watch.Interface, error) {
+						return targetClient.Core().Secrets(api_v1.NamespaceAll).Watch(options)
 					},
 				},
 				&api_v1.Secret{},

@@ -138,7 +138,7 @@ func TestSecretController(t *testing.T) {
 	assert.Equal(t, secret1.Name, updatedSecret.Name)
 	assert.Equal(t, secret1.Namespace, updatedSecret.Namespace)
 	assert.True(t, secretsEqual(secret1, *updatedSecret2),
-		fmt.Sprintf("expected: %v, actual: %v", secret1, *updatedSecret2))
+		fmt.Sprintf("expected: %#v, actual: %#v", secret1, *updatedSecret2))
 
 	// Test add cluster
 	clusterWatch.Add(cluster2)

@@ -79,7 +79,7 @@ type ConfigMapController struct {
 func NewConfigMapController(client federationclientset.Interface) *ConfigMapController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(client))
-	recorder := broadcaster.NewRecorder(api.EventSource{Component: "federated-configmaps-controller"})
+	recorder := broadcaster.NewRecorder(api_v1.EventSource{Component: "federated-configmaps-controller"})
 
 	configmapcontroller := &ConfigMapController{
 		federatedApiClient:    client,
@@ -98,13 +98,11 @@ func NewConfigMapController(client federationclientset.Interface) *ConfigMapCont
 	// Start informer on federated API servers on configmaps that should be federated.
 	configmapcontroller.configmapInformerStore, configmapcontroller.configmapInformerController = cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-				versionedOptions := util.VersionizeV1ListOptions(options)
-				return client.Core().ConfigMaps(api_v1.NamespaceAll).List(versionedOptions)
+			ListFunc: func(options api_v1.ListOptions) (pkg_runtime.Object, error) {
+				return client.Core().ConfigMaps(api_v1.NamespaceAll).List(options)
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				versionedOptions := util.VersionizeV1ListOptions(options)
-				return client.Core().ConfigMaps(api_v1.NamespaceAll).Watch(versionedOptions)
+			WatchFunc: func(options api_v1.ListOptions) (watch.Interface, error) {
+				return client.Core().ConfigMaps(api_v1.NamespaceAll).Watch(options)
 			},
 		},
 		&api_v1.ConfigMap{},
@@ -117,13 +115,11 @@ func NewConfigMapController(client federationclientset.Interface) *ConfigMapCont
 		func(cluster *federation_api.Cluster, targetClient kubeclientset.Interface) (cache.Store, cache.ControllerInterface) {
 			return cache.NewInformer(
 				&cache.ListWatch{
-					ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-						versionedOptions := util.VersionizeV1ListOptions(options)
-						return targetClient.Core().ConfigMaps(api_v1.NamespaceAll).List(versionedOptions)
+					ListFunc: func(options api_v1.ListOptions) (pkg_runtime.Object, error) {
+						return targetClient.Core().ConfigMaps(api_v1.NamespaceAll).List(options)
 					},
-					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-						versionedOptions := util.VersionizeV1ListOptions(options)
-						return targetClient.Core().ConfigMaps(api_v1.NamespaceAll).Watch(versionedOptions)
+					WatchFunc: func(options api_v1.ListOptions) (watch.Interface, error) {
+						return targetClient.Core().ConfigMaps(api_v1.NamespaceAll).Watch(options)
 					},
 				},
 				&api_v1.ConfigMap{},
