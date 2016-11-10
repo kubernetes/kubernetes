@@ -17,8 +17,10 @@ limitations under the License.
 package bootstrappolicy_test
 
 import (
+	"reflect"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api/meta"
 	rbac "k8s.io/kubernetes/pkg/apis/rbac"
 	rbacvalidation "k8s.io/kubernetes/pkg/apis/rbac/validation"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -134,5 +136,30 @@ func TestEditViewRelationship(t *testing.T) {
 	}
 	if covers, miss := rbacvalidation.Covers(semanticRoles.view.Rules, semanticRoles.edit.Rules); !covers {
 		t.Errorf("view is missing rules for: %#v\nIf these are escalating powers, add them to the list.  Otherwise, add them to the view role.", miss)
+	}
+}
+
+func TestBootstrapLabel(t *testing.T) {
+	roles := bootstrappolicy.ClusterRoles()
+	for i := range roles {
+		role := roles[i]
+		accessor, err := meta.Accessor(&role)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got, want := accessor.GetLabels(), map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"}; !reflect.DeepEqual(got, want) {
+			t.Errorf("ClusterRole: %s GetLabels() = %s, want %s", accessor.GetName(), got, want)
+		}
+	}
+	rolebindings := bootstrappolicy.ClusterRoleBindings()
+	for i := range rolebindings {
+		rolebinding := rolebindings[i]
+		accessor, err := meta.Accessor(&rolebinding)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got, want := accessor.GetLabels(), map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"}; !reflect.DeepEqual(got, want) {
+			t.Errorf("ClusterRoleBinding: %s GetLabels() = %s, want %s", accessor.GetName(), got, want)
+		}
 	}
 }

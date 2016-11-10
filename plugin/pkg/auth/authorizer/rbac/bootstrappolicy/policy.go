@@ -25,6 +25,8 @@ import (
 var (
 	ReadWrite = []string{"get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"}
 	Read      = []string{"get", "list", "watch"}
+
+	Label = map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"}
 )
 
 const (
@@ -46,7 +48,7 @@ func ClusterRoles() []rbac.ClusterRole {
 	return []rbac.ClusterRole{
 		{
 			// a "root" role which can do absolutely anything
-			ObjectMeta: api.ObjectMeta{Name: "cluster-admin"},
+			ObjectMeta: api.ObjectMeta{Name: "cluster-admin", Labels: Label},
 			Rules: []rbac.PolicyRule{
 				rbac.NewRule("*").Groups("*").Resources("*").RuleOrDie(),
 				rbac.NewRule("*").URLs("*").RuleOrDie(),
@@ -54,14 +56,14 @@ func ClusterRoles() []rbac.ClusterRole {
 		},
 		{
 			// a role which provides just enough power to discovery API versions for negotiation
-			ObjectMeta: api.ObjectMeta{Name: "system:discovery"},
+			ObjectMeta: api.ObjectMeta{Name: "system:discovery", Labels: Label},
 			Rules: []rbac.PolicyRule{
 				rbac.NewRule("get").URLs("/version", "/api", "/api/*", "/apis", "/apis/*").RuleOrDie(),
 			},
 		},
 		{
 			// a role which provides minimal resource access to allow a "normal" user to learn information about themselves
-			ObjectMeta: api.ObjectMeta{Name: "system:basic-user"},
+			ObjectMeta: api.ObjectMeta{Name: "system:basic-user", Labels: Label},
 			Rules: []rbac.PolicyRule{
 				// TODO add future selfsubjectrulesreview, project request APIs, project listing APIs
 				rbac.NewRule("create").Groups(authorizationGroup).Resources("selfsubjectaccessreviews").RuleOrDie(),
@@ -70,7 +72,7 @@ func ClusterRoles() []rbac.ClusterRole {
 
 		{
 			// a role for a namespace level admin.  It is `edit` plus the power to grant permissions to other users.
-			ObjectMeta: api.ObjectMeta{Name: "admin"},
+			ObjectMeta: api.ObjectMeta{Name: "admin", Labels: Label},
 			Rules: []rbac.PolicyRule{
 				rbac.NewRule(ReadWrite...).Groups(legacyGroup).Resources("pods", "pods/attach", "pods/proxy", "pods/exec", "pods/portforward").RuleOrDie(),
 				rbac.NewRule(ReadWrite...).Groups(legacyGroup).Resources("replicationcontrollers", "replicationcontrollers/scale", "serviceaccounts",
@@ -100,7 +102,7 @@ func ClusterRoles() []rbac.ClusterRole {
 			// a role for a namespace level editor.  It grants access to all user level actions in a namespace.
 			// It does not grant powers for "privileged" resources which are domain of the system: `/status`
 			// subresources or `quota`/`limits` which are used to control namespaces
-			ObjectMeta: api.ObjectMeta{Name: "edit"},
+			ObjectMeta: api.ObjectMeta{Name: "edit", Labels: Label},
 			Rules: []rbac.PolicyRule{
 				rbac.NewRule(ReadWrite...).Groups(legacyGroup).Resources("pods", "pods/attach", "pods/proxy", "pods/exec", "pods/portforward").RuleOrDie(),
 				rbac.NewRule(ReadWrite...).Groups(legacyGroup).Resources("replicationcontrollers", "replicationcontrollers/scale", "serviceaccounts",
@@ -125,7 +127,7 @@ func ClusterRoles() []rbac.ClusterRole {
 		{
 			// a role for namespace level viewing.  It grants Read-only access to non-escalating resources in
 			// a namespace.
-			ObjectMeta: api.ObjectMeta{Name: "view"},
+			ObjectMeta: api.ObjectMeta{Name: "view", Labels: Label},
 			Rules: []rbac.PolicyRule{
 				rbac.NewRule(Read...).Groups(legacyGroup).Resources("pods", "replicationcontrollers", "replicationcontrollers/scale", "serviceaccounts",
 					"services", "endpoints", "persistentvolumeclaims", "configmaps").RuleOrDie(),
@@ -147,7 +149,7 @@ func ClusterRoles() []rbac.ClusterRole {
 		},
 		{
 			// a role for nodes to use to have the access they need for running pods
-			ObjectMeta: api.ObjectMeta{Name: "system:node"},
+			ObjectMeta: api.ObjectMeta{Name: "system:node", Labels: Label},
 			Rules: []rbac.PolicyRule{
 				// Needed to check API access.  These creates are non-mutating
 				rbac.NewRule("create").Groups(authenticationGroup).Resources("tokenreviews").RuleOrDie(),
@@ -188,7 +190,7 @@ func ClusterRoles() []rbac.ClusterRole {
 		},
 		{
 			// a role to use for setting up a proxy
-			ObjectMeta: api.ObjectMeta{Name: "system:node-proxier"},
+			ObjectMeta: api.ObjectMeta{Name: "system:node-proxier", Labels: Label},
 			Rules: []rbac.PolicyRule{
 				// Used to build serviceLister
 				rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("services", "endpoints").RuleOrDie(),
