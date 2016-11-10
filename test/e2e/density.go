@@ -75,7 +75,7 @@ func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceC
 		if numNodes <= 5 {
 			apiserverCPU = 0.35
 			apiserverMem = 150 * (1024 * 1024)
-			controllerCPU = 0.1
+			controllerCPU = 0.15
 			controllerMem = 100 * (1024 * 1024)
 			schedulerCPU = 0.05
 			schedulerMem = 50 * (1024 * 1024)
@@ -133,8 +133,8 @@ func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceC
 		MemoryConstraint: 100 * (1024 * 1024),
 	}
 	constraints["kube-proxy"] = framework.ResourceConstraint{
-		CPUConstraint:    0.1,
-		MemoryConstraint: 20 * (1024 * 1024),
+		CPUConstraint:    0.15,
+		MemoryConstraint: 30 * (1024 * 1024),
 	}
 	constraints["l7-lb-controller"] = framework.ResourceConstraint{
 		CPUConstraint:    0.15,
