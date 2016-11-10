@@ -12,9 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM ubuntu:xenial
-MAINTAINER vishh@google.com
+#!/bin/bash
 
-RUN apt-get update && apt-get install -y netbase nfs-common=1:1.2.8-9ubuntu12 glusterfs-client=3.7.6-1ubuntu1
-ADD startmounter.sh /startmounter.sh
-ENTRYPOINT ["/bin/mount"]
+# start rpcbind if it is not started yet
+s=`/etc/init.d/rpcbind status`
+if [[ $s == *"not running"* ]]; then
+   echo "Starting rpcbind"
+   /sbin/rpcbind -w
+fi
+s=`/etc/init.d/rpcbind status`
+echo "$s"
+s=`ps aux | grep rpc`
+/bin/mount "${@}"

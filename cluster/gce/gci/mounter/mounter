@@ -18,7 +18,7 @@ set -e
 set -o pipefail
 
 MOUNTER_DOCKER_IMAGE=gcr.io/google_containers/gci-mounter
-MOUNTER_DOCKER_VERSION=v2
+MOUNTER_DOCKER_VERSION=v3
 MOUNTER_USER=root
 RKT_BINARY=/home/kubernetes/bin/rkt
 
@@ -33,4 +33,4 @@ ${RKT_BINARY} run --stage1-name="coreos.com/rkt/stage1-fly:1.18.0" \
 	--insecure-options=image \
 	--volume=rootfs,kind=host,source=/,readOnly=false,recursive=true \
 	--mount volume=rootfs,target=/media/root \
-	docker://${MOUNTER_DOCKER_IMAGE}:${MOUNTER_DOCKER_VERSION} --user=${MOUNTER_USER} --exec /bin/mount -- "$@"
+	docker://${MOUNTER_DOCKER_IMAGE}:${MOUNTER_DOCKER_VERSION} --user=${MOUNTER_USER} --exec /startmounter.sh -- "$@"
