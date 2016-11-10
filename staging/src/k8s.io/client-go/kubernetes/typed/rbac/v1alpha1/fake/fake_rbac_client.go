@@ -22,29 +22,29 @@ import (
 	testing "k8s.io/client-go/testing"
 )
 
-type FakeRbac struct {
+type FakeRbacV1alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeRbac) ClusterRoles() v1alpha1.ClusterRoleInterface {
+func (c *FakeRbacV1alpha1) ClusterRoles() v1alpha1.ClusterRoleInterface {
 	return &FakeClusterRoles{c}
 }
 
-func (c *FakeRbac) ClusterRoleBindings() v1alpha1.ClusterRoleBindingInterface {
+func (c *FakeRbacV1alpha1) ClusterRoleBindings() v1alpha1.ClusterRoleBindingInterface {
 	return &FakeClusterRoleBindings{c}
 }
 
-func (c *FakeRbac) Roles(namespace string) v1alpha1.RoleInterface {
+func (c *FakeRbacV1alpha1) Roles(namespace string) v1alpha1.RoleInterface {
 	return &FakeRoles{c, namespace}
 }
 
-func (c *FakeRbac) RoleBindings(namespace string) v1alpha1.RoleBindingInterface {
+func (c *FakeRbacV1alpha1) RoleBindings(namespace string) v1alpha1.RoleBindingInterface {
 	return &FakeRoleBindings{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeRbac) RESTClient() rest.Interface {
+func (c *FakeRbacV1alpha1) RESTClient() rest.Interface {
 	var ret *rest.RESTClient
 	return ret
 }

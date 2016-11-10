@@ -49,7 +49,7 @@ type limitRanges struct {
 }
 
 // newLimitRanges returns a LimitRanges
-func newLimitRanges(c *CoreClient, namespace string) *limitRanges {
+func newLimitRanges(c *CoreV1Client, namespace string) *limitRanges {
 	return &limitRanges{
 		client: c.RESTClient(),
 		ns:     namespace,

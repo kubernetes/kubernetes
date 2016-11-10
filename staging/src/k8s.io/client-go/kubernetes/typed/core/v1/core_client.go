@@ -17,13 +17,15 @@ limitations under the License.
 package v1
 
 import (
+	fmt "fmt"
 	api "k8s.io/client-go/pkg/api"
+	unversioned "k8s.io/client-go/pkg/api/unversioned"
 	registered "k8s.io/client-go/pkg/apimachinery/registered"
 	serializer "k8s.io/client-go/pkg/runtime/serializer"
 	rest "k8s.io/client-go/rest"
 )
 
-type CoreInterface interface {
+type CoreV1Interface interface {
 	RESTClient() rest.Interface
 	ComponentStatusesGetter
 	ConfigMapsGetter
@@ -43,77 +45,77 @@ type CoreInterface interface {
 	ServiceAccountsGetter
 }
 
-// CoreClient is used to interact with features provided by the Core group.
-type CoreClient struct {
+// CoreV1Client is used to interact with features provided by the k8s.io/kubernetes/pkg/apimachinery/registered.Group group.
+type CoreV1Client struct {
 	restClient rest.Interface
 }
 
-func (c *CoreClient) ComponentStatuses() ComponentStatusInterface {
+func (c *CoreV1Client) ComponentStatuses() ComponentStatusInterface {
 	return newComponentStatuses(c)
 }
 
-func (c *CoreClient) ConfigMaps(namespace string) ConfigMapInterface {
+func (c *CoreV1Client) ConfigMaps(namespace string) ConfigMapInterface {
 	return newConfigMaps(c, namespace)
 }
 
-func (c *CoreClient) Endpoints(namespace string) EndpointsInterface {
+func (c *CoreV1Client) Endpoints(namespace string) EndpointsInterface {
 	return newEndpoints(c, namespace)
 }
 
-func (c *CoreClient) Events(namespace string) EventInterface {
+func (c *CoreV1Client) Events(namespace string) EventInterface {
 	return newEvents(c, namespace)
 }
 
-func (c *CoreClient) LimitRanges(namespace string) LimitRangeInterface {
+func (c *CoreV1Client) LimitRanges(namespace string) LimitRangeInterface {
 	return newLimitRanges(c, namespace)
 }
 
-func (c *CoreClient) Namespaces() NamespaceInterface {
+func (c *CoreV1Client) Namespaces() NamespaceInterface {
 	return newNamespaces(c)
 }
 
-func (c *CoreClient) Nodes() NodeInterface {
+func (c *CoreV1Client) Nodes() NodeInterface {
 	return newNodes(c)
 }
 
-func (c *CoreClient) PersistentVolumes() PersistentVolumeInterface {
+func (c *CoreV1Client) PersistentVolumes() PersistentVolumeInterface {
 	return newPersistentVolumes(c)
 }
 
-func (c *CoreClient) PersistentVolumeClaims(namespace string) PersistentVolumeClaimInterface {
+func (c *CoreV1Client) PersistentVolumeClaims(namespace string) PersistentVolumeClaimInterface {
 	return newPersistentVolumeClaims(c, namespace)
 }
 
-func (c *CoreClient) Pods(namespace string) PodInterface {
+func (c *CoreV1Client) Pods(namespace string) PodInterface {
 	return newPods(c, namespace)
 }
 
-func (c *CoreClient) PodTemplates(namespace string) PodTemplateInterface {
+func (c *CoreV1Client) PodTemplates(namespace string) PodTemplateInterface {
 	return newPodTemplates(c, namespace)
 }
 
-func (c *CoreClient) ReplicationControllers(namespace string) ReplicationControllerInterface {
+func (c *CoreV1Client) ReplicationControllers(namespace string) ReplicationControllerInterface {
 	return newReplicationControllers(c, namespace)
 }
 
-func (c *CoreClient) ResourceQuotas(namespace string) ResourceQuotaInterface {
+func (c *CoreV1Client) ResourceQuotas(namespace string) ResourceQuotaInterface {
 	return newResourceQuotas(c, namespace)
 }
 
-func (c *CoreClient) Secrets(namespace string) SecretInterface {
+func (c *CoreV1Client) Secrets(namespace string) SecretInterface {
 	return newSecrets(c, namespace)
 }
 
-func (c *CoreClient) Services(namespace string) ServiceInterface {
+func (c *CoreV1Client) Services(namespace string) ServiceInterface {
 	return newServices(c, namespace)
 }
 
-func (c *CoreClient) ServiceAccounts(namespace string) ServiceAccountInterface {
+func (c *CoreV1Client) ServiceAccounts(namespace string) ServiceAccountInterface {
 	return newServiceAccounts(c, namespace)
 }
 
-// NewForConfig creates a new CoreClient for the given config.
-func NewForConfig(c *rest.Config) (*CoreClient, error) {
+// NewForConfig creates a new CoreV1Client for the given config.
+func NewForConfig(c *rest.Config) (*CoreV1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -122,12 +124,12 @@ func NewForConfig(c *rest.Config) (*CoreClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &CoreClient{client}, nil
+	return &CoreV1Client{client}, nil
 }
 
-// NewForConfigOrDie creates a new CoreClient for the given config and
+// NewForConfigOrDie creates a new CoreV1Client for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *rest.Config) *CoreClient {
+func NewForConfigOrDie(c *rest.Config) *CoreV1Client {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -135,26 +137,26 @@ func NewForConfigOrDie(c *rest.Config) *CoreClient {
 	return client
 }
 
-// New creates a new CoreClient for the given RESTClient.
-func New(c rest.Interface) *CoreClient {
-	return &CoreClient{c}
+// New creates a new CoreV1Client for the given RESTClient.
+func New(c rest.Interface) *CoreV1Client {
+	return &CoreV1Client{c}
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	// if core group is not registered, return an error
-	g, err := registered.Group("")
+	gv, err := unversioned.ParseGroupVersion("/v1")
 	if err != nil {
 		return err
+	}
+	// if /v1 is not enabled, return an error
+	if !registered.IsEnabledVersion(gv) {
+		return fmt.Errorf("/v1 is not enabled")
 	}
 	config.APIPath = "/api"
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	// TODO: Unconditionally set the config.Version, until we fix the config.
-	//if config.Version == "" {
-	copyGroupVersion := g.GroupVersion
+	copyGroupVersion := gv
 	config.GroupVersion = &copyGroupVersion
-	//}
 
 	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
 
@@ -163,7 +165,7 @@ func setConfigDefaults(config *rest.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *CoreClient) RESTClient() rest.Interface {
+func (c *CoreV1Client) RESTClient() rest.Interface {
 	if c == nil {
 		return nil
 	}

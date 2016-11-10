@@ -28,7 +28,7 @@ import (
 
 // FakeReplicaSets implements ReplicaSetInterface
 type FakeReplicaSets struct {
-	Fake *FakeExtensions
+	Fake *FakeExtensionsV1beta1
 	ns   string
 }
 

@@ -26,6 +26,7 @@ import (
 	conversion "k8s.io/client-go/pkg/conversion"
 	federation "k8s.io/client-go/pkg/federation/apis/federation"
 	runtime "k8s.io/client-go/pkg/runtime"
+	unsafe "unsafe"
 )
 
 func init() {
@@ -117,17 +118,7 @@ func Convert_federation_ClusterCondition_To_v1beta1_ClusterCondition(in *federat
 
 func autoConvert_v1beta1_ClusterList_To_federation_ClusterList(in *ClusterList, out *federation.ClusterList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]federation.Cluster, len(*in))
-		for i := range *in {
-			if err := Convert_v1beta1_Cluster_To_federation_Cluster(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]federation.Cluster)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -137,17 +128,7 @@ func Convert_v1beta1_ClusterList_To_federation_ClusterList(in *ClusterList, out 
 
 func autoConvert_federation_ClusterList_To_v1beta1_ClusterList(in *federation.ClusterList, out *ClusterList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]Cluster, len(*in))
-		for i := range *in {
-			if err := Convert_federation_Cluster_To_v1beta1_Cluster(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]Cluster)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -156,27 +137,8 @@ func Convert_federation_ClusterList_To_v1beta1_ClusterList(in *federation.Cluste
 }
 
 func autoConvert_v1beta1_ClusterSpec_To_federation_ClusterSpec(in *ClusterSpec, out *federation.ClusterSpec, s conversion.Scope) error {
-	if in.ServerAddressByClientCIDRs != nil {
-		in, out := &in.ServerAddressByClientCIDRs, &out.ServerAddressByClientCIDRs
-		*out = make([]federation.ServerAddressByClientCIDR, len(*in))
-		for i := range *in {
-			if err := Convert_v1beta1_ServerAddressByClientCIDR_To_federation_ServerAddressByClientCIDR(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.ServerAddressByClientCIDRs = nil
-	}
-	if in.SecretRef != nil {
-		in, out := &in.SecretRef, &out.SecretRef
-		*out = new(api.LocalObjectReference)
-		// TODO: Inefficient conversion - can we improve it?
-		if err := s.Convert(*in, *out, 0); err != nil {
-			return err
-		}
-	} else {
-		out.SecretRef = nil
-	}
+	out.ServerAddressByClientCIDRs = *(*[]federation.ServerAddressByClientCIDR)(unsafe.Pointer(&in.ServerAddressByClientCIDRs))
+	out.SecretRef = (*api.LocalObjectReference)(unsafe.Pointer(in.SecretRef))
 	return nil
 }
 
@@ -185,27 +147,8 @@ func Convert_v1beta1_ClusterSpec_To_federation_ClusterSpec(in *ClusterSpec, out 
 }
 
 func autoConvert_federation_ClusterSpec_To_v1beta1_ClusterSpec(in *federation.ClusterSpec, out *ClusterSpec, s conversion.Scope) error {
-	if in.ServerAddressByClientCIDRs != nil {
-		in, out := &in.ServerAddressByClientCIDRs, &out.ServerAddressByClientCIDRs
-		*out = make([]ServerAddressByClientCIDR, len(*in))
-		for i := range *in {
-			if err := Convert_federation_ServerAddressByClientCIDR_To_v1beta1_ServerAddressByClientCIDR(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.ServerAddressByClientCIDRs = nil
-	}
-	if in.SecretRef != nil {
-		in, out := &in.SecretRef, &out.SecretRef
-		*out = new(v1.LocalObjectReference)
-		// TODO: Inefficient conversion - can we improve it?
-		if err := s.Convert(*in, *out, 0); err != nil {
-			return err
-		}
-	} else {
-		out.SecretRef = nil
-	}
+	out.ServerAddressByClientCIDRs = *(*[]ServerAddressByClientCIDR)(unsafe.Pointer(&in.ServerAddressByClientCIDRs))
+	out.SecretRef = (*v1.LocalObjectReference)(unsafe.Pointer(in.SecretRef))
 	return nil
 }
 
@@ -214,18 +157,8 @@ func Convert_federation_ClusterSpec_To_v1beta1_ClusterSpec(in *federation.Cluste
 }
 
 func autoConvert_v1beta1_ClusterStatus_To_federation_ClusterStatus(in *ClusterStatus, out *federation.ClusterStatus, s conversion.Scope) error {
-	if in.Conditions != nil {
-		in, out := &in.Conditions, &out.Conditions
-		*out = make([]federation.ClusterCondition, len(*in))
-		for i := range *in {
-			if err := Convert_v1beta1_ClusterCondition_To_federation_ClusterCondition(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Conditions = nil
-	}
-	out.Zones = in.Zones
+	out.Conditions = *(*[]federation.ClusterCondition)(unsafe.Pointer(&in.Conditions))
+	out.Zones = *(*[]string)(unsafe.Pointer(&in.Zones))
 	out.Region = in.Region
 	return nil
 }
@@ -235,18 +168,8 @@ func Convert_v1beta1_ClusterStatus_To_federation_ClusterStatus(in *ClusterStatus
 }
 
 func autoConvert_federation_ClusterStatus_To_v1beta1_ClusterStatus(in *federation.ClusterStatus, out *ClusterStatus, s conversion.Scope) error {
-	if in.Conditions != nil {
-		in, out := &in.Conditions, &out.Conditions
-		*out = make([]ClusterCondition, len(*in))
-		for i := range *in {
-			if err := Convert_federation_ClusterCondition_To_v1beta1_ClusterCondition(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Conditions = nil
-	}
-	out.Zones = in.Zones
+	out.Conditions = *(*[]ClusterCondition)(unsafe.Pointer(&in.Conditions))
+	out.Zones = *(*[]string)(unsafe.Pointer(&in.Zones))
 	out.Region = in.Region
 	return nil
 }
