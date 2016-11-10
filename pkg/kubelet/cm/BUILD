@@ -30,6 +30,7 @@ go_library(
         "//pkg/kubelet/qos:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util:go_default_library",
+        "//pkg/util/cgroups:go_default_library",
         "//pkg/util/errors:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/oom:go_default_library",
