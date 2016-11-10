@@ -428,6 +428,15 @@ create_master_kubelet_auth() {
   fi
 }
 
+function create-master-etcd-auth {
+  if [[ -n "${ETCD_CA_CERT:-}" && -n "${ETCD_PEER_KEY:-}" && -n "${ETCD_PEER_CERT:-}" ]]; then
+    local -r auth_dir="/etc/srv/kubernetes"
+    echo "${ETCD_CA_CERT}" | base64 --decode | gunzip > "${auth_dir}/etcd-ca.crt"
+    echo "${ETCD_PEER_KEY}" | base64 --decode > "${auth_dir}/etcd-peer.key"
+    echo "${ETCD_PEER_CERT}" | base64 --decode | gunzip > "${auth_dir}/etcd-peer.crt"
+  fi
+}
+
 # Replaces the variables in the etcd manifest file with the real values, and then
 # copy the file to the manifest dir
 # $1: value for variable 'suffix'
@@ -439,14 +448,23 @@ prepare_etcd_manifest() {
   local host_name=$(hostname)
   local etcd_cluster=""
   local cluster_state="new"
+  local etcd_protocol="http"
+  local etcd_creds=""
+
+  if [[ -n "${ETCD_CA_KEY:-}" && -n "${ETCD_CA_CERT:-}" && -n "${ETCD_PEER_KEY:-}" && -n "${ETCD_PEER_CERT:-}" ]]; then
+    etcd_creds=" --peer-trusted-ca-file /etc/srv/kubernetes/etcd-ca.crt --peer-cert-file /etc/srv/kubernetes/etcd-peer.crt --peer-key-file /etc/srv/kubernetes/etcd-peer.key -peer-client-cert-auth "
+    etcd_protocol="https"
+  fi
+
   for host in $(echo "${INITIAL_ETCD_CLUSTER:-${host_name}}" | tr "," "\n"); do
-    etcd_host="etcd-${host}=http://${host}:$3"
+    etcd_host="etcd-${host}=${etcd_protocol}://${host}:$3"
     if [[ -n "${etcd_cluster}" ]]; then
       etcd_cluster+=","
       cluster_state="existing"
     fi
     etcd_cluster+="${etcd_host}"
   done
+
   etcd_temp_file="/tmp/$5"
   cp /home/kubernetes/kube-manifests/kubernetes/gci-trusty/etcd.manifest "${etcd_temp_file}"
   remove_salt_config_comments "${etcd_temp_file}"
@@ -454,6 +472,7 @@ prepare_etcd_manifest() {
   sed -i -e "s@{{ *port *}}@$2@g" "${etcd_temp_file}"
   sed -i -e "s@{{ *server_port *}}@$3@g" "${etcd_temp_file}"
   sed -i -e "s@{{ *cpulimit *}}@\"$4\"@g" "${etcd_temp_file}"
+  sed -i -e "s@{{ *srv_kube_path *}}@/etc/srv/kubernetes@g" "${etcd_temp_file}"
   sed -i -e "s@{{ *hostname *}}@$host_name@g" "${etcd_temp_file}"
   sed -i -e "s@{{ *etcd_cluster *}}@$etcd_cluster@g" "${etcd_temp_file}"
   sed -i -e "s@{{ *storage_backend *}}@${STORAGE_BACKEND:-}@g" "${temp_file}"
@@ -468,6 +487,8 @@ prepare_etcd_manifest() {
   else
     sed -i -e "s@{{ *pillar\.get('etcd_docker_tag', '\(.*\)') *}}@\1@g" "${etcd_temp_file}"
   fi
+  sed -i -e "s@{{ *etcd_protocol *}}@$etcd_protocol@g" "${etcd_temp_file}"
+  sed -i -e "s@{{ *etcd_creds *}}@$etcd_creds@g" "${etcd_temp_file}"
   if [[ -n "${ETCD_VERSION:-}" ]]; then
     sed -i -e "s@{{ *pillar\.get('etcd_version', '\(.*\)') *}}@${ETCD_VERSION}@g" "${etcd_temp_file}"
   else
