@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -24,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/util/validation/field"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 // ValidateStorageClass validates a StorageClass.
@@ -78,6 +80,12 @@ func validateParameters(params map[string]string, fldPath *field.Path) field.Err
 	for k, v := range params {
 		if len(k) < 1 {
 			allErrs = append(allErrs, field.Invalid(fldPath, k, "field can not be empty."))
+		}
+		if k == "zone" {
+			if _, err := volume.Zones2Set(v); err != nil {
+				errMsg := fmt.Sprintf("%v", err)
+				allErrs = append(allErrs, field.Invalid(fldPath, k, errMsg))
+			}
 		}
 		totalSize += (int64)(len(k)) + (int64)(len(v))
 	}

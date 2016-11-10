@@ -45,6 +45,7 @@ func TestValidateStorageClass(t *testing.T) {
 				"kubernetes.io/foo-parameter": "free/form/string",
 				"foo-parameter":               "free-form-string",
 				"foo-parameter2":              "{\"embedded\": \"json\", \"with\": {\"structures\":\"inside\"}}",
+				" zone ":                      "us-east-1b, us-west-2a, europe-west-1a",
 			},
 		},
 	}
@@ -90,6 +91,13 @@ func TestValidateStorageClass(t *testing.T) {
 			ObjectMeta:  api.ObjectMeta{Name: "foo"},
 			Provisioner: "kubernetes.io/foo",
 			Parameters:  longParameters,
+		},
+		"comma separated list of zones must not contain an empty zone": {
+			ObjectMeta:  api.ObjectMeta{Name: "foo"},
+			Provisioner: "kubernetes.io/foo-provisioner",
+			Parameters: map[string]string{
+				"zone": "us-east-1b, , europe-west-1a",
+			},
 		},
 	}
 
