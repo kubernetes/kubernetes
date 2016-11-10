@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -152,6 +153,52 @@ func TestWatchFromZero(t *testing.T) {
 		t.Fatalf("Watch failed: %v", err)
 	}
 	testCheckResult(t, 0, watch.Added, w, storedObj)
+	w.Stop()
+
+	// Update
+	out := &api.Pod{}
+	err = store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
+		func(runtime.Object) (runtime.Object, error) {
+			return &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "ns", Annotations: map[string]string{"a": "1"}}}, nil
+		}))
+	if err != nil {
+		t.Fatalf("GuaranteedUpdate failed: %v", err)
+	}
+
+	w, err = store.Watch(ctx, key, "0", storage.Everything)
+	if err != nil {
+		t.Fatalf("Watch failed: %v", err)
+	}
+	testCheckResult(t, 1, watch.Modified, w, out)
+	w.Stop()
+
+	// Update again
+	out = &api.Pod{}
+	err = store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
+		func(runtime.Object) (runtime.Object, error) {
+			return &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "ns"}}, nil
+		}))
+	if err != nil {
+		t.Fatalf("GuaranteedUpdate failed: %v", err)
+	}
+
+	// Compact previous versions
+	revToCompact, err := strconv.Atoi(out.ResourceVersion)
+	if err != nil {
+		t.Fatalf("Error converting %q to an int: %v", storedObj.ResourceVersion, err)
+	}
+	client := cluster.RandClient()
+	_, err = client.Compact(ctx, int64(revToCompact), clientv3.WithCompactPhysical())
+	if err != nil {
+		t.Fatalf("Error compacting: %v", err)
+	}
+
+	// Make sure we can still watch
+	w, err = store.Watch(ctx, key, "0", storage.Everything)
+	if err != nil {
+		t.Fatalf("Watch failed: %v", err)
+	}
+	testCheckResult(t, 1, watch.Modified, w, out)
 }
 
 // TestWatchFromNoneZero tests that

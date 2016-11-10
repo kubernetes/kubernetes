@@ -158,13 +158,19 @@ func (wc *watchChan) sync() error {
 	wc.initialRev = getResp.Header.Revision
 
 	for _, kv := range getResp.Kvs {
-		prevResp, err := wc.watcher.client.Get(wc.ctx, string(kv.Key), clientv3.WithRev(kv.ModRevision-1), clientv3.WithSerializable())
-		if err != nil {
-			return err
-		}
 		var prevVal []byte
-		if len(prevResp.Kvs) > 0 {
-			prevVal = prevResp.Kvs[0].Value
+		if kv.ModRevision != kv.CreateRevision {
+			prevResp, err := wc.watcher.client.Get(wc.ctx, string(kv.Key), clientv3.WithRev(kv.ModRevision-1), clientv3.WithSerializable())
+			// If we can't get the previous version due to compaction, continue without a prevVal.
+			// This ends up resulting in an ADDED watch event instead of a MODIFIED event.
+			if err != etcdrpc.ErrCompacted {
+				if err != nil {
+					return err
+				}
+				if len(prevResp.Kvs) > 0 {
+					prevVal = prevResp.Kvs[0].Value
+				}
+			}
 		}
 		wc.sendEvent(parseKV(kv, prevVal))
 	}
