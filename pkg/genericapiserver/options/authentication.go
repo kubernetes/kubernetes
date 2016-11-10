@@ -22,6 +22,8 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
+	authenticationclient "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/authentication/v1beta1"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 )
 
 type BuiltInAuthenticationOptions struct {
@@ -243,8 +245,10 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 }
 
-func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.AuthenticatorConfig {
-	ret := authenticator.AuthenticatorConfig{}
+func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig(clientCAFile string) authenticator.AuthenticatorConfig {
+	ret := authenticator.AuthenticatorConfig{
+		ClientCAFile: clientCAFile,
+	}
 	if s.Anonymous != nil {
 		ret.Anonymous = s.Anonymous.Allow
 	}
@@ -305,11 +309,21 @@ func (s *RequestHeaderAuthenticationOptions) AuthenticationRequestHeaderConfig()
 	}
 }
 
+// DelegatingAuthenticationOptions provides an easy way for composing API servers to delegate their authentication to
+// the root kube API server
 type DelegatingAuthenticationOptions struct {
+	// RemoteKubeConfigFile is the file to use to connect to a "normal" kube API server which hosts the
+	// TokenAcessReview.authentication.k8s.io endpoint for checking tokens.
+	RemoteKubeConfigFile string
+
+	// CacheTTL is the length of time that a token authentication answer will be cached.
+	CacheTTL time.Duration
 }
 
 func NewDelegatingAuthenticationOptions() *DelegatingAuthenticationOptions {
-	return &DelegatingAuthenticationOptions{}
+	return &DelegatingAuthenticationOptions{
+		CacheTTL: 5 * time.Minute,
+	}
 }
 
 func (s *DelegatingAuthenticationOptions) Validate() []error {
@@ -318,4 +332,44 @@ func (s *DelegatingAuthenticationOptions) Validate() []error {
 }
 
 func (s *DelegatingAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&s.RemoteKubeConfigFile, "authentication-kubeconfig", s.RemoteKubeConfigFile, ""+
+		"kubeconfig file pointing at the 'core' kubernetes server with enough rights to create "+
+		" tokenaccessreviews.authencation.k8s.io.")
+}
+
+func (s *DelegatingAuthenticationOptions) ToAuthenticationConfig(clientCAFile string) (authenticator.DelegatingAuthenticatorConfig, error) {
+	tokenClient, err := s.newTokenAccessReview()
+	if err != nil {
+		return authenticator.DelegatingAuthenticatorConfig{}, err
+	}
+
+	ret := authenticator.DelegatingAuthenticatorConfig{
+		Anonymous:               true,
+		TokenAccessReviewClient: tokenClient,
+		CacheTTL:                s.CacheTTL,
+		ClientCAFile:            clientCAFile,
+	}
+	return ret, nil
+}
+
+func (s *DelegatingAuthenticationOptions) newTokenAccessReview() (authenticationclient.TokenReviewInterface, error) {
+	if len(s.RemoteKubeConfigFile) == 0 {
+		return nil, nil
+	}
+
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	loadingRules.ExplicitPath = s.RemoteKubeConfigFile
+	loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
+
+	clientConfig, err := loader.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := authenticationclient.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return client.TokenReviews(), nil
 }
