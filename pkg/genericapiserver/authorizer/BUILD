@@ -12,12 +12,16 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["authz.go"],
+    srcs = [
+        "builtin.go",
+        "delegating.go",
+    ],
     tags = ["automanaged"],
     deps = [
         "//pkg/auth/authorizer:go_default_library",
         "//pkg/auth/authorizer/abac:go_default_library",
         "//pkg/auth/authorizer/union:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset/typed/authorization/internalversion:go_default_library",
         "//pkg/controller/informers:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac:go_default_library",
         "//plugin/pkg/auth/authorizer/webhook:go_default_library",
