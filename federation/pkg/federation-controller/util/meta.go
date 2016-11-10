@@ -65,10 +65,10 @@ func ObjectMetaEquivalent(a, b api_v1.ObjectMeta) bool {
 	if a.Namespace != b.Namespace {
 		return false
 	}
-	if !reflect.DeepEqual(a.Labels, b.Labels) {
+	if !reflect.DeepEqual(a.Labels, b.Labels) && (len(a.Labels) != 0 || len(b.Labels) != 0) {
 		return false
 	}
-	if !reflect.DeepEqual(a.Annotations, b.Annotations) {
+	if !reflect.DeepEqual(a.Annotations, b.Annotations) && (len(a.Annotations) != 0 || len(b.Annotations) != 0) {
 		return false
 	}
 	return true
