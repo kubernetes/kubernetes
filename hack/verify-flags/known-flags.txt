@@ -36,6 +36,7 @@ authentication-kubeconfig
 authentication-token-webhook
 authentication-token-webhook-cache-ttl
 authentication-token-webhook-config-file
+authorization-kubeconfig
 authorization-mode
 authorization-policy-file
 authorization-rbac-super-user

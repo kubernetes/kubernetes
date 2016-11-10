@@ -29,9 +29,9 @@ import (
 	authenticationclient "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/authentication/v1beta1"
 	authorizationclient "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/authorization/v1beta1"
 	alwaysallowauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
+	apiserverauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	"k8s.io/kubernetes/pkg/types"
-	webhooksar "k8s.io/kubernetes/plugin/pkg/auth/authorizer/webhook"
 )
 
 func buildAuth(nodeName types.NodeName, client clientset.Interface, config componentconfig.KubeletConfiguration) (server.AuthInterface, error) {
@@ -87,11 +87,12 @@ func buildAuthz(client authorizationclient.SubjectAccessReviewInterface, authz c
 		if client == nil {
 			return nil, errors.New("no client provided, cannot use webhook authorization")
 		}
-		return webhooksar.NewFromInterface(
-			client,
-			authz.Webhook.CacheAuthorizedTTL.Duration,
-			authz.Webhook.CacheUnauthorizedTTL.Duration,
-		)
+		authorizerConfig := apiserverauthorizer.DelegatingAuthorizerConfig{
+			SubjectAccessReviewClient: client,
+			AllowCacheTTL:             authz.Webhook.CacheAuthorizedTTL.Duration,
+			DenyCacheTTL:              authz.Webhook.CacheUnauthorizedTTL.Duration,
+		}
+		return authorizerConfig.New()
 
 	case "":
 		return nil, fmt.Errorf("No authorization mode specified")
