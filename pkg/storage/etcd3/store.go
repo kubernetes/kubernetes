@@ -23,6 +23,7 @@ import (
 	"path"
 	"reflect"
 	"strings"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/etcd"
+	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/coreos/etcd/clientv3"
@@ -214,6 +216,9 @@ func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.O
 func (s *store) GuaranteedUpdate(
 	ctx context.Context, key string, out runtime.Object, ignoreNotFound bool,
 	precondtions *storage.Preconditions, tryUpdate storage.UpdateFunc, suggestion ...runtime.Object) error {
+	trace := util.NewTrace(fmt.Sprintf("GuaranteedUpdate etcd3: %s", reflect.TypeOf(out).String()))
+	defer trace.LogIfLong(500 * time.Millisecond)
+
 	v, err := conversion.EnforcePtr(out)
 	if err != nil {
 		panic("unable to convert output object to pointer")
@@ -236,6 +241,7 @@ func (s *store) GuaranteedUpdate(
 			return err
 		}
 	}
+	trace.Step("initial value restored")
 
 	for {
 		if err := checkPreconditions(key, precondtions, origState.obj); err != nil {
@@ -259,6 +265,7 @@ func (s *store) GuaranteedUpdate(
 		if err != nil {
 			return err
 		}
+		trace.Step("Transaction prepared")
 
 		txnResp, err := s.client.KV.Txn(ctx).If(
 			clientv3.Compare(clientv3.ModRevision(key), "=", origState.rev),
@@ -270,6 +277,7 @@ func (s *store) GuaranteedUpdate(
 		if err != nil {
 			return err
 		}
+		trace.Step("Transaction committed")
 		if !txnResp.Succeeded {
 			getResp := (*clientv3.GetResponse)(txnResp.Responses[0].GetResponseRange())
 			glog.V(4).Infof("GuaranteedUpdate of %s failed because of a conflict, going to retry", key)
@@ -277,6 +285,7 @@ func (s *store) GuaranteedUpdate(
 			if err != nil {
 				return err
 			}
+			trace.Step("Retry value restored")
 			continue
 		}
 		putResp := txnResp.Responses[0].GetResponsePut()
