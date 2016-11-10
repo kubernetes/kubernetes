@@ -19,8 +19,6 @@ package authorizer
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/genericapiserver/options"
-
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
 )
@@ -50,67 +48,71 @@ func TestNewAuthorizerFromAuthorizationConfig(t *testing.T) {
 	examplePolicyFile := "../../auth/authorizer/abac/example_policy_file.jsonl"
 
 	tests := []struct {
-		modes   []string
 		config  AuthorizationConfig
 		wantErr bool
 		msg     string
 	}{
 		{
 			// Unknown modes should return errors
-			modes:   []string{"DoesNotExist"},
+			config:  AuthorizationConfig{AuthorizationModes: []string{"DoesNotExist"}},
 			wantErr: true,
 			msg:     "using a fake mode should have returned an error",
 		},
 		{
 			// ModeAlwaysAllow and ModeAlwaysDeny should return without authorizationPolicyFile
 			// but error if one is given
-			modes: []string{options.ModeAlwaysAllow, options.ModeAlwaysDeny},
-			msg:   "returned an error for valid config",
+			config: AuthorizationConfig{AuthorizationModes: []string{ModeAlwaysAllow, ModeAlwaysDeny}},
+			msg:    "returned an error for valid config",
 		},
 		{
 			// ModeABAC requires a policy file
-			modes:   []string{options.ModeAlwaysAllow, options.ModeAlwaysDeny, options.ModeABAC},
+			config:  AuthorizationConfig{AuthorizationModes: []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABAC}},
 			wantErr: true,
 			msg:     "specifying ABAC with no policy file should return an error",
 		},
 		{
 			// ModeABAC should not error if a valid policy path is provided
-			modes:  []string{options.ModeAlwaysAllow, options.ModeAlwaysDeny, options.ModeABAC},
-			config: AuthorizationConfig{PolicyFile: examplePolicyFile},
-			msg:    "errored while using a valid policy file",
+			config: AuthorizationConfig{
+				AuthorizationModes: []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABAC},
+				PolicyFile:         examplePolicyFile,
+			},
+			msg: "errored while using a valid policy file",
 		},
 		{
 
 			// Authorization Policy file cannot be used without ModeABAC
-			modes:   []string{options.ModeAlwaysAllow, options.ModeAlwaysDeny},
-			config:  AuthorizationConfig{PolicyFile: examplePolicyFile},
+			config: AuthorizationConfig{
+				AuthorizationModes: []string{ModeAlwaysAllow, ModeAlwaysDeny},
+				PolicyFile:         examplePolicyFile,
+			},
 			wantErr: true,
 			msg:     "should have errored when Authorization Policy File is used without ModeABAC",
 		},
 		{
 			// At least one authorizationMode is necessary
-			modes:   []string{},
 			config:  AuthorizationConfig{PolicyFile: examplePolicyFile},
 			wantErr: true,
 			msg:     "should have errored when no authorization modes are passed",
 		},
 		{
 			// ModeWebhook requires at minimum a target.
-			modes:   []string{options.ModeWebhook},
+			config:  AuthorizationConfig{AuthorizationModes: []string{ModeWebhook}},
 			wantErr: true,
 			msg:     "should have errored when config was empty with ModeWebhook",
 		},
 		{
 			// Cannot provide webhook flags without ModeWebhook
-			modes:   []string{options.ModeAlwaysAllow},
-			config:  AuthorizationConfig{WebhookConfigFile: "authz_webhook_config.yml"},
+			config: AuthorizationConfig{
+				AuthorizationModes: []string{ModeAlwaysAllow},
+				WebhookConfigFile:  "authz_webhook_config.yml",
+			},
 			wantErr: true,
 			msg:     "should have errored when Webhook config file is used without ModeWebhook",
 		},
 	}
 
 	for _, tt := range tests {
-		_, err := NewAuthorizerFromAuthorizationConfig(tt.modes, tt.config)
+		_, err := NewAuthorizerFromAuthorizationConfig(tt.config)
 		if tt.wantErr && (err == nil) {
 			t.Errorf("NewAuthorizerFromAuthorizationConfig %s", tt.msg)
 		} else if !tt.wantErr && (err != nil) {
