@@ -280,3 +280,29 @@ func WaitForStoreUpdate(store util.FederatedReadOnlyStore, clusterName, key stri
 	})
 	return err
 }
+
+// Ensure a key is in the store before returning (or timeout w/ error)
+func WaitForStoreUpdateChecking(store util.FederatedReadOnlyStore, clusterName, key string, timeout time.Duration,
+	checkFunction CheckingFunction) error {
+	retryInterval := 500 * time.Millisecond
+	var lastError error
+	err := wait.PollImmediate(retryInterval, timeout, func() (bool, error) {
+		item, found, err := store.GetByKey(clusterName, key)
+		if err != nil || !found {
+			return found, err
+		}
+		runtimeObj := item.(runtime.Object)
+		lastError = checkFunction(runtimeObj)
+		return lastError == nil, nil
+	})
+	return err
+}
+
+func MetaAndSpecCheckingFunction(expected runtime.Object) CheckingFunction {
+	return func(obj runtime.Object) error {
+		if util.ObjectMetaAndSpecEquivalent(obj, expected) {
+			return nil
+		}
+		return fmt.Errorf("Object different expected=%#v  received=%#v", expected, obj)
+	}
+}
