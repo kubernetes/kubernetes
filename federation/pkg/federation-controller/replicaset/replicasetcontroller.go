@@ -595,10 +595,12 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) (reconciliatio
 			}
 			fedStatus.Replicas += currentLrs.Status.Replicas
 			fedStatus.FullyLabeledReplicas += currentLrs.Status.FullyLabeledReplicas
-			// leave the replicaset even the replicas dropped to 0
+			fedStatus.ReadyReplicas += currentLrs.Status.ReadyReplicas
+			fedStatus.AvailableReplicas += currentLrs.Status.AvailableReplicas
 		}
 	}
-	if fedStatus.Replicas != frs.Status.Replicas || fedStatus.FullyLabeledReplicas != frs.Status.FullyLabeledReplicas {
+	if fedStatus.Replicas != frs.Status.Replicas || fedStatus.FullyLabeledReplicas != frs.Status.FullyLabeledReplicas ||
+		fedStatus.ReadyReplicas != frs.Status.ReadyReplicas || fedStatus.AvailableReplicas != frs.Status.AvailableReplicas {
 		frs.Status = fedStatus
 		_, err = frsc.fedClient.Extensions().ReplicaSets(frs.Namespace).UpdateStatus(frs)
 		if err != nil {
