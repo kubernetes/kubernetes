@@ -376,6 +376,28 @@ func TestSetDefaultDownwardAPIVolumeSource(t *testing.T) {
 	}
 }
 
+func TestSetDefaultProjectedVolumeSource(t *testing.T) {
+	s := versioned.PodSpec{}
+	s.Volumes = []versioned.Volume{
+		{
+			VolumeSource: versioned.VolumeSource{
+				Projected: &versioned.ProjectedVolumeSource{},
+			},
+		},
+	}
+	pod := &versioned.Pod{
+		Spec: s,
+	}
+	output := roundTrip(t, runtime.Object(pod))
+	pod2 := output.(*versioned.Pod)
+	defaultMode := pod2.Spec.Volumes[0].VolumeSource.Projected.DefaultMode
+	expectedMode := versioned.ProjectedVolumeSourceDefaultMode
+
+	if defaultMode == nil || *defaultMode != expectedMode {
+		t.Errorf("Expected ProjectedVolumeSource DefaultMode %v, got %v", expectedMode, defaultMode)
+	}
+}
+
 func TestSetDefaultSecret(t *testing.T) {
 	s := &v1.Secret{}
 	obj2 := roundTrip(t, runtime.Object(s))
