@@ -82,6 +82,7 @@ func Run(s *options.ServerRunOptions) error {
 							ApplySecureServingOptions(s.SecureServing).
 							ApplyInsecureServingOptions(s.InsecureServing).
 							ApplyAuthenticationOptions(s.Authentication).
+							ApplyRBACSuperUser(s.Authorization.RBACSuperUser).
 							Complete() // set default values based on the known values
 
 	if err := genericConfig.MaybeGenerateServingCerts(); err != nil {
@@ -143,16 +144,8 @@ func Run(s *options.ServerRunOptions) error {
 	}
 	sharedInformers := informers.NewSharedInformerFactory(nil, client, 10*time.Minute)
 
-	authorizationConfig := authorizer.AuthorizationConfig{
-		PolicyFile:                  s.GenericServerRunOptions.AuthorizationPolicyFile,
-		WebhookConfigFile:           s.GenericServerRunOptions.AuthorizationWebhookConfigFile,
-		WebhookCacheAuthorizedTTL:   s.GenericServerRunOptions.AuthorizationWebhookCacheAuthorizedTTL,
-		WebhookCacheUnauthorizedTTL: s.GenericServerRunOptions.AuthorizationWebhookCacheUnauthorizedTTL,
-		RBACSuperUser:               s.GenericServerRunOptions.AuthorizationRBACSuperUser,
-		InformerFactory:             sharedInformers,
-	}
-	authorizationModeNames := strings.Split(s.GenericServerRunOptions.AuthorizationMode, ",")
-	apiAuthorizer, err := authorizer.NewAuthorizerFromAuthorizationConfig(authorizationModeNames, authorizationConfig)
+	authorizerconfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
+	apiAuthorizer, err := authorizer.NewAuthorizerFromAuthorizationConfig(authorizerconfig)
 	if err != nil {
 		glog.Fatalf("Invalid Authorization Config: %v", err)
 	}

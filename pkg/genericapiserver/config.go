@@ -291,6 +291,11 @@ func (c *Config) ApplyAuthenticationOptions(o *options.BuiltInAuthenticationOpti
 	return c
 }
 
+func (c *Config) ApplyRBACSuperUser(rbacSuperUser string) *Config {
+	c.AuthorizerRBACSuperUser = rbacSuperUser
+	return c
+}
+
 // ApplyOptions applies the run options to the method receiver and returns self
 func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 	if len(options.AuditLogPath) != 0 {
@@ -302,7 +307,6 @@ func (c *Config) ApplyOptions(options *options.ServerRunOptions) *Config {
 		}
 	}
 
-	c.AuthorizerRBACSuperUser = options.AuthorizationRBACSuperUser
 	c.CorsAllowedOriginList = options.CorsAllowedOriginList
 	c.EnableGarbageCollection = options.EnableGarbageCollection
 	c.EnableProfiling = options.EnableProfiling

@@ -36,6 +36,7 @@ type ServerRunOptions struct {
 	SecureServing           *genericoptions.SecureServingOptions
 	InsecureServing         *genericoptions.ServingOptions
 	Authentication          *genericoptions.BuiltInAuthenticationOptions
+	Authorization           *genericoptions.BuiltInAuthorizationOptions
 
 	AllowPrivileged          bool
 	EventTTL                 time.Duration
@@ -53,6 +54,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		SecureServing:   genericoptions.NewSecureServingOptions(),
 		InsecureServing: genericoptions.NewInsecureServingOptions(),
 		Authentication:  genericoptions.NewBuiltInAuthenticationOptions().WithAll(),
+		Authorization:   genericoptions.NewBuiltInAuthorizationOptions(),
 
 		EventTTL: 1 * time.Hour,
 		KubeletConfig: kubeletclient.KubeletClientConfig{
@@ -81,6 +83,7 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	s.InsecureServing.AddFlags(fs)
 	s.InsecureServing.AddDeprecatedFlags(fs)
 	s.Authentication.AddFlags(fs)
+	s.Authorization.AddFlags(fs)
 
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.
