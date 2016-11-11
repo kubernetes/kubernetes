@@ -20,13 +20,19 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 )
 
-const logString = "This is the expected log content of this node e2e test"
+const (
+	logString = "This is the expected log content of this node e2e test"
+
+	logPodName    = "logger-pod"
+	logContName   = "logger-container"
+	checkPodName  = "checker-pod"
+	checkContName = "checker-container"
+)
 
 var _ = framework.KubeDescribe("ContainerLogPath", func() {
 	f := framework.NewDefaultFramework("kubelet-container-log-path")
@@ -38,11 +44,6 @@ var _ = framework.KubeDescribe("ContainerLogPath", func() {
 
 				logDirVolumeName := "log-dir-vol"
 				logDir := kubelet.ContainerLogsDir
-
-				logPodName := "logger-" + string(uuid.NewUUID())
-				logContName := "logger-c-" + string(uuid.NewUUID())
-				checkPodName := "checker" + string(uuid.NewUUID())
-				checkContName := "checker-c-" + string(uuid.NewUUID())
 
 				logPod := &v1.Pod{
 					ObjectMeta: v1.ObjectMeta{
