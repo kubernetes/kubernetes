@@ -42,17 +42,12 @@ const (
 // be loaded or the initial listen call fails. The actual server loop (stoppable by closing
 // stopCh) runs in a go routine, i.e. serveSecurely does not block.
 func (s *GenericAPIServer) serveSecurely(stopCh <-chan struct{}) error {
-	namedCerts, err := getNamedCertificateMap(s.SecureServingInfo.SNICerts)
-	if err != nil {
-		return fmt.Errorf("unable to load SNI certificates: %v", err)
-	}
-
 	secureServer := &http.Server{
 		Addr:           s.SecureServingInfo.BindAddress,
 		Handler:        s.Handler,
 		MaxHeaderBytes: 1 << 20,
 		TLSConfig: &tls.Config{
-			NameToCertificate: namedCerts,
+			NameToCertificate: s.SecureServingInfo.SNICerts,
 			// Can't use SSLv3 because of POODLE and BEAST
 			// Can't use TLSv1.0 because of POODLE and BEAST using CBC cipher
 			// Can't use TLSv1.1 because of RC4 cipher usage
@@ -62,19 +57,15 @@ func (s *GenericAPIServer) serveSecurely(stopCh <-chan struct{}) error {
 		},
 	}
 
-	if len(s.SecureServingInfo.ServerCert.CertFile) != 0 || len(s.SecureServingInfo.ServerCert.KeyFile) != 0 {
-		secureServer.TLSConfig.Certificates = make([]tls.Certificate, 1)
-		secureServer.TLSConfig.Certificates[0], err = tls.LoadX509KeyPair(s.SecureServingInfo.ServerCert.CertFile, s.SecureServingInfo.ServerCert.KeyFile)
-		if err != nil {
-			return fmt.Errorf("unable to load server certificate: %v", err)
-		}
+	if s.SecureServingInfo.Cert != nil {
+		secureServer.TLSConfig.Certificates = []tls.Certificate{*s.SecureServingInfo.Cert}
 	}
 
 	// append all named certs. Otherwise, the go tls stack will think no SNI processing
 	// is necessary because there is only one cert anyway.
 	// Moreover, if ServerCert.CertFile/ServerCert.KeyFile are not set, the first SNI
 	// cert will become the default cert. That's what we expect anyway.
-	for _, c := range namedCerts {
+	for _, c := range s.SecureServingInfo.SNICerts {
 		secureServer.TLSConfig.Certificates = append(secureServer.TLSConfig.Certificates, *c)
 	}
 
@@ -91,6 +82,7 @@ func (s *GenericAPIServer) serveSecurely(stopCh <-chan struct{}) error {
 	}
 
 	glog.Infof("Serving securely on %s", s.SecureServingInfo.BindAddress)
+	var err error
 	s.effectiveSecurePort, err = runServer(secureServer, s.SecureServingInfo.BindNetwork, stopCh)
 	return err
 }
@@ -186,48 +178,40 @@ func runServer(server *http.Server, network string, stopCh <-chan struct{}) (int
 	return tcpAddr.Port, nil
 }
 
-// getNamedCertificateMap returns a map of strings to *tls.Certificate, suitable for use in
-// tls.Config#NamedCertificates. Returns an error if any of the certs cannot be loaded.
-// Returns nil if len(namedCertKeys) == 0
-func getNamedCertificateMap(namedCertKeys []NamedCertKey) (map[string]*tls.Certificate, error) {
-	if len(namedCertKeys) == 0 {
-		return nil, nil
-	}
+type namedTlsCert struct {
+	tlsCert tls.Certificate
 
-	// load keys
-	tlsCerts := make([]tls.Certificate, len(namedCertKeys))
-	for i := range namedCertKeys {
-		var err error
-		nkc := &namedCertKeys[i]
-		tlsCerts[i], err = tls.LoadX509KeyPair(nkc.CertFile, nkc.KeyFile)
-		if err != nil {
-			return nil, err
-		}
-	}
+	// names is a list of domain patterns: fully qualified domain names, possibly prefixed with
+	// wildcard segments.
+	names []string
+}
 
+// getNamedCertificateMap returns a map of *tls.Certificate by name. It's is
+// suitable for use in tls.Config#NamedCertificates. Returns an error if any of the certs
+// cannot be loaded. Returns nil if len(certs) == 0
+func getNamedCertificateMap(certs []namedTlsCert) (map[string]*tls.Certificate, error) {
 	// register certs with implicit names first, reverse order such that earlier trump over the later
-	tlsCertsByName := map[string]*tls.Certificate{}
-	for i := len(namedCertKeys) - 1; i >= 0; i-- {
-		nkc := &namedCertKeys[i]
-		if len(nkc.Names) > 0 {
+	byName := map[string]*tls.Certificate{}
+	for i := len(certs) - 1; i >= 0; i-- {
+		if len(certs[i].names) > 0 {
 			continue
 		}
-		cert := &tlsCerts[i]
+		cert := &certs[i].tlsCert
 
 		// read names from certificate common names and DNS names
 		if len(cert.Certificate) == 0 {
-			return nil, fmt.Errorf("no certificate found in %q", nkc.CertFile)
+			return nil, fmt.Errorf("empty SNI certificate, skipping")
 		}
 		x509Cert, err := x509.ParseCertificate(cert.Certificate[0])
 		if err != nil {
-			return nil, fmt.Errorf("parse error for certificate in %q: %v", nkc.CertFile, err)
+			return nil, fmt.Errorf("parse error for SNI certificate: %v", err)
 		}
 		cn := x509Cert.Subject.CommonName
 		if cn == "*" || len(validation.IsDNS1123Subdomain(strings.TrimPrefix(cn, "*."))) == 0 {
-			tlsCertsByName[cn] = cert
+			byName[cn] = cert
 		}
 		for _, san := range x509Cert.DNSNames {
-			tlsCertsByName[san] = cert
+			byName[san] = cert
 		}
 		// intentionally all IPs in the cert are ignored as SNI forbids passing IPs
 		// to select a cert. Before go 1.6 the tls happily passed IPs as SNI values.
@@ -235,17 +219,14 @@ func getNamedCertificateMap(namedCertKeys []NamedCertKey) (map[string]*tls.Certi
 
 	// register certs with explicit names last, overwriting every of the implicit ones,
 	// again in reverse order.
-	for i := len(namedCertKeys) - 1; i >= 0; i-- {
-		nkc := &namedCertKeys[i]
-		if len(nkc.Names) == 0 {
-			continue
-		}
-		for _, name := range nkc.Names {
-			tlsCertsByName[name] = &tlsCerts[i]
+	for i := len(certs) - 1; i >= 0; i-- {
+		namedCert := &certs[i]
+		for _, name := range namedCert.names {
+			byName[name] = &certs[i].tlsCert
 		}
 	}
 
-	return tlsCertsByName, nil
+	return byName, nil
 }
 
 // tcpKeepAliveListener sets TCP keep-alive timeouts on accepted

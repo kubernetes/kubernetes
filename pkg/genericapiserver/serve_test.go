@@ -20,15 +20,18 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/pem"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
 	"testing"
 
-	utilcert "k8s.io/kubernetes/pkg/util/cert"
-
 	"github.com/stretchr/testify/assert"
+
+	"k8s.io/kubernetes/pkg/genericapiserver/options"
+	utilcert "k8s.io/kubernetes/pkg/util/cert"
+	"k8s.io/kubernetes/pkg/util/config"
 )
 
 type TestCertSpec struct {
@@ -39,53 +42,6 @@ type TestCertSpec struct {
 type NamedTestCertSpec struct {
 	TestCertSpec
 	explicitNames []string // as --tls-sni-cert-key explicit names
-}
-
-func createTestCerts(dir string, spec TestCertSpec) (caFilePath, certFilePath, keyFilePath string, err error) {
-	var ips []net.IP
-	for _, ip := range spec.ips {
-		ips = append(ips, net.ParseIP(ip))
-	}
-
-	caCertPem, _, certPem, keyPem, err := utilcert.GenerateSelfSignedCertKey(spec.host, ips, spec.names)
-	if err != nil {
-		return "", "", "", err
-	}
-
-	caCertFile, err := ioutil.TempFile(dir, "ca-cert")
-	if err != nil {
-		return "", "", "", err
-	}
-
-	certFile, err := ioutil.TempFile(dir, "cert")
-	if err != nil {
-		return "", "", "", err
-	}
-
-	keyFile, err := ioutil.TempFile(dir, "key")
-	if err != nil {
-		return "", "", "", err
-	}
-
-	_, err = caCertFile.Write(caCertPem)
-	if err != nil {
-		return "", "", "", err
-	}
-	caCertFile.Close()
-
-	_, err = certFile.Write(certPem)
-	if err != nil {
-		return "", "", "", err
-	}
-	certFile.Close()
-
-	_, err = keyFile.Write(keyPem)
-	if err != nil {
-		return "", "", "", err
-	}
-	keyFile.Close()
-
-	return caCertFile.Name(), certFile.Name(), keyFile.Name(), nil
 }
 
 func TestGetNamedCertificateMap(t *testing.T) {
@@ -229,32 +185,23 @@ func TestGetNamedCertificateMap(t *testing.T) {
 		},
 	}
 
-	tempDir, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tempDir)
-
 NextTest:
 	for i, test := range tests {
-		var namedCertKeys []NamedCertKey
+		var namedTLSCerts []namedTlsCert
 		bySignature := map[string]int{} // index in test.certs by cert signature
 		for j, c := range test.certs {
-			_, certFile, keyFile, err := createTestCerts(tempDir, c.TestCertSpec)
+			cert, err := createTestTLSCerts(c.TestCertSpec)
 			if err != nil {
 				t.Errorf("%d - failed to create cert %d: %v", i, j, err)
 				continue NextTest
 			}
 
-			namedCertKeys = append(namedCertKeys, NamedCertKey{
-				CertKey: CertKey{
-					KeyFile:  keyFile,
-					CertFile: certFile,
-				},
-				Names: c.explicitNames,
+			namedTLSCerts = append(namedTLSCerts, namedTlsCert{
+				tlsCert: cert,
+				names:   c.explicitNames,
 			})
 
-			sig, err := certFileSignature(certFile, keyFile)
+			sig, err := certSignature(cert)
 			if err != nil {
 				t.Errorf("%d - failed to get signature for %d: %v", i, j, err)
 				continue NextTest
@@ -262,7 +209,7 @@ NextTest:
 			bySignature[sig] = j
 		}
 
-		certMap, err := getNamedCertificateMap(namedCertKeys)
+		certMap, err := getNamedCertificateMap(namedTLSCerts)
 		if err == nil && len(test.errorString) != 0 {
 			t.Errorf("%d - expected no error, got: %v", i, err)
 		} else if err != nil && err.Error() != test.errorString {
@@ -382,15 +329,21 @@ func TestServerRunWithSNI(t *testing.T) {
 NextTest:
 	for i, test := range tests {
 		// create server cert
-		caCertFile, serverCertFile, serverKeyFile, err := createTestCerts(tempDir, test.Cert)
+		serverCertBundleFile, serverKeyFile, err := createTestCertFiles(tempDir, test.Cert)
 		if err != nil {
 			t.Errorf("%d - failed to create server cert: %v", i, err)
+			continue NextTest
 		}
+		ca, err := caCertFromBundle(serverCertBundleFile)
+		if err != nil {
+			t.Errorf("%d - failed to extract ca cert from server cert bundle: %v", i, err)
+			continue NextTest
+		}
+		caCerts := []*x509.Certificate{ca}
 
 		// create SNI certs
-		var namedCertKeys []NamedCertKey
-		caCertFiles := []string{caCertFile}
-		serverSig, err := certFileSignature(serverCertFile, serverKeyFile)
+		var namedCertKeys []config.NamedCertKey
+		serverSig, err := certFileSignature(serverCertBundleFile, serverKeyFile)
 		if err != nil {
 			t.Errorf("%d - failed to get server cert signature: %v", i, err)
 			continue NextTest
@@ -399,23 +352,27 @@ NextTest:
 			serverSig: -1,
 		}
 		for j, c := range test.SNICerts {
-			caCertFile, certFile, keyFile, err := createTestCerts(tempDir, c.TestCertSpec)
+			certBundleFile, keyFile, err := createTestCertFiles(tempDir, c.TestCertSpec)
 			if err != nil {
 				t.Errorf("%d - failed to create SNI cert %d: %v", i, j, err)
 				continue NextTest
 			}
 
-			namedCertKeys = append(namedCertKeys, NamedCertKey{
-				CertKey: CertKey{
-					KeyFile:  keyFile,
-					CertFile: certFile,
-				},
-				Names: c.explicitNames,
+			namedCertKeys = append(namedCertKeys, config.NamedCertKey{
+				KeyFile:  keyFile,
+				CertFile: certBundleFile,
+				Names:    c.explicitNames,
 			})
-			caCertFiles = append(caCertFiles, caCertFile)
+
+			ca, err := caCertFromBundle(certBundleFile)
+			if err != nil {
+				t.Errorf("%d - failed to extract ca cert from SNI cert bundle %s: %v", i, j, err)
+				continue NextTest
+			}
+			caCerts = append(caCerts, ca)
 
 			// store index in namedCertKeys with the signature as the key
-			sig, err := certFileSignature(certFile, keyFile)
+			sig, err := certFileSignature(certBundleFile, keyFile)
 			if err != nil {
 				t.Errorf("%d - failed get SNI cert %d signature: %v", i, j, err)
 				continue NextTest
@@ -430,17 +387,22 @@ NextTest:
 		defer etcdserver.Terminate(t)
 
 		config.EnableIndex = true
-		config.SecureServingInfo = &SecureServingInfo{
-			ServingInfo: ServingInfo{
-				BindAddress: "localhost:0",
+		_, err = config.ApplySecureServingOptions(&options.SecureServingOptions{
+			ServingOptions: options.ServingOptions{
+				BindAddress: net.ParseIP("127.0.0.1"),
+				BindPort:    6443,
 			},
-			ServerCert: GeneratableKeyCert{
-				CertKey: CertKey{
-					CertFile: serverCertFile,
+			ServerCert: options.GeneratableKeyCert{
+				CertKey: options.CertKey{
+					CertFile: serverCertBundleFile,
 					KeyFile:  serverKeyFile,
 				},
 			},
-			SNICerts: namedCertKeys,
+			SNICertKeys: namedCertKeys,
+		}, "1.2.3.4")
+		if err != nil {
+			t.Errorf("%d - failed applying the SecureServingOptions: %v", i, err)
+			continue NextTest
 		}
 		config.InsecureServingInfo = nil
 
@@ -450,6 +412,9 @@ NextTest:
 			continue NextTest
 		}
 
+		// patch in a 0-port to enable auto port allocation
+		s.SecureServingInfo.BindAddress = "127.0.0.1:0"
+
 		if err := s.serveSecurely(stopCh); err != nil {
 			t.Errorf("%d - failed running the server: %v", i, err)
 			continue NextTest
@@ -457,16 +422,8 @@ NextTest:
 
 		// load ca certificates into a pool
 		roots := x509.NewCertPool()
-		for _, caCertFile := range caCertFiles {
-			bs, err := ioutil.ReadFile(caCertFile)
-			if err != nil {
-				t.Errorf("%d - error reading %q: %v", i, caCertFile, err)
-				continue NextTest
-			}
-			if ok := roots.AppendCertsFromPEM(bs); !ok {
-				t.Errorf("%d - error adding ca cert %q to the pool", i, caCertFile)
-				continue NextTest
-			}
+		for _, caCert := range caCerts {
+			roots.AddCert(caCert)
 		}
 
 		// try to dial
@@ -495,6 +452,78 @@ NextTest:
 	}
 }
 
+func parseIPList(ips []string) []net.IP {
+	var netIPs []net.IP
+	for _, ip := range ips {
+		netIPs = append(netIPs, net.ParseIP(ip))
+	}
+	return netIPs
+}
+
+func createTestTLSCerts(spec TestCertSpec) (tlsCert tls.Certificate, err error) {
+	_, _, certPem, keyPem, err := utilcert.GenerateSelfSignedCertKey(spec.host, parseIPList(spec.ips), spec.names)
+	if err != nil {
+		return tlsCert, err
+	}
+
+	tlsCert, err = tls.X509KeyPair(certPem, keyPem)
+	return tlsCert, err
+}
+
+func createTestCertFiles(dir string, spec TestCertSpec) (certFilePath, keyFilePath string, err error) {
+	caCertPem, _, certPem, keyPem, err := utilcert.GenerateSelfSignedCertKey(spec.host, parseIPList(spec.ips), spec.names)
+	if err != nil {
+		return "", "", err
+	}
+
+	certFile, err := ioutil.TempFile(dir, "cert")
+	if err != nil {
+		return "", "", err
+	}
+
+	keyFile, err := ioutil.TempFile(dir, "key")
+	if err != nil {
+		return "", "", err
+	}
+
+	_, err = certFile.Write(append(certPem, caCertPem...))
+	if err != nil {
+		return "", "", err
+	}
+	certFile.Close()
+
+	_, err = keyFile.Write(keyPem)
+	if err != nil {
+		return "", "", err
+	}
+	keyFile.Close()
+
+	return certFile.Name(), keyFile.Name(), nil
+}
+
+func caCertFromBundle(bundlePath string) (*x509.Certificate, error) {
+	pemData, err := ioutil.ReadFile(bundlePath)
+	if err != nil {
+		return nil, err
+	}
+
+	// skip first non-ca cert
+	block, pemData := pem.Decode(pemData)
+	if block == nil {
+		return nil, fmt.Errorf("bundle %q cannot be empty", bundlePath)
+	}
+
+	block, pemData = pem.Decode(pemData)
+	if block == nil {
+		return nil, fmt.Errorf("no ca found in bundle %q", bundlePath)
+	}
+
+	if block.Type != "CERTIFICATE" {
+		return nil, fmt.Errorf("expected CERTIFICATE block in bundle %q, found: %s", bundlePath, block.Type)
+	}
+	return x509.ParseCertificate(block.Bytes)
+}
+
 func x509CertSignature(cert *x509.Certificate) string {
 	return base64.StdEncoding.EncodeToString(cert.Signature)
 }
@@ -504,13 +533,13 @@ func certFileSignature(certFile, keyFile string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return certSignature(cert)
+}
 
+func certSignature(cert tls.Certificate) (string, error) {
 	x509Certs, err := x509.ParseCertificates(cert.Certificate[0])
 	if err != nil {
 		return "", err
-	}
-	if len(x509Certs) == 0 {
-		return "", fmt.Errorf("expected at least one cert after reparsing cert %q", certFile)
 	}
 	return x509CertSignature(x509Certs[0]), nil
 }
