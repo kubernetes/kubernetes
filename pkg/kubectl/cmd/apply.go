@@ -61,6 +61,8 @@ const (
 	backOffPeriod = 1 * time.Second
 	// how many times we can retry before back off
 	triesBeforeBackOff = 1
+
+	warningNoLastAppliedConfigAnnotation = "Warning: kubectl apply should be used on resource created by eithor kubectl create --save-config or kubectl apply\n"
 )
 
 var (
@@ -81,7 +83,7 @@ var (
 		cat pod.json | kubectl apply -f -`)
 )
 
-func NewCmdApply(f cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdApply(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	var options ApplyOptions
 
 	cmd := &cobra.Command{
@@ -93,7 +95,7 @@ func NewCmdApply(f cmdutil.Factory, out io.Writer) *cobra.Command {
 			cmdutil.CheckErr(validateArgs(cmd, args))
 			cmdutil.CheckErr(cmdutil.ValidateOutputArgs(cmd))
 			cmdutil.CheckErr(validatePruneAll(options.Prune, cmdutil.GetFlagBool(cmd, "all"), options.Selector))
-			cmdutil.CheckErr(RunApply(f, cmd, out, &options))
+			cmdutil.CheckErr(RunApply(f, cmd, out, errOut, &options))
 		},
 	}
 
@@ -154,7 +156,7 @@ func parsePruneResources(gvks []string) ([]pruneResource, error) {
 	return pruneResources, nil
 }
 
-func RunApply(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *ApplyOptions) error {
+func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, options *ApplyOptions) error {
 	shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
 	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
 	if err != nil {
@@ -249,6 +251,13 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *App
 		}
 
 		if !dryRun {
+			annotationMap, err := info.Mapping.MetadataAccessor.Annotations(info.Object)
+			if err != nil {
+				return err
+			}
+			if _, ok := annotationMap[annotations.LastAppliedConfigAnnotation]; !ok {
+				fmt.Fprintf(errOut, warningNoLastAppliedConfigAnnotation)
+			}
 			overwrite := cmdutil.GetFlagBool(cmd, "overwrite")
 			helper := resource.NewHelper(info.Client, info.Mapping)
 			patcher := &patcher{
