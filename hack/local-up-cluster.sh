@@ -149,6 +149,12 @@ function test_openssl_installed {
     fi
 }
 
+function test_kubeconfig_present {
+    [[ -f ${CERT_DIR}/kubeconfig ]] && return 0
+    echo "kubeconfig not found in"${CERT_DIR}". Please ensure kubeconfig and certificates are installed in"${CERT_DIR}"."
+    exit 1
+}
+
 # Shut down anyway if there's an error.
 set +e
 
@@ -414,6 +420,7 @@ EOF
 }
 
 function start_controller_manager {
+    test_kubeconfig_present
     node_cidr_args=""
     if [[ "${NET_PLUGIN}" == "kubenet" ]]; then
       node_cidr_args="--allocate-node-cidrs=true --cluster-cidr=10.1.0.0/16 "
@@ -436,6 +443,7 @@ function start_controller_manager {
 }
 
 function start_kubelet {
+    test_kubeconfig_present
     KUBELET_LOG=/tmp/kubelet.log
 
     priv_arg=""
@@ -552,6 +560,7 @@ function start_kubelet {
 }
 
 function start_kubeproxy {
+    test_kubeconfig_present
     PROXY_LOG=/tmp/kube-proxy.log
     sudo -E "${GO_OUT}/hyperkube" proxy \
       --v=${LOG_LEVEL} \
