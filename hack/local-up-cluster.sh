@@ -598,7 +598,8 @@ metadata:
   name: kube-system
 EOF
         ${KUBECTL} config set-cluster local --server=https://${API_HOST}:${API_SECURE_PORT} --certificate-authority=${ROOT_CA_FILE}
-        ${KUBECTL} config set-context local --cluster=local
+        ${KUBECTL} config set-credentials myself --username=admin --password=admin
+        ${KUBECTL} config set-context local --cluster=local --user=myself
         ${KUBECTL} config use-context local
 
         ${KUBECTL} create -f namespace.yaml
