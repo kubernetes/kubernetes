@@ -20,17 +20,23 @@ limitations under the License.
 
 package v1alpha1
 
-import (
-	runtime "k8s.io/kubernetes/pkg/runtime"
-)
+type DefaultRegisterer interface {
+	AddTypeDefaultingFunc(srcType interface{}, fn func(interface{}))
+}
 
-// RegisterDefaults adds defaulters functions to the given scheme.
+// RegisterDefaults adds defaulters functions to the given DefaultRegisterer.
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
-func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&KubeProxyConfiguration{}, func(obj interface{}) { SetObjectDefaults_KubeProxyConfiguration(obj.(*KubeProxyConfiguration)) })
-	scheme.AddTypeDefaultingFunc(&KubeSchedulerConfiguration{}, func(obj interface{}) { SetObjectDefaults_KubeSchedulerConfiguration(obj.(*KubeSchedulerConfiguration)) })
-	scheme.AddTypeDefaultingFunc(&KubeletConfiguration{}, func(obj interface{}) { SetObjectDefaults_KubeletConfiguration(obj.(*KubeletConfiguration)) })
+func RegisterDefaults(registerer DefaultRegisterer) error {
+	registerer.AddTypeDefaultingFunc(
+		&KubeProxyConfiguration{},
+		func(obj interface{}) { SetObjectDefaults_KubeProxyConfiguration(obj.(*KubeProxyConfiguration)) })
+	registerer.AddTypeDefaultingFunc(
+		&KubeSchedulerConfiguration{},
+		func(obj interface{}) { SetObjectDefaults_KubeSchedulerConfiguration(obj.(*KubeSchedulerConfiguration)) })
+	registerer.AddTypeDefaultingFunc(
+		&KubeletConfiguration{},
+		func(obj interface{}) { SetObjectDefaults_KubeletConfiguration(obj.(*KubeletConfiguration)) })
 	return nil
 }
 

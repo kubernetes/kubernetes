@@ -22,27 +22,54 @@ package v1beta1
 
 import (
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
-// RegisterDefaults adds defaulters functions to the given scheme.
+type DefaultRegisterer interface {
+	AddTypeDefaultingFunc(srcType interface{}, fn func(interface{}))
+}
+
+// RegisterDefaults adds defaulters functions to the given DefaultRegisterer.
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
-func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&DaemonSet{}, func(obj interface{}) { SetObjectDefaults_DaemonSet(obj.(*DaemonSet)) })
-	scheme.AddTypeDefaultingFunc(&DaemonSetList{}, func(obj interface{}) { SetObjectDefaults_DaemonSetList(obj.(*DaemonSetList)) })
-	scheme.AddTypeDefaultingFunc(&Deployment{}, func(obj interface{}) { SetObjectDefaults_Deployment(obj.(*Deployment)) })
-	scheme.AddTypeDefaultingFunc(&DeploymentList{}, func(obj interface{}) { SetObjectDefaults_DeploymentList(obj.(*DeploymentList)) })
-	scheme.AddTypeDefaultingFunc(&HorizontalPodAutoscaler{}, func(obj interface{}) { SetObjectDefaults_HorizontalPodAutoscaler(obj.(*HorizontalPodAutoscaler)) })
-	scheme.AddTypeDefaultingFunc(&HorizontalPodAutoscalerList{}, func(obj interface{}) {
-		SetObjectDefaults_HorizontalPodAutoscalerList(obj.(*HorizontalPodAutoscalerList))
-	})
-	scheme.AddTypeDefaultingFunc(&Job{}, func(obj interface{}) { SetObjectDefaults_Job(obj.(*Job)) })
-	scheme.AddTypeDefaultingFunc(&JobList{}, func(obj interface{}) { SetObjectDefaults_JobList(obj.(*JobList)) })
-	scheme.AddTypeDefaultingFunc(&NetworkPolicy{}, func(obj interface{}) { SetObjectDefaults_NetworkPolicy(obj.(*NetworkPolicy)) })
-	scheme.AddTypeDefaultingFunc(&NetworkPolicyList{}, func(obj interface{}) { SetObjectDefaults_NetworkPolicyList(obj.(*NetworkPolicyList)) })
-	scheme.AddTypeDefaultingFunc(&ReplicaSet{}, func(obj interface{}) { SetObjectDefaults_ReplicaSet(obj.(*ReplicaSet)) })
-	scheme.AddTypeDefaultingFunc(&ReplicaSetList{}, func(obj interface{}) { SetObjectDefaults_ReplicaSetList(obj.(*ReplicaSetList)) })
+func RegisterDefaults(registerer DefaultRegisterer) error {
+	registerer.AddTypeDefaultingFunc(
+		&DaemonSet{},
+		func(obj interface{}) { SetObjectDefaults_DaemonSet(obj.(*DaemonSet)) })
+	registerer.AddTypeDefaultingFunc(
+		&DaemonSetList{},
+		func(obj interface{}) { SetObjectDefaults_DaemonSetList(obj.(*DaemonSetList)) })
+	registerer.AddTypeDefaultingFunc(
+		&Deployment{},
+		func(obj interface{}) { SetObjectDefaults_Deployment(obj.(*Deployment)) })
+	registerer.AddTypeDefaultingFunc(
+		&DeploymentList{},
+		func(obj interface{}) { SetObjectDefaults_DeploymentList(obj.(*DeploymentList)) })
+	registerer.AddTypeDefaultingFunc(
+		&HorizontalPodAutoscaler{},
+		func(obj interface{}) { SetObjectDefaults_HorizontalPodAutoscaler(obj.(*HorizontalPodAutoscaler)) })
+	registerer.AddTypeDefaultingFunc(
+		&HorizontalPodAutoscalerList{},
+		func(obj interface{}) {
+			SetObjectDefaults_HorizontalPodAutoscalerList(obj.(*HorizontalPodAutoscalerList))
+		})
+	registerer.AddTypeDefaultingFunc(
+		&Job{},
+		func(obj interface{}) { SetObjectDefaults_Job(obj.(*Job)) })
+	registerer.AddTypeDefaultingFunc(
+		&JobList{},
+		func(obj interface{}) { SetObjectDefaults_JobList(obj.(*JobList)) })
+	registerer.AddTypeDefaultingFunc(
+		&NetworkPolicy{},
+		func(obj interface{}) { SetObjectDefaults_NetworkPolicy(obj.(*NetworkPolicy)) })
+	registerer.AddTypeDefaultingFunc(
+		&NetworkPolicyList{},
+		func(obj interface{}) { SetObjectDefaults_NetworkPolicyList(obj.(*NetworkPolicyList)) })
+	registerer.AddTypeDefaultingFunc(
+		&ReplicaSet{},
+		func(obj interface{}) { SetObjectDefaults_ReplicaSet(obj.(*ReplicaSet)) })
+	registerer.AddTypeDefaultingFunc(
+		&ReplicaSetList{},
+		func(obj interface{}) { SetObjectDefaults_ReplicaSetList(obj.(*ReplicaSetList)) })
 	return nil
 }
 

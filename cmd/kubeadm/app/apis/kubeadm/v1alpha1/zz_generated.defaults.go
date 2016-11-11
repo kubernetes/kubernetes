@@ -20,16 +20,20 @@ limitations under the License.
 
 package v1alpha1
 
-import (
-	runtime "k8s.io/kubernetes/pkg/runtime"
-)
+type DefaultRegisterer interface {
+	AddTypeDefaultingFunc(srcType interface{}, fn func(interface{}))
+}
 
-// RegisterDefaults adds defaulters functions to the given scheme.
+// RegisterDefaults adds defaulters functions to the given DefaultRegisterer.
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
-func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&MasterConfiguration{}, func(obj interface{}) { SetObjectDefaults_MasterConfiguration(obj.(*MasterConfiguration)) })
-	scheme.AddTypeDefaultingFunc(&NodeConfiguration{}, func(obj interface{}) { SetObjectDefaults_NodeConfiguration(obj.(*NodeConfiguration)) })
+func RegisterDefaults(registerer DefaultRegisterer) error {
+	registerer.AddTypeDefaultingFunc(
+		&MasterConfiguration{},
+		func(obj interface{}) { SetObjectDefaults_MasterConfiguration(obj.(*MasterConfiguration)) })
+	registerer.AddTypeDefaultingFunc(
+		&NodeConfiguration{},
+		func(obj interface{}) { SetObjectDefaults_NodeConfiguration(obj.(*NodeConfiguration)) })
 	return nil
 }
 

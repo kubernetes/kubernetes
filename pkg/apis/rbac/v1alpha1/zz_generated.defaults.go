@@ -20,18 +20,26 @@ limitations under the License.
 
 package v1alpha1
 
-import (
-	runtime "k8s.io/kubernetes/pkg/runtime"
-)
+type DefaultRegisterer interface {
+	AddTypeDefaultingFunc(srcType interface{}, fn func(interface{}))
+}
 
-// RegisterDefaults adds defaulters functions to the given scheme.
+// RegisterDefaults adds defaulters functions to the given DefaultRegisterer.
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
-func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&ClusterRoleBinding{}, func(obj interface{}) { SetObjectDefaults_ClusterRoleBinding(obj.(*ClusterRoleBinding)) })
-	scheme.AddTypeDefaultingFunc(&ClusterRoleBindingList{}, func(obj interface{}) { SetObjectDefaults_ClusterRoleBindingList(obj.(*ClusterRoleBindingList)) })
-	scheme.AddTypeDefaultingFunc(&RoleBinding{}, func(obj interface{}) { SetObjectDefaults_RoleBinding(obj.(*RoleBinding)) })
-	scheme.AddTypeDefaultingFunc(&RoleBindingList{}, func(obj interface{}) { SetObjectDefaults_RoleBindingList(obj.(*RoleBindingList)) })
+func RegisterDefaults(registerer DefaultRegisterer) error {
+	registerer.AddTypeDefaultingFunc(
+		&ClusterRoleBinding{},
+		func(obj interface{}) { SetObjectDefaults_ClusterRoleBinding(obj.(*ClusterRoleBinding)) })
+	registerer.AddTypeDefaultingFunc(
+		&ClusterRoleBindingList{},
+		func(obj interface{}) { SetObjectDefaults_ClusterRoleBindingList(obj.(*ClusterRoleBindingList)) })
+	registerer.AddTypeDefaultingFunc(
+		&RoleBinding{},
+		func(obj interface{}) { SetObjectDefaults_RoleBinding(obj.(*RoleBinding)) })
+	registerer.AddTypeDefaultingFunc(
+		&RoleBindingList{},
+		func(obj interface{}) { SetObjectDefaults_RoleBindingList(obj.(*RoleBindingList)) })
 	return nil
 }
 
