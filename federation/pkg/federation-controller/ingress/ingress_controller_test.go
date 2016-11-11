@@ -118,14 +118,14 @@ func TestIngressController(t *testing.T) {
 	t.Log("Adding Ingress UID ConfigMap to cluster 1")
 	cluster1ConfigMapWatch.Add(cfg1)
 
-	t.Log("Checking that UID annotation on Cluster 1 annotation was correctly updated")
-	cluster := GetClusterFromChan(fedClusterUpdateChan)
-	assert.NotNil(t, cluster)
-	assert.Equal(t, cluster.ObjectMeta.Annotations[uidAnnotationKey], cfg1.Data[uidKey])
-
 	// Test add federated ingress.
 	t.Log("Adding Federated Ingress")
 	fedIngressWatch.Add(&ing1)
+
+	t.Log("Checking that UID annotation on Cluster 1 annotation was correctly updated after added Federated Ingress")
+	cluster := GetClusterFromChan(fedClusterUpdateChan)
+	assert.NotNil(t, cluster)
+	assert.Equal(t, cluster.ObjectMeta.Annotations[uidAnnotationKey], cfg1.Data[uidKey])
 	/*
 		// TODO: Re-enable this when we have fixed these flaky tests: https://github.com/kubernetes/kubernetes/issues/36540.
 		t.Logf("Checking that approproate finalizers are added")

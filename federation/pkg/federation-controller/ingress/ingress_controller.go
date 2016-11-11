@@ -489,6 +489,12 @@ func (ic *IngressController) reconcileConfigMapForCluster(clusterName string) {
 		return
 	}
 
+	ingressList := ic.ingressInformerStore.List()
+	if len(ingressList) <= 0 {
+		glog.V(4).Infof("No federated ingresses, ignore reconcile config map.")
+		return
+	}
+
 	if clusterName == allClustersKey {
 		clusters, err := ic.configMapFederatedInformer.GetReadyClusters()
 		if err != nil {
