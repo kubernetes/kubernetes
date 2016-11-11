@@ -853,16 +853,12 @@ type ClusterVerification struct {
 	podState  PodStateVerification
 }
 
-func (f *Framework) NewClusterVerificationInNamespace(filter PodStateVerification, ns *api.Namespace) *ClusterVerification {
+func (f *Framework) NewClusterVerification(filter PodStateVerification) *ClusterVerification {
 	return &ClusterVerification{
 		f.ClientSet,
-		ns,
+		f.Namespace,
 		filter,
 	}
-}
-
-func (f *Framework) NewClusterVerification(filter PodStateVerification) *ClusterVerification {
-	return f.NewClusterVerificationInNamespace(filter, f.Namespace)
 }
 
 func passesPodNameFilter(pod api.Pod, name string) bool {
