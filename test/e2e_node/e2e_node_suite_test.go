@@ -32,8 +32,8 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/services"
@@ -222,7 +222,7 @@ func waitForNodeReady() {
 	client, err := clientset.NewForConfig(config)
 	Expect(err).NotTo(HaveOccurred())
 	Eventually(func() error {
-		nodes, err := client.Nodes().List(api.ListOptions{})
+		nodes, err := client.Nodes().List(v1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		if nodes == nil {
 			return fmt.Errorf("the node list is nil.")
@@ -232,7 +232,7 @@ func waitForNodeReady() {
 			return fmt.Errorf("empty node list: %+v", nodes)
 		}
 		node := nodes.Items[0]
-		if !api.IsNodeReady(&node) {
+		if !v1.IsNodeReady(&node) {
 			return fmt.Errorf("node is not ready: %+v", node)
 		}
 		return nil

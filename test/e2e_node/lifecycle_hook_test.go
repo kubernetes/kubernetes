@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -34,7 +34,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 	var file string
 	const podWaitTimeout = 2 * time.Minute
 
-	testPodWithHook := func(podWithHook *api.Pod) {
+	testPodWithHook := func(podWithHook *v1.Pod) {
 		podCheckHook := getLifecycleHookTestPod("pod-check-hook",
 			// Wait until the file is created.
 			[]string{"sh", "-c", fmt.Sprintf("while [ ! -e %s ]; do sleep 1; done", file)},
@@ -48,7 +48,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 			podClient.WaitForSuccess(podCheckHook.Name, podWaitTimeout)
 		}
 		By("delete the pod with lifecycle hook")
-		podClient.DeleteSync(podWithHook.Name, api.NewDeleteOptions(15), podWaitTimeout)
+		podClient.DeleteSync(podWithHook.Name, v1.NewDeleteOptions(15), podWaitTimeout)
 		if podWithHook.Spec.Containers[0].Lifecycle.PreStop != nil {
 			By("create the hook check pod")
 			podClient.Create(podCheckHook)
@@ -76,9 +76,9 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 					// Block forever
 					[]string{"tail", "-f", "/dev/null"},
 				)
-				podWithHook.Spec.Containers[0].Lifecycle = &api.Lifecycle{
-					PostStart: &api.Handler{
-						Exec: &api.ExecAction{Command: []string{"touch", file}},
+				podWithHook.Spec.Containers[0].Lifecycle = &v1.Lifecycle{
+					PostStart: &v1.Handler{
+						Exec: &v1.ExecAction{Command: []string{"touch", file}},
 					},
 				}
 				testPodWithHook(podWithHook)
@@ -89,9 +89,9 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 					// Block forever
 					[]string{"tail", "-f", "/dev/null"},
 				)
-				podWithHook.Spec.Containers[0].Lifecycle = &api.Lifecycle{
-					PreStop: &api.Handler{
-						Exec: &api.ExecAction{Command: []string{"touch", file}},
+				podWithHook.Spec.Containers[0].Lifecycle = &v1.Lifecycle{
+					PreStop: &v1.Handler{
+						Exec: &v1.ExecAction{Command: []string{"touch", file}},
 					},
 				}
 				testPodWithHook(podWithHook)
@@ -108,10 +108,10 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 						fmt.Sprintf("echo -e \"HTTP/1.1 200 OK\n\" | nc -l -p 1234; touch %s", file),
 					},
 				)
-				podHandleHookRequest.Spec.Containers[0].Ports = []api.ContainerPort{
+				podHandleHookRequest.Spec.Containers[0].Ports = []v1.ContainerPort{
 					{
 						ContainerPort: 1234,
-						Protocol:      api.ProtocolTCP,
+						Protocol:      v1.ProtocolTCP,
 					},
 				}
 				podHandleHookRequest = podClient.CreateSync(podHandleHookRequest)
@@ -122,9 +122,9 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 					// Block forever
 					[]string{"tail", "-f", "/dev/null"},
 				)
-				podWithHook.Spec.Containers[0].Lifecycle = &api.Lifecycle{
-					PostStart: &api.Handler{
-						HTTPGet: &api.HTTPGetAction{
+				podWithHook.Spec.Containers[0].Lifecycle = &v1.Lifecycle{
+					PostStart: &v1.Handler{
+						HTTPGet: &v1.HTTPGetAction{
 							Host: targetIP,
 							Port: intstr.FromInt(1234),
 						},
@@ -137,9 +137,9 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 					// Block forever
 					[]string{"tail", "-f", "/dev/null"},
 				)
-				podWithHook.Spec.Containers[0].Lifecycle = &api.Lifecycle{
-					PreStop: &api.Handler{
-						HTTPGet: &api.HTTPGetAction{
+				podWithHook.Spec.Containers[0].Lifecycle = &v1.Lifecycle{
+					PreStop: &v1.Handler{
+						HTTPGet: &v1.HTTPGetAction{
 							Host: targetIP,
 							Port: intstr.FromInt(1234),
 						},
@@ -151,17 +151,17 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 	})
 })
 
-func getLifecycleHookTestPod(name string, cmd []string) *api.Pod {
-	return &api.Pod{
-		ObjectMeta: api.ObjectMeta{
+func getLifecycleHookTestPod(name string, cmd []string) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: v1.ObjectMeta{
 			Name: name,
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:  name,
 					Image: "gcr.io/google_containers/busybox:1.24",
-					VolumeMounts: []api.VolumeMount{
+					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "tmpfs",
 							MountPath: "/tmp",
@@ -170,11 +170,11 @@ func getLifecycleHookTestPod(name string, cmd []string) *api.Pod {
 					Command: cmd,
 				},
 			},
-			RestartPolicy: api.RestartPolicyNever,
-			Volumes: []api.Volume{
+			RestartPolicy: v1.RestartPolicyNever,
+			Volumes: []v1.Volume{
 				{
 					Name:         "tmpfs",
-					VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/tmp"}},
+					VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: "/tmp"}},
 				},
 			},
 		},

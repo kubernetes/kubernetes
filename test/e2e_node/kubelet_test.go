@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	apiUnversioned "k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -39,14 +39,14 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 	Context("when scheduling a busybox command in a pod", func() {
 		podName := "busybox-scheduling-" + string(uuid.NewUUID())
 		It("it should print the output to logs [Conformance]", func() {
-			podClient.CreateSync(&api.Pod{
-				ObjectMeta: api.ObjectMeta{
+			podClient.CreateSync(&v1.Pod{
+				ObjectMeta: v1.ObjectMeta{
 					Name: podName,
 				},
-				Spec: api.PodSpec{
+				Spec: v1.PodSpec{
 					// Don't restart the Pod since it is expected to exit
-					RestartPolicy: api.RestartPolicyNever,
-					Containers: []api.Container{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
 						{
 							Image:   "gcr.io/google_containers/busybox:1.24",
 							Name:    podName,
@@ -57,7 +57,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 			})
 			Eventually(func() string {
 				sinceTime := apiUnversioned.NewTime(time.Now().Add(time.Duration(-1 * time.Hour)))
-				rc, err := podClient.GetLogs(podName, &api.PodLogOptions{SinceTime: &sinceTime}).Stream()
+				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{SinceTime: &sinceTime}).Stream()
 				if err != nil {
 					return ""
 				}
@@ -73,14 +73,14 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 
 		BeforeEach(func() {
 			podName = "bin-false" + string(uuid.NewUUID())
-			podClient.Create(&api.Pod{
-				ObjectMeta: api.ObjectMeta{
+			podClient.Create(&v1.Pod{
+				ObjectMeta: v1.ObjectMeta{
 					Name: podName,
 				},
-				Spec: api.PodSpec{
+				Spec: v1.PodSpec{
 					// Don't restart the Pod since it is expected to exit
-					RestartPolicy: api.RestartPolicyNever,
-					Containers: []api.Container{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
 						{
 							Image:   "gcr.io/google_containers/busybox:1.24",
 							Name:    podName,
@@ -112,7 +112,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		})
 
 		It("should be possible to delete", func() {
-			err := podClient.Delete(podName, &api.DeleteOptions{})
+			err := podClient.Delete(podName, &v1.DeleteOptions{})
 			Expect(err).To(BeNil(), fmt.Sprintf("Error deleting Pod %v", err))
 		})
 	})
@@ -120,19 +120,19 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		podName := "busybox-readonly-fs" + string(uuid.NewUUID())
 		It("it should not write to root filesystem [Conformance]", func() {
 			isReadOnly := true
-			podClient.CreateSync(&api.Pod{
-				ObjectMeta: api.ObjectMeta{
+			podClient.CreateSync(&v1.Pod{
+				ObjectMeta: v1.ObjectMeta{
 					Name: podName,
 				},
-				Spec: api.PodSpec{
+				Spec: v1.PodSpec{
 					// Don't restart the Pod since it is expected to exit
-					RestartPolicy: api.RestartPolicyNever,
-					Containers: []api.Container{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
 						{
 							Image:   "gcr.io/google_containers/busybox:1.24",
 							Name:    podName,
 							Command: []string{"sh", "-c", "echo test > /file; sleep 240"},
-							SecurityContext: &api.SecurityContext{
+							SecurityContext: &v1.SecurityContext{
 								ReadOnlyRootFilesystem: &isReadOnly,
 							},
 						},
@@ -140,7 +140,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 				},
 			})
 			Eventually(func() string {
-				rc, err := podClient.GetLogs(podName, &api.PodLogOptions{}).Stream()
+				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream()
 				if err != nil {
 					return ""
 				}

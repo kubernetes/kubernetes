@@ -25,8 +25,8 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	kubemetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -429,7 +429,7 @@ func runDensitySeqTest(f *framework.Framework, rc *ResourceCollector, testArg de
 
 // createBatchPodWithRateControl creates a batch of pods concurrently, uses one goroutine for each creation.
 // between creations there is an interval for throughput control
-func createBatchPodWithRateControl(f *framework.Framework, pods []*api.Pod, interval time.Duration) map[string]unversioned.Time {
+func createBatchPodWithRateControl(f *framework.Framework, pods []*v1.Pod, interval time.Duration) map[string]unversioned.Time {
 	createTimes := make(map[string]unversioned.Time)
 	for _, pod := range pods {
 		createTimes[pod.ObjectMeta.Name] = unversioned.Now()
@@ -479,12 +479,12 @@ func verifyPodStartupLatency(expect, actual framework.LatencyMetric) error {
 func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes map[string]unversioned.Time,
 	podType string) *cache.Controller {
 	ns := f.Namespace.Name
-	checkPodRunning := func(p *api.Pod) {
+	checkPodRunning := func(p *v1.Pod) {
 		mutex.Lock()
 		defer mutex.Unlock()
 		defer GinkgoRecover()
 
-		if p.Status.Phase == api.PodRunning {
+		if p.Status.Phase == v1.PodRunning {
 			if _, found := watchTimes[p.Name]; !found {
 				watchTimes[p.Name] = unversioned.Now()
 			}
@@ -493,26 +493,26 @@ func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes m
 
 	_, controller := cache.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": podType})
+			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": podType}).String()
 				obj, err := f.ClientSet.Core().Pods(ns).List(options)
 				return runtime.Object(obj), err
 			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": podType})
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": podType}).String()
 				return f.ClientSet.Core().Pods(ns).Watch(options)
 			},
 		},
-		&api.Pod{},
+		&v1.Pod{},
 		0,
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				p, ok := obj.(*api.Pod)
+				p, ok := obj.(*v1.Pod)
 				Expect(ok).To(Equal(true))
 				go checkPodRunning(p)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
-				p, ok := newObj.(*api.Pod)
+				p, ok := newObj.(*v1.Pod)
 				Expect(ok).To(Equal(true))
 				go checkPodRunning(p)
 			},
@@ -522,7 +522,7 @@ func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes m
 }
 
 // createBatchPodSequential creats pods back-to-back in sequence.
-func createBatchPodSequential(f *framework.Framework, pods []*api.Pod) (time.Duration, []framework.PodLatencyData) {
+func createBatchPodSequential(f *framework.Framework, pods []*v1.Pod) (time.Duration, []framework.PodLatencyData) {
 	batchStartTime := unversioned.Now()
 	e2eLags := make([]framework.PodLatencyData, 0)
 	for _, pod := range pods {

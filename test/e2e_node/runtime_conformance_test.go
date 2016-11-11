@@ -21,7 +21,7 @@ import (
 	"path"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -44,34 +44,34 @@ var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
 			It("it should run with the expected status [Conformance]", func() {
 				restartCountVolumeName := "restart-count"
 				restartCountVolumePath := "/restart-count"
-				testContainer := api.Container{
+				testContainer := v1.Container{
 					Image: "gcr.io/google_containers/busybox:1.24",
-					VolumeMounts: []api.VolumeMount{
+					VolumeMounts: []v1.VolumeMount{
 						{
 							MountPath: restartCountVolumePath,
 							Name:      restartCountVolumeName,
 						},
 					},
 				}
-				testVolumes := []api.Volume{
+				testVolumes := []v1.Volume{
 					{
 						Name: restartCountVolumeName,
-						VolumeSource: api.VolumeSource{
-							EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory},
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory},
 						},
 					},
 				}
 				testCases := []struct {
 					Name          string
-					RestartPolicy api.RestartPolicy
-					Phase         api.PodPhase
+					RestartPolicy v1.RestartPolicy
+					Phase         v1.PodPhase
 					State         ContainerState
 					RestartCount  int32
 					Ready         bool
 				}{
-					{"terminate-cmd-rpa", api.RestartPolicyAlways, api.PodRunning, ContainerStateRunning, 2, true},
-					{"terminate-cmd-rpof", api.RestartPolicyOnFailure, api.PodSucceeded, ContainerStateTerminated, 1, false},
-					{"terminate-cmd-rpn", api.RestartPolicyNever, api.PodFailed, ContainerStateTerminated, 0, false},
+					{"terminate-cmd-rpa", v1.RestartPolicyAlways, v1.PodRunning, ContainerStateRunning, 2, true},
+					{"terminate-cmd-rpof", v1.RestartPolicyOnFailure, v1.PodSucceeded, ContainerStateTerminated, 1, false},
+					{"terminate-cmd-rpn", v1.RestartPolicyNever, v1.PodFailed, ContainerStateTerminated, 0, false},
 				}
 				for _, testCase := range testCases {
 
@@ -95,8 +95,8 @@ while true; do sleep 1; done
 						Container:     testContainer,
 						RestartPolicy: testCase.RestartPolicy,
 						Volumes:       testVolumes,
-						PodSecurityContext: &api.PodSecurityContext{
-							SELinuxOptions: &api.SELinuxOptions{
+						PodSecurityContext: &v1.PodSecurityContext{
+							SELinuxOptions: &v1.SELinuxOptions{
 								Level: "s0",
 							},
 						},
@@ -135,17 +135,17 @@ while true; do sleep 1; done
 				priv := true
 				c := ConformanceContainer{
 					PodClient: f.PodClient(),
-					Container: api.Container{
+					Container: v1.Container{
 						Image:   "gcr.io/google_containers/busybox:1.24",
 						Name:    name,
 						Command: []string{"/bin/sh", "-c"},
 						Args:    []string{fmt.Sprintf("/bin/echo -n %s > %s", terminationMessage, terminationMessagePath)},
 						TerminationMessagePath: terminationMessagePath,
-						SecurityContext: &api.SecurityContext{
+						SecurityContext: &v1.SecurityContext{
 							Privileged: &priv,
 						},
 					},
-					RestartPolicy: api.RestartPolicyNever,
+					RestartPolicy: v1.RestartPolicyNever,
 				}
 
 				By("create the container")
@@ -153,7 +153,7 @@ while true; do sleep 1; done
 				defer c.Delete()
 
 				By("wait for the container to succeed")
-				Eventually(c.GetPhase, retryTimeout, pollInterval).Should(Equal(api.PodSucceeded))
+				Eventually(c.GetPhase, retryTimeout, pollInterval).Should(Equal(v1.PodSucceeded))
 
 				By("get the container status")
 				status, err := c.GetStatus()
@@ -181,55 +181,55 @@ while true; do sleep 1; done
 		}
 	}
 }`
-			secret := &api.Secret{
-				Data: map[string][]byte{api.DockerConfigJsonKey: []byte(auth)},
-				Type: api.SecretTypeDockerConfigJson,
+			secret := &v1.Secret{
+				Data: map[string][]byte{v1.DockerConfigJsonKey: []byte(auth)},
+				Type: v1.SecretTypeDockerConfigJson,
 			}
 			// The following images are not added into NodeImageWhiteList, because this test is
 			// testing image pulling, these images don't need to be prepulled. The ImagePullPolicy
-			// is api.PullAlways, so it won't be blocked by framework image white list check.
+			// is v1.PullAlways, so it won't be blocked by framework image white list check.
 			for _, testCase := range []struct {
 				description string
 				image       string
 				secret      bool
-				phase       api.PodPhase
+				phase       v1.PodPhase
 				waiting     bool
 			}{
 				{
 					description: "should not be able to pull image from invalid registry",
 					image:       "invalid.com/invalid/alpine:3.1",
-					phase:       api.PodPending,
+					phase:       v1.PodPending,
 					waiting:     true,
 				},
 				{
 					description: "should not be able to pull non-existing image from gcr.io",
 					image:       "gcr.io/google_containers/invalid-image:invalid-tag",
-					phase:       api.PodPending,
+					phase:       v1.PodPending,
 					waiting:     true,
 				},
 				{
 					description: "should be able to pull image from gcr.io",
 					image:       "gcr.io/google_containers/alpine-with-bash:1.0",
-					phase:       api.PodRunning,
+					phase:       v1.PodRunning,
 					waiting:     false,
 				},
 				{
 					description: "should be able to pull image from docker hub",
 					image:       "alpine:3.1",
-					phase:       api.PodRunning,
+					phase:       v1.PodRunning,
 					waiting:     false,
 				},
 				{
 					description: "should not be able to pull from private registry without secret",
 					image:       "gcr.io/authenticated-image-pulling/alpine:3.1",
-					phase:       api.PodPending,
+					phase:       v1.PodPending,
 					waiting:     true,
 				},
 				{
 					description: "should be able to pull from private registry with secret",
 					image:       "gcr.io/authenticated-image-pulling/alpine:3.1",
 					secret:      true,
-					phase:       api.PodRunning,
+					phase:       v1.PodRunning,
 					waiting:     false,
 				},
 			} {
@@ -239,14 +239,14 @@ while true; do sleep 1; done
 					command := []string{"/bin/sh", "-c", "while true; do sleep 1; done"}
 					container := ConformanceContainer{
 						PodClient: f.PodClient(),
-						Container: api.Container{
+						Container: v1.Container{
 							Name:    name,
 							Image:   testCase.image,
 							Command: command,
 							// PullAlways makes sure that the image will always be pulled even if it is present before the test.
-							ImagePullPolicy: api.PullAlways,
+							ImagePullPolicy: v1.PullAlways,
 						},
-						RestartPolicy: api.RestartPolicyNever,
+						RestartPolicy: v1.RestartPolicyNever,
 					}
 					if testCase.secret {
 						secret.Name = "image-pull-secret-" + string(uuid.NewUUID())
