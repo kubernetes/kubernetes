@@ -482,6 +482,105 @@ func TestReplicaCalcEmptyCPURequest(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestReplicaCalcMissingMetricsNoChangeEq(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  2,
+		expectedReplicas: 2,
+		resource: &resourceInfo{
+			name:     api.ResourceCPU,
+			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0")},
+			levels:   []int64{1000},
+
+			targetUtilization:   100,
+			expectedUtilization: 100,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcMissingMetricsNoChangeGt(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  2,
+		expectedReplicas: 2,
+		resource: &resourceInfo{
+			name:     api.ResourceCPU,
+			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0")},
+			levels:   []int64{1900},
+
+			targetUtilization:   100,
+			expectedUtilization: 190,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcMissingMetricsNoChangeLt(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  2,
+		expectedReplicas: 2,
+		resource: &resourceInfo{
+			name:     api.ResourceCPU,
+			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0")},
+			levels:   []int64{600},
+
+			targetUtilization:   100,
+			expectedUtilization: 60,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcMissingMetricsUnreadyNoChange(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  3,
+		expectedReplicas: 3,
+		podReadiness:     []api.ConditionStatus{api.ConditionFalse, api.ConditionTrue, api.ConditionTrue},
+		resource: &resourceInfo{
+			name:     api.ResourceCPU,
+			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+			levels:   []int64{100, 450},
+
+			targetUtilization:   50,
+			expectedUtilization: 45,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcMissingMetricsUnreadyScaleUp(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  3,
+		expectedReplicas: 4,
+		podReadiness:     []api.ConditionStatus{api.ConditionFalse, api.ConditionTrue, api.ConditionTrue},
+		resource: &resourceInfo{
+			name:     api.ResourceCPU,
+			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+			levels:   []int64{100, 2000},
+
+			targetUtilization:   50,
+			expectedUtilization: 200,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcMissingMetricsUnreadyScaleDown(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  4,
+		expectedReplicas: 3,
+		podReadiness:     []api.ConditionStatus{api.ConditionFalse, api.ConditionTrue, api.ConditionTrue, api.ConditionTrue},
+		resource: &resourceInfo{
+			name:     api.ResourceCPU,
+			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+			levels:   []int64{100, 100, 100},
+
+			targetUtilization:   50,
+			expectedUtilization: 10,
+		},
+	}
+	tc.runTest(t)
+}
+
 // TestComputedToleranceAlgImplementation is a regression test which
 // back-calculates a minimal percentage for downscaling based on a small percentage
 // increase in pod utilization which is calibrated against the tolerance value.
