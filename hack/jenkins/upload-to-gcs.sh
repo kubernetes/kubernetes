@@ -131,7 +131,8 @@ function find_version() {
 function print_started() {
   local metadata_keys=$(compgen -e | grep ^BUILD_METADATA_)
   echo "{"
-  echo "    \"version\": \"${version}\","
+  echo "    \"version\": \"${version}\","  # TODO(fejta): retire
+  echo "    \"job-version\": \"${version}\","
   echo "    \"timestamp\": ${timestamp},"
   if [[ -n "${metadata_keys}" ]]; then
     # Any exported variables of the form BUILD_METADATA_KEY=VALUE
