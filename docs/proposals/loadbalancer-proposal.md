@@ -36,17 +36,16 @@ Documentation for other releases can be found at
 ----
 
 ### Overview
+Thie proposal aims to:
 
-LoadBalancer is a commen resource provided by IaaS cloud provider, but currently
-kuberntes does not expose cloud LoadBalancer resource to users explicitly, we
-just use it implicitly by "Loadbalancer" type Service. We proposed to:
+* introduce a first class API "LoadBalancer" so that user can
+  create/update/delete a loadbalancer.
+* introduce a first class API "LoadBalancerClaim" so that loadbalancer can be
+  dynamically provisioned and "used" based on networking resource request.
+* introduce some networking resource such as bandwidth and iops, so that Ingress
+  can declare how many networking resource it request, and let k8s to schedule a
+  loadbalancer for it.
 
-* explicitly expose cloud loadbalancer to users.
-* introduce `LoadbalancerClaim` mechanism to allow user to create, use, and
-  delete loadbalancer in a convinent way.
-* introduce some networking resource types(such as bandwidth, iops) so that
-  Ingress (and intranet l7 loadbalancing rules which may eventually be added)
-  can request "how many networking resource I expected to use"
 
 ### Background
 
@@ -57,9 +56,9 @@ Ingress can be used to expose a service in the kubernetes cluster:
 * user creates Ingress resources
 * the ingress-controller Pod will list&watch ***All*** Ingress Resources in the
   cluster
-  * on bare-metal, the ingress-controller then call the cloud provider to sync
-    the ingress L7 loadbalancing rules
-  * on cloud provider case, the ingress-controller then sync the
+  * on cloud provider, the ingress-controller then call the cloud provider to
+    sync the ingress L7 loadbalancing rules
+  * on bare-metal  case, the ingress-controller then sync the
     nginx(or haproxy, etc) config and reload
 * user out of cluster then can access service in the cluster by:
   * on bare-metal, accessing the node's ip on which ingress-controller Pod is
@@ -69,74 +68,97 @@ Ingress can be used to expose a service in the kubernetes cluster:
     cloud provider will forward request into cluster based on rules defined in
     Ingress Resource
 
-##### Limitations of Ingress
-###### On bare-metal only
-1. l4 client ip is lost
-2. It does not provide High Availability because client needs to know the IP
-   addresss of the node where ingress-controller Pod is running. In case of a
-   failure the ingress-controller Pod can be moved to a different node
-
-###### Both on bare-metal and on cloud provider
-3. How many ingress-controller Pod should run in a cluster? Should all
-   ingress-controller Pod list&watch all Ingress Resource with out distinction?
-   There is no way to bind or schedule Ingress resource to a ingress-controller
-   Pod, which result in:
+##### Limitations of current Ingress implementation
+* On bare-metal, it does not provide High Availability because client needs
+  to know the IP addresss of the node where ingress-controller Pod is running.
+  In case of a failure the ingress-controller Pod can be moved to a different
+  node.
+* How many ingress-controller Pod should run in a cluster? Should all
+  ingress-controller Pod list&watch all Ingress resource with out distinction?
+  There is no way to bind or schedule Ingress resource to a ingress-controller
+  Pod, which result in:
 
    * insufficient or excessive use of neworking resource.
    * reload storm when update Ingress resource
 
-2. Ingress resource is actually internet l7 loadbalancing rules, intranet l7
-   loadbalancing rules has not been supported yet.
+* Ingress resource is actually internet l7 loadbalancing rules, intranet l7
+  loadbalancing rules has not been supported yet. Eventually, We need a general
+  mechanism for both the Ingress and intranet L7 lb rules "consume" a
+  loadbalancer
 
 
-### Goal
+### Goal and NoneGoal
+##### Goal
+* LoadBalancer API
+* LoadBalancerClaim API
+* networking resource
+* loadbalancer provider
+* loadbalancer scheduling
+
+##### NoGoal
+* LoadBalancer HA on bare-metal
+* LoadBalancerClass: different type(internet or intranet), different qos level, etc
+* LoadBalancer scheduling over-commitment
+
+### Design
 ##### LoadBalancer
-Explicitly expose loadbalancer to users, let Ingress resource(internet
+Introduce "LoadBalancer" as first-class API, let Ingress resource (internet
 loadbalancing rules) and intranet loadbalancing rules to "use" or "consume"
-loadbalancers based on on the networking resources(bandwidth, iops, etc) the
-loadbalancing rules request.
+loadbalancers based on on the networking resources(bandwidth, iops, etc) they
+request. Just like how Pod "consume" Node.
 
-*Why "LoadBalancer"*, instead of someting like "IngressService":
-
-Ingress is actually internet l7 loadbalancing rules. Not only Ingress can
-"use" or "consume" loadbalancer, intranet l7 loadbalancing rules also can.
-Something like "IngressService" is a little confusing.
 
 
 ##### LoadBalancerClaim
-* make dynamically provision LoadBalancer possible
-* Ingress(and intranet L7 loadbalancing rules) "use" or "consume" a bronze
-  loadbalancer by LoadBalancerClaim. A shceduler help to pick a best-matching
-  LoadBalancer for LoadBalancerClaim.
-* Ingress can "consume" a loadbalancer, as well as loadbalancerclaim.
-  Just like the PV/PVC model, Pod can mount PV, as well as PVC.
-* for more background see https://github.com/kubernetes/kubernetes/issues/30151
 
-##### Networking resource
-Allow user to define how many networking resources(bandwidth, iops, etc) a
-Ingress resource request. Then loadbalancer-scheduler can pick a best-matching
-one.
+Introduce "LoadBalancerClaim" as first-class API so that:
 
-##### Loadbalancer controller and Loadbalancer provider
-Loadbalancer provider is responssible for:
+* Ingress(and intranet L7 loadbalancing rules) can "use" or "consume" a bronze
+loadbalancer by "using" or "consuming" a LoadBalancerClaim, just like how
+Pod mount a PV by mounting PVC.
+* make dynamically loadbalancer provisioning possible, just like how PV is
+  dynamically provisioned.
 
-* provide loadbalancer Create/Delete/Update/Delete interface
+for more background see https://github.com/kubernetes/kubernetes/issues/30151
 
-Loadbalancer-controller is responsible for:
+##### LoadBalancer provider interface
+
+* provide loadbalancer Create/Update/Delete interface
+* k8s can have multiple LoadBalancer provider implementation, such as:
+  * AWS loadbalancer provider
+  * GCE loadbalancer provider
+  * bare-metal nginx loadbalancer provider
+  * bare-metal haproxy loadbalancer provider
+
+##### Loadbalancer-controller
+
+loadbalancer-controller is responsible for:
 
 * list&watch Ingress resources and call Loadbalancer provider to update
   corresponding loadbalancer's loadbalancing rules
 * pick a best-matching loadbalancer from existing loadbalancer pool for
-  loadbalancerclaim
+  loadbalancerclaim based on the networking resource the loadbalancerclaim
+  request
 * call loadbalancer provider to dynamically provision a loadbalancer for
   loadbalancerclaim when it can not find a matching one among existing
   loadbalancer
 * recycle or deprovision a loadbalancer when no consumers.
 
+##### Networking resource
+Allow user to define how many networking resources(bandwidth, iops, etc) an
+Ingress request. Then loadbalancer-controller can pick a best-matching one.
 
-### NoneGoal
-* LoadBalancerClass: different type(internet or intranet), different qos level, etc
-* LoadBalancer scheduling over-commit
+##### Loadbalancer scheduling
+Unlike PV/PVC, LB and LBC binding relationship is not exclusive, which means
+multiple LBC can bind to one LB. For example, if we have a loadbalancer with
+3G bandwidth, we can bind 6 LBC each request 500m bandwidth on it. Some
+scheduling mechanism is needed in such a case.
+
+If we go further, we may eventually introduce the request/limit model for
+networking resource so that we can over commit.
+
+
+### API
 
 ##### networking resource type
 ```
@@ -154,7 +176,7 @@ type LoadBalancer struct {
     unversioned.TypeMeta `json:",inline"`
     ObjectMeta           `json:"metadata,omitempty"`
 
-	//Spec defines a loadbalancer owned by the cluster
+    //Spec defines a loadbalancer owned by the cluster
 	Spec LoadBalancerSpec `json:"spec,omitempty"`
 
 	// Status represents the current information about loadbalancer.
@@ -289,6 +311,74 @@ type LoadBalancerClaimSource struct {
 }
 
 ```
+
+### Implementation
+
+#### loadbalancer
+
+The current loadbalancer(ingress-controller) implementation has some
+limitations on cloud provider when we have multiple loadbalancers:
+
+* we need deploy multiple ingress-controller pod even on cloud provider, it
+  result in some excessive use of resource. Actually it fine that a cluster
+  just has one process which list&watch all ingresses, and call cloud provider
+  provider to update loadbalancing rules.
+
+Thus, we propose to redesign the current ingress-controller as follows:
+
+Add a loadbalancer-controller in conroller-manager component, which list&watch
+all ingresses resource and call loadbalancer provider to update the
+loadbalancing rules.
+
+* On cloud provider
+
+  No extra ingress-controler need to be deployed
+
+* On bare-metal
+    * put all loadbalancing rules in configmap
+    * ingress-controller not need list&watch any Ingress anymore. Just notify
+      the nginx/haproxy process to reload when configmap was updated.
+    * loadbalancer-controller in controller-manager component will list&watch
+      all Ingress and update corresponding nginx/haproxy's configmap
+
+
+
+#### loadbalancer controller
+
+Add a loadbalancer-controller in conroller-manager component. Which works as
+follows:
+
+* bind loadbalancerclaim with loadbalancer
+* dynamically provision loadbalancer on demand
+* recycle or deprovision a loadbalancer when no loadbalancerclaim bind with
+  it for a long time.
+* list&watch all ingress and call loadbalancer provider to update l7
+  loadbalancing rules
+* we put loadblancer provider logic in loadbalancer-controlle too. On cloud
+  provider, it just delegate all loadbalancer provider logic to cloud provider;
+  on bare-metal, it:
+  * create a loadbalancer by deploying a nginx/haproxy pod in "kube-system"
+    namespace
+  * update a loadbalancer by updating the configmap of nginx/haproxy pod
+  * delete a loadbalancer by deleting the nginx/haproxy pod and all its relating
+    resource(such as configmap, etc).
+
+### Implementation plan
+
+##### First step: make it workable
+* implement the scheduling, provisioning and recycling logic first.
+* ingress-controller just works as currently, but it just list&watch ingresses
+  assigned to it, insteal all ingresses
+
+##### Second step: loadbalancer provider
+* Add loadbalancer provider in loadbalancer-controller
+* refactor the current ingress-controller implementation as I descrive in the
+  "Implementation" section and rename "ingress-controller" as
+  "nginx-loadbalancer"
+
+##### Long term
+* loadbalancer scheduling over-commitment
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/federation.md?pixel)]()
