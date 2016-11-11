@@ -20,6 +20,7 @@ import (
 	"sync"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -74,7 +75,7 @@ func TestRCNumber(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if e, a := "3", list.(*v1.List).ResourceVersion; e != a {
+	if e, a := "3", list.(*api.List).ResourceVersion; e != a {
 		t.Errorf("wanted %v, got %v", e, a)
 	}
 

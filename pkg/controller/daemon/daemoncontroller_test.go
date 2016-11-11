@@ -139,7 +139,7 @@ func addPods(podStore cache.Store, nodeName string, label map[string]string, num
 
 func newTestController() (*DaemonSetsController, *controller.FakePodControl) {
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
-	informerFactory := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
+	informerFactory := informers.NewSharedInformerFactory(clientset, nil, controller.NoResyncPeriodFunc())
 
 	manager := NewDaemonSetsController(informerFactory.DaemonSets(), informerFactory.Pods(), informerFactory.Nodes(), clientset, 0)
 	informerFactory.Start(wait.NeverStop)

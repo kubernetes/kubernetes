@@ -28,28 +28,7 @@ import (
 )
 
 // LoadPodFromFile will read, decode, and return a Pod from a file.
-func LoadPodFromFile(filePath string) (*api.Pod, error) {
-	if filePath == "" {
-		return nil, fmt.Errorf("file path not specified")
-	}
-	podDef, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file path %s: %+v", filePath, err)
-	}
-	if len(podDef) == 0 {
-		return nil, fmt.Errorf("file was empty: %s", filePath)
-	}
-	pod := &api.Pod{}
-
-	codec := api.Codecs.LegacyCodec(registered.GroupOrDie(api.GroupName).GroupVersion)
-	if err := runtime.DecodeInto(codec, podDef, pod); err != nil {
-		return nil, fmt.Errorf("failed decoding file: %v", err)
-	}
-	return pod, nil
-}
-
-// LoadPodFromFile will read, decode, and return a v1 Pod from a file.
-func LoadV1PodFromFile(filePath string) (*v1.Pod, error) {
+func LoadPodFromFile(filePath string) (*v1.Pod, error) {
 	if filePath == "" {
 		return nil, fmt.Errorf("file path not specified")
 	}
@@ -62,7 +41,7 @@ func LoadV1PodFromFile(filePath string) (*v1.Pod, error) {
 	}
 	pod := &v1.Pod{}
 
-	codec := api.Codecs.LegacyCodec(registered.GroupOrDie(api.GroupName).GroupVersion)
+	codec := api.Codecs.LegacyCodec(registered.GroupOrDie(v1.GroupName).GroupVersion)
 	if err := runtime.DecodeInto(codec, podDef, pod); err != nil {
 		return nil, fmt.Errorf("failed decoding file: %v", err)
 	}
@@ -70,11 +49,11 @@ func LoadV1PodFromFile(filePath string) (*v1.Pod, error) {
 }
 
 // SavePodToFile will encode and save a pod to a given path & permissions
-func SavePodToFile(pod *api.Pod, filePath string, perm os.FileMode) error {
+func SavePodToFile(pod *v1.Pod, filePath string, perm os.FileMode) error {
 	if filePath == "" {
 		return fmt.Errorf("file path not specified")
 	}
-	codec := api.Codecs.LegacyCodec(registered.GroupOrDie(api.GroupName).GroupVersion)
+	codec := api.Codecs.LegacyCodec(registered.GroupOrDie(v1.GroupName).GroupVersion)
 	data, err := runtime.Encode(codec, pod)
 	if err != nil {
 		return fmt.Errorf("failed encoding pod: %v", err)

@@ -19,25 +19,25 @@ package validation
 import (
 	"testing"
 
-	"k8s.io/kubernetes/plugin/pkg/scheduler/api/v1"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/api"
 )
 
 func TestValidatePriorityWithNoWeight(t *testing.T) {
-	policy := v1.Policy{Priorities: []v1.PriorityPolicy{{Name: "NoWeightPriority"}}}
+	policy := api.Policy{Priorities: []api.PriorityPolicy{{Name: "NoWeightPriority"}}}
 	if ValidatePolicy(policy) == nil {
 		t.Errorf("Expected error about priority weight not being positive")
 	}
 }
 
 func TestValidatePriorityWithZeroWeight(t *testing.T) {
-	policy := v1.Policy{Priorities: []v1.PriorityPolicy{{Name: "NoWeightPriority", Weight: 0}}}
+	policy := api.Policy{Priorities: []api.PriorityPolicy{{Name: "NoWeightPriority", Weight: 0}}}
 	if ValidatePolicy(policy) == nil {
 		t.Errorf("Expected error about priority weight not being positive")
 	}
 }
 
 func TestValidatePriorityWithNonZeroWeight(t *testing.T) {
-	policy := v1.Policy{Priorities: []v1.PriorityPolicy{{Name: "WeightPriority", Weight: 2}}}
+	policy := api.Policy{Priorities: []api.PriorityPolicy{{Name: "WeightPriority", Weight: 2}}}
 	errs := ValidatePolicy(policy)
 	if errs != nil {
 		t.Errorf("Unexpected errors %v", errs)
@@ -45,7 +45,7 @@ func TestValidatePriorityWithNonZeroWeight(t *testing.T) {
 }
 
 func TestValidatePriorityWithNegativeWeight(t *testing.T) {
-	policy := v1.Policy{Priorities: []v1.PriorityPolicy{{Name: "WeightPriority", Weight: -2}}}
+	policy := api.Policy{Priorities: []api.PriorityPolicy{{Name: "WeightPriority", Weight: -2}}}
 	if ValidatePolicy(policy) == nil {
 		t.Errorf("Expected error about priority weight not being positive")
 	}

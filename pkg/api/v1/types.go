@@ -4027,4 +4027,14 @@ type RangeAllocation struct {
 const (
 	// "default-scheduler" is the name of default scheduler.
 	DefaultSchedulerName = "default-scheduler"
+
+	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
+	// corresponding to every RequiredDuringScheduling affinity rule.
+	// When the --hard-pod-affinity-weight scheduler flag is not specified,
+	// DefaultHardPodAffinityWeight defines the weight of the implicit PreferredDuringScheduling affinity rule.
+	DefaultHardPodAffinitySymmetricWeight int = 1
+
+	// When the --failure-domains scheduler flag is not specified,
+	// DefaultFailureDomains defines the set of label keys used when TopologyKey is empty in PreferredDuringScheduling anti-affinity.
+	DefaultFailureDomains string = unversioned.LabelHostname + "," + unversioned.LabelZoneFailureDomain + "," + unversioned.LabelZoneRegion
 )

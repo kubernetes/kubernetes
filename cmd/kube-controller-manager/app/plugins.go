@@ -172,7 +172,7 @@ func getProvisionablePluginFromVolumePlugins(plugins []volume.VolumePlugin) (vol
 // If unsuccessful, an error is returned. Function is exported for reuse downstream.
 func AttemptToLoadRecycler(path string, config *volume.VolumeConfig) error {
 	if path != "" {
-		recyclerPod, err := io.LoadV1PodFromFile(path)
+		recyclerPod, err := io.LoadPodFromFile(path)
 		if err != nil {
 			return err
 		}

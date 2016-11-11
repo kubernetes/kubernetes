@@ -169,7 +169,7 @@ func (f *FakeControllerSource) List(options v1.ListOptions) (runtime.Object, err
 	if err != nil {
 		return nil, err
 	}
-	listObj := &v1.List{}
+	listObj := &api.List{}
 	if err := meta.SetList(listObj, list); err != nil {
 		return nil, err
 	}

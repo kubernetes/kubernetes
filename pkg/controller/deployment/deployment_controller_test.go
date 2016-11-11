@@ -164,7 +164,7 @@ func newFixture(t *testing.T) *fixture {
 
 func (f *fixture) run(deploymentName string) {
 	f.client = fake.NewSimpleClientset(f.objects...)
-	informers := informers.NewSharedInformerFactory(f.client, controller.NoResyncPeriodFunc())
+	informers := informers.NewSharedInformerFactory(f.client, nil, controller.NoResyncPeriodFunc())
 	c := NewDeploymentController(informers.Deployments(), informers.ReplicaSets(), informers.Pods(), f.client)
 	c.eventRecorder = &record.FakeRecorder{}
 	c.dListerSynced = alwaysReady
@@ -237,7 +237,7 @@ func TestSyncDeploymentDontDoAnythingDuringDeletion(t *testing.T) {
 // issue: https://github.com/kubernetes/kubernetes/issues/23218
 func TestDeploymentController_dontSyncDeploymentsWithEmptyPodSelector(t *testing.T) {
 	fake := &fake.Clientset{}
-	informers := informers.NewSharedInformerFactory(fake, controller.NoResyncPeriodFunc())
+	informers := informers.NewSharedInformerFactory(fake, nil, controller.NoResyncPeriodFunc())
 	controller := NewDeploymentController(informers.Deployments(), informers.ReplicaSets(), informers.Pods(), fake)
 	controller.eventRecorder = &record.FakeRecorder{}
 	controller.dListerSynced = alwaysReady

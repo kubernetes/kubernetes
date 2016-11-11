@@ -136,7 +136,7 @@ func PriorityTwo(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo
 func TestDefaultErrorFunc(t *testing.T) {
 	testPod := &v1.Pod{
 		ObjectMeta: v1.ObjectMeta{Name: "foo", Namespace: "bar"},
-		Spec:       apitesting.DeepEqualSafePodSpec(),
+		Spec:       apitesting.V1DeepEqualSafePodSpec(),
 	}
 	handler := utiltesting.FakeHandler{
 		StatusCode:   200,

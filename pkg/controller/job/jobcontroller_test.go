@@ -88,7 +88,7 @@ func getKey(job *batch.Job, t *testing.T) string {
 }
 
 func newJobControllerFromClient(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc) (*JobController, informers.SharedInformerFactory) {
-	sharedInformers := informers.NewSharedInformerFactory(kubeClient, resyncPeriod())
+	sharedInformers := informers.NewSharedInformerFactory(kubeClient, nil, resyncPeriod())
 	jm := NewJobController(sharedInformers.Pods().Informer(), sharedInformers.Jobs(), kubeClient)
 
 	return jm, sharedInformers
