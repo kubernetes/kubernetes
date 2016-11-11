@@ -19,6 +19,7 @@ go_library(
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/leaderelection:go_default_library",
+        "//pkg/util/config:go_default_library",
         "//vendor:github.com/spf13/pflag",
     ],
 )
