@@ -92,9 +92,16 @@ In summary, all of [GCE L7 Load Balancer](https://cloud.google.com/compute/docs/
 
 ### Implementation
 
-1. Federation user creates (federated) Ingress object
-1. Federated Ingress Controller creates Ingress object in each cluster in the federation
-1. Each cluster-level Ingress Controller ("GLBC") creates Google L7 Load Balancer machinery (forwarding rules, target proxy, URL map, backend service, health check) which ensures that traffic to the Ingress (backed by a Service), is directed to one of the nodes in the cluster.
+1. Federation user creates (federated) Ingress object (the services
+   backing the ingress object must share the same nodePort, as they
+   share a single GCP health check).
+1. Federated Ingress Controller creates Ingress object in each cluster
+   in the federation (after [configuring each cluster ingress
+   controller to share the same ingress UID](https://gist.github.com/bprashanth/52648b2a0b6a5b637f843e7efb2abc97)).
+1. Each cluster-level Ingress Controller ("GLBC") creates Google L7
+   Load Balancer machinery (forwarding rules, target proxy, URL map,
+   backend service, health check) which ensures that traffic to the
+   Ingress (backed by a Service), is directed to the nodes in the cluster.
 1. KubeProxy redirects to one of the backend Pods (currently round-robin, per KubeProxy instance)
 
 An alternative implementation approach involves lifting the current
