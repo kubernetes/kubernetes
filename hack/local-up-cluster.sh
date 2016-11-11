@@ -638,6 +638,7 @@ function start_kubedns {
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kubedns-svc.yaml
         echo "Kube-dns deployment and service successfully deployed."
         rm  kubedns-deployment.yaml kubedns-svc.yaml
+        KUBEDNS_POD_NAME=$(${KUBECTL} get pods --namespace kube-system -o name | grep "kube-dns")
     fi
 }
 
@@ -649,28 +650,21 @@ function create_psp_policy {
 }
 
 function print_success {
-if [[ "${START_MODE}" != "kubeletonly" ]]; then
   cat <<EOF
 Local Kubernetes cluster is running. Press Ctrl-C to shut it down.
 
+Kube DNS service name:
+  ${KUBEDNS_POD_NAME:-"DNS service was not enabled."}
+
 Logs:
-  ${APISERVER_LOG:-}
-  ${CTLRMGR_LOG:-}
-  ${PROXY_LOG:-}
-  ${SCHEDULER_LOG:-}
+  API Server:         ${APISERVER_LOG:-"Not enabled."}
+  Controller Manager: ${CTLRMGR_LOG:-"Not enabled."}
+  Kube-Proxy:         ${PROXY_LOG:-"Not enabled."}
+  Kube-Scheduler:     ${SCHEDULER_LOG:-"Not enabled."}
+  Kubelet:            ${KUBELET_LOG:-"Not enabled"}
+  Discovery Server:   ${DISCOVERY_SERVER_LOG:-"Not enabled"}
 EOF
-fi
 
-if [[ "${START_MODE}" == "all" ]]; then
-  echo "  ${KUBELET_LOG}"
-elif [[ "${START_MODE}" == "nokubelet" ]]; then
-  echo
-  echo "No kubelet was started because you set START_MODE=nokubelet"
-  echo "Run this script again with START_MODE=kubeletonly to run a kubelet"
-fi
-
-if [[ "${START_MODE}" != "kubeletonly" ]]; then
-  echo
   cat <<EOF
 To start using your cluster, open up another terminal/tab and run:
 
@@ -682,14 +676,6 @@ To start using your cluster, open up another terminal/tab and run:
   cluster/kubectl.sh config use-context local
   cluster/kubectl.sh
 EOF
-else
-  cat <<EOF
-The kubelet was started.
-
-Logs:
-  ${KUBELET_LOG}
-EOF
-fi
 }
 
 # validate that etcd is: not running, in path, and has minimum required version.
