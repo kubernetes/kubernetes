@@ -28,6 +28,7 @@ go_library(
         "dashboard.go",
         "density.go",
         "deployment.go",
+        "disruption.go",
         "dns.go",
         "dns_autoscaling.go",
         "e2e.go",
@@ -200,7 +201,12 @@ go_library(
         "//vendor:google.golang.org/api/compute/v1",
         "//vendor:google.golang.org/api/googleapi",
         "//vendor:gopkg.in/inf.v0",
+        "//vendor:k8s.io/client-go/kubernetes",
+        "//vendor:k8s.io/client-go/pkg/api/unversioned",
         "//vendor:k8s.io/client-go/pkg/api/v1",
+        "//vendor:k8s.io/client-go/pkg/apis/extensions/v1beta1",
+        "//vendor:k8s.io/client-go/pkg/apis/policy/v1beta1",
+        "//vendor:k8s.io/client-go/pkg/util/intstr",
     ],
 )
 
