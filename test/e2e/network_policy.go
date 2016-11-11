@@ -31,7 +31,7 @@ import (
 /*
 The following Network Policy tests verify that policy object definitions
 are correctly enforced by a networking plugin. It accomplishes this by launching
-a simple netcat server, and (in these tests) two clients with different
+a simple netcat server, and two clients with different
 attributes. Each test case creates a network policy which should only allow
 connections from one of the clients. The test then asserts that the clients
 failed or succesfully connected as expected.
@@ -254,7 +254,7 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 		testCanConnect(f, ns, "client-b", service, 81)
 	})
 
-	It("should enforce multiple, stacked policy [Feature:NetworkPolicy]", func() {
+	It("should enforce multiple, stacked policies with overlapping podSelectors [Feature:NetworkPolicy]", func() {
 		ns := f.Namespace
 
 		// Create Server with Service
@@ -282,7 +282,7 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 
 		setNamespaceIsolation(f, ns, "DefaultDeny")
 
-		By("Testing pods can connect to both ports when no policy is defined.")
+		By("Testing pods cannot connect to either port when no policy is defined.")
 		testCannotConnect(f, ns, "test-a-2", service, 80)
 		testCannotConnect(f, ns, "test-b-2", service, 81)
 
@@ -314,7 +314,7 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 			}
 		}()
 
-		By("Creating a network policy for the Service which allows traffic only to one port.")
+		By("Creating a network policy for the Service which allows traffic only to another port.")
 		policy2, err := f.ClientSet.Extensions().NetworkPolicies(ns.Name).Create(&extensions.NetworkPolicy{
 			ObjectMeta: api.ObjectMeta{
 				Name: "allow-ingress-on-port-81",
@@ -375,16 +375,16 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 		setNamespaceIsolation(f, ns, "DefaultDeny")
 
 		By("Testing pods cannot connect to either port when isolation is on.")
-		testCanConnect(f, ns, "test-a", service, 80)
-		testCanConnect(f, ns, "test-b", service, 81)
+		testCannotConnect(f, ns, "test-a", service, 80)
+		testCannotConnect(f, ns, "test-b", service, 81)
 
 		By("Creating a network policy which allows all traffic.")
 		policy, err := f.ClientSet.Extensions().NetworkPolicies(ns.Name).Create(&extensions.NetworkPolicy{
 			ObjectMeta: api.ObjectMeta{
-				Name: fmt.Sprintf("allow-ingress-on-port-%d", 80),
+				Name: "allow-all",
 			},
 			Spec: extensions.NetworkPolicySpec{
-				// Allow traffic only to one port.
+				// Allow all traffic
 				PodSelector: unversioned.LabelSelector{
 					MatchLabels: map[string]string{},
 				},
@@ -473,8 +473,8 @@ var _ = framework.KubeDescribe("NetworkPolicy", func() {
 })
 
 func testCanConnect(f *framework.Framework, ns *api.Namespace, podName string, service *api.Service, targetPort int) {
+	By(fmt.Sprintf("Creating client pod %s that should successfully connect to %s."), podName, service.Name)
 	podClient := createClientPod(f, ns, podName, service, targetPort)
-	By("Creating client that should successfully connect to the opened port.")
 	defer func() {
 		By(fmt.Sprintf("Cleaning up the pod %s", podName))
 		if err := f.ClientSet.Core().Pods(ns.Name).Delete(podClient.Name, nil); err != nil {
@@ -492,18 +492,14 @@ func testCanConnect(f *framework.Framework, ns *api.Namespace, podName string, s
 }
 
 func testCannotConnect(f *framework.Framework, ns *api.Namespace, podName string, service *api.Service, targetPort int) {
+	By(fmt.Sprintf("Creating client pod %s that should not be able to connect to %s."), podName, service.Name)
 	podClient := createClientPod(f, ns, podName, service, targetPort)
-	By("Creating client that should not be able to connect to the opened port.")
 	defer func() {
 		By(fmt.Sprintf("Cleaning up the pod %s", podName))
 		if err := f.ClientSet.Core().Pods(ns.Name).Delete(podClient.Name, nil); err != nil {
 			framework.Failf("unable to cleanup pod %v: %v", podClient.Name, err)
 		}
 	}()
-
-	//framework.Logf("Waiting for %s to complete.", podName)
-	//err := framework.WaitForPodNoLongerRunningInNamespace(f.ClientSet, podClient.Name, ns.Name, "0")
-	//Expect(err).NotTo(HaveOccurred(), "Pod did not finish as expected.")
 
 	framework.Logf("Waiting for %s to complete.", podClient.Name)
 	err := framework.WaitForPodSuccessInNamespace(f.ClientSet, podClient.Name, ns.Name)
