@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/v1/service"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/labels"
@@ -83,10 +84,12 @@ var _ = framework.KubeDescribe("Services", func() {
 	f := framework.NewDefaultFramework("services")
 
 	var cs clientset.Interface
+	var internalClientset internalclientset.Interface
 	serviceLBNames := []string{}
 
 	BeforeEach(func() {
 		cs = f.ClientSet
+		internalClientset = f.InternalClientset
 	})
 
 	AfterEach(func() {
@@ -311,10 +314,10 @@ var _ = framework.KubeDescribe("Services", func() {
 		numPods, servicePort := 3, 80
 
 		By("creating service1 in namespace " + ns)
-		podNames1, svc1IP, err := startServeHostnameService(cs, ns, "service1", servicePort, numPods)
+		podNames1, svc1IP, err := startServeHostnameService(cs, internalClientset, ns, "service1", servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 		By("creating service2 in namespace " + ns)
-		podNames2, svc2IP, err := startServeHostnameService(cs, ns, "service2", servicePort, numPods)
+		podNames2, svc2IP, err := startServeHostnameService(cs, internalClientset, ns, "service2", servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
 		hosts, err := framework.NodeSSHHosts(cs)
@@ -332,7 +335,7 @@ var _ = framework.KubeDescribe("Services", func() {
 
 		// Stop service 1 and make sure it is gone.
 		By("stopping service1")
-		framework.ExpectNoError(stopServeHostnameService(f.ClientSet, ns, "service1"))
+		framework.ExpectNoError(stopServeHostnameService(f.ClientSet, f.InternalClientset, ns, "service1"))
 
 		By("verifying service1 is not up")
 		framework.ExpectNoError(verifyServeHostnameServiceDown(cs, host, svc1IP, servicePort))
@@ -341,7 +344,7 @@ var _ = framework.KubeDescribe("Services", func() {
 
 		// Start another service and verify both are up.
 		By("creating service3 in namespace " + ns)
-		podNames3, svc3IP, err := startServeHostnameService(cs, ns, "service3", servicePort, numPods)
+		podNames3, svc3IP, err := startServeHostnameService(cs, internalClientset, ns, "service3", servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
 		if svc2IP == svc3IP {
@@ -365,12 +368,12 @@ var _ = framework.KubeDescribe("Services", func() {
 		svc1 := "service1"
 		svc2 := "service2"
 
-		defer func() { framework.ExpectNoError(stopServeHostnameService(f.ClientSet, ns, svc1)) }()
-		podNames1, svc1IP, err := startServeHostnameService(cs, ns, svc1, servicePort, numPods)
+		defer func() { framework.ExpectNoError(stopServeHostnameService(f.ClientSet, f.InternalClientset, ns, svc1)) }()
+		podNames1, svc1IP, err := startServeHostnameService(cs, internalClientset, ns, svc1, servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
-		defer func() { framework.ExpectNoError(stopServeHostnameService(f.ClientSet, ns, svc2)) }()
-		podNames2, svc2IP, err := startServeHostnameService(cs, ns, svc2, servicePort, numPods)
+		defer func() { framework.ExpectNoError(stopServeHostnameService(f.ClientSet, f.InternalClientset, ns, svc2)) }()
+		podNames2, svc2IP, err := startServeHostnameService(cs, internalClientset, ns, svc2, servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
 		if svc1IP == svc2IP {
@@ -414,8 +417,10 @@ var _ = framework.KubeDescribe("Services", func() {
 		ns := f.Namespace.Name
 		numPods, servicePort := 3, 80
 
-		defer func() { framework.ExpectNoError(stopServeHostnameService(f.ClientSet, ns, "service1")) }()
-		podNames1, svc1IP, err := startServeHostnameService(cs, ns, "service1", servicePort, numPods)
+		defer func() {
+			framework.ExpectNoError(stopServeHostnameService(f.ClientSet, f.InternalClientset, ns, "service1"))
+		}()
+		podNames1, svc1IP, err := startServeHostnameService(cs, internalClientset, ns, "service1", servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
 		hosts, err := framework.NodeSSHHosts(cs)
@@ -439,8 +444,10 @@ var _ = framework.KubeDescribe("Services", func() {
 		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podNames1, svc1IP, servicePort))
 
 		// Create a new service and check if it's not reusing IP.
-		defer func() { framework.ExpectNoError(stopServeHostnameService(f.ClientSet, ns, "service2")) }()
-		podNames2, svc2IP, err := startServeHostnameService(cs, ns, "service2", servicePort, numPods)
+		defer func() {
+			framework.ExpectNoError(stopServeHostnameService(f.ClientSet, f.InternalClientset, ns, "service2"))
+		}()
+		podNames2, svc2IP, err := startServeHostnameService(cs, internalClientset, ns, "service2", servicePort, numPods)
 		Expect(err).NotTo(HaveOccurred())
 
 		if svc1IP == svc2IP {
@@ -1840,7 +1847,7 @@ func testNotReachableUDP(ip string, port int, request string) (bool, error) {
 }
 
 // Creates a replication controller that serves its hostname and a service on top of it.
-func startServeHostnameService(c clientset.Interface, ns, name string, port, replicas int) ([]string, string, error) {
+func startServeHostnameService(c clientset.Interface, internalClient internalclientset.Interface, ns, name string, port, replicas int) ([]string, string, error) {
 	podNames := make([]string, replicas)
 
 	By("creating service " + name + " in namespace " + ns)
@@ -1867,6 +1874,7 @@ func startServeHostnameService(c clientset.Interface, ns, name string, port, rep
 	maxContainerFailures := 0
 	config := testutils.RCConfig{
 		Client:               c,
+		InternalClient:       internalClient,
 		Image:                "gcr.io/google_containers/serve_hostname:v1.4",
 		Name:                 name,
 		Namespace:            ns,
@@ -1901,8 +1909,8 @@ func startServeHostnameService(c clientset.Interface, ns, name string, port, rep
 	return podNames, serviceIP, nil
 }
 
-func stopServeHostnameService(clientset clientset.Interface, ns, name string) error {
-	if err := framework.DeleteRCAndPods(clientset, ns, name); err != nil {
+func stopServeHostnameService(clientset clientset.Interface, internalClientset internalclientset.Interface, ns, name string) error {
+	if err := framework.DeleteRCAndPods(clientset, internalClientset, ns, name); err != nil {
 		return err
 	}
 	if err := clientset.Core().Services(ns).Delete(name, nil); err != nil {
@@ -2444,7 +2452,7 @@ func (j *ServiceTestJig) newRCTemplate(namespace string) *v1.ReplicationControll
 			Labels:    j.Labels,
 		},
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: 1,
+			Replicas: func(i int) *int32 { x := int32(i); return &x }(1),
 			Selector: j.Labels,
 			Template: &v1.PodTemplateSpec{
 				ObjectMeta: v1.ObjectMeta{
@@ -2635,7 +2643,8 @@ func (t *ServiceTestFixture) Cleanup() []error {
 		if err != nil {
 			errs = append(errs, err)
 		}
-		old.Spec.Replicas = 0
+		x := int32(0)
+		old.Spec.Replicas = &x
 		if _, err := t.Client.Core().ReplicationControllers(t.Namespace).Update(old); err != nil {
 			errs = append(errs, err)
 		}

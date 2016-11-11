@@ -31,8 +31,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/typed/extensions/v1beta1"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/labels"
@@ -170,20 +171,20 @@ func checkDeploymentRevision(c clientset.Interface, ns, deploymentName, revision
 	return deployment, newRS
 }
 
-func stopDeploymentOverlap(c clientset.Interface, ns, deploymentName, overlapWith string) {
-	stopDeploymentMaybeOverlap(c, ns, deploymentName, overlapWith)
+func stopDeploymentOverlap(c clientset.Interface, internalClient internalclientset.Interface, ns, deploymentName, overlapWith string) {
+	stopDeploymentMaybeOverlap(c, internalClient, ns, deploymentName, overlapWith)
 }
 
-func stopDeployment(c clientset.Interface, ns, deploymentName string) {
-	stopDeploymentMaybeOverlap(c, ns, deploymentName, "")
+func stopDeployment(c clientset.Interface, internalClient internalclientset.Interface, ns, deploymentName string) {
+	stopDeploymentMaybeOverlap(c, internalClient, ns, deploymentName, "")
 }
 
-func stopDeploymentMaybeOverlap(c clientset.Interface, ns, deploymentName, overlapWith string) {
+func stopDeploymentMaybeOverlap(c clientset.Interface, internalClient internalclientset.Interface, ns, deploymentName, overlapWith string) {
 	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
 
 	framework.Logf("Deleting deployment %s", deploymentName)
-	reaper, err := kubectl.ReaperFor(extensionsinternal.Kind("Deployment"), c)
+	reaper, err := kubectl.ReaperFor(extensionsinternal.Kind("Deployment"), internalClient)
 	Expect(err).NotTo(HaveOccurred())
 	timeout := 1 * time.Minute
 	err = reaper.Stop(ns, deployment.Name, timeout, api.NewDeleteOptions(0))
@@ -272,6 +273,7 @@ func testNewDeployment(f *framework.Framework) {
 func testDeleteDeployment(f *framework.Framework) {
 	ns := f.Namespace.Name
 	c := f.ClientSet
+	internalClient := f.InternalClientset
 
 	deploymentName := "test-new-deployment"
 	podLabels := map[string]string{"name": nginxImageName}
@@ -297,7 +299,7 @@ func testDeleteDeployment(f *framework.Framework) {
 		err = fmt.Errorf("expected a replica set, got nil")
 		Expect(err).NotTo(HaveOccurred())
 	}
-	stopDeployment(c, ns, deploymentName)
+	stopDeployment(c, internalClient, ns, deploymentName)
 }
 
 func testRollingUpdateDeployment(f *framework.Framework) {
@@ -1017,7 +1019,7 @@ func testScalePausedDeployment(f *framework.Framework) {
 	framework.Logf("Scaling up the paused deployment %q", deploymentName)
 	newReplicas := int32(5)
 	deployment, err = framework.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *extensions.Deployment) {
-		update.Spec.Replicas = newReplicas
+		update.Spec.Replicas = &newReplicas
 	})
 	Expect(err).NotTo(HaveOccurred())
 
@@ -1092,18 +1094,18 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	first, err = c.Extensions().ReplicaSets(first.Namespace).Get(first.Name)
 	Expect(err).NotTo(HaveOccurred())
 
-	firstCond := client.ReplicaSetHasDesiredReplicas(c.Extensions(), first)
+	firstCond := replicaSetHasDesiredReplicas(c.Extensions(), first)
 	err = wait.PollImmediate(10*time.Millisecond, 1*time.Minute, firstCond)
 	Expect(err).NotTo(HaveOccurred())
 
-	secondCond := client.ReplicaSetHasDesiredReplicas(c.Extensions(), second)
+	secondCond := replicaSetHasDesiredReplicas(c.Extensions(), second)
 	err = wait.PollImmediate(10*time.Millisecond, 1*time.Minute, secondCond)
 	Expect(err).NotTo(HaveOccurred())
 
 	By(fmt.Sprintf("Updating the size (up) and template at the same time for deployment %q", deploymentName))
 	newReplicas := int32(20)
 	deployment, err = framework.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *extensions.Deployment) {
-		update.Spec.Replicas = newReplicas
+		update.Spec.Replicas = &newReplicas
 		update.Spec.Template.Spec.Containers[0].Image = nautilusImage
 	})
 	Expect(err).NotTo(HaveOccurred())
@@ -1152,18 +1154,18 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	newRs, err := deploymentutil.GetNewReplicaSet(deployment, c)
 	Expect(err).NotTo(HaveOccurred())
 
-	oldCond := client.ReplicaSetHasDesiredReplicas(c.Extensions(), oldRs)
+	oldCond := replicaSetHasDesiredReplicas(c.Extensions(), oldRs)
 	err = wait.PollImmediate(10*time.Millisecond, 1*time.Minute, oldCond)
 	Expect(err).NotTo(HaveOccurred())
 
-	newCond := client.ReplicaSetHasDesiredReplicas(c.Extensions(), newRs)
+	newCond := replicaSetHasDesiredReplicas(c.Extensions(), newRs)
 	err = wait.PollImmediate(10*time.Millisecond, 1*time.Minute, newCond)
 	Expect(err).NotTo(HaveOccurred())
 
 	By(fmt.Sprintf("Updating the size (down) and template at the same time for deployment %q", deploymentName))
 	newReplicas = int32(5)
 	deployment, err = framework.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *extensions.Deployment) {
-		update.Spec.Replicas = newReplicas
+		update.Spec.Replicas = &newReplicas
 		update.Spec.Template.Spec.Containers[0].Image = kittenImage
 	})
 	Expect(err).NotTo(HaveOccurred())
@@ -1191,6 +1193,7 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 func testOverlappingDeployment(f *framework.Framework) {
 	ns := f.Namespace.Name
 	c := f.ClientSet
+	internalClient := f.InternalClientset
 
 	deploymentName := "first-deployment"
 	podLabels := map[string]string{"name": redisImageName}
@@ -1229,7 +1232,7 @@ func testOverlappingDeployment(f *framework.Framework) {
 	Expect(rsList.Items[0].Spec.Template.Spec.Containers[0].Image).To(Equal(deploy.Spec.Template.Spec.Containers[0].Image))
 
 	By("Deleting the first deployment")
-	stopDeploymentOverlap(c, ns, deploy.Name, deployOverlapping.Name)
+	stopDeploymentOverlap(c, internalClient, ns, deploy.Name, deployOverlapping.Name)
 
 	// Wait for overlapping annotation cleared
 	By("Waiting for the second deployment to clear overlapping annotation")
@@ -1464,4 +1467,15 @@ func testIterativeDeployments(f *framework.Framework) {
 
 	framework.Logf("Checking deployment %q for a complete condition", deploymentName)
 	Expect(framework.WaitForDeploymentWithCondition(c, ns, deploymentName, deploymentutil.NewRSAvailableReason, extensions.DeploymentProgressing)).NotTo(HaveOccurred())
+}
+
+func replicaSetHasDesiredReplicas(rsClient extensionsclient.ReplicaSetsGetter, replicaSet *extensions.ReplicaSet) wait.ConditionFunc {
+	desiredGeneration := replicaSet.Generation
+	return func() (bool, error) {
+		rs, err := rsClient.ReplicaSets(replicaSet.Namespace).Get(replicaSet.Name)
+		if err != nil {
+			return false, err
+		}
+		return rs.Status.ObservedGeneration >= desiredGeneration && rs.Status.Replicas == *(rs.Spec.Replicas), nil
+	}
 }

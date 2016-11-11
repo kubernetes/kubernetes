@@ -70,11 +70,12 @@ func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames 
 
 	// TODO: Use a more realistic workload
 	Expect(framework.RunRC(testutils.RCConfig{
-		Client:    f.ClientSet,
-		Name:      rcName,
-		Namespace: f.Namespace.Name,
-		Image:     framework.GetPauseImageName(f.ClientSet),
-		Replicas:  totalPods,
+		Client:         f.ClientSet,
+		InternalClient: f.InternalClientset,
+		Name:           rcName,
+		Namespace:      f.Namespace.Name,
+		Image:          framework.GetPauseImageName(f.ClientSet),
+		Replicas:       totalPods,
 	})).NotTo(HaveOccurred())
 
 	// Log once and flush the stats.

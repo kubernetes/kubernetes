@@ -109,12 +109,13 @@ var _ = framework.KubeDescribe("Proxy", func() {
 			By("starting an echo server on multiple ports")
 			pods := []*v1.Pod{}
 			cfg := testutils.RCConfig{
-				Client:       f.ClientSet,
-				Image:        "gcr.io/google_containers/porter:cd5cb5791ebaa8641955f0e8c2a9bed669b1eaab",
-				Name:         service.Name,
-				Namespace:    f.Namespace.Name,
-				Replicas:     1,
-				PollInterval: time.Second,
+				Client:         f.ClientSet,
+				InternalClient: f.InternalClientset,
+				Image:          "gcr.io/google_containers/porter:cd5cb5791ebaa8641955f0e8c2a9bed669b1eaab",
+				Name:           service.Name,
+				Namespace:      f.Namespace.Name,
+				Replicas:       1,
+				PollInterval:   time.Second,
 				Env: map[string]string{
 					"SERVE_PORT_80":   `<a href="/rewriteme">test</a>`,
 					"SERVE_PORT_1080": `<a href="/rewriteme">test</a>`,

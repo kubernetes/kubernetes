@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -55,10 +56,11 @@ const (
 var MaxContainerFailures = 0
 
 type DensityTestConfig struct {
-	Configs      []testutils.RCConfig
-	ClientSet    clientset.Interface
-	PollInterval time.Duration
-	PodCount     int
+	Configs           []testutils.RCConfig
+	ClientSet         clientset.Interface
+	InternalClientset internalclientset.Interface
+	PollInterval      time.Duration
+	PodCount          int
 }
 
 func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceConstraint {
@@ -404,12 +406,13 @@ var _ = framework.KubeDescribe("Density", func() {
 			podThroughput := 20
 			timeout := time.Duration(totalPods/podThroughput)*time.Second + 3*time.Minute
 			// createClients is defined in load.go
-			clients, err := createClients(numberOfRCs)
+			clients, internalClients, err := createClients(numberOfRCs)
 			for i := 0; i < numberOfRCs; i++ {
 				RCName := fmt.Sprintf("density%v-%v-%v", totalPods, i, uuid)
 				nsName := namespaces[i].Name
 				RCConfigs[i] = testutils.RCConfig{
 					Client:               clients[i],
+					InternalClient:       internalClients[i],
 					Image:                framework.GetPauseImageName(f.ClientSet),
 					Name:                 RCName,
 					Namespace:            nsName,
@@ -426,10 +429,11 @@ var _ = framework.KubeDescribe("Density", func() {
 			}
 
 			dConfig := DensityTestConfig{
-				ClientSet:    f.ClientSet,
-				Configs:      RCConfigs,
-				PodCount:     totalPods,
-				PollInterval: DensityPollInterval,
+				ClientSet:         f.ClientSet,
+				InternalClientset: f.InternalClientset,
+				Configs:           RCConfigs,
+				PodCount:          totalPods,
+				PollInterval:      DensityPollInterval,
 			}
 			e2eStartupTime = runDensityTest(dConfig)
 			if itArg.runLatencyTest {
@@ -478,12 +482,12 @@ var _ = framework.KubeDescribe("Density", func() {
 					latencyPodsStore, controller := cache.NewInformer(
 						&cache.ListWatch{
 							ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-								options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": additionalPodsPrefix.String()}).String()
+								options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": additionalPodsPrefix}).String()
 								obj, err := c.Core().Pods(nsName).List(options)
 								return runtime.Object(obj), err
 							},
 							WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-								options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": additionalPodsPrefix.String()}).String()
+								options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": additionalPodsPrefix}).String()
 								return c.Core().Pods(nsName).Watch(options)
 							},
 						},
@@ -566,7 +570,7 @@ var _ = framework.KubeDescribe("Density", func() {
 						"involvedObject.kind":      "Pod",
 						"involvedObject.namespace": nsName,
 						"source":                   v1.DefaultSchedulerName,
-					}.AsSelector()
+					}.AsSelector().String()
 					options := v1.ListOptions{FieldSelector: selector}
 					schedEvents, err := c.Core().Events(nsName).List(options)
 					framework.ExpectNoError(err)
@@ -701,7 +705,7 @@ func createRunningPodFromRC(wg *sync.WaitGroup, c clientset.Interface, name, ns,
 			Labels: labels,
 		},
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: 1,
+			Replicas: func(i int) *int32 { x := int32(i); return &x }(1),
 			Selector: labels,
 			Template: &v1.PodTemplateSpec{
 				ObjectMeta: v1.ObjectMeta{

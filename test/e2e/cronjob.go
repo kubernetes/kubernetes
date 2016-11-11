@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	batch "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/controller/job"
@@ -62,7 +63,7 @@ var _ = framework.KubeDescribe("CronJob", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring at least two running jobs exists by listing jobs explicitly")
-		jobs, err := f.ClientSet.BatchV2alpha1().Jobs(f.Namespace.Name).List(v1.ListOptions{})
+		jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(v1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		activeJobs := filterActiveJobs(jobs)
 		Expect(len(activeJobs) >= 2).To(BeTrue())
@@ -85,7 +86,7 @@ var _ = framework.KubeDescribe("CronJob", func() {
 		Expect(err).To(HaveOccurred())
 
 		By("Ensuring no job exists by listing jobs explicitly")
-		jobs, err := f.ClientSet.BatchV2alpha1().Jobs(f.Namespace.Name).List(v1.ListOptions{})
+		jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(v1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(jobs.Items).To(HaveLen(0))
 
@@ -111,7 +112,7 @@ var _ = framework.KubeDescribe("CronJob", func() {
 		Expect(cronJob.Status.Active).Should(HaveLen(1))
 
 		By("Ensuring exaclty one running job exists by listing jobs explicitly")
-		jobs, err := f.ClientSet.BatchV2alpha1().Jobs(f.Namespace.Name).List(v1.ListOptions{})
+		jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(v1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		activeJobs := filterActiveJobs(jobs)
 		Expect(activeJobs).To(HaveLen(1))
@@ -142,7 +143,7 @@ var _ = framework.KubeDescribe("CronJob", func() {
 		Expect(cronJob.Status.Active).Should(HaveLen(1))
 
 		By("Ensuring exaclty one running job exists by listing jobs explicitly")
-		jobs, err := f.ClientSet.BatchV2alpha1().Jobs(f.Namespace.Name).List(v1.ListOptions{})
+		jobs, err := f.ClientSet.Batch().Jobs(f.Namespace.Name).List(v1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		activeJobs := filterActiveJobs(jobs)
 		Expect(activeJobs).To(HaveLen(1))
@@ -267,7 +268,7 @@ func waitForNoJobs(c clientset.Interface, ns, jobName string) error {
 // Wait for a job to be replaced with a new one.
 func waitForJobReplaced(c clientset.Interface, ns, previousJobName string) error {
 	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
-		jobs, err := c.BatchV2alpha1().Jobs(ns).List(v1.ListOptions{})
+		jobs, err := c.Batch().Jobs(ns).List(v1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -284,7 +285,7 @@ func waitForJobReplaced(c clientset.Interface, ns, previousJobName string) error
 // waitForJobsAtLeast waits for at least a number of jobs to appear.
 func waitForJobsAtLeast(c clientset.Interface, ns string, atLeast int) error {
 	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
-		jobs, err := c.BatchV2alpha1().Jobs(ns).List(v1.ListOptions{})
+		jobs, err := c.Batch().Jobs(ns).List(v1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -295,7 +296,7 @@ func waitForJobsAtLeast(c clientset.Interface, ns string, atLeast int) error {
 // waitForAnyFinishedJob waits for any completed job to appear.
 func waitForAnyFinishedJob(c clientset.Interface, ns string) error {
 	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
-		jobs, err := c.BatchV2alpha1().Jobs(ns).List(v1.ListOptions{})
+		jobs, err := c.Batch().Jobs(ns).List(v1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -327,7 +328,7 @@ func checkNoUnexpectedEvents(c clientset.Interface, ns, cronJobName string) erro
 	return nil
 }
 
-func filterActiveJobs(jobs *batch.JobList) (active []*batch.Job) {
+func filterActiveJobs(jobs *batchv1.JobList) (active []*batchv1.Job) {
 	for i := range jobs.Items {
 		j := jobs.Items[i]
 		if !job.IsJobFinished(&j) {

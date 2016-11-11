@@ -288,7 +288,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 		pods, err := clusterState().WaitFor(atLeast, framework.PodStartTimeout)
 		if err != nil || len(pods) < atLeast {
 			// TODO: Generalize integrating debug info into these tests so we always get debug info when we need it
-			framework.DumpAllNamespaceInfo(c, f.ClientSet, ns)
+			framework.DumpAllNamespaceInfo(f.ClientSet, ns)
 			framework.Failf("Verified %v of %v pods , error : %v", len(pods), atLeast, err)
 		}
 	}
@@ -519,7 +519,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 				ExecOrDie()
 			Expect(runOutput).ToNot(ContainSubstring("stdin closed"))
 			g := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
-			runTestPod, _, err := util.GetFirstPod(f.ClientSet.Core(), ns, labels.SelectorFromSet(map[string]string{"run": "run-test-3"}), 1*time.Minute, g)
+			runTestPod, _, err := util.GetFirstPod(f.InternalClientset.Core(), ns, labels.SelectorFromSet(map[string]string{"run": "run-test-3"}), 1*time.Minute, g)
 			if err != nil {
 				os.Exit(1)
 			}

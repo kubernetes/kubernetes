@@ -196,7 +196,7 @@ func SpreadRCOrFail(f *framework.Framework, replicaCount int32, image string) {
 			Name:      name,
 		},
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: replicaCount,
+			Replicas: &replicaCount,
 			Selector: map[string]string{
 				"name": name,
 			},

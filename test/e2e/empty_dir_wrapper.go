@@ -332,7 +332,7 @@ func testNoWrappedVolumeRace(f *framework.Framework, volumes []v1.Volume, volume
 			Name: rcName,
 		},
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: podCount,
+			Replicas: &podCount,
 			Selector: map[string]string{
 				"name": rcName,
 			},

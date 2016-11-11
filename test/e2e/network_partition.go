@@ -167,7 +167,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 					if !framework.IsNodeConditionSetAsExpected(&node, v1.NodeReady, true) {
 						return false
 					}
-					podOpts = v1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name)}
+					podOpts = v1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name).String()}
 					pods, err := c.Core().Pods(v1.NamespaceAll).List(podOpts)
 					if err != nil || len(pods.Items) <= 0 {
 						return false
@@ -178,7 +178,7 @@ var _ = framework.KubeDescribe("Network Partition [Disruptive] [Slow]", func() {
 					framework.Failf("No eligible node were found: %d", len(nodes.Items))
 				}
 				node := nodes.Items[0]
-				podOpts = v1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name)}
+				podOpts = v1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name).String()}
 				if err = framework.WaitForMatchPodsCondition(c, podOpts, "Running and Ready", podReadyTimeout, testutils.PodRunningReady); err != nil {
 					framework.Failf("Pods on node %s are not ready and running within %v: %v", node.Name, podReadyTimeout, err)
 				}

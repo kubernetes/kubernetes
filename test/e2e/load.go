@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/transport"
@@ -211,8 +212,9 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 	}
 })
 
-func createClients(numberOfClients int) ([]*clientset.Clientset, error) {
+func createClients(numberOfClients int) ([]*clientset.Clientset, []*internalclientset.Clientset, error) {
 	clients := make([]*clientset.Clientset, numberOfClients)
+	internalClients := make([]*internalclientset.Clientset, numberOfClients)
 	for i := 0; i < numberOfClients; i++ {
 		config, err := framework.LoadConfig()
 		Expect(err).NotTo(HaveOccurred())
@@ -228,11 +230,11 @@ func createClients(numberOfClients int) ([]*clientset.Clientset, error) {
 		// each client here.
 		transportConfig, err := config.TransportConfig()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		tlsConfig, err := transport.TLSConfigFor(transportConfig)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		config.Transport = utilnet.SetTransportDefaults(&http.Transport{
 			Proxy:               http.ProxyFromEnvironment,
@@ -250,11 +252,16 @@ func createClients(numberOfClients int) ([]*clientset.Clientset, error) {
 
 		c, err := clientset.NewForConfig(config)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		clients[i] = c
+		internalClient, err := internalclientset.NewForConfig(config)
+		if err != nil {
+			return nil, nil, err
+		}
+		internalClients[i] = internalClient
 	}
-	return clients, nil
+	return clients, internalClients, nil
 }
 
 func computeRCCounts(total int) (int, int, int) {
@@ -282,11 +289,12 @@ func generateRCConfigs(totalPods int, image string, command []string, nss []*v1.
 	// Create a number of clients to better simulate real usecase
 	// where not everyone is using exactly the same client.
 	rcsPerClient := 20
-	clients, err := createClients((len(configs) + rcsPerClient - 1) / rcsPerClient)
+	clients, internalClients, err := createClients((len(configs) + rcsPerClient - 1) / rcsPerClient)
 	framework.ExpectNoError(err)
 
 	for i := 0; i < len(configs); i++ {
 		configs[i].Client = clients[i%len(clients)]
+		configs[i].InternalClient = internalClients[i%len(internalClients)]
 	}
 
 	return configs
@@ -297,15 +305,16 @@ func generateRCConfigsForGroup(
 	configs := make([]*testutils.RCConfig, 0, count)
 	for i := 1; i <= count; i++ {
 		config := &testutils.RCConfig{
-			Client:     nil, // this will be overwritten later
-			Name:       groupName + "-" + strconv.Itoa(i),
-			Namespace:  nss[i%len(nss)].Name,
-			Timeout:    10 * time.Minute,
-			Image:      image,
-			Command:    command,
-			Replicas:   size,
-			CpuRequest: 10,       // 0.01 core
-			MemRequest: 26214400, // 25MB
+			Client:         nil, // this will be overwritten later
+			InternalClient: nil, // this will be overwritten later
+			Name:           groupName + "-" + strconv.Itoa(i),
+			Namespace:      nss[i%len(nss)].Name,
+			Timeout:        10 * time.Minute,
+			Image:          image,
+			Command:        command,
+			Replicas:       size,
+			CpuRequest:     10,       // 0.01 core
+			MemRequest:     26214400, // 25MB
 		}
 		configs = append(configs, config)
 	}
@@ -373,7 +382,7 @@ func scaleRC(wg *sync.WaitGroup, config *testutils.RCConfig, scalingTime time.Du
 
 	sleepUpTo(scalingTime)
 	newSize := uint(rand.Intn(config.Replicas) + config.Replicas/2)
-	framework.ExpectNoError(framework.ScaleRC(config.Client, config.Namespace, config.Name, newSize, true),
+	framework.ExpectNoError(framework.ScaleRC(config.Client, config.InternalClient, config.Namespace, config.Name, newSize, true),
 		fmt.Sprintf("scaling rc %s for the first time", config.Name))
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": config.Name}))
 	options := v1.ListOptions{
@@ -401,7 +410,7 @@ func deleteRC(wg *sync.WaitGroup, config *testutils.RCConfig, deletingTime time.
 	if framework.TestContext.GarbageCollectorEnabled {
 		framework.ExpectNoError(framework.DeleteRCAndWaitForGC(config.Client, config.Namespace, config.Name), fmt.Sprintf("deleting rc %s", config.Name))
 	} else {
-		framework.ExpectNoError(framework.DeleteRCAndPods(config.Client, config.Namespace, config.Name), fmt.Sprintf("deleting rc %s", config.Name))
+		framework.ExpectNoError(framework.DeleteRCAndPods(config.Client, config.InternalClient, config.Namespace, config.Name), fmt.Sprintf("deleting rc %s", config.Name))
 	}
 }
 

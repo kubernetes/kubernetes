@@ -138,7 +138,7 @@ var _ = framework.KubeDescribe("NodeOutOfDisk [Serial] [Flaky] [Disruptive] [Fea
 				"involvedObject.namespace": ns,
 				"source":                   v1.DefaultSchedulerName,
 				"reason":                   "FailedScheduling",
-			}.AsSelector()
+			}.AsSelector().String()
 			options := v1.ListOptions{FieldSelector: selector}
 			schedEvents, err := c.Core().Events(ns).List(options)
 			framework.ExpectNoError(err)
@@ -200,7 +200,7 @@ func createOutOfDiskPod(c clientset.Interface, ns, name string, milliCPU int64) 
 func availCpu(c clientset.Interface, node *v1.Node) (int64, error) {
 	podClient := c.Core().Pods(v1.NamespaceAll)
 
-	selector := fields.Set{"spec.nodeName": node.Name}.AsSelector()
+	selector := fields.Set{"spec.nodeName": node.Name}.AsSelector().String()
 	options := v1.ListOptions{FieldSelector: selector}
 	pods, err := podClient.List(options)
 	if err != nil {

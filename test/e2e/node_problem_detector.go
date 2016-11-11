@@ -149,7 +149,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 				"involvedObject.name":      node.Name,
 				"involvedObject.namespace": v1.NamespaceAll,
 				"source":                   source,
-			}.AsSelector()
+			}.AsSelector().String()
 			eventListOptions = v1.ListOptions{FieldSelector: selector}
 			By("Create the test log file")
 			tmpDir = "/tmp/" + name
@@ -170,7 +170,8 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 				},
 				Spec: v1.PodSpec{
 					NodeName:        node.Name,
-					SecurityContext: &v1.PodSecurityContext{HostNetwork: true},
+					HostNetwork:     true,
+					SecurityContext: &v1.PodSecurityContext{},
 					Volumes: []v1.Volume{
 						{
 							Name: configVolume,

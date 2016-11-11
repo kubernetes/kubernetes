@@ -42,10 +42,9 @@ func scTestPod(hostIPC bool, hostPID bool) *v1.Pod {
 			Annotations: map[string]string{},
 		},
 		Spec: v1.PodSpec{
-			SecurityContext: &v1.PodSecurityContext{
-				HostIPC: hostIPC,
-				HostPID: hostPID,
-			},
+			HostIPC:         hostIPC,
+			HostPID:         hostPID,
+			SecurityContext: &v1.PodSecurityContext{},
 			Containers: []v1.Container{
 				{
 					Name:  "test-container",

@@ -93,7 +93,7 @@ var _ = framework.KubeDescribe("Events", func() {
 				"involvedObject.uid":       string(podWithUid.UID),
 				"involvedObject.namespace": f.Namespace.Name,
 				"source":                   v1.DefaultSchedulerName,
-			}.AsSelector()
+			}.AsSelector().String()
 			options := v1.ListOptions{FieldSelector: selector}
 			events, err := f.ClientSet.Core().Events(f.Namespace.Name).List(options)
 			if err != nil {
@@ -113,7 +113,7 @@ var _ = framework.KubeDescribe("Events", func() {
 				"involvedObject.kind":      "Pod",
 				"involvedObject.namespace": f.Namespace.Name,
 				"source":                   "kubelet",
-			}.AsSelector()
+			}.AsSelector().String()
 			options := v1.ListOptions{FieldSelector: selector}
 			events, err = f.ClientSet.Core().Events(f.Namespace.Name).List(options)
 			if err != nil {

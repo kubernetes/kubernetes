@@ -99,7 +99,7 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 				// cleanup. deletion of replicasets is not supported for underlying clusters
 				By(fmt.Sprintf("Preparing replicaset %q/%q for deletion by setting replicas to zero", nsName, rs.Name))
 				replicas := int32(0)
-				*(rs.Spec.Replicas) = &replicas
+				rs.Spec.Replicas = &replicas
 				f.FederationClientset_1_5.ReplicaSets(nsName).Update(rs)
 				waitForReplicaSetOrFail(f.FederationClientset_1_5, nsName, rs.Name, clusters)
 				f.FederationClientset_1_5.ReplicaSets(nsName).Delete(rs.Name, &v1.DeleteOptions{})
@@ -137,14 +137,14 @@ func waitForReplicaSet(c *federation_release_1_5.Clientset, namespace string, re
 					By(fmt.Sprintf("Replicaset meta or spec not match for cluster %q:\n    federation: %v\n    cluster: %v", cluster.name, frs, rs))
 					return false, nil
 				}
-				specReplicas += **(rs.Spec.Replicas)
+				specReplicas += *(rs.Spec.Replicas)
 				statusReplicas += rs.Status.Replicas
 			}
 		}
-		if statusReplicas == frs.Status.Replicas && specReplicas >= **(frs.Spec.Replicas) {
+		if statusReplicas == frs.Status.Replicas && specReplicas >= *(frs.Spec.Replicas) {
 			return true, nil
 		}
-		By(fmt.Sprintf("Replicas not match, federation replicas: %v/%v, clusters replicas: %v/%v\n", **(frs.Spec.Replicas), frs.Status.Replicas, specReplicas, statusReplicas))
+		By(fmt.Sprintf("Replicas not match, federation replicas: %v/%v, clusters replicas: %v/%v\n", *(frs.Spec.Replicas), frs.Status.Replicas, specReplicas, statusReplicas))
 		return false, nil
 	})
 

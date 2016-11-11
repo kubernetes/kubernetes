@@ -207,7 +207,8 @@ func rcConditionCheck(f *framework.Framework) {
 
 	By(fmt.Sprintf("Scaling down rc %q to satisfy pod quota", name))
 	rc, err = framework.UpdateReplicationControllerWithRetries(c, namespace, name, func(update *v1.ReplicationController) {
-		update.Spec.Replicas = 2
+		x := int32(2)
+		update.Spec.Replicas = &x
 	})
 	Expect(err).NotTo(HaveOccurred())
 

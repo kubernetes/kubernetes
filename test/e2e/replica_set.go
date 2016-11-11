@@ -222,7 +222,8 @@ func rsConditionCheck(f *framework.Framework) {
 
 	By(fmt.Sprintf("Scaling down replica set %q to satisfy pod quota", name))
 	rs, err = framework.UpdateReplicaSetWithRetries(c, namespace, name, func(update *extensions.ReplicaSet) {
-		update.Spec.Replicas = 2
+		x := int32(2)
+		update.Spec.Replicas = &x
 	})
 	Expect(err).NotTo(HaveOccurred())
 

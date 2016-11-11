@@ -458,14 +458,15 @@ func CreateNodeSelectorPods(f *framework.Framework, id string, replicas int, nod
 	By(fmt.Sprintf("Running RC which reserves host port and defines node selector"))
 
 	config := &testutils.RCConfig{
-		Client:       f.ClientSet,
-		Name:         "node-selector",
-		Namespace:    f.Namespace.Name,
-		Timeout:      defaultTimeout,
-		Image:        framework.GetPauseImageName(f.ClientSet),
-		Replicas:     replicas,
-		HostPorts:    map[string]int{"port1": 4321},
-		NodeSelector: map[string]string{"cluster-autoscaling-test.special-node": "true"},
+		Client:         f.ClientSet,
+		InternalClient: f.InternalClientset,
+		Name:           "node-selector",
+		Namespace:      f.Namespace.Name,
+		Timeout:        defaultTimeout,
+		Image:          framework.GetPauseImageName(f.ClientSet),
+		Replicas:       replicas,
+		HostPorts:      map[string]int{"port1": 4321},
+		NodeSelector:   map[string]string{"cluster-autoscaling-test.special-node": "true"},
 	}
 	err := framework.RunRC(*config)
 	if expectRunning {
@@ -476,13 +477,14 @@ func CreateNodeSelectorPods(f *framework.Framework, id string, replicas int, nod
 func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectRunning bool) {
 	By(fmt.Sprintf("Running RC which reserves host port"))
 	config := &testutils.RCConfig{
-		Client:    f.ClientSet,
-		Name:      id,
-		Namespace: f.Namespace.Name,
-		Timeout:   defaultTimeout,
-		Image:     framework.GetPauseImageName(f.ClientSet),
-		Replicas:  replicas,
-		HostPorts: map[string]int{"port1": 4321},
+		Client:         f.ClientSet,
+		InternalClient: f.InternalClientset,
+		Name:           id,
+		Namespace:      f.Namespace.Name,
+		Timeout:        defaultTimeout,
+		Image:          framework.GetPauseImageName(f.ClientSet),
+		Replicas:       replicas,
+		HostPorts:      map[string]int{"port1": 4321},
 	}
 	err := framework.RunRC(*config)
 	if expectRunning {
@@ -494,13 +496,14 @@ func ReserveCpu(f *framework.Framework, id string, replicas, millicores int) {
 	By(fmt.Sprintf("Running RC which reserves %v millicores", millicores))
 	request := int64(millicores / replicas)
 	config := &testutils.RCConfig{
-		Client:     f.ClientSet,
-		Name:       id,
-		Namespace:  f.Namespace.Name,
-		Timeout:    defaultTimeout,
-		Image:      framework.GetPauseImageName(f.ClientSet),
-		Replicas:   replicas,
-		CpuRequest: request,
+		Client:         f.ClientSet,
+		InternalClient: f.InternalClientset,
+		Name:           id,
+		Namespace:      f.Namespace.Name,
+		Timeout:        defaultTimeout,
+		Image:          framework.GetPauseImageName(f.ClientSet),
+		Replicas:       replicas,
+		CpuRequest:     request,
 	}
 	framework.ExpectNoError(framework.RunRC(*config))
 }
@@ -509,13 +512,14 @@ func ReserveMemory(f *framework.Framework, id string, replicas, megabytes int, e
 	By(fmt.Sprintf("Running RC which reserves %v MB of memory", megabytes))
 	request := int64(1024 * 1024 * megabytes / replicas)
 	config := &testutils.RCConfig{
-		Client:     f.ClientSet,
-		Name:       id,
-		Namespace:  f.Namespace.Name,
-		Timeout:    defaultTimeout,
-		Image:      framework.GetPauseImageName(f.ClientSet),
-		Replicas:   replicas,
-		MemRequest: request,
+		Client:         f.ClientSet,
+		InternalClient: f.InternalClientset,
+		Name:           id,
+		Namespace:      f.Namespace.Name,
+		Timeout:        defaultTimeout,
+		Image:          framework.GetPauseImageName(f.ClientSet),
+		Replicas:       replicas,
+		MemRequest:     request,
 	}
 	err := framework.RunRC(*config)
 	if expectRunning {
@@ -528,7 +532,7 @@ func WaitForClusterSizeFunc(c clientset.Interface, sizeFunc func(int) bool, time
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
 		nodes, err := c.Core().Nodes().List(v1.ListOptions{FieldSelector: fields.Set{
 			"spec.unschedulable": "false",
-		}.AsSelector()})
+		}.AsSelector().String()})
 		if err != nil {
 			glog.Warningf("Failed to list nodes: %v", err)
 			continue

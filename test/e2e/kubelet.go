@@ -188,12 +188,13 @@ var _ = framework.KubeDescribe("kubelet", func() {
 				rcName := fmt.Sprintf("cleanup%d-%s", totalPods, string(uuid.NewUUID()))
 
 				Expect(framework.RunRC(testutils.RCConfig{
-					Client:       f.ClientSet,
-					Name:         rcName,
-					Namespace:    f.Namespace.Name,
-					Image:        framework.GetPauseImageName(f.ClientSet),
-					Replicas:     totalPods,
-					NodeSelector: nodeLabels,
+					Client:         f.ClientSet,
+					InternalClient: f.InternalClientset,
+					Name:           rcName,
+					Namespace:      f.Namespace.Name,
+					Image:          framework.GetPauseImageName(f.ClientSet),
+					Replicas:       totalPods,
+					NodeSelector:   nodeLabels,
 				})).NotTo(HaveOccurred())
 				// Perform a sanity check so that we know all desired pods are
 				// running on the nodes according to kubelet. The timeout is set to

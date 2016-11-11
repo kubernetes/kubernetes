@@ -118,12 +118,13 @@ var _ = framework.KubeDescribe("Service endpoints latency", func() {
 
 func runServiceLatencies(f *framework.Framework, inParallel, total int) (output []time.Duration, err error) {
 	cfg := testutils.RCConfig{
-		Client:       f.ClientSet,
-		Image:        framework.GetPauseImageName(f.ClientSet),
-		Name:         "svc-latency-rc",
-		Namespace:    f.Namespace.Name,
-		Replicas:     1,
-		PollInterval: time.Second,
+		Client:         f.ClientSet,
+		InternalClient: f.InternalClientset,
+		Image:          framework.GetPauseImageName(f.ClientSet),
+		Name:           "svc-latency-rc",
+		Namespace:      f.Namespace.Name,
+		Replicas:       1,
+		PollInterval:   time.Second,
 	}
 	if err := framework.RunRC(cfg); err != nil {
 		return nil, err
