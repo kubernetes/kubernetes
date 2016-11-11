@@ -41,61 +41,115 @@ LoadBalancer is a commen resource provided by IaaS cloud provider, but currently
 kuberntes does not expose cloud LoadBalancer resource to users explicitly, we
 just use it implicitly by "Loadbalancer" type Service. We proposed to:
 
-* explicitly expose cloud loadbalancer to users
-* introduce `LoadbalancerClaim` mechanism to allow user to create, use, and delete
-loadbalancer in a convienet way.
+* explicitly expose cloud loadbalancer to users.
+* introduce `LoadbalancerClaim` mechanism to allow user to create, use, and
+  delete loadbalancer in a convinent way.
+* introduce some networking resource types(such as bandwidth, iops) so that
+  Ingress (and intranet l7 loadbalancing rules which may eventually be added)
+  can request "how many networking resource I expected to use"
 
-####  Goal
-* LoadBalancer and LoadBalancerClaim API
-* LoadBalancer provisioning
-* LoadBalancer scheduling based on bandwidth and iops request
+### Background
 
-#### NoneGoal
-* LoadBalancerClass: different type(internet or intranet), different qos level etc
+#### Current behavior of Ingress
+Ingress can be used to expose a service in the kubernetes cluster:
+
+* usually cluster admin deploys one ingress-controller Pod
+* user creates Ingress resources
+* the ingress-controller Pod will list&watch ***All*** Ingress Resources in the
+  cluster
+  * on bare-metal, the ingress-controller then call the cloud provider to sync
+    the ingress L7 loadbalancing rules
+  * on cloud provider case, the ingress-controller then sync the
+    nginx(or haproxy, etc) config and reload
+* user out of cluster then can access service in the cluster by:
+  * on bare-metal, accessing the node's ip on which ingress-controller Pod is
+    running, ingress-controller Pod will forward request into cluster based on
+    rules defined in Ingress resource
+  * on cloud-provider, accessing the ip provided by cloud provider loadbalancer,
+    cloud provider will forward request into cluster based on rules defined in
+    Ingress Resource
+
+##### Limitations of Ingress
+###### On bare-metal only
+1. l4 client ip is lost
+2. It does not provide High Availability because client needs to know the IP
+   addresss of the node where ingress-controller Pod is running. In case of a
+   failure the ingress-controller Pod can be moved to a different node
+
+###### Both on bare-metal and on cloud provider
+3. How many ingress-controller Pod should run in a cluster? Should all
+   ingress-controller Pod list&watch all Ingress Resource with out distinction?
+   There is no way to bind or schedule Ingress resource to a ingress-controller
+   Pod, which result in:
+
+   * insufficient or excessive use of neworking resource.
+   * reload storm when update Ingress resource
+
+2. Ingress resource is actually internet l7 loadbalancing rules, intranet l7
+   loadbalancing rules has not been supported yet.
+
+
+### Goal
+##### LoadBalancer
+Explicitly expose loadbalancer to users, let Ingress resource(internet
+loadbalancing rules) and intranet loadbalancing rules to "use" or "consume"
+loadbalancers based on on the networking resources(bandwidth, iops, etc) the
+loadbalancing rules request.
+
+*Why "LoadBalancer"*, instead of someting like "IngressService":
+
+Ingress is actually internet l7 loadbalancing rules. Not only Ingress can
+"use" or "consume" loadbalancer, intranet l7 loadbalancing rules also can.
+Something like "IngressService" is a little confusing.
+
+
+##### LoadBalancerClaim
+* make dynamically provision LoadBalancer possible
+* Ingress(and intranet L7 loadbalancing rules) "use" or "consume" a bronze
+  loadbalancer by LoadBalancerClaim. A shceduler help to pick a best-matching
+  LoadBalancer for LoadBalancerClaim.
+* Ingress can "consume" a loadbalancer, as well as loadbalancerclaim.
+  Just like the PV/PVC model, Pod can mount PV, as well as PVC.
+* for more background see https://github.com/kubernetes/kubernetes/issues/30151
+
+##### Networking resource
+Allow user to define how many networking resources(bandwidth, iops, etc) a
+Ingress resource request. Then loadbalancer-scheduler can pick a best-matching
+one.
+
+##### Loadbalancer controller and Loadbalancer provider
+Loadbalancer provider is responssible for:
+
+* provide loadbalancer Create/Delete/Update/Delete interface
+
+Loadbalancer-controller is responsible for:
+
+* list&watch Ingress resources and call Loadbalancer provider to update
+  corresponding loadbalancer's loadbalancing rules
+* pick a best-matching loadbalancer from existing loadbalancer pool for
+  loadbalancerclaim
+* call loadbalancer provider to dynamically provision a loadbalancer for
+  loadbalancerclaim when it can not find a matching one among existing
+  loadbalancer
+* recycle or deprovision a loadbalancer when no consumers.
+
+
+### NoneGoal
+* LoadBalancerClass: different type(internet or intranet), different qos level, etc
 * LoadBalancer scheduling over-commit
 
-
-### Design
-* Add a `LoadBalancer` API to expose LoadBalancer explicitly to user
-* Add bandwidth and iops as new resource type, to describe the resource capacity
-  of a LoadBalancer and describe the resource a LoadBalancerClaim request
-* When user create a Ingress resource, we need a LoadBalancer to satisfy the
-  request, but which LoadBalancer to choose? we propose that Ingress "use" a
-  loadbalancer indirectly through LoadBalancerClaim
-* If use know exactly which LoadBalancer to use, he can create a LoadBalancerClaim
-  and bind it with the LoadBalancer manully. Otherwise, a loadbalancer-scheduler
-  will help user to make the decision based on the resource a LoadBalancerClaim
-  request and LoadBalancer's remaining capacity
-* LoadBalancerClaim->LoadBalancer binding is non-exclusive
-
-### Implement
-* Add a loadbalancer-scheduler to schedule loadbalancerclaim to loadbalancer
-* Add a loadbalancer-cliam controller to:
-    * dynamically provison lb when scheduler can not find a suitable loadbalancer
-      for a loadbalancerclaim
-    * recycle lb when ALL lbc bound to it has been deleted
-
-* Redesign the current ingress-controller, as follows:
-    * addd some loadbalancer related function in cloud provider interface
-    * add a loadbalancer controller to list&watch all Ingress resource and
-      call cloud provider to sync ingress rules, instead of ingress-controller
-      pod list&watch Ingress resource itself
-    * for bare-metal cluster, write a fake cloud provider, loadbalancer-controller
-      call cloud provider, then cloud provider call the nginx/haproxy pod to
-      update and reload config.
-
-### API
-
 ##### networking resource type
-``` go
+```
 const (
     ResourceBandWidth ResourceName = "network-bandwidth"
     ResourceIOPS ResourceName = "network-iops"
 )
 ```
 
+We may introduce more networking resource in the future.
+
 ##### Loadbalancer API
-``` go
+```
 type LoadBalancer struct {
     unversioned.TypeMeta `json:",inline"`
     ObjectMeta           `json:"metadata,omitempty"`
@@ -163,8 +217,7 @@ const (
 	LoadBalancerPending LoadBalancerPhase = "Pending"
 	// used for LoadBalancers that are working well
 	LoadBalancerPending LoadBalancerPhase = "Running"
-	// used for LoadBalancers that failed to be correctly deprovisioned after
-	// all LoadBalancerClaim boun with it has been deleted
+	// used for LoadBalancers that failed to be correctly recycled or deleted after being released from a claim
 	LoadBalanceFailed LoadBalancerPhase = "Failed"
 )
 
@@ -183,7 +236,7 @@ type LoadBalancerIngress struct {
 ```
 
 ##### LoadbalancerClaim API
-``` go
+```
 type LoadbalancerClaim struct {
     unversioned.TypeMeta `json:",inline"`
 	ObjectMeta           `json:"metadata,omitempty"`
@@ -210,20 +263,29 @@ type LoadBalancerClaimStatus struct {
 }
 ```
 
-##### Ingress
-* Add a new field "ClaimName" in IngressSpec, so that Ingress Resource can "use"
-  a LoadBalancer
+##### change on Ingress API
+Add a new knob "LoadBalancer" in IngressSpec, so that Ingress can "use" or
+"consume" a LoadBalancer
 
-
-``` go
-// IngressSpec describes the Ingress the user wishes to exist.
+```
 type IngressSpec struct {
     /*
     ...
     */
-    // ClaimName is the name of a LoadBalancerClaim in the same namespace as
-    // the Ingress using this cliam
-    ClaimName string `json:"claimName"`
+
+    LoadBalancer LBSource `json:"loadBalancer"`
+}
+
+type LBSource struct {
+    GCELoadBalancer *GCELoadBalancerSource `json:"gceLoadBalancer,omitempty"`
+	AWSLoadBalancer *AWSLoadBalancerSource `json:"awsLoadBalancer,omitempty"`
+	BareMetalLoadBalancer *BareMetalLoadBalancerSource `json:"bareMetalLoadBalancer,omitempty"`
+	LoadBalancerClaim *LoadBalancerClaimSource `json:"loadBalancerClaim,omitempty"`
+}
+
+type LoadBalancerClaimSource struct {
+	// ClaimName is the name of a LoadBalancerClaim in the same namespace as the ingress using this lb
+	ClaimName string `json:"claimName"`
 }
 
 ```
