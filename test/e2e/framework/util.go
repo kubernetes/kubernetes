@@ -52,10 +52,10 @@ import (
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
@@ -750,7 +750,7 @@ func waitForServiceAccountInNamespace(c clientset.Interface, ns, serviceAccountN
 	if err != nil {
 		return err
 	}
-	_, err = watch.Until(timeout, w, client.ServiceAccountHasSecrets)
+	_, err = watch.Until(timeout, w, conditions.ServiceAccountHasSecrets)
 	return err
 }
 
@@ -1274,7 +1274,7 @@ func waitTimeoutForPodRunningInNamespace(c clientset.Interface, podName, namespa
 	if err != nil {
 		return err
 	}
-	_, err = watch.Until(timeout, w, client.PodRunning)
+	_, err = watch.Until(timeout, w, conditions.PodRunning)
 	return err
 }
 
@@ -1289,7 +1289,7 @@ func WaitTimeoutForPodNoLongerRunningInNamespace(c clientset.Interface, podName,
 	if err != nil {
 		return err
 	}
-	_, err = watch.Until(timeout, w, client.PodCompleted)
+	_, err = watch.Until(timeout, w, conditions.PodCompleted)
 	return err
 }
 
@@ -1298,7 +1298,7 @@ func waitTimeoutForPodReadyInNamespace(c clientset.Interface, podName, namespace
 	if err != nil {
 		return err
 	}
-	_, err = watch.Until(timeout, w, client.PodRunningAndReady)
+	_, err = watch.Until(timeout, w, conditions.PodRunningAndReady)
 	return err
 }
 
@@ -1310,7 +1310,7 @@ func WaitForPodNotPending(c clientset.Interface, ns, podName, resourceVersion st
 	if err != nil {
 		return err
 	}
-	_, err = watch.Until(PodStartTimeout, w, client.PodNotPending)
+	_, err = watch.Until(PodStartTimeout, w, conditions.PodNotPending)
 	return err
 }
 
@@ -3467,8 +3467,8 @@ func NewHostExecPodSpec(ns, name string) *v1.Pod {
 					ImagePullPolicy: v1.PullIfNotPresent,
 				},
 			},
-HostNetwork: true,
-SecurityContext: &v1.PodSecurityContext{},
+			HostNetwork:     true,
+			SecurityContext: &v1.PodSecurityContext{},
 		},
 	}
 	return pod

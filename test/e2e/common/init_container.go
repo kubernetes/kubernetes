@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -80,7 +80,7 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 		w, err := podClient.Watch(v1.SingleObject(startedPod.ObjectMeta))
 		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
 		wr := watch.NewRecorder(w)
-		event, err := watch.Until(framework.PodStartTimeout, wr, client.PodCompleted)
+		event, err := watch.Until(framework.PodStartTimeout, wr, conditions.PodCompleted)
 		Expect(err).To(BeNil())
 		framework.CheckInvariants(wr.Events(), framework.ContainerInitInvariant)
 		endPod := event.Object.(*v1.Pod)
@@ -143,7 +143,7 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 		w, err := podClient.Watch(v1.SingleObject(startedPod.ObjectMeta))
 		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
 		wr := watch.NewRecorder(w)
-		event, err := watch.Until(framework.PodStartTimeout, wr, client.PodRunning)
+		event, err := watch.Until(framework.PodStartTimeout, wr, conditions.PodRunning)
 		Expect(err).To(BeNil())
 		framework.CheckInvariants(wr.Events(), framework.ContainerInitInvariant)
 		endPod := event.Object.(*v1.Pod)
@@ -358,7 +358,7 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 					return false, fmt.Errorf("unexpected object: %#v", t)
 				}
 			},
-			client.PodCompleted,
+			conditions.PodCompleted,
 		)
 		Expect(err).To(BeNil())
 		framework.CheckInvariants(wr.Events(), framework.ContainerInitInvariant)
