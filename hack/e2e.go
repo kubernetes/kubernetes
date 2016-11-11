@@ -213,6 +213,7 @@ func run(deploy deployer) error {
 	var (
 		beforeResources []byte
 		upResources     []byte
+		downResources   []byte
 		afterResources  []byte
 	)
 
@@ -293,6 +294,13 @@ func run(deploy deployer) error {
 		}))
 	}
 
+	if *checkLeakedResources {
+		errs = appendError(errs, xmlWrap("ListResources Down", func() error {
+			downResources, err = ListResources()
+			return err
+		}))
+	}
+
 	if *down {
 		errs = appendError(errs, xmlWrap("TearDown", deploy.Down))
 	}
@@ -307,7 +315,7 @@ func run(deploy deployer) error {
 			errs = append(errs, err)
 		} else {
 			errs = appendError(errs, xmlWrap("DiffResources", func() error {
-				return DiffResources(beforeResources, upResources, afterResources, *dump)
+				return DiffResources(beforeResources, upResources, downResources, afterResources, *dump)
 			}))
 		}
 	}
@@ -318,7 +326,7 @@ func run(deploy deployer) error {
 	return nil
 }
 
-func DiffResources(before, clusterUp, after []byte, location string) error {
+func DiffResources(before, clusterUp, clusterDown, after []byte, location string) error {
 	if location == "" {
 		var err error
 		location, err = ioutil.TempDir("", "e2e-check-resources")
@@ -330,6 +338,7 @@ func DiffResources(before, clusterUp, after []byte, location string) error {
 	var mode os.FileMode = 0664
 	bp := filepath.Join(location, "gcp-resources-before.txt")
 	up := filepath.Join(location, "gcp-resources-cluster-up.txt")
+	cdp := filepath.Join(location, "gcp-resources-cluster-down.txt")
 	ap := filepath.Join(location, "gcp-resources-after.txt")
 	dp := filepath.Join(location, "gcp-resources-diff.txt")
 
@@ -337,6 +346,9 @@ func DiffResources(before, clusterUp, after []byte, location string) error {
 		return err
 	}
 	if err := ioutil.WriteFile(up, clusterUp, mode); err != nil {
+		return err
+	}
+	if err := ioutil.WriteFile(cdp, clusterDown, mode); err != nil {
 		return err
 	}
 	if err := ioutil.WriteFile(ap, after, mode); err != nil {
