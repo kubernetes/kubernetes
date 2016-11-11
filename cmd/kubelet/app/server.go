@@ -525,12 +525,7 @@ func InitializeTLS(kc *componentconfig.KubeletConfiguration) (*server.TLSOptions
 				return nil, fmt.Errorf("unable to generate self signed cert: %v", err)
 			}
 
-			caCertPath := path.Join(path.Dir(kc.TLSCertFile), "ca-"+path.Base(kc.TLSCertFile))
-			if err := certutil.WriteCert(caCertPath, caCert); err != nil {
-				return nil, err
-			}
-
-			if err := certutil.WriteCert(kc.TLSCertFile, cert); err != nil {
+			if err := certutil.WriteCert(kc.TLSCertFile, cert, caCert); err != nil {
 				return nil, err
 			}
 
