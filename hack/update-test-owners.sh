@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,8 +22,4 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 
 cd "${KUBE_ROOT}"
-if ! hack/update_owners.py --check; then
-    echo 'Run ./hack/update-test-owners.sh to fix it'
-    exit  # TODO(rmmh): fix Github merging to respect .gitattributes
-    exit 1
-fi
+hack/update_owners.py
