@@ -26,6 +26,7 @@ go_library(
         "//pkg/api/errors:go_default_library",
         "//pkg/api/unversioned:go_default_library",
         "//pkg/apis/extensions:go_default_library",
+        "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/client/cache:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
