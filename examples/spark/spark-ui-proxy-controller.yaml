@@ -2,7 +2,6 @@ kind: ReplicationController
 apiVersion: v1
 metadata:
   name: spark-ui-proxy-controller
-  namespace: spark-cluster
 spec:
   replicas: 1
   selector:
