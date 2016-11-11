@@ -2033,6 +2033,9 @@ message PersistentVolumeSource {
   // AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
   // +optional
   optional AzureDiskVolumeSource azureDisk = 16;
+
+  // PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine
+  optional PhotonPersistentDiskVolumeSource photonPersistentDisk = 17;
 }
 
 // PersistentVolumeSpec is the specification of a persistent volume.
@@ -2080,6 +2083,17 @@ message PersistentVolumeStatus {
   // for machine parsing and tidy display in the CLI.
   // +optional
   optional string reason = 3;
+}
+
+// Represents a Photon Controller persistent disk resource.
+message PhotonPersistentDiskVolumeSource {
+  // ID that identifies Photon Controller persistent disk
+  optional string pdID = 1;
+
+  // Filesystem type to mount.
+  // Must be a filesystem type supported by the host operating system.
+  // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  optional string fsType = 2;
 }
 
 // Pod is a collection of containers that can run on a host. This resource is created
@@ -3541,6 +3555,9 @@ message VolumeSource {
   // AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
   // +optional
   optional AzureDiskVolumeSource azureDisk = 22;
+
+  // PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine
+  optional PhotonPersistentDiskVolumeSource photonPersistentDisk = 23;
 }
 
 // Represents a vSphere volume resource.
