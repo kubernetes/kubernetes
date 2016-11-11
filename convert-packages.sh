@@ -222,7 +222,7 @@ sed -i "s|\"k8s.io/kubernetes/pkg/apis/storage/util\"|\
 # PART III: rewrite api. to v1.
 #sed -i "s|api\.|v1.|g" "${target}"
 sed -i 's|\<api\.|v1\.|g' "${target}"
-sed -i 's|v1.Scheme|api.Scheme|g' "${target}"
+sed -i 's|v1.Scheme\>|api.Scheme\>|g' "${target}"
 sed -i 's|v1.Unversioned|api.Unversioned|g' "${target}"
 sed -i 's|v1.StrategicMergePatchType|api.StrategicMergePatchType|g' "${target}"
 sed -i 's|v1.ObjectNameField|api.ObjectNameField|g' "${target}"

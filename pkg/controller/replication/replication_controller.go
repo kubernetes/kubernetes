@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -69,7 +68,7 @@ const (
 )
 
 func getRCKind() unversioned.GroupVersionKind {
-	return api.SchemeGroupVersion.WithKind("ReplicationController")
+	return v1.SchemeGroupVersion.WithKind("ReplicationController")
 }
 
 // ReplicationManager is responsible for synchronizing ReplicationController objects stored

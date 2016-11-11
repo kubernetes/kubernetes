@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/controller"
@@ -38,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	quotainstall "k8s.io/kubernetes/pkg/quota/install"
+	internalquotainstall "k8s.io/kubernetes/pkg/quotainternal/install"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota"
 	"k8s.io/kubernetes/test/integration"
@@ -65,7 +67,8 @@ func TestQuota(t *testing.T) {
 
 	admissionCh := make(chan struct{})
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
-	admission, err := resourcequota.NewResourceQuota(clientset, quotainstall.NewRegistry(clientset, nil), 5, admissionCh)
+	internalClientset := internalclientset.NewForConfigOrDie(&restclient.Config{QPS: -1, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}})
+	admission, err := resourcequota.NewResourceQuota(internalClientset, internalquotainstall.NewRegistry(internalClientset, nil), 5, admissionCh)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -156,14 +159,14 @@ func waitForQuota(t *testing.T, quota *v1.ResourceQuota, clientset *clientset.Cl
 }
 
 func scale(t *testing.T, namespace string, clientset *clientset.Clientset) {
-	target := 100
+	target := int32(100)
 	rc := &v1.ReplicationController{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      "foo",
 			Namespace: namespace,
 		},
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: int32(target),
+			Replicas: &target,
 			Selector: map[string]string{"foo": "bar"},
 			Template: &v1.PodTemplateSpec{
 				ObjectMeta: v1.ObjectMeta{
@@ -202,7 +205,7 @@ func scale(t *testing.T, namespace string, clientset *clientset.Clientset) {
 		switch cast := event.Object.(type) {
 		case *v1.ReplicationController:
 			fmt.Printf("Found %v of %v replicas\n", int(cast.Status.Replicas), target)
-			if int(cast.Status.Replicas) == target {
+			if cast.Status.Replicas == target {
 				return true, nil
 			}
 		}
@@ -210,7 +213,7 @@ func scale(t *testing.T, namespace string, clientset *clientset.Clientset) {
 		return false, nil
 	})
 	if err != nil {
-		pods, _ := clientset.Core().Pods(namespace).List(v1.ListOptions{LabelSelector: labels.Everything(), FieldSelector: fields.Everything().String()})
+		pods, _ := clientset.Core().Pods(namespace).List(v1.ListOptions{LabelSelector: labels.Everything().String(), FieldSelector: fields.Everything().String()})
 		t.Fatalf("unexpected error: %v, ended with %v pods", err, len(pods.Items))
 	}
 }

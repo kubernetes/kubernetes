@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/controller"
@@ -352,6 +353,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	// Root client
 	// TODO: remove rootClient after we refactor pkg/admission to use the clientset.
 	rootClientset := clientset.NewForConfigOrDie(&restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}, BearerToken: rootToken})
+	internalRootClientset := internalclientset.NewForConfigOrDie(&restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &registered.GroupOrDie(v1.GroupName).GroupVersion}, BearerToken: rootToken})
 	// Set up two authenticators:
 	// 1. A token authenticator that maps the rootToken to the "root" user
 	// 2. A ServiceAccountToken authenticator that validates ServiceAccount tokens
@@ -405,7 +407,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	})
 
 	// Set up admission plugin to auto-assign serviceaccounts to pods
-	serviceAccountAdmission := serviceaccountadmission.NewServiceAccount(rootClientset)
+	serviceAccountAdmission := serviceaccountadmission.NewServiceAccount(internalRootClientset)
 
 	masterConfig := framework.NewMasterConfig()
 	masterConfig.GenericConfig.EnableIndex = true
@@ -419,7 +421,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	tokenController := serviceaccountcontroller.NewTokensController(rootClientset, serviceaccountcontroller.TokensControllerOptions{TokenGenerator: serviceaccount.JWTTokenGenerator(serviceAccountKey)})
 	go tokenController.Run(1, stopCh)
 
-	informers := informers.NewSharedInformerFactory(rootClientset, controller.NoResyncPeriodFunc())
+	informers := informers.NewSharedInformerFactory(rootClientset, nil, controller.NoResyncPeriodFunc())
 	serviceAccountController := serviceaccountcontroller.NewServiceAccountsController(informers.ServiceAccounts(), informers.Namespaces(), rootClientset, serviceaccountcontroller.DefaultServiceAccountsControllerOptions())
 	informers.Start(stopCh)
 	go serviceAccountController.Run(5, stopCh)
