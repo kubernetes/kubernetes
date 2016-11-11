@@ -35,7 +35,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer"
 	uexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
@@ -326,6 +328,94 @@ func TestDumpReaderToFile(t *testing.T) {
 	stringData := string(data)
 	if stringData != testString {
 		t.Fatalf("Wrong file content %s != %s", testString, stringData)
+	}
+}
+
+type TestType struct {
+	unversioned.TypeMeta
+	api.ObjectMeta
+	Data string
+}
+
+func (t *TestType) GetObjectKind() unversioned.ObjectKind {
+	return &t.TypeMeta
+}
+
+type ExternalTestType struct {
+	unversioned.TypeMeta `json:",inline"`
+	v1.ObjectMeta        `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Data                 string `json:"notData,omitempty" protobuf:"bytes,2,opt,name=data"`
+}
+
+func (t *ExternalTestType) GetObjectKind() unversioned.ObjectKind {
+	return &t.TypeMeta
+}
+
+func TestChangeResourcePatch(t *testing.T) {
+	// TestType is an internal type without JSON tags
+	internalGV := unversioned.GroupVersion{Group: "test", Version: runtime.APIVersionInternal}
+	externalGV := unversioned.GroupVersion{Group: "test", Version: "v1"}
+
+	s := runtime.NewScheme()
+	s.AddKnownTypes(internalGV, &TestType{})
+	s.AddKnownTypes(externalGV, &ExternalTestType{})
+	s.AddKnownTypeWithName(externalGV.WithKind("TestType"), &ExternalTestType{})
+	s.AddKnownTypeWithName(internalGV.WithKind("TestType"), &TestType{})
+	// TODO: Use AddToScheme(s) here instead of explicitely calling the conversion function.
+	// api.AddToScheme(s)
+	s.AddConversionFuncs(api.Convert_unversioned_Time_To_unversioned_Time)
+	testEncoder := serializer.NewCodecFactory(s).LegacyCodec(externalGV)
+
+	tests := []struct {
+		input     runtime.Object
+		encoder   runtime.Encoder
+		convertor runtime.ObjectConvertor
+		typer     runtime.ObjectTyper
+		expected  string
+		version   string
+	}{
+		{
+			input: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+			},
+			version:   "v1",
+			convertor: api.Scheme,
+			typer:     api.Scheme,
+			encoder:   api.Codecs.LegacyCodec(registered.EnabledVersions()...),
+			expected:  "{\"metadata\":{\"annotations\":{\"kubernetes.io/change-cause\":\"changed by foo\"}}}",
+		},
+		{
+			input: &TestType{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Data: "bar",
+			},
+			version:   "test/v1",
+			convertor: s,
+			typer:     s,
+			encoder:   testEncoder,
+			expected:  "{\"metadata\":{\"annotations\":{\"kubernetes.io/change-cause\":\"changed by foo\"}}}",
+		},
+	}
+	for i, test := range tests {
+		accessor, _ := meta.TypeAccessor(test.input)
+		info := resource.Info{
+			Object: test.input,
+			Mapping: &meta.RESTMapping{
+				ObjectConvertor:  test.convertor,
+				GroupVersionKind: unversioned.FromAPIVersionAndKind(test.version, accessor.GetKind()),
+			},
+		}
+		result, err := ChangeResourcePatch(&info, test.typer, test.encoder, "changed by foo")
+		if err != nil {
+			t.Errorf("[%d] unexpected error: %v", i, err)
+		}
+		if string(result) != test.expected {
+			t.Errorf("[%d] expected %q got %q", i, test.expected, string(result))
+		}
 	}
 }
 

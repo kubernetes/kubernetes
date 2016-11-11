@@ -18,7 +18,6 @@ package util
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -521,19 +520,24 @@ func RecordChangeCause(obj runtime.Object, changeCause string) error {
 
 // ChangeResourcePatch creates a strategic merge patch between the origin input resource info
 // and the annotated with change-cause input resource info.
-func ChangeResourcePatch(info *resource.Info, changeCause string) ([]byte, error) {
-	oldData, err := json.Marshal(info.Object)
+func ChangeResourcePatch(info *resource.Info, typer runtime.ObjectTyper, encoder runtime.Encoder, changeCause string) ([]byte, error) {
+	defaultVersion := info.ResourceMapping().GroupVersionKind.GroupVersion()
+	object, err := resource.AsVersionedObject([]*resource.Info{info}, false, defaultVersion, typer, encoder)
 	if err != nil {
 		return nil, err
 	}
-	if err := RecordChangeCause(info.Object, changeCause); err != nil {
-		return nil, err
-	}
-	newData, err := json.Marshal(info.Object)
+	oldData, err := runtime.Encode(encoder, object)
 	if err != nil {
 		return nil, err
 	}
-	return strategicpatch.CreateTwoWayMergePatch(oldData, newData, info.Object)
+	if err := RecordChangeCause(object, changeCause); err != nil {
+		return nil, err
+	}
+	newData, err := runtime.Encode(encoder, object)
+	if err != nil {
+		return nil, err
+	}
+	return strategicpatch.CreateTwoWayMergePatch(oldData, newData, object)
 }
 
 // containsChangeCause checks if input resource info contains change-cause annotation.

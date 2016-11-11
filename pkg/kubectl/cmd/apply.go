@@ -271,7 +271,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *App
 			}
 
 			if cmdutil.ShouldRecord(cmd, info) {
-				patch, err := cmdutil.ChangeResourcePatch(info, f.Command())
+				patch, err := cmdutil.ChangeResourcePatch(info, typer, encoder, f.Command())
 				if err != nil {
 					return err
 				}
