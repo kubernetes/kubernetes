@@ -45,7 +45,7 @@ import (
 
 // Reflector watches a specified resource and causes all changes to be reflected in the given store.
 type Reflector struct {
-	// name identifies this reflector.  By default it will be a file:line if possible.
+	// name identifies this reflector. By default it will be a file:line if possible.
 	name string
 
 	// The type of object we expect to place in the store.
@@ -74,12 +74,6 @@ var (
 	// However, it can be modified to avoid periodic resync to break the
 	// TCP connection.
 	minWatchTimeout = 5 * time.Minute
-	// If we are within 'forceResyncThreshold' from the next planned resync
-	// and are just before issuing Watch(), resync will be forced now.
-	forceResyncThreshold = 3 * time.Second
-	// We try to set timeouts for Watch() so that we will finish about
-	// than 'timeoutThreshold' from next planned periodic resync.
-	timeoutThreshold = 1 * time.Second
 )
 
 // NewNamespaceKeyedIndexerAndReflector creates an Indexer and a Reflector
@@ -114,7 +108,7 @@ func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, 
 	return r
 }
 
-// internalPackages are packages that ignored when creating a default reflector name.  These packages are in the common
+// internalPackages are packages that ignored when creating a default reflector name. These packages are in the common
 // call chains to NewReflector, so they'd be low entropy names for reflectors
 var internalPackages = []string{"kubernetes/pkg/client/cache/", "/runtime/asm_"}
 
