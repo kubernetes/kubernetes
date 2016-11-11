@@ -65,6 +65,8 @@ type ControllerManagerConfiguration struct {
 	LeaderElection componentconfig.LeaderElectionConfiguration `json:"leaderElection"`
 	// contentType is contentType of requests sent to apiserver.
 	ContentType string `json:"contentType"`
+	// enableIngressController enables the Federation Ingress Controller
+	EnableIngressController bool `json:"enableIngressController"`
 }
 
 // CMServer is the main context object for the controller manager.
@@ -92,6 +94,7 @@ func NewCMServer() *CMServer {
 			APIServerQPS:              20.0,
 			APIServerBurst:            30,
 			LeaderElection:            leaderelection.DefaultLeaderElectionConfiguration(),
+			EnableIngressController:   true,
 		},
 	}
 	return &s
@@ -115,5 +118,6 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.APIServerBurst, "federated-api-burst", s.APIServerBurst, "Burst to use while talking with federation apiserver")
 	fs.StringVar(&s.DnsProvider, "dns-provider", s.DnsProvider, "DNS provider. Valid values are: "+fmt.Sprintf("%q", dnsprovider.RegisteredDnsProviders()))
 	fs.StringVar(&s.DnsConfigFile, "dns-provider-config", s.DnsConfigFile, "Path to config file for configuring DNS provider.")
+	fs.BoolVar(&s.EnableIngressController, "enable-ingress-controller", s.EnableIngressController, "Enable federation ingress controller.")
 	leaderelection.BindFlags(&s.LeaderElection, fs)
 }

@@ -182,11 +182,13 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 	// TODO: rename s.ConcurentReplicaSetSyncs
 	go deploymentController.Run(s.ConcurrentReplicaSetSyncs, wait.NeverStop)
 
-	glog.Infof("Loading client config for ingress controller %q", "ingress-controller")
-	ingClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "ingress-controller"))
-	ingressController := ingresscontroller.NewIngressController(ingClientset)
-	glog.Infof("Running ingress controller")
-	ingressController.Run(wait.NeverStop)
+	if s.EnableIngressController {
+		glog.Infof("Loading client config for ingress controller %q", "ingress-controller")
+		ingClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "ingress-controller"))
+		ingressController := ingresscontroller.NewIngressController(ingClientset)
+		glog.Infof("Running ingress controller")
+		ingressController.Run(wait.NeverStop)
+	}
 
 	glog.Infof("Loading client config for service controller %q", servicecontroller.UserAgentName)
 	scClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, servicecontroller.UserAgentName))
