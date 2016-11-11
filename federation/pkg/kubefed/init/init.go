@@ -24,8 +24,6 @@ limitations under the License.
 // 5. Generate credentials of the following types for the API server:
 //    i.  "known_tokens.csv"
 //    ii. "basic_auth.csv"
-// 6. Add the ability to customize DNS domain suffix. It should probably be derived
-//    from cluster config.
 // 7. Make etcd PVC size configurable.
 // 8. Make API server and controller manager replicas customizable via the HA work.
 package init
@@ -116,7 +114,8 @@ func NewCmdInit(cmdOut io.Writer, config util.AdminConfig) *cobra.Command {
 	defaultImage := fmt.Sprintf("%s:%s", hyperkubeImageName, version.Get())
 
 	util.AddSubcommandFlags(cmd)
-	cmd.Flags().String("dns-zone-name", "", "DNS suffix for this federation. Federated Service DNS names are published with this suffix.")
+	cmd.Flags().String("dns-zone-name", "", "DNS domain (Zone) name, like example.com.")
+	cmd.Flags().String("service-dns-suffix", "", "DNS Suffix to use when publishing federated service names.  Defaults to dns-zone-name.")
 	cmd.Flags().String("image", defaultImage, "Image to use for federation API server and controller manager binaries.")
 	return cmd
 }
@@ -137,6 +136,7 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 		return err
 	}
 	dnsZoneName := cmdutil.GetFlagString(cmd, "dns-zone-name")
+	dnsSuffix := cmdutil.GetFlagString(cmd, "service-dns-suffix")
 	image := cmdutil.GetFlagString(cmd, "image")
 
 	hostFactory := config.HostFactory(initFlags.Host, initFlags.Kubeconfig)
@@ -210,7 +210,7 @@ func initFederation(cmdOut io.Writer, config util.AdminConfig, cmd *cobra.Comman
 	}
 
 	// 7. Create federation controller manager
-	_, err = createControllerManager(hostClientset, initFlags.FederationSystemNamespace, initFlags.Name, cmName, image, cmKubeconfigName, dnsZoneName)
+	_, err = createControllerManager(hostClientset, initFlags.FederationSystemNamespace, initFlags.Name, cmName, image, cmKubeconfigName, dnsZoneName, dnsSuffix)
 	if err != nil {
 		return err
 	}
@@ -479,7 +479,22 @@ func createAPIServer(clientset *client.Clientset, namespace, name, image, creden
 	return clientset.Extensions().Deployments(namespace).Create(dep)
 }
 
-func createControllerManager(clientset *client.Clientset, namespace, name, cmName, image, kubeconfigName, dnsZoneName string) (*extensions.Deployment, error) {
+func createControllerManager(clientset *client.Clientset, namespace, name, cmName, image, kubeconfigName, dnsZoneName, dnsSuffix string) (*extensions.Deployment, error) {
+	command := []string{
+		"/hyperkube",
+		"federation-controller-manager",
+		"--master=https://federation-apiserver",
+		"--kubeconfig=/etc/federation/controller-manager/kubeconfig",
+		"--dns-provider=gce",
+		"--dns-provider-config=",
+		fmt.Sprintf("--federation-name=%s", name),
+		fmt.Sprintf("--zone-name=%s", dnsZoneName),
+	}
+
+	if dnsSuffix != "" {
+		command = append(command, fmt.Sprintf("--service-dns-suffix=%s", dnsSuffix))
+	}
+
 	dep := &extensions.Deployment{
 		ObjectMeta: api.ObjectMeta{
 			Name:      cmName,
@@ -496,18 +511,9 @@ func createControllerManager(clientset *client.Clientset, namespace, name, cmNam
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{
-							Name:  "controller-manager",
-							Image: image,
-							Command: []string{
-								"/hyperkube",
-								"federation-controller-manager",
-								"--master=https://federation-apiserver",
-								"--kubeconfig=/etc/federation/controller-manager/kubeconfig",
-								"--dns-provider=gce",
-								"--dns-provider-config=",
-								fmt.Sprintf("--federation-name=%s", name),
-								fmt.Sprintf("--zone-name=%s", dnsZoneName),
-							},
+							Name:    "controller-manager",
+							Image:   image,
+							Command: command,
 							VolumeMounts: []api.VolumeMount{
 								{
 									Name:      kubeconfigName,
