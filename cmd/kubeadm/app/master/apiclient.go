@@ -177,21 +177,22 @@ func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset, sched
 		n.ObjectMeta.Annotations[api.TaintsAnnotationKey] = string(taintsAnnotation)
 	}
 
-	if _, err := client.Nodes().Update(n); err != nil {
-		if apierrs.IsConflict(err) {
-			fmt.Println("<master/apiclient> temporarily unable to update master node metadata due to conflict (will retry)")
-			time.Sleep(apiCallRetryInterval)
-			attemptToUpdateMasterRoleLabelsAndTaints(client, schedulable)
+	for {
+		if _, err := client.Nodes().Update(n); err != nil {
+			if apierrs.IsConflict(err) {
+				fmt.Println("<master/apiclient> temporarily unable to update master node metadata due to conflict (will retry)")
+				time.Sleep(apiCallRetryInterval)
+			} else {
+				return err
+			}
 		} else {
-			return err
+			return nil
 		}
 	}
 
-	return nil
 }
 
 func UpdateMasterRoleLabelsAndTaints(client *clientset.Clientset, schedulable bool) error {
-	// TODO(phase1+) use iterate instead of recursion
 	err := attemptToUpdateMasterRoleLabelsAndTaints(client, schedulable)
 	if err != nil {
 		return fmt.Errorf("<master/apiclient> failed to update master node - %v", err)
