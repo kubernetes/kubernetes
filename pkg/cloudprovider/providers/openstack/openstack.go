@@ -262,7 +262,7 @@ func getServerByName(client *gophercloud.ServiceClient, name string) (*servers.S
 	}
 
 	if len(serverList) == 0 {
-		return nil, ErrNotFound
+		return nil, cloudprovider.InstanceNotFound
 	} else if len(serverList) > 1 {
 		return nil, ErrMultipleResults
 	}
