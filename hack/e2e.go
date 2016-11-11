@@ -151,6 +151,8 @@ func writeXML(start time.Time) {
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	flag.Parse()
+	// Manually set checkLeakedResources to true for PR Jenkins test
+	*checkLeakedResources = true
 
 	if err := validWorkingDirectory(); err != nil {
 		log.Fatalf("Called from invalid working directory: %v", err)

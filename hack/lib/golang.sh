@@ -129,6 +129,7 @@ readonly KUBE_TEST_PORTABLE=(
   hack/ginkgo-e2e.sh
   hack/federated-ginkgo-e2e.sh
   hack/lib
+  hack/jenkins/.use_head_e2e
 )
 
 # Test targets which run on the Kubernetes clusters directly, so we only
