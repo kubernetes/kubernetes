@@ -252,7 +252,6 @@ func TestTaint(t *testing.T) {
 
 	for _, test := range tests {
 		oldNode, expectNewNode := generateNodeAndTaintedNode(test.oldTaints, test.newTaints)
-
 		new_node := &api.Node{}
 		tainted := false
 		f, tf, codec, ns := cmdtesting.NewAPIFactory()
@@ -262,6 +261,12 @@ func TestTaint(t *testing.T) {
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				m := &MyReq{req}
 				switch {
+				case m.isFor("GET", "/version"):
+					resp, err := genResponseWithJsonEncodedBody(serverVersion_1_5_0)
+					if err != nil {
+						t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
+					}
+					return resp, nil
 				case m.isFor("GET", "/nodes/node-name"):
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, oldNode)}, nil
 				case m.isFor("PATCH", "/nodes/node-name"), m.isFor("PUT", "/nodes/node-name"):
