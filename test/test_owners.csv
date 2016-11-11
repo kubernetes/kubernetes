@@ -163,6 +163,8 @@ Federation secrets Secret objects should be deleted from underlying clusters whe
 Federation secrets Secret objects should not be deleted from underlying clusters when OrphanDependents is true,nikhiljindal,0
 GCP Volumes GlusterFS should be mountable,rkouj,0
 GCP Volumes NFSv4 should be mountable for NFSv4,rkouj,0
+GCP Volumes GlusterFS should be mountable,eparis,0
+GCP Volumes NFSv4 should be mountable for NFSv4,fabioy,0
 GKE local SSD should write and read from node local SSD,fabioy,0
 GKE node pools should create a cluster with multiple node pools,fabioy,1
 Garbage collector should delete pods created by rc when not orphaning,justinsb,1
@@ -172,6 +174,8 @@ Garbage collector should orphan pods created by rc if deleteOptions.OrphanDepend
 "Generated release_1_5 clientset should create v2alpha1 cronJobs, delete cronJobs, watch cronJobs",soltysh,1
 HA-master pods survive addition/removal different zones,rkouj,0
 HA-master pods survive addition/removal same zone,rkouj,0
+HA-master pods survive addition/removal different zones,roberthbailey,0
+HA-master pods survive addition/removal same zone,roberthbailey,0
 Hazelcast should create and scale hazelcast,mikedanese,1
 Horizontal pod autoscaling (scale resource: CPU) Deployment Should scale from 1 pod to 3 pods and from 3 to 5,jszczepkowski,0
 Horizontal pod autoscaling (scale resource: CPU) Deployment Should scale from 5 pods to 3 pods and from 3 to 1,jszczepkowski,0
