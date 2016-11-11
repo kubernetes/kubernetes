@@ -177,7 +177,6 @@ func (m *ReplicaSetControllerRefManager) Classify(replicaSets []*extensions.Repl
 	controlledDoesNotMatch []*extensions.ReplicaSet) {
 	for i := range replicaSets {
 		replicaSet := replicaSets[i]
-		// TODO: Do we need to ignore inactive RS
 		controllerRef := getControllerOf(replicaSet.ObjectMeta)
 		if controllerRef != nil {
 			if controllerRef.UID == m.controllerObject.UID {
