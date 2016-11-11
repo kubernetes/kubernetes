@@ -18,7 +18,7 @@ package fake
 
 import (
 	"k8s.io/kubernetes/pkg/api/v1"
-	policy "k8s.io/kubernetes/pkg/apis/policy/v1alpha1"
+	policy "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 )
