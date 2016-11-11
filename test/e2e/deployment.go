@@ -398,8 +398,8 @@ func testRollingUpdateDeploymentEvents(f *framework.Framework) {
 	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(newRS).NotTo(Equal(nil))
-	Expect(events.Items[0].Message).Should(Equal(fmt.Sprintf("Created new replica set %q and scaled up to 1", newRS.Name)))
-	Expect(events.Items[1].Message).Should(Equal(fmt.Sprintf("Scaled down replica set %q to 0", rsName)))
+	Expect(events.Items[0].Message).Should(Equal(fmt.Sprintf("Scaled up replica set %s to 1", newRS.Name)))
+	Expect(events.Items[1].Message).Should(Equal(fmt.Sprintf("Scaled down replica set %s to 0", rsName)))
 }
 
 func testRecreateDeployment(f *framework.Framework) {
@@ -450,8 +450,8 @@ func testRecreateDeployment(f *framework.Framework) {
 	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(newRS).NotTo(Equal(nil))
-	Expect(events.Items[0].Message).Should(Equal(fmt.Sprintf("Scaled down replica set %q to 0", rsName)))
-	Expect(events.Items[1].Message).Should(Equal(fmt.Sprintf("Created new replica set %q and scaled up to 3", newRS.Name)))
+	Expect(events.Items[0].Message).Should(Equal(fmt.Sprintf("Scaled down replica set %s to 0", rsName)))
+	Expect(events.Items[1].Message).Should(Equal(fmt.Sprintf("Scaled up replica set %s to 3", newRS.Name)))
 }
 
 // testDeploymentCleanUpPolicy tests that deployment supports cleanup policy

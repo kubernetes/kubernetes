@@ -379,7 +379,7 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 		return nil, err
 	}
 	if newReplicasCount > 0 {
-		dc.eventRecorder.Eventf(deployment, api.EventTypeNormal, "ScalingReplicaSet", "Created new replica set %q and scaled up to %d", createdRS.Name, newReplicasCount)
+		dc.eventRecorder.Eventf(deployment, api.EventTypeNormal, "ScalingReplicaSet", "Scaled up replica set %s to %d", createdRS.Name, newReplicasCount)
 	}
 
 	deploymentutil.SetDeploymentRevision(deployment, newRevision)
@@ -524,7 +524,7 @@ func (dc *DeploymentController) scaleReplicaSet(rs *extensions.ReplicaSet, newSc
 		rsCopy.Spec.Replicas = newScale
 		rs, err = dc.client.Extensions().ReplicaSets(rsCopy.Namespace).Update(rsCopy)
 		if err == nil && sizeNeedsUpdate {
-			dc.eventRecorder.Eventf(deployment, api.EventTypeNormal, "ScalingReplicaSet", "Scaled %s replica set %q to %d", scalingOperation, rs.Name, newScale)
+			dc.eventRecorder.Eventf(deployment, api.EventTypeNormal, "ScalingReplicaSet", "Scaled %s replica set %s to %d", scalingOperation, rs.Name, newScale)
 		}
 	}
 	return rs, err
