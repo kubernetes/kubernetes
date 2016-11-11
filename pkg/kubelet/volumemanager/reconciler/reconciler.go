@@ -474,6 +474,7 @@ func (rc *reconciler) syncStates(podsDir string) {
 		volumesNeedUpdate[reconstructedVolume.volumeName] = reconstructedVolume
 
 	}
+
 	if len(volumesNeedUpdate) > 0 {
 		if err = rc.updateStates(volumesNeedUpdate); err != nil {
 			glog.Errorf("Error occurred during reconstruct volume from disk: %v", err)
@@ -492,16 +493,17 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 	if err != nil {
 		return nil, err
 	}
-	volumeName, err := plugin.GetVolumeName(volumeSpec)
-	if err != nil {
-		return nil, err
-	}
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			UID: types.UID(volume.podName),
 		},
 	}
 	attachablePlugin, err := rc.volumePluginMgr.FindAttachablePluginByName(volume.pluginName)
+	if err != nil {
+		return nil, err
+	}
+
+	volumeName, err := plugin.GetVolumeName(volumeSpec)
 	if err != nil {
 		return nil, err
 	}
@@ -527,10 +529,14 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 	}
 
 	reconstructedVolume := &reconstructedVolume{
-		volumeName:          uniqueVolumeName,
-		podName:             volume.podName,
-		volumeSpec:          volumeSpec,
-		outerVolumeSpecName: volumeName, /* volumeName is InnerVolumeSpecName. But this information will not be used for cleanup */
+		volumeName: uniqueVolumeName,
+		podName:    volume.podName,
+		volumeSpec: volumeSpec,
+		// volume.volumeSpecName is actually InnerVolumeSpecName. But this information will likely to be updated in updateStates()
+		// by checking the desired state volumeToMount list and getting the real OuterVolumeSpecName.
+		// In case the pod is deleted during this period and desired state does not have this information, it will not be used
+		// for volume cleanup.
+		outerVolumeSpecName: volume.volumeSpecName,
 		pod:                 pod,
 		pluginIsAttachable:  attachablePlugin != nil,
 		volumeGidValue:      "",
@@ -550,8 +556,19 @@ func (rc *reconciler) updateStates(volumesNeedUpdate map[api.UniqueVolumeName]*r
 			if volume, exists := volumesNeedUpdate[attachedVolume.Name]; exists {
 				volume.devicePath = attachedVolume.DevicePath
 				volumesNeedUpdate[attachedVolume.Name] = volume
-				glog.V(4).Infof("Get devicePath from node status for volume (%q): %q", attachedVolume.Name, volume.devicePath)
+				glog.V(4).Infof("Update devicePath from node status for volume (%q): %q", attachedVolume.Name, volume.devicePath)
 			}
+		}
+	}
+
+	// Get the list of volumes from desired state and update OuterVolumeSpecName if the information is avaiable
+	volumesToMount := rc.desiredStateOfWorld.GetVolumesToMount()
+	for _, volumeToMount := range volumesToMount {
+		if volume, exists := volumesNeedUpdate[volumeToMount.VolumeName]; exists {
+			volume.outerVolumeSpecName = volumeToMount.OuterVolumeSpecName
+			volumesNeedUpdate[volumeToMount.VolumeName] = volume
+			glog.V(4).Infof("Update OuterVolumeSpecName from desired state for volume (%q): %q",
+				volumeToMount.VolumeName, volume.outerVolumeSpecName)
 		}
 	}
 
