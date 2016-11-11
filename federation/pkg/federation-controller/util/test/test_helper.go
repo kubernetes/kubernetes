@@ -257,11 +257,11 @@ func CompareObjectMeta(a, b api_v1.ObjectMeta) error {
 	if a.Name != b.Name {
 		return fmt.Errorf("Different name expected:%s observed:%s", a.Namespace, b.Namespace)
 	}
-	if !reflect.DeepEqual(a.Annotations, b.Annotations) {
-		return fmt.Errorf("Annotations are different expected:%v observerd:%v", a.Annotations, b.Annotations)
+	if !reflect.DeepEqual(a.Labels, b.Labels) && (len(a.Labels) != 0 || len(b.Labels) != 0) {
+		return fmt.Errorf("Labels are different expected:%v observerd:%v", a.Labels, b.Labels)
 	}
-	if !reflect.DeepEqual(a.Labels, b.Labels) {
-		return fmt.Errorf("Annotations are different expected:%v observerd:%v", a.Labels, b.Labels)
+	if !reflect.DeepEqual(a.Annotations, b.Annotations) && (len(a.Annotations) != 0 || len(b.Annotations) != 0) {
+		return fmt.Errorf("Annotations are different expected:%v observerd:%v", a.Annotations, b.Annotations)
 	}
 	return nil
 }
@@ -294,4 +294,31 @@ func WaitForStoreUpdate(store util.FederatedReadOnlyStore, clusterName, key stri
 		return found, err
 	})
 	return err
+}
+
+// Ensure a key is in the store before returning (or timeout w/ error)
+func WaitForStoreUpdateChecking(store util.FederatedReadOnlyStore, clusterName, key string, timeout time.Duration,
+	checkFunction CheckingFunction) error {
+	retryInterval := 500 * time.Millisecond
+	var lastError error
+	err := wait.PollImmediate(retryInterval, timeout, func() (bool, error) {
+		item, found, err := store.GetByKey(clusterName, key)
+		if err != nil || !found {
+			return found, err
+		}
+		runtimeObj := item.(runtime.Object)
+		lastError = checkFunction(runtimeObj)
+		glog.V(2).Infof("Check function failed for %s %v %v", key, runtimeObj, lastError)
+		return lastError == nil, nil
+	})
+	return err
+}
+
+func MetaAndSpecCheckingFunction(expected runtime.Object) CheckingFunction {
+	return func(obj runtime.Object) error {
+		if util.ObjectMetaAndSpecEquivalent(obj, expected) {
+			return nil
+		}
+		return fmt.Errorf("Object different expected=%#v  received=%#v", expected, obj)
+	}
 }

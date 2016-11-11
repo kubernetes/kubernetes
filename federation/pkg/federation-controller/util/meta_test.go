@@ -56,6 +56,18 @@ func TestObjectMeta(t *testing.T) {
 		ResourceVersion: "1231255531412",
 		Annotations:     map[string]string{"A": "B"},
 	}
+	o7 := api_v1.ObjectMeta{
+		Namespace:       "ns1",
+		Name:            "s1",
+		ResourceVersion: "1231255531412",
+		Annotations:     map[string]string{},
+		Labels:          map[string]string{},
+	}
+	o8 := api_v1.ObjectMeta{
+		Namespace:       "ns1",
+		Name:            "s1",
+		ResourceVersion: "1231255531412",
+	}
 	assert.Equal(t, 0, len(o2.UID))
 	assert.Equal(t, 0, len(o2.ResourceVersion))
 	assert.Equal(t, o1.Name, o2.Name)
@@ -64,6 +76,8 @@ func TestObjectMeta(t *testing.T) {
 	assert.True(t, ObjectMetaEquivalent(o3, o4))
 	assert.True(t, ObjectMetaEquivalent(o5, o6))
 	assert.True(t, ObjectMetaEquivalent(o3, o5))
+	assert.True(t, ObjectMetaEquivalent(o7, o8))
+	assert.True(t, ObjectMetaEquivalent(o8, o7))
 }
 
 func TestObjectMetaAndSpec(t *testing.T) {
