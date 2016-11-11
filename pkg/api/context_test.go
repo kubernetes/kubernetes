@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-        "k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 // TestNamespaceContext validates that a namespace can be get/set on a context object
@@ -71,7 +71,7 @@ func TestValidNamespace(t *testing.T) {
 //TestUIDContext validates that a UID can be get/set on a context object
 func TestUIDContext(t *testing.T) {
 	ctx := api.NewContext()
-	_,ok := api.UIDFrom(ctx)
+	_, ok := api.UIDFrom(ctx)
 	if ok {
 		t.Errorf("Should not be ok because there is no UID on the context")
 	}
@@ -79,7 +79,7 @@ func TestUIDContext(t *testing.T) {
 		ctx,
 		types.UID{"testUID"},
 	)
-	_,ok = api.UIDFrom(ctx)
+	_, ok = api.UIDFrom(ctx)
 	if !ok {
 		t.Errorf("Error getting UID")
 	}
@@ -88,7 +88,7 @@ func TestUIDContext(t *testing.T) {
 //TestUserAgentContext validates that a useragent can be get/set on a context object
 func TestUserAgentContext(t *testing.T) {
 	ctx := api.NewContext()
-	_,ok := api.UserAgentFrom(ctx)
+	_, ok := api.UserAgentFrom(ctx)
 	if ok {
 		t.Errorf("Should not be ok because there is no UserAgent on the context")
 	}
@@ -97,7 +97,7 @@ func TestUserAgentContext(t *testing.T) {
 		ctx,
 		"TestUserAgent",
 	)
-	result,ok:= api.UserAgentFrom(ctx)
+	result, ok := api.UserAgentFrom(ctx)
 	if !ok {
 		t.Errorf("Error getting UserAgent")
 	}
