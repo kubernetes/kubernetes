@@ -20,7 +20,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubelet"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -39,10 +38,10 @@ var _ = framework.KubeDescribe("ContainerLogPath", func() {
 				logDirVolumeName := "log-dir-vol"
 				logDir := kubelet.ContainerLogsDir
 
-				logPodName := "logger-" + string(uuid.NewUUID())
-				logContName := "logger-c-" + string(uuid.NewUUID())
-				checkPodName := "checker" + string(uuid.NewUUID())
-				checkContName := "checker-c-" + string(uuid.NewUUID())
+				logPodName := "logger-pod"
+				logContName := "logger-container"
+				checkPodName := "checker-pod"
+				checkContName := "checker-container"
 
 				logPod := &api.Pod{
 					ObjectMeta: api.ObjectMeta{
@@ -66,8 +65,8 @@ var _ = framework.KubeDescribe("ContainerLogPath", func() {
 				framework.ExpectNoError(err, "Failed waiting for pod: %s to enter success state", logPodName)
 
 				// get containerID from created Pod
-				createdLogPod, err := podClient.Get(logPodName)
-				logConID := kubecontainer.ParseContainerID(createdLogPod.Status.ContainerStatuses[0].ContainerID)
+				pod, err := podClient.Get(logPodName)
+				logConID := kubecontainer.ParseContainerID(pod.Status.ContainerStatuses[0].ContainerID)
 				framework.ExpectNoError(err, "Failed to get pod: %s", logPodName)
 
 				expectedlogFile := logDir + "/" + logPodName + "_" + ns + "_" + logContName + "-" + logConID.ID + ".log"
