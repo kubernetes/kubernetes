@@ -98,7 +98,7 @@ type DeploymentController struct {
 }
 
 // NewDeploymentController creates a new DeploymentController.
-func NewDeploymentController(dInformer informers.DeploymentInformer, rsInformer informers.ReplicaSetInformer, podInformer informers.PodInformer, client clientset.Interface, garbageCollectorEnabled bool) *DeploymentController {
+func NewDeploymentController(dInformer informers.DeploymentInformer, rsInformer informers.ReplicaSetInformer, podInformer informers.PodInformer, client clientset.Interface) *DeploymentController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
@@ -333,6 +333,10 @@ func (dc *DeploymentController) handleErr(err error, key interface{}) {
 	dc.queue.Forget(key)
 }
 
+// classifyReplicaSets uses NewReplicaSetControllerRefManager to classify ReplicaSets
+// and adopts them if their labels match the Deployment but are missing the reference.
+// It also removes the controllerRef for ReplicaSets, whose labels no longer matches
+// the deployment.
 func (dc *DeploymentController) classifyReplicaSets(deployment *extensions.Deployment) error {
 	rsList, err := dc.rsLister.ReplicaSets(deployment.Namespace).List(labels.Everything())
 	if err != nil {
@@ -363,7 +367,7 @@ func (dc *DeploymentController) classifyReplicaSets(deployment *extensions.Deplo
 	for _, replicaSet := range controlledDoesNotMatch {
 		err := cm.ReleaseReplicaSet(replicaSet)
 		if err != nil {
-			errlist = append(errlist, cm.ReleaseReplicaSet(replicaSet))
+			errlist = append(errlist, err)
 		}
 	}
 	if len(errlist) != 0 {
@@ -410,8 +414,9 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return nil
 	}
 
-	if dc.garbageCollectorEnabled {
-		dc.classifyReplicaSets(deployment)
+	err = dc.classifyReplicaSets(deployment)
+	if err != nil {
+		glog.Infof("Classifying ReplicaSets failed")
 	}
 
 	if d.DeletionTimestamp != nil {
