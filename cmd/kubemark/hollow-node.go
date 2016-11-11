@@ -19,8 +19,9 @@ package main
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -94,9 +95,13 @@ func main() {
 		glog.Fatalf("Failed to create a ClientConfig: %v. Exiting.", err)
 	}
 
-	clientset, err := internalclientset.NewForConfig(clientConfig)
+	clientset, err := clientset.NewForConfig(clientConfig)
 	if err != nil {
 		glog.Fatalf("Failed to create a ClientSet: %v. Exiting.", err)
+	}
+	internalClientset, err := internalclientset.NewForConfig(clientConfig)
+	if err != nil {
+		glog.Fatalf("Failed to create an internal ClientSet: %v. Exiting.", err)
 	}
 
 	if config.Morph == "kubelet" {
@@ -122,7 +127,7 @@ func main() {
 
 	if config.Morph == "proxy" {
 		eventBroadcaster := record.NewBroadcaster()
-		recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "kube-proxy", Host: config.NodeName})
+		recorder := eventBroadcaster.NewRecorder(v1.EventSource{Component: "kube-proxy", Host: config.NodeName})
 
 		iptInterface := fakeiptables.NewFake()
 
@@ -132,7 +137,7 @@ func main() {
 		endpointsConfig := proxyconfig.NewEndpointsConfig()
 		endpointsConfig.RegisterHandler(&kubemark.FakeProxyHandler{})
 
-		hollowProxy := kubemark.NewHollowProxyOrDie(config.NodeName, clientset, endpointsConfig, serviceConfig, iptInterface, eventBroadcaster, recorder)
+		hollowProxy := kubemark.NewHollowProxyOrDie(config.NodeName, internalClientset, endpointsConfig, serviceConfig, iptInterface, eventBroadcaster, recorder)
 		hollowProxy.Run()
 	}
 }
