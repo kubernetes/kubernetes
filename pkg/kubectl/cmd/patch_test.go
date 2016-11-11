@@ -34,6 +34,12 @@ func TestPatchObject(t *testing.T) {
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
+			case p == "/version" && m == "GET":
+				resp, err := genResponseWithJsonEncodedBody(serverVersion_1_5_0)
+				if err != nil {
+					t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
+				}
+				return resp, nil
 			case p == "/namespaces/test/services/frontend" && (m == "PATCH" || m == "GET"):
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &svc.Items[0])}, nil
 			default:
@@ -43,6 +49,7 @@ func TestPatchObject(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
+	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdPatch(f, buf)
@@ -66,6 +73,12 @@ func TestPatchObjectFromFile(t *testing.T) {
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
+			case p == "/version" && m == "GET":
+				resp, err := genResponseWithJsonEncodedBody(serverVersion_1_5_0)
+				if err != nil {
+					t.Fatalf("error: failed to generate server version response: %#v\n", serverVersion_1_5_0)
+				}
+				return resp, nil
 			case p == "/namespaces/test/services/frontend" && (m == "PATCH" || m == "GET"):
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &svc.Items[0])}, nil
 			default:
@@ -75,6 +88,7 @@ func TestPatchObjectFromFile(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
+	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdPatch(f, buf)

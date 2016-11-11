@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/strategicpatch"
 )
 
 // ImageOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -35,6 +36,7 @@ import (
 type ImageOptions struct {
 	resource.FilenameOptions
 
+	f           cmdutil.Factory
 	Mapper      meta.RESTMapper
 	Typer       runtime.ObjectTyper
 	Infos       []*resource.Info
@@ -108,6 +110,7 @@ func NewCmdImage(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 }
 
 func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	o.f = f
 	o.Mapper, o.Typer = f.Object()
 	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
 	o.Encoder = f.JSONEncoder()
@@ -162,7 +165,7 @@ func (o *ImageOptions) Validate() error {
 func (o *ImageOptions) Run() error {
 	allErrs := []error{}
 
-	patches := CalculatePatches(o.Infos, o.Encoder, func(info *resource.Info) (bool, error) {
+	patches := CalculatePatches(o.f, o.Infos, o.Encoder, o.Local, func(info *resource.Info) (bool, error) {
 		transformed := false
 		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *api.PodSpec) error {
 			for name, image := range o.ContainerImages {
@@ -186,6 +189,14 @@ func (o *ImageOptions) Run() error {
 		return transformed, err
 	})
 
+	smPatchVersion := strategicpatch.SMPatchVersionLatest
+	var err error
+	if !o.Local {
+		smPatchVersion, err = cmdutil.GetServerSupportedSMPatchVersionFromFactory(o.f)
+		if err != nil {
+			return err
+		}
+	}
 	for _, patch := range patches {
 		info := patch.Info
 		if patch.Err != nil {
@@ -212,7 +223,7 @@ func (o *ImageOptions) Run() error {
 
 		// record this change (for rollout history)
 		if o.Record || cmdutil.ContainsChangeCause(info) {
-			if patch, err := cmdutil.ChangeResourcePatch(info, o.ChangeCause); err == nil {
+			if patch, err := cmdutil.ChangeResourcePatch(info, o.ChangeCause, smPatchVersion); err == nil {
 				if obj, err = resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch); err != nil {
 					fmt.Fprintf(o.Err, "WARNING: changes to %s/%s can't be recorded: %v\n", info.Mapping.Resource, info.Name, err)
 				}
