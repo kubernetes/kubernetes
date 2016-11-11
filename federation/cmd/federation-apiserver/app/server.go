@@ -81,8 +81,10 @@ func Run(s *options.ServerRunOptions) error {
 							ApplyAuthenticationOptions(s.Authentication).
 							ApplyRBACSuperUser(s.Authorization.RBACSuperUser)
 
-	if err := genericConfig.MaybeGenerateServingCerts(); err != nil {
-		glog.Fatalf("Failed to generate service certificate: %v", err)
+	if genericConfig.SecureServingInfo != nil {
+		if err := genericConfig.SecureServingInfo.MaybeGenerateServingCert(genericConfig.PublicAddress); err != nil{
+			glog.Fatalf("Failed to generate service certificate: %v", err)
+		}
 	}
 
 	// TODO: register cluster federation resources here.

@@ -17,6 +17,7 @@ limitations under the License.
 package genericapiserver
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -46,6 +47,7 @@ import (
 	authorizerunion "k8s.io/kubernetes/pkg/auth/authorizer/union"
 	authhandlers "k8s.io/kubernetes/pkg/auth/handlers"
 	"k8s.io/kubernetes/pkg/auth/user"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	apiserverauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
@@ -166,8 +168,6 @@ type SecureServingInfo struct {
 	ServerCert GeneratableKeyCert
 	// SNICerts are named CertKeys for serving secure traffic with SNI support.
 	SNICerts []NamedCertKey
-	// ServerCA is the certificate bundle needed to verify the ServerCert
-	ServerCA string
 	// ClientCA is the certificate bundle for all the signers that you'll recognize for incoming client certificates
 	ClientCA string
 }
@@ -277,6 +277,12 @@ func (c *Config) ApplySecureServingOptions(secureServing *options.SecureServingO
 func (c *Config) ApplyInsecureServingOptions(insecureServing *options.ServingOptions) *Config {
 	if insecureServing == nil || insecureServing.BindPort <= 0 {
 		return c
+		if secureServingInfo.ServerCert.Generate && secureServingInfo.ServerCA == "" {
+			secureServingInfo.ServerCA = path.Join(path.Dir(secureServingInfo.ServerCert.CertFile), "ca-"+path.Base(secureServingInfo.ServerCert.CertFile))
+		}
+
+		c.SecureServingInfo = secureServingInfo
+		c.ReadWritePort = options.SecurePort
 	}
 
 	c.InsecureServingInfo = &ServingInfo{
@@ -450,32 +456,69 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 }
 
 // MaybeGenerateServingCerts generates serving certificates if requested and needed.
-func (c *Config) MaybeGenerateServingCerts(alternateIPs ...net.IP) error {
+func (c *Config) MaybeGenerateServingCerts(publicAddress net.IP, alternateIPs ...net.IP) error {
 	// It would be nice to set a fqdn subject alt name, but only the kubelets know, the apiserver is clueless
 	// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
-	if c.SecureServingInfo != nil && c.SecureServingInfo.ServerCert.Generate && !certutil.CanReadCertOrKey(c.SecureServingInfo.ServerCert.CertFile, c.SecureServingInfo.ServerCert.KeyFile) {
+	if info.ServerCert.Generate && !certutil.CanReadCertOrKey(info.ServerCert.CertFile, info.ServerCert.KeyFile) {
 		// TODO (cjcullen): Is ClusterIP the right address to sign a cert with?
 		alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes", "localhost"}
 
-		if caCert, _, cert, key, err := certutil.GenerateSelfSignedCertKey(c.PublicAddress.String(), alternateIPs, alternateDNS); err != nil {
+		if caCert, _, cert, key, err := certutil.GenerateSelfSignedCertKey(publicAddress.String(), alternateIPs, alternateDNS); err != nil {
 			return fmt.Errorf("unable to generate self signed cert: %v", err)
 		} else {
-			if err := certutil.WriteCert(c.SecureServingInfo.ServerCA, caCert); err != nil {
+			if err := certutil.WriteCert(info.ServerCert.CertFile, cert, caCert); err != nil {
 				return err
 			}
 
-			if err := certutil.WriteCert(c.SecureServingInfo.ServerCert.CertFile, cert); err != nil {
+			if err := certutil.WriteKey(info.ServerCert.KeyFile, key); err != nil {
 				return err
 			}
-
-			if err := certutil.WriteKey(c.SecureServingInfo.ServerCert.KeyFile, key); err != nil {
-				return err
-			}
-			glog.Infof("Generated self-signed cert (%s, %s)", c.SecureServingInfo.ServerCert.CertFile, c.SecureServingInfo.ServerCert.KeyFile)
+			glog.Infof("Generated self-signed cert (%s, %s)", info.ServerCert.CertFile, info.ServerCert.KeyFile)
 		}
 	}
 
 	return nil
+}
+
+// Returns a clientset which can be used to talk to this apiserver.
+func (s *SecureServingInfo) NewSelfClient(token string) (clientset.Interface, error) {
+	clientConfig, err := s.NewSelfClientConfig(token)
+	if err != nil {
+		return nil, err
+	}
+	return clientset.NewForConfig(clientConfig)
+}
+
+// Returns a clientconfig which can be used to talk to this apiserver.
+func (s *Config) NewSelfClientConfig(token string) (*restclient.Config, error) {
+	clientConfig := &restclient.Config{
+		// Increase QPS limits. The client is currently passed to all admission plugins,
+		// and those can be throttled in case of higher load on apiserver - see #22340 and #22422
+		// for more details. Once #22422 is fixed, we may want to remove it.
+		QPS:   50,
+		Burst: 100,
+	}
+
+	// Use secure port if the TLSCAFile is specified
+	if s.SecureServingInfo {
+		clientConfig.Host = s.SecureServingInfo.BindAddress
+		clientConfig.CAFile = s.TLSCAFile
+		clientConfig.BearerToken = token
+	} else if s.InsecureServingInfo != nil {
+		clientConfig.Host = s.InsecureServingInfo.BindAddress
+	} else {
+		return nil, errors.New("Unable to set url for apiserver local client")
+	}
+
+	host, port, err := net.SplitHostPort(clientConfig.Host)
+	if err != nil {
+		return fmt.Errorf("invalid bind address: %v", clientConfig.Host)
+	}
+	if host == "0.0.0.0" {
+		clientConfig.Host = net.JoinHostPort("localhost", port)
+	}
+
+	return clientConfig, nil
 }
 
 func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) (secure, insecure http.Handler) {

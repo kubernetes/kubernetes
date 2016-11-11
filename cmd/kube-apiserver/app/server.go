@@ -97,7 +97,7 @@ func Run(s *options.ServerRunOptions) error {
 	if err != nil {
 		glog.Fatalf("Error determining service IP ranges: %v", err)
 	}
-	if err := genericConfig.MaybeGenerateServingCerts(apiServerServiceIP); err != nil {
+	if err := genericConfig.SecureServingInfo.MaybeGenerateServingCert(genericConfig.PublicAddress, apiServerServiceIP); err != nil {
 		glog.Fatalf("Failed to generate service certificate: %v", err)
 	}
 
