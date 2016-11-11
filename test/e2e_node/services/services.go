@@ -199,7 +199,6 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		"--address", "0.0.0.0",
 		"--port", kubeletPort,
 		"--read-only-port", kubeletReadOnlyPort,
-		"--hostname-override", framework.TestContext.NodeName, // Required because hostname is inconsistent across hosts
 		"--volume-stats-agg-period", "10s", // Aggregate volumes frequently so tests don't need to wait as long
 		"--allow-privileged", "true",
 		"--serialize-image-pulls", "false",
@@ -213,7 +212,9 @@ func (e *E2EServices) startKubelet() (*server, error) {
 
 		"--experimental-mounter-path", framework.TestContext.MounterPath,
 	)
-
+	if framework.TestContext.NodeName != "" { // If node name is specified, set hostname override.
+		cmdArgs = append(cmdArgs, "--hostname-override", framework.TestContext.NodeName)
+	}
 	if framework.TestContext.EnableCRI {
 		cmdArgs = append(cmdArgs, "--experimental-cri", "true") // Whether to use experimental cri integration.
 	}
