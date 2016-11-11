@@ -326,8 +326,6 @@ type KubeletConfiguration struct {
 	RktPath string `json:"rktPath,omitempty"`
 	// experimentalMounterPath is the path of mounter binary. Leave empty to use the default mount path
 	ExperimentalMounterPath string `json:"experimentalMounterPath,omitempty"`
-	// experimentalMounterRootfsPath is the absolute path to root filesystem for the mounter binary.
-	ExperimentalMounterRootfsPath string `json:"experimentalMounterRootfsPath,omitempty"`
 	// rktApiEndpoint is the endpoint of the rkt API service to communicate with.
 	// +optional
 	RktAPIEndpoint string `json:"rktAPIEndpoint,omitempty"`
@@ -468,6 +466,10 @@ type KubeletConfiguration struct {
 	// TODO(#34726:1.8.0): Remove the opt-in for failing when swap is enabled.
 	// Tells the Kubelet to fail to start if swap is enabled on the node.
 	ExperimentalFailSwapOn bool `json:"experimentalFailSwapOn,omitempty"`
+	// This flag, if set, enables a check prior to mount operations to verify that the required components
+	// (binaries, etc.) to mount the volume are available on the underlying node. If the check is enabled
+	// and fails the mount operation fails.
+	ExperimentalCheckNodeCapabilitiesBeforeMount bool `json:"ExperimentalCheckNodeCapabilitiesBeforeMount,omitempty"`
 }
 
 type KubeletAuthorizationMode string
