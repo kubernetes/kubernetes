@@ -195,6 +195,7 @@ external-etcd-endpoints
 external-etcd-keyfile
 external-hostname
 external-ip
+external-name
 extra-peer-dirs
 failover-timeout
 failure-domains
