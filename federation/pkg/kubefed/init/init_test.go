@@ -74,6 +74,7 @@ func TestInitFederation(t *testing.T) {
 		kubeconfigGlobal   string
 		kubeconfigExplicit string
 		dnsZoneName        string
+		dnsSuffix          string
 		lbIP               string
 		image              string
 		etcdPVCapacity     string
@@ -87,6 +88,7 @@ func TestInitFederation(t *testing.T) {
 			kubeconfigGlobal:   fakeKubeFiles[0],
 			kubeconfigExplicit: "",
 			dnsZoneName:        "example.test.",
+			dnsSuffix:          "",
 			lbIP:               "10.20.30.40",
 			image:              "example.test/foo:bar",
 			etcdPVCapacity:     "5Gi",
@@ -100,6 +102,7 @@ func TestInitFederation(t *testing.T) {
 			kubeconfigGlobal:   fakeKubeFiles[0],
 			kubeconfigExplicit: "",
 			dnsZoneName:        "example.test.",
+			dnsSuffix:          "",
 			lbIP:               "10.20.30.40",
 			image:              "example.test/foo:bar",
 			etcdPVCapacity:     "", //test for default value of pvc-size
@@ -113,6 +116,7 @@ func TestInitFederation(t *testing.T) {
 			kubeconfigGlobal:   fakeKubeFiles[0],
 			kubeconfigExplicit: "",
 			dnsZoneName:        "example.test.",
+			dnsSuffix:          "",
 			lbIP:               "10.20.30.40",
 			image:              "example.test/foo:bar",
 			etcdPVCapacity:     "",
@@ -126,6 +130,21 @@ func TestInitFederation(t *testing.T) {
 			kubeconfigGlobal:   fakeKubeFiles[0],
 			kubeconfigExplicit: "",
 			dnsZoneName:        "example.test.",
+			dnsSuffix:          "",
+			lbIP:               "10.20.30.40",
+			image:              "example.test/foo:bar",
+			etcdPVCapacity:     "5Gi",
+			expectedErr:        "",
+			dnsProvider:        "test-dns-provider",
+			storageBackend:     "etcd3",
+			dryRun:             "",
+		},
+		{
+			federation:         "union",
+			kubeconfigGlobal:   fakeKubeFiles[0],
+			kubeconfigExplicit: "",
+			dnsZoneName:        "example.test.",
+			dnsSuffix:          "federation.example.test",
 			lbIP:               "10.20.30.40",
 			image:              "example.test/foo:bar",
 			etcdPVCapacity:     "5Gi",
@@ -148,7 +167,7 @@ func TestInitFederation(t *testing.T) {
 		} else {
 			dnsProvider = "google-clouddns" //default value of dns-provider
 		}
-		hostFactory, err := fakeInitHostFactory(tc.federation, util.DefaultFederationSystemNamespace, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.etcdPVCapacity, tc.storageBackend)
+		hostFactory, err := fakeInitHostFactory(tc.federation, util.DefaultFederationSystemNamespace, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.dnsSuffix, tc.etcdPVCapacity, tc.storageBackend)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -176,7 +195,9 @@ func TestInitFederation(t *testing.T) {
 		if tc.dryRun == "valid-run" {
 			cmd.Flags().Set("dry-run", "true")
 		}
-
+		if tc.dnsSuffix != "" {
+			cmd.Flags().Set("service-dns-suffix", tc.dnsSuffix)
+		}
 		cmd.Run(cmd, []string{tc.federation})
 
 		if tc.expectedErr == "" {
@@ -443,7 +464,7 @@ func TestCertsHTTPS(t *testing.T) {
 	}
 }
 
-func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, dnsProvider, etcdPVCapacity, storageProvider string) (cmdutil.Factory, error) {
+func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, dnsProvider, dnsSuffix, etcdPVCapacity, storageProvider string) (cmdutil.Factory, error) {
 	svcName := federationName + "-apiserver"
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
@@ -647,6 +668,20 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 	}
 
 	cmName := federationName + "-controller-manager"
+	command := []string{
+		"/hyperkube",
+		"federation-controller-manager",
+		"--master=https://" + svcName,
+		"--kubeconfig=/etc/federation/controller-manager/kubeconfig",
+		fmt.Sprintf("--dns-provider=%s", dnsProvider),
+		"--dns-provider-config=",
+		fmt.Sprintf("--federation-name=%s", federationName),
+		fmt.Sprintf("--zone-name=%s", dnsZoneName),
+	}
+	if dnsSuffix != "" {
+		command = append(command, fmt.Sprintf("--service-dns-suffix=%s", dnsSuffix))
+	}
+
 	cm := v1beta1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
@@ -668,18 +703,9 @@ func fakeInitHostFactory(federationName, namespaceName, ip, dnsZoneName, image, 
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:  "controller-manager",
-							Image: image,
-							Command: []string{
-								"/hyperkube",
-								"federation-controller-manager",
-								"--master=https://" + svcName,
-								"--kubeconfig=/etc/federation/controller-manager/kubeconfig",
-								fmt.Sprintf("--dns-provider=%s", dnsProvider),
-								"--dns-provider-config=",
-								fmt.Sprintf("--federation-name=%s", federationName),
-								fmt.Sprintf("--zone-name=%s", dnsZoneName),
-							},
+							Name:    "controller-manager",
+							Image:   image,
+							Command: command,
 							VolumeMounts: []v1.VolumeMount{
 								{
 									Name:      cmKubeconfigSecretName,
