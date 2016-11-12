@@ -89,21 +89,6 @@ func findDisk(wwn, lun string, io ioHandler) (string, string) {
 	return "", ""
 }
 
-func createMultipathConf(path string, io ioHandler) {
-	if _, err := os.Lstat(path); err != nil {
-		data := []byte(`defaults {
-	find_multipaths yes
-	user_friendly_names yes
-}
-
-
-blacklist {
-}
-`)
-		io.WriteFile(path, data, 0664)
-	}
-}
-
 // rescan scsi bus
 func scsiHostRescan(io ioHandler) {
 	scsi_path := "/sys/class/scsi_host/"
@@ -148,8 +133,6 @@ func searchDisk(wwns []string, lun string, io ioHandler) (string, string) {
 			break
 		}
 		// rescan and search again
-		// create multipath conf if it is not there
-		createMultipathConf("/etc/multipath.conf", io)
 		// rescan scsi bus
 		scsiHostRescan(io)
 		rescaned = true
