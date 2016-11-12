@@ -316,6 +316,49 @@ function set_service_accounts {
     fi
 }
 
+function create_client_certkey {
+    local CA=$1
+    local ID=$2
+    local CN=${3:-$2}
+    local NAMES=""
+    local SEP=""
+    shift 3
+    while [ -n "${1:-}" ]; do
+        NAMES+="${SEP}{\"O\":\"$1\"}"
+        SEP=","
+        shift 1
+    done
+    echo "{\"CN\":\"${CN}\",\"names\":[${NAMES}],\"hosts\":[\"\"],\"key\":{\"algo\":\"rsa\",\"size\":2048}}" | docker run -i  --entrypoint /bin/bash -v "${CERT_DIR}:/certs" -w /certs cfssl/cfssl:latest -ec "cfssl gencert -ca=${CA}.crt -ca-key=${CA}.key -config=client-ca-config.json - | cfssljson -bare client-${ID}"
+    sudo /bin/bash -e <<EOF
+    mv "${CERT_DIR}/client-${ID}-key.pem" "${CERT_DIR}/client-${ID}.key"
+    mv "${CERT_DIR}/client-${ID}.pem" "${CERT_DIR}/client-${ID}.crt"
+    rm -f "${CERT_DIR}/client-${ID}.csr"
+EOF
+}
+
+function write_client_kubeconfig {
+    cat <<EOF | sudo tee "${CERT_DIR}"/$1.kubeconfig > /dev/null
+apiVersion: v1
+kind: Config
+clusters:
+  - cluster:
+      certificate-authority: ${ROOT_CA_FILE}
+      server: https://${API_HOST}:${API_SECURE_PORT}/
+    name: local-up-cluster
+users:
+  - user:
+      client-certificate: ${CERT_DIR}/client-$1.crt
+      client-key: ${CERT_DIR}/client-$1.key
+    name: local-up-cluster
+contexts:
+  - context:
+      cluster: local-up-cluster
+      user: local-up-cluster
+    name: local-up-cluster
+current-context: local-up-cluster
+EOF
+}
+
 function start_apiserver {
     security_admission=""
     if [[ -z "${ALLOW_SECURITY_CONTEXT}" ]]; then
@@ -347,10 +390,6 @@ function start_apiserver {
     if [[ -n "${RUNTIME_CONFIG}" ]]; then
       runtime_config="--runtime-config=${RUNTIME_CONFIG}"
     fi
-    client_ca_file_arg=""
-    if [[ -n "${CLIENT_CA_FILE:-}" ]]; then
-      client_ca_file_arg="--client-ca-file=${CLIENT_CA_FILE}"
-    fi
 
     # Let the API server pick a default address when API_HOST
     # is set to 127.0.0.1
@@ -362,13 +401,27 @@ function start_apiserver {
     # Ensure CERT_DIR is created for auto-generated crt/key and kubeconfig
     sudo mkdir -p "${CERT_DIR}"
 
+    # Create client ca
+    sudo /bin/bash -e <<EOF
+    rm -f "${CERT_DIR}/client-ca.crt" "${CERT_DIR}/client-ca.key"
+    openssl req -x509 -sha256 -new -nodes -days 365 -newkey rsa:2048 -keyout "${CERT_DIR}/client-ca.key" -out "${CERT_DIR}/client-ca.crt" -subj "/C=xx/ST=x/L=x/O=x/OU=x/CN=ca/emailAddress=x/"
+    echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "${CERT_DIR}/client-ca-config.json"
+EOF
+
+    # Create client certs signed with client-ca, given id, given CN and a number of groups
+    # NOTE: system:masters will be removed in the future
+    create_client_certkey client-ca kubelet system:node:${HOSTNAME_OVERRIDE} system:nodes
+    create_client_certkey client-ca kube-proxy system:kube-proxy system:nodes
+    create_client_certkey client-ca controller system:controller system:masters
+    create_client_certkey client-ca scheduler system:scheduler system:masters
+    create_client_certkey client-ca admin system:admin system:cluster-admins
 
     APISERVER_LOG=/tmp/kube-apiserver.log
     sudo -E "${GO_OUT}/hyperkube" apiserver ${anytoken_arg} ${authorizer_arg} ${priv_arg} ${runtime_config}\
-      ${client_ca_file_arg} \
       ${advertise_address} \
       --v=${LOG_LEVEL} \
       --cert-dir="${CERT_DIR}" \
+      --client-ca-file="${CERT_DIR}/client-ca.crt" \
       --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
       --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
       --admission-control="${ADMISSION_CONTROL}" \
@@ -385,32 +438,15 @@ function start_apiserver {
       --cors-allowed-origins="${API_CORS_ALLOWED_ORIGINS}" >"${APISERVER_LOG}" 2>&1 &
     APISERVER_PID=$!
 
-    # We created a kubeconfig that uses the apiserver.crt
-    cat <<EOF | sudo tee "${CERT_DIR}"/kubeconfig > /dev/null
-apiVersion: v1
-kind: Config
-clusters:
-  - cluster:
-      certificate-authority: ${ROOT_CA_FILE}
-      server: https://${API_HOST}:${API_SECURE_PORT}/
-    name: local-up-cluster
-users:
-  - user:
-      token: ${KUBECONFIG_TOKEN:-}
-      client-certificate: ${KUBECONFIG_CLIENT_CERTIFICATE:-}
-      client-key: ${KUBECONFIG_CLIENT_KEY:-}
-    name: local-up-cluster
-contexts:
-  - context:
-      cluster: local-up-cluster
-      user: local-up-cluster
-    name: service-to-apiserver
-current-context: service-to-apiserver
-EOF
-
     # Wait for kube-apiserver to come up before launching the rest of the components.
     echo "Waiting for apiserver to come up"
     kube::util::wait_for_url "https://${API_HOST}:${API_SECURE_PORT}/version" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} || exit 1
+
+    # Create kubeconfigs for all components, using client certs
+    write_client_kubeconfig kubelet
+    write_client_kubeconfig kube-proxy
+    write_client_kubeconfig controller
+    write_client_kubeconfig scheduler
 }
 
 function start_controller_manager {
@@ -430,7 +466,7 @@ function start_controller_manager {
       --feature-gates="${FEATURE_GATES}" \
       --cloud-provider="${CLOUD_PROVIDER}" \
       --cloud-config="${CLOUD_CONFIG}" \
-      --kubeconfig "$CERT_DIR"/kubeconfig \
+      --kubeconfig "$CERT_DIR"/controller.kubeconfig \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
     CTLRMGR_PID=$!
 }
@@ -498,7 +534,7 @@ function start_kubelet {
         --cloud-config="${CLOUD_CONFIG}" \
         --address="${KUBELET_HOST}" \
         --require-kubeconfig \
-        --kubeconfig "$CERT_DIR"/kubeconfig \
+        --kubeconfig "$CERT_DIR"/kubelet.kubeconfig \
         --feature-gates="${FEATURE_GATES}" \
         --cpu-cfs-quota=${CPU_CFS_QUOTA} \
         --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" \
@@ -547,7 +583,7 @@ function start_kubelet {
         -i \
         --cidfile=$KUBELET_CIDFILE \
         gcr.io/google_containers/kubelet \
-        /kubelet --v=${LOG_LEVEL} --containerized ${priv_arg}--chaos-chance="${CHAOS_CHANCE}" --hostname-override="${HOSTNAME_OVERRIDE}" --cloud-provider="${CLOUD_PROVIDER}" --cloud-config="${CLOUD_CONFIG}" \ --address="127.0.0.1" --require-kubeconfig --kubeconfig "$CERT_DIR"/kubeconfig --api-servers="https://${API_HOST}:${API_SECURE_PORT}" --port="$KUBELET_PORT"  --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" &> $KUBELET_LOG &
+        /kubelet --v=${LOG_LEVEL} --containerized ${priv_arg}--chaos-chance="${CHAOS_CHANCE}" --hostname-override="${HOSTNAME_OVERRIDE}" --cloud-provider="${CLOUD_PROVIDER}" --cloud-config="${CLOUD_CONFIG}" \ --address="127.0.0.1" --require-kubeconfig --kubeconfig "$CERT_DIR"/kubelet.kubeconfig --api-servers="https://${API_HOST}:${API_SECURE_PORT}" --port="$KUBELET_PORT"  --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}" &> $KUBELET_LOG &
     fi
 }
 
@@ -557,14 +593,14 @@ function start_kubeproxy {
       --v=${LOG_LEVEL} \
       --hostname-override="${HOSTNAME_OVERRIDE}" \
       --feature-gates="${FEATURE_GATES}" \
-      --kubeconfig "$CERT_DIR"/kubeconfig \
+      --kubeconfig "$CERT_DIR"/kube-proxy.kubeconfig \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${PROXY_LOG}" 2>&1 &
     PROXY_PID=$!
 
     SCHEDULER_LOG=/tmp/kube-scheduler.log
     sudo -E "${GO_OUT}/hyperkube" scheduler \
       --v=${LOG_LEVEL} \
-      --kubeconfig "$CERT_DIR"/kubeconfig \
+      --kubeconfig "$CERT_DIR"/scheduler.kubeconfig \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${SCHEDULER_LOG}" 2>&1 &
     SCHEDULER_PID=$!
 }
@@ -636,7 +672,7 @@ To start using your cluster, open up another terminal/tab and run:
   export KUBERNETES_PROVIDER=local
 
   cluster/kubectl.sh config set-cluster local --server=https://${API_HOST}:${API_SECURE_PORT} --certificate-authority=${ROOT_CA_FILE}
-  cluster/kubectl.sh config set-credentials myself --username=admin --password=admin
+  cluster/kubectl.sh config set-credentials myself --client-key=${CERT_DIR}/client-admin.key --client-certificate=${CERT_DIR}/client-admin.crt
   cluster/kubectl.sh config set-context local --cluster=local --user=myself
   cluster/kubectl.sh config use-context local
   cluster/kubectl.sh
