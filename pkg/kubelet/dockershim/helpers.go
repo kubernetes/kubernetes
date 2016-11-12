@@ -18,6 +18,7 @@ package dockershim
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -35,6 +36,10 @@ import (
 
 const (
 	annotationPrefix = "annotation."
+)
+
+var (
+	conflictRE = regexp.MustCompile(`Conflict. (?:.)+ is already in use by container ([0-9a-z]+)`)
 )
 
 // apiVersion implements kubecontainer.Version interface by implementing
@@ -281,4 +286,31 @@ func getUserFromImageUser(imageUser string) (*int64, *string) {
 	}
 	// If user is a numeric uid.
 	return &uid, nil
+}
+
+// See #33189. If the previous attempt to create a sandbox container name FOO
+// failed due to "device or resource busy", it is possbile that docker did
+// not clean up properly and has inconsistent internal state. Docker would
+// not report the existence of FOO, but would complain if user wants to
+// create a new container named FOO. To work around this, we parse the error
+// message to identify failure caused by naming conflict, and try to remove
+// the old container FOO.
+// TODO(#33189): Monitor the tests to see if the fix is sufficent.
+func recoverFromConflictIfNeeded(client dockertools.DockerInterface, err error) {
+	if err == nil {
+		return
+	}
+
+	matches := conflictRE.FindStringSubmatch(err.Error())
+	if len(matches) != 2 {
+		return
+	}
+
+	id := matches[1]
+	glog.Warningf("Unable to create pod sandbox due to conflict. Attempting to remove sandbox %q", id)
+	if err := client.RemoveContainer(id, dockertypes.ContainerRemoveOptions{RemoveVolumes: true}); err != nil {
+		glog.Errorf("Failed to remove the conflicting sandbox container: %v", err)
+	} else {
+		glog.V(2).Infof("Successfully removed conflicting sandbox %q", id)
+	}
 }
