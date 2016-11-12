@@ -165,6 +165,10 @@ type ObjectMeta struct {
 	// +optional
 	OwnerReferences []OwnerReference `json:"ownerReferences,omitempty"`
 
+	// Must be empty before the object is visible to regular clients. Initialization allows system
+	// clients to perform initial setup actions for new resources.
+	Initializers []string `json:"initializers"`
+
 	// Must be empty before the object is deleted from the registry. Each entry
 	// is an identifier for the responsible component that will remove the entry
 	// from the list. If the deletionTimestamp of the object is non-nil, entries

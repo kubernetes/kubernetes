@@ -341,6 +341,14 @@ func (u *Unstructured) GroupVersionKind() unversioned.GroupVersionKind {
 	return gvk
 }
 
+func (u *Unstructured) GetInitializers() []string {
+	return getNestedSlice(u.Object, "metadata", "initializers")
+}
+
+func (u *Unstructured) SetInitializers(initializers []string) {
+	u.setNestedSlice(initializers, "metadata", "initializers")
+}
+
 func (u *Unstructured) GetFinalizers() []string {
 	return getNestedSlice(u.Object, "metadata", "finalizers")
 }

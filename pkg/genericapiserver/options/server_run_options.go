@@ -127,7 +127,7 @@ type ServerRunOptions struct {
 
 func NewServerRunOptions() *ServerRunOptions {
 	return &ServerRunOptions{
-		AdmissionControl:                         "AlwaysAdmit",
+		AdmissionControl:                         "AlwaysAdmit,Initializers",
 		AnonymousAuth:                            true,
 		AuthorizationMode:                        "AlwaysAllow",
 		AuthorizationWebhookCacheAuthorizedTTL:   5 * time.Minute,
