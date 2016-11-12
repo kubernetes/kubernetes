@@ -11532,3 +11532,18 @@ go_library(
     ],
     tags = ["automanaged"],
 )
+
+go_library(
+    name = "github.com/cloudflare/cfssl/initca",
+    srcs = ["github.com/cloudflare/cfssl/initca/initca.go"],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/cloudflare/cfssl/config",
+        "//vendor:github.com/cloudflare/cfssl/csr",
+        "//vendor:github.com/cloudflare/cfssl/errors",
+        "//vendor:github.com/cloudflare/cfssl/helpers",
+        "//vendor:github.com/cloudflare/cfssl/log",
+        "//vendor:github.com/cloudflare/cfssl/signer",
+        "//vendor:github.com/cloudflare/cfssl/signer/local",
+    ],
+)
