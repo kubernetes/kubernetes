@@ -17,14 +17,11 @@ limitations under the License.
 package options
 
 import (
-	"errors"
 	"fmt"
 	"net"
-	"strconv"
 
 	"github.com/spf13/pflag"
 
-	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/util/config"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
@@ -43,10 +40,6 @@ type SecureServingOptions struct {
 	SNICertKeys []config.NamedCertKey
 	// ClientCA is the certificate bundle for all the signers that you'll recognize for incoming client certificates
 	ClientCA string
-
-	// ServerCA is the certificate bundle for the signer of your serving certificate.  Used for building a loopback
-	// connection to the API server for admission.
-	ServerCA string
 }
 
 type CertKey struct {
@@ -78,31 +71,6 @@ func NewSecureServingOptions() *SecureServingOptions {
 			CertDirectory: "/var/run/kubernetes",
 		},
 	}
-}
-
-func (s *SecureServingOptions) NewSelfClientConfig(token string) *restclient.Config {
-	if s == nil || s.ServingOptions.BindPort <= 0 || len(s.ServerCA) == 0 {
-		return nil
-	}
-
-	clientConfig := &restclient.Config{
-		// Increase QPS limits. The client is currently passed to all admission plugins,
-		// and those can be throttled in case of higher load on apiserver - see #22340 and #22422
-		// for more details. Once #22422 is fixed, we may want to remove it.
-		QPS:   50,
-		Burst: 100,
-	}
-
-	// Use secure port if the ServerCA is specified
-	host := s.ServingOptions.BindAddress.String()
-	if host == "0.0.0.0" {
-		host = "localhost"
-	}
-	clientConfig.Host = "https://" + net.JoinHostPort(host, strconv.Itoa(s.ServingOptions.BindPort))
-	clientConfig.CAFile = s.ServerCA
-	clientConfig.BearerToken = token
-
-	return clientConfig
 }
 
 func (s *SecureServingOptions) Validate() []error {
@@ -151,11 +119,6 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"If set, any request presenting a client certificate signed by one of "+
 		"the authorities in the client-ca-file is authenticated with an identity "+
 		"corresponding to the CommonName of the client certificate.")
-
-	fs.StringVar(&s.ServerCA, "tls-ca-file", s.ServerCA, "If set, this "+
-		"certificate authority will used for secure access from Admission "+
-		"Controllers. This must be a valid PEM-encoded CA bundle.")
-
 }
 
 func (s *SecureServingOptions) AddDeprecatedFlags(fs *pflag.FlagSet) {
@@ -163,6 +126,10 @@ func (s *SecureServingOptions) AddDeprecatedFlags(fs *pflag.FlagSet) {
 		"DEPRECATED: see --bind-address instead.")
 	fs.MarkDeprecated("public-address-override", "see --bind-address instead.")
 
+	var serverCA string
+	fs.StringVar(&serverCA, "tls-ca-file", serverCA, "DEPRECATED: This value is ignored. Instead "+
+		"the certificate authority for the Admission Controller is automatically derived from "+
+		"--tls-cert-file and --tls-sni-cert-key.")
 }
 
 func NewInsecureServingOptions() *ServingOptions {
@@ -180,23 +147,6 @@ func (s ServingOptions) Validate(portArg string) []error {
 	}
 
 	return errors
-}
-
-func (s *ServingOptions) NewSelfClientConfig(token string) *restclient.Config {
-	if s == nil || s.BindPort <= 0 {
-		return nil
-	}
-	clientConfig := &restclient.Config{
-		// Increase QPS limits. The client is currently passed to all admission plugins,
-		// and those can be throttled in case of higher load on apiserver - see #22340 and #22422
-		// for more details. Once #22422 is fixed, we may want to remove it.
-		QPS:   50,
-		Burst: 100,
-	}
-
-	clientConfig.Host = net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.BindPort))
-
-	return clientConfig
 }
 
 func (s *ServingOptions) DefaultExternalAddress() (net.IP, error) {
@@ -222,16 +172,4 @@ func (s *ServingOptions) AddDeprecatedFlags(fs *pflag.FlagSet) {
 
 	fs.IntVar(&s.BindPort, "port", s.BindPort, "DEPRECATED: see --insecure-port instead.")
 	fs.MarkDeprecated("port", "see --insecure-port instead.")
-}
-
-// Returns a clientconfig which can be used to talk to this apiserver.
-func NewSelfClientConfig(secureServingOptions *SecureServingOptions, insecureServingOptions *ServingOptions, token string) (*restclient.Config, error) {
-	if cfg := secureServingOptions.NewSelfClientConfig(token); cfg != nil {
-		return cfg, nil
-	}
-	if cfg := insecureServingOptions.NewSelfClientConfig(token); cfg != nil {
-		return cfg, nil
-	}
-
-	return nil, errors.New("Unable to set url for apiserver local client")
 }

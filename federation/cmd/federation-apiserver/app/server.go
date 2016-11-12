@@ -20,6 +20,7 @@ limitations under the License.
 package app
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -38,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
-	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
@@ -74,17 +74,14 @@ func Run(s *options.ServerRunOptions) error {
 	}
 
 	genericapiserver.DefaultAndValidateRunOptions(s.GenericServerRunOptions)
-	genericConfig := genericapiserver.NewConfig(). // create the new config
-							ApplyOptions(s.GenericServerRunOptions). // apply the options selected
-							ApplySecureServingOptions(s.SecureServing).
-							ApplyInsecureServingOptions(s.InsecureServing).
-							ApplyAuthenticationOptions(s.Authentication).
-							ApplyRBACSuperUser(s.Authorization.RBACSuperUser)
-
-	if genericConfig.SecureServingInfo != nil {
-		if err := genericConfig.SecureServingInfo.MaybeGenerateServingCert(genericConfig.PublicAddress); err != nil{
-			glog.Fatalf("Failed to generate service certificate: %v", err)
-		}
+	genericConfig, err := genericapiserver.NewConfig(). // create the new config
+								ApplyOptions(s.GenericServerRunOptions). // apply the options selected
+								ApplyInsecureServingOptions(s.InsecureServing).
+								ApplyAuthenticationOptions(s.Authentication).
+								ApplyRBACSuperUser(s.Authorization.RBACSuperUser).
+								ApplySecureServingOptions(s.SecureServing, s.GenericServerRunOptions.AdvertiseAddress.String())
+	if err != nil {
+		return fmt.Errorf("failed to configure https: %s", err)
 	}
 
 	// TODO: register cluster federation resources here.
@@ -132,7 +129,7 @@ func Run(s *options.ServerRunOptions) error {
 	}
 
 	privilegedLoopbackToken := uuid.NewRandom().String()
-	selfClientConfig, err := genericoptions.NewSelfClientConfig(s.SecureServing, s.InsecureServing, privilegedLoopbackToken)
+	selfClientConfig, err := genericapiserver.NewSelfClientConfig(genericConfig.SecureServingInfo, genericConfig.InsecureServingInfo, privilegedLoopbackToken)
 	if err != nil {
 		glog.Fatalf("Failed to create clientset: %v", err)
 	}

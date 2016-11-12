@@ -17,6 +17,8 @@ limitations under the License.
 package genericapiserver
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
@@ -47,7 +49,6 @@ import (
 	authorizerunion "k8s.io/kubernetes/pkg/auth/authorizer/union"
 	authhandlers "k8s.io/kubernetes/pkg/auth/handlers"
 	"k8s.io/kubernetes/pkg/auth/user"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	apiserverauthorizer "k8s.io/kubernetes/pkg/genericapiserver/authorizer"
@@ -164,33 +165,23 @@ type ServingInfo struct {
 type SecureServingInfo struct {
 	ServingInfo
 
-	// ServerCert is the TLS cert info for serving secure traffic
-	ServerCert GeneratableKeyCert
-	// SNICerts are named CertKeys for serving secure traffic with SNI support.
-	SNICerts []NamedCertKey
+	// Cert is the main server cert which is used if SNI does not match. Cert must be non-nil and is
+	// allowed to be in SNICerts.
+	Cert *tls.Certificate
+
+	// SNICerts are the TLS certificates by name used for SNI.
+	SNICerts map[string]*tls.Certificate
+
 	// ClientCA is the certificate bundle for all the signers that you'll recognize for incoming client certificates
 	ClientCA string
 }
 
-type CertKey struct {
-	// CertFile is a file containing a PEM-encoded certificate
-	CertFile string
-	// KeyFile is a file containing a PEM-encoded private key for the certificate specified by CertFile
-	KeyFile string
-}
-
-type NamedCertKey struct {
-	CertKey
+type NamedTLSCert struct {
+	TLSCert tls.Certificate
 
 	// Names is a list of domain patterns: fully qualified domain names, possibly prefixed with
 	// wildcard segments.
 	Names []string
-}
-
-type GeneratableKeyCert struct {
-	CertKey
-	// Generate indicates that the cert/key pair should be generated if its not present.
-	Generate bool
 }
 
 // NewConfig returns a Config struct with the default values
@@ -233,56 +224,81 @@ func NewConfig() *Config {
 	return config.ApplyOptions(defaultOptions)
 }
 
-func (c *Config) ApplySecureServingOptions(secureServing *options.SecureServingOptions) *Config {
+func (c *Config) ApplySecureServingOptions(secureServing *options.SecureServingOptions, publicAddress string, alternateIPs ...net.IP) (*Config, error) {
 	if secureServing == nil || secureServing.ServingOptions.BindPort <= 0 {
-		return c
+		return c, nil
 	}
 
 	secureServingInfo := &SecureServingInfo{
 		ServingInfo: ServingInfo{
 			BindAddress: net.JoinHostPort(secureServing.ServingOptions.BindAddress.String(), strconv.Itoa(secureServing.ServingOptions.BindPort)),
 		},
-		ServerCert: GeneratableKeyCert{
-			CertKey: CertKey{
-				CertFile: secureServing.ServerCert.CertKey.CertFile,
-				KeyFile:  secureServing.ServerCert.CertKey.KeyFile,
-			},
-		},
-		SNICerts: []NamedCertKey{},
 		ClientCA: secureServing.ClientCA,
 	}
-	if secureServing.ServerCert.CertKey.CertFile == "" && secureServing.ServerCert.CertKey.KeyFile == "" {
-		secureServingInfo.ServerCert.Generate = true
-		secureServingInfo.ServerCert.CertFile = path.Join(secureServing.ServerCert.CertDirectory, secureServing.ServerCert.PairName+".crt")
-		secureServingInfo.ServerCert.KeyFile = path.Join(secureServing.ServerCert.CertDirectory, secureServing.ServerCert.PairName+".key")
+
+	serverCertFile, serverKeyFile := secureServing.ServerCert.CertKey.CertFile, secureServing.ServerCert.CertKey.KeyFile
+
+	// possibly self-signed cert and key
+	if len(serverCertFile) == 0 && len(serverKeyFile) == 0 {
+		serverCertFile = path.Join(secureServing.ServerCert.CertDirectory, secureServing.ServerCert.PairName+".crt")
+		serverKeyFile = path.Join(secureServing.ServerCert.CertDirectory, secureServing.ServerCert.PairName+".key")
+
+		if !certutil.CanReadCertOrKey(serverCertFile, serverKeyFile) {
+			// TODO: It would be nice to set a fqdn subject alt name, but only the kubelets know, the apiserver is clueless
+			// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
+			// TODO (cjcullen): Is ClusterIP the right address to sign a cert with?
+			alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes", "localhost"}
+			if caCert, _, cert, key, err := certutil.GenerateSelfSignedCertKey(publicAddress, alternateIPs, alternateDNS); err != nil {
+				return nil, fmt.Errorf("unable to generate self signed cert: %v", err)
+			} else {
+				if err := certutil.WriteCert(serverCertFile, cert, caCert); err != nil {
+					return nil, err
+				}
+
+				if err := certutil.WriteKey(serverKeyFile, key); err != nil {
+					return nil, err
+				}
+				glog.Infof("Generated self-signed cert (%s, %s)", serverCertFile, serverKeyFile)
+			}
+		}
 	}
 
-	secureServingInfo.SNICerts = nil
-	for _, nkc := range secureServing.SNICertKeys {
-		secureServingInfo.SNICerts = append(secureServingInfo.SNICerts, NamedCertKey{
-			CertKey: CertKey{
-				KeyFile:  nkc.KeyFile,
-				CertFile: nkc.CertFile,
-			},
-			Names: nkc.Names,
+	// load main cert
+	if len(serverCertFile) != 0 || len(serverKeyFile) != 0 {
+		x509cert, err := tls.LoadX509KeyPair(serverCertFile, serverKeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("unable to load server certificate: %v", err)
+		}
+		secureServingInfo.Cert = &x509cert
+	}
+
+	// load SNI certs
+	namedTlsCerts := make([]NamedTLSCert, len(secureServing.SNICertKeys))
+	for _, nck := range secureServing.SNICertKeys {
+		tlsCert, err := tls.LoadX509KeyPair(nck.CertFile, nck.KeyFile)
+		namedTlsCerts = append(namedTlsCerts, NamedTLSCert{
+			TLSCert: tlsCert,
+			Names:   nck.Names,
 		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to load SNI cert and key: %v", err)
+		}
+	}
+	var err error
+	secureServingInfo.SNICerts, err = getNamedCertificateMap(namedTlsCerts)
+	if err != nil {
+		return nil, err
 	}
 
 	c.SecureServingInfo = secureServingInfo
 	c.ReadWritePort = secureServing.ServingOptions.BindPort
 
-	return c
+	return c, nil
 }
 
 func (c *Config) ApplyInsecureServingOptions(insecureServing *options.ServingOptions) *Config {
 	if insecureServing == nil || insecureServing.BindPort <= 0 {
 		return c
-		if secureServingInfo.ServerCert.Generate && secureServingInfo.ServerCA == "" {
-			secureServingInfo.ServerCA = path.Join(path.Dir(secureServingInfo.ServerCert.CertFile), "ca-"+path.Base(secureServingInfo.ServerCert.CertFile))
-		}
-
-		c.SecureServingInfo = secureServingInfo
-		c.ReadWritePort = options.SecurePort
 	}
 
 	c.InsecureServingInfo = &ServingInfo{
@@ -455,70 +471,97 @@ func (c completedConfig) New() (*GenericAPIServer, error) {
 	return s, nil
 }
 
-// MaybeGenerateServingCerts generates serving certificates if requested and needed.
-func (c *Config) MaybeGenerateServingCerts(publicAddress net.IP, alternateIPs ...net.IP) error {
-	// It would be nice to set a fqdn subject alt name, but only the kubelets know, the apiserver is clueless
-	// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
-	if info.ServerCert.Generate && !certutil.CanReadCertOrKey(info.ServerCert.CertFile, info.ServerCert.KeyFile) {
-		// TODO (cjcullen): Is ClusterIP the right address to sign a cert with?
-		alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes", "localhost"}
+func (s *SecureServingInfo) NewSelfClientConfig(token string) (*restclient.Config, error) {
+	if s == nil || (s.Cert == nil && len(s.SNICerts) == 0) {
+		return nil, nil
+	}
 
-		if caCert, _, cert, key, err := certutil.GenerateSelfSignedCertKey(publicAddress.String(), alternateIPs, alternateDNS); err != nil {
-			return fmt.Errorf("unable to generate self signed cert: %v", err)
-		} else {
-			if err := certutil.WriteCert(info.ServerCert.CertFile, cert, caCert); err != nil {
-				return err
-			}
+	host, port, err := net.SplitHostPort(s.ServingInfo.BindAddress)
+	if err != nil {
+		// should never happen
+		return nil, fmt.Errorf("invalid secure bind address: %q", s.ServingInfo.BindAddress)
+	}
+	if host == "0.0.0.0" {
+		host = "localhost"
+	}
 
-			if err := certutil.WriteKey(info.ServerCert.KeyFile, key); err != nil {
-				return err
-			}
-			glog.Infof("Generated self-signed cert (%s, %s)", info.ServerCert.CertFile, info.ServerCert.KeyFile)
+	clientConfig := &restclient.Config{
+		// Increase QPS limits. The client is currently passed to all admission plugins,
+		// and those can be throttled in case of higher load on apiserver - see #22340 and #22422
+		// for more details. Once #22422 is fixed, we may want to remove it.
+		QPS:         50,
+		Burst:       100,
+		Host:        "https://" + net.JoinHostPort(host, port),
+		BearerToken: token,
+	}
+
+	cert := s.Cert
+	if cert != nil {
+		x509Cert, err := x509.ParseCertificate(cert.Certificate[0])
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse server certificate: %v", err)
+		}
+
+		if (net.ParseIP(host) != nil && certMatchesIP(x509Cert, host)) || certMatchesName(x509Cert, host) {
+			clientConfig.CAData = cert.Certificate[0]
 		}
 	}
-
-	return nil
-}
-
-// Returns a clientset which can be used to talk to this apiserver.
-func (s *SecureServingInfo) NewSelfClient(token string) (clientset.Interface, error) {
-	clientConfig, err := s.NewSelfClientConfig(token)
-	if err != nil {
-		return nil, err
+	if clientConfig.CAData == nil && net.ParseIP(host) == nil {
+		if cert, found := s.SNICerts[host]; found {
+			clientConfig.CAData = cert.Certificate[0]
+		}
 	}
-	return clientset.NewForConfig(clientConfig)
+	if clientConfig.CAData == nil {
+		return nil, fmt.Errorf("failed to find certificate which matches %q", host)
+	}
+
+	return clientConfig, nil
 }
 
-// Returns a clientconfig which can be used to talk to this apiserver.
-func (s *Config) NewSelfClientConfig(token string) (*restclient.Config, error) {
-	clientConfig := &restclient.Config{
+func (s *ServingInfo) NewSelfClientConfig(token string) (*restclient.Config, error) {
+	if s == nil {
+		return nil, nil
+	}
+	return &restclient.Config{
+		Host: s.BindAddress,
 		// Increase QPS limits. The client is currently passed to all admission plugins,
 		// and those can be throttled in case of higher load on apiserver - see #22340 and #22422
 		// for more details. Once #22422 is fixed, we may want to remove it.
 		QPS:   50,
 		Burst: 100,
+	}, nil
+}
+
+// NewSelfClientConfig returns a clientconfig which can be used to talk to this apiserver.
+func NewSelfClientConfig(secureServingInfo *SecureServingInfo, insecureServingInfo *ServingInfo, token string) (*restclient.Config, error) {
+	if cfg, err := secureServingInfo.NewSelfClientConfig(token); err != nil || cfg != nil {
+		return cfg, err
+	}
+	if cfg, err := insecureServingInfo.NewSelfClientConfig(token); err != nil || cfg != nil {
+		return cfg, err
 	}
 
-	// Use secure port if the TLSCAFile is specified
-	if s.SecureServingInfo {
-		clientConfig.Host = s.SecureServingInfo.BindAddress
-		clientConfig.CAFile = s.TLSCAFile
-		clientConfig.BearerToken = token
-	} else if s.InsecureServingInfo != nil {
-		clientConfig.Host = s.InsecureServingInfo.BindAddress
-	} else {
-		return nil, errors.New("Unable to set url for apiserver local client")
+	return nil, errors.New("Unable to set url for apiserver local client")
+}
+
+func certMatchesName(cert *x509.Certificate, name string) bool {
+	for _, certName := range cert.DNSNames {
+		if certName == name {
+			return true
+		}
 	}
 
-	host, port, err := net.SplitHostPort(clientConfig.Host)
-	if err != nil {
-		return fmt.Errorf("invalid bind address: %v", clientConfig.Host)
-	}
-	if host == "0.0.0.0" {
-		clientConfig.Host = net.JoinHostPort("localhost", port)
+	return false
+}
+
+func certMatchesIP(cert *x509.Certificate, ip string) bool {
+	for _, certIP := range cert.IPAddresses {
+		if certIP.String() == ip {
+			return true
+		}
 	}
 
-	return clientConfig, nil
+	return false
 }
 
 func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) (secure, insecure http.Handler) {
