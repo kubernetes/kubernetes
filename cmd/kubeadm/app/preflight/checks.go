@@ -17,6 +17,7 @@ limitations under the License.
 package preflight
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/util/initsystem"
 	"k8s.io/kubernetes/pkg/util/node"
+	"k8s.io/kubernetes/test/e2e_node/system"
 )
 
 type PreFlightError struct {
@@ -213,9 +215,26 @@ func (hst HttpProxyCheck) Check() (warnings, errors []error) {
 	return nil, nil
 }
 
+type SystemVerificationCheck struct{}
+
+func (sysver SystemVerificationCheck) Check() (warnings, errors []error) {
+	// Create a buffered writer and choose a quite large value (1M) and suppose the output from the system verification test won't exceed the limit
+	bufw := bufio.NewWriterSize(os.Stdout, 1*1024*1024)
+
+	// Run the system verification check, but write to out buffered writer instead of stdout
+	err := system.Validate(system.DefaultSysSpec, &system.StreamReporter{WriteStream: bufw})
+	if err != nil {
+		// Only print the output from the system verification check if the check failed
+		fmt.Println("System verification failed. Printing the output from the verification...")
+		bufw.Flush()
+		return nil, []error{err}
+	}
+	return nil, nil
+}
+
 func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
-	// TODO: Some of these ports should come from kubeadm config eventually:
 	checks := []PreFlightCheck{
+		SystemVerificationCheck{},
 		IsRootCheck{root: true},
 		HostnameCheck{},
 		ServiceCheck{Service: "kubelet"},
@@ -249,8 +268,8 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 }
 
 func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
-	// TODO: Some of these ports should come from kubeadm config eventually:
 	checks := []PreFlightCheck{
+		SystemVerificationCheck{},
 		IsRootCheck{root: true},
 		HostnameCheck{},
 		ServiceCheck{Service: "docker"},
