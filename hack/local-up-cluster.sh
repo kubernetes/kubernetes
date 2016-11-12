@@ -173,7 +173,7 @@ ENABLE_HOSTPATH_PROVISIONER=${ENABLE_HOSTPATH_PROVISIONER:-"false"}
 CLAIM_BINDER_SYNC_PERIOD=${CLAIM_BINDER_SYNC_PERIOD:-"15s"} # current k8s default
 ENABLE_CONTROLLER_ATTACH_DETACH=${ENABLE_CONTROLLER_ATTACH_DETACH:-"true"} # current default
 CERT_DIR=${CERT_DIR:-"/var/run/kubernetes"}
-ROOT_CA_FILE=$CERT_DIR/ca-apiserver.crt
+ROOT_CA_FILE=${CERT_DIR}/ca-apiserver.crt
 EXPERIMENTAL_CRI=${EXPERIMENTAL_CRI:-"false"}
 
 function test_apiserver_off {
@@ -373,7 +373,6 @@ function start_apiserver {
       --admission-control="${ADMISSION_CONTROL}" \
       --bind-address="${API_BIND_ADDR}" \
       --secure-port="${API_SECURE_PORT}" \
-      --tls-ca-file="${ROOT_CA_FILE}" \
       --insecure-bind-address="${API_HOST_IP}" \
       --insecure-port="${API_PORT}" \
       --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
@@ -383,6 +382,13 @@ function start_apiserver {
       --cloud-config="${CLOUD_CONFIG}" \
       --cors-allowed-origins="${API_CORS_ALLOWED_ORIGINS}" >"${APISERVER_LOG}" 2>&1 &
     APISERVER_PID=$!
+
+    # Wait for kube-apiserver to come up before launching the rest of the components.
+    echo "Waiting for apiserver to come up"
+    kube::util::wait_for_url "https://${API_HOST}:${API_SECURE_PORT}/version" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} || exit 1
+
+    openssl crl2pkcs7 -nocrl -certfile "${CERT_DIR}/apiserver.crt" | openssl pkcs7 -print_certs | \
+        sudo /bin/bash -c "awk '/subject.*CN=127.0.0.1@ca-/,/END CERTIFICATE/' > \"${ROOT_CA_FILE}\""
 
     # We created a kubeconfig that uses the apiserver.crt
     cat <<EOF | sudo tee "${CERT_DIR}"/kubeconfig > /dev/null
@@ -406,10 +412,6 @@ contexts:
     name: service-to-apiserver
 current-context: service-to-apiserver
 EOF
-
-    # Wait for kube-apiserver to come up before launching the rest of the components.
-    echo "Waiting for apiserver to come up"
-    kube::util::wait_for_url "https://${API_HOST}:${API_SECURE_PORT}/version" "apiserver: " 1 ${WAIT_FOR_URL_API_SERVER} || exit 1
 }
 
 function start_controller_manager {
