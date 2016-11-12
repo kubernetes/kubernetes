@@ -27,6 +27,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -102,7 +103,7 @@ func (plugin *awsElasticBlockStorePlugin) newMounterInternal(spec *volume.Spec, 
 		return nil, err
 	}
 
-	volumeID := ebs.VolumeID
+	volumeID := aws.KubernetesVolumeID(ebs.VolumeID)
 	fsType := ebs.FSType
 	partition := ""
 	if ebs.Partition != 0 {
@@ -153,7 +154,7 @@ func (plugin *awsElasticBlockStorePlugin) newDeleterInternal(spec *volume.Spec, 
 	return &awsElasticBlockStoreDeleter{
 		awsElasticBlockStore: &awsElasticBlockStore{
 			volName:  spec.Name(),
-			volumeID: spec.PersistentVolume.Spec.AWSElasticBlockStore.VolumeID,
+			volumeID: aws.KubernetesVolumeID(spec.PersistentVolume.Spec.AWSElasticBlockStore.VolumeID),
 			manager:  manager,
 			plugin:   plugin,
 		}}, nil
@@ -208,7 +209,7 @@ func (plugin *awsElasticBlockStorePlugin) ConstructVolumeSpec(volName, mountPath
 
 // Abstract interface to PD operations.
 type ebsManager interface {
-	CreateVolume(provisioner *awsElasticBlockStoreProvisioner) (volumeID string, volumeSizeGB int, labels map[string]string, err error)
+	CreateVolume(provisioner *awsElasticBlockStoreProvisioner) (volumeID aws.KubernetesVolumeID, volumeSizeGB int, labels map[string]string, err error)
 	// Deletes a volume
 	DeleteVolume(deleter *awsElasticBlockStoreDeleter) error
 }
@@ -219,7 +220,7 @@ type awsElasticBlockStore struct {
 	volName string
 	podUID  types.UID
 	// Unique id of the PD, used to find the disk resource in the provider.
-	volumeID string
+	volumeID aws.KubernetesVolumeID
 	// Specifies the partition to mount
 	partition string
 	// Utility interface that provides API calls to the provider to attach/detach disks.
@@ -315,9 +316,9 @@ func (b *awsElasticBlockStoreMounter) SetUpAt(dir string, fsGroup *int64) error 
 	return nil
 }
 
-func makeGlobalPDPath(host volume.VolumeHost, volumeID string) string {
+func makeGlobalPDPath(host volume.VolumeHost, volumeID aws.KubernetesVolumeID) string {
 	// Clean up the URI to be more fs-friendly
-	name := volumeID
+	name := string(volumeID)
 	name = strings.Replace(name, "://", "/", -1)
 	return path.Join(host.GetPluginDir(awsElasticBlockStorePluginName), "mounts", name)
 }
@@ -435,7 +436,7 @@ func (c *awsElasticBlockStoreProvisioner) Provision() (*api.PersistentVolume, er
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{
-					VolumeID:  volumeID,
+					VolumeID:  string(volumeID),
 					FSType:    "ext4",
 					Partition: 0,
 					ReadOnly:  false,

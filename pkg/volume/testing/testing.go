@@ -423,6 +423,12 @@ func (fv *FakeVolume) Detach(deviceMountPath string, hostName string) error {
 	return nil
 }
 
+func (fv *FakeVolume) VolumesAreAttached(spec []*Spec, nodeName string) (map[*Spec]bool, error) {
+	fv.Lock()
+	defer fv.Unlock()
+	return nil, nil
+}
+
 func (fv *FakeVolume) GetDetachCallCount() int {
 	fv.RLock()
 	defer fv.RUnlock()

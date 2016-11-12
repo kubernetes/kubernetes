@@ -118,7 +118,8 @@ func (l *persistentVolumeLabel) findAWSEBSLabels(volume *api.PersistentVolume) (
 
 	// TODO: GetVolumeLabels is actually a method on the Volumes interface
 	// If that gets standardized we can refactor to reduce code duplication
-	labels, err := ebsVolumes.GetVolumeLabels(volume.Spec.AWSElasticBlockStore.VolumeID)
+	spec := aws.KubernetesVolumeID(volume.Spec.AWSElasticBlockStore.VolumeID)
+	labels, err := ebsVolumes.GetVolumeLabels(spec)
 	if err != nil {
 		return nil, err
 	}

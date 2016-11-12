@@ -64,6 +64,13 @@ type OperationExecutor interface {
 	// It then updates the actual state of the world to reflect that.
 	AttachVolume(volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
 
+	// VerifyVolumesAreAttached verifies the given list of volumes to see whether they are still attached to the node.
+	// If any volume is not attached right now, it will update the actual state of the world to reflect that.
+	// Note that this operation could be operated concurrently with other attach/detach operations.
+	// In theory (but very unlikely in practise), race condition among these operations might mark volume as detached
+	// even if it is attached. But reconciler can correct this in a short period of time.
+	VerifyVolumesAreAttached(AttachedVolumes []AttachedVolume, nodeName string, actualStateOfWorld ActualStateOfWorldAttacherUpdater) error
+
 	// DetachVolume detaches the volume from the node specified in
 	// volumeToDetach, and updates the actual state of the world to reflect
 	// that. If verifySafeToDetach is set, a call is made to the fetch the node
@@ -397,6 +404,19 @@ func (oe *operationExecutor) DetachVolume(
 		volumeToDetach.VolumeName, "" /* podName */, detachFunc)
 }
 
+func (oe *operationExecutor) VerifyVolumesAreAttached(
+	attachedVolumes []AttachedVolume,
+	nodeName string,
+	actualStateOfWorld ActualStateOfWorldAttacherUpdater) error {
+	volumesAreAttachedFunc, err :=
+		oe.generateVolumesAreAttachedFunc(attachedVolumes, nodeName, actualStateOfWorld)
+	if err != nil {
+		return err
+	}
+	// Give an empty UniqueVolumeName so that this operation could be executed concurrently.
+	return oe.pendingOperations.Run("" /* volumeName */, "" /* podName */, volumesAreAttachedFunc)
+}
+
 func (oe *operationExecutor) MountVolume(
 	waitForAttachTimeout time.Duration,
 	volumeToMount VolumeToMount,
@@ -463,6 +483,83 @@ func (oe *operationExecutor) VerifyControllerAttachedVolume(
 
 	return oe.pendingOperations.Run(
 		volumeToMount.VolumeName, "" /* podName */, verifyControllerAttachedVolumeFunc)
+}
+
+func (oe *operationExecutor) generateVolumesAreAttachedFunc(
+	attachedVolumes []AttachedVolume,
+	nodeName string,
+	actualStateOfWorld ActualStateOfWorldAttacherUpdater) (func() error, error) {
+
+	// volumesPerPlugin maps from a volume plugin to a list of volume specs which belong
+	// to this type of plugin
+	volumesPerPlugin := make(map[string][]*volume.Spec)
+	// volumeSpecMap maps from a volume spec to its unique volumeName which will be used
+	// when calling MarkVolumeAsDetached
+	volumeSpecMap := make(map[*volume.Spec]api.UniqueVolumeName)
+	// Iterate each volume spec and put them into a map index by the pluginName
+	for _, volumeAttached := range attachedVolumes {
+		volumePlugin, err :=
+			oe.volumePluginMgr.FindPluginBySpec(volumeAttached.VolumeSpec)
+		if err != nil || volumePlugin == nil {
+			glog.Errorf(
+				"VolumesAreAttached.FindPluginBySpec failed for volume %q (spec.Name: %q) on node %q with error: %v",
+				volumeAttached.VolumeName,
+				volumeAttached.VolumeSpec.Name(),
+				volumeAttached.NodeName,
+				err)
+		}
+		volumeSpecList, pluginExists := volumesPerPlugin[volumePlugin.GetPluginName()]
+		if !pluginExists {
+			volumeSpecList = []*volume.Spec{}
+		}
+		volumeSpecList = append(volumeSpecList, volumeAttached.VolumeSpec)
+		volumesPerPlugin[volumePlugin.GetPluginName()] = volumeSpecList
+		volumeSpecMap[volumeAttached.VolumeSpec] = volumeAttached.VolumeName
+	}
+
+	return func() error {
+
+		// For each volume plugin, pass the list of volume specs to VolumesAreAttached to check
+		// whether the volumes are still attached.
+		for pluginName, volumesSpecs := range volumesPerPlugin {
+			attachableVolumePlugin, err :=
+				oe.volumePluginMgr.FindAttachablePluginByName(pluginName)
+			if err != nil || attachableVolumePlugin == nil {
+				glog.Errorf(
+					"VolumeAreAttached.FindAttachablePluginBySpec failed for plugin %q with: %v",
+					pluginName,
+					err)
+				continue
+			}
+
+			volumeAttacher, newAttacherErr := attachableVolumePlugin.NewAttacher()
+			if newAttacherErr != nil {
+				glog.Errorf(
+					"VolumesAreAttached failed for getting plugin %q with: %v",
+					pluginName,
+					newAttacherErr)
+				continue
+			}
+
+			attached, areAttachedErr := volumeAttacher.VolumesAreAttached(volumesSpecs, nodeName)
+			if areAttachedErr != nil {
+				glog.Errorf(
+					"VolumesAreAttached failed for checking on node %q with: %v",
+					nodeName,
+					areAttachedErr)
+				continue
+			}
+
+			for spec, check := range attached {
+				if !check {
+					actualStateOfWorld.MarkVolumeAsDetached(volumeSpecMap[spec], nodeName)
+					glog.V(1).Infof("VerifyVolumesAreAttached determined volume %q (spec.Name: %q) is no longer attached to node %q, therefore it was marked as detached.",
+						volumeSpecMap[spec], spec.Name(), nodeName)
+				}
+			}
+		}
+		return nil
+	}, nil
 }
 
 func (oe *operationExecutor) generateAttachVolumeFunc(
