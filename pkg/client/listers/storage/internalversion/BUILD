@@ -17,11 +17,4 @@ go_library(
         "storageclass.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/errors:go_default_library",
-        "//pkg/apis/storage:go_default_library",
-        "//pkg/client/cache:go_default_library",
-        "//pkg/labels:go_default_library",
-    ],
 )

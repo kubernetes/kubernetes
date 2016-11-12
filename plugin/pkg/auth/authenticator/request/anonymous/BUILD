@@ -14,10 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["anonymous.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/auth/authenticator:go_default_library",
-        "//pkg/auth/user:go_default_library",
-    ],
 )
 
 go_test(
@@ -25,9 +21,5 @@ go_test(
     srcs = ["anonymous_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/auth/authenticator:go_default_library",
-        "//pkg/auth/user:go_default_library",
-        "//pkg/util/sets:go_default_library",
-    ],
+    deps = [],
 )

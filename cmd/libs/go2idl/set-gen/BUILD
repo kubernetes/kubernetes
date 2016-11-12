@@ -14,11 +14,6 @@ go_binary(
     name = "set-gen",
     srcs = ["main.go"],
     tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/golang/glog",
-        "//vendor:k8s.io/gengo/args",
-        "//vendor:k8s.io/gengo/examples/set-gen/generators",
-    ],
 )
 
 exports_files([

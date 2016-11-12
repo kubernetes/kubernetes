@@ -17,26 +17,11 @@ go_library(
         "protobuf.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/serializer/recognizer:go_default_library",
-        "//pkg/util/framer:go_default_library",
-        "//vendor:github.com/gogo/protobuf/proto",
-    ],
 )
 
 go_test(
     name = "go_default_xtest",
     srcs = ["protobuf_test.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/install:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/api/v1:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/serializer/protobuf:go_default_library",
-        "//pkg/util/diff:go_default_library",
-    ],
+    deps = [],
 )

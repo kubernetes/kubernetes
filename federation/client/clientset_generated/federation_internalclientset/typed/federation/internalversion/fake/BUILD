@@ -18,14 +18,4 @@ go_library(
         "fake_federation_client.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//federation/apis/federation:go_default_library",
-        "//federation/client/clientset_generated/federation_internalclientset/typed/federation/internalversion:go_default_library",
-        "//pkg/api:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/client/restclient:go_default_library",
-        "//pkg/client/testing/core:go_default_library",
-        "//pkg/labels:go_default_library",
-        "//pkg/watch:go_default_library",
-    ],
 )

@@ -14,7 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["parsers.go"],
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/docker/distribution/reference"],
 )
 
 go_test(

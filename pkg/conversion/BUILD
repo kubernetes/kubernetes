@@ -20,7 +20,6 @@ go_library(
         "helper.go",
     ],
     tags = ["automanaged"],
-    deps = ["//third_party/forked/golang/reflect:go_default_library"],
 )
 
 go_test(
@@ -32,9 +31,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/util/diff:go_default_library",
-        "//vendor:github.com/google/gofuzz",
-        "//vendor:github.com/spf13/pflag",
-    ],
+    deps = [],
 )

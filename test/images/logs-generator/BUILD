@@ -14,8 +14,4 @@ go_binary(
     name = "logs-generator",
     srcs = ["logs_generator.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/util/rand:go_default_library",
-        "//vendor:github.com/golang/glog",
-    ],
 )

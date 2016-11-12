@@ -14,14 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["validation.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/validation:go_default_library",
-        "//pkg/api/validation/path:go_default_library",
-        "//pkg/apis/autoscaling:go_default_library",
-        "//pkg/apis/extensions:go_default_library",
-        "//pkg/controller/podautoscaler:go_default_library",
-        "//pkg/util/validation/field:go_default_library",
-    ],
 )
 
 go_test(
@@ -29,9 +21,5 @@ go_test(
     srcs = ["validation_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/apis/autoscaling:go_default_library",
-        "//pkg/controller/podautoscaler:go_default_library",
-    ],
+    deps = [],
 )

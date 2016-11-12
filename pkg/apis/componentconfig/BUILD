@@ -21,14 +21,6 @@ go_library(
         "zz_generated.deepcopy.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/conversion:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/util/config:go_default_library",
-        "//pkg/util/net:go_default_library",
-        "//vendor:github.com/ugorji/go/codec",
-    ],
 )
 
 go_test(
@@ -36,5 +28,5 @@ go_test(
     srcs = ["helpers_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/spf13/pflag"],
+    deps = [],
 )

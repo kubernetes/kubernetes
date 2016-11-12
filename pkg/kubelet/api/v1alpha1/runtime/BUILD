@@ -17,9 +17,4 @@ go_library(
         "constants.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/gogo/protobuf/proto",
-        "//vendor:golang.org/x/net/context",
-        "//vendor:google.golang.org/grpc",
-    ],
 )

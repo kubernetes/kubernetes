@@ -14,8 +14,4 @@ go_binary(
     name = "net",
     srcs = ["main.go"],
     tags = ["automanaged"],
-    deps = [
-        "//test/images/net/common:go_default_library",
-        "//test/images/net/nat:go_default_library",
-    ],
 )

@@ -33,17 +33,6 @@ go_library(
         "zz_generated.deepcopy.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/meta/metatypes:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/conversion:go_default_library",
-        "//pkg/conversion/queryparams:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/util/errors:go_default_library",
-        "//pkg/util/json:go_default_library",
-        "//vendor:github.com/gogo/protobuf/proto",
-        "//vendor:github.com/golang/glog",
-    ],
 )
 
 go_test(
@@ -66,21 +55,5 @@ go_test(
         "unversioned_test.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/meta:go_default_library",
-        "//pkg/api/meta/metatypes:go_default_library",
-        "//pkg/api/testapi:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/api/validation:go_default_library",
-        "//pkg/apimachinery/registered:go_default_library",
-        "//pkg/apis/extensions:go_default_library",
-        "//pkg/conversion:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/serializer:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/util/diff:go_default_library",
-        "//vendor:github.com/google/gofuzz",
-        "//vendor:github.com/spf13/pflag",
-    ],
+    deps = [],
 )

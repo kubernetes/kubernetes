@@ -18,8 +18,4 @@ go_library(
         "tristate.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/spf13/pflag",
-    ],
 )

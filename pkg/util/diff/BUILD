@@ -14,10 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["diff.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/util/validation/field:go_default_library",
-        "//vendor:github.com/davecgh/go-spew/spew",
-    ],
 )
 
 go_test(

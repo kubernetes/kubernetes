@@ -14,10 +14,4 @@ go_library(
     name = "go_default_library",
     srcs = ["fake_host.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/kubelet/container:go_default_library",
-        "//pkg/kubelet/container/testing:go_default_library",
-    ],
 )

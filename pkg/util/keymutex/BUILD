@@ -14,7 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["keymutex.go"],
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/golang/glog"],
 )
 
 go_test(

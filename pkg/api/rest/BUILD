@@ -22,15 +22,4 @@ go_library(
         "update.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/errors:go_default_library",
-        "//pkg/api/meta:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/api/validation:go_default_library",
-        "//pkg/api/validation/path:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/util/validation/field:go_default_library",
-        "//pkg/watch:go_default_library",
-    ],
 )

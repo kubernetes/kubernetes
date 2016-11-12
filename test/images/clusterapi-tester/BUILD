@@ -14,11 +14,4 @@ go_binary(
     name = "clusterapi-tester",
     srcs = ["main.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/client/restclient:go_default_library",
-        "//pkg/fields:go_default_library",
-        "//pkg/labels:go_default_library",
-    ],
 )

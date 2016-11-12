@@ -14,10 +14,4 @@ go_binary(
     name = "protoc-gen-gogo",
     srcs = ["main.go"],
     tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/gogo/protobuf/gogoproto",
-        "//vendor:github.com/gogo/protobuf/proto",
-        "//vendor:github.com/gogo/protobuf/sortkeys",
-        "//vendor:github.com/gogo/protobuf/vanity/command",
-    ],
 )

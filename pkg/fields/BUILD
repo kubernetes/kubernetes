@@ -19,7 +19,6 @@ go_library(
         "selector.go",
     ],
     tags = ["automanaged"],
-    deps = ["//pkg/selection:go_default_library"],
 )
 
 go_test(

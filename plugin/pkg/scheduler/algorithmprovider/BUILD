@@ -14,7 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["plugins.go"],
     tags = ["automanaged"],
-    deps = ["//plugin/pkg/scheduler/algorithmprovider/defaults:go_default_library"],
 )
 
 go_test(
@@ -25,5 +24,5 @@ go_test(
         "automanaged",
         "skip",
     ],
-    deps = ["//plugin/pkg/scheduler/factory:go_default_library"],
+    deps = [],
 )

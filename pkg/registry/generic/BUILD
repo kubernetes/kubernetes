@@ -19,14 +19,4 @@ go_library(
         "storage_decorator.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/rest:go_default_library",
-        "//pkg/fields:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/storage:go_default_library",
-        "//pkg/storage/storagebackend:go_default_library",
-        "//pkg/storage/storagebackend/factory:go_default_library",
-        "//vendor:github.com/golang/glog",
-    ],
 )

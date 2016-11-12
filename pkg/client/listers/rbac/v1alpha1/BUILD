@@ -20,12 +20,4 @@ go_library(
         "rolebinding.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/errors:go_default_library",
-        "//pkg/api/v1:go_default_library",
-        "//pkg/apis/rbac:go_default_library",
-        "//pkg/apis/rbac/v1alpha1:go_default_library",
-        "//pkg/client/cache:go_default_library",
-        "//pkg/labels:go_default_library",
-    ],
 )

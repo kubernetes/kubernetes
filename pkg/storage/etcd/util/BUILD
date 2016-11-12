@@ -17,7 +17,6 @@ go_library(
         "etcd_util.go",
     ],
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/coreos/etcd/client"],
 )
 
 go_test(
@@ -25,8 +24,5 @@ go_test(
     srcs = ["etcd_util_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/coreos/etcd/client",
-        "//vendor:github.com/stretchr/testify/assert",
-    ],
+    deps = [],
 )

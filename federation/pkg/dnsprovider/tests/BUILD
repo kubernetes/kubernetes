@@ -14,8 +14,4 @@ go_library(
     name = "go_default_library",
     srcs = ["commontests.go"],
     tags = ["automanaged"],
-    deps = [
-        "//federation/pkg/dnsprovider:go_default_library",
-        "//federation/pkg/dnsprovider/rrstype:go_default_library",
-    ],
 )

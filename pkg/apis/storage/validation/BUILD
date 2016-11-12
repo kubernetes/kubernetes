@@ -14,12 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["validation.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/validation:go_default_library",
-        "//pkg/apis/storage:go_default_library",
-        "//pkg/util/validation:go_default_library",
-        "//pkg/util/validation/field:go_default_library",
-    ],
 )
 
 go_test(
@@ -27,8 +21,5 @@ go_test(
     srcs = ["validation_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/apis/storage:go_default_library",
-    ],
+    deps = [],
 )

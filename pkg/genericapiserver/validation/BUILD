@@ -17,9 +17,4 @@ go_library(
         "universal_validation.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/genericapiserver/options:go_default_library",
-        "//pkg/util/errors:go_default_library",
-        "//vendor:github.com/golang/glog",
-    ],
 )

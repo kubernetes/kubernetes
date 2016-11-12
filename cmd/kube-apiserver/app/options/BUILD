@@ -14,14 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["options.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/validation:go_default_library",
-        "//pkg/genericapiserver/options:go_default_library",
-        "//pkg/kubelet/client:go_default_library",
-        "//pkg/master/ports:go_default_library",
-        "//vendor:github.com/spf13/pflag",
-    ],
 )
 
 go_test(
@@ -29,5 +21,5 @@ go_test(
     srcs = ["options_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/spf13/pflag"],
+    deps = [],
 )

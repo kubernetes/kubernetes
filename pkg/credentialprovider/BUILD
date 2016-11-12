@@ -20,12 +20,6 @@ go_library(
         "provider.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/util/sets:go_default_library",
-        "//vendor:github.com/docker/engine-api/types",
-        "//vendor:github.com/golang/glog",
-    ],
 )
 
 go_test(

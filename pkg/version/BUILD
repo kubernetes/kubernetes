@@ -19,10 +19,6 @@ go_library(
         "version.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/blang/semver",
-        "//vendor:github.com/golang/glog",
-    ],
 )
 
 go_test(

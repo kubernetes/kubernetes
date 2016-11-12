@@ -14,8 +14,4 @@ go_library(
     name = "go_default_library",
     srcs = ["plugins.go"],
     tags = ["automanaged"],
-    deps = [
-        "//plugin/pkg/client/auth/gcp:go_default_library",
-        "//plugin/pkg/client/auth/oidc:go_default_library",
-    ],
 )

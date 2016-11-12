@@ -25,24 +25,6 @@ go_library(
         "versionize_listoptions.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//federation/apis/federation/v1beta1:go_default_library",
-        "//federation/client/clientset_generated/federation_release_1_5:go_default_library",
-        "//pkg/api:go_default_library",
-        "//pkg/api/v1:go_default_library",
-        "//pkg/client/cache:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/client/clientset_generated/release_1_5:go_default_library",
-        "//pkg/client/restclient:go_default_library",
-        "//pkg/client/unversioned/clientcmd:go_default_library",
-        "//pkg/client/unversioned/clientcmd/api:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/util/flowcontrol:go_default_library",
-        "//pkg/util/net:go_default_library",
-        "//pkg/util/wait:go_default_library",
-        "//pkg/watch:go_default_library",
-        "//vendor:github.com/golang/glog",
-    ],
 )
 
 go_test(
@@ -56,17 +38,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//federation/apis/federation/v1beta1:go_default_library",
-        "//federation/client/clientset_generated/federation_release_1_5/fake:go_default_library",
-        "//pkg/api:go_default_library",
-        "//pkg/api/v1:go_default_library",
-        "//pkg/client/cache:go_default_library",
-        "//pkg/client/clientset_generated/release_1_5:go_default_library",
-        "//pkg/client/clientset_generated/release_1_5/fake:go_default_library",
-        "//pkg/client/testing/core:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/watch:go_default_library",
-        "//vendor:github.com/stretchr/testify/assert",
-    ],
+    deps = [],
 )

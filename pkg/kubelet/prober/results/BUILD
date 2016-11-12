@@ -14,11 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["results_manager.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/kubelet/container:go_default_library",
-        "//pkg/types:go_default_library",
-    ],
 )
 
 go_test(
@@ -26,10 +21,5 @@ go_test(
     srcs = ["results_manager_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/kubelet/container:go_default_library",
-        "//pkg/util/wait:go_default_library",
-        "//vendor:github.com/stretchr/testify/assert",
-    ],
+    deps = [],
 )

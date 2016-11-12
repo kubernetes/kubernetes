@@ -14,10 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["util.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/errors:go_default_library",
-        "//pkg/util/wait:go_default_library",
-    ],
 )
 
 go_test(
@@ -25,9 +21,5 @@ go_test(
     srcs = ["util_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/errors:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/util/wait:go_default_library",
-    ],
+    deps = [],
 )

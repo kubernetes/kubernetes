@@ -14,10 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["tcp.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/probe:go_default_library",
-        "//vendor:github.com/golang/glog",
-    ],
 )
 
 go_test(
@@ -25,5 +21,5 @@ go_test(
     srcs = ["tcp_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/probe:go_default_library"],
+    deps = [],
 )

@@ -20,11 +20,6 @@ go_library(
         "namedcertkey_flag.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/util/wait:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/spf13/pflag",
-    ],
 )
 
 go_test(
@@ -36,5 +31,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/spf13/pflag"],
+    deps = [],
 )

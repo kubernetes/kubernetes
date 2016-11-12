@@ -14,9 +14,4 @@ go_library(
     name = "go_default_library",
     srcs = ["provider.go"],
     tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/coreos/go-oidc/jose",
-        "//vendor:github.com/coreos/go-oidc/key",
-        "//vendor:github.com/coreos/go-oidc/oidc",
-    ],
 )

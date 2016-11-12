@@ -17,14 +17,4 @@ go_library(
         "container_manager_linux.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/kubelet/cm:go_default_library",
-        "//pkg/kubelet/dockertools:go_default_library",
-        "//pkg/kubelet/qos:go_default_library",
-        "//pkg/util/wait:go_default_library",
-        "//vendor:github.com/blang/semver",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/opencontainers/runc/libcontainer/cgroups/fs",
-        "//vendor:github.com/opencontainers/runc/libcontainer/configs",
-    ],
 )

@@ -20,11 +20,6 @@ go_library(
         "util.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/kubelet/leaky:go_default_library",
-        "//vendor:github.com/docker/engine-api/types/container",
-    ],
 )
 
 go_test(
@@ -35,9 +30,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/testing:go_default_library",
-        "//vendor:github.com/docker/engine-api/types/container",
-    ],
+    deps = [],
 )

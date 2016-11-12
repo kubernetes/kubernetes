@@ -14,5 +14,4 @@ go_library(
     name = "go_default_library",
     srcs = ["flock_unix.go"],
     tags = ["automanaged"],
-    deps = ["//vendor:golang.org/x/sys/unix"],
 )

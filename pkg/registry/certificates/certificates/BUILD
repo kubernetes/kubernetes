@@ -18,19 +18,6 @@ go_library(
         "strategy.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/rest:go_default_library",
-        "//pkg/apis/certificates:go_default_library",
-        "//pkg/apis/certificates/validation:go_default_library",
-        "//pkg/fields:go_default_library",
-        "//pkg/labels:go_default_library",
-        "//pkg/registry/generic:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/storage:go_default_library",
-        "//pkg/util/validation/field:go_default_library",
-        "//pkg/watch:go_default_library",
-    ],
 )
 
 go_test(
@@ -38,11 +25,5 @@ go_test(
     srcs = ["strategy_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/apis/certificates:go_default_library",
-        "//pkg/auth/user:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/util/diff:go_default_library",
-    ],
+    deps = [],
 )

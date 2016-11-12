@@ -17,9 +17,4 @@ go_library(
         "fake.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/cloudprovider:go_default_library",
-        "//pkg/types:go_default_library",
-    ],
 )

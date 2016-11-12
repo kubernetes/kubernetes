@@ -17,15 +17,6 @@ go_library(
         "desired_state_of_world.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/volume:go_default_library",
-        "//pkg/volume/util/operationexecutor:go_default_library",
-        "//pkg/volume/util/types:go_default_library",
-        "//pkg/volume/util/volumehelper:go_default_library",
-        "//vendor:github.com/golang/glog",
-    ],
 )
 
 go_test(
@@ -36,11 +27,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/controller/volume/attachdetach/testing:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/volume/testing:go_default_library",
-        "//pkg/volume/util/types:go_default_library",
-    ],
+    deps = [],
 )

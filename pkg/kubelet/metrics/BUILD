@@ -14,9 +14,4 @@ go_library(
     name = "go_default_library",
     srcs = ["metrics.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/kubelet/container:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/prometheus/client_golang/prometheus",
-    ],
 )

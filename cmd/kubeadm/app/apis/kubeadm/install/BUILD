@@ -17,9 +17,4 @@ go_library(
         "install.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:go_default_library",
-        "//pkg/apimachinery/announced:go_default_library",
-    ],
 )

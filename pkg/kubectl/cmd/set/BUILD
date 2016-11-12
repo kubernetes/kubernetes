@@ -19,19 +19,6 @@ go_library(
         "set_resources.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/errors:go_default_library",
-        "//pkg/api/meta:go_default_library",
-        "//pkg/kubectl:go_default_library",
-        "//pkg/kubectl/cmd/templates:go_default_library",
-        "//pkg/kubectl/cmd/util:go_default_library",
-        "//pkg/kubectl/resource:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/util/errors:go_default_library",
-        "//pkg/util/strategicpatch:go_default_library",
-        "//vendor:github.com/spf13/cobra",
-    ],
 )
 
 go_test(
@@ -42,13 +29,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/apimachinery/registered:go_default_library",
-        "//pkg/client/restclient:go_default_library",
-        "//pkg/client/restclient/fake:go_default_library",
-        "//pkg/kubectl/cmd/testing:go_default_library",
-        "//pkg/kubectl/cmd/util:go_default_library",
-        "//pkg/kubectl/resource:go_default_library",
-    ],
+    deps = [],
 )

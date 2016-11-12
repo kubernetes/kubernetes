@@ -14,10 +14,4 @@ go_binary(
     name = "deepcopy-gen",
     srcs = ["main.go"],
     tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/spf13/pflag",
-        "//vendor:k8s.io/gengo/args",
-        "//vendor:k8s.io/gengo/examples/deepcopy-gen/generators",
-    ],
 )

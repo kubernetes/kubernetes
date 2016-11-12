@@ -14,5 +14,4 @@ go_binary(
     name = "environment",
     srcs = ["conformance.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/kubelet/cadvisor:go_default_library"],
 )

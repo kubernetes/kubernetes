@@ -22,13 +22,6 @@ go_library(
         "suffix.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/genericapiserver/openapi/common:go_default_library",
-        "//vendor:github.com/go-openapi/spec",
-        "//vendor:github.com/gogo/protobuf/proto",
-        "//vendor:github.com/spf13/pflag",
-        "//vendor:gopkg.in/inf.v0",
-    ],
 )
 
 go_test(
@@ -41,16 +34,12 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/google/gofuzz",
-        "//vendor:github.com/spf13/pflag",
-        "//vendor:gopkg.in/inf.v0",
-    ],
+    deps = [],
 )
 
 go_test(
     name = "go_default_xtest",
     srcs = ["quantity_example_test.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/api/resource:go_default_library"],
+    deps = [],
 )

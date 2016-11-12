@@ -17,12 +17,6 @@ go_library(
         "portforward.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/kubelet/server/portforward:go_default_library",
-        "//pkg/util/httpstream:go_default_library",
-        "//pkg/util/runtime:go_default_library",
-    ],
 )
 
 go_test(
@@ -30,11 +24,5 @@ go_test(
     srcs = ["portforward_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/client/restclient:go_default_library",
-        "//pkg/client/unversioned/remotecommand:go_default_library",
-        "//pkg/kubelet/server/portforward:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/util/httpstream:go_default_library",
-    ],
+    deps = [],
 )

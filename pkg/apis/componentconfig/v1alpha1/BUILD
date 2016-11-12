@@ -22,15 +22,4 @@ go_library(
         "zz_generated.defaults.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/apis/componentconfig:go_default_library",
-        "//pkg/conversion:go_default_library",
-        "//pkg/kubelet/qos:go_default_library",
-        "//pkg/kubelet/types:go_default_library",
-        "//pkg/master/ports:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/util/config:go_default_library",
-    ],
 )

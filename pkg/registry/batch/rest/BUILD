@@ -14,14 +14,4 @@ go_library(
     name = "go_default_library",
     srcs = ["storage_batch.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/rest:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/apis/batch:go_default_library",
-        "//pkg/apis/batch/v1:go_default_library",
-        "//pkg/apis/batch/v2alpha1:go_default_library",
-        "//pkg/genericapiserver:go_default_library",
-        "//pkg/registry/batch/cronjob/etcd:go_default_library",
-        "//pkg/registry/batch/job/etcd:go_default_library",
-    ],
 )

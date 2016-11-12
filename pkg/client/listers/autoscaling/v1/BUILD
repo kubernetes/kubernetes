@@ -17,11 +17,4 @@ go_library(
         "horizontalpodautoscaler.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/errors:go_default_library",
-        "//pkg/apis/autoscaling:go_default_library",
-        "//pkg/apis/autoscaling/v1:go_default_library",
-        "//pkg/client/cache:go_default_library",
-        "//pkg/labels:go_default_library",
-    ],
 )

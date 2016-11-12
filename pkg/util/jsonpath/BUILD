@@ -19,7 +19,6 @@ go_library(
         "parser.go",
     ],
     tags = ["automanaged"],
-    deps = ["//third_party/forked/golang/template:go_default_library"],
 )
 
 go_test(

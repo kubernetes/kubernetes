@@ -14,5 +14,4 @@ go_binary(
     name = "controller",
     srcs = ["controller.go"],
     tags = ["automanaged"],
-    deps = ["//test/images/resource-consumer/common:go_default_library"],
 )

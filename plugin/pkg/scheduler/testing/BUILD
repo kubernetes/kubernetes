@@ -17,9 +17,4 @@ go_library(
         "pods_to_cache.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/labels:go_default_library",
-        "//plugin/pkg/scheduler/schedulercache:go_default_library",
-    ],
 )

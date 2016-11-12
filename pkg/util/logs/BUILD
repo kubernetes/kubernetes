@@ -14,9 +14,4 @@ go_library(
     name = "go_default_library",
     srcs = ["logs.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/util/wait:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/spf13/pflag",
-    ],
 )

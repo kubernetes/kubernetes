@@ -14,14 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["kubelet_client.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/client/restclient:go_default_library",
-        "//pkg/client/transport:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/util/net:go_default_library",
-        "//pkg/util/node:go_default_library",
-    ],
 )
 
 go_test(
@@ -32,8 +24,5 @@ go_test(
         "automanaged",
         "skip",
     ],
-    deps = [
-        "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
-        "//pkg/client/restclient:go_default_library",
-    ],
+    deps = [],
 )

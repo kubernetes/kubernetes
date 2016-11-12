@@ -28,16 +28,6 @@ go_library(
         "zz_generated.deepcopy.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/conversion:go_default_library",
-        "//pkg/genericapiserver/openapi/common:go_default_library",
-        "//pkg/labels:go_default_library",
-        "//pkg/selection:go_default_library",
-        "//vendor:github.com/go-openapi/spec",
-        "//vendor:github.com/gogo/protobuf/proto",
-        "//vendor:github.com/gogo/protobuf/sortkeys",
-        "//vendor:github.com/google/gofuzz",
-    ],
 )
 
 go_test(
@@ -50,9 +40,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/labels:go_default_library",
-        "//vendor:github.com/ghodss/yaml",
-        "//vendor:github.com/ugorji/go/codec",
-    ],
+    deps = [],
 )

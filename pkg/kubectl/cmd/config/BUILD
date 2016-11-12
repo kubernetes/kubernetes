@@ -29,18 +29,6 @@ go_library(
         "view.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/client/unversioned/clientcmd:go_default_library",
-        "//pkg/client/unversioned/clientcmd/api:go_default_library",
-        "//pkg/client/unversioned/clientcmd/api/latest:go_default_library",
-        "//pkg/kubectl:go_default_library",
-        "//pkg/kubectl/cmd/templates:go_default_library",
-        "//pkg/kubectl/cmd/util:go_default_library",
-        "//pkg/util/errors:go_default_library",
-        "//pkg/util/flag:go_default_library",
-        "//pkg/util/sets:go_default_library",
-        "//vendor:github.com/spf13/cobra",
-    ],
 )
 
 go_test(
@@ -57,11 +45,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/client/unversioned/clientcmd:go_default_library",
-        "//pkg/client/unversioned/clientcmd/api:go_default_library",
-        "//pkg/util/diff:go_default_library",
-        "//pkg/util/flag:go_default_library",
-    ],
+    deps = [],
 )

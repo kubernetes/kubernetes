@@ -21,7 +21,6 @@ go_library(
         "util.go",
     ],
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/golang/glog"],
 )
 
 go_test(
@@ -32,8 +31,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/util/diff:go_default_library",
-        "//vendor:github.com/stretchr/testify/assert",
-    ],
+    deps = [],
 )

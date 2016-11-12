@@ -19,10 +19,6 @@ go_library(
         "oom_linux.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/kubelet/cm/util:go_default_library",
-        "//vendor:github.com/golang/glog",
-    ],
 )
 
 go_test(
@@ -30,5 +26,5 @@ go_test(
     srcs = ["oom_linux_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/stretchr/testify/assert"],
+    deps = [],
 )

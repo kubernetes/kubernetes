@@ -24,5 +24,5 @@ go_test(
     srcs = ["httpstream_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/api:go_default_library"],
+    deps = [],
 )

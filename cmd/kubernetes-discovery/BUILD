@@ -14,8 +14,4 @@ go_binary(
     name = "kubernetes-discovery",
     srcs = ["main.go"],
     tags = ["automanaged"],
-    deps = [
-        "//cmd/kubernetes-discovery/discoverysummarizer:go_default_library",
-        "//vendor:github.com/golang/glog",
-    ],
 )

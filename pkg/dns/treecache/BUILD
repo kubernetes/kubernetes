@@ -14,7 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["treecache.go"],
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/skynetservices/skydns/msg"],
 )
 
 go_test(
@@ -22,5 +21,5 @@ go_test(
     srcs = ["treecache_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/skynetservices/skydns/msg"],
+    deps = [],
 )

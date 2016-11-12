@@ -14,12 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["handlers.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/auth/authenticator:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/prometheus/client_golang/prometheus",
-    ],
 )
 
 go_test(
@@ -27,9 +21,5 @@ go_test(
     srcs = ["handlers_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/auth/authenticator:go_default_library",
-        "//pkg/auth/user:go_default_library",
-    ],
+    deps = [],
 )

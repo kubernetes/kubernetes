@@ -17,10 +17,6 @@ go_library(
         "resources.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/types:go_default_library",
-    ],
 )
 
 go_test(
@@ -28,8 +24,5 @@ go_test(
     srcs = ["resources_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/resource:go_default_library",
-    ],
+    deps = [],
 )

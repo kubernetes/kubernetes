@@ -17,7 +17,6 @@ go_library(
         "lruexpirecache.go",
     ],
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/golang/groupcache/lru"],
 )
 
 go_test(
@@ -28,5 +27,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/golang/groupcache/lru"],
+    deps = [],
 )

@@ -18,15 +18,6 @@ go_library(
         "pleg.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/kubelet/container:go_default_library",
-        "//pkg/kubelet/metrics:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/util/clock:go_default_library",
-        "//pkg/util/sets:go_default_library",
-        "//pkg/util/wait:go_default_library",
-        "//vendor:github.com/golang/glog",
-    ],
 )
 
 go_test(
@@ -34,12 +25,5 @@ go_test(
     srcs = ["generic_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/kubelet/container:go_default_library",
-        "//pkg/kubelet/container/testing:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/util/clock:go_default_library",
-        "//pkg/util/diff:go_default_library",
-        "//vendor:github.com/stretchr/testify/assert",
-    ],
+    deps = [],
 )

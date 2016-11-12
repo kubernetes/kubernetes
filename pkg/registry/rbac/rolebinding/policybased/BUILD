@@ -14,13 +14,4 @@ go_library(
     name = "go_default_library",
     srcs = ["storage.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/errors:go_default_library",
-        "//pkg/api/rest:go_default_library",
-        "//pkg/apis/rbac:go_default_library",
-        "//pkg/apis/rbac/validation:go_default_library",
-        "//pkg/registry/rbac:go_default_library",
-        "//pkg/runtime:go_default_library",
-    ],
 )

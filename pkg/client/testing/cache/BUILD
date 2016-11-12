@@ -14,13 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["fake_controller_source.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/meta:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/watch:go_default_library",
-    ],
 )
 
 go_test(
@@ -28,8 +21,5 @@ go_test(
     srcs = ["fake_controller_source_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/watch:go_default_library",
-    ],
+    deps = [],
 )

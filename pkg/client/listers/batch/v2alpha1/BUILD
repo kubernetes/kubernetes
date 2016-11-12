@@ -18,11 +18,4 @@ go_library(
         "job.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/errors:go_default_library",
-        "//pkg/apis/batch:go_default_library",
-        "//pkg/apis/batch/v2alpha1:go_default_library",
-        "//pkg/client/cache:go_default_library",
-        "//pkg/labels:go_default_library",
-    ],
 )

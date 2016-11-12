@@ -19,20 +19,6 @@ go_library(
         "fake.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/errors:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/client/restclient:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/util/clock:go_default_library",
-        "//pkg/util/runtime:go_default_library",
-        "//pkg/util/sets:go_default_library",
-        "//pkg/util/strategicpatch:go_default_library",
-        "//pkg/watch:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/golang/groupcache/lru",
-    ],
 )
 
 go_test(
@@ -43,15 +29,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/errors:go_default_library",
-        "//pkg/api/install:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/client/restclient:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/util/clock:go_default_library",
-        "//pkg/util/diff:go_default_library",
-        "//pkg/util/strategicpatch:go_default_library",
-    ],
+    deps = [],
 )

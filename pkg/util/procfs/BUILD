@@ -19,10 +19,6 @@ go_library(
         "procfs_linux.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/util/errors:go_default_library",
-        "//vendor:github.com/golang/glog",
-    ],
 )
 
 go_test(
@@ -33,5 +29,5 @@ go_test(
         "automanaged",
         "skip",
     ],
-    deps = ["//vendor:github.com/stretchr/testify/assert"],
+    deps = [],
 )

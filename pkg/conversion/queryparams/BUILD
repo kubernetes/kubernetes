@@ -23,8 +23,5 @@ go_test(
     name = "go_default_xtest",
     srcs = ["convert_test.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/conversion/queryparams:go_default_library",
-    ],
+    deps = [],
 )

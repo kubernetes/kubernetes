@@ -19,17 +19,4 @@ go_library(
         "server_run_options.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/admission:go_default_library",
-        "//pkg/api:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/apimachinery/registered:go_default_library",
-        "//pkg/apiserver/authenticator:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/client/restclient:go_default_library",
-        "//pkg/storage/storagebackend:go_default_library",
-        "//pkg/util/config:go_default_library",
-        "//pkg/util/net:go_default_library",
-        "//vendor:github.com/spf13/pflag",
-    ],
 )

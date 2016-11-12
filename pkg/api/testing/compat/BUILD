@@ -14,11 +14,4 @@ go_library(
     name = "go_default_library",
     srcs = ["compatibility_tester.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/kubectl:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/util/validation/field:go_default_library",
-    ],
 )

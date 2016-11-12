@@ -23,11 +23,6 @@ go_library(
         "timed_queue.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/util/clock:go_default_library",
-        "//pkg/util/ratelimit:go_default_library",
-        "//pkg/util/runtime:go_default_library",
-    ],
 )
 
 go_test(
@@ -40,16 +35,12 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/v1:go_default_library",
-        "//pkg/util/clock:go_default_library",
-        "//pkg/util/wait:go_default_library",
-    ],
+    deps = [],
 )
 
 go_test(
     name = "go_default_xtest",
     srcs = ["queue_test.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/util/workqueue:go_default_library"],
+    deps = [],
 )

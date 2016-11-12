@@ -17,12 +17,6 @@ go_library(
         "intstr.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/genericapiserver/openapi/common:go_default_library",
-        "//vendor:github.com/go-openapi/spec",
-        "//vendor:github.com/gogo/protobuf/proto",
-        "//vendor:github.com/google/gofuzz",
-    ],
 )
 
 go_test(
@@ -30,5 +24,5 @@ go_test(
     srcs = ["intstr_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/ghodss/yaml"],
+    deps = [],
 )

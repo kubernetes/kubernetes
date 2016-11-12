@@ -17,9 +17,4 @@ go_library(
         "types.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/serializer:go_default_library",
-    ],
 )

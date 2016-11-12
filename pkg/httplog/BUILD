@@ -17,7 +17,6 @@ go_library(
         "log.go",
     ],
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/golang/glog"],
 )
 
 go_test(

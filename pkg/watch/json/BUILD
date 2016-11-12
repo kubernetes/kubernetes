@@ -17,8 +17,4 @@ go_library(
         "types.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/runtime:go_default_library",
-        "//pkg/watch:go_default_library",
-    ],
 )

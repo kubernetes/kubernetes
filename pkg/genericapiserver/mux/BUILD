@@ -18,11 +18,6 @@ go_library(
         "pathrecorder.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/apiserver:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//vendor:github.com/emicklei/go-restful",
-    ],
 )
 
 go_test(
@@ -30,5 +25,5 @@ go_test(
     srcs = ["container_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/stretchr/testify/assert"],
+    deps = [],
 )

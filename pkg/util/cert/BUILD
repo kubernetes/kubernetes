@@ -19,7 +19,6 @@ go_library(
         "pem.go",
     ],
     tags = ["automanaged"],
-    deps = ["//pkg/apis/certificates:go_default_library"],
 )
 
 go_test(

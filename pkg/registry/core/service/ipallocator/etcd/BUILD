@@ -21,17 +21,5 @@ go_test(
     srcs = ["etcd_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/registry/core/service/allocator:go_default_library",
-        "//pkg/registry/core/service/allocator/etcd:go_default_library",
-        "//pkg/registry/core/service/ipallocator:go_default_library",
-        "//pkg/registry/generic:go_default_library",
-        "//pkg/registry/registrytest:go_default_library",
-        "//pkg/storage:go_default_library",
-        "//pkg/storage/etcd/etcdtest:go_default_library",
-        "//pkg/storage/etcd/testing:go_default_library",
-        "//pkg/storage/storagebackend/factory:go_default_library",
-        "//vendor:golang.org/x/net/context",
-    ],
+    deps = [],
 )

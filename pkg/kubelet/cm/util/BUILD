@@ -14,8 +14,4 @@ go_library(
     name = "go_default_library",
     srcs = ["cgroups_linux.go"],
     tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/opencontainers/runc/libcontainer/cgroups",
-        "//vendor:github.com/opencontainers/runc/libcontainer/utils",
-    ],
 )

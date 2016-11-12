@@ -14,5 +14,4 @@ go_binary(
     name = "netexec",
     srcs = ["netexec.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/util/net:go_default_library"],
 )

@@ -19,10 +19,4 @@ go_library(
         "fake_tokenreview_expansion.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/apis/authentication/v1beta1:go_default_library",
-        "//pkg/client/clientset_generated/release_1_5/typed/authentication/v1beta1:go_default_library",
-        "//pkg/client/restclient:go_default_library",
-        "//pkg/client/testing/core:go_default_library",
-    ],
 )

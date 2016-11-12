@@ -14,16 +14,4 @@ go_binary(
     name = "serve_hostnames",
     srcs = ["serve_hostnames.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/errors:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/client/restclient:go_default_library",
-        "//pkg/client/unversioned/clientcmd:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/util/intstr:go_default_library",
-        "//test/e2e/framework:go_default_library",
-        "//vendor:github.com/golang/glog",
-    ],
 )

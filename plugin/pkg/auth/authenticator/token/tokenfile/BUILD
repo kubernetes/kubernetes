@@ -14,7 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["tokenfile.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/auth/user:go_default_library"],
 )
 
 go_test(
@@ -22,5 +21,5 @@ go_test(
     srcs = ["tokenfile_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/auth/user:go_default_library"],
+    deps = [],
 )

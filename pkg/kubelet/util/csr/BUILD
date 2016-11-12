@@ -14,14 +14,4 @@ go_library(
     name = "go_default_library",
     srcs = ["csr.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/apis/certificates:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset/typed/certificates/internalversion:go_default_library",
-        "//pkg/fields:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/util/cert:go_default_library",
-        "//pkg/watch:go_default_library",
-    ],
 )

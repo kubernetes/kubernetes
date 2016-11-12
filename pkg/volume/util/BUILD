@@ -22,15 +22,6 @@ go_library(
         "util.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/resource:go_default_library",
-        "//pkg/apis/storage:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/util/mount:go_default_library",
-        "//pkg/util/sets:go_default_library",
-        "//vendor:github.com/golang/glog",
-    ],
 )
 
 go_test(
@@ -41,8 +32,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/util/sets:go_default_library",
-        "//pkg/util/testing:go_default_library",
-    ],
+    deps = [],
 )

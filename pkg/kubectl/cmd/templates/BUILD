@@ -20,11 +20,4 @@ go_library(
         "templates.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/util/term:go_default_library",
-        "//vendor:github.com/MakeNowJust/heredoc",
-        "//vendor:github.com/russross/blackfriday",
-        "//vendor:github.com/spf13/cobra",
-        "//vendor:github.com/spf13/pflag",
-    ],
 )

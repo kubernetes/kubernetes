@@ -14,5 +14,4 @@ go_binary(
     name = "goproxy",
     srcs = ["goproxy.go"],
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/elazarl/goproxy"],
 )

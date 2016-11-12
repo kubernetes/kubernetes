@@ -14,7 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["planner.go"],
     tags = ["automanaged"],
-    deps = ["//federation/apis/federation:go_default_library"],
 )
 
 go_test(
@@ -22,8 +21,5 @@ go_test(
     srcs = ["planner_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//federation/apis/federation:go_default_library",
-        "//vendor:github.com/stretchr/testify/assert",
-    ],
+    deps = [],
 )

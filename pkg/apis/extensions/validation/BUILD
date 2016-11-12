@@ -14,21 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["validation.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/api/unversioned/validation:go_default_library",
-        "//pkg/api/validation:go_default_library",
-        "//pkg/apis/extensions:go_default_library",
-        "//pkg/labels:go_default_library",
-        "//pkg/security/apparmor:go_default_library",
-        "//pkg/security/podsecuritypolicy/seccomp:go_default_library",
-        "//pkg/security/podsecuritypolicy/util:go_default_library",
-        "//pkg/util/intstr:go_default_library",
-        "//pkg/util/sets:go_default_library",
-        "//pkg/util/validation:go_default_library",
-        "//pkg/util/validation/field:go_default_library",
-    ],
 )
 
 go_test(
@@ -36,14 +21,5 @@ go_test(
     srcs = ["validation_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/apis/extensions:go_default_library",
-        "//pkg/security/apparmor:go_default_library",
-        "//pkg/security/podsecuritypolicy/seccomp:go_default_library",
-        "//pkg/security/podsecuritypolicy/util:go_default_library",
-        "//pkg/util/intstr:go_default_library",
-        "//pkg/util/validation/field:go_default_library",
-    ],
+    deps = [],
 )

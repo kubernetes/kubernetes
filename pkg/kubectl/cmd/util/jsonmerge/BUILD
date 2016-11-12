@@ -14,10 +14,4 @@ go_library(
     name = "go_default_library",
     srcs = ["jsonmerge.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/util/strategicpatch:go_default_library",
-        "//pkg/util/yaml:go_default_library",
-        "//vendor:github.com/evanphx/json-patch",
-        "//vendor:github.com/golang/glog",
-    ],
 )

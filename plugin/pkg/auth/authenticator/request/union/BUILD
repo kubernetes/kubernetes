@@ -14,11 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["union.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/auth/authenticator:go_default_library",
-        "//pkg/auth/user:go_default_library",
-        "//pkg/util/errors:go_default_library",
-    ],
 )
 
 go_test(
@@ -26,5 +21,5 @@ go_test(
     srcs = ["unionauth_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/auth/user:go_default_library"],
+    deps = [],
 )

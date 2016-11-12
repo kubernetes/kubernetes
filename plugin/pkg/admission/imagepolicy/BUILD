@@ -18,19 +18,6 @@ go_library(
         "doc.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/admission:go_default_library",
-        "//pkg/api:go_default_library",
-        "//pkg/api/errors:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/apis/imagepolicy/v1alpha1:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/client/restclient:go_default_library",
-        "//pkg/util/cache:go_default_library",
-        "//pkg/util/yaml:go_default_library",
-        "//plugin/pkg/webhook:go_default_library",
-        "//vendor:github.com/golang/glog",
-    ],
 )
 
 go_test(
@@ -42,13 +29,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/admission:go_default_library",
-        "//pkg/api:go_default_library",
-        "//pkg/apis/imagepolicy/install:go_default_library",
-        "//pkg/apis/imagepolicy/v1alpha1:go_default_library",
-        "//pkg/auth/user:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
-        "//pkg/client/unversioned/clientcmd/api/v1:go_default_library",
-    ],
+    deps = [],
 )

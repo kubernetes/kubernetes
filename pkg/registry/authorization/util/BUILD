@@ -14,9 +14,4 @@ go_library(
     name = "go_default_library",
     srcs = ["helpers.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/apis/authorization:go_default_library",
-        "//pkg/auth/authorizer:go_default_library",
-        "//pkg/auth/user:go_default_library",
-    ],
 )

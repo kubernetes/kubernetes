@@ -18,14 +18,4 @@ go_library(
         "fake_testtype.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//cmd/libs/go2idl/client-gen/test_apis/testgroup:go_default_library",
-        "//cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion:go_default_library",
-        "//pkg/api:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/client/restclient:go_default_library",
-        "//pkg/client/testing/core:go_default_library",
-        "//pkg/labels:go_default_library",
-        "//pkg/watch:go_default_library",
-    ],
 )

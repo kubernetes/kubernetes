@@ -14,5 +14,4 @@ go_library(
     name = "go_default_library",
     srcs = ["helpers.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/api:go_default_library"],
 )

@@ -14,9 +14,4 @@ go_library(
     name = "go_default_library",
     srcs = ["install.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/apimachinery/announced:go_default_library",
-        "//pkg/apis/policy:go_default_library",
-        "//pkg/apis/policy/v1beta1:go_default_library",
-    ],
 )

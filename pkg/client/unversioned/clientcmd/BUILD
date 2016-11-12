@@ -23,22 +23,6 @@ go_library(
         "validation.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/client/restclient:go_default_library",
-        "//pkg/client/unversioned/auth:go_default_library",
-        "//pkg/client/unversioned/clientcmd/api:go_default_library",
-        "//pkg/client/unversioned/clientcmd/api/latest:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/util/errors:go_default_library",
-        "//pkg/util/homedir:go_default_library",
-        "//pkg/util/validation:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/howeyc/gopass",
-        "//vendor:github.com/imdario/mergo",
-        "//vendor:github.com/spf13/pflag",
-    ],
 )
 
 go_test(
@@ -51,13 +35,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/client/restclient:go_default_library",
-        "//pkg/client/unversioned/clientcmd/api:go_default_library",
-        "//pkg/client/unversioned/clientcmd/api/latest:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/util/errors:go_default_library",
-        "//vendor:github.com/ghodss/yaml",
-        "//vendor:github.com/imdario/mergo",
-    ],
+    deps = [],
 )

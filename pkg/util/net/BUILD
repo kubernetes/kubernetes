@@ -20,11 +20,6 @@ go_library(
         "util.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/util/sets:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:golang.org/x/net/http2",
-    ],
 )
 
 go_test(
@@ -38,8 +33,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/util/sets:go_default_library",
-        "//vendor:github.com/spf13/pflag",
-    ],
+    deps = [],
 )

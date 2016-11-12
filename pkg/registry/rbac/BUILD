@@ -14,8 +14,4 @@ go_library(
     name = "go_default_library",
     srcs = ["escalation_check.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/auth/user:go_default_library",
-    ],
 )

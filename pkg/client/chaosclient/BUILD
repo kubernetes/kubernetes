@@ -14,7 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["chaosclient.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/util/net:go_default_library"],
 )
 
 go_test(

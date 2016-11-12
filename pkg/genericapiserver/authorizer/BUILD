@@ -14,15 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["authz.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/auth/authorizer:go_default_library",
-        "//pkg/auth/authorizer/abac:go_default_library",
-        "//pkg/auth/authorizer/union:go_default_library",
-        "//pkg/controller/informers:go_default_library",
-        "//pkg/genericapiserver/options:go_default_library",
-        "//plugin/pkg/auth/authorizer/rbac:go_default_library",
-        "//plugin/pkg/auth/authorizer/webhook:go_default_library",
-    ],
 )
 
 go_test(
@@ -33,9 +24,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/auth/authorizer:go_default_library",
-        "//pkg/auth/user:go_default_library",
-        "//pkg/genericapiserver/options:go_default_library",
-    ],
+    deps = [],
 )

@@ -14,9 +14,4 @@ go_binary(
     name = "clicheck",
     srcs = ["check_cli_conventions.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/kubectl/cmd:go_default_library",
-        "//pkg/kubectl/cmd/util:go_default_library",
-        "//pkg/kubectl/cmd/util/sanity:go_default_library",
-    ],
 )

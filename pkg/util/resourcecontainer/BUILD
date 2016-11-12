@@ -14,8 +14,4 @@ go_library(
     name = "go_default_library",
     srcs = ["resource_container_linux.go"],
     tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/opencontainers/runc/libcontainer/cgroups/fs",
-        "//vendor:github.com/opencontainers/runc/libcontainer/configs",
-    ],
 )

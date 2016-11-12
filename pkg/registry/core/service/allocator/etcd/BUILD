@@ -14,19 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["etcd.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/errors:go_default_library",
-        "//pkg/api/errors/storage:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/registry/core/rangeallocation:go_default_library",
-        "//pkg/registry/core/service/allocator:go_default_library",
-        "//pkg/registry/generic:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/storage:go_default_library",
-        "//pkg/storage/storagebackend:go_default_library",
-        "//vendor:golang.org/x/net/context",
-    ],
 )
 
 go_test(
@@ -34,13 +21,5 @@ go_test(
     srcs = ["etcd_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/registry/core/service/allocator:go_default_library",
-        "//pkg/registry/registrytest:go_default_library",
-        "//pkg/storage/etcd/etcdtest:go_default_library",
-        "//pkg/storage/etcd/testing:go_default_library",
-        "//pkg/storage/storagebackend:go_default_library",
-        "//vendor:golang.org/x/net/context",
-    ],
+    deps = [],
 )

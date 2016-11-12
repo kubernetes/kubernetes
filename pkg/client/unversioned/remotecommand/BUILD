@@ -22,19 +22,6 @@ go_library(
         "v4.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/client/restclient:go_default_library",
-        "//pkg/client/transport:go_default_library",
-        "//pkg/kubelet/server/remotecommand:go_default_library",
-        "//pkg/util/exec:go_default_library",
-        "//pkg/util/httpstream:go_default_library",
-        "//pkg/util/httpstream/spdy:go_default_library",
-        "//pkg/util/runtime:go_default_library",
-        "//pkg/util/term:go_default_library",
-        "//vendor:github.com/golang/glog",
-    ],
 )
 
 go_test(
@@ -46,15 +33,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/testapi:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/client/restclient:go_default_library",
-        "//pkg/kubelet/server/remotecommand:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/util/httpstream:go_default_library",
-        "//pkg/util/term:go_default_library",
-        "//pkg/util/wait:go_default_library",
-    ],
+    deps = [],
 )

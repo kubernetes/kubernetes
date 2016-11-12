@@ -14,10 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["work_queue.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/types:go_default_library",
-        "//pkg/util/clock:go_default_library",
-    ],
 )
 
 go_test(
@@ -25,9 +21,5 @@ go_test(
     srcs = ["work_queue_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/types:go_default_library",
-        "//pkg/util/clock:go_default_library",
-        "//pkg/util/sets:go_default_library",
-    ],
+    deps = [],
 )

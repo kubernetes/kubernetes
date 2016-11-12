@@ -14,13 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["etcd.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/registry/core/event:go_default_library",
-        "//pkg/registry/generic:go_default_library",
-        "//pkg/registry/generic/registry:go_default_library",
-        "//pkg/runtime:go_default_library",
-    ],
 )
 
 go_test(
@@ -28,11 +21,5 @@ go_test(
     srcs = ["etcd_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/registry/generic:go_default_library",
-        "//pkg/registry/registrytest:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/storage/etcd/testing:go_default_library",
-    ],
+    deps = [],
 )

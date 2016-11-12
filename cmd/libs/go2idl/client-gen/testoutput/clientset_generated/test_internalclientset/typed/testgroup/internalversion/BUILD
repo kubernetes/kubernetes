@@ -19,11 +19,4 @@ go_library(
         "testtype.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//cmd/libs/go2idl/client-gen/test_apis/testgroup:go_default_library",
-        "//pkg/api:go_default_library",
-        "//pkg/apimachinery/registered:go_default_library",
-        "//pkg/client/restclient:go_default_library",
-        "//pkg/watch:go_default_library",
-    ],
 )

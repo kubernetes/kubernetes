@@ -22,11 +22,4 @@ go_library(
         "replicaset.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/apimachinery/registered:go_default_library",
-        "//pkg/apis/extensions:go_default_library",
-        "//pkg/client/restclient:go_default_library",
-        "//pkg/watch:go_default_library",
-    ],
 )

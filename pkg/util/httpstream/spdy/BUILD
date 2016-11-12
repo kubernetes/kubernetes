@@ -18,16 +18,6 @@ go_library(
         "upgrade.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/errors:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/util/httpstream:go_default_library",
-        "//pkg/util/runtime:go_default_library",
-        "//third_party/forked/golang/netutil:go_default_library",
-        "//vendor:github.com/docker/spdystream",
-        "//vendor:github.com/golang/glog",
-    ],
 )
 
 go_test(
@@ -39,8 +29,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/util/httpstream:go_default_library",
-        "//vendor:github.com/elazarl/goproxy",
-    ],
+    deps = [],
 )

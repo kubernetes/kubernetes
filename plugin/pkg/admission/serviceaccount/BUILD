@@ -17,20 +17,6 @@ go_library(
         "doc.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/admission:go_default_library",
-        "//pkg/api:go_default_library",
-        "//pkg/api/errors:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/client/cache:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/fields:go_default_library",
-        "//pkg/kubelet/types:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/serviceaccount:go_default_library",
-        "//pkg/util/sets:go_default_library",
-        "//pkg/watch:go_default_library",
-    ],
 )
 
 go_test(
@@ -38,12 +24,5 @@ go_test(
     srcs = ["admission_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/admission:go_default_library",
-        "//pkg/api:go_default_library",
-        "//pkg/api/errors:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
-        "//pkg/kubelet/types:go_default_library",
-        "//pkg/types:go_default_library",
-    ],
+    deps = [],
 )

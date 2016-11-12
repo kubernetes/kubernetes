@@ -20,11 +20,6 @@ go_library(
         "pod-level-interface.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/kubelet/api:go_default_library",
-        "//pkg/kubelet/api/v1alpha1/runtime:go_default_library",
-        "//pkg/kubelet/util/ioutils:go_default_library",
-    ],
 )
 
 go_test(
@@ -32,5 +27,5 @@ go_test(
     srcs = ["imagestore_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/kubelet/api/v1alpha1/runtime:go_default_library"],
+    deps = [],
 )

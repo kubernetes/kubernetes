@@ -18,14 +18,6 @@ go_library(
         "save_restore.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/util/dbus:go_default_library",
-        "//pkg/util/exec:go_default_library",
-        "//pkg/util/sets:go_default_library",
-        "//vendor:github.com/coreos/go-semver/semver",
-        "//vendor:github.com/godbus/dbus",
-        "//vendor:github.com/golang/glog",
-    ],
 )
 
 go_test(
@@ -33,9 +25,5 @@ go_test(
     srcs = ["iptables_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/util/dbus:go_default_library",
-        "//pkg/util/exec:go_default_library",
-        "//pkg/util/sets:go_default_library",
-    ],
+    deps = [],
 )

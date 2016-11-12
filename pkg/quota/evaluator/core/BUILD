@@ -24,21 +24,6 @@ go_library(
         "services.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/admission:go_default_library",
-        "//pkg/api:go_default_library",
-        "//pkg/api/resource:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/api/validation:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/controller/informers:go_default_library",
-        "//pkg/kubelet/qos:go_default_library",
-        "//pkg/quota:go_default_library",
-        "//pkg/quota/generic:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/util/sets:go_default_library",
-        "//pkg/util/validation/field:go_default_library",
-    ],
 )
 
 go_test(
@@ -50,11 +35,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/resource:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
-        "//pkg/quota:go_default_library",
-    ],
+    deps = [],
 )

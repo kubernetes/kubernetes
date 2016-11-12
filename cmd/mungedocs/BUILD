@@ -25,5 +25,4 @@ go_binary(
         "whitespace.go",
     ],
     tags = ["automanaged"],
-    deps = ["//vendor:github.com/spf13/pflag"],
 )

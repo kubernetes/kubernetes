@@ -14,5 +14,4 @@ go_library(
     name = "go_default_library",
     srcs = ["config.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/runtime:go_default_library"],
 )

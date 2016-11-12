@@ -14,5 +14,4 @@ go_binary(
     name = "kubefed",
     srcs = ["kubefed.go"],
     tags = ["automanaged"],
-    deps = ["//federation/cmd/kubefed/app:go_default_library"],
 )

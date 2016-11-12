@@ -19,19 +19,6 @@ go_library(
         "plugins.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/resource:go_default_library",
-        "//pkg/cloudprovider:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/util/net:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/mesos/mesos-go/detector",
-        "//vendor:github.com/mesos/mesos-go/detector/zoo",
-        "//vendor:github.com/mesos/mesos-go/mesosproto",
-        "//vendor:golang.org/x/net/context",
-        "//vendor:gopkg.in/gcfg.v1",
-    ],
 )
 
 go_test(
@@ -43,13 +30,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/cloudprovider:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/util/net:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/mesos/mesos-go/detector",
-        "//vendor:github.com/mesos/mesos-go/mesosutil",
-        "//vendor:golang.org/x/net/context",
-    ],
+    deps = [],
 )

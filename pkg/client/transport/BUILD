@@ -19,10 +19,6 @@ go_library(
         "transport.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/util/net:go_default_library",
-        "//vendor:github.com/golang/glog",
-    ],
 )
 
 go_test(

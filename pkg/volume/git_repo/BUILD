@@ -17,14 +17,6 @@ go_library(
         "git_repo.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/util/exec:go_default_library",
-        "//pkg/util/strings:go_default_library",
-        "//pkg/volume:go_default_library",
-        "//pkg/volume/util:go_default_library",
-    ],
 )
 
 go_test(
@@ -32,12 +24,5 @@ go_test(
     srcs = ["git_repo_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/util/exec:go_default_library",
-        "//pkg/volume:go_default_library",
-        "//pkg/volume/empty_dir:go_default_library",
-        "//pkg/volume/testing:go_default_library",
-    ],
+    deps = [],
 )

@@ -14,10 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["basicauth.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/auth/authenticator:go_default_library",
-        "//pkg/auth/user:go_default_library",
-    ],
 )
 
 go_test(
@@ -25,8 +21,5 @@ go_test(
     srcs = ["basicauth_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/auth/authenticator:go_default_library",
-        "//pkg/auth/user:go_default_library",
-    ],
+    deps = [],
 )

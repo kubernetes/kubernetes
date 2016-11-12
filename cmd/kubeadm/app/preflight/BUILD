@@ -14,12 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["checks.go"],
     tags = ["automanaged"],
-    deps = [
-        "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//pkg/api/validation:go_default_library",
-        "//pkg/util/initsystem:go_default_library",
-        "//pkg/util/node:go_default_library",
-    ],
 )
 
 go_test(

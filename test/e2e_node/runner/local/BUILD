@@ -14,8 +14,4 @@ go_binary(
     name = "local",
     srcs = ["run_local.go"],
     tags = ["automanaged"],
-    deps = [
-        "//test/e2e_node/builder:go_default_library",
-        "//vendor:github.com/golang/glog",
-    ],
 )

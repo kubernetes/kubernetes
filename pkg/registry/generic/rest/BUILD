@@ -19,18 +19,6 @@ go_library(
         "streamer.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/errors:go_default_library",
-        "//pkg/api/rest:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/util/config:go_default_library",
-        "//pkg/util/httpstream:go_default_library",
-        "//pkg/util/net:go_default_library",
-        "//pkg/util/proxy:go_default_library",
-        "//pkg/util/runtime:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/mxk/go-flowrate/flowrate",
-    ],
 )
 
 go_test(
@@ -42,15 +30,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/errors:go_default_library",
-        "//pkg/util/config:go_default_library",
-        "//pkg/util/httpstream:go_default_library",
-        "//pkg/util/net:go_default_library",
-        "//pkg/util/proxy:go_default_library",
-        "//vendor:github.com/stretchr/testify/assert",
-        "//vendor:github.com/stretchr/testify/require",
-        "//vendor:golang.org/x/net/websocket",
-    ],
+    deps = [],
 )

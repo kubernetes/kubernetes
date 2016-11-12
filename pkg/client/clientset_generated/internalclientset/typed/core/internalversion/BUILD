@@ -39,13 +39,4 @@ go_library(
         "serviceaccount.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/apimachinery/registered:go_default_library",
-        "//pkg/client/restclient:go_default_library",
-        "//pkg/fields:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/util/net:go_default_library",
-        "//pkg/watch:go_default_library",
-    ],
 )

@@ -23,29 +23,6 @@ go_library(
         "types.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/resource:go_default_library",
-        "//pkg/kubelet/cadvisor:go_default_library",
-        "//pkg/kubelet/cm/util:go_default_library",
-        "//pkg/kubelet/qos:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/util:go_default_library",
-        "//pkg/util/errors:go_default_library",
-        "//pkg/util/mount:go_default_library",
-        "//pkg/util/oom:go_default_library",
-        "//pkg/util/procfs:go_default_library",
-        "//pkg/util/runtime:go_default_library",
-        "//pkg/util/sets:go_default_library",
-        "//pkg/util/sysctl:go_default_library",
-        "//pkg/util/wait:go_default_library",
-        "//vendor:github.com/blang/semver",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/opencontainers/runc/libcontainer/cgroups",
-        "//vendor:github.com/opencontainers/runc/libcontainer/cgroups/fs",
-        "//vendor:github.com/opencontainers/runc/libcontainer/cgroups/systemd",
-        "//vendor:github.com/opencontainers/runc/libcontainer/configs",
-    ],
 )
 
 go_test(
@@ -57,11 +34,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/resource:go_default_library",
-        "//pkg/util/mount:go_default_library",
-        "//vendor:github.com/stretchr/testify/assert",
-        "//vendor:github.com/stretchr/testify/require",
-    ],
+    deps = [],
 )

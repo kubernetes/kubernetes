@@ -18,8 +18,4 @@ go_library(
         "utils.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/kubelet/api/v1alpha1/runtime:go_default_library",
-        "//pkg/kubelet/util/sliceutils:go_default_library",
-    ],
 )

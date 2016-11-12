@@ -14,8 +14,4 @@ go_binary(
     name = "linkcheck",
     srcs = ["links.go"],
     tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/mvdan/xurls",
-        "//vendor:github.com/spf13/pflag",
-    ],
 )

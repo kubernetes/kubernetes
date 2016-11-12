@@ -18,14 +18,6 @@ go_library(
         "whitelist.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/validation:go_default_library",
-        "//pkg/apis/extensions/validation:go_default_library",
-        "//pkg/kubelet/container:go_default_library",
-        "//pkg/kubelet/dockertools:go_default_library",
-        "//pkg/kubelet/lifecycle:go_default_library",
-    ],
 )
 
 go_test(
@@ -36,5 +28,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/api:go_default_library"],
+    deps = [],
 )

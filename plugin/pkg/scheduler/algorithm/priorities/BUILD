@@ -27,20 +27,6 @@ go_library(
         "test_util.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/resource:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/labels:go_default_library",
-        "//pkg/util/node:go_default_library",
-        "//pkg/util/workqueue:go_default_library",
-        "//plugin/pkg/scheduler/algorithm:go_default_library",
-        "//plugin/pkg/scheduler/algorithm/predicates:go_default_library",
-        "//plugin/pkg/scheduler/algorithm/priorities/util:go_default_library",
-        "//plugin/pkg/scheduler/api:go_default_library",
-        "//plugin/pkg/scheduler/schedulercache:go_default_library",
-        "//vendor:github.com/golang/glog",
-    ],
 )
 
 go_test(
@@ -63,17 +49,5 @@ go_test(
         "automanaged",
         "skip",
     ],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/resource:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/apis/extensions:go_default_library",
-        "//pkg/util/codeinspector:go_default_library",
-        "//plugin/pkg/scheduler/algorithm:go_default_library",
-        "//plugin/pkg/scheduler/algorithm/priorities/util:go_default_library",
-        "//plugin/pkg/scheduler/api:go_default_library",
-        "//plugin/pkg/scheduler/schedulercache:go_default_library",
-        "//vendor:k8s.io/gengo/parser",
-        "//vendor:k8s.io/gengo/types",
-    ],
+    deps = [],
 )

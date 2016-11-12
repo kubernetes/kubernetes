@@ -19,21 +19,6 @@ go_library(
         "unstructured.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/errors:go_default_library",
-        "//pkg/api/meta:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/api/v1:go_default_library",
-        "//pkg/client/restclient:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/runtime/serializer:go_default_library",
-        "//pkg/util/sets:go_default_library",
-        "//pkg/version:go_default_library",
-        "//plugin/pkg/client/auth:go_default_library",
-        "//vendor:github.com/emicklei/go-restful/swagger",
-        "//vendor:github.com/golang/glog",
-    ],
 )
 
 go_test(
@@ -44,31 +29,12 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/errors:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/api/v1:go_default_library",
-        "//pkg/apimachinery/registered:go_default_library",
-        "//pkg/client/restclient:go_default_library",
-        "//pkg/client/restclient/fake:go_default_library",
-        "//pkg/version:go_default_library",
-        "//vendor:github.com/emicklei/go-restful/swagger",
-        "//vendor:github.com/stretchr/testify/assert",
-    ],
+    deps = [],
 )
 
 go_test(
     name = "go_default_xtest",
     srcs = ["helper_blackbox_test.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/testapi:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/apimachinery/registered:go_default_library",
-        "//pkg/client/restclient:go_default_library",
-        "//pkg/client/restclient/fake:go_default_library",
-        "//pkg/client/typed/discovery:go_default_library",
-        "//pkg/runtime:go_default_library",
-    ],
+    deps = [],
 )

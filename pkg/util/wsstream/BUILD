@@ -18,11 +18,6 @@ go_library(
         "stream.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/util/runtime:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:golang.org/x/net/websocket",
-    ],
 )
 
 go_test(
@@ -33,5 +28,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = ["//vendor:golang.org/x/net/websocket"],
+    deps = [],
 )

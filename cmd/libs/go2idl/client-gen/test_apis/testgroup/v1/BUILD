@@ -19,13 +19,4 @@ go_library(
         "types.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/api/v1:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/watch/versioned:go_default_library",
-        "//vendor:github.com/ugorji/go/codec",
-    ],
 )

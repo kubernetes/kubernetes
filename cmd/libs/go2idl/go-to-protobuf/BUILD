@@ -14,8 +14,4 @@ go_binary(
     name = "go-to-protobuf",
     srcs = ["main.go"],
     tags = ["automanaged"],
-    deps = [
-        "//cmd/libs/go2idl/go-to-protobuf/protobuf:go_default_library",
-        "//vendor:github.com/spf13/pflag",
-    ],
 )

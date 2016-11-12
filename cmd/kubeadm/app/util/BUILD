@@ -18,14 +18,6 @@ go_library(
         "tokens.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//cmd/kubeadm/app/preflight:go_default_library",
-        "//pkg/client/unversioned/clientcmd:go_default_library",
-        "//pkg/client/unversioned/clientcmd/api:go_default_library",
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/renstrom/dedent",
-    ],
 )
 
 go_test(
@@ -37,9 +29,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//cmd/kubeadm/app/preflight:go_default_library",
-        "//pkg/client/unversioned/clientcmd/api:go_default_library",
-    ],
+    deps = [],
 )

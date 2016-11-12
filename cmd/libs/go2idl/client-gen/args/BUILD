@@ -14,5 +14,4 @@ go_library(
     name = "go_default_library",
     srcs = ["args.go"],
     tags = ["automanaged"],
-    deps = ["//cmd/libs/go2idl/client-gen/types:go_default_library"],
 )

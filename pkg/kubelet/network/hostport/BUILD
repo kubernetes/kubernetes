@@ -17,15 +17,6 @@ go_library(
         "hostport.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/kubelet/container:go_default_library",
-        "//pkg/proxy/iptables:go_default_library",
-        "//pkg/util/dbus:go_default_library",
-        "//pkg/util/exec:go_default_library",
-        "//pkg/util/iptables:go_default_library",
-        "//vendor:github.com/golang/glog",
-    ],
 )
 
 go_test(
@@ -33,9 +24,5 @@ go_test(
     srcs = ["hostport_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/kubelet/container:go_default_library",
-        "//pkg/util/iptables:go_default_library",
-    ],
+    deps = [],
 )

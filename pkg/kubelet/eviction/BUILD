@@ -19,22 +19,6 @@ go_library(
         "types.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/resource:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/client/record:go_default_library",
-        "//pkg/kubelet/api/v1alpha1/stats:go_default_library",
-        "//pkg/kubelet/lifecycle:go_default_library",
-        "//pkg/kubelet/qos:go_default_library",
-        "//pkg/kubelet/server/stats:go_default_library",
-        "//pkg/kubelet/util/format:go_default_library",
-        "//pkg/quota/evaluator/core:go_default_library",
-        "//pkg/util/clock:go_default_library",
-        "//pkg/util/sets:go_default_library",
-        "//pkg/util/wait:go_default_library",
-        "//vendor:github.com/golang/glog",
-    ],
 )
 
 go_test(
@@ -45,15 +29,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/resource:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/client/record:go_default_library",
-        "//pkg/kubelet/api/v1alpha1/stats:go_default_library",
-        "//pkg/kubelet/lifecycle:go_default_library",
-        "//pkg/quota:go_default_library",
-        "//pkg/types:go_default_library",
-        "//pkg/util/clock:go_default_library",
-    ],
+    deps = [],
 )

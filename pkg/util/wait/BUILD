@@ -17,7 +17,6 @@ go_library(
         "wait.go",
     ],
     tags = ["automanaged"],
-    deps = ["//pkg/util/runtime:go_default_library"],
 )
 
 go_test(
@@ -25,5 +24,5 @@ go_test(
     srcs = ["wait_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/util/runtime:go_default_library"],
+    deps = [],
 )

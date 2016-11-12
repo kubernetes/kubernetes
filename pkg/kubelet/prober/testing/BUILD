@@ -14,8 +14,4 @@ go_library(
     name = "go_default_library",
     srcs = ["fake_manager.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/types:go_default_library",
-    ],
 )

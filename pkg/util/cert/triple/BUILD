@@ -14,5 +14,4 @@ go_library(
     name = "go_default_library",
     srcs = ["triple.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/util/cert:go_default_library"],
 )

@@ -14,10 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["allow.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/auth/authenticator:go_default_library",
-        "//pkg/auth/user:go_default_library",
-    ],
 )
 
 go_test(

@@ -17,16 +17,4 @@ go_library(
         "doc.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset:go_default_library",
-        "//cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion:go_default_library",
-        "//cmd/libs/go2idl/client-gen/testoutput/clientset_generated/test_internalclientset/typed/testgroup/internalversion/fake:go_default_library",
-        "//pkg/api:go_default_library",
-        "//pkg/apimachinery/registered:go_default_library",
-        "//pkg/client/testing/core:go_default_library",
-        "//pkg/client/typed/discovery:go_default_library",
-        "//pkg/client/typed/discovery/fake:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/watch:go_default_library",
-    ],
 )

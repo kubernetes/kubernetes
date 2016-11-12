@@ -18,10 +18,4 @@ go_library(
         "poddisruptionbudget.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/errors:go_default_library",
-        "//pkg/apis/policy:go_default_library",
-        "//pkg/client/cache:go_default_library",
-        "//pkg/labels:go_default_library",
-    ],
 )

@@ -14,7 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["sorted_event_list.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/api:go_default_library"],
 )
 
 go_test(
@@ -22,8 +21,5 @@ go_test(
     srcs = ["sorted_event_list_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-    ],
+    deps = [],
 )

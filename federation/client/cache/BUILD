@@ -14,9 +14,4 @@ go_library(
     name = "go_default_library",
     srcs = ["cluster_cache.go"],
     tags = ["automanaged"],
-    deps = [
-        "//federation/apis/federation/v1beta1:go_default_library",
-        "//pkg/client/cache:go_default_library",
-        "//vendor:github.com/golang/glog",
-    ],
 )

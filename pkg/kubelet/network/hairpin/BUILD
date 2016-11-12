@@ -14,10 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["hairpin.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/util/exec:go_default_library",
-        "//vendor:github.com/golang/glog",
-    ],
 )
 
 go_test(
@@ -25,5 +21,5 @@ go_test(
     srcs = ["hairpin_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/util/exec:go_default_library"],
+    deps = [],
 )

@@ -18,8 +18,4 @@ go_library(
         "ui.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/genericapiserver/mux:go_default_library",
-        "//vendor:github.com/emicklei/go-restful",
-    ],
 )

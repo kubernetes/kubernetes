@@ -14,8 +14,4 @@ go_library(
     name = "go_default_library",
     srcs = ["util.go"],
     tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/golang/glog",
-        "//vendor:github.com/skynetservices/skydns/msg",
-    ],
 )

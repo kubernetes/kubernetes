@@ -14,5 +14,4 @@ go_binary(
     name = "consume-cpu",
     srcs = ["consume_cpu.go"],
     tags = ["automanaged"],
-    deps = ["//vendor:bitbucket.org/bertimus9/systemstat"],
 )

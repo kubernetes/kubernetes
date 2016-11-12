@@ -14,13 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["admission.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/admission:go_default_library",
-        "//pkg/api:go_default_library",
-        "//pkg/api/errors:go_default_library",
-        "//pkg/api/rest:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
-    ],
 )
 
 go_test(
@@ -28,12 +21,5 @@ go_test(
     srcs = ["admission_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/admission:go_default_library",
-        "//pkg/api:go_default_library",
-        "//pkg/api/rest:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",
-        "//pkg/client/testing/core:go_default_library",
-        "//pkg/runtime:go_default_library",
-    ],
+    deps = [],
 )

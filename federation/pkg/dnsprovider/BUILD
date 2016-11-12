@@ -18,10 +18,6 @@ go_library(
         "plugins.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//federation/pkg/dnsprovider/rrstype:go_default_library",
-        "//vendor:github.com/golang/glog",
-    ],
 )
 
 go_test(
@@ -29,5 +25,5 @@ go_test(
     srcs = ["dns_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = ["//federation/pkg/dnsprovider/rrstype:go_default_library"],
+    deps = [],
 )

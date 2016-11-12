@@ -14,10 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["decoder.go"],
     tags = ["automanaged"],
-    deps = [
-        "//vendor:github.com/ghodss/yaml",
-        "//vendor:github.com/golang/glog",
-    ],
 )
 
 go_test(

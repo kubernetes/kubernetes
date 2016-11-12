@@ -17,11 +17,6 @@ go_library(
         "throttle.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/util/clock:go_default_library",
-        "//pkg/util/integer:go_default_library",
-        "//pkg/util/ratelimit:go_default_library",
-    ],
 )
 
 go_test(
@@ -32,5 +27,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = ["//pkg/util/clock:go_default_library"],
+    deps = [],
 )

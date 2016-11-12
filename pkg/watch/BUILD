@@ -21,14 +21,6 @@ go_library(
         "watch.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/util/net:go_default_library",
-        "//pkg/util/runtime:go_default_library",
-        "//pkg/util/wait:go_default_library",
-        "//vendor:github.com/golang/glog",
-    ],
 )
 
 go_test(
@@ -42,10 +34,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/unversioned:go_default_library",
-        "//pkg/runtime:go_default_library",
-        "//pkg/util/wait:go_default_library",
-    ],
+    deps = [],
 )

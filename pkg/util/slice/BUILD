@@ -14,7 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["slice.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/util/rand:go_default_library"],
 )
 
 go_test(

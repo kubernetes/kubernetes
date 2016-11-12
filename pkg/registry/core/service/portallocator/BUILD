@@ -17,12 +17,6 @@ go_library(
         "operation.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/registry/core/service/allocator:go_default_library",
-        "//pkg/util/net:go_default_library",
-        "//vendor:github.com/golang/glog",
-    ],
 )
 
 go_test(
@@ -30,9 +24,5 @@ go_test(
     srcs = ["allocator_test.go"],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/util/net:go_default_library",
-        "//pkg/util/sets:go_default_library",
-    ],
+    deps = [],
 )

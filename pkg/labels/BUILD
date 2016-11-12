@@ -18,12 +18,6 @@ go_library(
         "selector.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/selection:go_default_library",
-        "//pkg/util/sets:go_default_library",
-        "//pkg/util/validation:go_default_library",
-        "//vendor:github.com/golang/glog",
-    ],
 )
 
 go_test(
@@ -34,8 +28,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/selection:go_default_library",
-        "//pkg/util/sets:go_default_library",
-    ],
+    deps = [],
 )

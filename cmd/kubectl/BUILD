@@ -14,5 +14,4 @@ go_binary(
     name = "kubectl",
     srcs = ["kubectl.go"],
     tags = ["automanaged"],
-    deps = ["//cmd/kubectl/app:go_default_library"],
 )

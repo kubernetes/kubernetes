@@ -17,11 +17,6 @@ go_library(
         "validate.go",
     ],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/util:go_default_library",
-        "//pkg/util/config:go_default_library",
-    ],
 )
 
 go_test(
@@ -32,8 +27,5 @@ go_test(
     ],
     library = "go_default_library",
     tags = ["automanaged"],
-    deps = [
-        "//pkg/api:go_default_library",
-        "//vendor:github.com/stretchr/testify/assert",
-    ],
+    deps = [],
 )

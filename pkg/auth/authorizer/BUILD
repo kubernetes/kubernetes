@@ -14,5 +14,4 @@ go_library(
     name = "go_default_library",
     srcs = ["interfaces.go"],
     tags = ["automanaged"],
-    deps = ["//pkg/auth/user:go_default_library"],
 )

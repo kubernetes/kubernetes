@@ -14,5 +14,4 @@ go_binary(
     name = "kube-discovery",
     srcs = ["kubediscovery.go"],
     tags = ["automanaged"],
-    deps = ["//cmd/kube-discovery/app:go_default_library"],
 )

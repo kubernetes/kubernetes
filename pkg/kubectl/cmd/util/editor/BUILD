@@ -14,10 +14,6 @@ go_library(
     name = "go_default_library",
     srcs = ["editor.go"],
     tags = ["automanaged"],
-    deps = [
-        "//pkg/util/term:go_default_library",
-        "//vendor:github.com/golang/glog",
-    ],
 )
 
 go_test(
