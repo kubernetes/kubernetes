@@ -140,6 +140,10 @@ func (r *BindingREST) Create(ctx genericapirequest.Context, obj runtime.Object) 
 	return
 }
 
+func (r *BindingREST) CreateInitialized(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
+	return r.Create(ctx, obj)
+}
+
 // setPodHostAndAnnotations sets the given pod's host to 'machine' if and only if it was
 // previously 'oldMachine' and merges the provided annotations with those of the pod.
 // Returns the current state of the pod, or an error.

@@ -448,6 +448,14 @@ func (u *Unstructured) GroupVersionKind() schema.GroupVersionKind {
 	return gvk
 }
 
+func (u *Unstructured) GetInitializers() *metav1.Initializers {
+	panic("not implemented")
+}
+
+func (u *Unstructured) SetInitializers(initializers *metav1.Initializers) {
+	panic("not implemented")
+}
+
 func (u *Unstructured) GetFinalizers() []string {
 	return getNestedSlice(u.Object, "metadata", "finalizers")
 }

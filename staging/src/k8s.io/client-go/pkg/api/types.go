@@ -166,6 +166,12 @@ type ObjectMeta struct {
 	// +optional
 	OwnerReferences []metav1.OwnerReference
 
+	// Information regarding the initialization of this object. May be set by privileged users on
+	// creation, otherwise is defaulted by the server. This object will not be visible to normal
+	// list, get, or watch calls until initialization completes and this field is set to null.
+	// Only privileged users may modify this field, and only until the object completes initialization.
+	Initializers *metav1.Initializers
+
 	// Must be empty before the object is deleted from the registry. Each entry
 	// is an identifier for the responsible component that will remove the entry
 	// from the list. If the deletionTimestamp of the object is non-nil, entries
@@ -3118,6 +3124,10 @@ type ListOptions struct {
 	LabelSelector labels.Selector
 	// A selector based on fields
 	FieldSelector fields.Selector
+
+	// If true, partially initialized resources are included in the response.
+	IncludeUninitialized bool
+
 	// If true, watch for changes to this list
 	Watch bool
 	// When specified with a watch call, shows changes that occur after that particular version of a resource.

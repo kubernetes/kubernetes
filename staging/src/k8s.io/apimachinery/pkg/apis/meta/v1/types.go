@@ -213,6 +213,12 @@ type ObjectMeta struct {
 	// +patchStrategy=merge
 	OwnerReferences []OwnerReference `json:"ownerReferences,omitempty" patchStrategy:"merge" patchMergeKey:"uid" protobuf:"bytes,13,rep,name=ownerReferences"`
 
+	// Information regarding the initialization of this object. May be set by privileged users on
+	// creation, otherwise is defaulted by the server. This object will not be visible to normal
+	// list, get, or watch calls until initialization completes and this field is set to null.
+	// Only privileged users may modify this field, and only until the object completes initialization.
+	Initializers *Initializers `json:"initializers,omitempty"`
+
 	// Must be empty before the object is deleted from the registry. Each entry
 	// is an identifier for the responsible component that will remove the entry
 	// from the list. If the deletionTimestamp of the object is non-nil, entries
@@ -226,6 +232,24 @@ type ObjectMeta struct {
 	// This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request.
 	// +optional
 	ClusterName string `json:"clusterName,omitempty" protobuf:"bytes,15,opt,name=clusterName"`
+}
+
+// Initializers tracks the progress of initialization.
+type Initializers struct {
+	// Pending is a list of initializers that must execute in order before this object is visible.
+	// When the last pending initializer is removed, and no failing result is set, the initializers
+	// struct will be set to nil and the object is considered as initialized and visible to all
+	// clients.
+	Pending []Initializer `json:"pending"`
+	// If result is set with the Failure field, the object will be persisted to storage and then deleted,
+	// ensuring that other clients can observe the deletion.
+	Result *Status `json:"result,omitempty"`
+}
+
+// Initializer is information about an initializer that has not yet completed.
+type Initializer struct {
+	// name of the process that is responsible for initializing this object.
+	Name string `json:"name"`
 }
 
 const (
@@ -281,6 +305,9 @@ type ListOptions struct {
 	// Defaults to everything.
 	// +optional
 	FieldSelector string `json:"fieldSelector,omitempty" protobuf:"bytes,2,opt,name=fieldSelector"`
+	// If true, partially initialized resources are included in the response.
+	// +optional
+	IncludeUninitialized bool `json:"includeUninitialized,omitempty"`
 	// Watch for changes to the described resources and return them as a stream of
 	// add, update, and remove notifications. Specify resourceVersion.
 	// +optional

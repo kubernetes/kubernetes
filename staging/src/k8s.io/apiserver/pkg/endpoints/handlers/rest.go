@@ -405,13 +405,15 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			}
 		}
 
+		// TODO: replace with content type negotiation?
+		bypassInitialization := req.URL.Query().Get("includeUninitialized") == "1"
+
 		trace.Step("About to store object in database")
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
-			out, err := r.Create(ctx, name, obj)
-			if status, ok := out.(*metav1.Status); ok && err == nil && status.Code == 0 {
-				status.Code = http.StatusCreated
+			if bypassInitialization {
+				return r.Create(ctx, name, obj)
 			}
-			return out, err
+			return r.CreateInitialized(ctx, name, obj)
 		})
 		if err != nil {
 			scope.err(err, w, req)
@@ -425,7 +427,19 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		}
 		trace.Step("Self-link added")
 
-		responsewriters.WriteObject(http.StatusCreated, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
+		// If the object is partially initialized, always indicate it via StatusAccepted
+		code := http.StatusCreated
+		if accessor, err := meta.Accessor(result); err == nil {
+			if accessor.GetInitializers() != nil {
+				code = http.StatusAccepted
+			}
+		}
+		status, ok := result.(*metav1.Status)
+		if ok && err == nil && status.Code == 0 {
+			status.Code = int32(code)
+		}
+
+		responsewriters.WriteObject(code, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
 	}
 }
 
@@ -445,6 +459,10 @@ type namedCreaterAdapter struct {
 
 func (c *namedCreaterAdapter) Create(ctx request.Context, name string, obj runtime.Object) (runtime.Object, error) {
 	return c.Creater.Create(ctx, obj)
+}
+
+func (c *namedCreaterAdapter) CreateInitialized(ctx request.Context, name string, obj runtime.Object) (runtime.Object, error) {
+	return c.Creater.CreateInitialized(ctx, obj)
 }
 
 // PatchResource returns a function that will handle a resource patch

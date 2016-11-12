@@ -184,7 +184,35 @@ func ValidateObjectMetaAccessor(meta metav1.Object, requiresNamespace bool, name
 	allErrs = append(allErrs, v1validation.ValidateLabels(meta.GetLabels(), fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(meta.GetAnnotations(), fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidateOwnerReferences(meta.GetOwnerReferences(), fldPath.Child("ownerReferences"))...)
+	allErrs = append(allErrs, ValidateInitializers(meta.GetInitializers(), fldPath.Child("initializers"))...)
 	allErrs = append(allErrs, ValidateFinalizers(meta.GetFinalizers(), fldPath.Child("finalizers"))...)
+	return allErrs
+}
+
+func ValidateInitializers(initializers *metav1.Initializers, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if initializers == nil {
+		return allErrs
+	}
+	for i, initializer := range initializers.Pending {
+		for _, msg := range validation.IsQualifiedName(initializer.Name) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("pending").Index(i), initializer.Name, msg))
+		}
+	}
+	allErrs = append(allErrs, validateInitializersResult(initializers.Result, fldPath.Child("result"))...)
+	return allErrs
+}
+
+func validateInitializersResult(result *metav1.Status, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if result == nil {
+		return allErrs
+	}
+	switch result.Status {
+	case metav1.StatusSuccess, metav1.StatusFailure:
+	default:
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("status"), result.Status, "must be 'Success' or 'Failure'"))
+	}
 	return allErrs
 }
 
@@ -259,6 +287,28 @@ func ValidateObjectMetaAccessorUpdate(newMeta, oldMeta metav1.Object, fldPath *f
 	}
 	if newMeta.GetDeletionTimestamp() != nil && (oldMeta.GetDeletionTimestamp() == nil || !newMeta.GetDeletionTimestamp().Equal(*oldMeta.GetDeletionTimestamp())) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("deletionTimestamp"), newMeta.GetDeletionTimestamp(), "field is immutable; may only be changed via deletion"))
+	}
+
+	oldInit := oldMeta.GetInitializers()
+	newInit := newMeta.GetInitializers()
+	switch {
+	case oldInit == nil && newInit != nil:
+		// Initializers may not be set on new objects
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("initializers"), nil, "field is immutable once all initialization has completed"))
+	case oldInit != nil && newInit == nil:
+		// this is a valid transition and means initialization was successful
+	case oldInit != nil && newInit != nil:
+		// validate changes to initializers
+		switch {
+		case oldInit.Result == nil && newInit.Result != nil:
+			// setting a result is allowed
+			allErrs = append(allErrs, validateInitializersResult(newInit.Result, fldPath.Child("initializers", "result"))...)
+		case oldInit.Result != nil:
+			// changing a result is not allowed
+			allErrs = append(allErrs, ValidateImmutableField(newInit.Result, oldInit.Result, fldPath.Child("initializers", "result"))...)
+		default:
+			// leaving the result nil is allowed
+		}
 	}
 
 	// Finalizers cannot be added if the object is already being deleted.

@@ -45,6 +45,8 @@ func GetGeneratedDeepCopyFuncs() []conversion.GeneratedDeepCopyFunc {
 		{Fn: DeepCopy_v1_GroupVersionForDiscovery, InType: reflect.TypeOf(&GroupVersionForDiscovery{})},
 		{Fn: DeepCopy_v1_GroupVersionKind, InType: reflect.TypeOf(&GroupVersionKind{})},
 		{Fn: DeepCopy_v1_GroupVersionResource, InType: reflect.TypeOf(&GroupVersionResource{})},
+		{Fn: DeepCopy_v1_Initializer, InType: reflect.TypeOf(&Initializer{})},
+		{Fn: DeepCopy_v1_Initializers, InType: reflect.TypeOf(&Initializers{})},
 		{Fn: DeepCopy_v1_InternalEvent, InType: reflect.TypeOf(&InternalEvent{})},
 		{Fn: DeepCopy_v1_LabelSelector, InType: reflect.TypeOf(&LabelSelector{})},
 		{Fn: DeepCopy_v1_LabelSelectorRequirement, InType: reflect.TypeOf(&LabelSelectorRequirement{})},
@@ -276,6 +278,37 @@ func DeepCopy_v1_GroupVersionResource(in interface{}, out interface{}, c *conver
 	}
 }
 
+func DeepCopy_v1_Initializer(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*Initializer)
+		out := out.(*Initializer)
+		*out = *in
+		return nil
+	}
+}
+
+func DeepCopy_v1_Initializers(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*Initializers)
+		out := out.(*Initializers)
+		*out = *in
+		if in.Pending != nil {
+			in, out := &in.Pending, &out.Pending
+			*out = make([]Initializer, len(*in))
+			copy(*out, *in)
+		}
+		if in.Result != nil {
+			in, out := &in.Result, &out.Result
+			if newVal, err := c.DeepCopy(*in); err != nil {
+				return err
+			} else {
+				*out = newVal.(*Status)
+			}
+		}
+		return nil
+	}
+}
+
 func DeepCopy_v1_InternalEvent(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*InternalEvent)
@@ -396,6 +429,14 @@ func DeepCopy_v1_ObjectMeta(in interface{}, out interface{}, c *conversion.Clone
 				} else {
 					(*out)[i] = *newVal.(*OwnerReference)
 				}
+			}
+		}
+		if in.Initializers != nil {
+			in, out := &in.Initializers, &out.Initializers
+			if newVal, err := c.DeepCopy(*in); err != nil {
+				return err
+			} else {
+				*out = newVal.(*Initializers)
 			}
 		}
 		if in.Finalizers != nil {

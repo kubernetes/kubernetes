@@ -1792,6 +1792,14 @@ func DeepCopy_api_ObjectMeta(in interface{}, out interface{}, c *conversion.Clon
 				}
 			}
 		}
+		if in.Initializers != nil {
+			in, out := &in.Initializers, &out.Initializers
+			if newVal, err := c.DeepCopy(*in); err != nil {
+				return err
+			} else {
+				*out = newVal.(*v1.Initializers)
+			}
+		}
 		if in.Finalizers != nil {
 			in, out := &in.Finalizers, &out.Finalizers
 			*out = make([]string, len(*in))

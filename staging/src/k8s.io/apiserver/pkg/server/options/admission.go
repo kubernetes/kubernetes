@@ -34,7 +34,7 @@ type AdmissionOptions struct {
 func NewAdmissionOptions(plugins *admission.Plugins) *AdmissionOptions {
 	return &AdmissionOptions{
 		Plugins: plugins,
-		Control: "AlwaysAdmit",
+		Control: "AlwaysAdmit,Initializers",
 	}
 }
 

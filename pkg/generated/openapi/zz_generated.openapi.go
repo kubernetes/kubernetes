@@ -615,6 +615,55 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 			},
 			Dependencies: []string{},
 		},
+		"k8s.io/apimachinery/pkg/apis/meta/v1.Initializer": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "Initializer is information about an initializer that has not yet completed.",
+					Properties: map[string]spec.Schema{
+						"name": {
+							SchemaProps: spec.SchemaProps{
+								Description: "name of the process that is responsible for initializing this object.",
+								Type:        []string{"string"},
+								Format:      "",
+							},
+						},
+					},
+					Required: []string{"name"},
+				},
+			},
+			Dependencies: []string{},
+		},
+		"k8s.io/apimachinery/pkg/apis/meta/v1.Initializers": {
+			Schema: spec.Schema{
+				SchemaProps: spec.SchemaProps{
+					Description: "Initializers tracks the progress of initialization.",
+					Properties: map[string]spec.Schema{
+						"pending": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Pending is a list of initializers that must execute in order before this object is visible. When the last pending initializer is removed, and no failing result is set, the initializers struct will be set to nil and the object is considered as initialized and visible to all clients.",
+								Type:        []string{"array"},
+								Items: &spec.SchemaOrArray{
+									Schema: &spec.Schema{
+										SchemaProps: spec.SchemaProps{
+											Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.Initializer"),
+										},
+									},
+								},
+							},
+						},
+						"result": {
+							SchemaProps: spec.SchemaProps{
+								Description: "If result is set with the Failure field, the object will be persisted to storage and then deleted, ensuring that other clients can observe the deletion.",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Status"),
+							},
+						},
+					},
+					Required: []string{"pending"},
+				},
+			},
+			Dependencies: []string{
+				"k8s.io/apimachinery/pkg/apis/meta/v1.Initializer", "k8s.io/apimachinery/pkg/apis/meta/v1.Status"},
+		},
 		"k8s.io/apimachinery/pkg/apis/meta/v1.InternalEvent": {
 			Schema: spec.Schema{
 				SchemaProps: spec.SchemaProps{
@@ -779,6 +828,13 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								Format:      "",
 							},
 						},
+						"includeUninitialized": {
+							SchemaProps: spec.SchemaProps{
+								Description: "If true, partially initialized resources are included in the response.",
+								Type:        []string{"boolean"},
+								Format:      "",
+							},
+						},
 						"watch": {
 							SchemaProps: spec.SchemaProps{
 								Description: "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
@@ -925,6 +981,12 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 								},
 							},
 						},
+						"initializers": {
+							SchemaProps: spec.SchemaProps{
+								Description: "Information regarding the initialization of this object. May be set by privileged users on creation, otherwise is defaulted by the server. This object will not be visible to normal list, get, or watch calls until initialization completes and this field is set to null. Only privileged users may modify this field, and only until the object completes initialization.",
+								Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Initializers"),
+							},
+						},
 						"finalizers": {
 							VendorExtensible: spec.VendorExtensible{
 								Extensions: spec.Extensions{
@@ -955,7 +1017,7 @@ func GetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi.Ope
 				},
 			},
 			Dependencies: []string{
-				"k8s.io/apimachinery/pkg/apis/meta/v1.OwnerReference", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+				"k8s.io/apimachinery/pkg/apis/meta/v1.Initializers", "k8s.io/apimachinery/pkg/apis/meta/v1.OwnerReference", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
 		},
 		"k8s.io/apimachinery/pkg/apis/meta/v1.OwnerReference": {
 			Schema: spec.Schema{

@@ -201,6 +201,12 @@ type ObjectMeta struct {
 	// +patchStrategy=merge
 	OwnerReferences []metav1.OwnerReference `json:"ownerReferences,omitempty" patchStrategy:"merge" patchMergeKey:"uid" protobuf:"bytes,13,rep,name=ownerReferences"`
 
+	// Information regarding the initialization of this object. May be set by privileged users on
+	// creation, otherwise is defaulted by the server. This object will not be visible to normal
+	// list, get, or watch calls until initialization completes and this field is set to null.
+	// Only privileged users may modify this field, and only until the object completes initialization.
+	Initializers *metav1.Initializers `json:"initializers,omitempty" patchStrategy:"merge" protobuf:"bytes,16,rep,name=initializers"`
+
 	// Must be empty before the object is deleted from the registry. Each entry
 	// is an identifier for the responsible component that will remove the entry
 	// from the list. If the deletionTimestamp of the object is non-nil, entries
@@ -3580,6 +3586,9 @@ type ListOptions struct {
 	// Defaults to everything.
 	// +optional
 	FieldSelector string `json:"fieldSelector,omitempty" protobuf:"bytes,2,opt,name=fieldSelector"`
+	// If true, partially initialized resources are included in the response.
+	// +optional
+	IncludeUninitialized bool `json:"includeUninitialized,omitempty"`
 	// Watch for changes to the described resources and return them as a stream of
 	// add, update, and remove notifications. Specify resourceVersion.
 	// +optional

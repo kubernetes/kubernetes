@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -28,16 +29,24 @@ type AttrFunc func(obj runtime.Object) (labels.Set, fields.Set, error)
 
 // SelectionPredicate is used to represent the way to select objects from api storage.
 type SelectionPredicate struct {
-	Label       labels.Selector
-	Field       fields.Selector
-	GetAttrs    AttrFunc
-	IndexFields []string
+	Label                labels.Selector
+	Field                fields.Selector
+	IncludeUninitialized bool
+	GetAttrs             AttrFunc
+	IndexFields          []string
 }
 
 // Matches returns true if the given object's labels and fields (as
 // returned by s.GetAttrs) match s.Label and s.Field. An error is
 // returned if s.GetAttrs fails.
 func (s *SelectionPredicate) Matches(obj runtime.Object) (bool, error) {
+	if !s.IncludeUninitialized {
+		if accessor, err := meta.Accessor(obj); err == nil {
+			if accessor.GetInitializers() != nil {
+				return false, nil
+			}
+		}
+	}
 	if s.Label.Empty() && s.Field.Empty() {
 		return true, nil
 	}
