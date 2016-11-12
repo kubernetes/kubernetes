@@ -191,11 +191,9 @@ func stopDeploymentMaybeOverlap(c clientset.Interface, ns, deploymentName, overl
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
 		_, err = c.Extensions().Deployments(ns).Get(deployment.Name)
 		if err != nil {
-			return true, nil
+			return true, err
 		}
-
-		return false, fmt.Errorf("Found Deployment %v", deployment.Name)
-
+		return false, nil
 	})
 	if err == wait.ErrWaitTimeout {
 		err = fmt.Errorf("Deployment %v not deleted", deployment.Name)
