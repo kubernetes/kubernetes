@@ -495,20 +495,25 @@ func (s *SecureServingInfo) NewSelfClientConfig(token string) (*restclient.Confi
 		BearerToken: token,
 	}
 
-	cert := s.Cert
-	if cert != nil {
-		x509Cert, err := x509.ParseCertificate(cert.Certificate[0])
+	if s.Cert != nil {
+		x509Cert, err := x509.ParseCertificate(s.Cert.Certificate[0])
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse server certificate: %v", err)
 		}
 
 		if (net.ParseIP(host) != nil && certMatchesIP(x509Cert, host)) || certMatchesName(x509Cert, host) {
-			clientConfig.CAData = cert.Certificate[0]
+			if len(s.Cert.Certificate) < 2 {
+				return nil, fmt.Errorf("missing certificate authority in certificate chain for %q", host)
+			}
+			clientConfig.CAData = s.Cert.Certificate[1]
 		}
 	}
 	if clientConfig.CAData == nil && net.ParseIP(host) == nil {
 		if cert, found := s.SNICerts[host]; found {
-			clientConfig.CAData = cert.Certificate[0]
+			if len(cert.Certificate) < 2 {
+				return nil, fmt.Errorf("missing certificate authority in certificate chain for %q", host)
+			}
+			clientConfig.CAData = cert.Certificate[1]
 		}
 	}
 	if clientConfig.CAData == nil {
