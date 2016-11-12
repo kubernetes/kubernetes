@@ -233,6 +233,7 @@ func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientse
 	SetMasterTaintTolerations(&kubeProxyDaemonSet.Spec.Template.ObjectMeta)
 	SetNodeAffinity(&kubeProxyDaemonSet.Spec.Template.ObjectMeta, NativeArchitectureNodeAffinity())
 
+	// TODO: use a versioned API in place of internal_api once the NamespaceSystem constant is available
 	if _, err := client.Extensions().DaemonSets(internal_api.NamespaceSystem).Create(kubeProxyDaemonSet); err != nil {
 		return fmt.Errorf("<master/addons> failed creating essential kube-proxy addon [%v]", err)
 	}
@@ -243,6 +244,7 @@ func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientse
 	SetMasterTaintTolerations(&kubeDNSDeployment.Spec.Template.ObjectMeta)
 	SetNodeAffinity(&kubeDNSDeployment.Spec.Template.ObjectMeta, NativeArchitectureNodeAffinity())
 
+	// TODO: use a versioned API in place of internal_api once the NamespaceSystem constant is available
 	if _, err := client.Extensions().Deployments(internal_api.NamespaceSystem).Create(kubeDNSDeployment); err != nil {
 		return fmt.Errorf("<master/addons> failed creating essential kube-dns addon [%v]", err)
 	}
@@ -253,6 +255,7 @@ func CreateEssentialAddons(cfg *kubeadmapi.MasterConfiguration, client *clientse
 	}
 
 	kubeDNSService := NewService("kube-dns", *kubeDNSServiceSpec)
+	// TODO: use a versioned API in place of internal_api once the NamespaceSystem constant is available
 	if _, err := client.Services(internal_api.NamespaceSystem).Create(kubeDNSService); err != nil {
 		return fmt.Errorf("<master/addons> failed creating essential kube-dns addon [%v]", err)
 	}

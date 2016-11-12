@@ -121,9 +121,11 @@ func newKubeDiscovery(cfg *kubeadmapi.MasterConfiguration, caCert *x509.Certific
 func CreateDiscoveryDeploymentAndSecret(cfg *kubeadmapi.MasterConfiguration, client *clientset.Clientset, caCert *x509.Certificate) error {
 	kd := newKubeDiscovery(cfg, caCert)
 
+	// TODO: use a versioned API in place of internal_api once the NamespaceSystem constant is available
 	if _, err := client.Extensions().Deployments(internal_api.NamespaceSystem).Create(kd.Deployment); err != nil {
 		return fmt.Errorf("<master/discovery> failed to create %q deployment [%v]", kubeDiscoveryName, err)
 	}
+	// TODO: use a versioned API in place of internal_api once the NamespaceSystem constant is available
 	if _, err := client.Secrets(internal_api.NamespaceSystem).Create(kd.Secret); err != nil {
 		return fmt.Errorf("<master/discovery> failed to create %q secret [%v]", kubeDiscoverySecretName, err)
 	}
@@ -132,6 +134,7 @@ func CreateDiscoveryDeploymentAndSecret(cfg *kubeadmapi.MasterConfiguration, cli
 
 	start := time.Now()
 	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
+		// TODO: use a versioned API in place of internal_api once the NamespaceSystem constant is available
 		d, err := client.Extensions().Deployments(internal_api.NamespaceSystem).Get(kubeDiscoveryName)
 		if err != nil {
 			return false, nil

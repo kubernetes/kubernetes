@@ -90,6 +90,7 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 			return false, nil
 		}
 		n := &nodeList.Items[0]
+		// TODO: use api.IsNodeReady() once it is available in a versioned API
 		if !isNodeReady(n) {
 			fmt.Println("<master/apiclient> first node has registered, but is not ready yet")
 			return false, nil
@@ -104,6 +105,7 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 	return client, nil
 }
 
+// TODO: remove this once api.IsNodeReady is available in a versioned API
 func isNodeReady(node *api.Node) bool {
 	for _, c := range node.Status.Conditions {
 		if c.Type == api.NodeReady {
@@ -179,11 +181,13 @@ func attemptToUpdateMasterRoleLabelsAndTaints(client *clientset.Clientset, sched
 	if err != nil {
 		return err
 	}
-
+	// TODO: use a versioned api in place of unversionedapi once NodeLabelKubeadmAlphaRole and NodeLabelRoleMaster
+	// are available
 	n.ObjectMeta.Labels[unversionedapi.NodeLabelKubeadmAlphaRole] = unversionedapi.NodeLabelRoleMaster
 
 	if !schedulable {
 		taintsAnnotation, _ := json.Marshal([]api.Taint{{Key: "dedicated", Value: "master", Effect: "NoSchedule"}})
+		// TODO: use a versioned API in place of internal_api once the TaintsAnnotationKey constant is available
 		n.ObjectMeta.Annotations[internal_api.TaintsAnnotationKey] = string(taintsAnnotation)
 	}
 
@@ -214,6 +218,7 @@ func SetMasterTaintTolerations(meta *api.ObjectMeta) {
 	if meta.Annotations == nil {
 		meta.Annotations = map[string]string{}
 	}
+	// TODO: use a versioned API in place of internal_api once the TolerationsAnnotationKey constant is available
 	meta.Annotations[internal_api.TolerationsAnnotationKey] = string(tolerationsAnnotation)
 }
 
@@ -228,12 +233,14 @@ func SetNodeAffinity(meta *api.ObjectMeta, expr ...api.NodeSelectorRequirement) 
 	if meta.Annotations == nil {
 		meta.Annotations = map[string]string{}
 	}
+	// TODO: use a versioned API in place of internal_api once the AffinityAnnotationKey constant is available
 	meta.Annotations[internal_api.AffinityAnnotationKey] = string(affinityAnnotation)
 }
 
 // MasterNodeAffinity returns api.NodeSelectorRequirement to be used with SetNodeAffinity to set affinity to master node
 func MasterNodeAffinity() api.NodeSelectorRequirement {
 	return api.NodeSelectorRequirement{
+		// TODO: use a versioned API instead of unversionedapi when the NodeLabel constants are available
 		Key:      unversionedapi.NodeLabelKubeadmAlphaRole,
 		Operator: api.NodeSelectorOpIn,
 		Values:   []string{unversionedapi.NodeLabelRoleMaster},
@@ -260,6 +267,7 @@ func createDummyDeployment(client *clientset.Clientset) {
 
 	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
 		// TODO: we should check the error, as some cases may be fatal
+		// TODO: use a versioned API in place of internal_api once the NamespaceSystem constant is available
 		if _, err := client.Extensions().Deployments(internal_api.NamespaceSystem).Create(dummyDeployment); err != nil {
 			fmt.Printf("<master/apiclient> failed to create test deployment [%v] (will retry)", err)
 			return false, nil
@@ -268,6 +276,7 @@ func createDummyDeployment(client *clientset.Clientset) {
 	})
 
 	wait.PollInfinite(apiCallRetryInterval, func() (bool, error) {
+		// TODO: use a versioned API in place of internal_api once the NamespaceSystem constant is available
 		d, err := client.Extensions().Deployments(internal_api.NamespaceSystem).Get("dummy")
 		if err != nil {
 			fmt.Printf("<master/apiclient> failed to get test deployment [%v] (will retry)", err)
@@ -281,6 +290,7 @@ func createDummyDeployment(client *clientset.Clientset) {
 
 	fmt.Println("<master/apiclient> test deployment succeeded")
 
+	// TODO: use a versioned API in place of internal_api once the NamespaceSystem constant is available
 	if err := client.Extensions().Deployments(internal_api.NamespaceSystem).Delete("dummy", &api.DeleteOptions{}); err != nil {
 		fmt.Printf("<master/apiclient> failed to delete test deployment [%v] (will ignore)", err)
 	}
