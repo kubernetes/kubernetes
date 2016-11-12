@@ -41,7 +41,7 @@ type AdmissionOptions struct {
 func NewAdmissionOptions() *AdmissionOptions {
 	options := &AdmissionOptions{
 		Plugins:     &admission.Plugins{},
-		PluginNames: []string{},
+		PluginNames: []string{"Initializers"},
 	}
 	server.RegisterAllAdmissionPlugins(options.Plugins)
 	return options

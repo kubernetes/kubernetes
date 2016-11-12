@@ -192,6 +192,11 @@ func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object) (runti
 	return out, err
 }
 
+// TODO: fix services to support initialization by using generic.Store
+func (rs *REST) CreateInitialized(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
+	return rs.Create(ctx, obj)
+}
+
 func (rs *REST) Delete(ctx genericapirequest.Context, id string) (runtime.Object, error) {
 	service, err := rs.registry.GetService(ctx, id, &metav1.GetOptions{})
 	if err != nil {

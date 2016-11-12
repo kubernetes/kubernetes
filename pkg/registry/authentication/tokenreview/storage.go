@@ -76,3 +76,7 @@ func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object) (runtim
 
 	return tokenReview, nil
 }
+
+func (r *REST) CreateInitialized(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
+	return r.Create(ctx, obj)
+}

@@ -61,12 +61,12 @@ func init() {
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	pod, ok := obj.(*example.Pod)
 	if !ok {
-		return nil, nil, fmt.Errorf("not a pod")
+		return nil, nil, false, fmt.Errorf("not a pod")
 	}
-	return labels.Set(pod.ObjectMeta.Labels), PodToSelectableFields(pod), nil
+	return labels.Set(pod.ObjectMeta.Labels), PodToSelectableFields(pod), pod.Initializers != nil, nil
 }
 
 // PodToSelectableFields returns a field set that represents the object
@@ -469,12 +469,12 @@ func TestFiltering(t *testing.T) {
 	pred := storage.SelectionPredicate{
 		Label: labels.SelectorFromSet(labels.Set{"filter": "foo"}),
 		Field: fields.Everything(),
-		GetAttrs: func(obj runtime.Object) (label labels.Set, field fields.Set, err error) {
+		GetAttrs: func(obj runtime.Object) (label labels.Set, field fields.Set, uninitialized bool, err error) {
 			metadata, err := meta.Accessor(obj)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			return labels.Set(metadata.GetLabels()), nil, nil
+			return labels.Set(metadata.GetLabels()), nil, metadata.GetInitializers() != nil, nil
 		},
 	}
 	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", fooCreated.ResourceVersion, pred)
