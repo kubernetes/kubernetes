@@ -17,8 +17,10 @@ limitations under the License.
 package genericapiserver
 
 import (
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -495,6 +497,8 @@ func (s *SecureServingInfo) NewSelfClientConfig(token string) (*restclient.Confi
 		BearerToken: token,
 	}
 
+	// find certificate for host: either the server cert or one of the SNI certs
+	var derCA []byte
 	if s.Cert != nil {
 		x509Cert, err := x509.ParseCertificate(s.Cert.Certificate[0])
 		if err != nil {
@@ -505,20 +509,25 @@ func (s *SecureServingInfo) NewSelfClientConfig(token string) (*restclient.Confi
 			if len(s.Cert.Certificate) < 2 {
 				return nil, fmt.Errorf("missing certificate authority in certificate chain for %q", host)
 			}
-			clientConfig.CAData = s.Cert.Certificate[1]
+			derCA = s.Cert.Certificate[1]
 		}
 	}
-	if clientConfig.CAData == nil && net.ParseIP(host) == nil {
+	if derCA == nil && net.ParseIP(host) == nil {
 		if cert, found := s.SNICerts[host]; found {
 			if len(cert.Certificate) < 2 {
 				return nil, fmt.Errorf("missing certificate authority in certificate chain for %q", host)
 			}
-			clientConfig.CAData = cert.Certificate[1]
+			derCA = cert.Certificate[1]
 		}
 	}
-	if clientConfig.CAData == nil {
+	if derCA == nil {
 		return nil, fmt.Errorf("failed to find certificate which matches %q", host)
 	}
+	pemCA := bytes.Buffer{}
+	if err := pem.Encode(&pemCA, &pem.Block{Type: "CERTIFICATE", Bytes: derCA}); err != nil {
+		return nil, err
+	}
+	clientConfig.CAData = pemCA.Bytes()
 
 	return clientConfig, nil
 }
