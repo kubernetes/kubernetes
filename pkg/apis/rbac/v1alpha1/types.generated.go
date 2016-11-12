@@ -4138,7 +4138,7 @@ func (x codecSelfer1234) decSliceRoleBinding(v *[]RoleBinding, d *codec1978.Deco
 
 			yyrg362 := len(yyv362) > 0
 			yyv2362 := yyv362
-			yyrl362, yyrt362 = z.DecInferLen(yyl362, z.DecBasicHandle().MaxInitLen, 328)
+			yyrl362, yyrt362 = z.DecInferLen(yyl362, z.DecBasicHandle().MaxInitLen, 352)
 			if yyrt362 {
 				if yyrl362 <= cap(yyv362) {
 					yyv362 = yyv362[:yyrl362]
@@ -4254,7 +4254,7 @@ func (x codecSelfer1234) decSliceRole(v *[]Role, d *codec1978.Decoder) {
 
 			yyrg368 := len(yyv368) > 0
 			yyv2368 := yyv368
-			yyrl368, yyrt368 = z.DecInferLen(yyl368, z.DecBasicHandle().MaxInitLen, 280)
+			yyrl368, yyrt368 = z.DecInferLen(yyl368, z.DecBasicHandle().MaxInitLen, 304)
 			if yyrt368 {
 				if yyrl368 <= cap(yyv368) {
 					yyv368 = yyv368[:yyrl368]
@@ -4370,7 +4370,7 @@ func (x codecSelfer1234) decSliceClusterRoleBinding(v *[]ClusterRoleBinding, d *
 
 			yyrg374 := len(yyv374) > 0
 			yyv2374 := yyv374
-			yyrl374, yyrt374 = z.DecInferLen(yyl374, z.DecBasicHandle().MaxInitLen, 328)
+			yyrl374, yyrt374 = z.DecInferLen(yyl374, z.DecBasicHandle().MaxInitLen, 352)
 			if yyrt374 {
 				if yyrl374 <= cap(yyv374) {
 					yyv374 = yyv374[:yyrl374]
@@ -4486,7 +4486,7 @@ func (x codecSelfer1234) decSliceClusterRole(v *[]ClusterRole, d *codec1978.Deco
 
 			yyrg380 := len(yyv380) > 0
 			yyv2380 := yyv380
-			yyrl380, yyrt380 = z.DecInferLen(yyl380, z.DecBasicHandle().MaxInitLen, 280)
+			yyrl380, yyrt380 = z.DecInferLen(yyl380, z.DecBasicHandle().MaxInitLen, 304)
 			if yyrt380 {
 				if yyrl380 <= cap(yyv380) {
 					yyv380 = yyv380[:yyrl380]

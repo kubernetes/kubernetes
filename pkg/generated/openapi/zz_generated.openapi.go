@@ -10103,6 +10103,20 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							},
 						},
 					},
+					"initializers": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Must be empty before the object is visible to regular clients. Initialization allows system clients to perform initial setup actions for new resources.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
 					"finalizers": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Must be empty before the object is deleted from the registry. Each entry is an identifier for the responsible component that will remove the entry from the list. If the deletionTimestamp of the object is non-nil, entries in this list can only be removed.",
@@ -10125,6 +10139,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 						},
 					},
 				},
+				Required: []string{"initializers"},
 			},
 		},
 		Dependencies: []string{

@@ -819,7 +819,7 @@ func (x codecSelfer1234) decSliceStorageClass(v *[]StorageClass, d *codec1978.De
 
 			yyrg68 := len(yyv68) > 0
 			yyv268 := yyv68
-			yyrl68, yyrt68 = z.DecInferLen(yyl68, z.DecBasicHandle().MaxInitLen, 280)
+			yyrl68, yyrt68 = z.DecInferLen(yyl68, z.DecBasicHandle().MaxInitLen, 304)
 			if yyrt68 {
 				if yyrl68 <= cap(yyv68) {
 					yyv68 = yyv68[:yyrl68]

@@ -2348,6 +2348,7 @@ func autoConvert_v1_ObjectMeta_To_api_ObjectMeta(in *ObjectMeta, out *api.Object
 	out.Labels = *(*map[string]string)(unsafe.Pointer(&in.Labels))
 	out.Annotations = *(*map[string]string)(unsafe.Pointer(&in.Annotations))
 	out.OwnerReferences = *(*[]api.OwnerReference)(unsafe.Pointer(&in.OwnerReferences))
+	out.Initializers = *(*[]string)(unsafe.Pointer(&in.Initializers))
 	out.Finalizers = *(*[]string)(unsafe.Pointer(&in.Finalizers))
 	out.ClusterName = in.ClusterName
 	return nil
@@ -2371,6 +2372,7 @@ func autoConvert_api_ObjectMeta_To_v1_ObjectMeta(in *api.ObjectMeta, out *Object
 	out.Labels = *(*map[string]string)(unsafe.Pointer(&in.Labels))
 	out.Annotations = *(*map[string]string)(unsafe.Pointer(&in.Annotations))
 	out.OwnerReferences = *(*[]OwnerReference)(unsafe.Pointer(&in.OwnerReferences))
+	out.Initializers = *(*[]string)(unsafe.Pointer(&in.Initializers))
 	out.Finalizers = *(*[]string)(unsafe.Pointer(&in.Finalizers))
 	out.ClusterName = in.ClusterName
 	return nil

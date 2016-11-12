@@ -21684,7 +21684,7 @@ func (x codecSelfer1234) decSliceHorizontalPodAutoscaler(v *[]HorizontalPodAutos
 
 			yyrg1830 := len(yyv1830) > 0
 			yyv21830 := yyv1830
-			yyrl1830, yyrt1830 = z.DecInferLen(yyl1830, z.DecBasicHandle().MaxInitLen, 376)
+			yyrl1830, yyrt1830 = z.DecInferLen(yyl1830, z.DecBasicHandle().MaxInitLen, 400)
 			if yyrt1830 {
 				if yyrl1830 <= cap(yyv1830) {
 					yyv1830 = yyv1830[:yyrl1830]
@@ -21916,7 +21916,7 @@ func (x codecSelfer1234) decSliceThirdPartyResource(v *[]ThirdPartyResource, d *
 
 			yyrg1842 := len(yyv1842) > 0
 			yyv21842 := yyv1842
-			yyrl1842, yyrt1842 = z.DecInferLen(yyl1842, z.DecBasicHandle().MaxInitLen, 296)
+			yyrl1842, yyrt1842 = z.DecInferLen(yyl1842, z.DecBasicHandle().MaxInitLen, 320)
 			if yyrt1842 {
 				if yyrl1842 <= cap(yyv1842) {
 					yyv1842 = yyv1842[:yyrl1842]
@@ -22148,7 +22148,7 @@ func (x codecSelfer1234) decSliceDeployment(v *[]Deployment, d *codec1978.Decode
 
 			yyrg1854 := len(yyv1854) > 0
 			yyv21854 := yyv1854
-			yyrl1854, yyrt1854 = z.DecInferLen(yyl1854, z.DecBasicHandle().MaxInitLen, 856)
+			yyrl1854, yyrt1854 = z.DecInferLen(yyl1854, z.DecBasicHandle().MaxInitLen, 904)
 			if yyrt1854 {
 				if yyrl1854 <= cap(yyv1854) {
 					yyv1854 = yyv1854[:yyrl1854]
@@ -22264,7 +22264,7 @@ func (x codecSelfer1234) decSliceDaemonSet(v *[]DaemonSet, d *codec1978.Decoder)
 
 			yyrg1860 := len(yyv1860) > 0
 			yyv21860 := yyv1860
-			yyrl1860, yyrt1860 = z.DecInferLen(yyl1860, z.DecBasicHandle().MaxInitLen, 752)
+			yyrl1860, yyrt1860 = z.DecInferLen(yyl1860, z.DecBasicHandle().MaxInitLen, 800)
 			if yyrt1860 {
 				if yyrl1860 <= cap(yyv1860) {
 					yyv1860 = yyv1860[:yyrl1860]
@@ -22380,7 +22380,7 @@ func (x codecSelfer1234) decSliceThirdPartyResourceData(v *[]ThirdPartyResourceD
 
 			yyrg1866 := len(yyv1866) > 0
 			yyv21866 := yyv1866
-			yyrl1866, yyrt1866 = z.DecInferLen(yyl1866, z.DecBasicHandle().MaxInitLen, 280)
+			yyrl1866, yyrt1866 = z.DecInferLen(yyl1866, z.DecBasicHandle().MaxInitLen, 304)
 			if yyrt1866 {
 				if yyrl1866 <= cap(yyv1866) {
 					yyv1866 = yyv1866[:yyrl1866]
@@ -22496,7 +22496,7 @@ func (x codecSelfer1234) decSliceJob(v *[]Job, d *codec1978.Decoder) {
 
 			yyrg1872 := len(yyv1872) > 0
 			yyv21872 := yyv1872
-			yyrl1872, yyrt1872 = z.DecInferLen(yyl1872, z.DecBasicHandle().MaxInitLen, 824)
+			yyrl1872, yyrt1872 = z.DecInferLen(yyl1872, z.DecBasicHandle().MaxInitLen, 872)
 			if yyrt1872 {
 				if yyrl1872 <= cap(yyv1872) {
 					yyv1872 = yyv1872[:yyrl1872]
@@ -22728,7 +22728,7 @@ func (x codecSelfer1234) decSliceIngress(v *[]Ingress, d *codec1978.Decoder) {
 
 			yyrg1884 := len(yyv1884) > 0
 			yyv21884 := yyv1884
-			yyrl1884, yyrt1884 = z.DecInferLen(yyl1884, z.DecBasicHandle().MaxInitLen, 336)
+			yyrl1884, yyrt1884 = z.DecInferLen(yyl1884, z.DecBasicHandle().MaxInitLen, 360)
 			if yyrt1884 {
 				if yyrl1884 <= cap(yyv1884) {
 					yyv1884 = yyv1884[:yyrl1884]
@@ -23192,7 +23192,7 @@ func (x codecSelfer1234) decSliceReplicaSet(v *[]ReplicaSet, d *codec1978.Decode
 
 			yyrg1908 := len(yyv1908) > 0
 			yyv21908 := yyv1908
-			yyrl1908, yyrt1908 = z.DecInferLen(yyl1908, z.DecBasicHandle().MaxInitLen, 800)
+			yyrl1908, yyrt1908 = z.DecInferLen(yyl1908, z.DecBasicHandle().MaxInitLen, 848)
 			if yyrt1908 {
 				if yyrl1908 <= cap(yyv1908) {
 					yyv1908 = yyv1908[:yyrl1908]
@@ -23876,7 +23876,7 @@ func (x codecSelfer1234) decSlicePodSecurityPolicy(v *[]PodSecurityPolicy, d *co
 
 			yyrg1943 := len(yyv1943) > 0
 			yyv21943 := yyv1943
-			yyrl1943, yyrt1943 = z.DecInferLen(yyl1943, z.DecBasicHandle().MaxInitLen, 552)
+			yyrl1943, yyrt1943 = z.DecInferLen(yyl1943, z.DecBasicHandle().MaxInitLen, 576)
 			if yyrt1943 {
 				if yyrl1943 <= cap(yyv1943) {
 					yyv1943 = yyv1943[:yyrl1943]
@@ -24340,7 +24340,7 @@ func (x codecSelfer1234) decSliceNetworkPolicy(v *[]NetworkPolicy, d *codec1978.
 
 			yyrg1967 := len(yyv1967) > 0
 			yyv21967 := yyv1967
-			yyrl1967, yyrt1967 = z.DecInferLen(yyl1967, z.DecBasicHandle().MaxInitLen, 312)
+			yyrl1967, yyrt1967 = z.DecInferLen(yyl1967, z.DecBasicHandle().MaxInitLen, 336)
 			if yyrt1967 {
 				if yyrl1967 <= cap(yyv1967) {
 					yyv1967 = yyv1967[:yyrl1967]

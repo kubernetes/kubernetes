@@ -1976,6 +1976,13 @@ func DeepCopy_api_ObjectMeta(in interface{}, out interface{}, c *conversion.Clon
 		} else {
 			out.OwnerReferences = nil
 		}
+		if in.Initializers != nil {
+			in, out := &in.Initializers, &out.Initializers
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		} else {
+			out.Initializers = nil
+		}
 		if in.Finalizers != nil {
 			in, out := &in.Finalizers, &out.Finalizers
 			*out = make([]string, len(*in))

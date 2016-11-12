@@ -1905,7 +1905,7 @@ func (x codecSelfer1234) decSlicePodDisruptionBudget(v *[]PodDisruptionBudget, d
 
 			yyrg161 := len(yyv161) > 0
 			yyv2161 := yyv161
-			yyrl161, yyrt161 = z.DecInferLen(yyl161, z.DecBasicHandle().MaxInitLen, 328)
+			yyrl161, yyrt161 = z.DecInferLen(yyl161, z.DecBasicHandle().MaxInitLen, 352)
 			if yyrt161 {
 				if yyrl161 <= cap(yyv161) {
 					yyv161 = yyv161[:yyrl161]
