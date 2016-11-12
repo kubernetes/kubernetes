@@ -93,7 +93,7 @@ func TestE2eNode(t *testing.T) {
 				glog.Exitf("chroot %q failed: %v", rootfs, err)
 			}
 		}
-		if err := system.Validate(); err != nil {
+		if err := system.ValidateDefault(); err != nil {
 			glog.Exitf("system validation failed: %v", err)
 		}
 		return

@@ -18,20 +18,22 @@ package system
 
 import (
 	"fmt"
+	"io"
+	"os"
 )
 
-// resultType is type of the validation result. Different validation results
+// ValidationResultType is type of the validation result. Different validation results
 // corresponds to different colors.
-type resultType int
+type ValidationResultType int32
 
 const (
-	good resultType = iota
+	good ValidationResultType = iota
 	bad
 	warn
 )
 
 // color is the color of the message.
-type color int
+type color int32
 
 const (
 	red    color = 31
@@ -40,15 +42,19 @@ const (
 	white        = 37
 )
 
-func wrap(s string, c color) string {
+func colorize(s string, c color) string {
 	return fmt.Sprintf("\033[0;%dm%s\033[0m", c, s)
 }
 
-// report reports "item: r". item is white, and the color of r depends on the
-// result type.
-func report(item, r string, t resultType) {
+// The default reporter for the system verification test
+type StreamReporter struct {
+	// The stream that this reporter is writing to
+	WriteStream io.Writer
+}
+
+func (dr *StreamReporter) Report(key, value string, resultType ValidationResultType) error {
 	var c color
-	switch t {
+	switch resultType {
 	case good:
 		c = green
 	case bad:
@@ -58,5 +64,15 @@ func report(item, r string, t resultType) {
 	default:
 		c = white
 	}
-	fmt.Printf("%s: %s\n", wrap(item, white), wrap(r, c))
+	if dr.WriteStream == nil {
+		return fmt.Errorf("WriteStream has to be defined for this reporter")
+	}
+
+	fmt.Fprintf(dr.WriteStream, "%s: %s\n", colorize(key, white), colorize(value, c))
+	return nil
+}
+
+// DefaultReporter is the default Reporter
+var DefaultReporter = &StreamReporter{
+	WriteStream: os.Stdout,
 }
