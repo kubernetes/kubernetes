@@ -82,6 +82,14 @@ func (r *Resource) ResourceList() v1.ResourceList {
 	return result
 }
 
+func (r *Resource) AddOpaque(name v1.ResourceName, quantity int64) {
+	// Lazily allocate opaque integer resource map.
+	if r.OpaqueIntResources == nil {
+		r.OpaqueIntResources = map[v1.ResourceName]int64{}
+	}
+	r.OpaqueIntResources[name] += quantity
+}
+
 // NewNodeInfo returns a ready to use empty NodeInfo object.
 // If any pods are given in arguments, their information will be aggregated in
 // the returned object.
@@ -215,7 +223,6 @@ func hasPodAffinityConstraints(pod *v1.Pod) bool {
 
 // addPod adds pod information to this NodeInfo.
 func (n *NodeInfo) addPod(pod *v1.Pod) {
-	// cpu, mem, nvidia_gpu, non0_cpu, non0_mem := calculateResource(pod)
 	res, non0_cpu, non0_mem := calculateResource(pod)
 	n.requestedResource.MilliCPU += res.MilliCPU
 	n.requestedResource.Memory += res.Memory
@@ -298,11 +305,7 @@ func calculateResource(pod *v1.Pod) (res Resource, non0_cpu int64, non0_mem int6
 				res.NvidiaGPU += rQuant.Value()
 			default:
 				if v1.IsOpaqueIntResourceName(rName) {
-					// Lazily allocate opaque resource map.
-					if res.OpaqueIntResources == nil {
-						res.OpaqueIntResources = map[v1.ResourceName]int64{}
-					}
-					res.OpaqueIntResources[rName] += rQuant.Value()
+					res.AddOpaque(rName, rQuant.Value())
 				}
 			}
 		}
@@ -330,11 +333,7 @@ func (n *NodeInfo) SetNode(node *v1.Node) error {
 			n.allowedPodNumber = int(rQuant.Value())
 		default:
 			if v1.IsOpaqueIntResourceName(rName) {
-				// Lazily allocate opaque resource map.
-				if n.allocatableResource.OpaqueIntResources == nil {
-					n.allocatableResource.OpaqueIntResources = map[v1.ResourceName]int64{}
-				}
-				n.allocatableResource.OpaqueIntResources[rName] = rQuant.Value()
+				n.allocatableResource.AddOpaque(rName, rQuant.Value())
 			}
 		}
 	}
