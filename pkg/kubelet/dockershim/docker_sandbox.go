@@ -18,6 +18,7 @@ package dockershim
 
 import (
 	"fmt"
+	"regexp"
 
 	dockertypes "github.com/docker/engine-api/types"
 	dockercontainer "github.com/docker/engine-api/types/container"
@@ -41,6 +42,10 @@ const (
 
 	// Name of the underlying container runtime
 	runtimeName = "docker"
+)
+
+var (
+	conflictRE = regexp.MustCompile(`Conflict. (?:.)+ is already in use by container ([0-9a-z]+)`)
 )
 
 // RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
@@ -68,6 +73,25 @@ func (ds *dockerService) RunPodSandbox(config *runtimeApi.PodSandboxConfig) (str
 		return "", fmt.Errorf("failed to make sandbox docker config for pod %q: %v", config.Metadata.GetName(), err)
 	}
 	createResp, err := ds.client.CreateContainer(*createConfig)
+	if err != nil {
+		// See #33189. If the previous attempt to create a sandbox container
+		// name FOO failed due to "device or resource busy", it is possbile
+		// that docker did not clean up properly and has inconsistent internal
+		// state. Docker would not report the existence of FOO, but would
+		// complain if user wants to create a new container named FOO. To work
+		// around this, we parse the error message to identify failure caused
+		// by naming conflict, and try to remove the old container FOO.
+		// TODO(#33189): Monitor the tests to see if the fix is sufficent.
+		if matches := conflictRE.FindStringSubmatch(err.Error()); len(matches) == 2 {
+			id := matches[1]
+			glog.Warningf("Unable to create pod sandbox due to conflict. Attempting to remove sandbox %q", id)
+			if err := ds.client.RemoveContainer(id, dockertypes.ContainerRemoveOptions{RemoveVolumes: true}); err != nil {
+				glog.Errorf("Failed to remove the conflicting sandbox container: %v", err)
+			} else {
+				glog.V(2).Infof("Successfully removed conflicting sandbox %q", id)
+			}
+		}
+	}
 	if err != nil || createResp == nil {
 		return "", fmt.Errorf("failed to create a sandbox for pod %q: %v", config.Metadata.GetName(), err)
 	}
