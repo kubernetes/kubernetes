@@ -83,6 +83,39 @@ func (attacher *vsphereVMDKAttacher) Attach(spec *volume.Spec, hostName string) 
 	return path.Join(diskByIDPath, diskSCSIPrefix+diskUUID), nil
 }
 
+func (attacher *vsphereVMDKAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName string) (map[*volume.Spec]bool, error) {
+	volumesAttachedCheck := make(map[*volume.Spec]bool)
+	volumeSpecMap := make(map[string]*volume.Spec)
+	volumePathList := []string{}
+	for _, spec := range specs {
+		volumeSource, _, err := getVolumeSource(spec)
+		if err != nil {
+			glog.Errorf("Error getting volume (%q) source : %v", spec.Name(), err)
+			continue
+		}
+
+		volumePathList = append(volumePathList, volumeSource.VolumePath)
+		volumesAttachedCheck[spec] = true
+		volumeSpecMap[volumeSource.VolumePath] = spec
+	}
+	attachedResult, err := attacher.vsphereVolumes.DisksAreAttached(volumePathList, nodeName)
+	if err != nil {
+		glog.Errorf(
+			"Error checking if volumes (%v) are attached to current node (%q). err=%v",
+			volumePathList, nodeName, err)
+		return volumesAttachedCheck, err
+	}
+
+	for volumePath, attached := range attachedResult {
+		if !attached {
+			spec := volumeSpecMap[volumePath]
+			volumesAttachedCheck[spec] = false
+			glog.V(2).Infof("VolumesAreAttached: check volume %q (specName: %q) is no longer attached", volumePath, spec.Name())
+		}
+	}
+	return volumesAttachedCheck, nil
+}
+
 func (attacher *vsphereVMDKAttacher) WaitForAttach(spec *volume.Spec, devicePath string, timeout time.Duration) (string, error) {
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {

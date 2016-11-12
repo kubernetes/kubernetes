@@ -63,7 +63,7 @@ func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, hostName
 		return "", err
 	}
 
-	volumeID := volumeSource.VolumeID
+	volumeID := aws.KubernetesVolumeID(volumeSource.VolumeID)
 
 	// awsCloud.AttachDisk checks if disk is already attached to node and
 	// succeeds in that case, so no need to do that separately.
@@ -74,6 +74,41 @@ func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, hostName
 	}
 
 	return devicePath, nil
+}
+
+func (attacher *awsElasticBlockStoreAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName string) (map[*volume.Spec]bool, error) {
+	volumesAttachedCheck := make(map[*volume.Spec]bool)
+	volumeSpecMap := make(map[aws.KubernetesVolumeID]*volume.Spec)
+	volumeIDList := []aws.KubernetesVolumeID{}
+	for _, spec := range specs {
+		volumeSource, _, err := getVolumeSource(spec)
+		if err != nil {
+			glog.Errorf("Error getting volume (%q) source : %v", spec.Name(), err)
+			continue
+		}
+
+		name := aws.KubernetesVolumeID(volumeSource.VolumeID)
+		volumeIDList = append(volumeIDList, name)
+		volumesAttachedCheck[spec] = true
+		volumeSpecMap[name] = spec
+	}
+	attachedResult, err := attacher.awsVolumes.DisksAreAttached(volumeIDList, nodeName)
+	if err != nil {
+		// Log error and continue with attach
+		glog.Errorf(
+			"Error checking if volumes (%v) is already attached to current node (%q). err=%v",
+			volumeIDList, nodeName, err)
+		return volumesAttachedCheck, err
+	}
+
+	for volumeID, attached := range attachedResult {
+		if !attached {
+			spec := volumeSpecMap[volumeID]
+			volumesAttachedCheck[spec] = false
+			glog.V(2).Infof("VolumesAreAttached: check volume %q (specName: %q) is no longer attached", volumeID, spec.Name())
+		}
+	}
+	return volumesAttachedCheck, nil
 }
 
 func (attacher *awsElasticBlockStoreAttacher) WaitForAttach(spec *volume.Spec, devicePath string, timeout time.Duration) (string, error) {
@@ -128,7 +163,7 @@ func (attacher *awsElasticBlockStoreAttacher) GetDeviceMountPath(
 		return "", err
 	}
 
-	return makeGlobalPDPath(attacher.host, volumeSource.VolumeID), nil
+	return makeGlobalPDPath(attacher.host, aws.KubernetesVolumeID(volumeSource.VolumeID)), nil
 }
 
 // FIXME: this method can be further pruned.
@@ -186,7 +221,7 @@ func (plugin *awsElasticBlockStorePlugin) NewDetacher() (volume.Detacher, error)
 }
 
 func (detacher *awsElasticBlockStoreDetacher) Detach(deviceMountPath string, hostName string) error {
-	volumeID := path.Base(deviceMountPath)
+	volumeID := aws.KubernetesVolumeID(path.Base(deviceMountPath))
 
 	attached, err := detacher.awsVolumes.DiskIsAttached(volumeID, hostName)
 	if err != nil {

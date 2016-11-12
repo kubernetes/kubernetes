@@ -56,6 +56,10 @@ const (
 	// desiredStateOfWorldPopulatorLoopSleepPeriod is the amount of time the
 	// DesiredStateOfWorldPopulator loop waits between successive executions
 	desiredStateOfWorldPopulatorLoopSleepPeriod time.Duration = 1 * time.Minute
+
+	// reconcilerSyncDuration is the amount of time the reconciler sync states loop
+	// wait between successive executions
+	reconcilerSyncDuration time.Duration = 5 * time.Second
 )
 
 // AttachDetachController defines the operations supported by this controller.
@@ -122,6 +126,7 @@ func NewAttachDetachController(
 	adc.reconciler = reconciler.NewReconciler(
 		reconcilerLoopPeriod,
 		reconcilerMaxWaitForUnmountDuration,
+		reconcilerSyncDuration,
 		adc.desiredStateOfWorld,
 		adc.actualStateOfWorld,
 		adc.attacherDetacher,

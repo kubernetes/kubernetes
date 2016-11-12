@@ -38,6 +38,9 @@ import (
 const (
 	// emptyUniquePodName is a UniquePodName for empty string.
 	emptyUniquePodName types.UniquePodName = types.UniquePodName("")
+
+	// emptyUniqueVolumeName is a UniqueVolumeName for empty string
+	emptyUniqueVolumeName api.UniqueVolumeName = api.UniqueVolumeName("")
 )
 
 // NestedPendingOperations defines the supported set of operations.
@@ -151,9 +154,15 @@ func (grm *nestedPendingOperations) IsOperationPending(
 	return false
 }
 
+// This is an internal function and caller should acquire and release the lock
 func (grm *nestedPendingOperations) isOperationExists(
 	volumeName api.UniqueVolumeName,
 	podName types.UniquePodName) (bool, int) {
+
+	// If volumeName is empty, operation can be executed concurrently
+	if volumeName == emptyUniqueVolumeName {
+		return false, -1
+	}
 
 	for previousOpIndex, previousOp := range grm.operations {
 		if previousOp.volumeName != volumeName {

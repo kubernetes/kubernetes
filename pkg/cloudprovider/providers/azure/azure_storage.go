@@ -73,6 +73,34 @@ func (az *Cloud) AttachDisk(diskName, diskURI, vmName string, lun int32, caching
 	return err
 }
 
+// DisksAreAttached checks if a list of volumes are attached to the node with the specified NodeName
+func (az *Cloud) DisksAreAttached(diskNames []string, nodeName string) (map[string]bool, error) {
+	attached := make(map[string]bool)
+	for _, diskName := range diskNames {
+		attached[diskName] = false
+	}
+	vm, exists, err := az.getVirtualMachine(nodeName)
+	if !exists {
+		// if host doesn't exist, no need to detach
+		glog.Warningf("Cannot find node %q, DisksAreAttached will assume disks %v are not attached to it.",
+			nodeName, diskNames)
+		return attached, nil
+	} else if err != nil {
+		return attached, err
+	}
+
+	disks := *vm.Properties.StorageProfile.DataDisks
+	for _, disk := range disks {
+		for _, diskName := range diskNames {
+			if disk.Name != nil && diskName != "" && *disk.Name == diskName {
+				attached[diskName] = true
+			}
+		}
+	}
+
+	return attached, nil
+}
+
 // DetachDiskByName detaches a vhd from host
 // the vhd can be identified by diskName or diskURI
 func (az *Cloud) DetachDiskByName(diskName, diskURI, vmName string) error {

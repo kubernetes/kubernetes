@@ -305,6 +305,10 @@ func (testcase *testcase) DiskIsAttached(diskName, hostName string) (bool, error
 	return expected.isAttached, expected.ret
 }
 
+func (testcase *testcase) DisksAreAttached(diskNames []string, nodeName string) (map[string]bool, error) {
+	return nil, errors.New("Not implemented")
+}
+
 func (testcase *testcase) CreateVolume(name string, size int, tags *map[string]string) (volumePath string, err error) {
 	return "", errors.New("Not implemented")
 }

@@ -132,6 +132,10 @@ type Disks interface {
 	// DiskIsAttached checks if a disk is attached to the given node.
 	DiskIsAttached(diskName, instanceID string) (bool, error)
 
+	// DisksAreAttached is a batch function to check if a list of disks are attached
+	// to the node with the specified NodeName.
+	DisksAreAttached(diskNames []string, nodeName string) (map[string]bool, error)
+
 	// CreateDisk creates a new PD with given properties. Tags are serialized
 	// as JSON into Description field.
 	CreateDisk(name string, diskType string, zone string, sizeGb int64, tags map[string]string) error
@@ -2576,6 +2580,37 @@ func (gce *GCECloud) DiskIsAttached(diskName, instanceID string) (bool, error) {
 	}
 
 	return false, nil
+}
+
+func (gce *GCECloud) DisksAreAttached(diskNames []string, nodeName string) (map[string]bool, error) {
+	attached := make(map[string]bool)
+	for _, diskName := range diskNames {
+		attached[diskName] = false
+	}
+	instance, err := gce.getInstanceByName(nodeName)
+	if err != nil {
+		if err == cloudprovider.InstanceNotFound {
+			// If instance no longer exists, safe to assume volume is not attached.
+			glog.Warningf(
+				"Instance %q does not exist. DisksAreAttached will assume PD %v are not attached to it.",
+				nodeName,
+				diskNames)
+			return attached, nil
+		}
+
+		return attached, err
+	}
+
+	for _, instanceDisk := range instance.Disks {
+		for _, diskName := range diskNames {
+			if instanceDisk.DeviceName == diskName {
+				// Disk is still attached to node
+				attached[diskName] = true
+			}
+		}
+	}
+
+	return attached, nil
 }
 
 // Returns a gceDisk for the disk, if it is found in the specified zone.
