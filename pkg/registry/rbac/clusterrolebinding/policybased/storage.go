@@ -63,6 +63,10 @@ func (s *Storage) Create(ctx genericapirequest.Context, obj runtime.Object) (run
 	return s.StandardStorage.Create(ctx, obj)
 }
 
+func (s *Storage) CreateInitialized(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
+	return s.Create(ctx, obj)
+}
+
 func (s *Storage) Update(ctx genericapirequest.Context, name string, obj rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
 	if rbacregistry.EscalationAllowed(ctx) {
 		return s.StandardStorage.Update(ctx, name, obj)

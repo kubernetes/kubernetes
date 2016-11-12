@@ -83,12 +83,12 @@ func (CustomResourceDefinitionStorageStrategy) ValidateUpdate(ctx genericapirequ
 	return validation.ValidateObjectMetaAccessorUpdate(objAccessor, oldAccessor, field.NewPath("metadata"))
 }
 
-func (a CustomResourceDefinitionStorageStrategy) GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func (a CustomResourceDefinitionStorageStrategy) GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
-	return labels.Set(accessor.GetLabels()), objectMetaFieldsSet(accessor, a.namespaceScoped), nil
+	return labels.Set(accessor.GetLabels()), objectMetaFieldsSet(accessor, a.namespaceScoped), accessor.GetInitializers() != nil, nil
 }
 
 // objectMetaFieldsSet returns a fields that represent the ObjectMeta.

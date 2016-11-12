@@ -407,6 +407,7 @@ type SimpleRESTStorage struct {
 	fakeWatch                  *watch.FakeWatcher
 	requestedLabelSelector     labels.Selector
 	requestedFieldSelector     fields.Selector
+	requestedUninitialized     bool
 	requestedResourceVersion   string
 	requestedResourceNamespace string
 
@@ -449,6 +450,7 @@ func (storage *SimpleRESTStorage) List(ctx request.Context, options *metainterna
 	if options != nil && options.FieldSelector != nil {
 		storage.requestedFieldSelector = options.FieldSelector
 	}
+	storage.requestedUninitialized = options.IncludeUninitialized
 	return result, storage.errors["list"]
 }
 
@@ -522,7 +524,7 @@ func (storage *SimpleRESTStorage) NewList() runtime.Object {
 	return &genericapitesting.SimpleList{}
 }
 
-func (storage *SimpleRESTStorage) Create(ctx request.Context, obj runtime.Object) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) Create(ctx request.Context, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	storage.created = obj.(*genericapitesting.Simple)
 	if err := storage.errors["create"]; err != nil {
@@ -717,7 +719,7 @@ type NamedCreaterRESTStorage struct {
 	createdName string
 }
 
-func (storage *NamedCreaterRESTStorage) Create(ctx request.Context, name string, obj runtime.Object) (runtime.Object, error) {
+func (storage *NamedCreaterRESTStorage) Create(ctx request.Context, name string, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	storage.created = obj.(*genericapitesting.Simple)
 	storage.createdName = name
@@ -1467,6 +1469,52 @@ func TestGet(t *testing.T) {
 	}
 	if !selfLinker.called {
 		t.Errorf("Never set self link")
+	}
+}
+
+func TestGetUninitialized(t *testing.T) {
+	storage := map[string]rest.Storage{}
+	simpleStorage := SimpleRESTStorage{
+		list: []genericapitesting.Simple{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Initializers: &metav1.Initializers{
+						Pending: []metav1.Initializer{{Name: "test"}},
+					},
+				},
+				Other: "foo",
+			},
+		},
+	}
+	selfLinker := &setTestSelfLinker{
+		t:              t,
+		expectedSet:    "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id",
+		alternativeSet: sets.NewString("/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple"),
+		name:           "id",
+		namespace:      "default",
+	}
+	storage["simple"] = &simpleStorage
+	handler := handleLinker(storage, selfLinker)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple?includeUninitialized=true")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("unexpected response: %#v", resp)
+	}
+	var itemOut genericapitesting.SimpleList
+	body, err := extractBody(resp, &itemOut)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(itemOut.Items) != 1 || itemOut.Items[0].Other != "foo" {
+		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
+	}
+	if !simpleStorage.requestedUninitialized {
+		t.Errorf("Didn't set correct flag")
 	}
 }
 

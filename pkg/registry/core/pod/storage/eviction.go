@@ -145,6 +145,11 @@ func (r *EvictionREST) Create(ctx genericapirequest.Context, obj runtime.Object)
 	return &metav1.Status{Status: metav1.StatusSuccess}, nil
 }
 
+// CreateInitialized will ensure the pod is evicted.
+func (r *EvictionREST) CreateInitialized(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
+	return r.Create(ctx, obj)
+}
+
 // checkAndDecrement checks if the provided PodDisruptionBudget allows any disruption.
 func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb policy.PodDisruptionBudget) (ok bool, err error) {
 	if pdb.Status.ObservedGeneration < pdb.Generation {

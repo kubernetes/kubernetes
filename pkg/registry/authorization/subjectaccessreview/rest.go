@@ -62,3 +62,7 @@ func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object) (runtim
 
 	return subjectAccessReview, nil
 }
+
+func (r *REST) CreateInitialized(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
+	return r.Create(ctx, obj)
+}
