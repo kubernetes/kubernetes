@@ -33,7 +33,6 @@ type REST struct {
 func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) *REST {
 	strategy := apiservice.NewStrategy(scheme)
 	store := &genericregistry.Store{
-		Copier:      scheme,
 		NewFunc:     func() runtime.Object { return &apiregistration.APIService{} },
 		NewListFunc: func() runtime.Object { return &apiregistration.APIServiceList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {

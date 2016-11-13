@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 )
 
@@ -62,7 +61,7 @@ func (s *storage) CreateRole(ctx genericapirequest.Context, role *rbac.Role) err
 }
 
 func (s *storage) UpdateRole(ctx genericapirequest.Context, role *rbac.Role) error {
-	_, _, err := s.Update(ctx, role.Name, rest.DefaultUpdatedObjectInfo(role, api.Scheme))
+	_, _, err := s.Update(ctx, role.Name, rest.DefaultUpdatedObjectInfo(role))
 	return err
 }
 

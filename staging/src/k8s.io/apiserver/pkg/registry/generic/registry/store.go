@@ -1200,7 +1200,6 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 			capacity = e.WatchCacheSize
 		}
 		e.Storage, e.DestroyFunc = opts.Decorator(
-			e.Copier,
 			opts.StorageConfig,
 			capacity,
 			e.NewFunc(),

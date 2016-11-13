@@ -209,7 +209,6 @@ func (tc *patchTestCase) Run(t *testing.T) {
 	ctx = request.WithNamespace(ctx, namespace)
 
 	namer := &testNamer{namespace, name}
-	copier := runtime.ObjectCopier(api.Scheme)
 	creater := runtime.ObjectCreater(api.Scheme)
 	defaulter := runtime.ObjectDefaulter(api.Scheme)
 	convertor := runtime.UnsafeObjectConvertor(api.Scheme)
@@ -256,7 +255,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 
 		}
 
-		resultObj, err := patchResource(ctx, admit, 1*time.Second, versionedObj, testPatcher, name, patchType, patch, namer, copier, creater, defaulter, convertor, kind, resource, codec)
+		resultObj, err := patchResource(ctx, admit, 1*time.Second, versionedObj, testPatcher, name, patchType, patch, namer, creater, defaulter, convertor, kind, resource, codec)
 		if len(tc.expectedError) != 0 {
 			if err == nil || err.Error() != tc.expectedError {
 				t.Errorf("%s: expected error %v, but got %v", tc.name, tc.expectedError, err)

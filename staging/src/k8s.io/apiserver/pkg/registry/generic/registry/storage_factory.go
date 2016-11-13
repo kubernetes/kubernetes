@@ -29,7 +29,6 @@ var _ generic.StorageDecorator = StorageWithCacher
 
 // Creates a cacher based given storageConfig.
 func StorageWithCacher(
-	copier runtime.ObjectCopier,
 	storageConfig *storagebackend.Config,
 	capacity int,
 	objectType runtime.Object,
@@ -46,7 +45,6 @@ func StorageWithCacher(
 		CacheCapacity:        capacity,
 		Storage:              s,
 		Versioner:            etcdstorage.APIObjectVersioner{},
-		Copier:               copier,
 		Type:                 objectType,
 		ResourcePrefix:       resourcePrefix,
 		KeyFunc:              keyFunc,
