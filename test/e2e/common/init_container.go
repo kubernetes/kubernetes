@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/watch"
@@ -76,6 +77,9 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 				},
 			},
 		}
+		if err := podutil.SetInitContainersAnnotations(pod); err != nil {
+			Expect(err).To(BeNil())
+		}
 		startedPod := podClient.Create(pod)
 		w, err := podClient.Watch(v1.SingleObject(startedPod.ObjectMeta))
 		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
@@ -84,6 +88,9 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 		Expect(err).To(BeNil())
 		framework.CheckInvariants(wr.Events(), framework.ContainerInitInvariant)
 		endPod := event.Object.(*v1.Pod)
+		if err := podutil.SetInitContainersAndStatuses(endPod); err != nil {
+			Expect(err).To(BeNil())
+		}
 
 		Expect(endPod.Status.Phase).To(Equal(v1.PodSucceeded))
 		_, init := v1.GetPodCondition(&endPod.Status, v1.PodInitialized)
@@ -139,6 +146,9 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 				},
 			},
 		}
+		if err := podutil.SetInitContainersAnnotations(pod); err != nil {
+			Expect(err).To(BeNil())
+		}
 		startedPod := podClient.Create(pod)
 		w, err := podClient.Watch(v1.SingleObject(startedPod.ObjectMeta))
 		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
@@ -152,6 +162,9 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 		_, init := v1.GetPodCondition(&endPod.Status, v1.PodInitialized)
 		Expect(init).NotTo(BeNil())
 		Expect(init.Status).To(Equal(v1.ConditionTrue))
+		if err := podutil.SetInitContainersAndStatuses(endPod); err != nil {
+			Expect(err).To(BeNil())
+		}
 
 		Expect(len(endPod.Status.InitContainerStatuses)).To(Equal(2))
 		for _, status := range endPod.Status.InitContainerStatuses {
@@ -167,6 +180,7 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 		By("creating the pod")
 		name := "pod-init-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
+
 		pod := &v1.Pod{
 			ObjectMeta: v1.ObjectMeta{
 				Name: name,
@@ -202,6 +216,9 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 				},
 			},
 		}
+		if err := podutil.SetInitContainersAnnotations(pod); err != nil {
+			Expect(err).To(BeNil())
+		}
 		startedPod := podClient.Create(pod)
 		w, err := podClient.Watch(v1.SingleObject(startedPod.ObjectMeta))
 		Expect(err).NotTo(HaveOccurred(), "error watching a pod")
@@ -213,6 +230,9 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 			func(evt watch.Event) (bool, error) {
 				switch t := evt.Object.(type) {
 				case *v1.Pod:
+					if err := podutil.SetInitContainersAndStatuses(t); err != nil {
+						Expect(err).To(BeNil())
+					}
 					for _, status := range t.Status.ContainerStatuses {
 						if status.State.Waiting == nil {
 							return false, fmt.Errorf("container %q should not be out of waiting: %#v", status.Name, status)
@@ -245,6 +265,9 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 			func(evt watch.Event) (bool, error) {
 				switch t := evt.Object.(type) {
 				case *v1.Pod:
+					if err := podutil.SetInitContainersAndStatuses(t); err != nil {
+						Expect(err).To(BeNil())
+					}
 					status := t.Status.InitContainerStatuses[0]
 					if status.RestartCount < 3 {
 						return false, nil
@@ -260,6 +283,9 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 		Expect(err).To(BeNil())
 		framework.CheckInvariants(wr.Events(), framework.ContainerInitInvariant)
 		endPod := event.Object.(*v1.Pod)
+		if err := podutil.SetInitContainersAndStatuses(endPod); err != nil {
+			Expect(err).To(BeNil())
+		}
 
 		Expect(endPod.Status.Phase).To(Equal(v1.PodPending))
 		_, init := v1.GetPodCondition(&endPod.Status, v1.PodInitialized)
@@ -313,6 +339,9 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 				},
 			},
 		}
+		if err := podutil.SetInitContainersAnnotations(pod); err != nil {
+			Expect(err).To(BeNil())
+		}
 		startedPod := podClient.Create(pod)
 
 		w, err := podClient.Watch(v1.SingleObject(startedPod.ObjectMeta))
@@ -325,6 +354,9 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 			func(evt watch.Event) (bool, error) {
 				switch t := evt.Object.(type) {
 				case *v1.Pod:
+					if err := podutil.SetInitContainersAndStatuses(t); err != nil {
+						Expect(err).To(BeNil())
+					}
 					for _, status := range t.Status.ContainerStatuses {
 						if status.State.Waiting == nil {
 							return false, fmt.Errorf("container %q should not be out of waiting: %#v", status.Name, status)
