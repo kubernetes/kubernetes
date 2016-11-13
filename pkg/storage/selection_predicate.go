@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -32,12 +33,21 @@ type SelectionPredicate struct {
 	Field       fields.Selector
 	GetAttrs    AttrFunc
 	IndexFields []string
+
+	IncludeUninitialized bool
 }
 
 // Matches returns true if the given object's labels and fields (as
 // returned by s.GetAttrs) match s.Label and s.Field. An error is
 // returned if s.GetAttrs fails.
 func (s *SelectionPredicate) Matches(obj runtime.Object) (bool, error) {
+	if !s.IncludeUninitialized {
+		if accessor, err := meta.Accessor(obj); err == nil {
+			if len(accessor.GetInitializers()) > 0 {
+				return false, nil
+			}
+		}
+	}
 	if s.Label.Empty() && s.Field.Empty() {
 		return true, nil
 	}

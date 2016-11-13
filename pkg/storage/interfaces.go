@@ -72,6 +72,8 @@ type FilterFunc func(obj runtime.Object) bool
 var Everything = SelectionPredicate{
 	Label: labels.Everything(),
 	Field: fields.Everything(),
+
+	IncludeUninitialized: true,
 }
 
 // Pass an UpdateFunc to Interface.GuaranteedUpdate to make an update

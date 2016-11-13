@@ -1500,6 +1500,7 @@ func DeepCopy_api_ListOptions(in interface{}, out interface{}, c *conversion.Clo
 		} else {
 			out.FieldSelector = *newVal.(*fields.Selector)
 		}
+		out.IncludeUninitialized = in.IncludeUninitialized
 		out.Watch = in.Watch
 		out.ResourceVersion = in.ResourceVersion
 		if in.TimeoutSeconds != nil {

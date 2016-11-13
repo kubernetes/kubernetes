@@ -1458,6 +1458,7 @@ func DeepCopy_v1_ListOptions(in interface{}, out interface{}, c *conversion.Clon
 		out.TypeMeta = in.TypeMeta
 		out.LabelSelector = in.LabelSelector
 		out.FieldSelector = in.FieldSelector
+		out.IncludeUninitialized = in.IncludeUninitialized
 		out.Watch = in.Watch
 		out.ResourceVersion = in.ResourceVersion
 		if in.TimeoutSeconds != nil {

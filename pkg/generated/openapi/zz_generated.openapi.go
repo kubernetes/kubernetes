@@ -9209,6 +9209,13 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 							Format:      "",
 						},
 					},
+					"includeUninitialized": {
+						SchemaProps: spec.SchemaProps{
+							Description: "If true, partially initialized resources are included in the response.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 					"watch": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",

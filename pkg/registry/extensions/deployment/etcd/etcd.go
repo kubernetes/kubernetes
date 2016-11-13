@@ -165,6 +165,10 @@ func (r *RollbackREST) Create(ctx api.Context, obj runtime.Object) (runtime.Obje
 	}, nil
 }
 
+func (r *RollbackREST) CreateInitialized(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+	return r.Create(ctx, obj)
+}
+
 func (r *RollbackREST) rollbackDeployment(ctx api.Context, deploymentID string, config *extensions.RollbackConfig, annotations map[string]string) error {
 	if _, err := r.setDeploymentRollback(ctx, deploymentID, config, annotations); err != nil {
 		err = storeerr.InterpretGetError(err, extensions.Resource("deployments"), deploymentID)

@@ -1795,6 +1795,7 @@ func autoConvert_v1_ListOptions_To_api_ListOptions(in *ListOptions, out *api.Lis
 	if err := api.Convert_string_To_fields_Selector(&in.FieldSelector, &out.FieldSelector, s); err != nil {
 		return err
 	}
+	out.IncludeUninitialized = in.IncludeUninitialized
 	out.Watch = in.Watch
 	out.ResourceVersion = in.ResourceVersion
 	out.TimeoutSeconds = (*int64)(unsafe.Pointer(in.TimeoutSeconds))
@@ -1812,6 +1813,7 @@ func autoConvert_api_ListOptions_To_v1_ListOptions(in *api.ListOptions, out *Lis
 	if err := api.Convert_fields_Selector_To_string(&in.FieldSelector, &out.FieldSelector, s); err != nil {
 		return err
 	}
+	out.IncludeUninitialized = in.IncludeUninitialized
 	out.Watch = in.Watch
 	out.ResourceVersion = in.ResourceVersion
 	out.TimeoutSeconds = (*int64)(unsafe.Pointer(in.TimeoutSeconds))

@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/auth/authorizer"
 )
 
 func init() {
@@ -38,42 +39,107 @@ type initializerOptions struct {
 }
 
 type initializer struct {
-	resources map[unversioned.GroupResource]initializerOptions
+	resources  map[unversioned.GroupResource]initializerOptions
+	authorizer authorizer.Authorizer
 }
 
 // NewAlwaysAdmit creates a new always admit admission handler
 func NewInitializer() admission.Interface {
-	return initializer{
+	return &initializer{
 		resources: map[unversioned.GroupResource]initializerOptions{
 			unversioned.GroupResource{Resource: "pods"}: {Initializers: []string{"Test"}},
 		},
 	}
 }
 
-func (i initializer) Admit(a admission.Attributes) (err error) {
-	if !i.Handles(a.GetOperation()) {
-		return nil
+func (i *initializer) Validate() error {
+	if i.authorizer == nil {
+		return fmt.Errorf("requires authorizer")
 	}
+	return nil
+}
+
+func (i *initializer) SetAuthorizer(a authorizer.Authorizer) {
+	i.authorizer = a
+}
+
+func (i *initializer) Admit(a admission.Attributes) (err error) {
+	// TODO: sub-resource action should be denied until the object is initialized
 	if len(a.GetSubresource()) > 0 {
 		return nil
 	}
+
 	resource, ok := i.resources[a.GetResource().GroupResource()]
 	if !ok {
 		return nil
 	}
-	fmt.Printf("Setting %v on %v\n", resource.Initializers, a.GetResource())
-	accessor, err := meta.Accessor(a.GetObject())
-	if err != nil {
-		return fmt.Errorf("initialized resources must be able to set initializers (%T): %v", a.GetObject(), err)
+
+	switch a.GetOperation() {
+	case admission.Create:
+		accessor, err := meta.Accessor(a.GetObject())
+		if err != nil {
+			return fmt.Errorf("initialized resources must be able to set initializers (%T): %v", a.GetObject(), err)
+		}
+		existing := accessor.GetInitializers()
+		// for now, disallow sending explicit initializers
+		if len(existing) > 0 {
+			return fmt.Errorf("initializers may not be set on creation")
+		}
+		// it must be possible for some users to bypass initialization - for now, check the initialize operation
+		// if the user provides an empty array for initialization (vs a nil one)
+		if existing != nil {
+			if err := i.canInitialize(a); err != nil {
+				return err
+			}
+		}
+		accessor.SetInitializers(resource.Initializers)
+
+	case admission.Update:
+		accessor, err := meta.Accessor(a.GetObject())
+		if err != nil {
+			return fmt.Errorf("initialized resources must be able to set initializers (%T): %v", a.GetObject(), err)
+		}
+		existing := accessor.GetInitializers()
+
+		// post initialization, all changes are allowed
+		if len(existing) == 0 {
+			return nil
+		}
+
+		// caller must have the ability to mutate un-initialized resources
+		if err := i.canInitialize(a); err != nil {
+			return err
+		}
+
+		// TODO: restrict initialization list changes to specific clients?
+
+		// TODO: reject mutation of the object after initialization failure status is set?
 	}
-	if existing := accessor.GetInitializers(); len(existing) > 0 {
-		return fmt.Errorf("initializers may not be set on creation")
-	}
-	accessor.SetInitializers(resource.Initializers)
 
 	return nil
 }
 
-func (i initializer) Handles(op admission.Operation) bool {
-	return op == admission.Create
+func (i *initializer) canInitialize(a admission.Attributes) error {
+	// caller must have the ability to mutate un-initialized resources
+	authorized, reason, err := i.authorizer.Authorize(authorizer.AttributesRecord{
+		Name:            a.GetName(),
+		ResourceRequest: true,
+		User:            a.GetUserInfo(),
+		Verb:            "initialize",
+		Namespace:       a.GetNamespace(),
+		APIGroup:        a.GetResource().Group,
+		APIVersion:      a.GetResource().Version,
+		Resource:        a.GetResource().Resource,
+	})
+	if err != nil {
+		return err
+	}
+	if !authorized {
+		return fmt.Errorf("user must have permission to initialize resources: %s", reason)
+	}
+	return nil
+}
+
+func (i *initializer) Handles(op admission.Operation) bool {
+	return true
 }

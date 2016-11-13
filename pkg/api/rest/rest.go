@@ -160,6 +160,10 @@ type Creater interface {
 
 	// Create creates a new version of a resource.
 	Create(ctx api.Context, obj runtime.Object) (runtime.Object, error)
+
+	// CreateInitialized creates a new version of a resource and waits until the object has been
+	// successfully initialized.
+	CreateInitialized(ctx api.Context, obj runtime.Object) (runtime.Object, error)
 }
 
 // NamedCreater is an object that can create an instance of a RESTful object using a name parameter.
@@ -172,6 +176,10 @@ type NamedCreater interface {
 	// This is needed for create operations on subresources which include the name of the parent
 	// resource in the path.
 	Create(ctx api.Context, name string, obj runtime.Object) (runtime.Object, error)
+
+	// CreateInitialized creates a new version of a resource and waits until the object has been
+	// successfully initialized.
+	CreateInitialized(ctx api.Context, name string, obj runtime.Object) (runtime.Object, error)
 }
 
 // UpdatedObjectInfo provides information about an updated object to an Updater.

@@ -204,6 +204,7 @@ func (e *Store) ListPredicate(ctx api.Context, p storage.SelectionPredicate, opt
 	if options == nil {
 		options = &api.ListOptions{ResourceVersion: "0"}
 	}
+	p.IncludeUninitialized = options.IncludeUninitialized
 	list := e.NewListFunc()
 	if name, ok := p.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
@@ -290,6 +291,67 @@ func (e *Store) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 	if e.Decorator != nil {
 		if err := e.Decorator(obj); err != nil {
 			return nil, err
+		}
+	}
+	return out, nil
+}
+
+func (e *Store) CreateInitialized(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+	out, err := e.Create(ctx, obj)
+	if err != nil {
+		return nil, err
+	}
+	if accessor, err := meta.Accessor(out); err == nil {
+		if len(accessor.GetInitializers()) > 0 {
+			key, err := e.KeyFunc(ctx, accessor.GetName())
+			if err != nil {
+				return nil, err
+			}
+			w, err := e.Storage.Watch(ctx, key, accessor.GetResourceVersion(), storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+
+				IncludeUninitialized: true,
+			})
+			if err != nil {
+				return nil, err
+			}
+			defer w.Stop()
+
+			latest := out
+			ch := w.ResultChan()
+			for {
+				select {
+				case event, ok := <-ch:
+					if !ok {
+						// TODO: questionable, exposes partially initialized objects?
+						return latest, nil
+					}
+					switch event.Type {
+					case watch.Deleted:
+						// TODO: check whether initialization completed
+						// TODO: turn into a status object based on initialization state
+						return nil, kubeerr.NewInternalError(fmt.Errorf("object deleted while waiting for creation"))
+					case watch.Error:
+						if status, ok := event.Object.(*unversioned.Status); ok {
+							return nil, &kubeerr.StatusError{*status}
+						}
+					case watch.Modified:
+						latest = event.Object
+						accessor, err = meta.Accessor(latest)
+						if err != nil {
+							// TODO: come up with a better failure mode
+							return nil, err
+						}
+						if len(accessor.GetInitializers()) == 0 {
+							return latest, nil
+						}
+					}
+				case <-ctx.Done():
+				}
+			}
+			// TODO: should we just expose the partially initialized object?
+			return nil, kubeerr.NewServerTimeout(e.QualifiedResource, "create", 0)
 		}
 	}
 	return out, nil
@@ -862,11 +924,14 @@ func (e *Store) Watch(ctx api.Context, options *api.ListOptions) (watch.Interfac
 	if options != nil && options.FieldSelector != nil {
 		field = options.FieldSelector
 	}
+	predicate := e.PredicateFunc(label, field)
+
 	resourceVersion := ""
 	if options != nil {
 		resourceVersion = options.ResourceVersion
+		predicate.IncludeUninitialized = options.IncludeUninitialized
 	}
-	return e.WatchPredicate(ctx, e.PredicateFunc(label, field), resourceVersion)
+	return e.WatchPredicate(ctx, predicate, resourceVersion)
 }
 
 // WatchPredicate starts a watch for the items that m matches.

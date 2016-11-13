@@ -58,6 +58,10 @@ func (s *Storage) Create(ctx api.Context, obj runtime.Object) (runtime.Object, e
 	return s.StandardStorage.Create(ctx, obj)
 }
 
+func (s *Storage) CreateInitialized(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+	return s.Create(ctx, obj)
+}
+
 func (s *Storage) Update(ctx api.Context, name string, obj rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
 	if rbacregistry.EscalationAllowed(ctx, s.superUser) {
 		return s.StandardStorage.Update(ctx, name, obj)

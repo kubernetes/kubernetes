@@ -115,6 +115,10 @@ func (r *EvictionREST) Create(ctx api.Context, obj runtime.Object) (runtime.Obje
 	return &unversioned.Status{Status: unversioned.StatusSuccess}, nil
 }
 
+func (r *EvictionREST) CreateInitialized(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+	return r.Create(ctx, obj)
+}
+
 func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb policy.PodDisruptionBudget) (ok bool, err error) {
 	if pdb.Status.ObservedGeneration != pdb.Generation {
 		return false, nil

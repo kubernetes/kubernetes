@@ -3234,6 +3234,9 @@ type ListOptions struct {
 	// Defaults to everything.
 	// +optional
 	FieldSelector string `json:"fieldSelector,omitempty" protobuf:"bytes,2,opt,name=fieldSelector"`
+	// If true, partially initialized resources are included in the response.
+	// +optional
+	IncludeUninitialized bool `json:"includeUninitialized,omitempty"`
 	// Watch for changes to the described resources and return them as a stream of
 	// add, update, and remove notifications. Specify resourceVersion.
 	// +optional
