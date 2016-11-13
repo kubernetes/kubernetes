@@ -547,14 +547,9 @@ Pod:
 // this field correctly, we will prevent the /evict handler from approving an
 // eviction when it may be unsafe to do so.
 func (dc *DisruptionController) failSafe(pdb *policy.PodDisruptionBudget) error {
-	obj, err := api.Scheme.DeepCopy(*pdb)
-	if err != nil {
-		return err
-	}
-	newPdb := obj.(policy.PodDisruptionBudget)
+	newPdb := pdb.DeepCopy()
 	newPdb.Status.PodDisruptionAllowed = false
-
-	return dc.getUpdater()(&newPdb)
+	return dc.getUpdater()(newPdb)
 }
 
 func (dc *DisruptionController) updatePdbSpec(pdb *policy.PodDisruptionBudget, currentHealthy, desiredHealthy, expectedCount int32) error {
@@ -568,12 +563,7 @@ func (dc *DisruptionController) updatePdbSpec(pdb *policy.PodDisruptionBudget, c
 		return nil
 	}
 
-	obj, err := api.Scheme.DeepCopy(*pdb)
-	if err != nil {
-		return err
-	}
-	newPdb := obj.(policy.PodDisruptionBudget)
-
+	newPdb := pdb.DeepCopy()
 	newPdb.Status = policy.PodDisruptionBudgetStatus{
 		CurrentHealthy:       currentHealthy,
 		DesiredHealthy:       desiredHealthy,
@@ -581,7 +571,7 @@ func (dc *DisruptionController) updatePdbSpec(pdb *policy.PodDisruptionBudget, c
 		PodDisruptionAllowed: disruptionAllowed,
 	}
 
-	return dc.getUpdater()(&newPdb)
+	return dc.getUpdater()(newPdb)
 }
 
 // refresh tries to re-GET the given PDB.  If there are any errors, it just

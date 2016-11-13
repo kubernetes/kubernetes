@@ -470,11 +470,8 @@ func (c *Cacher) GuaranteedUpdate(
 	if elem, exists, err := c.watchCache.GetByKey(key); err != nil {
 		glog.Errorf("GetByKey returned error: %v", err)
 	} else if exists {
-		currObj, copyErr := api.Scheme.Copy(elem.(*storeElement).Object)
-		if copyErr == nil {
-			return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, currObj)
-		}
-		glog.Errorf("couldn't copy object: %v", copyErr)
+		currObj := elem.(*storeElement).Object.DeepCopyObject()
+		return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, currObj)
 	}
 	// If we couldn't get the object, fallback to no-suggestion.
 	return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate)
@@ -782,11 +779,7 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 		return
 	}
 
-	object, err := api.Scheme.Copy(event.Object)
-	if err != nil {
-		glog.Errorf("unexpected copy error: %v", err)
-		return
-	}
+	object := event.Object.DeepCopyObject()
 	switch {
 	case curObjPasses && !oldObjPasses:
 		c.result <- watch.Event{Type: watch.Added, Object: object}

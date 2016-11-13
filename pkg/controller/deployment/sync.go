@@ -123,11 +123,7 @@ func (dc *DeploymentController) rsAndPodsWithHashKeySynced(deployment *extension
 // 2. Add hash label to all pods this rs owns, wait until replicaset controller reports rs.Status.FullyLabeledReplicas equal to the desired number of replicas
 // 3. Add hash label to the rs's label and selector
 func (dc *DeploymentController) addHashKeyToRSAndPods(rs *extensions.ReplicaSet) (updatedRS *extensions.ReplicaSet, err error) {
-	objCopy, err := api.Scheme.Copy(rs)
-	if err != nil {
-		return nil, err
-	}
-	updatedRS = objCopy.(*extensions.ReplicaSet)
+	updatedRS = rs.DeepCopy()
 
 	// If the rs already has the new hash label in its selector, it's done syncing
 	if labelsutil.SelectorHasLabel(rs.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey) {
@@ -252,11 +248,7 @@ func (dc *DeploymentController) getNewReplicaSet(deployment *extensions.Deployme
 	// and maxReplicas) and also update the revision annotation in the deployment with the
 	// latest revision.
 	if existingNewRS != nil {
-		objCopy, err := api.Scheme.Copy(existingNewRS)
-		if err != nil {
-			return nil, err
-		}
-		rsCopy := objCopy.(*extensions.ReplicaSet)
+		rsCopy := existingNewRS.DeepCopy()
 
 		// Set existing new replica set's annotation
 		annotationsUpdated := deploymentutil.SetNewReplicaSetAnnotations(deployment, rsCopy, newRevision, true)

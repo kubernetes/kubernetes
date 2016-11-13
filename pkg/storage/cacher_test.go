@@ -74,12 +74,7 @@ func makeTestPod(name string) *api.Pod {
 
 func updatePod(t *testing.T, s storage.Interface, obj, old *api.Pod) *api.Pod {
 	updateFn := func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
-		newObj, err := api.Scheme.DeepCopy(obj)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-			return nil, nil, err
-		}
-		return newObj.(*api.Pod), nil, nil
+		return obj.DeepCopyObject(), nil, nil
 	}
 	key := etcdtest.AddPrefix("pods/" + obj.Namespace + "/" + obj.Name)
 	if err := s.GuaranteedUpdate(context.TODO(), key, &api.Pod{}, old == nil, nil, updateFn); err != nil {

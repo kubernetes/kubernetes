@@ -186,3 +186,31 @@ type VersionedObjects struct {
 	// by a normal Decode call.
 	Objects []Object
 }
+
+type EmbeddedTest struct {
+	TypeMeta
+	ID          string
+	Object      Object
+	EmptyObject Object
+}
+
+type EmbeddedTestExternal struct {
+	TypeMeta    `json:",inline"`
+	ID          string       `json:"id,omitempty"`
+	Object      RawExtension `json:"object,omitempty"`
+	EmptyObject RawExtension `json:"emptyObject,omitempty"`
+}
+
+type ObjectTest struct {
+	TypeMeta
+
+	ID    string
+	Items []Object
+}
+
+type ObjectTestExternal struct {
+	TypeMeta `yaml:",inline" json:",inline"`
+
+	ID    string         `json:"id,omitempty"`
+	Items []RawExtension `json:"items,omitempty"`
+}

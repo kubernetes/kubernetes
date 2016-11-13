@@ -84,11 +84,7 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 	printer := spew.ConfigState{DisableMethods: true}
 
 	original := item
-	copied, err := api.Scheme.DeepCopy(item)
-	if err != nil {
-		panic(fmt.Sprintf("unable to copy: %v", err))
-	}
-	item = copied.(runtime.Object)
+	item = item.DeepCopyObject()
 
 	name := reflect.TypeOf(item).Elem().Name()
 	data, err := runtime.Encode(codec, item)

@@ -161,13 +161,10 @@ func TestDefaulting(t *testing.T) {
 
 			src.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{})
 
-			original, err := scheme.DeepCopy(src)
-			if err != nil {
-				t.Fatal(err)
-			}
+			original := src.DeepCopyObject()
 
 			// get internal
-			withDefaults, _ := scheme.DeepCopy(src)
+			withDefaults := src.DeepCopyObject()
 			scheme.Default(withDefaults.(runtime.Object))
 
 			if !reflect.DeepEqual(original, withDefaults) {

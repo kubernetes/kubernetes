@@ -150,10 +150,7 @@ func (m *manager) SetPodStatus(pod *api.Pod, status api.PodStatus) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 	// Make sure we're caching a deep copy.
-	status, err := copyStatus(&status)
-	if err != nil {
-		return
-	}
+	status = *status.DeepCopy()
 	// Force a status update if deletion timestamp is set. This is necessary
 	// because if the pod is in the non-running state, the pod worker still
 	// needs to be able to trigger an update and/or deletion.
@@ -192,11 +189,8 @@ func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontai
 	}
 
 	// Make sure we're not updating the cached version.
-	status, err := copyStatus(&oldStatus.status)
-	if err != nil {
-		return
-	}
-	containerStatus, _, _ = findContainerStatus(&status, containerID.String())
+	status := oldStatus.status.DeepCopy()
+	containerStatus, _, _ = findContainerStatus(status, containerID.String())
 	containerStatus.Ready = ready
 
 	// Update pod condition.
@@ -215,7 +209,7 @@ func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontai
 		status.Conditions = append(status.Conditions, readyCondition)
 	}
 
-	m.updateStatusInternal(pod, status, false)
+	m.updateStatusInternal(pod, *status, false)
 }
 
 func findContainerStatus(status *api.PodStatus, containerID string) (containerStatus *api.ContainerStatus, init bool, ok bool) {
@@ -243,10 +237,7 @@ func (m *manager) TerminatePod(pod *api.Pod) {
 	if cachedStatus, ok := m.podStatuses[pod.UID]; ok {
 		oldStatus = &cachedStatus.status
 	}
-	status, err := copyStatus(oldStatus)
-	if err != nil {
-		return
-	}
+	status := oldStatus.DeepCopy()
 	for i := range status.ContainerStatuses {
 		status.ContainerStatuses[i].State = api.ContainerState{
 			Terminated: &api.ContainerStateTerminated{},
@@ -483,19 +474,16 @@ func (m *manager) needsReconcile(uid types.UID, status api.PodStatus) bool {
 		pod = mirrorPod
 	}
 
-	podStatus, err := copyStatus(&pod.Status)
-	if err != nil {
-		return false
-	}
-	normalizeStatus(pod, &podStatus)
+	podStatus := pod.Status.DeepCopy()
+	normalizeStatus(pod, podStatus)
 
-	if isStatusEqual(&podStatus, &status) {
+	if isStatusEqual(podStatus, &status) {
 		// If the status from the source is the same with the cached status,
 		// reconcile is not needed. Just return.
 		return false
 	}
 	glog.V(3).Infof("Pod status is inconsistent with cached status for pod %q, a reconciliation should be triggered:\n %+v", format.Pod(pod),
-		diff.ObjectDiff(podStatus, status))
+		diff.ObjectDiff(*podStatus, status))
 
 	return true
 }
@@ -559,14 +547,4 @@ func notRunning(statuses []api.ContainerStatus) bool {
 		}
 	}
 	return true
-}
-
-func copyStatus(source *api.PodStatus) (api.PodStatus, error) {
-	clone, err := api.Scheme.DeepCopy(source)
-	if err != nil {
-		glog.Errorf("Failed to clone status %+v: %v", source, err)
-		return api.PodStatus{}, err
-	}
-	status := *clone.(*api.PodStatus)
-	return status, nil
 }

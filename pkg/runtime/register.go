@@ -73,3 +73,8 @@ func (obj *VersionedObjects) DeepCopyObject() unversioned.Object {
 	}
 	return out
 }
+
+func (obj *ObjectTest) GetObjectKind() unversioned.ObjectKind           { return &obj.TypeMeta }
+func (obj *ObjectTestExternal) GetObjectKind() unversioned.ObjectKind   { return &obj.TypeMeta }
+func (obj *EmbeddedTest) GetObjectKind() unversioned.ObjectKind         { return &obj.TypeMeta }
+func (obj *EmbeddedTestExternal) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }

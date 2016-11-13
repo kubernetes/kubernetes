@@ -272,13 +272,7 @@ func NewNodeController(
 
 		nodeEventHandlerFuncs = cache.ResourceEventHandlerFuncs{
 			AddFunc: func(originalObj interface{}) {
-				obj, err := api.Scheme.DeepCopy(originalObj)
-				if err != nil {
-					utilruntime.HandleError(err)
-					return
-				}
-				node := obj.(*api.Node)
-
+				node := originalObj.(*api.Node).DeepCopy()
 				if err := nc.cidrAllocator.AllocateOrOccupyCIDR(node); err != nil {
 					utilruntime.HandleError(fmt.Errorf("Error allocating CIDR: %v", err))
 				}
@@ -305,30 +299,19 @@ func NewNodeController(
 				// state is correct.
 				// Restart of NC fixes the issue.
 				if node.Spec.PodCIDR == "" {
-					nodeCopy, err := api.Scheme.Copy(node)
-					if err != nil {
-						utilruntime.HandleError(err)
-						return
-					}
-
-					if err := nc.cidrAllocator.AllocateOrOccupyCIDR(nodeCopy.(*api.Node)); err != nil {
+					if err := nc.cidrAllocator.AllocateOrOccupyCIDR(node.DeepCopy()); err != nil {
 						utilruntime.HandleError(fmt.Errorf("Error allocating CIDR: %v", err))
 					}
 				}
 			},
 			DeleteFunc: func(originalObj interface{}) {
-				obj, err := api.Scheme.DeepCopy(originalObj)
-				if err != nil {
-					utilruntime.HandleError(err)
-					return
-				}
+				node, isNode := originalObj.(*api.Node)
 
-				node, isNode := obj.(*api.Node)
 				// We can get DeletedFinalStateUnknown instead of *api.Node here and we need to handle that correctly. #34692
 				if !isNode {
-					deletedState, ok := obj.(cache.DeletedFinalStateUnknown)
+					deletedState, ok := originalObj.(cache.DeletedFinalStateUnknown)
 					if !ok {
-						glog.Errorf("Received unexpected object: %v", obj)
+						glog.Errorf("Received unexpected object: %v", originalObj)
 						return
 					}
 					node, ok = deletedState.Obj.(*api.Node)
@@ -337,7 +320,7 @@ func NewNodeController(
 						return
 					}
 				}
-				if err := nc.cidrAllocator.ReleaseCIDR(node); err != nil {
+				if err := nc.cidrAllocator.ReleaseCIDR(node.DeepCopy()); err != nil {
 					glog.Errorf("Error releasing CIDR: %v", err)
 				}
 			},

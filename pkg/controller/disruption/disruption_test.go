@@ -40,12 +40,7 @@ func (ps *pdbStates) Set(pdb *policy.PodDisruptionBudget) error {
 	if err != nil {
 		return err
 	}
-	obj, err := api.Scheme.DeepCopy(*pdb)
-	if err != nil {
-		return err
-	}
-	(*ps)[key] = obj.(policy.PodDisruptionBudget)
-
+	(*ps)[key] = *pdb.DeepCopy()
 	return nil
 }
 

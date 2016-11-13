@@ -124,11 +124,7 @@ func (t *Tester) setObjectMeta(obj runtime.Object, name string) {
 }
 
 func copyOrDie(obj runtime.Object) runtime.Object {
-	out, err := api.Scheme.Copy(obj)
-	if err != nil {
-		panic(err)
-	}
-	return out
+	return obj.DeepCopyObject()
 }
 
 type AssignFunc func([]runtime.Object) []runtime.Object

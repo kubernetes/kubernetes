@@ -41,28 +41,14 @@ func (kl *Kubelet) defaultPodLimitsForDownwardApi(pod *api.Pod, container *api.C
 	}
 	allocatable := node.Status.Allocatable
 
-	podCopy, err := api.Scheme.Copy(pod)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to perform a deep copy of pod object: %v", err)
-	}
-	outputPod, ok := podCopy.(*api.Pod)
-	if !ok {
-		return nil, nil, fmt.Errorf("unexpected type returned from deep copy of pod object")
-	}
+	outputPod := pod.DeepCopy()
 	for idx := range outputPod.Spec.Containers {
 		fieldpath.MergeContainerResourceLimits(&outputPod.Spec.Containers[idx], allocatable)
 	}
 
 	var outputContainer *api.Container
 	if container != nil {
-		containerCopy, err := api.Scheme.DeepCopy(container)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to perform a deep copy of container object: %v", err)
-		}
-		outputContainer, ok = containerCopy.(*api.Container)
-		if !ok {
-			return nil, nil, fmt.Errorf("unexpected type returned from deep copy of container object")
-		}
+		outputContainer = container.DeepCopy()
 		fieldpath.MergeContainerResourceLimits(outputContainer, allocatable)
 	}
 	return outputPod, outputContainer, nil

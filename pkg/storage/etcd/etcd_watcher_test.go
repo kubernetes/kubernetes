@@ -373,12 +373,7 @@ func TestWatchEtcdState(t *testing.T) {
 
 	// CAS the previous value
 	updateFn := func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
-		newObj, err := api.Scheme.DeepCopy(endpoint)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-			return nil, nil, err
-		}
-		return newObj.(*api.Endpoints), nil, nil
+		return endpoint.DeepCopy(), nil, nil
 	}
 	err = h.GuaranteedUpdate(context.TODO(), key, &api.Endpoints{}, false, nil, updateFn)
 	if err != nil {

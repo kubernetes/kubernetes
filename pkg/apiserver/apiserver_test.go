@@ -447,11 +447,7 @@ func (storage *SimpleRESTStorage) Get(ctx api.Context, id string) (runtime.Objec
 	if id == "binary" {
 		return storage.stream, storage.errors["get"]
 	}
-	copied, err := api.Scheme.Copy(&storage.item)
-	if err != nil {
-		panic(err)
-	}
-	return copied, storage.errors["get"]
+	return storage.item.DeepCopyObject(), storage.errors["get"]
 }
 
 func (storage *SimpleRESTStorage) checkContext(ctx api.Context) {
@@ -677,11 +673,7 @@ func (storage *SimpleTypedStorage) New() runtime.Object {
 
 func (storage *SimpleTypedStorage) Get(ctx api.Context, id string) (runtime.Object, error) {
 	storage.checkContext(ctx)
-	copied, err := api.Scheme.Copy(storage.item)
-	if err != nil {
-		panic(err)
-	}
-	return copied, storage.errors["get"]
+	return storage.item.DeepCopyObject(), storage.errors["get"]
 }
 
 func (storage *SimpleTypedStorage) checkContext(ctx api.Context) {
@@ -3187,11 +3179,7 @@ func (storage *SimpleXGSubresourceRESTStorage) New() runtime.Object {
 }
 
 func (storage *SimpleXGSubresourceRESTStorage) Get(ctx api.Context, id string) (runtime.Object, error) {
-	copied, err := api.Scheme.Copy(&storage.item)
-	if err != nil {
-		panic(err)
-	}
-	return copied, nil
+	return storage.item.DeepCopyObject(), nil
 }
 
 func TestXGSubresource(t *testing.T) {

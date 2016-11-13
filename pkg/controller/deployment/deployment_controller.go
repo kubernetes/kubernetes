@@ -325,10 +325,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	deployment := obj.(*extensions.Deployment)
 	// Deep-copy otherwise we are mutating our cache.
 	// TODO: Deep-copy only when needed.
-	d, err := util.DeploymentDeepCopy(deployment)
-	if err != nil {
-		return err
-	}
+	d := deployment.DeepCopy()
 
 	everything := unversioned.LabelSelector{}
 	if reflect.DeepEqual(d.Spec.Selector, &everything) {
@@ -393,10 +390,7 @@ func (dc *DeploymentController) handleOverlap(d *extensions.Deployment) error {
 	overlapping := false
 	for _, other := range deployments {
 		if !selector.Empty() && selector.Matches(labels.Set(other.Spec.Template.Labels)) && d.UID != other.UID {
-			deploymentCopy, err := util.DeploymentDeepCopy(other)
-			if err != nil {
-				return err
-			}
+			deploymentCopy := other.DeepCopy()
 			overlapping = true
 			// Skip syncing this one if older overlapping one is found.
 			if util.SelectorUpdatedBefore(deploymentCopy, d) {

@@ -200,10 +200,7 @@ func TestReplicationControllerStop(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		copiedForWatch, err := api.Scheme.Copy(test.Objs[0])
-		if err != nil {
-			t.Fatalf("%s unexpected error: %v", test.Name, err)
-		}
+		copiedForWatch := test.Objs[0].DeepCopyObject()
 		fake := fake.NewSimpleClientset(test.Objs...)
 		fakeWatch := watch.NewFake()
 		fake.PrependWatchReactor("replicationcontrollers", testcore.DefaultWatchReactor(fakeWatch, nil))

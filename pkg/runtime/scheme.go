@@ -138,6 +138,14 @@ func (s *Scheme) Converter() *conversion.Converter {
 	return s.converter
 }
 
+// TODO(sttts): get rid of the ObjectCopier interface and call DeepCopy functions directly
+func (s *Scheme) Copy(obj Object) (Object, error) {
+	if obj == nil {
+		return nil, nil
+	}
+	return obj.DeepCopyObject(), nil
+}
+
 // AddUnversionedTypes registers the provided types as "unversioned", which means that they follow special rules.
 // Whenever an object of this type is serialized, it is serialized with the provided group version and is not
 // converted. Thus unversioned objects are expected to remain backwards compatible forever, as if they were in an
@@ -442,15 +450,6 @@ func (s *Scheme) Default(src Object) {
 	}
 }
 
-// Copy does a deep copy of an API object.
-func (s *Scheme) Copy(src Object) (Object, error) {
-	dst, err := s.DeepCopy(src)
-	if err != nil {
-		return nil, err
-	}
-	return dst.(Object), nil
-}
-
 // Performs a deep copy of the given object.
 func (s *Scheme) DeepCopy(src interface{}) (interface{}, error) {
 	return s.cloner.DeepCopy(src)
@@ -544,11 +543,7 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 	}
 
 	if copy {
-		copied, err := s.Copy(in)
-		if err != nil {
-			return nil, err
-		}
-		in = copied
+		in = in.DeepCopyObject()
 	}
 
 	flags, meta := s.generateConvertMeta(in)

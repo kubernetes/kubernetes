@@ -24,7 +24,6 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/diff"
 )
@@ -102,10 +101,7 @@ func (d *defaultCacheMutationDetector) AddObject(obj interface{}) {
 		return
 	}
 
-	copiedObj, err := api.Scheme.Copy(obj.(runtime.Object))
-	if err != nil {
-		return
-	}
+	copiedObj := obj.(runtime.Object).DeepCopyObject()
 
 	d.lock.Lock()
 	defer d.lock.Unlock()

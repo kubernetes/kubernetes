@@ -74,12 +74,7 @@ func (r *ServiceRegistry) CreateService(ctx api.Context, svc *api.Service) (*api
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.Service = new(api.Service)
-	clone, err := api.Scheme.DeepCopy(svc)
-	if err != nil {
-		return nil, err
-	}
-	r.Service = clone.(*api.Service)
+	r.Service = svc.DeepCopy()
 
 	r.List.Items = append(r.List.Items, *svc)
 	return svc, r.Err

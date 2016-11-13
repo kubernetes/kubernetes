@@ -117,11 +117,7 @@ func TestMultiIndexKeys(t *testing.T) {
 		t.Errorf("Expected 0 pods but got %v", len(elmoPods))
 	}
 
-	obj, err := api.Scheme.DeepCopy(pod2)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	copyOfPod2 := obj.(*api.Pod)
+	copyOfPod2 := pod2.DeepCopy()
 	copyOfPod2.Annotations["users"] = "oscar"
 	index.Update(copyOfPod2)
 	bertPods, err = index.ByIndex("byUser", "bert")

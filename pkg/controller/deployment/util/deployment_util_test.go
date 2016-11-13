@@ -431,14 +431,8 @@ func TestEqualIgnoreHash(t *testing.T) {
 	for _, test := range tests {
 		runTest := func(t1, t2 api.PodTemplateSpec, reversed bool) {
 			// Set up
-			t1Copy, err := api.Scheme.DeepCopy(t1)
-			if err != nil {
-				t.Errorf("Failed setting up the test: %v", err)
-			}
-			t2Copy, err := api.Scheme.DeepCopy(t2)
-			if err != nil {
-				t.Errorf("Failed setting up the test: %v", err)
-			}
+			t1Copy := t1.DeepCopy()
+			t2Copy := t2.DeepCopy()
 			reverseString := ""
 			if reversed {
 				reverseString = " (reverse order)"
