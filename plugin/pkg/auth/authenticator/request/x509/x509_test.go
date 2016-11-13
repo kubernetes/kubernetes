@@ -925,7 +925,7 @@ func getCert(t *testing.T, pemData string) *x509.Certificate {
 }
 
 func getCerts(t *testing.T, pemData ...string) []*x509.Certificate {
-	certs := make([]*x509.Certificate, 0)
+	certs := []*x509.Certificate{}
 	for _, pemData := range pemData {
 		certs = append(certs, getCert(t, pemData))
 	}
