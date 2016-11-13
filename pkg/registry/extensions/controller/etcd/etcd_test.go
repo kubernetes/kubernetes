@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/storage"
-	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/storage/storagebackend/factory"
 )
@@ -92,7 +91,7 @@ func TestGet(t *testing.T) {
 	defer destroyFunc()
 
 	ctx := api.WithNamespace(api.NewContext(), "test")
-	key := etcdtest.AddPrefix("/controllers/test/foo")
+	key := "/controllers/test/foo"
 	if err := si.Create(ctx, key, &validController, nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -111,7 +110,7 @@ func TestUpdate(t *testing.T) {
 	defer destroyFunc()
 
 	ctx := api.WithNamespace(api.NewContext(), "test")
-	key := etcdtest.AddPrefix("/controllers/test/foo")
+	key := "/controllers/test/foo"
 	if err := si.Create(ctx, key, &validController, nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
-	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
@@ -86,7 +85,7 @@ func TestStatusUpdate(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	ctx := api.WithNamespace(api.NewContext(), api.NamespaceDefault)
-	key := etcdtest.AddPrefix("/poddisruptionbudgets/" + api.NamespaceDefault + "/foo")
+	key := "/poddisruptionbudgets/" + api.NamespaceDefault + "/foo"
 	validPodDisruptionBudget := validNewPodDisruptionBudget()
 	if err := storage.Storage.Create(ctx, key, validPodDisruptionBudget, nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)

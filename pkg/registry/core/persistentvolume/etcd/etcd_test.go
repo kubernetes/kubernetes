@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/util/diff"
 )
@@ -159,7 +158,6 @@ func TestUpdateStatus(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	ctx := api.NewContext()
 	key, _ := storage.KeyFunc(ctx, "foo")
-	key = etcdtest.AddPrefix(key)
 	pvStart := validNewPersistentVolume("foo")
 	err := storage.Storage.Create(ctx, key, pvStart, nil, 0)
 	if err != nil {
