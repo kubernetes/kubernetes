@@ -30,7 +30,7 @@ To update a single build file, run:
 $ # get gazel
 $ go get -u github.com/mikedanese/gazel
 $ # .e.g. ./pkg/kubectl/BUILD
-$ gazel ./pkg/kubectl
+$ gazel -root="${YOUR_KUBE_ROOT_PATH}" ./pkg/kubectl
 ```
 
 Updating BUILD file for a package will be required when:
