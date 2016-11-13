@@ -54,7 +54,6 @@ type FinalizeREST struct {
 // NewREST returns a RESTStorage object that will work against namespaces.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *FinalizeREST) {
 	store := &genericregistry.Store{
-		Copier:            api.Scheme,
 		NewFunc:           func() runtime.Object { return &api.Namespace{} },
 		NewListFunc:       func() runtime.Object { return &api.NamespaceList{} },
 		PredicateFunc:     namespace.MatchNamespace,

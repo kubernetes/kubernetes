@@ -330,7 +330,7 @@ func TestServiceRegistryUpdate(t *testing.T) {
 				TargetPort: intstr.FromInt(6502),
 			}},
 		},
-	}, api.Scheme))
+	}))
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
@@ -391,7 +391,7 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 		},
 	}
 	for _, failureCase := range failureCases {
-		c, created, err := storage.Update(ctx, failureCase.Name, rest.DefaultUpdatedObjectInfo(&failureCase, api.Scheme))
+		c, created, err := storage.Update(ctx, failureCase.Name, rest.DefaultUpdatedObjectInfo(&failureCase))
 		if c != nil || created {
 			t.Errorf("Expected nil object or created false")
 		}
@@ -499,14 +499,14 @@ func TestServiceRegistryUpdateExternalService(t *testing.T) {
 	// Modify load balancer to be external.
 	svc2 := svc1.DeepCopy()
 	svc2.Spec.Type = api.ServiceTypeLoadBalancer
-	if _, _, err := storage.Update(ctx, svc2.Name, rest.DefaultUpdatedObjectInfo(svc2, api.Scheme)); err != nil {
+	if _, _, err := storage.Update(ctx, svc2.Name, rest.DefaultUpdatedObjectInfo(svc2)); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
 	// Change port.
 	svc3 := svc2.DeepCopy()
 	svc3.Spec.Ports[0].Port = 6504
-	if _, _, err := storage.Update(ctx, svc3.Name, rest.DefaultUpdatedObjectInfo(svc3, api.Scheme)); err != nil {
+	if _, _, err := storage.Update(ctx, svc3.Name, rest.DefaultUpdatedObjectInfo(svc3)); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 }
@@ -542,7 +542,7 @@ func TestServiceRegistryUpdateMultiPortExternalService(t *testing.T) {
 	// Modify ports
 	svc2 := svc1.DeepCopy()
 	svc2.Spec.Ports[1].Port = 8088
-	if _, _, err := storage.Update(ctx, svc2.Name, rest.DefaultUpdatedObjectInfo(svc2, api.Scheme)); err != nil {
+	if _, _, err := storage.Update(ctx, svc2.Name, rest.DefaultUpdatedObjectInfo(svc2)); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 }
@@ -881,7 +881,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 	update := created_service.DeepCopy()
 	update.Spec.Ports[0].Port = 6503
 
-	updated_svc, _, _ := storage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(update, api.Scheme))
+	updated_svc, _, _ := storage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(update))
 	updated_service := updated_svc.(*api.Service)
 	if updated_service.Spec.Ports[0].Port != 6503 {
 		t.Errorf("Expected port 6503, but got %v", updated_service.Spec.Ports[0].Port)
@@ -900,7 +900,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 	update.Spec.Ports[0].Port = 6503
 	update.Spec.ClusterIP = testIP // Error: Cluster IP is immutable
 
-	_, _, err := storage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(update, api.Scheme))
+	_, _, err := storage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(update))
 	if err == nil || !errors.IsInvalid(err) {
 		t.Errorf("Unexpected error type: %v", err)
 	}
@@ -934,7 +934,7 @@ func TestServiceRegistryIPLoadBalancer(t *testing.T) {
 
 	update := created_service.DeepCopy()
 
-	_, _, err := storage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(update, api.Scheme))
+	_, _, err := storage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(update))
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
@@ -947,7 +947,7 @@ func TestUpdateServiceWithConflictingNamespace(t *testing.T) {
 	}
 
 	ctx := genericapirequest.NewDefaultContext()
-	obj, created, err := storage.Update(ctx, service.Name, rest.DefaultUpdatedObjectInfo(service, api.Scheme))
+	obj, created, err := storage.Update(ctx, service.Name, rest.DefaultUpdatedObjectInfo(service))
 	if obj != nil || created {
 		t.Error("Expected a nil object, but we got a value or created was true")
 	}

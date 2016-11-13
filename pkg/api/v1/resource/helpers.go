@@ -111,27 +111,15 @@ func ExtractResourceValueByContainerName(fs *v1.ResourceFieldSelector, pod *v1.P
 	return ExtractContainerResourceValue(fs, container)
 }
 
-type deepCopier interface {
-	DeepCopy(interface{}) (interface{}, error)
-}
-
 // ExtractResourceValueByContainerNameAndNodeAllocatable extracts the value of a resource
 // by providing container name and node allocatable
-func ExtractResourceValueByContainerNameAndNodeAllocatable(copier deepCopier, fs *v1.ResourceFieldSelector, pod *v1.Pod, containerName string, nodeAllocatable v1.ResourceList) (string, error) {
+func ExtractResourceValueByContainerNameAndNodeAllocatable(fs *v1.ResourceFieldSelector, pod *v1.Pod, containerName string, nodeAllocatable v1.ResourceList) (string, error) {
 	realContainer, err := findContainerInPod(pod, containerName)
 	if err != nil {
 		return "", err
 	}
 
-	containerCopy, err := copier.DeepCopy(realContainer)
-	if err != nil {
-		return "", fmt.Errorf("failed to perform a deep copy of container object: %v", err)
-	}
-
-	container, ok := containerCopy.(*v1.Container)
-	if !ok {
-		return "", fmt.Errorf("unexpected type returned from deep copy of container object")
-	}
+	container := realContainer.DeepCopy()
 
 	MergeContainerResourceLimits(container, nodeAllocatable)
 

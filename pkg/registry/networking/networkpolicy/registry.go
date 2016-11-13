@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/networking"
 )
 
@@ -62,7 +61,7 @@ func (s *storage) CreateNetworkPolicy(ctx genericapirequest.Context, np *network
 }
 
 func (s *storage) UpdateNetworkPolicy(ctx genericapirequest.Context, np *networking.NetworkPolicy) error {
-	_, _, err := s.Update(ctx, np.Name, rest.DefaultUpdatedObjectInfo(np, api.Scheme))
+	_, _, err := s.Update(ctx, np.Name, rest.DefaultUpdatedObjectInfo(np))
 	return err
 }
 

@@ -103,7 +103,6 @@ func newTestCacher(s storage.Interface, cap int) *storage.Cacher {
 		CacheCapacity:  cap,
 		Storage:        s,
 		Versioner:      etcdstorage.APIObjectVersioner{},
-		Copier:         scheme,
 		Type:           &example.Pod{},
 		ResourcePrefix: prefix,
 		KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },

@@ -710,7 +710,7 @@ func TestEtcdUpdateNotScheduled(t *testing.T) {
 	}
 
 	podIn := validChangedPod()
-	_, _, err := storage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(podIn, api.Scheme))
+	_, _, err := storage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(podIn))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -780,7 +780,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 			SchedulerName:                 api.DefaultSchedulerName,
 		},
 	}
-	_, _, err = storage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(&podIn, api.Scheme))
+	_, _, err = storage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(&podIn))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -864,7 +864,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 	expected.Labels = podIn.Labels
 	expected.Status = podIn.Status
 
-	_, _, err = statusStorage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(&podIn, api.Scheme))
+	_, _, err = statusStorage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(&podIn))
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
