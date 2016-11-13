@@ -21,8 +21,7 @@ limitations under the License.
 // offers a `.DeepCopy()` method, it will simply call that.  Otherwise it will
 // use standard value assignment whenever possible.  If that is not possible it
 // will try to call its own generated copy function for the type, if the type is
-// within the allowed root packages.  Failing that, it will fall back on
-// `conversion.Cloner.DeepCopy(val)` to make the copy.  The resulting file will
+// within the allowed root packages. The resulting file will
 // be stored in the same directory as the processed source package.
 //
 // Generation is governed by comment tags in the source.  Any package may

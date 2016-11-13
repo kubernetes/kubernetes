@@ -23,15 +23,12 @@ import (
 
 	"github.com/go-openapi/spec"
 
-	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apiserver/pkg/util/trie"
 )
 
 const (
 	DEFINITION_PREFIX = "#/definitions/"
 )
-
-var cloner = conversion.NewCloner()
 
 // Run a walkRefCallback method on all references of an OpenAPI spec
 type walkAllRefs struct {

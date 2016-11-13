@@ -96,7 +96,7 @@ func testScheme(t *testing.T) (*runtime.Scheme, serializer.CodecFactory) {
 }
 
 func newEtcdHelper(client etcd.Client, scheme *runtime.Scheme, codec runtime.Codec, prefix string) etcdHelper {
-	return *NewEtcdStorage(client, codec, prefix, false, etcdtest.DeserializationCacheSize, scheme, prefixTransformer{prefix: "test!"}).(*etcdHelper)
+	return *NewEtcdStorage(client, codec, prefix, false, etcdtest.DeserializationCacheSize, prefixTransformer{prefix: "test!"}).(*etcdHelper)
 }
 
 // Returns an encoded version of example.Pod with the given name.

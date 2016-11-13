@@ -203,13 +203,6 @@ type ObjectCreater interface {
 	New(kind schema.GroupVersionKind) (out Object, err error)
 }
 
-// ObjectCopier duplicates an object.
-type ObjectCopier interface {
-	// Copy returns an exact copy of the provided Object, or an error if the
-	// copy could not be completed.
-	Copy(Object) (Object, error)
-}
-
 // ResourceVersioner provides methods for setting and retrieving
 // the resource version from an API object.
 type ResourceVersioner interface {

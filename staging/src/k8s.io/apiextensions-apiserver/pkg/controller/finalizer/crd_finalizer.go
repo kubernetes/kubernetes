@@ -42,8 +42,6 @@ import (
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
 )
 
-var cloner = conversion.NewCloner()
-
 // CRDFinalizer is a controller that finalizes the CRD by deleting all the CRs associated with it.
 type CRDFinalizer struct {
 	crdClient      client.CustomResourceDefinitionsGetter

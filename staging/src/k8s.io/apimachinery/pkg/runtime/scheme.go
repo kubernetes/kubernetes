@@ -68,10 +68,6 @@ type Scheme struct {
 	// converter stores all registered conversion functions. It also has
 	// default coverting behavior.
 	converter *conversion.Converter
-
-	// cloner stores all registered copy functions. It also has default
-	// deep copy behavior.
-	cloner *conversion.Cloner
 }
 
 // Function to convert a field selector to internal representation.
@@ -80,11 +76,10 @@ type FieldLabelConversionFunc func(label, value string) (internalLabel, internal
 // NewScheme creates a new Scheme. This scheme is pluggable by default.
 func NewScheme() *Scheme {
 	s := &Scheme{
-		gvkToType:        map[schema.GroupVersionKind]reflect.Type{},
-		typeToGVK:        map[reflect.Type][]schema.GroupVersionKind{},
-		unversionedTypes: map[reflect.Type]schema.GroupVersionKind{},
-		unversionedKinds: map[string]reflect.Type{},
-		cloner:           conversion.NewCloner(),
+		gvkToType:                 map[schema.GroupVersionKind]reflect.Type{},
+		typeToGVK:                 map[reflect.Type][]schema.GroupVersionKind{},
+		unversionedTypes:          map[reflect.Type]schema.GroupVersionKind{},
+		unversionedKinds:          map[string]reflect.Type{},
 		fieldLabelConversionFuncs: map[string]map[string]FieldLabelConversionFunc{},
 		defaulterFuncs:            map[reflect.Type]func(interface{}){},
 	}
@@ -354,29 +349,6 @@ func (s *Scheme) AddGeneratedConversionFuncs(conversionFuncs ...interface{}) err
 	return nil
 }
 
-// AddDeepCopyFuncs adds a function to the list of deep-copy functions.
-// For the expected format of deep-copy function, see the comment for
-// Copier.RegisterDeepCopyFunction.
-func (s *Scheme) AddDeepCopyFuncs(deepCopyFuncs ...interface{}) error {
-	for _, f := range deepCopyFuncs {
-		if err := s.cloner.RegisterDeepCopyFunc(f); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// Similar to AddDeepCopyFuncs, but registers deep-copy functions that were
-// automatically generated.
-func (s *Scheme) AddGeneratedDeepCopyFuncs(deepCopyFuncs ...conversion.GeneratedDeepCopyFunc) error {
-	for _, fn := range deepCopyFuncs {
-		if err := s.cloner.RegisterGeneratedDeepCopyFunc(fn); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // AddFieldLabelConversionFunc adds a conversion function to convert field selectors
 // of the given kind from the given version to internal version representation.
 func (s *Scheme) AddFieldLabelConversionFunc(version, kind string, conversionFunc FieldLabelConversionFunc) error {
@@ -418,20 +390,6 @@ func (s *Scheme) Default(src Object) {
 	if fn, ok := s.defaulterFuncs[reflect.TypeOf(src)]; ok {
 		fn(src)
 	}
-}
-
-// Copy does a deep copy of an API object.
-func (s *Scheme) Copy(src Object) (Object, error) {
-	dst, err := s.DeepCopy(src)
-	if err != nil {
-		return nil, err
-	}
-	return dst.(Object), nil
-}
-
-// Performs a deep copy of the given object.
-func (s *Scheme) DeepCopy(src interface{}) (interface{}, error) {
-	return s.cloner.DeepCopy(src)
 }
 
 // Convert will attempt to convert in into out. Both must be pointers. For easy
@@ -501,9 +459,9 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 		// TODO: when we move to server API versions, we should completely remove the unversioned concept
 		if unversionedKind, ok := s.unversionedTypes[t]; ok {
 			if gvk, ok := target.KindForGroupVersionKinds([]schema.GroupVersionKind{unversionedKind}); ok {
-				return copyAndSetTargetKind(copy, s, in, gvk)
+				return copyAndSetTargetKind(copy, in, gvk)
 			}
-			return copyAndSetTargetKind(copy, s, in, unversionedKind)
+			return copyAndSetTargetKind(copy, in, unversionedKind)
 		}
 
 		return nil, NewNotRegisteredErrForTarget(t, target)
@@ -512,16 +470,16 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 	// target wants to use the existing type, set kind and return (no conversion necessary)
 	for _, kind := range kinds {
 		if gvk == kind {
-			return copyAndSetTargetKind(copy, s, in, gvk)
+			return copyAndSetTargetKind(copy, in, gvk)
 		}
 	}
 
 	// type is unversioned, no conversion necessary
 	if unversionedKind, ok := s.unversionedTypes[t]; ok {
 		if gvk, ok := target.KindForGroupVersionKinds([]schema.GroupVersionKind{unversionedKind}); ok {
-			return copyAndSetTargetKind(copy, s, in, gvk)
+			return copyAndSetTargetKind(copy, in, gvk)
 		}
-		return copyAndSetTargetKind(copy, s, in, unversionedKind)
+		return copyAndSetTargetKind(copy, in, unversionedKind)
 	}
 
 	out, err := s.New(gvk)
@@ -549,7 +507,7 @@ func (s *Scheme) generateConvertMeta(in interface{}) (conversion.FieldMatchingFl
 }
 
 // copyAndSetTargetKind performs a conditional copy before returning the object, or an error if copy was not successful.
-func copyAndSetTargetKind(copy bool, copier ObjectCopier, obj Object, kind schema.GroupVersionKind) (Object, error) {
+func copyAndSetTargetKind(copy bool, obj Object, kind schema.GroupVersionKind) (Object, error) {
 	if copy {
 		obj = obj.DeepCopyObject()
 	}
