@@ -6,7 +6,7 @@ The example assumes that you have already set up a Glusterfs server cluster and 
 
 ### Prerequisites
 
-Set up Glusterfs server cluster; install Glusterfs client package on the Kubernetes nodes. ([Guide](https://www.howtoforge.com/high-availability-storage-with-glusterfs-3.2.x-on-debian-wheezy-automatic-file-replication-mirror-across-two-storage-servers))
+Set up Glusterfs server cluster; install Glusterfs client package on the Kubernetes nodes. ([Guide](http://gluster.readthedocs.io/en/latest/Administrator%20Guide/))
 
 ### Create endpoints
 
