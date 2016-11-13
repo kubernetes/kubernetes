@@ -43,7 +43,7 @@ type SecureServingOptions struct {
 }
 
 type CertKey struct {
-	// CertFile is a file containing a PEM-encoded certificate
+	// CertFile is a file containing a PEM-encoded certificate, and possibly the complete certificate chain
 	CertFile string
 	// KeyFile is a file containing a PEM-encoded private key for the certificate specified by CertFile
 	KeyFile string
@@ -52,6 +52,8 @@ type CertKey struct {
 type GeneratableKeyCert struct {
 	CertKey CertKey
 
+	// CaCertFile is an optional file containing the certificate chain for CertKey.CertFile
+	CaCertFile string
 	// CertDirectory is a directory that will contain the certificates.  If the cert and key aren't specifically set
 	// this will be used to derive a match with the "pair-name"
 	CertDirectory string
@@ -106,6 +108,11 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ServerCert.CertKey.KeyFile, "tls-private-key-file", s.ServerCert.CertKey.KeyFile,
 		"File containing the default x509 private key matching --tls-cert-file.")
 
+	fs.StringVar(&s.ServerCert.CaCertFile, "tls-ca-file", s.ServerCert.CaCertFile, "If set, this "+
+		"certificate authority will used for secure access from Admission "+
+		"Controllers. This must be a valid PEM-encoded CA bundle. Altneratively, the certificate authority "+
+		"can be appended to the certificate provided by --tls-cert-file.")
+
 	fs.Var(config.NewNamedCertKeyArray(&s.SNICertKeys), "tls-sni-cert-key", ""+
 		"A pair of x509 certificate and private key file paths, optionally suffixed with a list of "+
 		"domain patterns which are fully qualified domain names, possibly with prefixed wildcard "+
@@ -125,11 +132,6 @@ func (s *SecureServingOptions) AddDeprecatedFlags(fs *pflag.FlagSet) {
 	fs.IPVar(&s.ServingOptions.BindAddress, "public-address-override", s.ServingOptions.BindAddress,
 		"DEPRECATED: see --bind-address instead.")
 	fs.MarkDeprecated("public-address-override", "see --bind-address instead.")
-
-	var serverCA string
-	fs.StringVar(&serverCA, "tls-ca-file", serverCA, "DEPRECATED: This value is ignored. Instead "+
-		"the certificate authority for the Admission Controller is automatically derived from "+
-		"--tls-cert-file and --tls-sni-cert-key.")
 }
 
 func NewInsecureServingOptions() *ServingOptions {

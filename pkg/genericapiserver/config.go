@@ -18,8 +18,10 @@ package genericapiserver
 
 import (
 	"crypto/tls"
+	"encoding/pem"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -167,6 +169,10 @@ type SecureServingInfo struct {
 	// allowed to be in SNICerts.
 	Cert *tls.Certificate
 
+	// CACert is an optional certificate authority used for the loopback connection of the Admission controllers.
+	// If this is nil, the certificate authority is extracted from Cert or a matching SNI certificate.
+	CACert *tls.Certificate
+
 	// SNICerts are the TLS certificates by name used for SNI.
 	SNICerts map[string]*tls.Certificate
 
@@ -260,6 +266,24 @@ func (c *Config) ApplySecureServingOptions(secureServing *options.SecureServingO
 			return nil, fmt.Errorf("unable to load server certificate: %v", err)
 		}
 		secureServingInfo.Cert = &tlsCert
+	}
+
+	// optionally load CA cert
+	if len(secureServing.ServerCert.CaCertFile) != 0 {
+		pemData, err := ioutil.ReadFile(secureServing.ServerCert.CaCertFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read certificate authority from %q: %v", secureServing.ServerCert.CaCertFile, err)
+		}
+		block, pemData := pem.Decode(pemData)
+		if block == nil {
+			return nil, fmt.Errorf("no certificate found in certificate authority file %q", secureServing.ServerCert.CaCertFile)
+		}
+		if block.Type != "CERTIFICATE" {
+			return nil, fmt.Errorf("expected CERTIFICATE block in certiticate authority file %q, found: %s", secureServing.ServerCert.CaCertFile, block.Type)
+		}
+		secureServingInfo.CACert = &tls.Certificate{
+			Certificate: [][]byte{block.Bytes},
+		}
 	}
 
 	// load SNI certs

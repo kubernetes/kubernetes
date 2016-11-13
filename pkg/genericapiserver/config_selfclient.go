@@ -63,9 +63,12 @@ func (s *SecureServingInfo) NewSelfClientConfig(token string) (*restclient.Confi
 		BearerToken: token,
 	}
 
-	// find certificate for host: either the server cert or one of the SNI certs
+	// find certificate for host: either explicitly given, from the server cert bundle or one of the SNI certs
 	var derCA []byte
-	if s.Cert != nil {
+	if s.CACert != nil {
+		derCA = s.CACert.Certificate[0]
+	}
+	if derCA == nil && s.Cert != nil {
 		x509Cert, err := x509.ParseCertificate(s.Cert.Certificate[0])
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse server certificate: %v", err)
