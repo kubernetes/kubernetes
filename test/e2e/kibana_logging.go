@@ -83,6 +83,7 @@ func ClusterLevelLoggingWithKibana(f *framework.Framework) {
 		proxyRequest, errProxy := framework.GetServicesProxyRequest(f.ClientSet, f.ClientSet.Core().RESTClient().Get())
 		if errProxy != nil {
 			framework.Logf("After %v failed to get services proxy request: %v", time.Since(start), errProxy)
+			err = errProxy
 			continue
 		}
 		// Query against the root URL for Kibana.
