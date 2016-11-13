@@ -398,8 +398,8 @@ func testRollingUpdateDeploymentEvents(f *framework.Framework) {
 	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(newRS).NotTo(Equal(nil))
-	Expect(events.Items[0].Message).Should(Equal(fmt.Sprintf("Scaled up replica set %s to 1", newRS.Name)))
-	Expect(events.Items[1].Message).Should(Equal(fmt.Sprintf("Scaled down replica set %s to 0", rsName)))
+	Expect(events.Items[0].Message).Should(Equal(fmt.Sprintf("Scaled up ReplicaSet %s to 1", newRS.Name)))
+	Expect(events.Items[1].Message).Should(Equal(fmt.Sprintf("Scaled down ReplicaSet %s to 0", rsName)))
 }
 
 func testRecreateDeployment(f *framework.Framework) {
