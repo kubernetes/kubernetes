@@ -42,6 +42,9 @@ var _ rest.ResourceStreamer = &LocationStreamer{}
 func (obj *LocationStreamer) GetObjectKind() unversioned.ObjectKind {
 	return unversioned.EmptyObjectKind
 }
+func (obj *LocationStreamer) DeepCopyObject() unversioned.Object {
+	panic("rest.LocationStreamer does not implement DeepCopyObject")
+}
 
 // InputStream returns a stream with the contents of the URL location. If no location is provided,
 // a null stream is returned.

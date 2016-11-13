@@ -24,6 +24,7 @@ import (
 
 // Event represents a single event to a watched resource.
 //
+// +k8s:deepcopy-gen=true
 // +protobuf=true
 // +k8s:openapi-gen=true
 type Event struct {

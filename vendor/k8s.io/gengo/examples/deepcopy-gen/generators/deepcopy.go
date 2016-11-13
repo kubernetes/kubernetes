@@ -520,7 +520,9 @@ func (g *genDeepCopy) doMap(t *types.Type, sw *generator.SnippetWriter) {
 			sw.Do("(*out)[key] = val\n", nil)
 			sw.Do("}\n", nil)
 		case t.Elem.Kind == types.Interface:
-			sw.Do(fmt.Sprintf("(*out)[key] = in.DeepCopy%s()\n", t.Elem.Name.Name), t)
+			sw.Do("for key, val := range *in {\n", nil)
+			sw.Do(fmt.Sprintf("(*out)[key] = val.DeepCopy%s()\n", t.Elem.Name.Name), t)
+			sw.Do("}\n", nil)
 		default:
 			sw.Do("for key, val := range *in {\n", nil)
 			if g.copyableAndInBounds(t.Elem) {
@@ -530,7 +532,12 @@ func (g *genDeepCopy) doMap(t *types.Type, sw *generator.SnippetWriter) {
 			} else if t.Elem.Kind == types.Slice && t.Elem.Elem.Kind == types.Builtin {
 				sw.Do("(*out)[key] = make($.|raw$, len(val))\n", t.Elem)
 				sw.Do("copy((*out)[key], val)\n", nil)
-			}else {
+			} else if t.Elem.Kind == types.Alias && t.Elem.Underlying.Kind == types.Slice && t.Elem.Underlying.Elem.Kind == types.Builtin {
+				sw.Do("(*out)[key] = make($.|raw$, len(val))\n", t.Elem)
+				sw.Do("copy((*out)[key], val)\n", nil)
+			} else if t.Elem.Kind == types.Pointer {
+				sw.Do("(*out)[key] = val.DeepCopy()\n", nil)
+			} else {
 				sw.Do("newVal := val.DeepCopy()\n", nil)
 				sw.Do("(*out)[key] = *newVal.(*$.|raw$)\n", t.Elem)
 			}

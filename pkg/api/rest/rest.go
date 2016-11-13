@@ -292,6 +292,8 @@ type StorageMetadata interface {
 }
 
 // ConnectRequest is an object passed to admission control for Connect operations
+//
+// +k8s:deepcopy-gen=true
 type ConnectRequest struct {
 	// Name is the name of the object on which the connect request was made
 	Name string
@@ -304,3 +306,9 @@ type ConnectRequest struct {
 }
 
 func (obj *ConnectRequest) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
+func (obj *ConnectRequest) DeepCopyObject() unversioned.Object {
+	if obj == nil {
+		return nil
+	}
+	return obj.DeepCopyObject()
+}

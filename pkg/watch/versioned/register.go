@@ -81,4 +81,17 @@ func Convert_versioned_Event_to_versioned_InternalEvent(in *Event, out *Internal
 type InternalEvent watch.Event
 
 func (e *InternalEvent) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
+func (e *InternalEvent) DeepCopyObject() unversioned.Object {
+	if e == nil {
+		return nil
+	}
+	return (*InternalEvent)((*watch.Event)(e).DeepCopy())
+}
+
 func (e *Event) GetObjectKind() unversioned.ObjectKind         { return unversioned.EmptyObjectKind }
+func (e *Event) DeepCopyObject() unversioned.Object {
+	if e == nil {
+		return nil
+	}
+	return e.DeepCopy()
+}

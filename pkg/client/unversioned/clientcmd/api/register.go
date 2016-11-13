@@ -44,3 +44,9 @@ func (obj *Config) SetGroupVersionKind(gvk unversioned.GroupVersionKind) {
 func (obj *Config) GroupVersionKind() unversioned.GroupVersionKind {
 	return unversioned.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
 }
+func (obj *Config) DeepCopyObject() unversioned.Object {
+	if obj == nil {
+		return nil
+	}
+	return obj.DeepCopy()
+}
