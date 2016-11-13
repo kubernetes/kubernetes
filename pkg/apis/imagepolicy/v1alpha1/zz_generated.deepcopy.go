@@ -21,85 +21,100 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1 "k8s.io/kubernetes/pkg/api/v1"
-	conversion "k8s.io/kubernetes/pkg/conversion"
-	runtime "k8s.io/kubernetes/pkg/runtime"
-	reflect "reflect"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 )
 
-func init() {
-	SchemeBuilder.Register(RegisterDeepCopies)
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ImageReview) DeepCopyInto(out *ImageReview) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	out.Status = in.Status
+	return
 }
 
-// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
-// to allow building arbitrary schemes.
-func RegisterDeepCopies(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_ImageReview, InType: reflect.TypeOf(&ImageReview{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_ImageReviewContainerSpec, InType: reflect.TypeOf(&ImageReviewContainerSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_ImageReviewSpec, InType: reflect.TypeOf(&ImageReviewSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_ImageReviewStatus, InType: reflect.TypeOf(&ImageReviewStatus{})},
-	)
+// DeepCopy will perform a deep copy of the receiver, creating a new ImageReview.
+func (x *ImageReview) DeepCopy() *ImageReview {
+	if x == nil {
+		return nil
+	}
+	out := new(ImageReview)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_v1alpha1_ImageReview(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ImageReview)
-		out := out.(*ImageReview)
-		out.TypeMeta = in.TypeMeta
-		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v1alpha1_ImageReviewSpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
-		}
-		out.Status = in.Status
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *ImageReview) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_v1alpha1_ImageReviewContainerSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ImageReviewContainerSpec)
-		out := out.(*ImageReviewContainerSpec)
-		out.Image = in.Image
-		return nil
-	}
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ImageReviewContainerSpec) DeepCopyInto(out *ImageReviewContainerSpec) {
+	out.Image = in.Image
+	return
 }
 
-func DeepCopy_v1alpha1_ImageReviewSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ImageReviewSpec)
-		out := out.(*ImageReviewSpec)
-		if in.Containers != nil {
-			in, out := &in.Containers, &out.Containers
-			*out = make([]ImageReviewContainerSpec, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.Containers = nil
-		}
-		if in.Annotations != nil {
-			in, out := &in.Annotations, &out.Annotations
-			*out = make(map[string]string)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		} else {
-			out.Annotations = nil
-		}
-		out.Namespace = in.Namespace
+// DeepCopy will perform a deep copy of the receiver, creating a new ImageReviewContainerSpec.
+func (x *ImageReviewContainerSpec) DeepCopy() *ImageReviewContainerSpec {
+	if x == nil {
 		return nil
 	}
+	out := new(ImageReviewContainerSpec)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_v1alpha1_ImageReviewStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ImageReviewStatus)
-		out := out.(*ImageReviewStatus)
-		out.Allowed = in.Allowed
-		out.Reason = in.Reason
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ImageReviewSpec) DeepCopyInto(out *ImageReviewSpec) {
+	if in.Containers != nil {
+		in, out := &in.Containers, &out.Containers
+		*out = make([]ImageReviewContainerSpec, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
+		}
+	} else {
+		out.Containers = nil
+	}
+	if in.Annotations != nil {
+		in, out := &in.Annotations, &out.Annotations
+		*out = make(map[string]string)
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	} else {
+		out.Annotations = nil
+	}
+	out.Namespace = in.Namespace
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ImageReviewSpec.
+func (x *ImageReviewSpec) DeepCopy() *ImageReviewSpec {
+	if x == nil {
 		return nil
 	}
+	out := new(ImageReviewSpec)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ImageReviewStatus) DeepCopyInto(out *ImageReviewStatus) {
+	out.Allowed = in.Allowed
+	out.Reason = in.Reason
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ImageReviewStatus.
+func (x *ImageReviewStatus) DeepCopy() *ImageReviewStatus {
+	if x == nil {
+		return nil
+	}
+	out := new(ImageReviewStatus)
+	x.DeepCopyInto(out)
+	return out
 }

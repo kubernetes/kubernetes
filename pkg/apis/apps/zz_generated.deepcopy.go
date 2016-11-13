@@ -23,110 +23,123 @@ package apps
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
-	conversion "k8s.io/kubernetes/pkg/conversion"
-	runtime "k8s.io/kubernetes/pkg/runtime"
-	reflect "reflect"
 )
 
-func init() {
-	SchemeBuilder.Register(RegisterDeepCopies)
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *StatefulSet) DeepCopyInto(out *StatefulSet) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	in.Status.DeepCopyInto(&out.Status)
+	return
 }
 
-// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
-// to allow building arbitrary schemes.
-func RegisterDeepCopies(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_apps_StatefulSet, InType: reflect.TypeOf(&StatefulSet{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_apps_StatefulSetList, InType: reflect.TypeOf(&StatefulSetList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_apps_StatefulSetSpec, InType: reflect.TypeOf(&StatefulSetSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_apps_StatefulSetStatus, InType: reflect.TypeOf(&StatefulSetStatus{})},
-	)
+// DeepCopy will perform a deep copy of the receiver, creating a new StatefulSet.
+func (x *StatefulSet) DeepCopy() *StatefulSet {
+	if x == nil {
+		return nil
+	}
+	out := new(StatefulSet)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_apps_StatefulSet(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*StatefulSet)
-		out := out.(*StatefulSet)
-		out.TypeMeta = in.TypeMeta
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_apps_StatefulSetSpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_apps_StatefulSetStatus(&in.Status, &out.Status, c); err != nil {
-			return err
-		}
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *StatefulSet) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_apps_StatefulSetList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*StatefulSetList)
-		out := out.(*StatefulSetList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]StatefulSet, len(*in))
-			for i := range *in {
-				if err := DeepCopy_apps_StatefulSet(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Items = nil
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *StatefulSetList) DeepCopyInto(out *StatefulSetList) {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]StatefulSet, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	} else {
+		out.Items = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new StatefulSetList.
+func (x *StatefulSetList) DeepCopy() *StatefulSetList {
+	if x == nil {
+		return nil
+	}
+	out := new(StatefulSetList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *StatefulSetList) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_apps_StatefulSetSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*StatefulSetSpec)
-		out := out.(*StatefulSetSpec)
-		out.Replicas = in.Replicas
-		if in.Selector != nil {
-			in, out := &in.Selector, &out.Selector
-			*out = new(unversioned.LabelSelector)
-			if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.Selector = nil
-		}
-		if err := api.DeepCopy_api_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {
-			return err
-		}
-		if in.VolumeClaimTemplates != nil {
-			in, out := &in.VolumeClaimTemplates, &out.VolumeClaimTemplates
-			*out = make([]api.PersistentVolumeClaim, len(*in))
-			for i := range *in {
-				if err := api.DeepCopy_api_PersistentVolumeClaim(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.VolumeClaimTemplates = nil
-		}
-		out.ServiceName = in.ServiceName
-		return nil
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *StatefulSetSpec) DeepCopyInto(out *StatefulSetSpec) {
+	out.Replicas = in.Replicas
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = (*in).DeepCopy()
+	} else {
+		out.Selector = nil
 	}
+	in.Template.DeepCopyInto(&out.Template)
+	if in.VolumeClaimTemplates != nil {
+		in, out := &in.VolumeClaimTemplates, &out.VolumeClaimTemplates
+		*out = make([]api.PersistentVolumeClaim, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.VolumeClaimTemplates = nil
+	}
+	out.ServiceName = in.ServiceName
+	return
 }
 
-func DeepCopy_apps_StatefulSetStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*StatefulSetStatus)
-		out := out.(*StatefulSetStatus)
-		if in.ObservedGeneration != nil {
-			in, out := &in.ObservedGeneration, &out.ObservedGeneration
-			*out = new(int64)
-			**out = **in
-		} else {
-			out.ObservedGeneration = nil
-		}
-		out.Replicas = in.Replicas
+// DeepCopy will perform a deep copy of the receiver, creating a new StatefulSetSpec.
+func (x *StatefulSetSpec) DeepCopy() *StatefulSetSpec {
+	if x == nil {
 		return nil
 	}
+	out := new(StatefulSetSpec)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *StatefulSetStatus) DeepCopyInto(out *StatefulSetStatus) {
+	if in.ObservedGeneration != nil {
+		in, out := &in.ObservedGeneration, &out.ObservedGeneration
+		*out = new(int64)
+		**out = **in
+	} else {
+		out.ObservedGeneration = nil
+	}
+	out.Replicas = in.Replicas
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new StatefulSetStatus.
+func (x *StatefulSetStatus) DeepCopy() *StatefulSetStatus {
+	if x == nil {
+		return nil
+	}
+	out := new(StatefulSetStatus)
+	x.DeepCopyInto(out)
+	return out
 }

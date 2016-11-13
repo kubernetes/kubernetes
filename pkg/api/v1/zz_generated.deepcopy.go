@@ -22,3712 +22,4744 @@ package v1
 
 import (
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
-	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 	types "k8s.io/kubernetes/pkg/types"
-	reflect "reflect"
 )
 
-func init() {
-	SchemeBuilder.Register(RegisterDeepCopies)
-}
-
-// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
-// to allow building arbitrary schemes.
-func RegisterDeepCopies(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_AWSElasticBlockStoreVolumeSource, InType: reflect.TypeOf(&AWSElasticBlockStoreVolumeSource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Affinity, InType: reflect.TypeOf(&Affinity{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_AttachedVolume, InType: reflect.TypeOf(&AttachedVolume{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_AvoidPods, InType: reflect.TypeOf(&AvoidPods{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_AzureDiskVolumeSource, InType: reflect.TypeOf(&AzureDiskVolumeSource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_AzureFileVolumeSource, InType: reflect.TypeOf(&AzureFileVolumeSource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Binding, InType: reflect.TypeOf(&Binding{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Capabilities, InType: reflect.TypeOf(&Capabilities{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_CephFSVolumeSource, InType: reflect.TypeOf(&CephFSVolumeSource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_CinderVolumeSource, InType: reflect.TypeOf(&CinderVolumeSource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ComponentCondition, InType: reflect.TypeOf(&ComponentCondition{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ComponentStatus, InType: reflect.TypeOf(&ComponentStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ComponentStatusList, InType: reflect.TypeOf(&ComponentStatusList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ConfigMap, InType: reflect.TypeOf(&ConfigMap{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ConfigMapKeySelector, InType: reflect.TypeOf(&ConfigMapKeySelector{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ConfigMapList, InType: reflect.TypeOf(&ConfigMapList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ConfigMapVolumeSource, InType: reflect.TypeOf(&ConfigMapVolumeSource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Container, InType: reflect.TypeOf(&Container{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ContainerImage, InType: reflect.TypeOf(&ContainerImage{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ContainerPort, InType: reflect.TypeOf(&ContainerPort{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ContainerState, InType: reflect.TypeOf(&ContainerState{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ContainerStateRunning, InType: reflect.TypeOf(&ContainerStateRunning{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ContainerStateTerminated, InType: reflect.TypeOf(&ContainerStateTerminated{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ContainerStateWaiting, InType: reflect.TypeOf(&ContainerStateWaiting{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ContainerStatus, InType: reflect.TypeOf(&ContainerStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_DaemonEndpoint, InType: reflect.TypeOf(&DaemonEndpoint{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_DeleteOptions, InType: reflect.TypeOf(&DeleteOptions{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_DownwardAPIVolumeFile, InType: reflect.TypeOf(&DownwardAPIVolumeFile{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_DownwardAPIVolumeSource, InType: reflect.TypeOf(&DownwardAPIVolumeSource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_EmptyDirVolumeSource, InType: reflect.TypeOf(&EmptyDirVolumeSource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_EndpointAddress, InType: reflect.TypeOf(&EndpointAddress{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_EndpointPort, InType: reflect.TypeOf(&EndpointPort{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_EndpointSubset, InType: reflect.TypeOf(&EndpointSubset{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Endpoints, InType: reflect.TypeOf(&Endpoints{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_EndpointsList, InType: reflect.TypeOf(&EndpointsList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_EnvVar, InType: reflect.TypeOf(&EnvVar{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_EnvVarSource, InType: reflect.TypeOf(&EnvVarSource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Event, InType: reflect.TypeOf(&Event{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_EventList, InType: reflect.TypeOf(&EventList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_EventSource, InType: reflect.TypeOf(&EventSource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ExecAction, InType: reflect.TypeOf(&ExecAction{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ExportOptions, InType: reflect.TypeOf(&ExportOptions{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_FCVolumeSource, InType: reflect.TypeOf(&FCVolumeSource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_FlexVolumeSource, InType: reflect.TypeOf(&FlexVolumeSource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_FlockerVolumeSource, InType: reflect.TypeOf(&FlockerVolumeSource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_GCEPersistentDiskVolumeSource, InType: reflect.TypeOf(&GCEPersistentDiskVolumeSource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_GitRepoVolumeSource, InType: reflect.TypeOf(&GitRepoVolumeSource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_GlusterfsVolumeSource, InType: reflect.TypeOf(&GlusterfsVolumeSource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_HTTPGetAction, InType: reflect.TypeOf(&HTTPGetAction{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_HTTPHeader, InType: reflect.TypeOf(&HTTPHeader{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Handler, InType: reflect.TypeOf(&Handler{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_HostPathVolumeSource, InType: reflect.TypeOf(&HostPathVolumeSource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ISCSIVolumeSource, InType: reflect.TypeOf(&ISCSIVolumeSource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_KeyToPath, InType: reflect.TypeOf(&KeyToPath{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Lifecycle, InType: reflect.TypeOf(&Lifecycle{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LimitRange, InType: reflect.TypeOf(&LimitRange{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LimitRangeItem, InType: reflect.TypeOf(&LimitRangeItem{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LimitRangeList, InType: reflect.TypeOf(&LimitRangeList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LimitRangeSpec, InType: reflect.TypeOf(&LimitRangeSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_List, InType: reflect.TypeOf(&List{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ListOptions, InType: reflect.TypeOf(&ListOptions{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LoadBalancerIngress, InType: reflect.TypeOf(&LoadBalancerIngress{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LoadBalancerStatus, InType: reflect.TypeOf(&LoadBalancerStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_LocalObjectReference, InType: reflect.TypeOf(&LocalObjectReference{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NFSVolumeSource, InType: reflect.TypeOf(&NFSVolumeSource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Namespace, InType: reflect.TypeOf(&Namespace{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NamespaceList, InType: reflect.TypeOf(&NamespaceList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NamespaceSpec, InType: reflect.TypeOf(&NamespaceSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NamespaceStatus, InType: reflect.TypeOf(&NamespaceStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Node, InType: reflect.TypeOf(&Node{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NodeAddress, InType: reflect.TypeOf(&NodeAddress{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NodeAffinity, InType: reflect.TypeOf(&NodeAffinity{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NodeCondition, InType: reflect.TypeOf(&NodeCondition{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NodeDaemonEndpoints, InType: reflect.TypeOf(&NodeDaemonEndpoints{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NodeList, InType: reflect.TypeOf(&NodeList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NodeProxyOptions, InType: reflect.TypeOf(&NodeProxyOptions{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NodeSelector, InType: reflect.TypeOf(&NodeSelector{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NodeSelectorRequirement, InType: reflect.TypeOf(&NodeSelectorRequirement{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NodeSelectorTerm, InType: reflect.TypeOf(&NodeSelectorTerm{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NodeSpec, InType: reflect.TypeOf(&NodeSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NodeStatus, InType: reflect.TypeOf(&NodeStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_NodeSystemInfo, InType: reflect.TypeOf(&NodeSystemInfo{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ObjectFieldSelector, InType: reflect.TypeOf(&ObjectFieldSelector{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ObjectMeta, InType: reflect.TypeOf(&ObjectMeta{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ObjectReference, InType: reflect.TypeOf(&ObjectReference{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_OwnerReference, InType: reflect.TypeOf(&OwnerReference{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PersistentVolume, InType: reflect.TypeOf(&PersistentVolume{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PersistentVolumeClaim, InType: reflect.TypeOf(&PersistentVolumeClaim{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PersistentVolumeClaimList, InType: reflect.TypeOf(&PersistentVolumeClaimList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PersistentVolumeClaimSpec, InType: reflect.TypeOf(&PersistentVolumeClaimSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PersistentVolumeClaimStatus, InType: reflect.TypeOf(&PersistentVolumeClaimStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PersistentVolumeClaimVolumeSource, InType: reflect.TypeOf(&PersistentVolumeClaimVolumeSource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PersistentVolumeList, InType: reflect.TypeOf(&PersistentVolumeList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PersistentVolumeSource, InType: reflect.TypeOf(&PersistentVolumeSource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PersistentVolumeSpec, InType: reflect.TypeOf(&PersistentVolumeSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PersistentVolumeStatus, InType: reflect.TypeOf(&PersistentVolumeStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Pod, InType: reflect.TypeOf(&Pod{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodAffinity, InType: reflect.TypeOf(&PodAffinity{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodAffinityTerm, InType: reflect.TypeOf(&PodAffinityTerm{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodAntiAffinity, InType: reflect.TypeOf(&PodAntiAffinity{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodAttachOptions, InType: reflect.TypeOf(&PodAttachOptions{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodCondition, InType: reflect.TypeOf(&PodCondition{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodExecOptions, InType: reflect.TypeOf(&PodExecOptions{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodList, InType: reflect.TypeOf(&PodList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodLogOptions, InType: reflect.TypeOf(&PodLogOptions{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodProxyOptions, InType: reflect.TypeOf(&PodProxyOptions{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodSecurityContext, InType: reflect.TypeOf(&PodSecurityContext{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodSignature, InType: reflect.TypeOf(&PodSignature{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodSpec, InType: reflect.TypeOf(&PodSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodStatus, InType: reflect.TypeOf(&PodStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodStatusResult, InType: reflect.TypeOf(&PodStatusResult{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodTemplate, InType: reflect.TypeOf(&PodTemplate{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodTemplateList, InType: reflect.TypeOf(&PodTemplateList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PodTemplateSpec, InType: reflect.TypeOf(&PodTemplateSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Preconditions, InType: reflect.TypeOf(&Preconditions{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PreferAvoidPodsEntry, InType: reflect.TypeOf(&PreferAvoidPodsEntry{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PreferredSchedulingTerm, InType: reflect.TypeOf(&PreferredSchedulingTerm{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Probe, InType: reflect.TypeOf(&Probe{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_QuobyteVolumeSource, InType: reflect.TypeOf(&QuobyteVolumeSource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_RBDVolumeSource, InType: reflect.TypeOf(&RBDVolumeSource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_RangeAllocation, InType: reflect.TypeOf(&RangeAllocation{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ReplicationController, InType: reflect.TypeOf(&ReplicationController{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ReplicationControllerCondition, InType: reflect.TypeOf(&ReplicationControllerCondition{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ReplicationControllerList, InType: reflect.TypeOf(&ReplicationControllerList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ReplicationControllerSpec, InType: reflect.TypeOf(&ReplicationControllerSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ReplicationControllerStatus, InType: reflect.TypeOf(&ReplicationControllerStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ResourceFieldSelector, InType: reflect.TypeOf(&ResourceFieldSelector{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ResourceQuota, InType: reflect.TypeOf(&ResourceQuota{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ResourceQuotaList, InType: reflect.TypeOf(&ResourceQuotaList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ResourceQuotaSpec, InType: reflect.TypeOf(&ResourceQuotaSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ResourceQuotaStatus, InType: reflect.TypeOf(&ResourceQuotaStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ResourceRequirements, InType: reflect.TypeOf(&ResourceRequirements{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_SELinuxOptions, InType: reflect.TypeOf(&SELinuxOptions{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Secret, InType: reflect.TypeOf(&Secret{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_SecretKeySelector, InType: reflect.TypeOf(&SecretKeySelector{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_SecretList, InType: reflect.TypeOf(&SecretList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_SecretVolumeSource, InType: reflect.TypeOf(&SecretVolumeSource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_SecurityContext, InType: reflect.TypeOf(&SecurityContext{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_SerializedReference, InType: reflect.TypeOf(&SerializedReference{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Service, InType: reflect.TypeOf(&Service{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ServiceAccount, InType: reflect.TypeOf(&ServiceAccount{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ServiceAccountList, InType: reflect.TypeOf(&ServiceAccountList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ServiceList, InType: reflect.TypeOf(&ServiceList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ServicePort, InType: reflect.TypeOf(&ServicePort{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ServiceProxyOptions, InType: reflect.TypeOf(&ServiceProxyOptions{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ServiceSpec, InType: reflect.TypeOf(&ServiceSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ServiceStatus, InType: reflect.TypeOf(&ServiceStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_TCPSocketAction, InType: reflect.TypeOf(&TCPSocketAction{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Taint, InType: reflect.TypeOf(&Taint{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Toleration, InType: reflect.TypeOf(&Toleration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Volume, InType: reflect.TypeOf(&Volume{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_VolumeMount, InType: reflect.TypeOf(&VolumeMount{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_VolumeSource, InType: reflect.TypeOf(&VolumeSource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_VsphereVirtualDiskVolumeSource, InType: reflect.TypeOf(&VsphereVirtualDiskVolumeSource{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_WeightedPodAffinityTerm, InType: reflect.TypeOf(&WeightedPodAffinityTerm{})},
-	)
-}
-
-func DeepCopy_v1_AWSElasticBlockStoreVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*AWSElasticBlockStoreVolumeSource)
-		out := out.(*AWSElasticBlockStoreVolumeSource)
-		out.VolumeID = in.VolumeID
-		out.FSType = in.FSType
-		out.Partition = in.Partition
-		out.ReadOnly = in.ReadOnly
-		return nil
-	}
-}
-
-func DeepCopy_v1_Affinity(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Affinity)
-		out := out.(*Affinity)
-		if in.NodeAffinity != nil {
-			in, out := &in.NodeAffinity, &out.NodeAffinity
-			*out = new(NodeAffinity)
-			if err := DeepCopy_v1_NodeAffinity(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.NodeAffinity = nil
-		}
-		if in.PodAffinity != nil {
-			in, out := &in.PodAffinity, &out.PodAffinity
-			*out = new(PodAffinity)
-			if err := DeepCopy_v1_PodAffinity(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.PodAffinity = nil
-		}
-		if in.PodAntiAffinity != nil {
-			in, out := &in.PodAntiAffinity, &out.PodAntiAffinity
-			*out = new(PodAntiAffinity)
-			if err := DeepCopy_v1_PodAntiAffinity(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.PodAntiAffinity = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_AttachedVolume(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*AttachedVolume)
-		out := out.(*AttachedVolume)
-		out.Name = in.Name
-		out.DevicePath = in.DevicePath
-		return nil
-	}
-}
-
-func DeepCopy_v1_AvoidPods(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*AvoidPods)
-		out := out.(*AvoidPods)
-		if in.PreferAvoidPods != nil {
-			in, out := &in.PreferAvoidPods, &out.PreferAvoidPods
-			*out = make([]PreferAvoidPodsEntry, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_PreferAvoidPodsEntry(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.PreferAvoidPods = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_AzureDiskVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*AzureDiskVolumeSource)
-		out := out.(*AzureDiskVolumeSource)
-		out.DiskName = in.DiskName
-		out.DataDiskURI = in.DataDiskURI
-		if in.CachingMode != nil {
-			in, out := &in.CachingMode, &out.CachingMode
-			*out = new(AzureDataDiskCachingMode)
-			**out = **in
-		} else {
-			out.CachingMode = nil
-		}
-		if in.FSType != nil {
-			in, out := &in.FSType, &out.FSType
-			*out = new(string)
-			**out = **in
-		} else {
-			out.FSType = nil
-		}
-		if in.ReadOnly != nil {
-			in, out := &in.ReadOnly, &out.ReadOnly
-			*out = new(bool)
-			**out = **in
-		} else {
-			out.ReadOnly = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_AzureFileVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*AzureFileVolumeSource)
-		out := out.(*AzureFileVolumeSource)
-		out.SecretName = in.SecretName
-		out.ShareName = in.ShareName
-		out.ReadOnly = in.ReadOnly
-		return nil
-	}
-}
-
-func DeepCopy_v1_Binding(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Binding)
-		out := out.(*Binding)
-		out.TypeMeta = in.TypeMeta
-		if err := DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
-		}
-		out.Target = in.Target
-		return nil
-	}
-}
-
-func DeepCopy_v1_Capabilities(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Capabilities)
-		out := out.(*Capabilities)
-		if in.Add != nil {
-			in, out := &in.Add, &out.Add
-			*out = make([]Capability, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.Add = nil
-		}
-		if in.Drop != nil {
-			in, out := &in.Drop, &out.Drop
-			*out = make([]Capability, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.Drop = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_CephFSVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*CephFSVolumeSource)
-		out := out.(*CephFSVolumeSource)
-		if in.Monitors != nil {
-			in, out := &in.Monitors, &out.Monitors
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.Monitors = nil
-		}
-		out.Path = in.Path
-		out.User = in.User
-		out.SecretFile = in.SecretFile
-		if in.SecretRef != nil {
-			in, out := &in.SecretRef, &out.SecretRef
-			*out = new(LocalObjectReference)
-			**out = **in
-		} else {
-			out.SecretRef = nil
-		}
-		out.ReadOnly = in.ReadOnly
-		return nil
-	}
-}
-
-func DeepCopy_v1_CinderVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*CinderVolumeSource)
-		out := out.(*CinderVolumeSource)
-		out.VolumeID = in.VolumeID
-		out.FSType = in.FSType
-		out.ReadOnly = in.ReadOnly
-		return nil
-	}
-}
-
-func DeepCopy_v1_ComponentCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ComponentCondition)
-		out := out.(*ComponentCondition)
-		out.Type = in.Type
-		out.Status = in.Status
-		out.Message = in.Message
-		out.Error = in.Error
-		return nil
-	}
-}
-
-func DeepCopy_v1_ComponentStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ComponentStatus)
-		out := out.(*ComponentStatus)
-		out.TypeMeta = in.TypeMeta
-		if err := DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
-		}
-		if in.Conditions != nil {
-			in, out := &in.Conditions, &out.Conditions
-			*out = make([]ComponentCondition, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.Conditions = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_ComponentStatusList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ComponentStatusList)
-		out := out.(*ComponentStatusList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]ComponentStatus, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_ComponentStatus(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Items = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_ConfigMap(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ConfigMap)
-		out := out.(*ConfigMap)
-		out.TypeMeta = in.TypeMeta
-		if err := DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
-		}
-		if in.Data != nil {
-			in, out := &in.Data, &out.Data
-			*out = make(map[string]string)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		} else {
-			out.Data = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_ConfigMapKeySelector(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ConfigMapKeySelector)
-		out := out.(*ConfigMapKeySelector)
-		out.LocalObjectReference = in.LocalObjectReference
-		out.Key = in.Key
-		return nil
-	}
-}
-
-func DeepCopy_v1_ConfigMapList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ConfigMapList)
-		out := out.(*ConfigMapList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]ConfigMap, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_ConfigMap(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Items = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_ConfigMapVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ConfigMapVolumeSource)
-		out := out.(*ConfigMapVolumeSource)
-		out.LocalObjectReference = in.LocalObjectReference
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]KeyToPath, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_KeyToPath(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Items = nil
-		}
-		if in.DefaultMode != nil {
-			in, out := &in.DefaultMode, &out.DefaultMode
-			*out = new(int32)
-			**out = **in
-		} else {
-			out.DefaultMode = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_Container(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Container)
-		out := out.(*Container)
-		out.Name = in.Name
-		out.Image = in.Image
-		if in.Command != nil {
-			in, out := &in.Command, &out.Command
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.Command = nil
-		}
-		if in.Args != nil {
-			in, out := &in.Args, &out.Args
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.Args = nil
-		}
-		out.WorkingDir = in.WorkingDir
-		if in.Ports != nil {
-			in, out := &in.Ports, &out.Ports
-			*out = make([]ContainerPort, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.Ports = nil
-		}
-		if in.Env != nil {
-			in, out := &in.Env, &out.Env
-			*out = make([]EnvVar, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_EnvVar(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Env = nil
-		}
-		if err := DeepCopy_v1_ResourceRequirements(&in.Resources, &out.Resources, c); err != nil {
-			return err
-		}
-		if in.VolumeMounts != nil {
-			in, out := &in.VolumeMounts, &out.VolumeMounts
-			*out = make([]VolumeMount, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.VolumeMounts = nil
-		}
-		if in.LivenessProbe != nil {
-			in, out := &in.LivenessProbe, &out.LivenessProbe
-			*out = new(Probe)
-			if err := DeepCopy_v1_Probe(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.LivenessProbe = nil
-		}
-		if in.ReadinessProbe != nil {
-			in, out := &in.ReadinessProbe, &out.ReadinessProbe
-			*out = new(Probe)
-			if err := DeepCopy_v1_Probe(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.ReadinessProbe = nil
-		}
-		if in.Lifecycle != nil {
-			in, out := &in.Lifecycle, &out.Lifecycle
-			*out = new(Lifecycle)
-			if err := DeepCopy_v1_Lifecycle(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.Lifecycle = nil
-		}
-		out.TerminationMessagePath = in.TerminationMessagePath
-		out.ImagePullPolicy = in.ImagePullPolicy
-		if in.SecurityContext != nil {
-			in, out := &in.SecurityContext, &out.SecurityContext
-			*out = new(SecurityContext)
-			if err := DeepCopy_v1_SecurityContext(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.SecurityContext = nil
-		}
-		out.Stdin = in.Stdin
-		out.StdinOnce = in.StdinOnce
-		out.TTY = in.TTY
-		return nil
-	}
-}
-
-func DeepCopy_v1_ContainerImage(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ContainerImage)
-		out := out.(*ContainerImage)
-		if in.Names != nil {
-			in, out := &in.Names, &out.Names
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.Names = nil
-		}
-		out.SizeBytes = in.SizeBytes
-		return nil
-	}
-}
-
-func DeepCopy_v1_ContainerPort(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ContainerPort)
-		out := out.(*ContainerPort)
-		out.Name = in.Name
-		out.HostPort = in.HostPort
-		out.ContainerPort = in.ContainerPort
-		out.Protocol = in.Protocol
-		out.HostIP = in.HostIP
-		return nil
-	}
-}
-
-func DeepCopy_v1_ContainerState(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ContainerState)
-		out := out.(*ContainerState)
-		if in.Waiting != nil {
-			in, out := &in.Waiting, &out.Waiting
-			*out = new(ContainerStateWaiting)
-			**out = **in
-		} else {
-			out.Waiting = nil
-		}
-		if in.Running != nil {
-			in, out := &in.Running, &out.Running
-			*out = new(ContainerStateRunning)
-			if err := DeepCopy_v1_ContainerStateRunning(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.Running = nil
-		}
-		if in.Terminated != nil {
-			in, out := &in.Terminated, &out.Terminated
-			*out = new(ContainerStateTerminated)
-			if err := DeepCopy_v1_ContainerStateTerminated(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.Terminated = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_ContainerStateRunning(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ContainerStateRunning)
-		out := out.(*ContainerStateRunning)
-		out.StartedAt = in.StartedAt.DeepCopy()
-		return nil
-	}
-}
-
-func DeepCopy_v1_ContainerStateTerminated(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ContainerStateTerminated)
-		out := out.(*ContainerStateTerminated)
-		out.ExitCode = in.ExitCode
-		out.Signal = in.Signal
-		out.Reason = in.Reason
-		out.Message = in.Message
-		out.StartedAt = in.StartedAt.DeepCopy()
-		out.FinishedAt = in.FinishedAt.DeepCopy()
-		out.ContainerID = in.ContainerID
-		return nil
-	}
-}
-
-func DeepCopy_v1_ContainerStateWaiting(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ContainerStateWaiting)
-		out := out.(*ContainerStateWaiting)
-		out.Reason = in.Reason
-		out.Message = in.Message
-		return nil
-	}
-}
-
-func DeepCopy_v1_ContainerStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ContainerStatus)
-		out := out.(*ContainerStatus)
-		out.Name = in.Name
-		if err := DeepCopy_v1_ContainerState(&in.State, &out.State, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v1_ContainerState(&in.LastTerminationState, &out.LastTerminationState, c); err != nil {
-			return err
-		}
-		out.Ready = in.Ready
-		out.RestartCount = in.RestartCount
-		out.Image = in.Image
-		out.ImageID = in.ImageID
-		out.ContainerID = in.ContainerID
-		return nil
-	}
-}
-
-func DeepCopy_v1_DaemonEndpoint(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*DaemonEndpoint)
-		out := out.(*DaemonEndpoint)
-		out.Port = in.Port
-		return nil
-	}
-}
-
-func DeepCopy_v1_DeleteOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*DeleteOptions)
-		out := out.(*DeleteOptions)
-		out.TypeMeta = in.TypeMeta
-		if in.GracePeriodSeconds != nil {
-			in, out := &in.GracePeriodSeconds, &out.GracePeriodSeconds
-			*out = new(int64)
-			**out = **in
-		} else {
-			out.GracePeriodSeconds = nil
-		}
-		if in.Preconditions != nil {
-			in, out := &in.Preconditions, &out.Preconditions
-			*out = new(Preconditions)
-			if err := DeepCopy_v1_Preconditions(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.Preconditions = nil
-		}
-		if in.OrphanDependents != nil {
-			in, out := &in.OrphanDependents, &out.OrphanDependents
-			*out = new(bool)
-			**out = **in
-		} else {
-			out.OrphanDependents = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_DownwardAPIVolumeFile(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*DownwardAPIVolumeFile)
-		out := out.(*DownwardAPIVolumeFile)
-		out.Path = in.Path
-		if in.FieldRef != nil {
-			in, out := &in.FieldRef, &out.FieldRef
-			*out = new(ObjectFieldSelector)
-			**out = **in
-		} else {
-			out.FieldRef = nil
-		}
-		if in.ResourceFieldRef != nil {
-			in, out := &in.ResourceFieldRef, &out.ResourceFieldRef
-			*out = new(ResourceFieldSelector)
-			if err := DeepCopy_v1_ResourceFieldSelector(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.ResourceFieldRef = nil
-		}
-		if in.Mode != nil {
-			in, out := &in.Mode, &out.Mode
-			*out = new(int32)
-			**out = **in
-		} else {
-			out.Mode = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_DownwardAPIVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*DownwardAPIVolumeSource)
-		out := out.(*DownwardAPIVolumeSource)
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]DownwardAPIVolumeFile, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_DownwardAPIVolumeFile(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Items = nil
-		}
-		if in.DefaultMode != nil {
-			in, out := &in.DefaultMode, &out.DefaultMode
-			*out = new(int32)
-			**out = **in
-		} else {
-			out.DefaultMode = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_EmptyDirVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*EmptyDirVolumeSource)
-		out := out.(*EmptyDirVolumeSource)
-		out.Medium = in.Medium
-		return nil
-	}
-}
-
-func DeepCopy_v1_EndpointAddress(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*EndpointAddress)
-		out := out.(*EndpointAddress)
-		out.IP = in.IP
-		out.Hostname = in.Hostname
-		if in.NodeName != nil {
-			in, out := &in.NodeName, &out.NodeName
-			*out = new(string)
-			**out = **in
-		} else {
-			out.NodeName = nil
-		}
-		if in.TargetRef != nil {
-			in, out := &in.TargetRef, &out.TargetRef
-			*out = new(ObjectReference)
-			**out = **in
-		} else {
-			out.TargetRef = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_EndpointPort(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*EndpointPort)
-		out := out.(*EndpointPort)
-		out.Name = in.Name
-		out.Port = in.Port
-		out.Protocol = in.Protocol
-		return nil
-	}
-}
-
-func DeepCopy_v1_EndpointSubset(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*EndpointSubset)
-		out := out.(*EndpointSubset)
-		if in.Addresses != nil {
-			in, out := &in.Addresses, &out.Addresses
-			*out = make([]EndpointAddress, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_EndpointAddress(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Addresses = nil
-		}
-		if in.NotReadyAddresses != nil {
-			in, out := &in.NotReadyAddresses, &out.NotReadyAddresses
-			*out = make([]EndpointAddress, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_EndpointAddress(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.NotReadyAddresses = nil
-		}
-		if in.Ports != nil {
-			in, out := &in.Ports, &out.Ports
-			*out = make([]EndpointPort, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.Ports = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_Endpoints(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Endpoints)
-		out := out.(*Endpoints)
-		out.TypeMeta = in.TypeMeta
-		if err := DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
-		}
-		if in.Subsets != nil {
-			in, out := &in.Subsets, &out.Subsets
-			*out = make([]EndpointSubset, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_EndpointSubset(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Subsets = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_EndpointsList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*EndpointsList)
-		out := out.(*EndpointsList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]Endpoints, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_Endpoints(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Items = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_EnvVar(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*EnvVar)
-		out := out.(*EnvVar)
-		out.Name = in.Name
-		out.Value = in.Value
-		if in.ValueFrom != nil {
-			in, out := &in.ValueFrom, &out.ValueFrom
-			*out = new(EnvVarSource)
-			if err := DeepCopy_v1_EnvVarSource(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.ValueFrom = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_EnvVarSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*EnvVarSource)
-		out := out.(*EnvVarSource)
-		if in.FieldRef != nil {
-			in, out := &in.FieldRef, &out.FieldRef
-			*out = new(ObjectFieldSelector)
-			**out = **in
-		} else {
-			out.FieldRef = nil
-		}
-		if in.ResourceFieldRef != nil {
-			in, out := &in.ResourceFieldRef, &out.ResourceFieldRef
-			*out = new(ResourceFieldSelector)
-			if err := DeepCopy_v1_ResourceFieldSelector(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.ResourceFieldRef = nil
-		}
-		if in.ConfigMapKeyRef != nil {
-			in, out := &in.ConfigMapKeyRef, &out.ConfigMapKeyRef
-			*out = new(ConfigMapKeySelector)
-			**out = **in
-		} else {
-			out.ConfigMapKeyRef = nil
-		}
-		if in.SecretKeyRef != nil {
-			in, out := &in.SecretKeyRef, &out.SecretKeyRef
-			*out = new(SecretKeySelector)
-			**out = **in
-		} else {
-			out.SecretKeyRef = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_Event(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Event)
-		out := out.(*Event)
-		out.TypeMeta = in.TypeMeta
-		if err := DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
-		}
-		out.InvolvedObject = in.InvolvedObject
-		out.Reason = in.Reason
-		out.Message = in.Message
-		out.Source = in.Source
-		out.FirstTimestamp = in.FirstTimestamp.DeepCopy()
-		out.LastTimestamp = in.LastTimestamp.DeepCopy()
-		out.Count = in.Count
-		out.Type = in.Type
-		return nil
-	}
-}
-
-func DeepCopy_v1_EventList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*EventList)
-		out := out.(*EventList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]Event, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_Event(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Items = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_EventSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*EventSource)
-		out := out.(*EventSource)
-		out.Component = in.Component
-		out.Host = in.Host
-		return nil
-	}
-}
-
-func DeepCopy_v1_ExecAction(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ExecAction)
-		out := out.(*ExecAction)
-		if in.Command != nil {
-			in, out := &in.Command, &out.Command
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.Command = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_ExportOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ExportOptions)
-		out := out.(*ExportOptions)
-		out.TypeMeta = in.TypeMeta
-		out.Export = in.Export
-		out.Exact = in.Exact
-		return nil
-	}
-}
-
-func DeepCopy_v1_FCVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*FCVolumeSource)
-		out := out.(*FCVolumeSource)
-		if in.TargetWWNs != nil {
-			in, out := &in.TargetWWNs, &out.TargetWWNs
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.TargetWWNs = nil
-		}
-		if in.Lun != nil {
-			in, out := &in.Lun, &out.Lun
-			*out = new(int32)
-			**out = **in
-		} else {
-			out.Lun = nil
-		}
-		out.FSType = in.FSType
-		out.ReadOnly = in.ReadOnly
-		return nil
-	}
-}
-
-func DeepCopy_v1_FlexVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*FlexVolumeSource)
-		out := out.(*FlexVolumeSource)
-		out.Driver = in.Driver
-		out.FSType = in.FSType
-		if in.SecretRef != nil {
-			in, out := &in.SecretRef, &out.SecretRef
-			*out = new(LocalObjectReference)
-			**out = **in
-		} else {
-			out.SecretRef = nil
-		}
-		out.ReadOnly = in.ReadOnly
-		if in.Options != nil {
-			in, out := &in.Options, &out.Options
-			*out = make(map[string]string)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		} else {
-			out.Options = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_FlockerVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*FlockerVolumeSource)
-		out := out.(*FlockerVolumeSource)
-		out.DatasetName = in.DatasetName
-		out.DatasetUUID = in.DatasetUUID
-		return nil
-	}
-}
-
-func DeepCopy_v1_GCEPersistentDiskVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*GCEPersistentDiskVolumeSource)
-		out := out.(*GCEPersistentDiskVolumeSource)
-		out.PDName = in.PDName
-		out.FSType = in.FSType
-		out.Partition = in.Partition
-		out.ReadOnly = in.ReadOnly
-		return nil
-	}
-}
-
-func DeepCopy_v1_GitRepoVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*GitRepoVolumeSource)
-		out := out.(*GitRepoVolumeSource)
-		out.Repository = in.Repository
-		out.Revision = in.Revision
-		out.Directory = in.Directory
-		return nil
-	}
-}
-
-func DeepCopy_v1_GlusterfsVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*GlusterfsVolumeSource)
-		out := out.(*GlusterfsVolumeSource)
-		out.EndpointsName = in.EndpointsName
-		out.Path = in.Path
-		out.ReadOnly = in.ReadOnly
-		return nil
-	}
-}
-
-func DeepCopy_v1_HTTPGetAction(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*HTTPGetAction)
-		out := out.(*HTTPGetAction)
-		out.Path = in.Path
-		out.Port = in.Port
-		out.Host = in.Host
-		out.Scheme = in.Scheme
-		if in.HTTPHeaders != nil {
-			in, out := &in.HTTPHeaders, &out.HTTPHeaders
-			*out = make([]HTTPHeader, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.HTTPHeaders = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_HTTPHeader(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*HTTPHeader)
-		out := out.(*HTTPHeader)
-		out.Name = in.Name
-		out.Value = in.Value
-		return nil
-	}
-}
-
-func DeepCopy_v1_Handler(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Handler)
-		out := out.(*Handler)
-		if in.Exec != nil {
-			in, out := &in.Exec, &out.Exec
-			*out = new(ExecAction)
-			if err := DeepCopy_v1_ExecAction(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.Exec = nil
-		}
-		if in.HTTPGet != nil {
-			in, out := &in.HTTPGet, &out.HTTPGet
-			*out = new(HTTPGetAction)
-			if err := DeepCopy_v1_HTTPGetAction(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.HTTPGet = nil
-		}
-		if in.TCPSocket != nil {
-			in, out := &in.TCPSocket, &out.TCPSocket
-			*out = new(TCPSocketAction)
-			**out = **in
-		} else {
-			out.TCPSocket = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_HostPathVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*HostPathVolumeSource)
-		out := out.(*HostPathVolumeSource)
-		out.Path = in.Path
-		return nil
-	}
-}
-
-func DeepCopy_v1_ISCSIVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ISCSIVolumeSource)
-		out := out.(*ISCSIVolumeSource)
-		out.TargetPortal = in.TargetPortal
-		out.IQN = in.IQN
-		out.Lun = in.Lun
-		out.ISCSIInterface = in.ISCSIInterface
-		out.FSType = in.FSType
-		out.ReadOnly = in.ReadOnly
-		return nil
-	}
-}
-
-func DeepCopy_v1_KeyToPath(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KeyToPath)
-		out := out.(*KeyToPath)
-		out.Key = in.Key
-		out.Path = in.Path
-		if in.Mode != nil {
-			in, out := &in.Mode, &out.Mode
-			*out = new(int32)
-			**out = **in
-		} else {
-			out.Mode = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_Lifecycle(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Lifecycle)
-		out := out.(*Lifecycle)
-		if in.PostStart != nil {
-			in, out := &in.PostStart, &out.PostStart
-			*out = new(Handler)
-			if err := DeepCopy_v1_Handler(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.PostStart = nil
-		}
-		if in.PreStop != nil {
-			in, out := &in.PreStop, &out.PreStop
-			*out = new(Handler)
-			if err := DeepCopy_v1_Handler(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.PreStop = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_LimitRange(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*LimitRange)
-		out := out.(*LimitRange)
-		out.TypeMeta = in.TypeMeta
-		if err := DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v1_LimitRangeSpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_LimitRangeItem(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*LimitRangeItem)
-		out := out.(*LimitRangeItem)
-		out.Type = in.Type
-		if in.Max != nil {
-			in, out := &in.Max, &out.Max
-			*out = make(ResourceList)
-			for key, val := range *in {
-				(*out)[key] = val.DeepCopy()
-			}
-		} else {
-			out.Max = nil
-		}
-		if in.Min != nil {
-			in, out := &in.Min, &out.Min
-			*out = make(ResourceList)
-			for key, val := range *in {
-				(*out)[key] = val.DeepCopy()
-			}
-		} else {
-			out.Min = nil
-		}
-		if in.Default != nil {
-			in, out := &in.Default, &out.Default
-			*out = make(ResourceList)
-			for key, val := range *in {
-				(*out)[key] = val.DeepCopy()
-			}
-		} else {
-			out.Default = nil
-		}
-		if in.DefaultRequest != nil {
-			in, out := &in.DefaultRequest, &out.DefaultRequest
-			*out = make(ResourceList)
-			for key, val := range *in {
-				(*out)[key] = val.DeepCopy()
-			}
-		} else {
-			out.DefaultRequest = nil
-		}
-		if in.MaxLimitRequestRatio != nil {
-			in, out := &in.MaxLimitRequestRatio, &out.MaxLimitRequestRatio
-			*out = make(ResourceList)
-			for key, val := range *in {
-				(*out)[key] = val.DeepCopy()
-			}
-		} else {
-			out.MaxLimitRequestRatio = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_LimitRangeList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*LimitRangeList)
-		out := out.(*LimitRangeList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]LimitRange, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_LimitRange(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Items = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_LimitRangeSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*LimitRangeSpec)
-		out := out.(*LimitRangeSpec)
-		if in.Limits != nil {
-			in, out := &in.Limits, &out.Limits
-			*out = make([]LimitRangeItem, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_LimitRangeItem(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Limits = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_List(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*List)
-		out := out.(*List)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]runtime.RawExtension, len(*in))
-			for i := range *in {
-				if err := runtime.DeepCopy_runtime_RawExtension(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Items = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_ListOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ListOptions)
-		out := out.(*ListOptions)
-		out.TypeMeta = in.TypeMeta
-		out.LabelSelector = in.LabelSelector
-		out.FieldSelector = in.FieldSelector
-		out.Watch = in.Watch
-		out.ResourceVersion = in.ResourceVersion
-		if in.TimeoutSeconds != nil {
-			in, out := &in.TimeoutSeconds, &out.TimeoutSeconds
-			*out = new(int64)
-			**out = **in
-		} else {
-			out.TimeoutSeconds = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_LoadBalancerIngress(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*LoadBalancerIngress)
-		out := out.(*LoadBalancerIngress)
-		out.IP = in.IP
-		out.Hostname = in.Hostname
-		return nil
-	}
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *AWSElasticBlockStoreVolumeSource) DeepCopyInto(out *AWSElasticBlockStoreVolumeSource) {
+	out.VolumeID = in.VolumeID
+	out.FSType = in.FSType
+	out.Partition = in.Partition
+	out.ReadOnly = in.ReadOnly
+	return
 }
 
-func DeepCopy_v1_LoadBalancerStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*LoadBalancerStatus)
-		out := out.(*LoadBalancerStatus)
-		if in.Ingress != nil {
-			in, out := &in.Ingress, &out.Ingress
-			*out = make([]LoadBalancerIngress, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.Ingress = nil
+// DeepCopy will perform a deep copy of the receiver, creating a new AWSElasticBlockStoreVolumeSource.
+func (x *AWSElasticBlockStoreVolumeSource) DeepCopy() *AWSElasticBlockStoreVolumeSource {
+	if x == nil {
+		return nil
+	}
+	out := new(AWSElasticBlockStoreVolumeSource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Affinity) DeepCopyInto(out *Affinity) {
+	if in.NodeAffinity != nil {
+		in, out := &in.NodeAffinity, &out.NodeAffinity
+		*out = (*in).DeepCopy()
+	} else {
+		out.NodeAffinity = nil
+	}
+	if in.PodAffinity != nil {
+		in, out := &in.PodAffinity, &out.PodAffinity
+		*out = (*in).DeepCopy()
+	} else {
+		out.PodAffinity = nil
+	}
+	if in.PodAntiAffinity != nil {
+		in, out := &in.PodAntiAffinity, &out.PodAntiAffinity
+		*out = (*in).DeepCopy()
+	} else {
+		out.PodAntiAffinity = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new Affinity.
+func (x *Affinity) DeepCopy() *Affinity {
+	if x == nil {
+		return nil
+	}
+	out := new(Affinity)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *AttachedVolume) DeepCopyInto(out *AttachedVolume) {
+	out.Name = in.Name
+	out.DevicePath = in.DevicePath
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new AttachedVolume.
+func (x *AttachedVolume) DeepCopy() *AttachedVolume {
+	if x == nil {
+		return nil
+	}
+	out := new(AttachedVolume)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *AvoidPods) DeepCopyInto(out *AvoidPods) {
+	if in.PreferAvoidPods != nil {
+		in, out := &in.PreferAvoidPods, &out.PreferAvoidPods
+		*out = make([]PreferAvoidPodsEntry, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.PreferAvoidPods = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new AvoidPods.
+func (x *AvoidPods) DeepCopy() *AvoidPods {
+	if x == nil {
+		return nil
+	}
+	out := new(AvoidPods)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *AzureDiskVolumeSource) DeepCopyInto(out *AzureDiskVolumeSource) {
+	out.DiskName = in.DiskName
+	out.DataDiskURI = in.DataDiskURI
+	if in.CachingMode != nil {
+		in, out := &in.CachingMode, &out.CachingMode
+		*out = new(AzureDataDiskCachingMode)
+		**out = **in
+	} else {
+		out.CachingMode = nil
+	}
+	if in.FSType != nil {
+		in, out := &in.FSType, &out.FSType
+		*out = new(string)
+		**out = **in
+	} else {
+		out.FSType = nil
+	}
+	if in.ReadOnly != nil {
+		in, out := &in.ReadOnly, &out.ReadOnly
+		*out = new(bool)
+		**out = **in
+	} else {
+		out.ReadOnly = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new AzureDiskVolumeSource.
+func (x *AzureDiskVolumeSource) DeepCopy() *AzureDiskVolumeSource {
+	if x == nil {
+		return nil
+	}
+	out := new(AzureDiskVolumeSource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *AzureFileVolumeSource) DeepCopyInto(out *AzureFileVolumeSource) {
+	out.SecretName = in.SecretName
+	out.ShareName = in.ShareName
+	out.ReadOnly = in.ReadOnly
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new AzureFileVolumeSource.
+func (x *AzureFileVolumeSource) DeepCopy() *AzureFileVolumeSource {
+	if x == nil {
+		return nil
+	}
+	out := new(AzureFileVolumeSource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Binding) DeepCopyInto(out *Binding) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	out.Target = in.Target
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new Binding.
+func (x *Binding) DeepCopy() *Binding {
+	if x == nil {
+		return nil
+	}
+	out := new(Binding)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *Binding) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Capabilities) DeepCopyInto(out *Capabilities) {
+	if in.Add != nil {
+		in, out := &in.Add, &out.Add
+		*out = make([]Capability, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
+		}
+	} else {
+		out.Add = nil
+	}
+	if in.Drop != nil {
+		in, out := &in.Drop, &out.Drop
+		*out = make([]Capability, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
+		}
+	} else {
+		out.Drop = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new Capabilities.
+func (x *Capabilities) DeepCopy() *Capabilities {
+	if x == nil {
+		return nil
+	}
+	out := new(Capabilities)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *CephFSVolumeSource) DeepCopyInto(out *CephFSVolumeSource) {
+	if in.Monitors != nil {
+		in, out := &in.Monitors, &out.Monitors
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.Monitors = nil
+	}
+	out.Path = in.Path
+	out.User = in.User
+	out.SecretFile = in.SecretFile
+	if in.SecretRef != nil {
+		in, out := &in.SecretRef, &out.SecretRef
+		*out = new(LocalObjectReference)
+		**out = **in
+	} else {
+		out.SecretRef = nil
+	}
+	out.ReadOnly = in.ReadOnly
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new CephFSVolumeSource.
+func (x *CephFSVolumeSource) DeepCopy() *CephFSVolumeSource {
+	if x == nil {
+		return nil
+	}
+	out := new(CephFSVolumeSource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *CinderVolumeSource) DeepCopyInto(out *CinderVolumeSource) {
+	out.VolumeID = in.VolumeID
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new CinderVolumeSource.
+func (x *CinderVolumeSource) DeepCopy() *CinderVolumeSource {
+	if x == nil {
+		return nil
+	}
+	out := new(CinderVolumeSource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ComponentCondition) DeepCopyInto(out *ComponentCondition) {
+	out.Type = in.Type
+	out.Status = in.Status
+	out.Message = in.Message
+	out.Error = in.Error
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ComponentCondition.
+func (x *ComponentCondition) DeepCopy() *ComponentCondition {
+	if x == nil {
+		return nil
+	}
+	out := new(ComponentCondition)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ComponentStatus) DeepCopyInto(out *ComponentStatus) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]ComponentCondition, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
+		}
+	} else {
+		out.Conditions = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ComponentStatus.
+func (x *ComponentStatus) DeepCopy() *ComponentStatus {
+	if x == nil {
+		return nil
+	}
+	out := new(ComponentStatus)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *ComponentStatus) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ComponentStatusList) DeepCopyInto(out *ComponentStatusList) {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]ComponentStatus, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.Items = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ComponentStatusList.
+func (x *ComponentStatusList) DeepCopy() *ComponentStatusList {
+	if x == nil {
+		return nil
+	}
+	out := new(ComponentStatusList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *ComponentStatusList) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ConfigMap) DeepCopyInto(out *ConfigMap) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	if in.Data != nil {
+		in, out := &in.Data, &out.Data
+		*out = make(map[string]string)
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	} else {
+		out.Data = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ConfigMap.
+func (x *ConfigMap) DeepCopy() *ConfigMap {
+	if x == nil {
+		return nil
+	}
+	out := new(ConfigMap)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *ConfigMap) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ConfigMapKeySelector) DeepCopyInto(out *ConfigMapKeySelector) {
+	out.LocalObjectReference = in.LocalObjectReference
+	out.Key = in.Key
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ConfigMapKeySelector.
+func (x *ConfigMapKeySelector) DeepCopy() *ConfigMapKeySelector {
+	if x == nil {
+		return nil
+	}
+	out := new(ConfigMapKeySelector)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ConfigMapList) DeepCopyInto(out *ConfigMapList) {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]ConfigMap, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.Items = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ConfigMapList.
+func (x *ConfigMapList) DeepCopy() *ConfigMapList {
+	if x == nil {
+		return nil
+	}
+	out := new(ConfigMapList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *ConfigMapList) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ConfigMapVolumeSource) DeepCopyInto(out *ConfigMapVolumeSource) {
+	out.LocalObjectReference = in.LocalObjectReference
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]KeyToPath, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.Items = nil
+	}
+	if in.DefaultMode != nil {
+		in, out := &in.DefaultMode, &out.DefaultMode
+		*out = new(int32)
+		**out = **in
+	} else {
+		out.DefaultMode = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ConfigMapVolumeSource.
+func (x *ConfigMapVolumeSource) DeepCopy() *ConfigMapVolumeSource {
+	if x == nil {
+		return nil
+	}
+	out := new(ConfigMapVolumeSource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Container) DeepCopyInto(out *Container) {
+	out.Name = in.Name
+	out.Image = in.Image
+	if in.Command != nil {
+		in, out := &in.Command, &out.Command
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.Command = nil
+	}
+	if in.Args != nil {
+		in, out := &in.Args, &out.Args
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.Args = nil
+	}
+	out.WorkingDir = in.WorkingDir
+	if in.Ports != nil {
+		in, out := &in.Ports, &out.Ports
+		*out = make([]ContainerPort, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
+		}
+	} else {
+		out.Ports = nil
+	}
+	if in.Env != nil {
+		in, out := &in.Env, &out.Env
+		*out = make([]EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.Env = nil
+	}
+	in.Resources.DeepCopyInto(&out.Resources)
+	if in.VolumeMounts != nil {
+		in, out := &in.VolumeMounts, &out.VolumeMounts
+		*out = make([]VolumeMount, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
+		}
+	} else {
+		out.VolumeMounts = nil
+	}
+	if in.LivenessProbe != nil {
+		in, out := &in.LivenessProbe, &out.LivenessProbe
+		*out = (*in).DeepCopy()
+	} else {
+		out.LivenessProbe = nil
+	}
+	if in.ReadinessProbe != nil {
+		in, out := &in.ReadinessProbe, &out.ReadinessProbe
+		*out = (*in).DeepCopy()
+	} else {
+		out.ReadinessProbe = nil
+	}
+	if in.Lifecycle != nil {
+		in, out := &in.Lifecycle, &out.Lifecycle
+		*out = (*in).DeepCopy()
+	} else {
+		out.Lifecycle = nil
+	}
+	out.TerminationMessagePath = in.TerminationMessagePath
+	out.ImagePullPolicy = in.ImagePullPolicy
+	if in.SecurityContext != nil {
+		in, out := &in.SecurityContext, &out.SecurityContext
+		*out = (*in).DeepCopy()
+	} else {
+		out.SecurityContext = nil
+	}
+	out.Stdin = in.Stdin
+	out.StdinOnce = in.StdinOnce
+	out.TTY = in.TTY
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new Container.
+func (x *Container) DeepCopy() *Container {
+	if x == nil {
+		return nil
+	}
+	out := new(Container)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ContainerImage) DeepCopyInto(out *ContainerImage) {
+	if in.Names != nil {
+		in, out := &in.Names, &out.Names
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.Names = nil
+	}
+	out.SizeBytes = in.SizeBytes
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ContainerImage.
+func (x *ContainerImage) DeepCopy() *ContainerImage {
+	if x == nil {
+		return nil
+	}
+	out := new(ContainerImage)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ContainerPort) DeepCopyInto(out *ContainerPort) {
+	out.Name = in.Name
+	out.HostPort = in.HostPort
+	out.ContainerPort = in.ContainerPort
+	out.Protocol = in.Protocol
+	out.HostIP = in.HostIP
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ContainerPort.
+func (x *ContainerPort) DeepCopy() *ContainerPort {
+	if x == nil {
+		return nil
+	}
+	out := new(ContainerPort)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ContainerState) DeepCopyInto(out *ContainerState) {
+	if in.Waiting != nil {
+		in, out := &in.Waiting, &out.Waiting
+		*out = new(ContainerStateWaiting)
+		**out = **in
+	} else {
+		out.Waiting = nil
+	}
+	if in.Running != nil {
+		in, out := &in.Running, &out.Running
+		*out = (*in).DeepCopy()
+	} else {
+		out.Running = nil
+	}
+	if in.Terminated != nil {
+		in, out := &in.Terminated, &out.Terminated
+		*out = (*in).DeepCopy()
+	} else {
+		out.Terminated = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ContainerState.
+func (x *ContainerState) DeepCopy() *ContainerState {
+	if x == nil {
+		return nil
+	}
+	out := new(ContainerState)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ContainerStateRunning) DeepCopyInto(out *ContainerStateRunning) {
+	in.StartedAt.DeepCopyInto(&out.StartedAt)
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ContainerStateRunning.
+func (x *ContainerStateRunning) DeepCopy() *ContainerStateRunning {
+	if x == nil {
+		return nil
+	}
+	out := new(ContainerStateRunning)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ContainerStateTerminated) DeepCopyInto(out *ContainerStateTerminated) {
+	out.ExitCode = in.ExitCode
+	out.Signal = in.Signal
+	out.Reason = in.Reason
+	out.Message = in.Message
+	in.StartedAt.DeepCopyInto(&out.StartedAt)
+	in.FinishedAt.DeepCopyInto(&out.FinishedAt)
+	out.ContainerID = in.ContainerID
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ContainerStateTerminated.
+func (x *ContainerStateTerminated) DeepCopy() *ContainerStateTerminated {
+	if x == nil {
+		return nil
+	}
+	out := new(ContainerStateTerminated)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ContainerStateWaiting) DeepCopyInto(out *ContainerStateWaiting) {
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ContainerStateWaiting.
+func (x *ContainerStateWaiting) DeepCopy() *ContainerStateWaiting {
+	if x == nil {
+		return nil
+	}
+	out := new(ContainerStateWaiting)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ContainerStatus) DeepCopyInto(out *ContainerStatus) {
+	out.Name = in.Name
+	in.State.DeepCopyInto(&out.State)
+	in.LastTerminationState.DeepCopyInto(&out.LastTerminationState)
+	out.Ready = in.Ready
+	out.RestartCount = in.RestartCount
+	out.Image = in.Image
+	out.ImageID = in.ImageID
+	out.ContainerID = in.ContainerID
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ContainerStatus.
+func (x *ContainerStatus) DeepCopy() *ContainerStatus {
+	if x == nil {
+		return nil
+	}
+	out := new(ContainerStatus)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *DaemonEndpoint) DeepCopyInto(out *DaemonEndpoint) {
+	out.Port = in.Port
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new DaemonEndpoint.
+func (x *DaemonEndpoint) DeepCopy() *DaemonEndpoint {
+	if x == nil {
+		return nil
+	}
+	out := new(DaemonEndpoint)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *DeleteOptions) DeepCopyInto(out *DeleteOptions) {
+	out.TypeMeta = in.TypeMeta
+	if in.GracePeriodSeconds != nil {
+		in, out := &in.GracePeriodSeconds, &out.GracePeriodSeconds
+		*out = new(int64)
+		**out = **in
+	} else {
+		out.GracePeriodSeconds = nil
+	}
+	if in.Preconditions != nil {
+		in, out := &in.Preconditions, &out.Preconditions
+		*out = (*in).DeepCopy()
+	} else {
+		out.Preconditions = nil
+	}
+	if in.OrphanDependents != nil {
+		in, out := &in.OrphanDependents, &out.OrphanDependents
+		*out = new(bool)
+		**out = **in
+	} else {
+		out.OrphanDependents = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new DeleteOptions.
+func (x *DeleteOptions) DeepCopy() *DeleteOptions {
+	if x == nil {
+		return nil
+	}
+	out := new(DeleteOptions)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *DeleteOptions) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *DownwardAPIVolumeFile) DeepCopyInto(out *DownwardAPIVolumeFile) {
+	out.Path = in.Path
+	if in.FieldRef != nil {
+		in, out := &in.FieldRef, &out.FieldRef
+		*out = new(ObjectFieldSelector)
+		**out = **in
+	} else {
+		out.FieldRef = nil
+	}
+	if in.ResourceFieldRef != nil {
+		in, out := &in.ResourceFieldRef, &out.ResourceFieldRef
+		*out = (*in).DeepCopy()
+	} else {
+		out.ResourceFieldRef = nil
+	}
+	if in.Mode != nil {
+		in, out := &in.Mode, &out.Mode
+		*out = new(int32)
+		**out = **in
+	} else {
+		out.Mode = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new DownwardAPIVolumeFile.
+func (x *DownwardAPIVolumeFile) DeepCopy() *DownwardAPIVolumeFile {
+	if x == nil {
+		return nil
+	}
+	out := new(DownwardAPIVolumeFile)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *DownwardAPIVolumeSource) DeepCopyInto(out *DownwardAPIVolumeSource) {
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]DownwardAPIVolumeFile, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.Items = nil
+	}
+	if in.DefaultMode != nil {
+		in, out := &in.DefaultMode, &out.DefaultMode
+		*out = new(int32)
+		**out = **in
+	} else {
+		out.DefaultMode = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new DownwardAPIVolumeSource.
+func (x *DownwardAPIVolumeSource) DeepCopy() *DownwardAPIVolumeSource {
+	if x == nil {
+		return nil
+	}
+	out := new(DownwardAPIVolumeSource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *EmptyDirVolumeSource) DeepCopyInto(out *EmptyDirVolumeSource) {
+	out.Medium = in.Medium
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new EmptyDirVolumeSource.
+func (x *EmptyDirVolumeSource) DeepCopy() *EmptyDirVolumeSource {
+	if x == nil {
+		return nil
+	}
+	out := new(EmptyDirVolumeSource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *EndpointAddress) DeepCopyInto(out *EndpointAddress) {
+	out.IP = in.IP
+	out.Hostname = in.Hostname
+	if in.NodeName != nil {
+		in, out := &in.NodeName, &out.NodeName
+		*out = new(string)
+		**out = **in
+	} else {
+		out.NodeName = nil
+	}
+	if in.TargetRef != nil {
+		in, out := &in.TargetRef, &out.TargetRef
+		*out = new(ObjectReference)
+		**out = **in
+	} else {
+		out.TargetRef = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new EndpointAddress.
+func (x *EndpointAddress) DeepCopy() *EndpointAddress {
+	if x == nil {
+		return nil
+	}
+	out := new(EndpointAddress)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *EndpointPort) DeepCopyInto(out *EndpointPort) {
+	out.Name = in.Name
+	out.Port = in.Port
+	out.Protocol = in.Protocol
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new EndpointPort.
+func (x *EndpointPort) DeepCopy() *EndpointPort {
+	if x == nil {
+		return nil
+	}
+	out := new(EndpointPort)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *EndpointSubset) DeepCopyInto(out *EndpointSubset) {
+	if in.Addresses != nil {
+		in, out := &in.Addresses, &out.Addresses
+		*out = make([]EndpointAddress, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.Addresses = nil
+	}
+	if in.NotReadyAddresses != nil {
+		in, out := &in.NotReadyAddresses, &out.NotReadyAddresses
+		*out = make([]EndpointAddress, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.NotReadyAddresses = nil
+	}
+	if in.Ports != nil {
+		in, out := &in.Ports, &out.Ports
+		*out = make([]EndpointPort, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
+		}
+	} else {
+		out.Ports = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new EndpointSubset.
+func (x *EndpointSubset) DeepCopy() *EndpointSubset {
+	if x == nil {
+		return nil
+	}
+	out := new(EndpointSubset)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Endpoints) DeepCopyInto(out *Endpoints) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	if in.Subsets != nil {
+		in, out := &in.Subsets, &out.Subsets
+		*out = make([]EndpointSubset, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.Subsets = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new Endpoints.
+func (x *Endpoints) DeepCopy() *Endpoints {
+	if x == nil {
+		return nil
+	}
+	out := new(Endpoints)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *Endpoints) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *EndpointsList) DeepCopyInto(out *EndpointsList) {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]Endpoints, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.Items = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new EndpointsList.
+func (x *EndpointsList) DeepCopy() *EndpointsList {
+	if x == nil {
+		return nil
+	}
+	out := new(EndpointsList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *EndpointsList) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *EnvVar) DeepCopyInto(out *EnvVar) {
+	out.Name = in.Name
+	out.Value = in.Value
+	if in.ValueFrom != nil {
+		in, out := &in.ValueFrom, &out.ValueFrom
+		*out = (*in).DeepCopy()
+	} else {
+		out.ValueFrom = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new EnvVar.
+func (x *EnvVar) DeepCopy() *EnvVar {
+	if x == nil {
+		return nil
+	}
+	out := new(EnvVar)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *EnvVarSource) DeepCopyInto(out *EnvVarSource) {
+	if in.FieldRef != nil {
+		in, out := &in.FieldRef, &out.FieldRef
+		*out = new(ObjectFieldSelector)
+		**out = **in
+	} else {
+		out.FieldRef = nil
+	}
+	if in.ResourceFieldRef != nil {
+		in, out := &in.ResourceFieldRef, &out.ResourceFieldRef
+		*out = (*in).DeepCopy()
+	} else {
+		out.ResourceFieldRef = nil
+	}
+	if in.ConfigMapKeyRef != nil {
+		in, out := &in.ConfigMapKeyRef, &out.ConfigMapKeyRef
+		*out = new(ConfigMapKeySelector)
+		**out = **in
+	} else {
+		out.ConfigMapKeyRef = nil
+	}
+	if in.SecretKeyRef != nil {
+		in, out := &in.SecretKeyRef, &out.SecretKeyRef
+		*out = new(SecretKeySelector)
+		**out = **in
+	} else {
+		out.SecretKeyRef = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new EnvVarSource.
+func (x *EnvVarSource) DeepCopy() *EnvVarSource {
+	if x == nil {
+		return nil
+	}
+	out := new(EnvVarSource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Event) DeepCopyInto(out *Event) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	out.InvolvedObject = in.InvolvedObject
+	out.Reason = in.Reason
+	out.Message = in.Message
+	out.Source = in.Source
+	in.FirstTimestamp.DeepCopyInto(&out.FirstTimestamp)
+	in.LastTimestamp.DeepCopyInto(&out.LastTimestamp)
+	out.Count = in.Count
+	out.Type = in.Type
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new Event.
+func (x *Event) DeepCopy() *Event {
+	if x == nil {
+		return nil
+	}
+	out := new(Event)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *Event) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *EventList) DeepCopyInto(out *EventList) {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]Event, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.Items = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new EventList.
+func (x *EventList) DeepCopy() *EventList {
+	if x == nil {
+		return nil
+	}
+	out := new(EventList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *EventList) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *EventSource) DeepCopyInto(out *EventSource) {
+	out.Component = in.Component
+	out.Host = in.Host
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new EventSource.
+func (x *EventSource) DeepCopy() *EventSource {
+	if x == nil {
+		return nil
+	}
+	out := new(EventSource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ExecAction) DeepCopyInto(out *ExecAction) {
+	if in.Command != nil {
+		in, out := &in.Command, &out.Command
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.Command = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ExecAction.
+func (x *ExecAction) DeepCopy() *ExecAction {
+	if x == nil {
+		return nil
+	}
+	out := new(ExecAction)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ExportOptions) DeepCopyInto(out *ExportOptions) {
+	out.TypeMeta = in.TypeMeta
+	out.Export = in.Export
+	out.Exact = in.Exact
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ExportOptions.
+func (x *ExportOptions) DeepCopy() *ExportOptions {
+	if x == nil {
+		return nil
+	}
+	out := new(ExportOptions)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *ExportOptions) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *FCVolumeSource) DeepCopyInto(out *FCVolumeSource) {
+	if in.TargetWWNs != nil {
+		in, out := &in.TargetWWNs, &out.TargetWWNs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.TargetWWNs = nil
+	}
+	if in.Lun != nil {
+		in, out := &in.Lun, &out.Lun
+		*out = new(int32)
+		**out = **in
+	} else {
+		out.Lun = nil
+	}
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new FCVolumeSource.
+func (x *FCVolumeSource) DeepCopy() *FCVolumeSource {
+	if x == nil {
+		return nil
+	}
+	out := new(FCVolumeSource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *FlexVolumeSource) DeepCopyInto(out *FlexVolumeSource) {
+	out.Driver = in.Driver
+	out.FSType = in.FSType
+	if in.SecretRef != nil {
+		in, out := &in.SecretRef, &out.SecretRef
+		*out = new(LocalObjectReference)
+		**out = **in
+	} else {
+		out.SecretRef = nil
+	}
+	out.ReadOnly = in.ReadOnly
+	if in.Options != nil {
+		in, out := &in.Options, &out.Options
+		*out = make(map[string]string)
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	} else {
+		out.Options = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new FlexVolumeSource.
+func (x *FlexVolumeSource) DeepCopy() *FlexVolumeSource {
+	if x == nil {
+		return nil
+	}
+	out := new(FlexVolumeSource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *FlockerVolumeSource) DeepCopyInto(out *FlockerVolumeSource) {
+	out.DatasetName = in.DatasetName
+	out.DatasetUUID = in.DatasetUUID
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new FlockerVolumeSource.
+func (x *FlockerVolumeSource) DeepCopy() *FlockerVolumeSource {
+	if x == nil {
+		return nil
+	}
+	out := new(FlockerVolumeSource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *GCEPersistentDiskVolumeSource) DeepCopyInto(out *GCEPersistentDiskVolumeSource) {
+	out.PDName = in.PDName
+	out.FSType = in.FSType
+	out.Partition = in.Partition
+	out.ReadOnly = in.ReadOnly
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new GCEPersistentDiskVolumeSource.
+func (x *GCEPersistentDiskVolumeSource) DeepCopy() *GCEPersistentDiskVolumeSource {
+	if x == nil {
+		return nil
+	}
+	out := new(GCEPersistentDiskVolumeSource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *GitRepoVolumeSource) DeepCopyInto(out *GitRepoVolumeSource) {
+	out.Repository = in.Repository
+	out.Revision = in.Revision
+	out.Directory = in.Directory
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new GitRepoVolumeSource.
+func (x *GitRepoVolumeSource) DeepCopy() *GitRepoVolumeSource {
+	if x == nil {
+		return nil
+	}
+	out := new(GitRepoVolumeSource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *GlusterfsVolumeSource) DeepCopyInto(out *GlusterfsVolumeSource) {
+	out.EndpointsName = in.EndpointsName
+	out.Path = in.Path
+	out.ReadOnly = in.ReadOnly
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new GlusterfsVolumeSource.
+func (x *GlusterfsVolumeSource) DeepCopy() *GlusterfsVolumeSource {
+	if x == nil {
+		return nil
+	}
+	out := new(GlusterfsVolumeSource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *HTTPGetAction) DeepCopyInto(out *HTTPGetAction) {
+	out.Path = in.Path
+	out.Port = in.Port
+	out.Host = in.Host
+	out.Scheme = in.Scheme
+	if in.HTTPHeaders != nil {
+		in, out := &in.HTTPHeaders, &out.HTTPHeaders
+		*out = make([]HTTPHeader, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
+		}
+	} else {
+		out.HTTPHeaders = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new HTTPGetAction.
+func (x *HTTPGetAction) DeepCopy() *HTTPGetAction {
+	if x == nil {
+		return nil
+	}
+	out := new(HTTPGetAction)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *HTTPHeader) DeepCopyInto(out *HTTPHeader) {
+	out.Name = in.Name
+	out.Value = in.Value
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new HTTPHeader.
+func (x *HTTPHeader) DeepCopy() *HTTPHeader {
+	if x == nil {
+		return nil
+	}
+	out := new(HTTPHeader)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Handler) DeepCopyInto(out *Handler) {
+	if in.Exec != nil {
+		in, out := &in.Exec, &out.Exec
+		*out = (*in).DeepCopy()
+	} else {
+		out.Exec = nil
+	}
+	if in.HTTPGet != nil {
+		in, out := &in.HTTPGet, &out.HTTPGet
+		*out = (*in).DeepCopy()
+	} else {
+		out.HTTPGet = nil
+	}
+	if in.TCPSocket != nil {
+		in, out := &in.TCPSocket, &out.TCPSocket
+		*out = new(TCPSocketAction)
+		**out = **in
+	} else {
+		out.TCPSocket = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new Handler.
+func (x *Handler) DeepCopy() *Handler {
+	if x == nil {
+		return nil
+	}
+	out := new(Handler)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *HostPathVolumeSource) DeepCopyInto(out *HostPathVolumeSource) {
+	out.Path = in.Path
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new HostPathVolumeSource.
+func (x *HostPathVolumeSource) DeepCopy() *HostPathVolumeSource {
+	if x == nil {
+		return nil
+	}
+	out := new(HostPathVolumeSource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ISCSIVolumeSource) DeepCopyInto(out *ISCSIVolumeSource) {
+	out.TargetPortal = in.TargetPortal
+	out.IQN = in.IQN
+	out.Lun = in.Lun
+	out.ISCSIInterface = in.ISCSIInterface
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ISCSIVolumeSource.
+func (x *ISCSIVolumeSource) DeepCopy() *ISCSIVolumeSource {
+	if x == nil {
+		return nil
+	}
+	out := new(ISCSIVolumeSource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *KeyToPath) DeepCopyInto(out *KeyToPath) {
+	out.Key = in.Key
+	out.Path = in.Path
+	if in.Mode != nil {
+		in, out := &in.Mode, &out.Mode
+		*out = new(int32)
+		**out = **in
+	} else {
+		out.Mode = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new KeyToPath.
+func (x *KeyToPath) DeepCopy() *KeyToPath {
+	if x == nil {
+		return nil
+	}
+	out := new(KeyToPath)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Lifecycle) DeepCopyInto(out *Lifecycle) {
+	if in.PostStart != nil {
+		in, out := &in.PostStart, &out.PostStart
+		*out = (*in).DeepCopy()
+	} else {
+		out.PostStart = nil
+	}
+	if in.PreStop != nil {
+		in, out := &in.PreStop, &out.PreStop
+		*out = (*in).DeepCopy()
+	} else {
+		out.PreStop = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new Lifecycle.
+func (x *Lifecycle) DeepCopy() *Lifecycle {
+	if x == nil {
+		return nil
+	}
+	out := new(Lifecycle)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *LimitRange) DeepCopyInto(out *LimitRange) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new LimitRange.
+func (x *LimitRange) DeepCopy() *LimitRange {
+	if x == nil {
+		return nil
+	}
+	out := new(LimitRange)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *LimitRange) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *LimitRangeItem) DeepCopyInto(out *LimitRangeItem) {
+	out.Type = in.Type
+	if in.Max != nil {
+		in, out := &in.Max, &out.Max
+		*out = make(ResourceList)
+		for key, val := range *in {
+			(*out)[key] = val.DeepCopy()
+		}
+	} else {
+		out.Max = nil
+	}
+	if in.Min != nil {
+		in, out := &in.Min, &out.Min
+		*out = make(ResourceList)
+		for key, val := range *in {
+			(*out)[key] = val.DeepCopy()
+		}
+	} else {
+		out.Min = nil
+	}
+	if in.Default != nil {
+		in, out := &in.Default, &out.Default
+		*out = make(ResourceList)
+		for key, val := range *in {
+			(*out)[key] = val.DeepCopy()
+		}
+	} else {
+		out.Default = nil
+	}
+	if in.DefaultRequest != nil {
+		in, out := &in.DefaultRequest, &out.DefaultRequest
+		*out = make(ResourceList)
+		for key, val := range *in {
+			(*out)[key] = val.DeepCopy()
+		}
+	} else {
+		out.DefaultRequest = nil
+	}
+	if in.MaxLimitRequestRatio != nil {
+		in, out := &in.MaxLimitRequestRatio, &out.MaxLimitRequestRatio
+		*out = make(ResourceList)
+		for key, val := range *in {
+			(*out)[key] = val.DeepCopy()
+		}
+	} else {
+		out.MaxLimitRequestRatio = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new LimitRangeItem.
+func (x *LimitRangeItem) DeepCopy() *LimitRangeItem {
+	if x == nil {
+		return nil
+	}
+	out := new(LimitRangeItem)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *LimitRangeList) DeepCopyInto(out *LimitRangeList) {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]LimitRange, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.Items = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new LimitRangeList.
+func (x *LimitRangeList) DeepCopy() *LimitRangeList {
+	if x == nil {
+		return nil
+	}
+	out := new(LimitRangeList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *LimitRangeList) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *LimitRangeSpec) DeepCopyInto(out *LimitRangeSpec) {
+	if in.Limits != nil {
+		in, out := &in.Limits, &out.Limits
+		*out = make([]LimitRangeItem, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.Limits = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new LimitRangeSpec.
+func (x *LimitRangeSpec) DeepCopy() *LimitRangeSpec {
+	if x == nil {
+		return nil
+	}
+	out := new(LimitRangeSpec)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *List) DeepCopyInto(out *List) {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]runtime.RawExtension, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.Items = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new List.
+func (x *List) DeepCopy() *List {
+	if x == nil {
+		return nil
+	}
+	out := new(List)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *List) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ListOptions) DeepCopyInto(out *ListOptions) {
+	out.TypeMeta = in.TypeMeta
+	out.LabelSelector = in.LabelSelector
+	out.FieldSelector = in.FieldSelector
+	out.Watch = in.Watch
+	out.ResourceVersion = in.ResourceVersion
+	if in.TimeoutSeconds != nil {
+		in, out := &in.TimeoutSeconds, &out.TimeoutSeconds
+		*out = new(int64)
+		**out = **in
+	} else {
+		out.TimeoutSeconds = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ListOptions.
+func (x *ListOptions) DeepCopy() *ListOptions {
+	if x == nil {
+		return nil
+	}
+	out := new(ListOptions)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *ListOptions) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *LoadBalancerIngress) DeepCopyInto(out *LoadBalancerIngress) {
+	out.IP = in.IP
+	out.Hostname = in.Hostname
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new LoadBalancerIngress.
+func (x *LoadBalancerIngress) DeepCopy() *LoadBalancerIngress {
+	if x == nil {
+		return nil
+	}
+	out := new(LoadBalancerIngress)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *LoadBalancerStatus) DeepCopyInto(out *LoadBalancerStatus) {
+	if in.Ingress != nil {
+		in, out := &in.Ingress, &out.Ingress
+		*out = make([]LoadBalancerIngress, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
+		}
+	} else {
+		out.Ingress = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new LoadBalancerStatus.
+func (x *LoadBalancerStatus) DeepCopy() *LoadBalancerStatus {
+	if x == nil {
+		return nil
+	}
+	out := new(LoadBalancerStatus)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *LocalObjectReference) DeepCopyInto(out *LocalObjectReference) {
+	out.Name = in.Name
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new LocalObjectReference.
+func (x *LocalObjectReference) DeepCopy() *LocalObjectReference {
+	if x == nil {
+		return nil
+	}
+	out := new(LocalObjectReference)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *NFSVolumeSource) DeepCopyInto(out *NFSVolumeSource) {
+	out.Server = in.Server
+	out.Path = in.Path
+	out.ReadOnly = in.ReadOnly
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new NFSVolumeSource.
+func (x *NFSVolumeSource) DeepCopy() *NFSVolumeSource {
+	if x == nil {
+		return nil
+	}
+	out := new(NFSVolumeSource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Namespace) DeepCopyInto(out *Namespace) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	out.Status = in.Status
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new Namespace.
+func (x *Namespace) DeepCopy() *Namespace {
+	if x == nil {
+		return nil
+	}
+	out := new(Namespace)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *Namespace) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *NamespaceList) DeepCopyInto(out *NamespaceList) {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]Namespace, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.Items = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new NamespaceList.
+func (x *NamespaceList) DeepCopy() *NamespaceList {
+	if x == nil {
+		return nil
+	}
+	out := new(NamespaceList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *NamespaceList) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *NamespaceSpec) DeepCopyInto(out *NamespaceSpec) {
+	if in.Finalizers != nil {
+		in, out := &in.Finalizers, &out.Finalizers
+		*out = make([]FinalizerName, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
+		}
+	} else {
+		out.Finalizers = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new NamespaceSpec.
+func (x *NamespaceSpec) DeepCopy() *NamespaceSpec {
+	if x == nil {
+		return nil
+	}
+	out := new(NamespaceSpec)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *NamespaceStatus) DeepCopyInto(out *NamespaceStatus) {
+	out.Phase = in.Phase
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new NamespaceStatus.
+func (x *NamespaceStatus) DeepCopy() *NamespaceStatus {
+	if x == nil {
+		return nil
+	}
+	out := new(NamespaceStatus)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Node) DeepCopyInto(out *Node) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	out.Spec = in.Spec
+	in.Status.DeepCopyInto(&out.Status)
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new Node.
+func (x *Node) DeepCopy() *Node {
+	if x == nil {
+		return nil
+	}
+	out := new(Node)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *Node) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *NodeAddress) DeepCopyInto(out *NodeAddress) {
+	out.Type = in.Type
+	out.Address = in.Address
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new NodeAddress.
+func (x *NodeAddress) DeepCopy() *NodeAddress {
+	if x == nil {
+		return nil
+	}
+	out := new(NodeAddress)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *NodeAffinity) DeepCopyInto(out *NodeAffinity) {
+	if in.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+		in, out := &in.RequiredDuringSchedulingIgnoredDuringExecution, &out.RequiredDuringSchedulingIgnoredDuringExecution
+		*out = (*in).DeepCopy()
+	} else {
+		out.RequiredDuringSchedulingIgnoredDuringExecution = nil
+	}
+	if in.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+		in, out := &in.PreferredDuringSchedulingIgnoredDuringExecution, &out.PreferredDuringSchedulingIgnoredDuringExecution
+		*out = make([]PreferredSchedulingTerm, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.PreferredDuringSchedulingIgnoredDuringExecution = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new NodeAffinity.
+func (x *NodeAffinity) DeepCopy() *NodeAffinity {
+	if x == nil {
+		return nil
+	}
+	out := new(NodeAffinity)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *NodeCondition) DeepCopyInto(out *NodeCondition) {
+	out.Type = in.Type
+	out.Status = in.Status
+	in.LastHeartbeatTime.DeepCopyInto(&out.LastHeartbeatTime)
+	in.LastTransitionTime.DeepCopyInto(&out.LastTransitionTime)
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new NodeCondition.
+func (x *NodeCondition) DeepCopy() *NodeCondition {
+	if x == nil {
+		return nil
+	}
+	out := new(NodeCondition)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *NodeDaemonEndpoints) DeepCopyInto(out *NodeDaemonEndpoints) {
+	out.KubeletEndpoint = in.KubeletEndpoint
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new NodeDaemonEndpoints.
+func (x *NodeDaemonEndpoints) DeepCopy() *NodeDaemonEndpoints {
+	if x == nil {
+		return nil
+	}
+	out := new(NodeDaemonEndpoints)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *NodeList) DeepCopyInto(out *NodeList) {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]Node, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.Items = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new NodeList.
+func (x *NodeList) DeepCopy() *NodeList {
+	if x == nil {
+		return nil
+	}
+	out := new(NodeList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *NodeList) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *NodeProxyOptions) DeepCopyInto(out *NodeProxyOptions) {
+	out.TypeMeta = in.TypeMeta
+	out.Path = in.Path
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new NodeProxyOptions.
+func (x *NodeProxyOptions) DeepCopy() *NodeProxyOptions {
+	if x == nil {
+		return nil
+	}
+	out := new(NodeProxyOptions)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *NodeProxyOptions) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *NodeSelector) DeepCopyInto(out *NodeSelector) {
+	if in.NodeSelectorTerms != nil {
+		in, out := &in.NodeSelectorTerms, &out.NodeSelectorTerms
+		*out = make([]NodeSelectorTerm, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.NodeSelectorTerms = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new NodeSelector.
+func (x *NodeSelector) DeepCopy() *NodeSelector {
+	if x == nil {
+		return nil
+	}
+	out := new(NodeSelector)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *NodeSelectorRequirement) DeepCopyInto(out *NodeSelectorRequirement) {
+	out.Key = in.Key
+	out.Operator = in.Operator
+	if in.Values != nil {
+		in, out := &in.Values, &out.Values
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.Values = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new NodeSelectorRequirement.
+func (x *NodeSelectorRequirement) DeepCopy() *NodeSelectorRequirement {
+	if x == nil {
+		return nil
+	}
+	out := new(NodeSelectorRequirement)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *NodeSelectorTerm) DeepCopyInto(out *NodeSelectorTerm) {
+	if in.MatchExpressions != nil {
+		in, out := &in.MatchExpressions, &out.MatchExpressions
+		*out = make([]NodeSelectorRequirement, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.MatchExpressions = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new NodeSelectorTerm.
+func (x *NodeSelectorTerm) DeepCopy() *NodeSelectorTerm {
+	if x == nil {
+		return nil
+	}
+	out := new(NodeSelectorTerm)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *NodeSpec) DeepCopyInto(out *NodeSpec) {
+	out.PodCIDR = in.PodCIDR
+	out.ExternalID = in.ExternalID
+	out.ProviderID = in.ProviderID
+	out.Unschedulable = in.Unschedulable
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new NodeSpec.
+func (x *NodeSpec) DeepCopy() *NodeSpec {
+	if x == nil {
+		return nil
+	}
+	out := new(NodeSpec)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *NodeStatus) DeepCopyInto(out *NodeStatus) {
+	if in.Capacity != nil {
+		in, out := &in.Capacity, &out.Capacity
+		*out = make(ResourceList)
+		for key, val := range *in {
+			(*out)[key] = val.DeepCopy()
+		}
+	} else {
+		out.Capacity = nil
+	}
+	if in.Allocatable != nil {
+		in, out := &in.Allocatable, &out.Allocatable
+		*out = make(ResourceList)
+		for key, val := range *in {
+			(*out)[key] = val.DeepCopy()
+		}
+	} else {
+		out.Allocatable = nil
+	}
+	out.Phase = in.Phase
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]NodeCondition, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.Conditions = nil
+	}
+	if in.Addresses != nil {
+		in, out := &in.Addresses, &out.Addresses
+		*out = make([]NodeAddress, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
+		}
+	} else {
+		out.Addresses = nil
+	}
+	out.DaemonEndpoints = in.DaemonEndpoints
+	out.NodeInfo = in.NodeInfo
+	if in.Images != nil {
+		in, out := &in.Images, &out.Images
+		*out = make([]ContainerImage, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.Images = nil
+	}
+	if in.VolumesInUse != nil {
+		in, out := &in.VolumesInUse, &out.VolumesInUse
+		*out = make([]UniqueVolumeName, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
+		}
+	} else {
+		out.VolumesInUse = nil
+	}
+	if in.VolumesAttached != nil {
+		in, out := &in.VolumesAttached, &out.VolumesAttached
+		*out = make([]AttachedVolume, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
+		}
+	} else {
+		out.VolumesAttached = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new NodeStatus.
+func (x *NodeStatus) DeepCopy() *NodeStatus {
+	if x == nil {
+		return nil
+	}
+	out := new(NodeStatus)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *NodeSystemInfo) DeepCopyInto(out *NodeSystemInfo) {
+	out.MachineID = in.MachineID
+	out.SystemUUID = in.SystemUUID
+	out.BootID = in.BootID
+	out.KernelVersion = in.KernelVersion
+	out.OSImage = in.OSImage
+	out.ContainerRuntimeVersion = in.ContainerRuntimeVersion
+	out.KubeletVersion = in.KubeletVersion
+	out.KubeProxyVersion = in.KubeProxyVersion
+	out.OperatingSystem = in.OperatingSystem
+	out.Architecture = in.Architecture
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new NodeSystemInfo.
+func (x *NodeSystemInfo) DeepCopy() *NodeSystemInfo {
+	if x == nil {
+		return nil
+	}
+	out := new(NodeSystemInfo)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ObjectFieldSelector) DeepCopyInto(out *ObjectFieldSelector) {
+	out.APIVersion = in.APIVersion
+	out.FieldPath = in.FieldPath
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ObjectFieldSelector.
+func (x *ObjectFieldSelector) DeepCopy() *ObjectFieldSelector {
+	if x == nil {
+		return nil
+	}
+	out := new(ObjectFieldSelector)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ObjectMeta) DeepCopyInto(out *ObjectMeta) {
+	out.Name = in.Name
+	out.GenerateName = in.GenerateName
+	out.Namespace = in.Namespace
+	out.SelfLink = in.SelfLink
+	out.UID = in.UID
+	out.ResourceVersion = in.ResourceVersion
+	out.Generation = in.Generation
+	in.CreationTimestamp.DeepCopyInto(&out.CreationTimestamp)
+	if in.DeletionTimestamp != nil {
+		in, out := &in.DeletionTimestamp, &out.DeletionTimestamp
+		*out = (*in).DeepCopy()
+	} else {
+		out.DeletionTimestamp = nil
+	}
+	if in.DeletionGracePeriodSeconds != nil {
+		in, out := &in.DeletionGracePeriodSeconds, &out.DeletionGracePeriodSeconds
+		*out = new(int64)
+		**out = **in
+	} else {
+		out.DeletionGracePeriodSeconds = nil
+	}
+	if in.Labels != nil {
+		in, out := &in.Labels, &out.Labels
+		*out = make(map[string]string)
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	} else {
+		out.Labels = nil
+	}
+	if in.Annotations != nil {
+		in, out := &in.Annotations, &out.Annotations
+		*out = make(map[string]string)
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	} else {
+		out.Annotations = nil
+	}
+	if in.OwnerReferences != nil {
+		in, out := &in.OwnerReferences, &out.OwnerReferences
+		*out = make([]OwnerReference, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.OwnerReferences = nil
+	}
+	if in.Finalizers != nil {
+		in, out := &in.Finalizers, &out.Finalizers
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.Finalizers = nil
+	}
+	out.ClusterName = in.ClusterName
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ObjectMeta.
+func (x *ObjectMeta) DeepCopy() *ObjectMeta {
+	if x == nil {
+		return nil
+	}
+	out := new(ObjectMeta)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ObjectReference) DeepCopyInto(out *ObjectReference) {
+	out.Kind = in.Kind
+	out.Namespace = in.Namespace
+	out.Name = in.Name
+	out.UID = in.UID
+	out.APIVersion = in.APIVersion
+	out.ResourceVersion = in.ResourceVersion
+	out.FieldPath = in.FieldPath
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ObjectReference.
+func (x *ObjectReference) DeepCopy() *ObjectReference {
+	if x == nil {
+		return nil
+	}
+	out := new(ObjectReference)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *OwnerReference) DeepCopyInto(out *OwnerReference) {
+	out.APIVersion = in.APIVersion
+	out.Kind = in.Kind
+	out.Name = in.Name
+	out.UID = in.UID
+	if in.Controller != nil {
+		in, out := &in.Controller, &out.Controller
+		*out = new(bool)
+		**out = **in
+	} else {
+		out.Controller = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new OwnerReference.
+func (x *OwnerReference) DeepCopy() *OwnerReference {
+	if x == nil {
+		return nil
+	}
+	out := new(OwnerReference)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PersistentVolume) DeepCopyInto(out *PersistentVolume) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	out.Status = in.Status
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PersistentVolume.
+func (x *PersistentVolume) DeepCopy() *PersistentVolume {
+	if x == nil {
+		return nil
+	}
+	out := new(PersistentVolume)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *PersistentVolume) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PersistentVolumeClaim) DeepCopyInto(out *PersistentVolumeClaim) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	in.Status.DeepCopyInto(&out.Status)
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PersistentVolumeClaim.
+func (x *PersistentVolumeClaim) DeepCopy() *PersistentVolumeClaim {
+	if x == nil {
+		return nil
+	}
+	out := new(PersistentVolumeClaim)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *PersistentVolumeClaim) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PersistentVolumeClaimList) DeepCopyInto(out *PersistentVolumeClaimList) {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]PersistentVolumeClaim, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.Items = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PersistentVolumeClaimList.
+func (x *PersistentVolumeClaimList) DeepCopy() *PersistentVolumeClaimList {
+	if x == nil {
+		return nil
+	}
+	out := new(PersistentVolumeClaimList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *PersistentVolumeClaimList) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PersistentVolumeClaimSpec) DeepCopyInto(out *PersistentVolumeClaimSpec) {
+	if in.AccessModes != nil {
+		in, out := &in.AccessModes, &out.AccessModes
+		*out = make([]PersistentVolumeAccessMode, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
+		}
+	} else {
+		out.AccessModes = nil
+	}
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = (*in).DeepCopy()
+	} else {
+		out.Selector = nil
+	}
+	in.Resources.DeepCopyInto(&out.Resources)
+	out.VolumeName = in.VolumeName
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PersistentVolumeClaimSpec.
+func (x *PersistentVolumeClaimSpec) DeepCopy() *PersistentVolumeClaimSpec {
+	if x == nil {
+		return nil
+	}
+	out := new(PersistentVolumeClaimSpec)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PersistentVolumeClaimStatus) DeepCopyInto(out *PersistentVolumeClaimStatus) {
+	out.Phase = in.Phase
+	if in.AccessModes != nil {
+		in, out := &in.AccessModes, &out.AccessModes
+		*out = make([]PersistentVolumeAccessMode, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
+		}
+	} else {
+		out.AccessModes = nil
+	}
+	if in.Capacity != nil {
+		in, out := &in.Capacity, &out.Capacity
+		*out = make(ResourceList)
+		for key, val := range *in {
+			(*out)[key] = val.DeepCopy()
+		}
+	} else {
+		out.Capacity = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PersistentVolumeClaimStatus.
+func (x *PersistentVolumeClaimStatus) DeepCopy() *PersistentVolumeClaimStatus {
+	if x == nil {
+		return nil
+	}
+	out := new(PersistentVolumeClaimStatus)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PersistentVolumeClaimVolumeSource) DeepCopyInto(out *PersistentVolumeClaimVolumeSource) {
+	out.ClaimName = in.ClaimName
+	out.ReadOnly = in.ReadOnly
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PersistentVolumeClaimVolumeSource.
+func (x *PersistentVolumeClaimVolumeSource) DeepCopy() *PersistentVolumeClaimVolumeSource {
+	if x == nil {
+		return nil
+	}
+	out := new(PersistentVolumeClaimVolumeSource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PersistentVolumeList) DeepCopyInto(out *PersistentVolumeList) {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]PersistentVolume, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.Items = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PersistentVolumeList.
+func (x *PersistentVolumeList) DeepCopy() *PersistentVolumeList {
+	if x == nil {
+		return nil
+	}
+	out := new(PersistentVolumeList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *PersistentVolumeList) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PersistentVolumeSource) DeepCopyInto(out *PersistentVolumeSource) {
+	if in.GCEPersistentDisk != nil {
+		in, out := &in.GCEPersistentDisk, &out.GCEPersistentDisk
+		*out = new(GCEPersistentDiskVolumeSource)
+		**out = **in
+	} else {
+		out.GCEPersistentDisk = nil
+	}
+	if in.AWSElasticBlockStore != nil {
+		in, out := &in.AWSElasticBlockStore, &out.AWSElasticBlockStore
+		*out = new(AWSElasticBlockStoreVolumeSource)
+		**out = **in
+	} else {
+		out.AWSElasticBlockStore = nil
+	}
+	if in.HostPath != nil {
+		in, out := &in.HostPath, &out.HostPath
+		*out = new(HostPathVolumeSource)
+		**out = **in
+	} else {
+		out.HostPath = nil
+	}
+	if in.Glusterfs != nil {
+		in, out := &in.Glusterfs, &out.Glusterfs
+		*out = new(GlusterfsVolumeSource)
+		**out = **in
+	} else {
+		out.Glusterfs = nil
+	}
+	if in.NFS != nil {
+		in, out := &in.NFS, &out.NFS
+		*out = new(NFSVolumeSource)
+		**out = **in
+	} else {
+		out.NFS = nil
+	}
+	if in.RBD != nil {
+		in, out := &in.RBD, &out.RBD
+		*out = (*in).DeepCopy()
+	} else {
+		out.RBD = nil
+	}
+	if in.ISCSI != nil {
+		in, out := &in.ISCSI, &out.ISCSI
+		*out = new(ISCSIVolumeSource)
+		**out = **in
+	} else {
+		out.ISCSI = nil
+	}
+	if in.Cinder != nil {
+		in, out := &in.Cinder, &out.Cinder
+		*out = new(CinderVolumeSource)
+		**out = **in
+	} else {
+		out.Cinder = nil
+	}
+	if in.CephFS != nil {
+		in, out := &in.CephFS, &out.CephFS
+		*out = (*in).DeepCopy()
+	} else {
+		out.CephFS = nil
+	}
+	if in.FC != nil {
+		in, out := &in.FC, &out.FC
+		*out = (*in).DeepCopy()
+	} else {
+		out.FC = nil
+	}
+	if in.Flocker != nil {
+		in, out := &in.Flocker, &out.Flocker
+		*out = new(FlockerVolumeSource)
+		**out = **in
+	} else {
+		out.Flocker = nil
+	}
+	if in.FlexVolume != nil {
+		in, out := &in.FlexVolume, &out.FlexVolume
+		*out = (*in).DeepCopy()
+	} else {
+		out.FlexVolume = nil
+	}
+	if in.AzureFile != nil {
+		in, out := &in.AzureFile, &out.AzureFile
+		*out = new(AzureFileVolumeSource)
+		**out = **in
+	} else {
+		out.AzureFile = nil
+	}
+	if in.VsphereVolume != nil {
+		in, out := &in.VsphereVolume, &out.VsphereVolume
+		*out = new(VsphereVirtualDiskVolumeSource)
+		**out = **in
+	} else {
+		out.VsphereVolume = nil
+	}
+	if in.Quobyte != nil {
+		in, out := &in.Quobyte, &out.Quobyte
+		*out = new(QuobyteVolumeSource)
+		**out = **in
+	} else {
+		out.Quobyte = nil
+	}
+	if in.AzureDisk != nil {
+		in, out := &in.AzureDisk, &out.AzureDisk
+		*out = (*in).DeepCopy()
+	} else {
+		out.AzureDisk = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PersistentVolumeSource.
+func (x *PersistentVolumeSource) DeepCopy() *PersistentVolumeSource {
+	if x == nil {
+		return nil
+	}
+	out := new(PersistentVolumeSource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PersistentVolumeSpec) DeepCopyInto(out *PersistentVolumeSpec) {
+	if in.Capacity != nil {
+		in, out := &in.Capacity, &out.Capacity
+		*out = make(ResourceList)
+		for key, val := range *in {
+			(*out)[key] = val.DeepCopy()
+		}
+	} else {
+		out.Capacity = nil
+	}
+	in.PersistentVolumeSource.DeepCopyInto(&out.PersistentVolumeSource)
+	if in.AccessModes != nil {
+		in, out := &in.AccessModes, &out.AccessModes
+		*out = make([]PersistentVolumeAccessMode, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
+		}
+	} else {
+		out.AccessModes = nil
+	}
+	if in.ClaimRef != nil {
+		in, out := &in.ClaimRef, &out.ClaimRef
+		*out = new(ObjectReference)
+		**out = **in
+	} else {
+		out.ClaimRef = nil
+	}
+	out.PersistentVolumeReclaimPolicy = in.PersistentVolumeReclaimPolicy
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PersistentVolumeSpec.
+func (x *PersistentVolumeSpec) DeepCopy() *PersistentVolumeSpec {
+	if x == nil {
+		return nil
+	}
+	out := new(PersistentVolumeSpec)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PersistentVolumeStatus) DeepCopyInto(out *PersistentVolumeStatus) {
+	out.Phase = in.Phase
+	out.Message = in.Message
+	out.Reason = in.Reason
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PersistentVolumeStatus.
+func (x *PersistentVolumeStatus) DeepCopy() *PersistentVolumeStatus {
+	if x == nil {
+		return nil
+	}
+	out := new(PersistentVolumeStatus)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Pod) DeepCopyInto(out *Pod) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	in.Status.DeepCopyInto(&out.Status)
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new Pod.
+func (x *Pod) DeepCopy() *Pod {
+	if x == nil {
+		return nil
+	}
+	out := new(Pod)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *Pod) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodAffinity) DeepCopyInto(out *PodAffinity) {
+	if in.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+		in, out := &in.RequiredDuringSchedulingIgnoredDuringExecution, &out.RequiredDuringSchedulingIgnoredDuringExecution
+		*out = make([]PodAffinityTerm, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.RequiredDuringSchedulingIgnoredDuringExecution = nil
+	}
+	if in.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+		in, out := &in.PreferredDuringSchedulingIgnoredDuringExecution, &out.PreferredDuringSchedulingIgnoredDuringExecution
+		*out = make([]WeightedPodAffinityTerm, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.PreferredDuringSchedulingIgnoredDuringExecution = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PodAffinity.
+func (x *PodAffinity) DeepCopy() *PodAffinity {
+	if x == nil {
+		return nil
+	}
+	out := new(PodAffinity)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodAffinityTerm) DeepCopyInto(out *PodAffinityTerm) {
+	if in.LabelSelector != nil {
+		in, out := &in.LabelSelector, &out.LabelSelector
+		*out = (*in).DeepCopy()
+	} else {
+		out.LabelSelector = nil
+	}
+	if in.Namespaces != nil {
+		in, out := &in.Namespaces, &out.Namespaces
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.Namespaces = nil
+	}
+	out.TopologyKey = in.TopologyKey
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PodAffinityTerm.
+func (x *PodAffinityTerm) DeepCopy() *PodAffinityTerm {
+	if x == nil {
+		return nil
+	}
+	out := new(PodAffinityTerm)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodAntiAffinity) DeepCopyInto(out *PodAntiAffinity) {
+	if in.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+		in, out := &in.RequiredDuringSchedulingIgnoredDuringExecution, &out.RequiredDuringSchedulingIgnoredDuringExecution
+		*out = make([]PodAffinityTerm, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.RequiredDuringSchedulingIgnoredDuringExecution = nil
+	}
+	if in.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+		in, out := &in.PreferredDuringSchedulingIgnoredDuringExecution, &out.PreferredDuringSchedulingIgnoredDuringExecution
+		*out = make([]WeightedPodAffinityTerm, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.PreferredDuringSchedulingIgnoredDuringExecution = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PodAntiAffinity.
+func (x *PodAntiAffinity) DeepCopy() *PodAntiAffinity {
+	if x == nil {
+		return nil
+	}
+	out := new(PodAntiAffinity)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodAttachOptions) DeepCopyInto(out *PodAttachOptions) {
+	out.TypeMeta = in.TypeMeta
+	out.Stdin = in.Stdin
+	out.Stdout = in.Stdout
+	out.Stderr = in.Stderr
+	out.TTY = in.TTY
+	out.Container = in.Container
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PodAttachOptions.
+func (x *PodAttachOptions) DeepCopy() *PodAttachOptions {
+	if x == nil {
+		return nil
+	}
+	out := new(PodAttachOptions)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *PodAttachOptions) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodCondition) DeepCopyInto(out *PodCondition) {
+	out.Type = in.Type
+	out.Status = in.Status
+	in.LastProbeTime.DeepCopyInto(&out.LastProbeTime)
+	in.LastTransitionTime.DeepCopyInto(&out.LastTransitionTime)
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PodCondition.
+func (x *PodCondition) DeepCopy() *PodCondition {
+	if x == nil {
+		return nil
+	}
+	out := new(PodCondition)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodExecOptions) DeepCopyInto(out *PodExecOptions) {
+	out.TypeMeta = in.TypeMeta
+	out.Stdin = in.Stdin
+	out.Stdout = in.Stdout
+	out.Stderr = in.Stderr
+	out.TTY = in.TTY
+	out.Container = in.Container
+	if in.Command != nil {
+		in, out := &in.Command, &out.Command
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.Command = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PodExecOptions.
+func (x *PodExecOptions) DeepCopy() *PodExecOptions {
+	if x == nil {
+		return nil
+	}
+	out := new(PodExecOptions)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *PodExecOptions) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodList) DeepCopyInto(out *PodList) {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]Pod, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.Items = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PodList.
+func (x *PodList) DeepCopy() *PodList {
+	if x == nil {
+		return nil
+	}
+	out := new(PodList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *PodList) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodLogOptions) DeepCopyInto(out *PodLogOptions) {
+	out.TypeMeta = in.TypeMeta
+	out.Container = in.Container
+	out.Follow = in.Follow
+	out.Previous = in.Previous
+	if in.SinceSeconds != nil {
+		in, out := &in.SinceSeconds, &out.SinceSeconds
+		*out = new(int64)
+		**out = **in
+	} else {
+		out.SinceSeconds = nil
+	}
+	if in.SinceTime != nil {
+		in, out := &in.SinceTime, &out.SinceTime
+		*out = (*in).DeepCopy()
+	} else {
+		out.SinceTime = nil
+	}
+	out.Timestamps = in.Timestamps
+	if in.TailLines != nil {
+		in, out := &in.TailLines, &out.TailLines
+		*out = new(int64)
+		**out = **in
+	} else {
+		out.TailLines = nil
+	}
+	if in.LimitBytes != nil {
+		in, out := &in.LimitBytes, &out.LimitBytes
+		*out = new(int64)
+		**out = **in
+	} else {
+		out.LimitBytes = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PodLogOptions.
+func (x *PodLogOptions) DeepCopy() *PodLogOptions {
+	if x == nil {
+		return nil
+	}
+	out := new(PodLogOptions)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *PodLogOptions) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodProxyOptions) DeepCopyInto(out *PodProxyOptions) {
+	out.TypeMeta = in.TypeMeta
+	out.Path = in.Path
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PodProxyOptions.
+func (x *PodProxyOptions) DeepCopy() *PodProxyOptions {
+	if x == nil {
+		return nil
+	}
+	out := new(PodProxyOptions)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *PodProxyOptions) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodSecurityContext) DeepCopyInto(out *PodSecurityContext) {
+	if in.SELinuxOptions != nil {
+		in, out := &in.SELinuxOptions, &out.SELinuxOptions
+		*out = new(SELinuxOptions)
+		**out = **in
+	} else {
+		out.SELinuxOptions = nil
+	}
+	if in.RunAsUser != nil {
+		in, out := &in.RunAsUser, &out.RunAsUser
+		*out = new(int64)
+		**out = **in
+	} else {
+		out.RunAsUser = nil
+	}
+	if in.RunAsNonRoot != nil {
+		in, out := &in.RunAsNonRoot, &out.RunAsNonRoot
+		*out = new(bool)
+		**out = **in
+	} else {
+		out.RunAsNonRoot = nil
+	}
+	if in.SupplementalGroups != nil {
+		in, out := &in.SupplementalGroups, &out.SupplementalGroups
+		*out = make([]int64, len(*in))
+		copy(*out, *in)
+	} else {
+		out.SupplementalGroups = nil
+	}
+	if in.FSGroup != nil {
+		in, out := &in.FSGroup, &out.FSGroup
+		*out = new(int64)
+		**out = **in
+	} else {
+		out.FSGroup = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PodSecurityContext.
+func (x *PodSecurityContext) DeepCopy() *PodSecurityContext {
+	if x == nil {
+		return nil
+	}
+	out := new(PodSecurityContext)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodSignature) DeepCopyInto(out *PodSignature) {
+	if in.PodController != nil {
+		in, out := &in.PodController, &out.PodController
+		*out = (*in).DeepCopy()
+	} else {
+		out.PodController = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PodSignature.
+func (x *PodSignature) DeepCopy() *PodSignature {
+	if x == nil {
+		return nil
+	}
+	out := new(PodSignature)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodSpec) DeepCopyInto(out *PodSpec) {
+	if in.Volumes != nil {
+		in, out := &in.Volumes, &out.Volumes
+		*out = make([]Volume, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.Volumes = nil
+	}
+	if in.InitContainers != nil {
+		in, out := &in.InitContainers, &out.InitContainers
+		*out = make([]Container, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.InitContainers = nil
+	}
+	if in.Containers != nil {
+		in, out := &in.Containers, &out.Containers
+		*out = make([]Container, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.Containers = nil
+	}
+	out.RestartPolicy = in.RestartPolicy
+	if in.TerminationGracePeriodSeconds != nil {
+		in, out := &in.TerminationGracePeriodSeconds, &out.TerminationGracePeriodSeconds
+		*out = new(int64)
+		**out = **in
+	} else {
+		out.TerminationGracePeriodSeconds = nil
+	}
+	if in.ActiveDeadlineSeconds != nil {
+		in, out := &in.ActiveDeadlineSeconds, &out.ActiveDeadlineSeconds
+		*out = new(int64)
+		**out = **in
+	} else {
+		out.ActiveDeadlineSeconds = nil
+	}
+	out.DNSPolicy = in.DNSPolicy
+	if in.NodeSelector != nil {
+		in, out := &in.NodeSelector, &out.NodeSelector
+		*out = make(map[string]string)
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	} else {
+		out.NodeSelector = nil
+	}
+	out.ServiceAccountName = in.ServiceAccountName
+	out.DeprecatedServiceAccount = in.DeprecatedServiceAccount
+	out.NodeName = in.NodeName
+	out.HostNetwork = in.HostNetwork
+	out.HostPID = in.HostPID
+	out.HostIPC = in.HostIPC
+	if in.SecurityContext != nil {
+		in, out := &in.SecurityContext, &out.SecurityContext
+		*out = (*in).DeepCopy()
+	} else {
+		out.SecurityContext = nil
+	}
+	if in.ImagePullSecrets != nil {
+		in, out := &in.ImagePullSecrets, &out.ImagePullSecrets
+		*out = make([]LocalObjectReference, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
+		}
+	} else {
+		out.ImagePullSecrets = nil
+	}
+	out.Hostname = in.Hostname
+	out.Subdomain = in.Subdomain
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PodSpec.
+func (x *PodSpec) DeepCopy() *PodSpec {
+	if x == nil {
+		return nil
+	}
+	out := new(PodSpec)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodStatus) DeepCopyInto(out *PodStatus) {
+	out.Phase = in.Phase
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]PodCondition, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.Conditions = nil
+	}
+	out.Message = in.Message
+	out.Reason = in.Reason
+	out.HostIP = in.HostIP
+	out.PodIP = in.PodIP
+	if in.StartTime != nil {
+		in, out := &in.StartTime, &out.StartTime
+		*out = (*in).DeepCopy()
+	} else {
+		out.StartTime = nil
+	}
+	if in.InitContainerStatuses != nil {
+		in, out := &in.InitContainerStatuses, &out.InitContainerStatuses
+		*out = make([]ContainerStatus, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.InitContainerStatuses = nil
+	}
+	if in.ContainerStatuses != nil {
+		in, out := &in.ContainerStatuses, &out.ContainerStatuses
+		*out = make([]ContainerStatus, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.ContainerStatuses = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PodStatus.
+func (x *PodStatus) DeepCopy() *PodStatus {
+	if x == nil {
+		return nil
+	}
+	out := new(PodStatus)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodStatusResult) DeepCopyInto(out *PodStatusResult) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Status.DeepCopyInto(&out.Status)
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PodStatusResult.
+func (x *PodStatusResult) DeepCopy() *PodStatusResult {
+	if x == nil {
+		return nil
+	}
+	out := new(PodStatusResult)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *PodStatusResult) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodTemplate) DeepCopyInto(out *PodTemplate) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Template.DeepCopyInto(&out.Template)
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PodTemplate.
+func (x *PodTemplate) DeepCopy() *PodTemplate {
+	if x == nil {
+		return nil
+	}
+	out := new(PodTemplate)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *PodTemplate) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodTemplateList) DeepCopyInto(out *PodTemplateList) {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]PodTemplate, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	} else {
+		out.Items = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PodTemplateList.
+func (x *PodTemplateList) DeepCopy() *PodTemplateList {
+	if x == nil {
+		return nil
+	}
+	out := new(PodTemplateList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *PodTemplateList) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PodTemplateSpec) DeepCopyInto(out *PodTemplateSpec) {
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PodTemplateSpec.
+func (x *PodTemplateSpec) DeepCopy() *PodTemplateSpec {
+	if x == nil {
+		return nil
+	}
+	out := new(PodTemplateSpec)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Preconditions) DeepCopyInto(out *Preconditions) {
+	if in.UID != nil {
+		in, out := &in.UID, &out.UID
+		*out = new(types.UID)
+		**out = **in
+	} else {
+		out.UID = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new Preconditions.
+func (x *Preconditions) DeepCopy() *Preconditions {
+	if x == nil {
+		return nil
+	}
+	out := new(Preconditions)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PreferAvoidPodsEntry) DeepCopyInto(out *PreferAvoidPodsEntry) {
+	in.PodSignature.DeepCopyInto(&out.PodSignature)
+	in.EvictionTime.DeepCopyInto(&out.EvictionTime)
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PreferAvoidPodsEntry.
+func (x *PreferAvoidPodsEntry) DeepCopy() *PreferAvoidPodsEntry {
+	if x == nil {
+		return nil
+	}
+	out := new(PreferAvoidPodsEntry)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PreferredSchedulingTerm) DeepCopyInto(out *PreferredSchedulingTerm) {
+	out.Weight = in.Weight
+	in.Preference.DeepCopyInto(&out.Preference)
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PreferredSchedulingTerm.
+func (x *PreferredSchedulingTerm) DeepCopy() *PreferredSchedulingTerm {
+	if x == nil {
+		return nil
+	}
+	out := new(PreferredSchedulingTerm)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Probe) DeepCopyInto(out *Probe) {
+	in.Handler.DeepCopyInto(&out.Handler)
+	out.InitialDelaySeconds = in.InitialDelaySeconds
+	out.TimeoutSeconds = in.TimeoutSeconds
+	out.PeriodSeconds = in.PeriodSeconds
+	out.SuccessThreshold = in.SuccessThreshold
+	out.FailureThreshold = in.FailureThreshold
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new Probe.
+func (x *Probe) DeepCopy() *Probe {
+	if x == nil {
+		return nil
+	}
+	out := new(Probe)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *QuobyteVolumeSource) DeepCopyInto(out *QuobyteVolumeSource) {
+	out.Registry = in.Registry
+	out.Volume = in.Volume
+	out.ReadOnly = in.ReadOnly
+	out.User = in.User
+	out.Group = in.Group
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new QuobyteVolumeSource.
+func (x *QuobyteVolumeSource) DeepCopy() *QuobyteVolumeSource {
+	if x == nil {
+		return nil
+	}
+	out := new(QuobyteVolumeSource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *RBDVolumeSource) DeepCopyInto(out *RBDVolumeSource) {
+	if in.CephMonitors != nil {
+		in, out := &in.CephMonitors, &out.CephMonitors
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.CephMonitors = nil
+	}
+	out.RBDImage = in.RBDImage
+	out.FSType = in.FSType
+	out.RBDPool = in.RBDPool
+	out.RadosUser = in.RadosUser
+	out.Keyring = in.Keyring
+	if in.SecretRef != nil {
+		in, out := &in.SecretRef, &out.SecretRef
+		*out = new(LocalObjectReference)
+		**out = **in
+	} else {
+		out.SecretRef = nil
+	}
+	out.ReadOnly = in.ReadOnly
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new RBDVolumeSource.
+func (x *RBDVolumeSource) DeepCopy() *RBDVolumeSource {
+	if x == nil {
+		return nil
+	}
+	out := new(RBDVolumeSource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *RangeAllocation) DeepCopyInto(out *RangeAllocation) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	out.Range = in.Range
+	if in.Data != nil {
+		in, out := &in.Data, &out.Data
+		*out = make([]byte, len(*in))
+		copy(*out, *in)
+	} else {
+		out.Data = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new RangeAllocation.
+func (x *RangeAllocation) DeepCopy() *RangeAllocation {
+	if x == nil {
+		return nil
+	}
+	out := new(RangeAllocation)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *RangeAllocation) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ReplicationController) DeepCopyInto(out *ReplicationController) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	in.Status.DeepCopyInto(&out.Status)
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ReplicationController.
+func (x *ReplicationController) DeepCopy() *ReplicationController {
+	if x == nil {
 		return nil
 	}
+	out := new(ReplicationController)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_v1_LocalObjectReference(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*LocalObjectReference)
-		out := out.(*LocalObjectReference)
-		out.Name = in.Name
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *ReplicationController) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ReplicationControllerCondition) DeepCopyInto(out *ReplicationControllerCondition) {
+	out.Type = in.Type
+	out.Status = in.Status
+	in.LastTransitionTime.DeepCopyInto(&out.LastTransitionTime)
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return
 }
 
-func DeepCopy_v1_NFSVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*NFSVolumeSource)
-		out := out.(*NFSVolumeSource)
-		out.Server = in.Server
-		out.Path = in.Path
-		out.ReadOnly = in.ReadOnly
+// DeepCopy will perform a deep copy of the receiver, creating a new ReplicationControllerCondition.
+func (x *ReplicationControllerCondition) DeepCopy() *ReplicationControllerCondition {
+	if x == nil {
 		return nil
 	}
+	out := new(ReplicationControllerCondition)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_v1_Namespace(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Namespace)
-		out := out.(*Namespace)
-		out.TypeMeta = in.TypeMeta
-		if err := DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ReplicationControllerList) DeepCopyInto(out *ReplicationControllerList) {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]ReplicationController, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
-		if err := DeepCopy_v1_NamespaceSpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
+	} else {
+		out.Items = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ReplicationControllerList.
+func (x *ReplicationControllerList) DeepCopy() *ReplicationControllerList {
+	if x == nil {
+		return nil
+	}
+	out := new(ReplicationControllerList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *ReplicationControllerList) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ReplicationControllerSpec) DeepCopyInto(out *ReplicationControllerSpec) {
+	if in.Replicas != nil {
+		in, out := &in.Replicas, &out.Replicas
+		*out = new(int32)
+		**out = **in
+	} else {
+		out.Replicas = nil
+	}
+	out.MinReadySeconds = in.MinReadySeconds
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = make(map[string]string)
+		for key, val := range *in {
+			(*out)[key] = val
 		}
-		out.Status = in.Status
+	} else {
+		out.Selector = nil
+	}
+	if in.Template != nil {
+		in, out := &in.Template, &out.Template
+		*out = (*in).DeepCopy()
+	} else {
+		out.Template = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ReplicationControllerSpec.
+func (x *ReplicationControllerSpec) DeepCopy() *ReplicationControllerSpec {
+	if x == nil {
 		return nil
 	}
+	out := new(ReplicationControllerSpec)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_v1_NamespaceList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*NamespaceList)
-		out := out.(*NamespaceList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]Namespace, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_Namespace(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Items = nil
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ReplicationControllerStatus) DeepCopyInto(out *ReplicationControllerStatus) {
+	out.Replicas = in.Replicas
+	out.FullyLabeledReplicas = in.FullyLabeledReplicas
+	out.ReadyReplicas = in.ReadyReplicas
+	out.AvailableReplicas = in.AvailableReplicas
+	out.ObservedGeneration = in.ObservedGeneration
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]ReplicationControllerCondition, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	} else {
+		out.Conditions = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ReplicationControllerStatus.
+func (x *ReplicationControllerStatus) DeepCopy() *ReplicationControllerStatus {
+	if x == nil {
+		return nil
+	}
+	out := new(ReplicationControllerStatus)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ResourceFieldSelector) DeepCopyInto(out *ResourceFieldSelector) {
+	out.ContainerName = in.ContainerName
+	out.Resource = in.Resource
+	out.Divisor = in.Divisor.DeepCopy()
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ResourceFieldSelector.
+func (x *ResourceFieldSelector) DeepCopy() *ResourceFieldSelector {
+	if x == nil {
+		return nil
+	}
+	out := new(ResourceFieldSelector)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ResourceQuota) DeepCopyInto(out *ResourceQuota) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	in.Status.DeepCopyInto(&out.Status)
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ResourceQuota.
+func (x *ResourceQuota) DeepCopy() *ResourceQuota {
+	if x == nil {
+		return nil
+	}
+	out := new(ResourceQuota)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *ResourceQuota) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_v1_NamespaceSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*NamespaceSpec)
-		out := out.(*NamespaceSpec)
-		if in.Finalizers != nil {
-			in, out := &in.Finalizers, &out.Finalizers
-			*out = make([]FinalizerName, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.Finalizers = nil
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ResourceQuotaList) DeepCopyInto(out *ResourceQuotaList) {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]ResourceQuota, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	} else {
+		out.Items = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ResourceQuotaList.
+func (x *ResourceQuotaList) DeepCopy() *ResourceQuotaList {
+	if x == nil {
 		return nil
 	}
+	out := new(ResourceQuotaList)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_v1_NamespaceStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*NamespaceStatus)
-		out := out.(*NamespaceStatus)
-		out.Phase = in.Phase
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *ResourceQuotaList) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_v1_Node(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Node)
-		out := out.(*Node)
-		out.TypeMeta = in.TypeMeta
-		if err := DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ResourceQuotaSpec) DeepCopyInto(out *ResourceQuotaSpec) {
+	if in.Hard != nil {
+		in, out := &in.Hard, &out.Hard
+		*out = make(ResourceList)
+		for key, val := range *in {
+			(*out)[key] = val.DeepCopy()
 		}
-		out.Spec = in.Spec
-		if err := DeepCopy_v1_NodeStatus(&in.Status, &out.Status, c); err != nil {
-			return err
+	} else {
+		out.Hard = nil
+	}
+	if in.Scopes != nil {
+		in, out := &in.Scopes, &out.Scopes
+		*out = make([]ResourceQuotaScope, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
 		}
-		return nil
+	} else {
+		out.Scopes = nil
 	}
+	return
 }
 
-func DeepCopy_v1_NodeAddress(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*NodeAddress)
-		out := out.(*NodeAddress)
-		out.Type = in.Type
-		out.Address = in.Address
+// DeepCopy will perform a deep copy of the receiver, creating a new ResourceQuotaSpec.
+func (x *ResourceQuotaSpec) DeepCopy() *ResourceQuotaSpec {
+	if x == nil {
 		return nil
 	}
+	out := new(ResourceQuotaSpec)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_v1_NodeAffinity(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*NodeAffinity)
-		out := out.(*NodeAffinity)
-		if in.RequiredDuringSchedulingIgnoredDuringExecution != nil {
-			in, out := &in.RequiredDuringSchedulingIgnoredDuringExecution, &out.RequiredDuringSchedulingIgnoredDuringExecution
-			*out = new(NodeSelector)
-			if err := DeepCopy_v1_NodeSelector(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.RequiredDuringSchedulingIgnoredDuringExecution = nil
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ResourceQuotaStatus) DeepCopyInto(out *ResourceQuotaStatus) {
+	if in.Hard != nil {
+		in, out := &in.Hard, &out.Hard
+		*out = make(ResourceList)
+		for key, val := range *in {
+			(*out)[key] = val.DeepCopy()
 		}
-		if in.PreferredDuringSchedulingIgnoredDuringExecution != nil {
-			in, out := &in.PreferredDuringSchedulingIgnoredDuringExecution, &out.PreferredDuringSchedulingIgnoredDuringExecution
-			*out = make([]PreferredSchedulingTerm, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_PreferredSchedulingTerm(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.PreferredDuringSchedulingIgnoredDuringExecution = nil
+	} else {
+		out.Hard = nil
+	}
+	if in.Used != nil {
+		in, out := &in.Used, &out.Used
+		*out = make(ResourceList)
+		for key, val := range *in {
+			(*out)[key] = val.DeepCopy()
 		}
+	} else {
+		out.Used = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ResourceQuotaStatus.
+func (x *ResourceQuotaStatus) DeepCopy() *ResourceQuotaStatus {
+	if x == nil {
 		return nil
 	}
+	out := new(ResourceQuotaStatus)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_v1_NodeCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*NodeCondition)
-		out := out.(*NodeCondition)
-		out.Type = in.Type
-		out.Status = in.Status
-		out.LastHeartbeatTime = in.LastHeartbeatTime.DeepCopy()
-		out.LastTransitionTime = in.LastTransitionTime.DeepCopy()
-		out.Reason = in.Reason
-		out.Message = in.Message
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ResourceRequirements) DeepCopyInto(out *ResourceRequirements) {
+	if in.Limits != nil {
+		in, out := &in.Limits, &out.Limits
+		*out = make(ResourceList)
+		for key, val := range *in {
+			(*out)[key] = val.DeepCopy()
+		}
+	} else {
+		out.Limits = nil
+	}
+	if in.Requests != nil {
+		in, out := &in.Requests, &out.Requests
+		*out = make(ResourceList)
+		for key, val := range *in {
+			(*out)[key] = val.DeepCopy()
+		}
+	} else {
+		out.Requests = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ResourceRequirements.
+func (x *ResourceRequirements) DeepCopy() *ResourceRequirements {
+	if x == nil {
 		return nil
 	}
+	out := new(ResourceRequirements)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *SELinuxOptions) DeepCopyInto(out *SELinuxOptions) {
+	out.User = in.User
+	out.Role = in.Role
+	out.Type = in.Type
+	out.Level = in.Level
+	return
 }
 
-func DeepCopy_v1_NodeDaemonEndpoints(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*NodeDaemonEndpoints)
-		out := out.(*NodeDaemonEndpoints)
-		out.KubeletEndpoint = in.KubeletEndpoint
+// DeepCopy will perform a deep copy of the receiver, creating a new SELinuxOptions.
+func (x *SELinuxOptions) DeepCopy() *SELinuxOptions {
+	if x == nil {
 		return nil
 	}
+	out := new(SELinuxOptions)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_v1_NodeList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*NodeList)
-		out := out.(*NodeList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]Node, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_Node(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Items = nil
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Secret) DeepCopyInto(out *Secret) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	if in.Data != nil {
+		in, out := &in.Data, &out.Data
+		*out = make(map[string][]byte)
+		for key, val := range *in {
+			(*out)[key] = make([]byte, len(val))
+			copy((*out)[key], val)
 		}
+	} else {
+		out.Data = nil
+	}
+	if in.StringData != nil {
+		in, out := &in.StringData, &out.StringData
+		*out = make(map[string]string)
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	} else {
+		out.StringData = nil
+	}
+	out.Type = in.Type
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new Secret.
+func (x *Secret) DeepCopy() *Secret {
+	if x == nil {
+		return nil
+	}
+	out := new(Secret)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *Secret) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *SecretKeySelector) DeepCopyInto(out *SecretKeySelector) {
+	out.LocalObjectReference = in.LocalObjectReference
+	out.Key = in.Key
+	return
 }
 
-func DeepCopy_v1_NodeProxyOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*NodeProxyOptions)
-		out := out.(*NodeProxyOptions)
-		out.TypeMeta = in.TypeMeta
-		out.Path = in.Path
+// DeepCopy will perform a deep copy of the receiver, creating a new SecretKeySelector.
+func (x *SecretKeySelector) DeepCopy() *SecretKeySelector {
+	if x == nil {
 		return nil
 	}
+	out := new(SecretKeySelector)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_v1_NodeSelector(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*NodeSelector)
-		out := out.(*NodeSelector)
-		if in.NodeSelectorTerms != nil {
-			in, out := &in.NodeSelectorTerms, &out.NodeSelectorTerms
-			*out = make([]NodeSelectorTerm, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_NodeSelectorTerm(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.NodeSelectorTerms = nil
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *SecretList) DeepCopyInto(out *SecretList) {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]Secret, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	} else {
+		out.Items = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new SecretList.
+func (x *SecretList) DeepCopy() *SecretList {
+	if x == nil {
 		return nil
 	}
+	out := new(SecretList)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_v1_NodeSelectorRequirement(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*NodeSelectorRequirement)
-		out := out.(*NodeSelectorRequirement)
-		out.Key = in.Key
-		out.Operator = in.Operator
-		if in.Values != nil {
-			in, out := &in.Values, &out.Values
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.Values = nil
-		}
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *SecretList) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
-	}
-}
-
-func DeepCopy_v1_NodeSelectorTerm(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*NodeSelectorTerm)
-		out := out.(*NodeSelectorTerm)
-		if in.MatchExpressions != nil {
-			in, out := &in.MatchExpressions, &out.MatchExpressions
-			*out = make([]NodeSelectorRequirement, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_NodeSelectorRequirement(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.MatchExpressions = nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *SecretVolumeSource) DeepCopyInto(out *SecretVolumeSource) {
+	out.SecretName = in.SecretName
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]KeyToPath, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	} else {
+		out.Items = nil
+	}
+	if in.DefaultMode != nil {
+		in, out := &in.DefaultMode, &out.DefaultMode
+		*out = new(int32)
+		**out = **in
+	} else {
+		out.DefaultMode = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new SecretVolumeSource.
+func (x *SecretVolumeSource) DeepCopy() *SecretVolumeSource {
+	if x == nil {
+		return nil
+	}
+	out := new(SecretVolumeSource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *SecurityContext) DeepCopyInto(out *SecurityContext) {
+	if in.Capabilities != nil {
+		in, out := &in.Capabilities, &out.Capabilities
+		*out = (*in).DeepCopy()
+	} else {
+		out.Capabilities = nil
+	}
+	if in.Privileged != nil {
+		in, out := &in.Privileged, &out.Privileged
+		*out = new(bool)
+		**out = **in
+	} else {
+		out.Privileged = nil
+	}
+	if in.SELinuxOptions != nil {
+		in, out := &in.SELinuxOptions, &out.SELinuxOptions
+		*out = new(SELinuxOptions)
+		**out = **in
+	} else {
+		out.SELinuxOptions = nil
+	}
+	if in.RunAsUser != nil {
+		in, out := &in.RunAsUser, &out.RunAsUser
+		*out = new(int64)
+		**out = **in
+	} else {
+		out.RunAsUser = nil
+	}
+	if in.RunAsNonRoot != nil {
+		in, out := &in.RunAsNonRoot, &out.RunAsNonRoot
+		*out = new(bool)
+		**out = **in
+	} else {
+		out.RunAsNonRoot = nil
+	}
+	if in.ReadOnlyRootFilesystem != nil {
+		in, out := &in.ReadOnlyRootFilesystem, &out.ReadOnlyRootFilesystem
+		*out = new(bool)
+		**out = **in
+	} else {
+		out.ReadOnlyRootFilesystem = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new SecurityContext.
+func (x *SecurityContext) DeepCopy() *SecurityContext {
+	if x == nil {
+		return nil
+	}
+	out := new(SecurityContext)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *SerializedReference) DeepCopyInto(out *SerializedReference) {
+	out.TypeMeta = in.TypeMeta
+	out.Reference = in.Reference
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new SerializedReference.
+func (x *SerializedReference) DeepCopy() *SerializedReference {
+	if x == nil {
+		return nil
+	}
+	out := new(SerializedReference)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *SerializedReference) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Service) DeepCopyInto(out *Service) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	in.Status.DeepCopyInto(&out.Status)
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new Service.
+func (x *Service) DeepCopy() *Service {
+	if x == nil {
 		return nil
 	}
-}
-
-func DeepCopy_v1_NodeSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*NodeSpec)
-		out := out.(*NodeSpec)
-		out.PodCIDR = in.PodCIDR
-		out.ExternalID = in.ExternalID
-		out.ProviderID = in.ProviderID
-		out.Unschedulable = in.Unschedulable
+	out := new(Service)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *Service) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_v1_NodeStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*NodeStatus)
-		out := out.(*NodeStatus)
-		if in.Capacity != nil {
-			in, out := &in.Capacity, &out.Capacity
-			*out = make(ResourceList)
-			for key, val := range *in {
-				(*out)[key] = val.DeepCopy()
-			}
-		} else {
-			out.Capacity = nil
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ServiceAccount) DeepCopyInto(out *ServiceAccount) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	if in.Secrets != nil {
+		in, out := &in.Secrets, &out.Secrets
+		*out = make([]ObjectReference, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
+		}
+	} else {
+		out.Secrets = nil
+	}
+	if in.ImagePullSecrets != nil {
+		in, out := &in.ImagePullSecrets, &out.ImagePullSecrets
+		*out = make([]LocalObjectReference, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
 		}
-		if in.Allocatable != nil {
-			in, out := &in.Allocatable, &out.Allocatable
-			*out = make(ResourceList)
-			for key, val := range *in {
-				(*out)[key] = val.DeepCopy()
-			}
-		} else {
-			out.Allocatable = nil
-		}
-		out.Phase = in.Phase
-		if in.Conditions != nil {
-			in, out := &in.Conditions, &out.Conditions
-			*out = make([]NodeCondition, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_NodeCondition(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Conditions = nil
-		}
-		if in.Addresses != nil {
-			in, out := &in.Addresses, &out.Addresses
-			*out = make([]NodeAddress, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.Addresses = nil
-		}
-		out.DaemonEndpoints = in.DaemonEndpoints
-		out.NodeInfo = in.NodeInfo
-		if in.Images != nil {
-			in, out := &in.Images, &out.Images
-			*out = make([]ContainerImage, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_ContainerImage(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Images = nil
-		}
-		if in.VolumesInUse != nil {
-			in, out := &in.VolumesInUse, &out.VolumesInUse
-			*out = make([]UniqueVolumeName, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.VolumesInUse = nil
-		}
-		if in.VolumesAttached != nil {
-			in, out := &in.VolumesAttached, &out.VolumesAttached
-			*out = make([]AttachedVolume, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.VolumesAttached = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_NodeSystemInfo(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*NodeSystemInfo)
-		out := out.(*NodeSystemInfo)
-		out.MachineID = in.MachineID
-		out.SystemUUID = in.SystemUUID
-		out.BootID = in.BootID
-		out.KernelVersion = in.KernelVersion
-		out.OSImage = in.OSImage
-		out.ContainerRuntimeVersion = in.ContainerRuntimeVersion
-		out.KubeletVersion = in.KubeletVersion
-		out.KubeProxyVersion = in.KubeProxyVersion
-		out.OperatingSystem = in.OperatingSystem
-		out.Architecture = in.Architecture
-		return nil
-	}
-}
-
-func DeepCopy_v1_ObjectFieldSelector(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ObjectFieldSelector)
-		out := out.(*ObjectFieldSelector)
-		out.APIVersion = in.APIVersion
-		out.FieldPath = in.FieldPath
-		return nil
-	}
-}
-
-func DeepCopy_v1_ObjectMeta(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ObjectMeta)
-		out := out.(*ObjectMeta)
-		out.Name = in.Name
-		out.GenerateName = in.GenerateName
-		out.Namespace = in.Namespace
-		out.SelfLink = in.SelfLink
-		out.UID = in.UID
-		out.ResourceVersion = in.ResourceVersion
-		out.Generation = in.Generation
-		out.CreationTimestamp = in.CreationTimestamp.DeepCopy()
-		if in.DeletionTimestamp != nil {
-			in, out := &in.DeletionTimestamp, &out.DeletionTimestamp
-			*out = new(unversioned.Time)
-			**out = (*in).DeepCopy()
-		} else {
-			out.DeletionTimestamp = nil
-		}
-		if in.DeletionGracePeriodSeconds != nil {
-			in, out := &in.DeletionGracePeriodSeconds, &out.DeletionGracePeriodSeconds
-			*out = new(int64)
-			**out = **in
-		} else {
-			out.DeletionGracePeriodSeconds = nil
-		}
-		if in.Labels != nil {
-			in, out := &in.Labels, &out.Labels
-			*out = make(map[string]string)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		} else {
-			out.Labels = nil
+	} else {
+		out.ImagePullSecrets = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ServiceAccount.
+func (x *ServiceAccount) DeepCopy() *ServiceAccount {
+	if x == nil {
+		return nil
+	}
+	out := new(ServiceAccount)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *ServiceAccount) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ServiceAccountList) DeepCopyInto(out *ServiceAccountList) {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]ServiceAccount, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
-		if in.Annotations != nil {
-			in, out := &in.Annotations, &out.Annotations
-			*out = make(map[string]string)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		} else {
-			out.Annotations = nil
-		}
-		if in.OwnerReferences != nil {
-			in, out := &in.OwnerReferences, &out.OwnerReferences
-			*out = make([]OwnerReference, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_OwnerReference(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.OwnerReferences = nil
-		}
-		if in.Finalizers != nil {
-			in, out := &in.Finalizers, &out.Finalizers
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.Finalizers = nil
-		}
-		out.ClusterName = in.ClusterName
-		return nil
-	}
-}
-
-func DeepCopy_v1_ObjectReference(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ObjectReference)
-		out := out.(*ObjectReference)
-		out.Kind = in.Kind
-		out.Namespace = in.Namespace
-		out.Name = in.Name
-		out.UID = in.UID
-		out.APIVersion = in.APIVersion
-		out.ResourceVersion = in.ResourceVersion
-		out.FieldPath = in.FieldPath
-		return nil
-	}
-}
-
-func DeepCopy_v1_OwnerReference(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*OwnerReference)
-		out := out.(*OwnerReference)
-		out.APIVersion = in.APIVersion
-		out.Kind = in.Kind
-		out.Name = in.Name
-		out.UID = in.UID
-		if in.Controller != nil {
-			in, out := &in.Controller, &out.Controller
-			*out = new(bool)
-			**out = **in
-		} else {
-			out.Controller = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_PersistentVolume(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PersistentVolume)
-		out := out.(*PersistentVolume)
-		out.TypeMeta = in.TypeMeta
-		if err := DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v1_PersistentVolumeSpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
-		}
-		out.Status = in.Status
-		return nil
-	}
-}
-
-func DeepCopy_v1_PersistentVolumeClaim(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PersistentVolumeClaim)
-		out := out.(*PersistentVolumeClaim)
-		out.TypeMeta = in.TypeMeta
-		if err := DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
+	} else {
+		out.Items = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ServiceAccountList.
+func (x *ServiceAccountList) DeepCopy() *ServiceAccountList {
+	if x == nil {
+		return nil
+	}
+	out := new(ServiceAccountList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *ServiceAccountList) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ServiceList) DeepCopyInto(out *ServiceList) {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]Service, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
-		if err := DeepCopy_v1_PersistentVolumeClaimSpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
+	} else {
+		out.Items = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ServiceList.
+func (x *ServiceList) DeepCopy() *ServiceList {
+	if x == nil {
+		return nil
+	}
+	out := new(ServiceList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *ServiceList) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ServicePort) DeepCopyInto(out *ServicePort) {
+	out.Name = in.Name
+	out.Protocol = in.Protocol
+	out.Port = in.Port
+	out.TargetPort = in.TargetPort
+	out.NodePort = in.NodePort
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ServicePort.
+func (x *ServicePort) DeepCopy() *ServicePort {
+	if x == nil {
+		return nil
+	}
+	out := new(ServicePort)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ServiceProxyOptions) DeepCopyInto(out *ServiceProxyOptions) {
+	out.TypeMeta = in.TypeMeta
+	out.Path = in.Path
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ServiceProxyOptions.
+func (x *ServiceProxyOptions) DeepCopy() *ServiceProxyOptions {
+	if x == nil {
+		return nil
+	}
+	out := new(ServiceProxyOptions)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *ServiceProxyOptions) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ServiceSpec) DeepCopyInto(out *ServiceSpec) {
+	if in.Ports != nil {
+		in, out := &in.Ports, &out.Ports
+		*out = make([]ServicePort, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
 		}
-		if err := DeepCopy_v1_PersistentVolumeClaimStatus(&in.Status, &out.Status, c); err != nil {
-			return err
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_PersistentVolumeClaimList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PersistentVolumeClaimList)
-		out := out.(*PersistentVolumeClaimList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]PersistentVolumeClaim, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_PersistentVolumeClaim(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Items = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_PersistentVolumeClaimSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PersistentVolumeClaimSpec)
-		out := out.(*PersistentVolumeClaimSpec)
-		if in.AccessModes != nil {
-			in, out := &in.AccessModes, &out.AccessModes
-			*out = make([]PersistentVolumeAccessMode, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.AccessModes = nil
-		}
-		if in.Selector != nil {
-			in, out := &in.Selector, &out.Selector
-			*out = new(unversioned.LabelSelector)
-			if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.Selector = nil
-		}
-		if err := DeepCopy_v1_ResourceRequirements(&in.Resources, &out.Resources, c); err != nil {
-			return err
-		}
-		out.VolumeName = in.VolumeName
-		return nil
-	}
-}
-
-func DeepCopy_v1_PersistentVolumeClaimStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PersistentVolumeClaimStatus)
-		out := out.(*PersistentVolumeClaimStatus)
-		out.Phase = in.Phase
-		if in.AccessModes != nil {
-			in, out := &in.AccessModes, &out.AccessModes
-			*out = make([]PersistentVolumeAccessMode, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.AccessModes = nil
-		}
-		if in.Capacity != nil {
-			in, out := &in.Capacity, &out.Capacity
-			*out = make(ResourceList)
-			for key, val := range *in {
-				(*out)[key] = val.DeepCopy()
-			}
-		} else {
-			out.Capacity = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_PersistentVolumeClaimVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PersistentVolumeClaimVolumeSource)
-		out := out.(*PersistentVolumeClaimVolumeSource)
-		out.ClaimName = in.ClaimName
-		out.ReadOnly = in.ReadOnly
-		return nil
-	}
-}
-
-func DeepCopy_v1_PersistentVolumeList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PersistentVolumeList)
-		out := out.(*PersistentVolumeList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]PersistentVolume, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_PersistentVolume(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Items = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_PersistentVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PersistentVolumeSource)
-		out := out.(*PersistentVolumeSource)
-		if in.GCEPersistentDisk != nil {
-			in, out := &in.GCEPersistentDisk, &out.GCEPersistentDisk
-			*out = new(GCEPersistentDiskVolumeSource)
-			**out = **in
-		} else {
-			out.GCEPersistentDisk = nil
-		}
-		if in.AWSElasticBlockStore != nil {
-			in, out := &in.AWSElasticBlockStore, &out.AWSElasticBlockStore
-			*out = new(AWSElasticBlockStoreVolumeSource)
-			**out = **in
-		} else {
-			out.AWSElasticBlockStore = nil
-		}
-		if in.HostPath != nil {
-			in, out := &in.HostPath, &out.HostPath
-			*out = new(HostPathVolumeSource)
-			**out = **in
-		} else {
-			out.HostPath = nil
-		}
-		if in.Glusterfs != nil {
-			in, out := &in.Glusterfs, &out.Glusterfs
-			*out = new(GlusterfsVolumeSource)
-			**out = **in
-		} else {
-			out.Glusterfs = nil
-		}
-		if in.NFS != nil {
-			in, out := &in.NFS, &out.NFS
-			*out = new(NFSVolumeSource)
-			**out = **in
-		} else {
-			out.NFS = nil
-		}
-		if in.RBD != nil {
-			in, out := &in.RBD, &out.RBD
-			*out = new(RBDVolumeSource)
-			if err := DeepCopy_v1_RBDVolumeSource(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.RBD = nil
-		}
-		if in.ISCSI != nil {
-			in, out := &in.ISCSI, &out.ISCSI
-			*out = new(ISCSIVolumeSource)
-			**out = **in
-		} else {
-			out.ISCSI = nil
-		}
-		if in.Cinder != nil {
-			in, out := &in.Cinder, &out.Cinder
-			*out = new(CinderVolumeSource)
-			**out = **in
-		} else {
-			out.Cinder = nil
-		}
-		if in.CephFS != nil {
-			in, out := &in.CephFS, &out.CephFS
-			*out = new(CephFSVolumeSource)
-			if err := DeepCopy_v1_CephFSVolumeSource(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.CephFS = nil
-		}
-		if in.FC != nil {
-			in, out := &in.FC, &out.FC
-			*out = new(FCVolumeSource)
-			if err := DeepCopy_v1_FCVolumeSource(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.FC = nil
-		}
-		if in.Flocker != nil {
-			in, out := &in.Flocker, &out.Flocker
-			*out = new(FlockerVolumeSource)
-			**out = **in
-		} else {
-			out.Flocker = nil
-		}
-		if in.FlexVolume != nil {
-			in, out := &in.FlexVolume, &out.FlexVolume
-			*out = new(FlexVolumeSource)
-			if err := DeepCopy_v1_FlexVolumeSource(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.FlexVolume = nil
-		}
-		if in.AzureFile != nil {
-			in, out := &in.AzureFile, &out.AzureFile
-			*out = new(AzureFileVolumeSource)
-			**out = **in
-		} else {
-			out.AzureFile = nil
-		}
-		if in.VsphereVolume != nil {
-			in, out := &in.VsphereVolume, &out.VsphereVolume
-			*out = new(VsphereVirtualDiskVolumeSource)
-			**out = **in
-		} else {
-			out.VsphereVolume = nil
-		}
-		if in.Quobyte != nil {
-			in, out := &in.Quobyte, &out.Quobyte
-			*out = new(QuobyteVolumeSource)
-			**out = **in
-		} else {
-			out.Quobyte = nil
-		}
-		if in.AzureDisk != nil {
-			in, out := &in.AzureDisk, &out.AzureDisk
-			*out = new(AzureDiskVolumeSource)
-			if err := DeepCopy_v1_AzureDiskVolumeSource(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.AzureDisk = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_PersistentVolumeSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PersistentVolumeSpec)
-		out := out.(*PersistentVolumeSpec)
-		if in.Capacity != nil {
-			in, out := &in.Capacity, &out.Capacity
-			*out = make(ResourceList)
-			for key, val := range *in {
-				(*out)[key] = val.DeepCopy()
-			}
-		} else {
-			out.Capacity = nil
-		}
-		if err := DeepCopy_v1_PersistentVolumeSource(&in.PersistentVolumeSource, &out.PersistentVolumeSource, c); err != nil {
-			return err
-		}
-		if in.AccessModes != nil {
-			in, out := &in.AccessModes, &out.AccessModes
-			*out = make([]PersistentVolumeAccessMode, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.AccessModes = nil
-		}
-		if in.ClaimRef != nil {
-			in, out := &in.ClaimRef, &out.ClaimRef
-			*out = new(ObjectReference)
-			**out = **in
-		} else {
-			out.ClaimRef = nil
-		}
-		out.PersistentVolumeReclaimPolicy = in.PersistentVolumeReclaimPolicy
-		return nil
-	}
-}
-
-func DeepCopy_v1_PersistentVolumeStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PersistentVolumeStatus)
-		out := out.(*PersistentVolumeStatus)
-		out.Phase = in.Phase
-		out.Message = in.Message
-		out.Reason = in.Reason
-		return nil
-	}
-}
-
-func DeepCopy_v1_Pod(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Pod)
-		out := out.(*Pod)
-		out.TypeMeta = in.TypeMeta
-		if err := DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v1_PodSpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v1_PodStatus(&in.Status, &out.Status, c); err != nil {
-			return err
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_PodAffinity(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodAffinity)
-		out := out.(*PodAffinity)
-		if in.RequiredDuringSchedulingIgnoredDuringExecution != nil {
-			in, out := &in.RequiredDuringSchedulingIgnoredDuringExecution, &out.RequiredDuringSchedulingIgnoredDuringExecution
-			*out = make([]PodAffinityTerm, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_PodAffinityTerm(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.RequiredDuringSchedulingIgnoredDuringExecution = nil
-		}
-		if in.PreferredDuringSchedulingIgnoredDuringExecution != nil {
-			in, out := &in.PreferredDuringSchedulingIgnoredDuringExecution, &out.PreferredDuringSchedulingIgnoredDuringExecution
-			*out = make([]WeightedPodAffinityTerm, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_WeightedPodAffinityTerm(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.PreferredDuringSchedulingIgnoredDuringExecution = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_PodAffinityTerm(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodAffinityTerm)
-		out := out.(*PodAffinityTerm)
-		if in.LabelSelector != nil {
-			in, out := &in.LabelSelector, &out.LabelSelector
-			*out = new(unversioned.LabelSelector)
-			if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.LabelSelector = nil
-		}
-		if in.Namespaces != nil {
-			in, out := &in.Namespaces, &out.Namespaces
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.Namespaces = nil
-		}
-		out.TopologyKey = in.TopologyKey
-		return nil
-	}
-}
-
-func DeepCopy_v1_PodAntiAffinity(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodAntiAffinity)
-		out := out.(*PodAntiAffinity)
-		if in.RequiredDuringSchedulingIgnoredDuringExecution != nil {
-			in, out := &in.RequiredDuringSchedulingIgnoredDuringExecution, &out.RequiredDuringSchedulingIgnoredDuringExecution
-			*out = make([]PodAffinityTerm, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_PodAffinityTerm(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.RequiredDuringSchedulingIgnoredDuringExecution = nil
-		}
-		if in.PreferredDuringSchedulingIgnoredDuringExecution != nil {
-			in, out := &in.PreferredDuringSchedulingIgnoredDuringExecution, &out.PreferredDuringSchedulingIgnoredDuringExecution
-			*out = make([]WeightedPodAffinityTerm, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_WeightedPodAffinityTerm(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.PreferredDuringSchedulingIgnoredDuringExecution = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_PodAttachOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodAttachOptions)
-		out := out.(*PodAttachOptions)
-		out.TypeMeta = in.TypeMeta
-		out.Stdin = in.Stdin
-		out.Stdout = in.Stdout
-		out.Stderr = in.Stderr
-		out.TTY = in.TTY
-		out.Container = in.Container
-		return nil
-	}
-}
-
-func DeepCopy_v1_PodCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodCondition)
-		out := out.(*PodCondition)
-		out.Type = in.Type
-		out.Status = in.Status
-		out.LastProbeTime = in.LastProbeTime.DeepCopy()
-		out.LastTransitionTime = in.LastTransitionTime.DeepCopy()
-		out.Reason = in.Reason
-		out.Message = in.Message
-		return nil
-	}
-}
-
-func DeepCopy_v1_PodExecOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodExecOptions)
-		out := out.(*PodExecOptions)
-		out.TypeMeta = in.TypeMeta
-		out.Stdin = in.Stdin
-		out.Stdout = in.Stdout
-		out.Stderr = in.Stderr
-		out.TTY = in.TTY
-		out.Container = in.Container
-		if in.Command != nil {
-			in, out := &in.Command, &out.Command
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.Command = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_PodList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodList)
-		out := out.(*PodList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]Pod, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_Pod(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Items = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_PodLogOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodLogOptions)
-		out := out.(*PodLogOptions)
-		out.TypeMeta = in.TypeMeta
-		out.Container = in.Container
-		out.Follow = in.Follow
-		out.Previous = in.Previous
-		if in.SinceSeconds != nil {
-			in, out := &in.SinceSeconds, &out.SinceSeconds
-			*out = new(int64)
-			**out = **in
-		} else {
-			out.SinceSeconds = nil
-		}
-		if in.SinceTime != nil {
-			in, out := &in.SinceTime, &out.SinceTime
-			*out = new(unversioned.Time)
-			**out = (*in).DeepCopy()
-		} else {
-			out.SinceTime = nil
-		}
-		out.Timestamps = in.Timestamps
-		if in.TailLines != nil {
-			in, out := &in.TailLines, &out.TailLines
-			*out = new(int64)
-			**out = **in
-		} else {
-			out.TailLines = nil
-		}
-		if in.LimitBytes != nil {
-			in, out := &in.LimitBytes, &out.LimitBytes
-			*out = new(int64)
-			**out = **in
-		} else {
-			out.LimitBytes = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_PodProxyOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodProxyOptions)
-		out := out.(*PodProxyOptions)
-		out.TypeMeta = in.TypeMeta
-		out.Path = in.Path
-		return nil
-	}
-}
-
-func DeepCopy_v1_PodSecurityContext(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodSecurityContext)
-		out := out.(*PodSecurityContext)
-		if in.SELinuxOptions != nil {
-			in, out := &in.SELinuxOptions, &out.SELinuxOptions
-			*out = new(SELinuxOptions)
-			**out = **in
-		} else {
-			out.SELinuxOptions = nil
-		}
-		if in.RunAsUser != nil {
-			in, out := &in.RunAsUser, &out.RunAsUser
-			*out = new(int64)
-			**out = **in
-		} else {
-			out.RunAsUser = nil
-		}
-		if in.RunAsNonRoot != nil {
-			in, out := &in.RunAsNonRoot, &out.RunAsNonRoot
-			*out = new(bool)
-			**out = **in
-		} else {
-			out.RunAsNonRoot = nil
-		}
-		if in.SupplementalGroups != nil {
-			in, out := &in.SupplementalGroups, &out.SupplementalGroups
-			*out = make([]int64, len(*in))
-			copy(*out, *in)
-		} else {
-			out.SupplementalGroups = nil
-		}
-		if in.FSGroup != nil {
-			in, out := &in.FSGroup, &out.FSGroup
-			*out = new(int64)
-			**out = **in
-		} else {
-			out.FSGroup = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_PodSignature(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodSignature)
-		out := out.(*PodSignature)
-		if in.PodController != nil {
-			in, out := &in.PodController, &out.PodController
-			*out = new(OwnerReference)
-			if err := DeepCopy_v1_OwnerReference(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.PodController = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_PodSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodSpec)
-		out := out.(*PodSpec)
-		if in.Volumes != nil {
-			in, out := &in.Volumes, &out.Volumes
-			*out = make([]Volume, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_Volume(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Volumes = nil
-		}
-		if in.InitContainers != nil {
-			in, out := &in.InitContainers, &out.InitContainers
-			*out = make([]Container, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_Container(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.InitContainers = nil
-		}
-		if in.Containers != nil {
-			in, out := &in.Containers, &out.Containers
-			*out = make([]Container, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_Container(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Containers = nil
-		}
-		out.RestartPolicy = in.RestartPolicy
-		if in.TerminationGracePeriodSeconds != nil {
-			in, out := &in.TerminationGracePeriodSeconds, &out.TerminationGracePeriodSeconds
-			*out = new(int64)
-			**out = **in
-		} else {
-			out.TerminationGracePeriodSeconds = nil
-		}
-		if in.ActiveDeadlineSeconds != nil {
-			in, out := &in.ActiveDeadlineSeconds, &out.ActiveDeadlineSeconds
-			*out = new(int64)
-			**out = **in
-		} else {
-			out.ActiveDeadlineSeconds = nil
-		}
-		out.DNSPolicy = in.DNSPolicy
-		if in.NodeSelector != nil {
-			in, out := &in.NodeSelector, &out.NodeSelector
-			*out = make(map[string]string)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		} else {
-			out.NodeSelector = nil
-		}
-		out.ServiceAccountName = in.ServiceAccountName
-		out.DeprecatedServiceAccount = in.DeprecatedServiceAccount
-		out.NodeName = in.NodeName
-		out.HostNetwork = in.HostNetwork
-		out.HostPID = in.HostPID
-		out.HostIPC = in.HostIPC
-		if in.SecurityContext != nil {
-			in, out := &in.SecurityContext, &out.SecurityContext
-			*out = new(PodSecurityContext)
-			if err := DeepCopy_v1_PodSecurityContext(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.SecurityContext = nil
-		}
-		if in.ImagePullSecrets != nil {
-			in, out := &in.ImagePullSecrets, &out.ImagePullSecrets
-			*out = make([]LocalObjectReference, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.ImagePullSecrets = nil
-		}
-		out.Hostname = in.Hostname
-		out.Subdomain = in.Subdomain
-		return nil
-	}
-}
-
-func DeepCopy_v1_PodStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodStatus)
-		out := out.(*PodStatus)
-		out.Phase = in.Phase
-		if in.Conditions != nil {
-			in, out := &in.Conditions, &out.Conditions
-			*out = make([]PodCondition, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_PodCondition(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Conditions = nil
-		}
-		out.Message = in.Message
-		out.Reason = in.Reason
-		out.HostIP = in.HostIP
-		out.PodIP = in.PodIP
-		if in.StartTime != nil {
-			in, out := &in.StartTime, &out.StartTime
-			*out = new(unversioned.Time)
-			**out = (*in).DeepCopy()
-		} else {
-			out.StartTime = nil
-		}
-		if in.InitContainerStatuses != nil {
-			in, out := &in.InitContainerStatuses, &out.InitContainerStatuses
-			*out = make([]ContainerStatus, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_ContainerStatus(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.InitContainerStatuses = nil
-		}
-		if in.ContainerStatuses != nil {
-			in, out := &in.ContainerStatuses, &out.ContainerStatuses
-			*out = make([]ContainerStatus, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_ContainerStatus(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.ContainerStatuses = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_PodStatusResult(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodStatusResult)
-		out := out.(*PodStatusResult)
-		out.TypeMeta = in.TypeMeta
-		if err := DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v1_PodStatus(&in.Status, &out.Status, c); err != nil {
-			return err
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_PodTemplate(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodTemplate)
-		out := out.(*PodTemplate)
-		out.TypeMeta = in.TypeMeta
-		if err := DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v1_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {
-			return err
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_PodTemplateList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodTemplateList)
-		out := out.(*PodTemplateList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]PodTemplate, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_PodTemplate(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Items = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_PodTemplateSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PodTemplateSpec)
-		out := out.(*PodTemplateSpec)
-		if err := DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v1_PodSpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_Preconditions(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Preconditions)
-		out := out.(*Preconditions)
-		if in.UID != nil {
-			in, out := &in.UID, &out.UID
-			*out = new(types.UID)
-			**out = **in
-		} else {
-			out.UID = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_PreferAvoidPodsEntry(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PreferAvoidPodsEntry)
-		out := out.(*PreferAvoidPodsEntry)
-		if err := DeepCopy_v1_PodSignature(&in.PodSignature, &out.PodSignature, c); err != nil {
-			return err
-		}
-		out.EvictionTime = in.EvictionTime.DeepCopy()
-		out.Reason = in.Reason
-		out.Message = in.Message
-		return nil
-	}
-}
-
-func DeepCopy_v1_PreferredSchedulingTerm(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PreferredSchedulingTerm)
-		out := out.(*PreferredSchedulingTerm)
-		out.Weight = in.Weight
-		if err := DeepCopy_v1_NodeSelectorTerm(&in.Preference, &out.Preference, c); err != nil {
-			return err
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_Probe(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Probe)
-		out := out.(*Probe)
-		if err := DeepCopy_v1_Handler(&in.Handler, &out.Handler, c); err != nil {
-			return err
-		}
-		out.InitialDelaySeconds = in.InitialDelaySeconds
-		out.TimeoutSeconds = in.TimeoutSeconds
-		out.PeriodSeconds = in.PeriodSeconds
-		out.SuccessThreshold = in.SuccessThreshold
-		out.FailureThreshold = in.FailureThreshold
-		return nil
-	}
-}
-
-func DeepCopy_v1_QuobyteVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*QuobyteVolumeSource)
-		out := out.(*QuobyteVolumeSource)
-		out.Registry = in.Registry
-		out.Volume = in.Volume
-		out.ReadOnly = in.ReadOnly
-		out.User = in.User
-		out.Group = in.Group
-		return nil
-	}
-}
-
-func DeepCopy_v1_RBDVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*RBDVolumeSource)
-		out := out.(*RBDVolumeSource)
-		if in.CephMonitors != nil {
-			in, out := &in.CephMonitors, &out.CephMonitors
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.CephMonitors = nil
-		}
-		out.RBDImage = in.RBDImage
-		out.FSType = in.FSType
-		out.RBDPool = in.RBDPool
-		out.RadosUser = in.RadosUser
-		out.Keyring = in.Keyring
-		if in.SecretRef != nil {
-			in, out := &in.SecretRef, &out.SecretRef
-			*out = new(LocalObjectReference)
-			**out = **in
-		} else {
-			out.SecretRef = nil
-		}
-		out.ReadOnly = in.ReadOnly
-		return nil
-	}
-}
-
-func DeepCopy_v1_RangeAllocation(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*RangeAllocation)
-		out := out.(*RangeAllocation)
-		out.TypeMeta = in.TypeMeta
-		if err := DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
-		}
-		out.Range = in.Range
-		if in.Data != nil {
-			in, out := &in.Data, &out.Data
-			*out = make([]byte, len(*in))
-			copy(*out, *in)
-		} else {
-			out.Data = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_ReplicationController(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ReplicationController)
-		out := out.(*ReplicationController)
-		out.TypeMeta = in.TypeMeta
-		if err := DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v1_ReplicationControllerSpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v1_ReplicationControllerStatus(&in.Status, &out.Status, c); err != nil {
-			return err
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_ReplicationControllerCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ReplicationControllerCondition)
-		out := out.(*ReplicationControllerCondition)
-		out.Type = in.Type
-		out.Status = in.Status
-		out.LastTransitionTime = in.LastTransitionTime.DeepCopy()
-		out.Reason = in.Reason
-		out.Message = in.Message
-		return nil
-	}
-}
-
-func DeepCopy_v1_ReplicationControllerList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ReplicationControllerList)
-		out := out.(*ReplicationControllerList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]ReplicationController, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_ReplicationController(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Items = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_ReplicationControllerSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ReplicationControllerSpec)
-		out := out.(*ReplicationControllerSpec)
-		if in.Replicas != nil {
-			in, out := &in.Replicas, &out.Replicas
-			*out = new(int32)
-			**out = **in
-		} else {
-			out.Replicas = nil
-		}
-		out.MinReadySeconds = in.MinReadySeconds
-		if in.Selector != nil {
-			in, out := &in.Selector, &out.Selector
-			*out = make(map[string]string)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		} else {
-			out.Selector = nil
-		}
-		if in.Template != nil {
-			in, out := &in.Template, &out.Template
-			*out = new(PodTemplateSpec)
-			if err := DeepCopy_v1_PodTemplateSpec(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.Template = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_ReplicationControllerStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ReplicationControllerStatus)
-		out := out.(*ReplicationControllerStatus)
-		out.Replicas = in.Replicas
-		out.FullyLabeledReplicas = in.FullyLabeledReplicas
-		out.ReadyReplicas = in.ReadyReplicas
-		out.AvailableReplicas = in.AvailableReplicas
-		out.ObservedGeneration = in.ObservedGeneration
-		if in.Conditions != nil {
-			in, out := &in.Conditions, &out.Conditions
-			*out = make([]ReplicationControllerCondition, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_ReplicationControllerCondition(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Conditions = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_ResourceFieldSelector(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ResourceFieldSelector)
-		out := out.(*ResourceFieldSelector)
-		out.ContainerName = in.ContainerName
-		out.Resource = in.Resource
-		out.Divisor = in.Divisor.DeepCopy()
-		return nil
-	}
-}
-
-func DeepCopy_v1_ResourceQuota(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ResourceQuota)
-		out := out.(*ResourceQuota)
-		out.TypeMeta = in.TypeMeta
-		if err := DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v1_ResourceQuotaSpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v1_ResourceQuotaStatus(&in.Status, &out.Status, c); err != nil {
-			return err
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_ResourceQuotaList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ResourceQuotaList)
-		out := out.(*ResourceQuotaList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]ResourceQuota, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_ResourceQuota(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Items = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_ResourceQuotaSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ResourceQuotaSpec)
-		out := out.(*ResourceQuotaSpec)
-		if in.Hard != nil {
-			in, out := &in.Hard, &out.Hard
-			*out = make(ResourceList)
-			for key, val := range *in {
-				(*out)[key] = val.DeepCopy()
-			}
-		} else {
-			out.Hard = nil
-		}
-		if in.Scopes != nil {
-			in, out := &in.Scopes, &out.Scopes
-			*out = make([]ResourceQuotaScope, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.Scopes = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_ResourceQuotaStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ResourceQuotaStatus)
-		out := out.(*ResourceQuotaStatus)
-		if in.Hard != nil {
-			in, out := &in.Hard, &out.Hard
-			*out = make(ResourceList)
-			for key, val := range *in {
-				(*out)[key] = val.DeepCopy()
-			}
-		} else {
-			out.Hard = nil
-		}
-		if in.Used != nil {
-			in, out := &in.Used, &out.Used
-			*out = make(ResourceList)
-			for key, val := range *in {
-				(*out)[key] = val.DeepCopy()
-			}
-		} else {
-			out.Used = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_ResourceRequirements(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ResourceRequirements)
-		out := out.(*ResourceRequirements)
-		if in.Limits != nil {
-			in, out := &in.Limits, &out.Limits
-			*out = make(ResourceList)
-			for key, val := range *in {
-				(*out)[key] = val.DeepCopy()
-			}
-		} else {
-			out.Limits = nil
-		}
-		if in.Requests != nil {
-			in, out := &in.Requests, &out.Requests
-			*out = make(ResourceList)
-			for key, val := range *in {
-				(*out)[key] = val.DeepCopy()
-			}
-		} else {
-			out.Requests = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_SELinuxOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*SELinuxOptions)
-		out := out.(*SELinuxOptions)
-		out.User = in.User
-		out.Role = in.Role
-		out.Type = in.Type
-		out.Level = in.Level
-		return nil
-	}
-}
-
-func DeepCopy_v1_Secret(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Secret)
-		out := out.(*Secret)
-		out.TypeMeta = in.TypeMeta
-		if err := DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
-		}
-		if in.Data != nil {
-			in, out := &in.Data, &out.Data
-			*out = make(map[string][]byte)
-			for key, val := range *in {
-				if newVal, err := c.DeepCopy(&val); err != nil {
-					return err
-				} else {
-					(*out)[key] = *newVal.(*[]byte)
-				}
-			}
-		} else {
-			out.Data = nil
-		}
-		if in.StringData != nil {
-			in, out := &in.StringData, &out.StringData
-			*out = make(map[string]string)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		} else {
-			out.StringData = nil
-		}
-		out.Type = in.Type
-		return nil
-	}
-}
-
-func DeepCopy_v1_SecretKeySelector(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*SecretKeySelector)
-		out := out.(*SecretKeySelector)
-		out.LocalObjectReference = in.LocalObjectReference
-		out.Key = in.Key
-		return nil
-	}
-}
-
-func DeepCopy_v1_SecretList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*SecretList)
-		out := out.(*SecretList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]Secret, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_Secret(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Items = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_SecretVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*SecretVolumeSource)
-		out := out.(*SecretVolumeSource)
-		out.SecretName = in.SecretName
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]KeyToPath, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_KeyToPath(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Items = nil
-		}
-		if in.DefaultMode != nil {
-			in, out := &in.DefaultMode, &out.DefaultMode
-			*out = new(int32)
-			**out = **in
-		} else {
-			out.DefaultMode = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_SecurityContext(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*SecurityContext)
-		out := out.(*SecurityContext)
-		if in.Capabilities != nil {
-			in, out := &in.Capabilities, &out.Capabilities
-			*out = new(Capabilities)
-			if err := DeepCopy_v1_Capabilities(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.Capabilities = nil
-		}
-		if in.Privileged != nil {
-			in, out := &in.Privileged, &out.Privileged
-			*out = new(bool)
-			**out = **in
-		} else {
-			out.Privileged = nil
-		}
-		if in.SELinuxOptions != nil {
-			in, out := &in.SELinuxOptions, &out.SELinuxOptions
-			*out = new(SELinuxOptions)
-			**out = **in
-		} else {
-			out.SELinuxOptions = nil
-		}
-		if in.RunAsUser != nil {
-			in, out := &in.RunAsUser, &out.RunAsUser
-			*out = new(int64)
-			**out = **in
-		} else {
-			out.RunAsUser = nil
-		}
-		if in.RunAsNonRoot != nil {
-			in, out := &in.RunAsNonRoot, &out.RunAsNonRoot
-			*out = new(bool)
-			**out = **in
-		} else {
-			out.RunAsNonRoot = nil
-		}
-		if in.ReadOnlyRootFilesystem != nil {
-			in, out := &in.ReadOnlyRootFilesystem, &out.ReadOnlyRootFilesystem
-			*out = new(bool)
-			**out = **in
-		} else {
-			out.ReadOnlyRootFilesystem = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_SerializedReference(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*SerializedReference)
-		out := out.(*SerializedReference)
-		out.TypeMeta = in.TypeMeta
-		out.Reference = in.Reference
-		return nil
-	}
-}
-
-func DeepCopy_v1_Service(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Service)
-		out := out.(*Service)
-		out.TypeMeta = in.TypeMeta
-		if err := DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v1_ServiceSpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v1_ServiceStatus(&in.Status, &out.Status, c); err != nil {
-			return err
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_ServiceAccount(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ServiceAccount)
-		out := out.(*ServiceAccount)
-		out.TypeMeta = in.TypeMeta
-		if err := DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
-		}
-		if in.Secrets != nil {
-			in, out := &in.Secrets, &out.Secrets
-			*out = make([]ObjectReference, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.Secrets = nil
-		}
-		if in.ImagePullSecrets != nil {
-			in, out := &in.ImagePullSecrets, &out.ImagePullSecrets
-			*out = make([]LocalObjectReference, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.ImagePullSecrets = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_ServiceAccountList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ServiceAccountList)
-		out := out.(*ServiceAccountList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]ServiceAccount, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_ServiceAccount(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Items = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_ServiceList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ServiceList)
-		out := out.(*ServiceList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]Service, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1_Service(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Items = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_ServicePort(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ServicePort)
-		out := out.(*ServicePort)
-		out.Name = in.Name
-		out.Protocol = in.Protocol
-		out.Port = in.Port
-		out.TargetPort = in.TargetPort
-		out.NodePort = in.NodePort
-		return nil
-	}
-}
-
-func DeepCopy_v1_ServiceProxyOptions(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ServiceProxyOptions)
-		out := out.(*ServiceProxyOptions)
-		out.TypeMeta = in.TypeMeta
-		out.Path = in.Path
-		return nil
-	}
-}
-
-func DeepCopy_v1_ServiceSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ServiceSpec)
-		out := out.(*ServiceSpec)
-		if in.Ports != nil {
-			in, out := &in.Ports, &out.Ports
-			*out = make([]ServicePort, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.Ports = nil
-		}
-		if in.Selector != nil {
-			in, out := &in.Selector, &out.Selector
-			*out = make(map[string]string)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		} else {
-			out.Selector = nil
-		}
-		out.ClusterIP = in.ClusterIP
-		out.Type = in.Type
-		if in.ExternalIPs != nil {
-			in, out := &in.ExternalIPs, &out.ExternalIPs
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.ExternalIPs = nil
-		}
-		if in.DeprecatedPublicIPs != nil {
-			in, out := &in.DeprecatedPublicIPs, &out.DeprecatedPublicIPs
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.DeprecatedPublicIPs = nil
-		}
-		out.SessionAffinity = in.SessionAffinity
-		out.LoadBalancerIP = in.LoadBalancerIP
-		if in.LoadBalancerSourceRanges != nil {
-			in, out := &in.LoadBalancerSourceRanges, &out.LoadBalancerSourceRanges
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.LoadBalancerSourceRanges = nil
-		}
-		out.ExternalName = in.ExternalName
-		return nil
-	}
-}
-
-func DeepCopy_v1_ServiceStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ServiceStatus)
-		out := out.(*ServiceStatus)
-		if err := DeepCopy_v1_LoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, c); err != nil {
-			return err
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_TCPSocketAction(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*TCPSocketAction)
-		out := out.(*TCPSocketAction)
-		out.Port = in.Port
-		return nil
-	}
-}
-
-func DeepCopy_v1_Taint(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Taint)
-		out := out.(*Taint)
-		out.Key = in.Key
-		out.Value = in.Value
-		out.Effect = in.Effect
-		return nil
-	}
-}
-
-func DeepCopy_v1_Toleration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Toleration)
-		out := out.(*Toleration)
-		out.Key = in.Key
-		out.Operator = in.Operator
-		out.Value = in.Value
-		out.Effect = in.Effect
-		return nil
-	}
-}
-
-func DeepCopy_v1_Volume(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Volume)
-		out := out.(*Volume)
-		out.Name = in.Name
-		if err := DeepCopy_v1_VolumeSource(&in.VolumeSource, &out.VolumeSource, c); err != nil {
-			return err
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_VolumeMount(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*VolumeMount)
-		out := out.(*VolumeMount)
-		out.Name = in.Name
-		out.ReadOnly = in.ReadOnly
-		out.MountPath = in.MountPath
-		out.SubPath = in.SubPath
-		return nil
-	}
-}
-
-func DeepCopy_v1_VolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*VolumeSource)
-		out := out.(*VolumeSource)
-		if in.HostPath != nil {
-			in, out := &in.HostPath, &out.HostPath
-			*out = new(HostPathVolumeSource)
-			**out = **in
-		} else {
-			out.HostPath = nil
-		}
-		if in.EmptyDir != nil {
-			in, out := &in.EmptyDir, &out.EmptyDir
-			*out = new(EmptyDirVolumeSource)
-			**out = **in
-		} else {
-			out.EmptyDir = nil
-		}
-		if in.GCEPersistentDisk != nil {
-			in, out := &in.GCEPersistentDisk, &out.GCEPersistentDisk
-			*out = new(GCEPersistentDiskVolumeSource)
-			**out = **in
-		} else {
-			out.GCEPersistentDisk = nil
-		}
-		if in.AWSElasticBlockStore != nil {
-			in, out := &in.AWSElasticBlockStore, &out.AWSElasticBlockStore
-			*out = new(AWSElasticBlockStoreVolumeSource)
-			**out = **in
-		} else {
-			out.AWSElasticBlockStore = nil
-		}
-		if in.GitRepo != nil {
-			in, out := &in.GitRepo, &out.GitRepo
-			*out = new(GitRepoVolumeSource)
-			**out = **in
-		} else {
-			out.GitRepo = nil
-		}
-		if in.Secret != nil {
-			in, out := &in.Secret, &out.Secret
-			*out = new(SecretVolumeSource)
-			if err := DeepCopy_v1_SecretVolumeSource(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.Secret = nil
-		}
-		if in.NFS != nil {
-			in, out := &in.NFS, &out.NFS
-			*out = new(NFSVolumeSource)
-			**out = **in
-		} else {
-			out.NFS = nil
-		}
-		if in.ISCSI != nil {
-			in, out := &in.ISCSI, &out.ISCSI
-			*out = new(ISCSIVolumeSource)
-			**out = **in
-		} else {
-			out.ISCSI = nil
-		}
-		if in.Glusterfs != nil {
-			in, out := &in.Glusterfs, &out.Glusterfs
-			*out = new(GlusterfsVolumeSource)
-			**out = **in
-		} else {
-			out.Glusterfs = nil
-		}
-		if in.PersistentVolumeClaim != nil {
-			in, out := &in.PersistentVolumeClaim, &out.PersistentVolumeClaim
-			*out = new(PersistentVolumeClaimVolumeSource)
-			**out = **in
-		} else {
-			out.PersistentVolumeClaim = nil
-		}
-		if in.RBD != nil {
-			in, out := &in.RBD, &out.RBD
-			*out = new(RBDVolumeSource)
-			if err := DeepCopy_v1_RBDVolumeSource(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.RBD = nil
-		}
-		if in.FlexVolume != nil {
-			in, out := &in.FlexVolume, &out.FlexVolume
-			*out = new(FlexVolumeSource)
-			if err := DeepCopy_v1_FlexVolumeSource(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.FlexVolume = nil
-		}
-		if in.Cinder != nil {
-			in, out := &in.Cinder, &out.Cinder
-			*out = new(CinderVolumeSource)
-			**out = **in
-		} else {
-			out.Cinder = nil
-		}
-		if in.CephFS != nil {
-			in, out := &in.CephFS, &out.CephFS
-			*out = new(CephFSVolumeSource)
-			if err := DeepCopy_v1_CephFSVolumeSource(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.CephFS = nil
-		}
-		if in.Flocker != nil {
-			in, out := &in.Flocker, &out.Flocker
-			*out = new(FlockerVolumeSource)
-			**out = **in
-		} else {
-			out.Flocker = nil
-		}
-		if in.DownwardAPI != nil {
-			in, out := &in.DownwardAPI, &out.DownwardAPI
-			*out = new(DownwardAPIVolumeSource)
-			if err := DeepCopy_v1_DownwardAPIVolumeSource(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.DownwardAPI = nil
-		}
-		if in.FC != nil {
-			in, out := &in.FC, &out.FC
-			*out = new(FCVolumeSource)
-			if err := DeepCopy_v1_FCVolumeSource(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.FC = nil
-		}
-		if in.AzureFile != nil {
-			in, out := &in.AzureFile, &out.AzureFile
-			*out = new(AzureFileVolumeSource)
-			**out = **in
-		} else {
-			out.AzureFile = nil
-		}
-		if in.ConfigMap != nil {
-			in, out := &in.ConfigMap, &out.ConfigMap
-			*out = new(ConfigMapVolumeSource)
-			if err := DeepCopy_v1_ConfigMapVolumeSource(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.ConfigMap = nil
-		}
-		if in.VsphereVolume != nil {
-			in, out := &in.VsphereVolume, &out.VsphereVolume
-			*out = new(VsphereVirtualDiskVolumeSource)
-			**out = **in
-		} else {
-			out.VsphereVolume = nil
-		}
-		if in.Quobyte != nil {
-			in, out := &in.Quobyte, &out.Quobyte
-			*out = new(QuobyteVolumeSource)
-			**out = **in
-		} else {
-			out.Quobyte = nil
-		}
-		if in.AzureDisk != nil {
-			in, out := &in.AzureDisk, &out.AzureDisk
-			*out = new(AzureDiskVolumeSource)
-			if err := DeepCopy_v1_AzureDiskVolumeSource(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.AzureDisk = nil
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v1_VsphereVirtualDiskVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*VsphereVirtualDiskVolumeSource)
-		out := out.(*VsphereVirtualDiskVolumeSource)
-		out.VolumePath = in.VolumePath
-		out.FSType = in.FSType
-		return nil
-	}
-}
-
-func DeepCopy_v1_WeightedPodAffinityTerm(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*WeightedPodAffinityTerm)
-		out := out.(*WeightedPodAffinityTerm)
-		out.Weight = in.Weight
-		if err := DeepCopy_v1_PodAffinityTerm(&in.PodAffinityTerm, &out.PodAffinityTerm, c); err != nil {
-			return err
+	} else {
+		out.Ports = nil
+	}
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = make(map[string]string)
+		for key, val := range *in {
+			(*out)[key] = val
 		}
+	} else {
+		out.Selector = nil
+	}
+	out.ClusterIP = in.ClusterIP
+	out.Type = in.Type
+	if in.ExternalIPs != nil {
+		in, out := &in.ExternalIPs, &out.ExternalIPs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.ExternalIPs = nil
+	}
+	if in.DeprecatedPublicIPs != nil {
+		in, out := &in.DeprecatedPublicIPs, &out.DeprecatedPublicIPs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.DeprecatedPublicIPs = nil
+	}
+	out.SessionAffinity = in.SessionAffinity
+	out.LoadBalancerIP = in.LoadBalancerIP
+	if in.LoadBalancerSourceRanges != nil {
+		in, out := &in.LoadBalancerSourceRanges, &out.LoadBalancerSourceRanges
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.LoadBalancerSourceRanges = nil
+	}
+	out.ExternalName = in.ExternalName
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ServiceSpec.
+func (x *ServiceSpec) DeepCopy() *ServiceSpec {
+	if x == nil {
+		return nil
+	}
+	out := new(ServiceSpec)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ServiceStatus) DeepCopyInto(out *ServiceStatus) {
+	in.LoadBalancer.DeepCopyInto(&out.LoadBalancer)
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ServiceStatus.
+func (x *ServiceStatus) DeepCopy() *ServiceStatus {
+	if x == nil {
+		return nil
+	}
+	out := new(ServiceStatus)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *TCPSocketAction) DeepCopyInto(out *TCPSocketAction) {
+	out.Port = in.Port
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new TCPSocketAction.
+func (x *TCPSocketAction) DeepCopy() *TCPSocketAction {
+	if x == nil {
+		return nil
+	}
+	out := new(TCPSocketAction)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Taint) DeepCopyInto(out *Taint) {
+	out.Key = in.Key
+	out.Value = in.Value
+	out.Effect = in.Effect
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new Taint.
+func (x *Taint) DeepCopy() *Taint {
+	if x == nil {
+		return nil
+	}
+	out := new(Taint)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Toleration) DeepCopyInto(out *Toleration) {
+	out.Key = in.Key
+	out.Operator = in.Operator
+	out.Value = in.Value
+	out.Effect = in.Effect
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new Toleration.
+func (x *Toleration) DeepCopy() *Toleration {
+	if x == nil {
+		return nil
+	}
+	out := new(Toleration)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Volume) DeepCopyInto(out *Volume) {
+	out.Name = in.Name
+	in.VolumeSource.DeepCopyInto(&out.VolumeSource)
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new Volume.
+func (x *Volume) DeepCopy() *Volume {
+	if x == nil {
+		return nil
+	}
+	out := new(Volume)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *VolumeMount) DeepCopyInto(out *VolumeMount) {
+	out.Name = in.Name
+	out.ReadOnly = in.ReadOnly
+	out.MountPath = in.MountPath
+	out.SubPath = in.SubPath
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new VolumeMount.
+func (x *VolumeMount) DeepCopy() *VolumeMount {
+	if x == nil {
+		return nil
+	}
+	out := new(VolumeMount)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *VolumeSource) DeepCopyInto(out *VolumeSource) {
+	if in.HostPath != nil {
+		in, out := &in.HostPath, &out.HostPath
+		*out = new(HostPathVolumeSource)
+		**out = **in
+	} else {
+		out.HostPath = nil
+	}
+	if in.EmptyDir != nil {
+		in, out := &in.EmptyDir, &out.EmptyDir
+		*out = new(EmptyDirVolumeSource)
+		**out = **in
+	} else {
+		out.EmptyDir = nil
+	}
+	if in.GCEPersistentDisk != nil {
+		in, out := &in.GCEPersistentDisk, &out.GCEPersistentDisk
+		*out = new(GCEPersistentDiskVolumeSource)
+		**out = **in
+	} else {
+		out.GCEPersistentDisk = nil
+	}
+	if in.AWSElasticBlockStore != nil {
+		in, out := &in.AWSElasticBlockStore, &out.AWSElasticBlockStore
+		*out = new(AWSElasticBlockStoreVolumeSource)
+		**out = **in
+	} else {
+		out.AWSElasticBlockStore = nil
+	}
+	if in.GitRepo != nil {
+		in, out := &in.GitRepo, &out.GitRepo
+		*out = new(GitRepoVolumeSource)
+		**out = **in
+	} else {
+		out.GitRepo = nil
+	}
+	if in.Secret != nil {
+		in, out := &in.Secret, &out.Secret
+		*out = (*in).DeepCopy()
+	} else {
+		out.Secret = nil
+	}
+	if in.NFS != nil {
+		in, out := &in.NFS, &out.NFS
+		*out = new(NFSVolumeSource)
+		**out = **in
+	} else {
+		out.NFS = nil
+	}
+	if in.ISCSI != nil {
+		in, out := &in.ISCSI, &out.ISCSI
+		*out = new(ISCSIVolumeSource)
+		**out = **in
+	} else {
+		out.ISCSI = nil
+	}
+	if in.Glusterfs != nil {
+		in, out := &in.Glusterfs, &out.Glusterfs
+		*out = new(GlusterfsVolumeSource)
+		**out = **in
+	} else {
+		out.Glusterfs = nil
+	}
+	if in.PersistentVolumeClaim != nil {
+		in, out := &in.PersistentVolumeClaim, &out.PersistentVolumeClaim
+		*out = new(PersistentVolumeClaimVolumeSource)
+		**out = **in
+	} else {
+		out.PersistentVolumeClaim = nil
+	}
+	if in.RBD != nil {
+		in, out := &in.RBD, &out.RBD
+		*out = (*in).DeepCopy()
+	} else {
+		out.RBD = nil
+	}
+	if in.FlexVolume != nil {
+		in, out := &in.FlexVolume, &out.FlexVolume
+		*out = (*in).DeepCopy()
+	} else {
+		out.FlexVolume = nil
+	}
+	if in.Cinder != nil {
+		in, out := &in.Cinder, &out.Cinder
+		*out = new(CinderVolumeSource)
+		**out = **in
+	} else {
+		out.Cinder = nil
+	}
+	if in.CephFS != nil {
+		in, out := &in.CephFS, &out.CephFS
+		*out = (*in).DeepCopy()
+	} else {
+		out.CephFS = nil
+	}
+	if in.Flocker != nil {
+		in, out := &in.Flocker, &out.Flocker
+		*out = new(FlockerVolumeSource)
+		**out = **in
+	} else {
+		out.Flocker = nil
+	}
+	if in.DownwardAPI != nil {
+		in, out := &in.DownwardAPI, &out.DownwardAPI
+		*out = (*in).DeepCopy()
+	} else {
+		out.DownwardAPI = nil
+	}
+	if in.FC != nil {
+		in, out := &in.FC, &out.FC
+		*out = (*in).DeepCopy()
+	} else {
+		out.FC = nil
+	}
+	if in.AzureFile != nil {
+		in, out := &in.AzureFile, &out.AzureFile
+		*out = new(AzureFileVolumeSource)
+		**out = **in
+	} else {
+		out.AzureFile = nil
+	}
+	if in.ConfigMap != nil {
+		in, out := &in.ConfigMap, &out.ConfigMap
+		*out = (*in).DeepCopy()
+	} else {
+		out.ConfigMap = nil
+	}
+	if in.VsphereVolume != nil {
+		in, out := &in.VsphereVolume, &out.VsphereVolume
+		*out = new(VsphereVirtualDiskVolumeSource)
+		**out = **in
+	} else {
+		out.VsphereVolume = nil
+	}
+	if in.Quobyte != nil {
+		in, out := &in.Quobyte, &out.Quobyte
+		*out = new(QuobyteVolumeSource)
+		**out = **in
+	} else {
+		out.Quobyte = nil
+	}
+	if in.AzureDisk != nil {
+		in, out := &in.AzureDisk, &out.AzureDisk
+		*out = (*in).DeepCopy()
+	} else {
+		out.AzureDisk = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new VolumeSource.
+func (x *VolumeSource) DeepCopy() *VolumeSource {
+	if x == nil {
+		return nil
+	}
+	out := new(VolumeSource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *VsphereVirtualDiskVolumeSource) DeepCopyInto(out *VsphereVirtualDiskVolumeSource) {
+	out.VolumePath = in.VolumePath
+	out.FSType = in.FSType
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new VsphereVirtualDiskVolumeSource.
+func (x *VsphereVirtualDiskVolumeSource) DeepCopy() *VsphereVirtualDiskVolumeSource {
+	if x == nil {
+		return nil
+	}
+	out := new(VsphereVirtualDiskVolumeSource)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *WeightedPodAffinityTerm) DeepCopyInto(out *WeightedPodAffinityTerm) {
+	out.Weight = in.Weight
+	in.PodAffinityTerm.DeepCopyInto(&out.PodAffinityTerm)
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new WeightedPodAffinityTerm.
+func (x *WeightedPodAffinityTerm) DeepCopy() *WeightedPodAffinityTerm {
+	if x == nil {
 		return nil
 	}
+	out := new(WeightedPodAffinityTerm)
+	x.DeepCopyInto(out)
+	return out
 }

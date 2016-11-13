@@ -21,176 +21,222 @@ limitations under the License.
 package authorization
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
-	conversion "k8s.io/kubernetes/pkg/conversion"
-	runtime "k8s.io/kubernetes/pkg/runtime"
-	reflect "reflect"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 )
 
-func init() {
-	SchemeBuilder.Register(RegisterDeepCopies)
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *LocalSubjectAccessReview) DeepCopyInto(out *LocalSubjectAccessReview) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	out.Status = in.Status
+	return
 }
 
-// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
-// to allow building arbitrary schemes.
-func RegisterDeepCopies(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_LocalSubjectAccessReview, InType: reflect.TypeOf(&LocalSubjectAccessReview{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_NonResourceAttributes, InType: reflect.TypeOf(&NonResourceAttributes{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_ResourceAttributes, InType: reflect.TypeOf(&ResourceAttributes{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_SelfSubjectAccessReview, InType: reflect.TypeOf(&SelfSubjectAccessReview{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_SelfSubjectAccessReviewSpec, InType: reflect.TypeOf(&SelfSubjectAccessReviewSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_SubjectAccessReview, InType: reflect.TypeOf(&SubjectAccessReview{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_SubjectAccessReviewSpec, InType: reflect.TypeOf(&SubjectAccessReviewSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_SubjectAccessReviewStatus, InType: reflect.TypeOf(&SubjectAccessReviewStatus{})},
-	)
+// DeepCopy will perform a deep copy of the receiver, creating a new LocalSubjectAccessReview.
+func (x *LocalSubjectAccessReview) DeepCopy() *LocalSubjectAccessReview {
+	if x == nil {
+		return nil
+	}
+	out := new(LocalSubjectAccessReview)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_authorization_LocalSubjectAccessReview(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*LocalSubjectAccessReview)
-		out := out.(*LocalSubjectAccessReview)
-		out.TypeMeta = in.TypeMeta
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_authorization_SubjectAccessReviewSpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
-		}
-		out.Status = in.Status
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *LocalSubjectAccessReview) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_authorization_NonResourceAttributes(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*NonResourceAttributes)
-		out := out.(*NonResourceAttributes)
-		out.Path = in.Path
-		out.Verb = in.Verb
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *NonResourceAttributes) DeepCopyInto(out *NonResourceAttributes) {
+	out.Path = in.Path
+	out.Verb = in.Verb
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new NonResourceAttributes.
+func (x *NonResourceAttributes) DeepCopy() *NonResourceAttributes {
+	if x == nil {
+		return nil
+	}
+	out := new(NonResourceAttributes)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ResourceAttributes) DeepCopyInto(out *ResourceAttributes) {
+	out.Namespace = in.Namespace
+	out.Verb = in.Verb
+	out.Group = in.Group
+	out.Version = in.Version
+	out.Resource = in.Resource
+	out.Subresource = in.Subresource
+	out.Name = in.Name
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ResourceAttributes.
+func (x *ResourceAttributes) DeepCopy() *ResourceAttributes {
+	if x == nil {
+		return nil
+	}
+	out := new(ResourceAttributes)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *SelfSubjectAccessReview) DeepCopyInto(out *SelfSubjectAccessReview) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	out.Status = in.Status
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new SelfSubjectAccessReview.
+func (x *SelfSubjectAccessReview) DeepCopy() *SelfSubjectAccessReview {
+	if x == nil {
+		return nil
+	}
+	out := new(SelfSubjectAccessReview)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *SelfSubjectAccessReview) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_authorization_ResourceAttributes(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ResourceAttributes)
-		out := out.(*ResourceAttributes)
-		out.Namespace = in.Namespace
-		out.Verb = in.Verb
-		out.Group = in.Group
-		out.Version = in.Version
-		out.Resource = in.Resource
-		out.Subresource = in.Subresource
-		out.Name = in.Name
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *SelfSubjectAccessReviewSpec) DeepCopyInto(out *SelfSubjectAccessReviewSpec) {
+	if in.ResourceAttributes != nil {
+		in, out := &in.ResourceAttributes, &out.ResourceAttributes
+		*out = new(ResourceAttributes)
+		**out = **in
+	} else {
+		out.ResourceAttributes = nil
+	}
+	if in.NonResourceAttributes != nil {
+		in, out := &in.NonResourceAttributes, &out.NonResourceAttributes
+		*out = new(NonResourceAttributes)
+		**out = **in
+	} else {
+		out.NonResourceAttributes = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new SelfSubjectAccessReviewSpec.
+func (x *SelfSubjectAccessReviewSpec) DeepCopy() *SelfSubjectAccessReviewSpec {
+	if x == nil {
+		return nil
+	}
+	out := new(SelfSubjectAccessReviewSpec)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *SubjectAccessReview) DeepCopyInto(out *SubjectAccessReview) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	out.Status = in.Status
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new SubjectAccessReview.
+func (x *SubjectAccessReview) DeepCopy() *SubjectAccessReview {
+	if x == nil {
+		return nil
+	}
+	out := new(SubjectAccessReview)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *SubjectAccessReview) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_authorization_SelfSubjectAccessReview(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*SelfSubjectAccessReview)
-		out := out.(*SelfSubjectAccessReview)
-		out.TypeMeta = in.TypeMeta
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_authorization_SelfSubjectAccessReviewSpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
-		}
-		out.Status = in.Status
-		return nil
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *SubjectAccessReviewSpec) DeepCopyInto(out *SubjectAccessReviewSpec) {
+	if in.ResourceAttributes != nil {
+		in, out := &in.ResourceAttributes, &out.ResourceAttributes
+		*out = new(ResourceAttributes)
+		**out = **in
+	} else {
+		out.ResourceAttributes = nil
 	}
+	if in.NonResourceAttributes != nil {
+		in, out := &in.NonResourceAttributes, &out.NonResourceAttributes
+		*out = new(NonResourceAttributes)
+		**out = **in
+	} else {
+		out.NonResourceAttributes = nil
+	}
+	out.User = in.User
+	if in.Groups != nil {
+		in, out := &in.Groups, &out.Groups
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.Groups = nil
+	}
+	if in.Extra != nil {
+		in, out := &in.Extra, &out.Extra
+		*out = make(map[string]ExtraValue)
+		for key, val := range *in {
+			(*out)[key] = make(ExtraValue, len(val))
+			copy((*out)[key], val)
+		}
+	} else {
+		out.Extra = nil
+	}
+	return
 }
 
-func DeepCopy_authorization_SelfSubjectAccessReviewSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*SelfSubjectAccessReviewSpec)
-		out := out.(*SelfSubjectAccessReviewSpec)
-		if in.ResourceAttributes != nil {
-			in, out := &in.ResourceAttributes, &out.ResourceAttributes
-			*out = new(ResourceAttributes)
-			**out = **in
-		} else {
-			out.ResourceAttributes = nil
-		}
-		if in.NonResourceAttributes != nil {
-			in, out := &in.NonResourceAttributes, &out.NonResourceAttributes
-			*out = new(NonResourceAttributes)
-			**out = **in
-		} else {
-			out.NonResourceAttributes = nil
-		}
+// DeepCopy will perform a deep copy of the receiver, creating a new SubjectAccessReviewSpec.
+func (x *SubjectAccessReviewSpec) DeepCopy() *SubjectAccessReviewSpec {
+	if x == nil {
 		return nil
 	}
+	out := new(SubjectAccessReviewSpec)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_authorization_SubjectAccessReview(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*SubjectAccessReview)
-		out := out.(*SubjectAccessReview)
-		out.TypeMeta = in.TypeMeta
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_authorization_SubjectAccessReviewSpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
-		}
-		out.Status = in.Status
-		return nil
-	}
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *SubjectAccessReviewStatus) DeepCopyInto(out *SubjectAccessReviewStatus) {
+	out.Allowed = in.Allowed
+	out.Reason = in.Reason
+	out.EvaluationError = in.EvaluationError
+	return
 }
 
-func DeepCopy_authorization_SubjectAccessReviewSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*SubjectAccessReviewSpec)
-		out := out.(*SubjectAccessReviewSpec)
-		if in.ResourceAttributes != nil {
-			in, out := &in.ResourceAttributes, &out.ResourceAttributes
-			*out = new(ResourceAttributes)
-			**out = **in
-		} else {
-			out.ResourceAttributes = nil
-		}
-		if in.NonResourceAttributes != nil {
-			in, out := &in.NonResourceAttributes, &out.NonResourceAttributes
-			*out = new(NonResourceAttributes)
-			**out = **in
-		} else {
-			out.NonResourceAttributes = nil
-		}
-		out.User = in.User
-		if in.Groups != nil {
-			in, out := &in.Groups, &out.Groups
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.Groups = nil
-		}
-		if in.Extra != nil {
-			in, out := &in.Extra, &out.Extra
-			*out = make(map[string]ExtraValue)
-			for key, val := range *in {
-				if newVal, err := c.DeepCopy(&val); err != nil {
-					return err
-				} else {
-					(*out)[key] = *newVal.(*ExtraValue)
-				}
-			}
-		} else {
-			out.Extra = nil
-		}
+// DeepCopy will perform a deep copy of the receiver, creating a new SubjectAccessReviewStatus.
+func (x *SubjectAccessReviewStatus) DeepCopy() *SubjectAccessReviewStatus {
+	if x == nil {
 		return nil
 	}
-}
-
-func DeepCopy_authorization_SubjectAccessReviewStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*SubjectAccessReviewStatus)
-		out := out.(*SubjectAccessReviewStatus)
-		out.Allowed = in.Allowed
-		out.Reason = in.Reason
-		out.EvaluationError = in.EvaluationError
-		return nil
-	}
+	out := new(SubjectAccessReviewStatus)
+	x.DeepCopyInto(out)
+	return out
 }

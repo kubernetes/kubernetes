@@ -20,56 +20,67 @@ limitations under the License.
 
 package runtime
 
-import (
-	conversion "k8s.io/kubernetes/pkg/conversion"
-)
-
-func DeepCopy_runtime_RawExtension(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*RawExtension)
-		out := out.(*RawExtension)
-		if in.Raw != nil {
-			in, out := &in.Raw, &out.Raw
-			*out = make([]byte, len(*in))
-			copy(*out, *in)
-		} else {
-			out.Raw = nil
-		}
-		if in.Object == nil {
-			out.Object = nil
-		} else if newVal, err := c.DeepCopy(&in.Object); err != nil {
-			return err
-		} else {
-			out.Object = *newVal.(*Object)
-		}
-		return nil
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *RawExtension) DeepCopyInto(out *RawExtension) {
+	if in.Raw != nil {
+		in, out := &in.Raw, &out.Raw
+		*out = make([]byte, len(*in))
+		copy(*out, *in)
+	} else {
+		out.Raw = nil
 	}
+	out.Object = in.Object.DeepCopyObject()
+	return
 }
 
-func DeepCopy_runtime_TypeMeta(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*TypeMeta)
-		out := out.(*TypeMeta)
-		out.APIVersion = in.APIVersion
-		out.Kind = in.Kind
+// DeepCopy will perform a deep copy of the receiver, creating a new RawExtension.
+func (x *RawExtension) DeepCopy() *RawExtension {
+	if x == nil {
 		return nil
 	}
+	out := new(RawExtension)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_runtime_Unknown(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Unknown)
-		out := out.(*Unknown)
-		out.TypeMeta = in.TypeMeta
-		if in.Raw != nil {
-			in, out := &in.Raw, &out.Raw
-			*out = make([]byte, len(*in))
-			copy(*out, *in)
-		} else {
-			out.Raw = nil
-		}
-		out.ContentEncoding = in.ContentEncoding
-		out.ContentType = in.ContentType
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *TypeMeta) DeepCopyInto(out *TypeMeta) {
+	out.APIVersion = in.APIVersion
+	out.Kind = in.Kind
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new TypeMeta.
+func (x *TypeMeta) DeepCopy() *TypeMeta {
+	if x == nil {
 		return nil
 	}
+	out := new(TypeMeta)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Unknown) DeepCopyInto(out *Unknown) {
+	out.TypeMeta = in.TypeMeta
+	if in.Raw != nil {
+		in, out := &in.Raw, &out.Raw
+		*out = make([]byte, len(*in))
+		copy(*out, *in)
+	} else {
+		out.Raw = nil
+	}
+	out.ContentEncoding = in.ContentEncoding
+	out.ContentType = in.ContentType
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new Unknown.
+func (x *Unknown) DeepCopy() *Unknown {
+	if x == nil {
+		return nil
+	}
+	out := new(Unknown)
+	x.DeepCopyInto(out)
+	return out
 }

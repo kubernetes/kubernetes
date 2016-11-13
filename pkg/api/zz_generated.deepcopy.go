@@ -662,7 +662,7 @@ func (x *ContainerState) DeepCopy() *ContainerState {
 
 // DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
 func (in *ContainerStateRunning) DeepCopyInto(out *ContainerStateRunning) {
-	out.StartedAt = in.StartedAt.DeepCopy()
+	in.StartedAt.DeepCopyInto(&out.StartedAt)
 	return
 }
 
@@ -682,8 +682,8 @@ func (in *ContainerStateTerminated) DeepCopyInto(out *ContainerStateTerminated) 
 	out.Signal = in.Signal
 	out.Reason = in.Reason
 	out.Message = in.Message
-	out.StartedAt = in.StartedAt.DeepCopy()
-	out.FinishedAt = in.FinishedAt.DeepCopy()
+	in.StartedAt.DeepCopyInto(&out.StartedAt)
+	in.FinishedAt.DeepCopyInto(&out.FinishedAt)
 	out.ContainerID = in.ContainerID
 	return
 }
@@ -1116,8 +1116,8 @@ func (in *Event) DeepCopyInto(out *Event) {
 	out.Reason = in.Reason
 	out.Message = in.Message
 	out.Source = in.Source
-	out.FirstTimestamp = in.FirstTimestamp.DeepCopy()
-	out.LastTimestamp = in.LastTimestamp.DeepCopy()
+	in.FirstTimestamp.DeepCopyInto(&out.FirstTimestamp)
+	in.LastTimestamp.DeepCopyInto(&out.LastTimestamp)
 	out.Count = in.Count
 	out.Type = in.Type
 	return
@@ -2022,8 +2022,8 @@ func (x *NodeAffinity) DeepCopy() *NodeAffinity {
 func (in *NodeCondition) DeepCopyInto(out *NodeCondition) {
 	out.Type = in.Type
 	out.Status = in.Status
-	out.LastHeartbeatTime = in.LastHeartbeatTime.DeepCopy()
-	out.LastTransitionTime = in.LastTransitionTime.DeepCopy()
+	in.LastHeartbeatTime.DeepCopyInto(&out.LastHeartbeatTime)
+	in.LastTransitionTime.DeepCopyInto(&out.LastTransitionTime)
 	out.Reason = in.Reason
 	out.Message = in.Message
 	return
@@ -2363,11 +2363,10 @@ func (in *ObjectMeta) DeepCopyInto(out *ObjectMeta) {
 	out.UID = in.UID
 	out.ResourceVersion = in.ResourceVersion
 	out.Generation = in.Generation
-	out.CreationTimestamp = in.CreationTimestamp.DeepCopy()
+	in.CreationTimestamp.DeepCopyInto(&out.CreationTimestamp)
 	if in.DeletionTimestamp != nil {
 		in, out := &in.DeletionTimestamp, &out.DeletionTimestamp
-		*out = new(unversioned.Time)
-		**out = (*in).DeepCopy()
+		*out = (*in).DeepCopy()
 	} else {
 		out.DeletionTimestamp = nil
 	}
@@ -3022,8 +3021,8 @@ func (x *PodAttachOptions) DeepCopyObject() unversioned.Object {
 func (in *PodCondition) DeepCopyInto(out *PodCondition) {
 	out.Type = in.Type
 	out.Status = in.Status
-	out.LastProbeTime = in.LastProbeTime.DeepCopy()
-	out.LastTransitionTime = in.LastTransitionTime.DeepCopy()
+	in.LastProbeTime.DeepCopyInto(&out.LastProbeTime)
+	in.LastTransitionTime.DeepCopyInto(&out.LastTransitionTime)
 	out.Reason = in.Reason
 	out.Message = in.Message
 	return
@@ -3126,8 +3125,7 @@ func (in *PodLogOptions) DeepCopyInto(out *PodLogOptions) {
 	}
 	if in.SinceTime != nil {
 		in, out := &in.SinceTime, &out.SinceTime
-		*out = new(unversioned.Time)
-		**out = (*in).DeepCopy()
+		*out = (*in).DeepCopy()
 	} else {
 		out.SinceTime = nil
 	}
@@ -3372,8 +3370,7 @@ func (in *PodStatus) DeepCopyInto(out *PodStatus) {
 	out.PodIP = in.PodIP
 	if in.StartTime != nil {
 		in, out := &in.StartTime, &out.StartTime
-		*out = new(unversioned.Time)
-		**out = (*in).DeepCopy()
+		*out = (*in).DeepCopy()
 	} else {
 		out.StartTime = nil
 	}
@@ -3539,7 +3536,7 @@ func (x *Preconditions) DeepCopy() *Preconditions {
 // DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
 func (in *PreferAvoidPodsEntry) DeepCopyInto(out *PreferAvoidPodsEntry) {
 	in.PodSignature.DeepCopyInto(&out.PodSignature)
-	out.EvictionTime = in.EvictionTime.DeepCopy()
+	in.EvictionTime.DeepCopyInto(&out.EvictionTime)
 	out.Reason = in.Reason
 	out.Message = in.Message
 	return
@@ -3714,7 +3711,7 @@ func (x *ReplicationController) DeepCopyObject() unversioned.Object {
 func (in *ReplicationControllerCondition) DeepCopyInto(out *ReplicationControllerCondition) {
 	out.Type = in.Type
 	out.Status = in.Status
-	out.LastTransitionTime = in.LastTransitionTime.DeepCopy()
+	in.LastTransitionTime.DeepCopyInto(&out.LastTransitionTime)
 	out.Reason = in.Reason
 	out.Message = in.Message
 	return

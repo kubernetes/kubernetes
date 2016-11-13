@@ -21,277 +21,375 @@ limitations under the License.
 package rbac
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
-	conversion "k8s.io/kubernetes/pkg/conversion"
-	runtime "k8s.io/kubernetes/pkg/runtime"
-	reflect "reflect"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 )
 
-func init() {
-	SchemeBuilder.Register(RegisterDeepCopies)
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ClusterRole) DeepCopyInto(out *ClusterRole) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	if in.Rules != nil {
+		in, out := &in.Rules, &out.Rules
+		*out = make([]PolicyRule, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.Rules = nil
+	}
+	return
 }
 
-// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
-// to allow building arbitrary schemes.
-func RegisterDeepCopies(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_rbac_ClusterRole, InType: reflect.TypeOf(&ClusterRole{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_rbac_ClusterRoleBinding, InType: reflect.TypeOf(&ClusterRoleBinding{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_rbac_ClusterRoleBindingList, InType: reflect.TypeOf(&ClusterRoleBindingList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_rbac_ClusterRoleList, InType: reflect.TypeOf(&ClusterRoleList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_rbac_PolicyRule, InType: reflect.TypeOf(&PolicyRule{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_rbac_Role, InType: reflect.TypeOf(&Role{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_rbac_RoleBinding, InType: reflect.TypeOf(&RoleBinding{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_rbac_RoleBindingList, InType: reflect.TypeOf(&RoleBindingList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_rbac_RoleList, InType: reflect.TypeOf(&RoleList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_rbac_RoleRef, InType: reflect.TypeOf(&RoleRef{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_rbac_Subject, InType: reflect.TypeOf(&Subject{})},
-	)
+// DeepCopy will perform a deep copy of the receiver, creating a new ClusterRole.
+func (x *ClusterRole) DeepCopy() *ClusterRole {
+	if x == nil {
+		return nil
+	}
+	out := new(ClusterRole)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_rbac_ClusterRole(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ClusterRole)
-		out := out.(*ClusterRole)
-		out.TypeMeta = in.TypeMeta
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
-		}
-		if in.Rules != nil {
-			in, out := &in.Rules, &out.Rules
-			*out = make([]PolicyRule, len(*in))
-			for i := range *in {
-				if err := DeepCopy_rbac_PolicyRule(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Rules = nil
-		}
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *ClusterRole) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_rbac_ClusterRoleBinding(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ClusterRoleBinding)
-		out := out.(*ClusterRoleBinding)
-		out.TypeMeta = in.TypeMeta
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ClusterRoleBinding) DeepCopyInto(out *ClusterRoleBinding) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	if in.Subjects != nil {
+		in, out := &in.Subjects, &out.Subjects
+		*out = make([]Subject, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
 		}
-		if in.Subjects != nil {
-			in, out := &in.Subjects, &out.Subjects
-			*out = make([]Subject, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.Subjects = nil
-		}
-		out.RoleRef = in.RoleRef
+	} else {
+		out.Subjects = nil
+	}
+	out.RoleRef = in.RoleRef
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ClusterRoleBinding.
+func (x *ClusterRoleBinding) DeepCopy() *ClusterRoleBinding {
+	if x == nil {
+		return nil
+	}
+	out := new(ClusterRoleBinding)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *ClusterRoleBinding) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_rbac_ClusterRoleBindingList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ClusterRoleBindingList)
-		out := out.(*ClusterRoleBindingList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]ClusterRoleBinding, len(*in))
-			for i := range *in {
-				if err := DeepCopy_rbac_ClusterRoleBinding(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Items = nil
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ClusterRoleBindingList) DeepCopyInto(out *ClusterRoleBindingList) {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]ClusterRoleBinding, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	} else {
+		out.Items = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ClusterRoleBindingList.
+func (x *ClusterRoleBindingList) DeepCopy() *ClusterRoleBindingList {
+	if x == nil {
+		return nil
+	}
+	out := new(ClusterRoleBindingList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *ClusterRoleBindingList) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_rbac_ClusterRoleList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ClusterRoleList)
-		out := out.(*ClusterRoleList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]ClusterRole, len(*in))
-			for i := range *in {
-				if err := DeepCopy_rbac_ClusterRole(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Items = nil
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ClusterRoleList) DeepCopyInto(out *ClusterRoleList) {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]ClusterRole, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	} else {
+		out.Items = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ClusterRoleList.
+func (x *ClusterRoleList) DeepCopy() *ClusterRoleList {
+	if x == nil {
+		return nil
+	}
+	out := new(ClusterRoleList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *ClusterRoleList) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_rbac_PolicyRule(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PolicyRule)
-		out := out.(*PolicyRule)
-		if in.Verbs != nil {
-			in, out := &in.Verbs, &out.Verbs
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.Verbs = nil
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PolicyRule) DeepCopyInto(out *PolicyRule) {
+	if in.Verbs != nil {
+		in, out := &in.Verbs, &out.Verbs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.Verbs = nil
+	}
+	out.AttributeRestrictions = in.AttributeRestrictions.DeepCopyObject()
+	if in.APIGroups != nil {
+		in, out := &in.APIGroups, &out.APIGroups
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.APIGroups = nil
+	}
+	if in.Resources != nil {
+		in, out := &in.Resources, &out.Resources
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.Resources = nil
+	}
+	if in.ResourceNames != nil {
+		in, out := &in.ResourceNames, &out.ResourceNames
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.ResourceNames = nil
+	}
+	if in.NonResourceURLs != nil {
+		in, out := &in.NonResourceURLs, &out.NonResourceURLs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.NonResourceURLs = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new PolicyRule.
+func (x *PolicyRule) DeepCopy() *PolicyRule {
+	if x == nil {
+		return nil
+	}
+	out := new(PolicyRule)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Role) DeepCopyInto(out *Role) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	if in.Rules != nil {
+		in, out := &in.Rules, &out.Rules
+		*out = make([]PolicyRule, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
-		if in.AttributeRestrictions == nil {
-			out.AttributeRestrictions = nil
-		} else if newVal, err := c.DeepCopy(&in.AttributeRestrictions); err != nil {
-			return err
-		} else {
-			out.AttributeRestrictions = *newVal.(*runtime.Object)
-		}
-		if in.APIGroups != nil {
-			in, out := &in.APIGroups, &out.APIGroups
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.APIGroups = nil
-		}
-		if in.Resources != nil {
-			in, out := &in.Resources, &out.Resources
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.Resources = nil
-		}
-		if in.ResourceNames != nil {
-			in, out := &in.ResourceNames, &out.ResourceNames
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.ResourceNames = nil
-		}
-		if in.NonResourceURLs != nil {
-			in, out := &in.NonResourceURLs, &out.NonResourceURLs
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.NonResourceURLs = nil
-		}
+	} else {
+		out.Rules = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new Role.
+func (x *Role) DeepCopy() *Role {
+	if x == nil {
+		return nil
+	}
+	out := new(Role)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *Role) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_rbac_Role(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Role)
-		out := out.(*Role)
-		out.TypeMeta = in.TypeMeta
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *RoleBinding) DeepCopyInto(out *RoleBinding) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	if in.Subjects != nil {
+		in, out := &in.Subjects, &out.Subjects
+		*out = make([]Subject, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
 		}
-		if in.Rules != nil {
-			in, out := &in.Rules, &out.Rules
-			*out = make([]PolicyRule, len(*in))
-			for i := range *in {
-				if err := DeepCopy_rbac_PolicyRule(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Rules = nil
-		}
+	} else {
+		out.Subjects = nil
+	}
+	out.RoleRef = in.RoleRef
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new RoleBinding.
+func (x *RoleBinding) DeepCopy() *RoleBinding {
+	if x == nil {
+		return nil
+	}
+	out := new(RoleBinding)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *RoleBinding) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_rbac_RoleBinding(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*RoleBinding)
-		out := out.(*RoleBinding)
-		out.TypeMeta = in.TypeMeta
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *RoleBindingList) DeepCopyInto(out *RoleBindingList) {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]RoleBinding, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
-		if in.Subjects != nil {
-			in, out := &in.Subjects, &out.Subjects
-			*out = make([]Subject, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.Subjects = nil
-		}
-		out.RoleRef = in.RoleRef
+	} else {
+		out.Items = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new RoleBindingList.
+func (x *RoleBindingList) DeepCopy() *RoleBindingList {
+	if x == nil {
+		return nil
+	}
+	out := new(RoleBindingList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *RoleBindingList) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_rbac_RoleBindingList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*RoleBindingList)
-		out := out.(*RoleBindingList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]RoleBinding, len(*in))
-			for i := range *in {
-				if err := DeepCopy_rbac_RoleBinding(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Items = nil
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *RoleList) DeepCopyInto(out *RoleList) {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]Role, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	} else {
+		out.Items = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new RoleList.
+func (x *RoleList) DeepCopy() *RoleList {
+	if x == nil {
+		return nil
+	}
+	out := new(RoleList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *RoleList) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_rbac_RoleList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*RoleList)
-		out := out.(*RoleList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]Role, len(*in))
-			for i := range *in {
-				if err := DeepCopy_rbac_Role(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Items = nil
-		}
-		return nil
-	}
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *RoleRef) DeepCopyInto(out *RoleRef) {
+	out.APIGroup = in.APIGroup
+	out.Kind = in.Kind
+	out.Name = in.Name
+	return
 }
 
-func DeepCopy_rbac_RoleRef(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*RoleRef)
-		out := out.(*RoleRef)
-		out.APIGroup = in.APIGroup
-		out.Kind = in.Kind
-		out.Name = in.Name
+// DeepCopy will perform a deep copy of the receiver, creating a new RoleRef.
+func (x *RoleRef) DeepCopy() *RoleRef {
+	if x == nil {
 		return nil
 	}
+	out := new(RoleRef)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_rbac_Subject(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Subject)
-		out := out.(*Subject)
-		out.Kind = in.Kind
-		out.APIVersion = in.APIVersion
-		out.Name = in.Name
-		out.Namespace = in.Namespace
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Subject) DeepCopyInto(out *Subject) {
+	out.Kind = in.Kind
+	out.APIVersion = in.APIVersion
+	out.Name = in.Name
+	out.Namespace = in.Namespace
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new Subject.
+func (x *Subject) DeepCopy() *Subject {
+	if x == nil {
 		return nil
 	}
+	out := new(Subject)
+	x.DeepCopyInto(out)
+	return out
 }

@@ -21,456 +21,569 @@ limitations under the License.
 package componentconfig
 
 import (
-	conversion "k8s.io/kubernetes/pkg/conversion"
-	runtime "k8s.io/kubernetes/pkg/runtime"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	config "k8s.io/kubernetes/pkg/util/config"
-	reflect "reflect"
 )
 
-func init() {
-	SchemeBuilder.Register(RegisterDeepCopies)
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *IPVar) DeepCopyInto(out *IPVar) {
+	if in.Val != nil {
+		in, out := &in.Val, &out.Val
+		*out = new(string)
+		**out = **in
+	} else {
+		out.Val = nil
+	}
+	return
 }
 
-// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
-// to allow building arbitrary schemes.
-func RegisterDeepCopies(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_IPVar, InType: reflect.TypeOf(&IPVar{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeControllerManagerConfiguration, InType: reflect.TypeOf(&KubeControllerManagerConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeProxyConfiguration, InType: reflect.TypeOf(&KubeProxyConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeSchedulerConfiguration, InType: reflect.TypeOf(&KubeSchedulerConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletAnonymousAuthentication, InType: reflect.TypeOf(&KubeletAnonymousAuthentication{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletAuthentication, InType: reflect.TypeOf(&KubeletAuthentication{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletAuthorization, InType: reflect.TypeOf(&KubeletAuthorization{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletConfiguration, InType: reflect.TypeOf(&KubeletConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletWebhookAuthentication, InType: reflect.TypeOf(&KubeletWebhookAuthentication{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletWebhookAuthorization, InType: reflect.TypeOf(&KubeletWebhookAuthorization{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletX509Authentication, InType: reflect.TypeOf(&KubeletX509Authentication{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_LeaderElectionConfiguration, InType: reflect.TypeOf(&LeaderElectionConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_PersistentVolumeRecyclerConfiguration, InType: reflect.TypeOf(&PersistentVolumeRecyclerConfiguration{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_PortRangeVar, InType: reflect.TypeOf(&PortRangeVar{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_VolumeConfiguration, InType: reflect.TypeOf(&VolumeConfiguration{})},
-	)
+// DeepCopy will perform a deep copy of the receiver, creating a new IPVar.
+func (x *IPVar) DeepCopy() *IPVar {
+	if x == nil {
+		return nil
+	}
+	out := new(IPVar)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_componentconfig_IPVar(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*IPVar)
-		out := out.(*IPVar)
-		if in.Val != nil {
-			in, out := &in.Val, &out.Val
-			*out = new(string)
-			**out = **in
-		} else {
-			out.Val = nil
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *KubeControllerManagerConfiguration) DeepCopyInto(out *KubeControllerManagerConfiguration) {
+	out.TypeMeta = in.TypeMeta
+	out.Port = in.Port
+	out.Address = in.Address
+	out.CloudProvider = in.CloudProvider
+	out.CloudConfigFile = in.CloudConfigFile
+	out.ConcurrentEndpointSyncs = in.ConcurrentEndpointSyncs
+	out.ConcurrentRSSyncs = in.ConcurrentRSSyncs
+	out.ConcurrentRCSyncs = in.ConcurrentRCSyncs
+	out.ConcurrentServiceSyncs = in.ConcurrentServiceSyncs
+	out.ConcurrentResourceQuotaSyncs = in.ConcurrentResourceQuotaSyncs
+	out.ConcurrentDeploymentSyncs = in.ConcurrentDeploymentSyncs
+	out.ConcurrentDaemonSetSyncs = in.ConcurrentDaemonSetSyncs
+	out.ConcurrentJobSyncs = in.ConcurrentJobSyncs
+	out.ConcurrentNamespaceSyncs = in.ConcurrentNamespaceSyncs
+	out.ConcurrentSATokenSyncs = in.ConcurrentSATokenSyncs
+	out.LookupCacheSizeForRC = in.LookupCacheSizeForRC
+	out.LookupCacheSizeForRS = in.LookupCacheSizeForRS
+	out.LookupCacheSizeForDaemonSet = in.LookupCacheSizeForDaemonSet
+	out.ServiceSyncPeriod = in.ServiceSyncPeriod
+	out.NodeSyncPeriod = in.NodeSyncPeriod
+	out.RouteReconciliationPeriod = in.RouteReconciliationPeriod
+	out.ResourceQuotaSyncPeriod = in.ResourceQuotaSyncPeriod
+	out.NamespaceSyncPeriod = in.NamespaceSyncPeriod
+	out.PVClaimBinderSyncPeriod = in.PVClaimBinderSyncPeriod
+	out.MinResyncPeriod = in.MinResyncPeriod
+	out.TerminatedPodGCThreshold = in.TerminatedPodGCThreshold
+	out.HorizontalPodAutoscalerSyncPeriod = in.HorizontalPodAutoscalerSyncPeriod
+	out.DeploymentControllerSyncPeriod = in.DeploymentControllerSyncPeriod
+	out.PodEvictionTimeout = in.PodEvictionTimeout
+	out.DeletingPodsQps = in.DeletingPodsQps
+	out.DeletingPodsBurst = in.DeletingPodsBurst
+	out.NodeMonitorGracePeriod = in.NodeMonitorGracePeriod
+	out.RegisterRetryCount = in.RegisterRetryCount
+	out.NodeStartupGracePeriod = in.NodeStartupGracePeriod
+	out.NodeMonitorPeriod = in.NodeMonitorPeriod
+	out.ServiceAccountKeyFile = in.ServiceAccountKeyFile
+	out.ClusterSigningCertFile = in.ClusterSigningCertFile
+	out.ClusterSigningKeyFile = in.ClusterSigningKeyFile
+	out.ApproveAllKubeletCSRsForGroup = in.ApproveAllKubeletCSRsForGroup
+	out.EnableProfiling = in.EnableProfiling
+	out.ClusterName = in.ClusterName
+	out.ClusterCIDR = in.ClusterCIDR
+	out.ServiceCIDR = in.ServiceCIDR
+	out.NodeCIDRMaskSize = in.NodeCIDRMaskSize
+	out.AllocateNodeCIDRs = in.AllocateNodeCIDRs
+	out.ConfigureCloudRoutes = in.ConfigureCloudRoutes
+	out.RootCAFile = in.RootCAFile
+	out.ContentType = in.ContentType
+	out.KubeAPIQPS = in.KubeAPIQPS
+	out.KubeAPIBurst = in.KubeAPIBurst
+	out.LeaderElection = in.LeaderElection
+	out.VolumeConfiguration = in.VolumeConfiguration
+	out.ControllerStartInterval = in.ControllerStartInterval
+	out.EnableGarbageCollector = in.EnableGarbageCollector
+	out.ConcurrentGCSyncs = in.ConcurrentGCSyncs
+	out.NodeEvictionRate = in.NodeEvictionRate
+	out.SecondaryNodeEvictionRate = in.SecondaryNodeEvictionRate
+	out.LargeClusterSizeThreshold = in.LargeClusterSizeThreshold
+	out.UnhealthyZoneThreshold = in.UnhealthyZoneThreshold
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new KubeControllerManagerConfiguration.
+func (x *KubeControllerManagerConfiguration) DeepCopy() *KubeControllerManagerConfiguration {
+	if x == nil {
+		return nil
+	}
+	out := new(KubeControllerManagerConfiguration)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *KubeControllerManagerConfiguration) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *KubeProxyConfiguration) DeepCopyInto(out *KubeProxyConfiguration) {
+	out.TypeMeta = in.TypeMeta
+	out.BindAddress = in.BindAddress
+	out.ClusterCIDR = in.ClusterCIDR
+	out.HealthzBindAddress = in.HealthzBindAddress
+	out.HealthzPort = in.HealthzPort
+	out.HostnameOverride = in.HostnameOverride
+	if in.IPTablesMasqueradeBit != nil {
+		in, out := &in.IPTablesMasqueradeBit, &out.IPTablesMasqueradeBit
+		*out = new(int32)
+		**out = **in
+	} else {
+		out.IPTablesMasqueradeBit = nil
+	}
+	out.IPTablesSyncPeriod = in.IPTablesSyncPeriod
+	out.KubeconfigPath = in.KubeconfigPath
+	out.MasqueradeAll = in.MasqueradeAll
+	out.Master = in.Master
+	if in.OOMScoreAdj != nil {
+		in, out := &in.OOMScoreAdj, &out.OOMScoreAdj
+		*out = new(int32)
+		**out = **in
+	} else {
+		out.OOMScoreAdj = nil
+	}
+	out.Mode = in.Mode
+	out.PortRange = in.PortRange
+	out.ResourceContainer = in.ResourceContainer
+	out.UDPIdleTimeout = in.UDPIdleTimeout
+	out.ConntrackMax = in.ConntrackMax
+	out.ConntrackMaxPerCore = in.ConntrackMaxPerCore
+	out.ConntrackMin = in.ConntrackMin
+	out.ConntrackTCPEstablishedTimeout = in.ConntrackTCPEstablishedTimeout
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new KubeProxyConfiguration.
+func (x *KubeProxyConfiguration) DeepCopy() *KubeProxyConfiguration {
+	if x == nil {
+		return nil
+	}
+	out := new(KubeProxyConfiguration)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *KubeProxyConfiguration) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *KubeSchedulerConfiguration) DeepCopyInto(out *KubeSchedulerConfiguration) {
+	out.TypeMeta = in.TypeMeta
+	out.Port = in.Port
+	out.Address = in.Address
+	out.AlgorithmProvider = in.AlgorithmProvider
+	out.PolicyConfigFile = in.PolicyConfigFile
+	out.EnableProfiling = in.EnableProfiling
+	out.ContentType = in.ContentType
+	out.KubeAPIQPS = in.KubeAPIQPS
+	out.KubeAPIBurst = in.KubeAPIBurst
+	out.SchedulerName = in.SchedulerName
+	out.HardPodAffinitySymmetricWeight = in.HardPodAffinitySymmetricWeight
+	out.FailureDomains = in.FailureDomains
+	out.LeaderElection = in.LeaderElection
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new KubeSchedulerConfiguration.
+func (x *KubeSchedulerConfiguration) DeepCopy() *KubeSchedulerConfiguration {
+	if x == nil {
+		return nil
+	}
+	out := new(KubeSchedulerConfiguration)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *KubeSchedulerConfiguration) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *KubeletAnonymousAuthentication) DeepCopyInto(out *KubeletAnonymousAuthentication) {
+	out.Enabled = in.Enabled
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new KubeletAnonymousAuthentication.
+func (x *KubeletAnonymousAuthentication) DeepCopy() *KubeletAnonymousAuthentication {
+	if x == nil {
+		return nil
+	}
+	out := new(KubeletAnonymousAuthentication)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *KubeletAuthentication) DeepCopyInto(out *KubeletAuthentication) {
+	out.X509 = in.X509
+	out.Webhook = in.Webhook
+	out.Anonymous = in.Anonymous
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new KubeletAuthentication.
+func (x *KubeletAuthentication) DeepCopy() *KubeletAuthentication {
+	if x == nil {
+		return nil
+	}
+	out := new(KubeletAuthentication)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *KubeletAuthorization) DeepCopyInto(out *KubeletAuthorization) {
+	out.Mode = in.Mode
+	out.Webhook = in.Webhook
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new KubeletAuthorization.
+func (x *KubeletAuthorization) DeepCopy() *KubeletAuthorization {
+	if x == nil {
+		return nil
+	}
+	out := new(KubeletAuthorization)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
+	out.TypeMeta = in.TypeMeta
+	out.PodManifestPath = in.PodManifestPath
+	out.SyncFrequency = in.SyncFrequency
+	out.FileCheckFrequency = in.FileCheckFrequency
+	out.HTTPCheckFrequency = in.HTTPCheckFrequency
+	out.ManifestURL = in.ManifestURL
+	out.ManifestURLHeader = in.ManifestURLHeader
+	out.EnableServer = in.EnableServer
+	out.Address = in.Address
+	out.Port = in.Port
+	out.ReadOnlyPort = in.ReadOnlyPort
+	out.TLSCertFile = in.TLSCertFile
+	out.TLSPrivateKeyFile = in.TLSPrivateKeyFile
+	out.CertDirectory = in.CertDirectory
+	out.Authentication = in.Authentication
+	out.Authorization = in.Authorization
+	out.HostnameOverride = in.HostnameOverride
+	out.PodInfraContainerImage = in.PodInfraContainerImage
+	out.DockerEndpoint = in.DockerEndpoint
+	out.RootDirectory = in.RootDirectory
+	out.SeccompProfileRoot = in.SeccompProfileRoot
+	out.AllowPrivileged = in.AllowPrivileged
+	if in.HostNetworkSources != nil {
+		in, out := &in.HostNetworkSources, &out.HostNetworkSources
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.HostNetworkSources = nil
+	}
+	if in.HostPIDSources != nil {
+		in, out := &in.HostPIDSources, &out.HostPIDSources
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.HostPIDSources = nil
+	}
+	if in.HostIPCSources != nil {
+		in, out := &in.HostIPCSources, &out.HostIPCSources
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.HostIPCSources = nil
+	}
+	out.RegistryPullQPS = in.RegistryPullQPS
+	out.RegistryBurst = in.RegistryBurst
+	out.EventRecordQPS = in.EventRecordQPS
+	out.EventBurst = in.EventBurst
+	out.EnableDebuggingHandlers = in.EnableDebuggingHandlers
+	out.MinimumGCAge = in.MinimumGCAge
+	out.MaxPerPodContainerCount = in.MaxPerPodContainerCount
+	out.MaxContainerCount = in.MaxContainerCount
+	out.CAdvisorPort = in.CAdvisorPort
+	out.HealthzPort = in.HealthzPort
+	out.HealthzBindAddress = in.HealthzBindAddress
+	out.OOMScoreAdj = in.OOMScoreAdj
+	out.RegisterNode = in.RegisterNode
+	out.ClusterDomain = in.ClusterDomain
+	out.MasterServiceNamespace = in.MasterServiceNamespace
+	out.ClusterDNS = in.ClusterDNS
+	out.StreamingConnectionIdleTimeout = in.StreamingConnectionIdleTimeout
+	out.NodeStatusUpdateFrequency = in.NodeStatusUpdateFrequency
+	out.ImageMinimumGCAge = in.ImageMinimumGCAge
+	out.ImageGCHighThresholdPercent = in.ImageGCHighThresholdPercent
+	out.ImageGCLowThresholdPercent = in.ImageGCLowThresholdPercent
+	out.LowDiskSpaceThresholdMB = in.LowDiskSpaceThresholdMB
+	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
+	out.NetworkPluginName = in.NetworkPluginName
+	out.NetworkPluginMTU = in.NetworkPluginMTU
+	out.NetworkPluginDir = in.NetworkPluginDir
+	out.CNIConfDir = in.CNIConfDir
+	out.CNIBinDir = in.CNIBinDir
+	out.VolumePluginDir = in.VolumePluginDir
+	out.CloudProvider = in.CloudProvider
+	out.CloudConfigFile = in.CloudConfigFile
+	out.KubeletCgroups = in.KubeletCgroups
+	out.CgroupsPerQOS = in.CgroupsPerQOS
+	out.CgroupDriver = in.CgroupDriver
+	out.RuntimeCgroups = in.RuntimeCgroups
+	out.SystemCgroups = in.SystemCgroups
+	out.CgroupRoot = in.CgroupRoot
+	out.ContainerRuntime = in.ContainerRuntime
+	out.RemoteRuntimeEndpoint = in.RemoteRuntimeEndpoint
+	out.RemoteImageEndpoint = in.RemoteImageEndpoint
+	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
+	out.RktPath = in.RktPath
+	out.ExperimentalMounterPath = in.ExperimentalMounterPath
+	out.ExperimentalMounterRootfsPath = in.ExperimentalMounterRootfsPath
+	out.RktAPIEndpoint = in.RktAPIEndpoint
+	out.RktStage1Image = in.RktStage1Image
+	out.LockFilePath = in.LockFilePath
+	out.ExitOnLockContention = in.ExitOnLockContention
+	out.HairpinMode = in.HairpinMode
+	out.BabysitDaemons = in.BabysitDaemons
+	out.MaxPods = in.MaxPods
+	out.NvidiaGPUs = in.NvidiaGPUs
+	out.DockerExecHandlerName = in.DockerExecHandlerName
+	out.PodCIDR = in.PodCIDR
+	out.ResolverConfig = in.ResolverConfig
+	out.CPUCFSQuota = in.CPUCFSQuota
+	out.Containerized = in.Containerized
+	out.MaxOpenFiles = in.MaxOpenFiles
+	out.ReconcileCIDR = in.ReconcileCIDR
+	out.RegisterSchedulable = in.RegisterSchedulable
+	out.ContentType = in.ContentType
+	out.KubeAPIQPS = in.KubeAPIQPS
+	out.KubeAPIBurst = in.KubeAPIBurst
+	out.SerializeImagePulls = in.SerializeImagePulls
+	out.OutOfDiskTransitionFrequency = in.OutOfDiskTransitionFrequency
+	out.NodeIP = in.NodeIP
+	if in.NodeLabels != nil {
+		in, out := &in.NodeLabels, &out.NodeLabels
+		*out = make(map[string]string)
+		for key, val := range *in {
+			(*out)[key] = val
 		}
-		return nil
+	} else {
+		out.NodeLabels = nil
 	}
-}
-
-func DeepCopy_componentconfig_KubeControllerManagerConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeControllerManagerConfiguration)
-		out := out.(*KubeControllerManagerConfiguration)
-		out.TypeMeta = in.TypeMeta
-		out.Port = in.Port
-		out.Address = in.Address
-		out.CloudProvider = in.CloudProvider
-		out.CloudConfigFile = in.CloudConfigFile
-		out.ConcurrentEndpointSyncs = in.ConcurrentEndpointSyncs
-		out.ConcurrentRSSyncs = in.ConcurrentRSSyncs
-		out.ConcurrentRCSyncs = in.ConcurrentRCSyncs
-		out.ConcurrentServiceSyncs = in.ConcurrentServiceSyncs
-		out.ConcurrentResourceQuotaSyncs = in.ConcurrentResourceQuotaSyncs
-		out.ConcurrentDeploymentSyncs = in.ConcurrentDeploymentSyncs
-		out.ConcurrentDaemonSetSyncs = in.ConcurrentDaemonSetSyncs
-		out.ConcurrentJobSyncs = in.ConcurrentJobSyncs
-		out.ConcurrentNamespaceSyncs = in.ConcurrentNamespaceSyncs
-		out.ConcurrentSATokenSyncs = in.ConcurrentSATokenSyncs
-		out.LookupCacheSizeForRC = in.LookupCacheSizeForRC
-		out.LookupCacheSizeForRS = in.LookupCacheSizeForRS
-		out.LookupCacheSizeForDaemonSet = in.LookupCacheSizeForDaemonSet
-		out.ServiceSyncPeriod = in.ServiceSyncPeriod
-		out.NodeSyncPeriod = in.NodeSyncPeriod
-		out.RouteReconciliationPeriod = in.RouteReconciliationPeriod
-		out.ResourceQuotaSyncPeriod = in.ResourceQuotaSyncPeriod
-		out.NamespaceSyncPeriod = in.NamespaceSyncPeriod
-		out.PVClaimBinderSyncPeriod = in.PVClaimBinderSyncPeriod
-		out.MinResyncPeriod = in.MinResyncPeriod
-		out.TerminatedPodGCThreshold = in.TerminatedPodGCThreshold
-		out.HorizontalPodAutoscalerSyncPeriod = in.HorizontalPodAutoscalerSyncPeriod
-		out.DeploymentControllerSyncPeriod = in.DeploymentControllerSyncPeriod
-		out.PodEvictionTimeout = in.PodEvictionTimeout
-		out.DeletingPodsQps = in.DeletingPodsQps
-		out.DeletingPodsBurst = in.DeletingPodsBurst
-		out.NodeMonitorGracePeriod = in.NodeMonitorGracePeriod
-		out.RegisterRetryCount = in.RegisterRetryCount
-		out.NodeStartupGracePeriod = in.NodeStartupGracePeriod
-		out.NodeMonitorPeriod = in.NodeMonitorPeriod
-		out.ServiceAccountKeyFile = in.ServiceAccountKeyFile
-		out.ClusterSigningCertFile = in.ClusterSigningCertFile
-		out.ClusterSigningKeyFile = in.ClusterSigningKeyFile
-		out.ApproveAllKubeletCSRsForGroup = in.ApproveAllKubeletCSRsForGroup
-		out.EnableProfiling = in.EnableProfiling
-		out.ClusterName = in.ClusterName
-		out.ClusterCIDR = in.ClusterCIDR
-		out.ServiceCIDR = in.ServiceCIDR
-		out.NodeCIDRMaskSize = in.NodeCIDRMaskSize
-		out.AllocateNodeCIDRs = in.AllocateNodeCIDRs
-		out.ConfigureCloudRoutes = in.ConfigureCloudRoutes
-		out.RootCAFile = in.RootCAFile
-		out.ContentType = in.ContentType
-		out.KubeAPIQPS = in.KubeAPIQPS
-		out.KubeAPIBurst = in.KubeAPIBurst
-		out.LeaderElection = in.LeaderElection
-		out.VolumeConfiguration = in.VolumeConfiguration
-		out.ControllerStartInterval = in.ControllerStartInterval
-		out.EnableGarbageCollector = in.EnableGarbageCollector
-		out.ConcurrentGCSyncs = in.ConcurrentGCSyncs
-		out.NodeEvictionRate = in.NodeEvictionRate
-		out.SecondaryNodeEvictionRate = in.SecondaryNodeEvictionRate
-		out.LargeClusterSizeThreshold = in.LargeClusterSizeThreshold
-		out.UnhealthyZoneThreshold = in.UnhealthyZoneThreshold
-		return nil
-	}
-}
-
-func DeepCopy_componentconfig_KubeProxyConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeProxyConfiguration)
-		out := out.(*KubeProxyConfiguration)
-		out.TypeMeta = in.TypeMeta
-		out.BindAddress = in.BindAddress
-		out.ClusterCIDR = in.ClusterCIDR
-		out.HealthzBindAddress = in.HealthzBindAddress
-		out.HealthzPort = in.HealthzPort
-		out.HostnameOverride = in.HostnameOverride
-		if in.IPTablesMasqueradeBit != nil {
-			in, out := &in.IPTablesMasqueradeBit, &out.IPTablesMasqueradeBit
-			*out = new(int32)
-			**out = **in
-		} else {
-			out.IPTablesMasqueradeBit = nil
+	out.NonMasqueradeCIDR = in.NonMasqueradeCIDR
+	out.EnableCustomMetrics = in.EnableCustomMetrics
+	out.EvictionHard = in.EvictionHard
+	out.EvictionSoft = in.EvictionSoft
+	out.EvictionSoftGracePeriod = in.EvictionSoftGracePeriod
+	out.EvictionPressureTransitionPeriod = in.EvictionPressureTransitionPeriod
+	out.EvictionMaxPodGracePeriod = in.EvictionMaxPodGracePeriod
+	out.EvictionMinimumReclaim = in.EvictionMinimumReclaim
+	out.PodsPerCore = in.PodsPerCore
+	out.EnableControllerAttachDetach = in.EnableControllerAttachDetach
+	if in.SystemReserved != nil {
+		in, out := &in.SystemReserved, &out.SystemReserved
+		*out = make(config.ConfigurationMap)
+		for key, val := range *in {
+			(*out)[key] = val
 		}
-		out.IPTablesSyncPeriod = in.IPTablesSyncPeriod
-		out.KubeconfigPath = in.KubeconfigPath
-		out.MasqueradeAll = in.MasqueradeAll
-		out.Master = in.Master
-		if in.OOMScoreAdj != nil {
-			in, out := &in.OOMScoreAdj, &out.OOMScoreAdj
-			*out = new(int32)
-			**out = **in
-		} else {
-			out.OOMScoreAdj = nil
+	} else {
+		out.SystemReserved = nil
+	}
+	if in.KubeReserved != nil {
+		in, out := &in.KubeReserved, &out.KubeReserved
+		*out = make(config.ConfigurationMap)
+		for key, val := range *in {
+			(*out)[key] = val
 		}
-		out.Mode = in.Mode
-		out.PortRange = in.PortRange
-		out.ResourceContainer = in.ResourceContainer
-		out.UDPIdleTimeout = in.UDPIdleTimeout
-		out.ConntrackMax = in.ConntrackMax
-		out.ConntrackMaxPerCore = in.ConntrackMaxPerCore
-		out.ConntrackMin = in.ConntrackMin
-		out.ConntrackTCPEstablishedTimeout = in.ConntrackTCPEstablishedTimeout
+	} else {
+		out.KubeReserved = nil
+	}
+	out.ProtectKernelDefaults = in.ProtectKernelDefaults
+	out.MakeIPTablesUtilChains = in.MakeIPTablesUtilChains
+	out.IPTablesMasqueradeBit = in.IPTablesMasqueradeBit
+	out.IPTablesDropBit = in.IPTablesDropBit
+	if in.AllowedUnsafeSysctls != nil {
+		in, out := &in.AllowedUnsafeSysctls, &out.AllowedUnsafeSysctls
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.AllowedUnsafeSysctls = nil
+	}
+	out.ExperimentalRuntimeIntegrationType = in.ExperimentalRuntimeIntegrationType
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new KubeletConfiguration.
+func (x *KubeletConfiguration) DeepCopy() *KubeletConfiguration {
+	if x == nil {
+		return nil
+	}
+	out := new(KubeletConfiguration)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *KubeletConfiguration) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_componentconfig_KubeSchedulerConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeSchedulerConfiguration)
-		out := out.(*KubeSchedulerConfiguration)
-		out.TypeMeta = in.TypeMeta
-		out.Port = in.Port
-		out.Address = in.Address
-		out.AlgorithmProvider = in.AlgorithmProvider
-		out.PolicyConfigFile = in.PolicyConfigFile
-		out.EnableProfiling = in.EnableProfiling
-		out.ContentType = in.ContentType
-		out.KubeAPIQPS = in.KubeAPIQPS
-		out.KubeAPIBurst = in.KubeAPIBurst
-		out.SchedulerName = in.SchedulerName
-		out.HardPodAffinitySymmetricWeight = in.HardPodAffinitySymmetricWeight
-		out.FailureDomains = in.FailureDomains
-		out.LeaderElection = in.LeaderElection
-		return nil
-	}
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *KubeletWebhookAuthentication) DeepCopyInto(out *KubeletWebhookAuthentication) {
+	out.Enabled = in.Enabled
+	out.CacheTTL = in.CacheTTL
+	return
 }
 
-func DeepCopy_componentconfig_KubeletAnonymousAuthentication(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeletAnonymousAuthentication)
-		out := out.(*KubeletAnonymousAuthentication)
-		out.Enabled = in.Enabled
+// DeepCopy will perform a deep copy of the receiver, creating a new KubeletWebhookAuthentication.
+func (x *KubeletWebhookAuthentication) DeepCopy() *KubeletWebhookAuthentication {
+	if x == nil {
 		return nil
 	}
+	out := new(KubeletWebhookAuthentication)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_componentconfig_KubeletAuthentication(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeletAuthentication)
-		out := out.(*KubeletAuthentication)
-		out.X509 = in.X509
-		out.Webhook = in.Webhook
-		out.Anonymous = in.Anonymous
-		return nil
-	}
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *KubeletWebhookAuthorization) DeepCopyInto(out *KubeletWebhookAuthorization) {
+	out.CacheAuthorizedTTL = in.CacheAuthorizedTTL
+	out.CacheUnauthorizedTTL = in.CacheUnauthorizedTTL
+	return
 }
 
-func DeepCopy_componentconfig_KubeletAuthorization(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeletAuthorization)
-		out := out.(*KubeletAuthorization)
-		out.Mode = in.Mode
-		out.Webhook = in.Webhook
+// DeepCopy will perform a deep copy of the receiver, creating a new KubeletWebhookAuthorization.
+func (x *KubeletWebhookAuthorization) DeepCopy() *KubeletWebhookAuthorization {
+	if x == nil {
 		return nil
 	}
+	out := new(KubeletWebhookAuthorization)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeletConfiguration)
-		out := out.(*KubeletConfiguration)
-		out.TypeMeta = in.TypeMeta
-		out.PodManifestPath = in.PodManifestPath
-		out.SyncFrequency = in.SyncFrequency
-		out.FileCheckFrequency = in.FileCheckFrequency
-		out.HTTPCheckFrequency = in.HTTPCheckFrequency
-		out.ManifestURL = in.ManifestURL
-		out.ManifestURLHeader = in.ManifestURLHeader
-		out.EnableServer = in.EnableServer
-		out.Address = in.Address
-		out.Port = in.Port
-		out.ReadOnlyPort = in.ReadOnlyPort
-		out.TLSCertFile = in.TLSCertFile
-		out.TLSPrivateKeyFile = in.TLSPrivateKeyFile
-		out.CertDirectory = in.CertDirectory
-		out.Authentication = in.Authentication
-		out.Authorization = in.Authorization
-		out.HostnameOverride = in.HostnameOverride
-		out.PodInfraContainerImage = in.PodInfraContainerImage
-		out.DockerEndpoint = in.DockerEndpoint
-		out.RootDirectory = in.RootDirectory
-		out.SeccompProfileRoot = in.SeccompProfileRoot
-		out.AllowPrivileged = in.AllowPrivileged
-		if in.HostNetworkSources != nil {
-			in, out := &in.HostNetworkSources, &out.HostNetworkSources
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.HostNetworkSources = nil
-		}
-		if in.HostPIDSources != nil {
-			in, out := &in.HostPIDSources, &out.HostPIDSources
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.HostPIDSources = nil
-		}
-		if in.HostIPCSources != nil {
-			in, out := &in.HostIPCSources, &out.HostIPCSources
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.HostIPCSources = nil
-		}
-		out.RegistryPullQPS = in.RegistryPullQPS
-		out.RegistryBurst = in.RegistryBurst
-		out.EventRecordQPS = in.EventRecordQPS
-		out.EventBurst = in.EventBurst
-		out.EnableDebuggingHandlers = in.EnableDebuggingHandlers
-		out.MinimumGCAge = in.MinimumGCAge
-		out.MaxPerPodContainerCount = in.MaxPerPodContainerCount
-		out.MaxContainerCount = in.MaxContainerCount
-		out.CAdvisorPort = in.CAdvisorPort
-		out.HealthzPort = in.HealthzPort
-		out.HealthzBindAddress = in.HealthzBindAddress
-		out.OOMScoreAdj = in.OOMScoreAdj
-		out.RegisterNode = in.RegisterNode
-		out.ClusterDomain = in.ClusterDomain
-		out.MasterServiceNamespace = in.MasterServiceNamespace
-		out.ClusterDNS = in.ClusterDNS
-		out.StreamingConnectionIdleTimeout = in.StreamingConnectionIdleTimeout
-		out.NodeStatusUpdateFrequency = in.NodeStatusUpdateFrequency
-		out.ImageMinimumGCAge = in.ImageMinimumGCAge
-		out.ImageGCHighThresholdPercent = in.ImageGCHighThresholdPercent
-		out.ImageGCLowThresholdPercent = in.ImageGCLowThresholdPercent
-		out.LowDiskSpaceThresholdMB = in.LowDiskSpaceThresholdMB
-		out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
-		out.NetworkPluginName = in.NetworkPluginName
-		out.NetworkPluginMTU = in.NetworkPluginMTU
-		out.NetworkPluginDir = in.NetworkPluginDir
-		out.CNIConfDir = in.CNIConfDir
-		out.CNIBinDir = in.CNIBinDir
-		out.VolumePluginDir = in.VolumePluginDir
-		out.CloudProvider = in.CloudProvider
-		out.CloudConfigFile = in.CloudConfigFile
-		out.KubeletCgroups = in.KubeletCgroups
-		out.CgroupsPerQOS = in.CgroupsPerQOS
-		out.CgroupDriver = in.CgroupDriver
-		out.RuntimeCgroups = in.RuntimeCgroups
-		out.SystemCgroups = in.SystemCgroups
-		out.CgroupRoot = in.CgroupRoot
-		out.ContainerRuntime = in.ContainerRuntime
-		out.RemoteRuntimeEndpoint = in.RemoteRuntimeEndpoint
-		out.RemoteImageEndpoint = in.RemoteImageEndpoint
-		out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
-		out.RktPath = in.RktPath
-		out.ExperimentalMounterPath = in.ExperimentalMounterPath
-		out.ExperimentalMounterRootfsPath = in.ExperimentalMounterRootfsPath
-		out.RktAPIEndpoint = in.RktAPIEndpoint
-		out.RktStage1Image = in.RktStage1Image
-		out.LockFilePath = in.LockFilePath
-		out.ExitOnLockContention = in.ExitOnLockContention
-		out.HairpinMode = in.HairpinMode
-		out.BabysitDaemons = in.BabysitDaemons
-		out.MaxPods = in.MaxPods
-		out.NvidiaGPUs = in.NvidiaGPUs
-		out.DockerExecHandlerName = in.DockerExecHandlerName
-		out.PodCIDR = in.PodCIDR
-		out.ResolverConfig = in.ResolverConfig
-		out.CPUCFSQuota = in.CPUCFSQuota
-		out.Containerized = in.Containerized
-		out.MaxOpenFiles = in.MaxOpenFiles
-		out.ReconcileCIDR = in.ReconcileCIDR
-		out.RegisterSchedulable = in.RegisterSchedulable
-		out.ContentType = in.ContentType
-		out.KubeAPIQPS = in.KubeAPIQPS
-		out.KubeAPIBurst = in.KubeAPIBurst
-		out.SerializeImagePulls = in.SerializeImagePulls
-		out.OutOfDiskTransitionFrequency = in.OutOfDiskTransitionFrequency
-		out.NodeIP = in.NodeIP
-		if in.NodeLabels != nil {
-			in, out := &in.NodeLabels, &out.NodeLabels
-			*out = make(map[string]string)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		} else {
-			out.NodeLabels = nil
-		}
-		out.NonMasqueradeCIDR = in.NonMasqueradeCIDR
-		out.EnableCustomMetrics = in.EnableCustomMetrics
-		out.EvictionHard = in.EvictionHard
-		out.EvictionSoft = in.EvictionSoft
-		out.EvictionSoftGracePeriod = in.EvictionSoftGracePeriod
-		out.EvictionPressureTransitionPeriod = in.EvictionPressureTransitionPeriod
-		out.EvictionMaxPodGracePeriod = in.EvictionMaxPodGracePeriod
-		out.EvictionMinimumReclaim = in.EvictionMinimumReclaim
-		out.PodsPerCore = in.PodsPerCore
-		out.EnableControllerAttachDetach = in.EnableControllerAttachDetach
-		if in.SystemReserved != nil {
-			in, out := &in.SystemReserved, &out.SystemReserved
-			*out = make(config.ConfigurationMap)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		} else {
-			out.SystemReserved = nil
-		}
-		if in.KubeReserved != nil {
-			in, out := &in.KubeReserved, &out.KubeReserved
-			*out = make(config.ConfigurationMap)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		} else {
-			out.KubeReserved = nil
-		}
-		out.ProtectKernelDefaults = in.ProtectKernelDefaults
-		out.MakeIPTablesUtilChains = in.MakeIPTablesUtilChains
-		out.IPTablesMasqueradeBit = in.IPTablesMasqueradeBit
-		out.IPTablesDropBit = in.IPTablesDropBit
-		if in.AllowedUnsafeSysctls != nil {
-			in, out := &in.AllowedUnsafeSysctls, &out.AllowedUnsafeSysctls
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.AllowedUnsafeSysctls = nil
-		}
-		out.ExperimentalRuntimeIntegrationType = in.ExperimentalRuntimeIntegrationType
-		return nil
-	}
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *KubeletX509Authentication) DeepCopyInto(out *KubeletX509Authentication) {
+	out.ClientCAFile = in.ClientCAFile
+	return
 }
 
-func DeepCopy_componentconfig_KubeletWebhookAuthentication(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeletWebhookAuthentication)
-		out := out.(*KubeletWebhookAuthentication)
-		out.Enabled = in.Enabled
-		out.CacheTTL = in.CacheTTL
+// DeepCopy will perform a deep copy of the receiver, creating a new KubeletX509Authentication.
+func (x *KubeletX509Authentication) DeepCopy() *KubeletX509Authentication {
+	if x == nil {
 		return nil
 	}
+	out := new(KubeletX509Authentication)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_componentconfig_KubeletWebhookAuthorization(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeletWebhookAuthorization)
-		out := out.(*KubeletWebhookAuthorization)
-		out.CacheAuthorizedTTL = in.CacheAuthorizedTTL
-		out.CacheUnauthorizedTTL = in.CacheUnauthorizedTTL
-		return nil
-	}
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *LeaderElectionConfiguration) DeepCopyInto(out *LeaderElectionConfiguration) {
+	out.LeaderElect = in.LeaderElect
+	out.LeaseDuration = in.LeaseDuration
+	out.RenewDeadline = in.RenewDeadline
+	out.RetryPeriod = in.RetryPeriod
+	return
 }
 
-func DeepCopy_componentconfig_KubeletX509Authentication(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*KubeletX509Authentication)
-		out := out.(*KubeletX509Authentication)
-		out.ClientCAFile = in.ClientCAFile
+// DeepCopy will perform a deep copy of the receiver, creating a new LeaderElectionConfiguration.
+func (x *LeaderElectionConfiguration) DeepCopy() *LeaderElectionConfiguration {
+	if x == nil {
 		return nil
 	}
+	out := new(LeaderElectionConfiguration)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_componentconfig_LeaderElectionConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*LeaderElectionConfiguration)
-		out := out.(*LeaderElectionConfiguration)
-		out.LeaderElect = in.LeaderElect
-		out.LeaseDuration = in.LeaseDuration
-		out.RenewDeadline = in.RenewDeadline
-		out.RetryPeriod = in.RetryPeriod
-		return nil
-	}
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PersistentVolumeRecyclerConfiguration) DeepCopyInto(out *PersistentVolumeRecyclerConfiguration) {
+	out.MaximumRetry = in.MaximumRetry
+	out.MinimumTimeoutNFS = in.MinimumTimeoutNFS
+	out.PodTemplateFilePathNFS = in.PodTemplateFilePathNFS
+	out.IncrementTimeoutNFS = in.IncrementTimeoutNFS
+	out.PodTemplateFilePathHostPath = in.PodTemplateFilePathHostPath
+	out.MinimumTimeoutHostPath = in.MinimumTimeoutHostPath
+	out.IncrementTimeoutHostPath = in.IncrementTimeoutHostPath
+	return
 }
 
-func DeepCopy_componentconfig_PersistentVolumeRecyclerConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PersistentVolumeRecyclerConfiguration)
-		out := out.(*PersistentVolumeRecyclerConfiguration)
-		out.MaximumRetry = in.MaximumRetry
-		out.MinimumTimeoutNFS = in.MinimumTimeoutNFS
-		out.PodTemplateFilePathNFS = in.PodTemplateFilePathNFS
-		out.IncrementTimeoutNFS = in.IncrementTimeoutNFS
-		out.PodTemplateFilePathHostPath = in.PodTemplateFilePathHostPath
-		out.MinimumTimeoutHostPath = in.MinimumTimeoutHostPath
-		out.IncrementTimeoutHostPath = in.IncrementTimeoutHostPath
+// DeepCopy will perform a deep copy of the receiver, creating a new PersistentVolumeRecyclerConfiguration.
+func (x *PersistentVolumeRecyclerConfiguration) DeepCopy() *PersistentVolumeRecyclerConfiguration {
+	if x == nil {
 		return nil
 	}
+	out := new(PersistentVolumeRecyclerConfiguration)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_componentconfig_PortRangeVar(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*PortRangeVar)
-		out := out.(*PortRangeVar)
-		if in.Val != nil {
-			in, out := &in.Val, &out.Val
-			*out = new(string)
-			**out = **in
-		} else {
-			out.Val = nil
-		}
-		return nil
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *PortRangeVar) DeepCopyInto(out *PortRangeVar) {
+	if in.Val != nil {
+		in, out := &in.Val, &out.Val
+		*out = new(string)
+		**out = **in
+	} else {
+		out.Val = nil
 	}
+	return
 }
 
-func DeepCopy_componentconfig_VolumeConfiguration(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*VolumeConfiguration)
-		out := out.(*VolumeConfiguration)
-		out.EnableHostPathProvisioning = in.EnableHostPathProvisioning
-		out.EnableDynamicProvisioning = in.EnableDynamicProvisioning
-		out.PersistentVolumeRecyclerConfiguration = in.PersistentVolumeRecyclerConfiguration
-		out.FlexVolumePluginDir = in.FlexVolumePluginDir
+// DeepCopy will perform a deep copy of the receiver, creating a new PortRangeVar.
+func (x *PortRangeVar) DeepCopy() *PortRangeVar {
+	if x == nil {
 		return nil
 	}
+	out := new(PortRangeVar)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *VolumeConfiguration) DeepCopyInto(out *VolumeConfiguration) {
+	out.EnableHostPathProvisioning = in.EnableHostPathProvisioning
+	out.EnableDynamicProvisioning = in.EnableDynamicProvisioning
+	out.PersistentVolumeRecyclerConfiguration = in.PersistentVolumeRecyclerConfiguration
+	out.FlexVolumePluginDir = in.FlexVolumePluginDir
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new VolumeConfiguration.
+func (x *VolumeConfiguration) DeepCopy() *VolumeConfiguration {
+	if x == nil {
+		return nil
+	}
+	out := new(VolumeConfiguration)
+	x.DeepCopyInto(out)
+	return out
 }

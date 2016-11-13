@@ -22,179 +22,220 @@ package federation
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
-	conversion "k8s.io/kubernetes/pkg/conversion"
-	runtime "k8s.io/kubernetes/pkg/runtime"
-	reflect "reflect"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 )
 
-func init() {
-	SchemeBuilder.Register(RegisterDeepCopies)
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Cluster) DeepCopyInto(out *Cluster) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	in.Status.DeepCopyInto(&out.Status)
+	return
 }
 
-// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
-// to allow building arbitrary schemes.
-func RegisterDeepCopies(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_federation_Cluster, InType: reflect.TypeOf(&Cluster{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_federation_ClusterCondition, InType: reflect.TypeOf(&ClusterCondition{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_federation_ClusterList, InType: reflect.TypeOf(&ClusterList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_federation_ClusterReplicaSetPreferences, InType: reflect.TypeOf(&ClusterReplicaSetPreferences{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_federation_ClusterSpec, InType: reflect.TypeOf(&ClusterSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_federation_ClusterStatus, InType: reflect.TypeOf(&ClusterStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_federation_FederatedReplicaSetPreferences, InType: reflect.TypeOf(&FederatedReplicaSetPreferences{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_federation_ServerAddressByClientCIDR, InType: reflect.TypeOf(&ServerAddressByClientCIDR{})},
-	)
+// DeepCopy will perform a deep copy of the receiver, creating a new Cluster.
+func (x *Cluster) DeepCopy() *Cluster {
+	if x == nil {
+		return nil
+	}
+	out := new(Cluster)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_federation_Cluster(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Cluster)
-		out := out.(*Cluster)
-		out.TypeMeta = in.TypeMeta
-		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_federation_ClusterSpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_federation_ClusterStatus(&in.Status, &out.Status, c); err != nil {
-			return err
-		}
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *Cluster) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_federation_ClusterCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ClusterCondition)
-		out := out.(*ClusterCondition)
-		out.Type = in.Type
-		out.Status = in.Status
-		out.LastProbeTime = in.LastProbeTime.DeepCopy()
-		out.LastTransitionTime = in.LastTransitionTime.DeepCopy()
-		out.Reason = in.Reason
-		out.Message = in.Message
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ClusterCondition) DeepCopyInto(out *ClusterCondition) {
+	out.Type = in.Type
+	out.Status = in.Status
+	in.LastProbeTime.DeepCopyInto(&out.LastProbeTime)
+	in.LastTransitionTime.DeepCopyInto(&out.LastTransitionTime)
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ClusterCondition.
+func (x *ClusterCondition) DeepCopy() *ClusterCondition {
+	if x == nil {
+		return nil
+	}
+	out := new(ClusterCondition)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ClusterList) DeepCopyInto(out *ClusterList) {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]Cluster, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.Items = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ClusterList.
+func (x *ClusterList) DeepCopy() *ClusterList {
+	if x == nil {
+		return nil
+	}
+	out := new(ClusterList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *ClusterList) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_federation_ClusterList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ClusterList)
-		out := out.(*ClusterList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]Cluster, len(*in))
-			for i := range *in {
-				if err := DeepCopy_federation_Cluster(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Items = nil
-		}
-		return nil
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ClusterReplicaSetPreferences) DeepCopyInto(out *ClusterReplicaSetPreferences) {
+	out.MinReplicas = in.MinReplicas
+	if in.MaxReplicas != nil {
+		in, out := &in.MaxReplicas, &out.MaxReplicas
+		*out = new(int64)
+		**out = **in
+	} else {
+		out.MaxReplicas = nil
 	}
+	out.Weight = in.Weight
+	return
 }
 
-func DeepCopy_federation_ClusterReplicaSetPreferences(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ClusterReplicaSetPreferences)
-		out := out.(*ClusterReplicaSetPreferences)
-		out.MinReplicas = in.MinReplicas
-		if in.MaxReplicas != nil {
-			in, out := &in.MaxReplicas, &out.MaxReplicas
-			*out = new(int64)
-			**out = **in
-		} else {
-			out.MaxReplicas = nil
-		}
-		out.Weight = in.Weight
+// DeepCopy will perform a deep copy of the receiver, creating a new ClusterReplicaSetPreferences.
+func (x *ClusterReplicaSetPreferences) DeepCopy() *ClusterReplicaSetPreferences {
+	if x == nil {
 		return nil
 	}
+	out := new(ClusterReplicaSetPreferences)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_federation_ClusterSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ClusterSpec)
-		out := out.(*ClusterSpec)
-		if in.ServerAddressByClientCIDRs != nil {
-			in, out := &in.ServerAddressByClientCIDRs, &out.ServerAddressByClientCIDRs
-			*out = make([]ServerAddressByClientCIDR, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.ServerAddressByClientCIDRs = nil
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
+	if in.ServerAddressByClientCIDRs != nil {
+		in, out := &in.ServerAddressByClientCIDRs, &out.ServerAddressByClientCIDRs
+		*out = make([]ServerAddressByClientCIDR, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
 		}
-		if in.SecretRef != nil {
-			in, out := &in.SecretRef, &out.SecretRef
-			*out = new(api.LocalObjectReference)
-			**out = **in
-		} else {
-			out.SecretRef = nil
-		}
-		return nil
+	} else {
+		out.ServerAddressByClientCIDRs = nil
 	}
+	if in.SecretRef != nil {
+		in, out := &in.SecretRef, &out.SecretRef
+		*out = new(api.LocalObjectReference)
+		**out = **in
+	} else {
+		out.SecretRef = nil
+	}
+	return
 }
 
-func DeepCopy_federation_ClusterStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ClusterStatus)
-		out := out.(*ClusterStatus)
-		if in.Conditions != nil {
-			in, out := &in.Conditions, &out.Conditions
-			*out = make([]ClusterCondition, len(*in))
-			for i := range *in {
-				if err := DeepCopy_federation_ClusterCondition(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Conditions = nil
-		}
-		if in.Zones != nil {
-			in, out := &in.Zones, &out.Zones
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.Zones = nil
-		}
-		out.Region = in.Region
+// DeepCopy will perform a deep copy of the receiver, creating a new ClusterSpec.
+func (x *ClusterSpec) DeepCopy() *ClusterSpec {
+	if x == nil {
 		return nil
 	}
+	out := new(ClusterSpec)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_federation_FederatedReplicaSetPreferences(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*FederatedReplicaSetPreferences)
-		out := out.(*FederatedReplicaSetPreferences)
-		out.Rebalance = in.Rebalance
-		if in.Clusters != nil {
-			in, out := &in.Clusters, &out.Clusters
-			*out = make(map[string]ClusterReplicaSetPreferences)
-			for key, val := range *in {
-				newVal := new(ClusterReplicaSetPreferences)
-				if err := DeepCopy_federation_ClusterReplicaSetPreferences(&val, newVal, c); err != nil {
-					return err
-				}
-				(*out)[key] = *newVal
-			}
-		} else {
-			out.Clusters = nil
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]ClusterCondition, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
-		return nil
+	} else {
+		out.Conditions = nil
 	}
+	if in.Zones != nil {
+		in, out := &in.Zones, &out.Zones
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.Zones = nil
+	}
+	out.Region = in.Region
+	return
 }
 
-func DeepCopy_federation_ServerAddressByClientCIDR(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ServerAddressByClientCIDR)
-		out := out.(*ServerAddressByClientCIDR)
-		out.ClientCIDR = in.ClientCIDR
-		out.ServerAddress = in.ServerAddress
+// DeepCopy will perform a deep copy of the receiver, creating a new ClusterStatus.
+func (x *ClusterStatus) DeepCopy() *ClusterStatus {
+	if x == nil {
 		return nil
 	}
+	out := new(ClusterStatus)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *FederatedReplicaSetPreferences) DeepCopyInto(out *FederatedReplicaSetPreferences) {
+	out.Rebalance = in.Rebalance
+	if in.Clusters != nil {
+		in, out := &in.Clusters, &out.Clusters
+		*out = make(map[string]ClusterReplicaSetPreferences)
+		for key, val := range *in {
+			newVal := new(ClusterReplicaSetPreferences)
+			val.DeepCopyInto(newVal)
+			(*out)[key] = *newVal
+		}
+	} else {
+		out.Clusters = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new FederatedReplicaSetPreferences.
+func (x *FederatedReplicaSetPreferences) DeepCopy() *FederatedReplicaSetPreferences {
+	if x == nil {
+		return nil
+	}
+	out := new(FederatedReplicaSetPreferences)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ServerAddressByClientCIDR) DeepCopyInto(out *ServerAddressByClientCIDR) {
+	out.ClientCIDR = in.ClientCIDR
+	out.ServerAddress = in.ServerAddress
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ServerAddressByClientCIDR.
+func (x *ServerAddressByClientCIDR) DeepCopy() *ServerAddressByClientCIDR {
+	if x == nil {
+		return nil
+	}
+	out := new(ServerAddressByClientCIDR)
+	x.DeepCopyInto(out)
+	return out
 }

@@ -21,64 +21,76 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1 "k8s.io/kubernetes/pkg/api/v1"
-	conversion "k8s.io/kubernetes/pkg/conversion"
-	runtime "k8s.io/kubernetes/pkg/runtime"
-	reflect "reflect"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 )
 
-func init() {
-	SchemeBuilder.Register(RegisterDeepCopies)
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *StorageClass) DeepCopyInto(out *StorageClass) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	out.Provisioner = in.Provisioner
+	if in.Parameters != nil {
+		in, out := &in.Parameters, &out.Parameters
+		*out = make(map[string]string)
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	} else {
+		out.Parameters = nil
+	}
+	return
 }
 
-// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
-// to allow building arbitrary schemes.
-func RegisterDeepCopies(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_StorageClass, InType: reflect.TypeOf(&StorageClass{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_StorageClassList, InType: reflect.TypeOf(&StorageClassList{})},
-	)
+// DeepCopy will perform a deep copy of the receiver, creating a new StorageClass.
+func (x *StorageClass) DeepCopy() *StorageClass {
+	if x == nil {
+		return nil
+	}
+	out := new(StorageClass)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_v1beta1_StorageClass(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*StorageClass)
-		out := out.(*StorageClass)
-		out.TypeMeta = in.TypeMeta
-		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
-		}
-		out.Provisioner = in.Provisioner
-		if in.Parameters != nil {
-			in, out := &in.Parameters, &out.Parameters
-			*out = make(map[string]string)
-			for key, val := range *in {
-				(*out)[key] = val
-			}
-		} else {
-			out.Parameters = nil
-		}
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *StorageClass) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_v1beta1_StorageClassList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*StorageClassList)
-		out := out.(*StorageClassList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]StorageClass, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v1beta1_StorageClass(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Items = nil
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *StorageClassList) DeepCopyInto(out *StorageClassList) {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]StorageClass, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	} else {
+		out.Items = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new StorageClassList.
+func (x *StorageClassList) DeepCopy() *StorageClassList {
+	if x == nil {
+		return nil
+	}
+	out := new(StorageClassList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *StorageClassList) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }

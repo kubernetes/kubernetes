@@ -552,10 +552,14 @@ func (x *StatusDetails) DeepCopy() *StatusDetails {
 	return out
 }
 
-// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
-func (in *Time) DeepCopyInto(out *Time) {
-	*out = in.DeepCopy()
-	return
+// DeepCopy will perform a deep copy of the receiver, creating a new Time.
+func (x *Time) DeepCopy() *Time {
+	if x == nil {
+		return nil
+	}
+	out := new(Time)
+	x.DeepCopyInto(out)
+	return out
 }
 
 // DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.

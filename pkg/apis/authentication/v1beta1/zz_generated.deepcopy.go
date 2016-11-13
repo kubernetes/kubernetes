@@ -21,91 +21,101 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1 "k8s.io/kubernetes/pkg/api/v1"
-	conversion "k8s.io/kubernetes/pkg/conversion"
-	runtime "k8s.io/kubernetes/pkg/runtime"
-	reflect "reflect"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 )
 
-func init() {
-	SchemeBuilder.Register(RegisterDeepCopies)
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *TokenReview) DeepCopyInto(out *TokenReview) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	out.Spec = in.Spec
+	in.Status.DeepCopyInto(&out.Status)
+	return
 }
 
-// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
-// to allow building arbitrary schemes.
-func RegisterDeepCopies(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_TokenReview, InType: reflect.TypeOf(&TokenReview{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_TokenReviewSpec, InType: reflect.TypeOf(&TokenReviewSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_TokenReviewStatus, InType: reflect.TypeOf(&TokenReviewStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_UserInfo, InType: reflect.TypeOf(&UserInfo{})},
-	)
+// DeepCopy will perform a deep copy of the receiver, creating a new TokenReview.
+func (x *TokenReview) DeepCopy() *TokenReview {
+	if x == nil {
+		return nil
+	}
+	out := new(TokenReview)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_v1beta1_TokenReview(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*TokenReview)
-		out := out.(*TokenReview)
-		out.TypeMeta = in.TypeMeta
-		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
-		}
-		out.Spec = in.Spec
-		if err := DeepCopy_v1beta1_TokenReviewStatus(&in.Status, &out.Status, c); err != nil {
-			return err
-		}
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *TokenReview) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_v1beta1_TokenReviewSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*TokenReviewSpec)
-		out := out.(*TokenReviewSpec)
-		out.Token = in.Token
-		return nil
-	}
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *TokenReviewSpec) DeepCopyInto(out *TokenReviewSpec) {
+	out.Token = in.Token
+	return
 }
 
-func DeepCopy_v1beta1_TokenReviewStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*TokenReviewStatus)
-		out := out.(*TokenReviewStatus)
-		out.Authenticated = in.Authenticated
-		if err := DeepCopy_v1beta1_UserInfo(&in.User, &out.User, c); err != nil {
-			return err
-		}
-		out.Error = in.Error
+// DeepCopy will perform a deep copy of the receiver, creating a new TokenReviewSpec.
+func (x *TokenReviewSpec) DeepCopy() *TokenReviewSpec {
+	if x == nil {
 		return nil
 	}
+	out := new(TokenReviewSpec)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_v1beta1_UserInfo(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*UserInfo)
-		out := out.(*UserInfo)
-		out.Username = in.Username
-		out.UID = in.UID
-		if in.Groups != nil {
-			in, out := &in.Groups, &out.Groups
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		} else {
-			out.Groups = nil
-		}
-		if in.Extra != nil {
-			in, out := &in.Extra, &out.Extra
-			*out = make(map[string]ExtraValue)
-			for key, val := range *in {
-				if newVal, err := c.DeepCopy(&val); err != nil {
-					return err
-				} else {
-					(*out)[key] = *newVal.(*ExtraValue)
-				}
-			}
-		} else {
-			out.Extra = nil
-		}
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *TokenReviewStatus) DeepCopyInto(out *TokenReviewStatus) {
+	out.Authenticated = in.Authenticated
+	in.User.DeepCopyInto(&out.User)
+	out.Error = in.Error
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new TokenReviewStatus.
+func (x *TokenReviewStatus) DeepCopy() *TokenReviewStatus {
+	if x == nil {
 		return nil
 	}
+	out := new(TokenReviewStatus)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *UserInfo) DeepCopyInto(out *UserInfo) {
+	out.Username = in.Username
+	out.UID = in.UID
+	if in.Groups != nil {
+		in, out := &in.Groups, &out.Groups
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	} else {
+		out.Groups = nil
+	}
+	if in.Extra != nil {
+		in, out := &in.Extra, &out.Extra
+		*out = make(map[string]ExtraValue)
+		for key, val := range *in {
+			(*out)[key] = make(ExtraValue, len(val))
+			copy((*out)[key], val)
+		}
+	} else {
+		out.Extra = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new UserInfo.
+func (x *UserInfo) DeepCopy() *UserInfo {
+	if x == nil {
+		return nil
+	}
+	out := new(UserInfo)
+	x.DeepCopyInto(out)
+	return out
 }

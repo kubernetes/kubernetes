@@ -23,285 +23,346 @@ package v2alpha1
 import (
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
-	conversion "k8s.io/kubernetes/pkg/conversion"
-	runtime "k8s.io/kubernetes/pkg/runtime"
-	reflect "reflect"
 )
 
-func init() {
-	SchemeBuilder.Register(RegisterDeepCopies)
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *Job) DeepCopyInto(out *Job) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	in.Status.DeepCopyInto(&out.Status)
+	return
 }
 
-// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
-// to allow building arbitrary schemes.
-func RegisterDeepCopies(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_Job, InType: reflect.TypeOf(&Job{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_JobCondition, InType: reflect.TypeOf(&JobCondition{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_JobList, InType: reflect.TypeOf(&JobList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_JobSpec, InType: reflect.TypeOf(&JobSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_JobStatus, InType: reflect.TypeOf(&JobStatus{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_JobTemplate, InType: reflect.TypeOf(&JobTemplate{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_JobTemplateSpec, InType: reflect.TypeOf(&JobTemplateSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ScheduledJob, InType: reflect.TypeOf(&ScheduledJob{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ScheduledJobList, InType: reflect.TypeOf(&ScheduledJobList{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ScheduledJobSpec, InType: reflect.TypeOf(&ScheduledJobSpec{})},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ScheduledJobStatus, InType: reflect.TypeOf(&ScheduledJobStatus{})},
-	)
+// DeepCopy will perform a deep copy of the receiver, creating a new Job.
+func (x *Job) DeepCopy() *Job {
+	if x == nil {
+		return nil
+	}
+	out := new(Job)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_v2alpha1_Job(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*Job)
-		out := out.(*Job)
-		out.TypeMeta = in.TypeMeta
-		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v2alpha1_JobSpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v2alpha1_JobStatus(&in.Status, &out.Status, c); err != nil {
-			return err
-		}
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *Job) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_v2alpha1_JobCondition(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*JobCondition)
-		out := out.(*JobCondition)
-		out.Type = in.Type
-		out.Status = in.Status
-		out.LastProbeTime = in.LastProbeTime.DeepCopy()
-		out.LastTransitionTime = in.LastTransitionTime.DeepCopy()
-		out.Reason = in.Reason
-		out.Message = in.Message
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *JobCondition) DeepCopyInto(out *JobCondition) {
+	out.Type = in.Type
+	out.Status = in.Status
+	in.LastProbeTime.DeepCopyInto(&out.LastProbeTime)
+	in.LastTransitionTime.DeepCopyInto(&out.LastTransitionTime)
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new JobCondition.
+func (x *JobCondition) DeepCopy() *JobCondition {
+	if x == nil {
+		return nil
+	}
+	out := new(JobCondition)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *JobList) DeepCopyInto(out *JobList) {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]Job, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	} else {
+		out.Items = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new JobList.
+func (x *JobList) DeepCopy() *JobList {
+	if x == nil {
+		return nil
+	}
+	out := new(JobList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *JobList) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_v2alpha1_JobList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*JobList)
-		out := out.(*JobList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]Job, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v2alpha1_Job(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Items = nil
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *JobSpec) DeepCopyInto(out *JobSpec) {
+	if in.Parallelism != nil {
+		in, out := &in.Parallelism, &out.Parallelism
+		*out = new(int32)
+		**out = **in
+	} else {
+		out.Parallelism = nil
+	}
+	if in.Completions != nil {
+		in, out := &in.Completions, &out.Completions
+		*out = new(int32)
+		**out = **in
+	} else {
+		out.Completions = nil
+	}
+	if in.ActiveDeadlineSeconds != nil {
+		in, out := &in.ActiveDeadlineSeconds, &out.ActiveDeadlineSeconds
+		*out = new(int64)
+		**out = **in
+	} else {
+		out.ActiveDeadlineSeconds = nil
+	}
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = (*in).DeepCopy()
+	} else {
+		out.Selector = nil
+	}
+	if in.ManualSelector != nil {
+		in, out := &in.ManualSelector, &out.ManualSelector
+		*out = new(bool)
+		**out = **in
+	} else {
+		out.ManualSelector = nil
+	}
+	in.Template.DeepCopyInto(&out.Template)
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new JobSpec.
+func (x *JobSpec) DeepCopy() *JobSpec {
+	if x == nil {
+		return nil
+	}
+	out := new(JobSpec)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *JobStatus) DeepCopyInto(out *JobStatus) {
+	if in.Conditions != nil {
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]JobCondition, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	} else {
+		out.Conditions = nil
+	}
+	if in.StartTime != nil {
+		in, out := &in.StartTime, &out.StartTime
+		*out = (*in).DeepCopy()
+	} else {
+		out.StartTime = nil
+	}
+	if in.CompletionTime != nil {
+		in, out := &in.CompletionTime, &out.CompletionTime
+		*out = (*in).DeepCopy()
+	} else {
+		out.CompletionTime = nil
+	}
+	out.Active = in.Active
+	out.Succeeded = in.Succeeded
+	out.Failed = in.Failed
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new JobStatus.
+func (x *JobStatus) DeepCopy() *JobStatus {
+	if x == nil {
+		return nil
+	}
+	out := new(JobStatus)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *JobTemplate) DeepCopyInto(out *JobTemplate) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Template.DeepCopyInto(&out.Template)
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new JobTemplate.
+func (x *JobTemplate) DeepCopy() *JobTemplate {
+	if x == nil {
+		return nil
+	}
+	out := new(JobTemplate)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *JobTemplate) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_v2alpha1_JobSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*JobSpec)
-		out := out.(*JobSpec)
-		if in.Parallelism != nil {
-			in, out := &in.Parallelism, &out.Parallelism
-			*out = new(int32)
-			**out = **in
-		} else {
-			out.Parallelism = nil
-		}
-		if in.Completions != nil {
-			in, out := &in.Completions, &out.Completions
-			*out = new(int32)
-			**out = **in
-		} else {
-			out.Completions = nil
-		}
-		if in.ActiveDeadlineSeconds != nil {
-			in, out := &in.ActiveDeadlineSeconds, &out.ActiveDeadlineSeconds
-			*out = new(int64)
-			**out = **in
-		} else {
-			out.ActiveDeadlineSeconds = nil
-		}
-		if in.Selector != nil {
-			in, out := &in.Selector, &out.Selector
-			*out = new(unversioned.LabelSelector)
-			if err := unversioned.DeepCopy_unversioned_LabelSelector(*in, *out, c); err != nil {
-				return err
-			}
-		} else {
-			out.Selector = nil
-		}
-		if in.ManualSelector != nil {
-			in, out := &in.ManualSelector, &out.ManualSelector
-			*out = new(bool)
-			**out = **in
-		} else {
-			out.ManualSelector = nil
-		}
-		if err := v1.DeepCopy_v1_PodTemplateSpec(&in.Template, &out.Template, c); err != nil {
-			return err
-		}
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *JobTemplateSpec) DeepCopyInto(out *JobTemplateSpec) {
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new JobTemplateSpec.
+func (x *JobTemplateSpec) DeepCopy() *JobTemplateSpec {
+	if x == nil {
+		return nil
+	}
+	out := new(JobTemplateSpec)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ScheduledJob) DeepCopyInto(out *ScheduledJob) {
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	in.Status.DeepCopyInto(&out.Status)
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ScheduledJob.
+func (x *ScheduledJob) DeepCopy() *ScheduledJob {
+	if x == nil {
+		return nil
+	}
+	out := new(ScheduledJob)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *ScheduledJob) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_v2alpha1_JobStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*JobStatus)
-		out := out.(*JobStatus)
-		if in.Conditions != nil {
-			in, out := &in.Conditions, &out.Conditions
-			*out = make([]JobCondition, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v2alpha1_JobCondition(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Conditions = nil
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ScheduledJobList) DeepCopyInto(out *ScheduledJobList) {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]ScheduledJob, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
-		if in.StartTime != nil {
-			in, out := &in.StartTime, &out.StartTime
-			*out = new(unversioned.Time)
-			**out = (*in).DeepCopy()
-		} else {
-			out.StartTime = nil
-		}
-		if in.CompletionTime != nil {
-			in, out := &in.CompletionTime, &out.CompletionTime
-			*out = new(unversioned.Time)
-			**out = (*in).DeepCopy()
-		} else {
-			out.CompletionTime = nil
-		}
-		out.Active = in.Active
-		out.Succeeded = in.Succeeded
-		out.Failed = in.Failed
+	} else {
+		out.Items = nil
+	}
+	return
+}
+
+// DeepCopy will perform a deep copy of the receiver, creating a new ScheduledJobList.
+func (x *ScheduledJobList) DeepCopy() *ScheduledJobList {
+	if x == nil {
+		return nil
+	}
+	out := new(ScheduledJobList)
+	x.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject will perform a deep copy of the receiver, creating a new object.
+func (x *ScheduledJobList) DeepCopyObject() unversioned.Object {
+	if c := x.DeepCopy(); c != nil {
+		return c
+	} else {
 		return nil
 	}
 }
 
-func DeepCopy_v2alpha1_JobTemplate(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*JobTemplate)
-		out := out.(*JobTemplate)
-		out.TypeMeta = in.TypeMeta
-		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v2alpha1_JobTemplateSpec(&in.Template, &out.Template, c); err != nil {
-			return err
-		}
-		return nil
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ScheduledJobSpec) DeepCopyInto(out *ScheduledJobSpec) {
+	out.Schedule = in.Schedule
+	if in.StartingDeadlineSeconds != nil {
+		in, out := &in.StartingDeadlineSeconds, &out.StartingDeadlineSeconds
+		*out = new(int64)
+		**out = **in
+	} else {
+		out.StartingDeadlineSeconds = nil
 	}
+	out.ConcurrencyPolicy = in.ConcurrencyPolicy
+	if in.Suspend != nil {
+		in, out := &in.Suspend, &out.Suspend
+		*out = new(bool)
+		**out = **in
+	} else {
+		out.Suspend = nil
+	}
+	in.JobTemplate.DeepCopyInto(&out.JobTemplate)
+	return
 }
 
-func DeepCopy_v2alpha1_JobTemplateSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*JobTemplateSpec)
-		out := out.(*JobTemplateSpec)
-		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v2alpha1_JobSpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
-		}
+// DeepCopy will perform a deep copy of the receiver, creating a new ScheduledJobSpec.
+func (x *ScheduledJobSpec) DeepCopy() *ScheduledJobSpec {
+	if x == nil {
 		return nil
 	}
+	out := new(ScheduledJobSpec)
+	x.DeepCopyInto(out)
+	return out
 }
 
-func DeepCopy_v2alpha1_ScheduledJob(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ScheduledJob)
-		out := out.(*ScheduledJob)
-		out.TypeMeta = in.TypeMeta
-		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
-			return err
+// DeepCopyInto will perform a deep copy of the receiver, writing to out. in must be non-nil.
+func (in *ScheduledJobStatus) DeepCopyInto(out *ScheduledJobStatus) {
+	if in.Active != nil {
+		in, out := &in.Active, &out.Active
+		*out = make([]v1.ObjectReference, len(*in))
+		for i := range *in {
+			(*out)[i] = (*in)[i]
 		}
-		if err := DeepCopy_v2alpha1_ScheduledJobSpec(&in.Spec, &out.Spec, c); err != nil {
-			return err
-		}
-		if err := DeepCopy_v2alpha1_ScheduledJobStatus(&in.Status, &out.Status, c); err != nil {
-			return err
-		}
-		return nil
+	} else {
+		out.Active = nil
 	}
+	if in.LastScheduleTime != nil {
+		in, out := &in.LastScheduleTime, &out.LastScheduleTime
+		*out = (*in).DeepCopy()
+	} else {
+		out.LastScheduleTime = nil
+	}
+	return
 }
 
-func DeepCopy_v2alpha1_ScheduledJobList(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ScheduledJobList)
-		out := out.(*ScheduledJobList)
-		out.TypeMeta = in.TypeMeta
-		out.ListMeta = in.ListMeta
-		if in.Items != nil {
-			in, out := &in.Items, &out.Items
-			*out = make([]ScheduledJob, len(*in))
-			for i := range *in {
-				if err := DeepCopy_v2alpha1_ScheduledJob(&(*in)[i], &(*out)[i], c); err != nil {
-					return err
-				}
-			}
-		} else {
-			out.Items = nil
-		}
+// DeepCopy will perform a deep copy of the receiver, creating a new ScheduledJobStatus.
+func (x *ScheduledJobStatus) DeepCopy() *ScheduledJobStatus {
+	if x == nil {
 		return nil
 	}
-}
-
-func DeepCopy_v2alpha1_ScheduledJobSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ScheduledJobSpec)
-		out := out.(*ScheduledJobSpec)
-		out.Schedule = in.Schedule
-		if in.StartingDeadlineSeconds != nil {
-			in, out := &in.StartingDeadlineSeconds, &out.StartingDeadlineSeconds
-			*out = new(int64)
-			**out = **in
-		} else {
-			out.StartingDeadlineSeconds = nil
-		}
-		out.ConcurrencyPolicy = in.ConcurrencyPolicy
-		if in.Suspend != nil {
-			in, out := &in.Suspend, &out.Suspend
-			*out = new(bool)
-			**out = **in
-		} else {
-			out.Suspend = nil
-		}
-		if err := DeepCopy_v2alpha1_JobTemplateSpec(&in.JobTemplate, &out.JobTemplate, c); err != nil {
-			return err
-		}
-		return nil
-	}
-}
-
-func DeepCopy_v2alpha1_ScheduledJobStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
-	{
-		in := in.(*ScheduledJobStatus)
-		out := out.(*ScheduledJobStatus)
-		if in.Active != nil {
-			in, out := &in.Active, &out.Active
-			*out = make([]v1.ObjectReference, len(*in))
-			for i := range *in {
-				(*out)[i] = (*in)[i]
-			}
-		} else {
-			out.Active = nil
-		}
-		if in.LastScheduleTime != nil {
-			in, out := &in.LastScheduleTime, &out.LastScheduleTime
-			*out = new(unversioned.Time)
-			**out = (*in).DeepCopy()
-		} else {
-			out.LastScheduleTime = nil
-		}
-		return nil
-	}
+	out := new(ScheduledJobStatus)
+	x.DeepCopyInto(out)
+	return out
 }
