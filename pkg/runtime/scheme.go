@@ -68,10 +68,6 @@ type Scheme struct {
 	// converter stores all registered conversion functions. It also has
 	// default coverting behavior.
 	converter *conversion.Converter
-
-	// cloner stores all registered copy functions. It also has default
-	// deep copy behavior.
-	cloner *conversion.Cloner
 }
 
 // Function to convert a field selector to internal representation.
@@ -84,7 +80,6 @@ func NewScheme() *Scheme {
 		typeToGVK:        map[reflect.Type][]unversioned.GroupVersionKind{},
 		unversionedTypes: map[reflect.Type]unversioned.GroupVersionKind{},
 		unversionedKinds: map[string]reflect.Type{},
-		cloner:           conversion.NewCloner(),
 		fieldLabelConversionFuncs: map[string]map[string]FieldLabelConversionFunc{},
 		defaulterFuncs:            map[reflect.Type]func(interface{}){},
 	}
@@ -361,29 +356,6 @@ func (s *Scheme) AddGeneratedConversionFuncs(conversionFuncs ...interface{}) err
 	return nil
 }
 
-// AddDeepCopyFuncs adds a function to the list of deep-copy functions.
-// For the expected format of deep-copy function, see the comment for
-// Copier.RegisterDeepCopyFunction.
-func (s *Scheme) AddDeepCopyFuncs(deepCopyFuncs ...interface{}) error {
-	for _, f := range deepCopyFuncs {
-		if err := s.cloner.RegisterDeepCopyFunc(f); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// Similar to AddDeepCopyFuncs, but registers deep-copy functions that were
-// automatically generated.
-func (s *Scheme) AddGeneratedDeepCopyFuncs(deepCopyFuncs ...conversion.GeneratedDeepCopyFunc) error {
-	for _, fn := range deepCopyFuncs {
-		if err := s.cloner.RegisterGeneratedDeepCopyFunc(fn); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // AddFieldLabelConversionFunc adds a conversion function to convert field selectors
 // of the given kind from the given version to internal version representation.
 func (s *Scheme) AddFieldLabelConversionFunc(version, kind string, conversionFunc FieldLabelConversionFunc) error {
@@ -448,11 +420,6 @@ func (s *Scheme) Default(src Object) {
 	if fn, ok := s.defaulterFuncs[reflect.TypeOf(src)]; ok {
 		fn(src)
 	}
-}
-
-// Performs a deep copy of the given object.
-func (s *Scheme) DeepCopy(src interface{}) (interface{}, error) {
-	return s.cloner.DeepCopy(src)
 }
 
 // Convert will attempt to convert in into out. Both must be pointers. For easy
