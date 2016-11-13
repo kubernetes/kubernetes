@@ -324,7 +324,7 @@ func (lsel internalSelector) String() string {
 	return strings.Join(reqs, ",")
 }
 
-func (lsel internalSelector) DeepCopySelector() Selector         {
+func (lsel internalSelector) DeepCopySelector() Selector {
 	return lsel
 }
 

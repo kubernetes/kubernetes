@@ -18,7 +18,6 @@ package conversion
 
 import (
 	"math/rand"
-	"reflect"
 	"testing"
 
 	"github.com/google/gofuzz"
@@ -26,135 +25,115 @@ import (
 
 func TestDeepCopy(t *testing.T) {
 	semantic := EqualitiesOrDie()
-	f := fuzz.New().NilChance(.5).NumElements(0, 100)
-	table := []interface{}{
-		map[string]string{},
-		int(5),
-		"hello world",
-		struct {
-			A, B, C struct {
-				D map[string]int
-			}
-			X []int
-			Y []byte
-		}{},
+	x := 42
+	table := []TestObject{
+		&TestStruct{Map: map[string]string{}},
+		&TestStruct{Int: int(5)},
+		&TestStruct{Pointer: nil},
+		&TestStruct{Pointer: &x},
+		&TestStruct{String: "hello world"},
+		&TestStruct{Struct: TestSubStruct{}},
+		&TestStruct{StructPointer: &TestSubStruct{X: []int{1}}},
+		&TestStruct{StructSlice: []*TestSubStruct{
+			{X: []int{1}},
+			{X: []int{2}},
+		}},
+		&TestStruct{StructMap: map[string]*TestSubStruct{
+			"A": {X: []int{1}},
+			"B": {X: []int{2}},
+		}},
 	}
 	for _, obj := range table {
-		obj2, err := NewCloner().DeepCopy(obj)
-		if err != nil {
-			t.Errorf("Error: couldn't copy %#v", obj)
-			continue
-		}
+		obj2 := obj.DeepCopyTestObject()
 		if e, a := obj, obj2; !semantic.DeepEqual(e, a) {
 			t.Errorf("expected %#v\ngot %#v", e, a)
 		}
-
-		obj3 := reflect.New(reflect.TypeOf(obj)).Interface()
-		f.Fuzz(obj3)
-		obj4, err := NewCloner().DeepCopy(obj3)
-		if err != nil {
-			t.Errorf("Error: couldn't copy %#v", obj)
-			continue
-		}
-		if e, a := obj3, obj4; !semantic.DeepEqual(e, a) {
-			t.Errorf("expected %#v\ngot %#v", e, a)
-		}
-		f.Fuzz(obj3)
 	}
 }
 
-func copyOrDie(t *testing.T, in interface{}) interface{} {
-	out, err := NewCloner().DeepCopy(in)
-	if err != nil {
-		t.Fatalf("DeepCopy failed: %#q: %v", in, err)
+func TestDeepCopyFuzz(t *testing.T) {
+	semantic := EqualitiesOrDie()
+	f := fuzz.New().NilChance(.5).NumElements(0, 100)
+	for x := 0; x < 100; x++ {
+		obj := &TestStruct{}
+		f.Fuzz(obj)
+		obj2 := obj.DeepCopy()
+		if e, a := obj, obj2; !semantic.DeepEqual(e, a) {
+			t.Errorf("expected %#v\ngot %#v", e, a)
+		}
 	}
-	return out
 }
 
 func TestDeepCopySliceSeparate(t *testing.T) {
-	x := []int{5}
-	y := copyOrDie(t, x).([]int)
-	x[0] = 3
-	if y[0] == 3 {
-		t.Errorf("deep copy wasn't deep: %#q %#q", x, y)
-	}
-}
-
-func TestDeepCopyArraySeparate(t *testing.T) {
-	x := [1]int{5}
-	y := copyOrDie(t, x).([1]int)
-	x[0] = 3
-	if y[0] == 3 {
+	x := &TestStruct{Struct: TestSubStruct{X: []int{5}}}
+	y := x.DeepCopy()
+	x.Struct.X[0] = 3
+	if y.Struct.X[0] == 3 {
 		t.Errorf("deep copy wasn't deep: %#q %#q", x, y)
 	}
 }
 
 func TestDeepCopyMapSeparate(t *testing.T) {
-	x := map[string]int{"foo": 5}
-	y := copyOrDie(t, x).(map[string]int)
-	x["foo"] = 3
-	if y["foo"] == 3 {
+	x := &TestStruct{Map: map[string]string{"foo": "bar"}}
+	y := x.DeepCopy()
+	x.Map["foo"] = "abc"
+	if y.Map["foo"] == "abc" {
 		t.Errorf("deep copy wasn't deep: %#q %#q", x, y)
 	}
 }
 
 func TestDeepCopyPointerSeparate(t *testing.T) {
 	z := 5
-	x := &z
-	y := copyOrDie(t, x).(*int)
-	*x = 3
-	if *y == 3 {
+	x := &TestStruct{Pointer: &z}
+	y := x.DeepCopy()
+	*x.Pointer = 3
+	if *y.Pointer == 3 {
 		t.Errorf("deep copy wasn't deep: %#q %#q", x, y)
 	}
 }
 
 func TestDeepCopyStruct(t *testing.T) {
-	type Foo struct {
-		A int
-	}
-	type Bar struct {
-		Foo
-		F *Foo
-	}
-	a := &Bar{Foo{1}, &Foo{2}}
-	b := copyOrDie(t, a).(*Bar)
-	a.A = 3
-	a.F.A = 4
-
-	if b.A != 1 || b.F.A != 2 {
-		t.Errorf("deep copy wasn't deep: %#v, %#v", a, b)
+	x := &TestStruct{Struct: TestSubStruct{A: TestSubSubStruct{E: 1}}}
+	y := x.DeepCopy()
+	x.Struct.A.E = 3
+	x.Struct.B.E = 4
+	if y.Struct.A.E != 1 || y.Struct.B.E != 0 {
+		t.Errorf("deep copy wasn't deep: %#v, %#v", x, y)
 	}
 }
 
-var result interface{}
+var result TestObject
 
 func BenchmarkDeepCopy(b *testing.B) {
-	table := []interface{}{
-		map[string]string{},
-		int(5),
-		"hello world",
-		struct {
-			A, B, C struct {
-				D map[string]int
-			}
-			X []int
-			Y []byte
-		}{},
+	x := 42
+	table := []TestObject{
+		&TestStruct{Map: map[string]string{}},
+		&TestStruct{Int: int(5)},
+		&TestStruct{Pointer: nil},
+		&TestStruct{Pointer: &x},
+		&TestStruct{String: "hello world"},
+		&TestStruct{Struct: TestSubStruct{}},
+		&TestStruct{StructPointer: &TestSubStruct{X: []int{1}}},
+		&TestStruct{StructSlice: []*TestSubStruct{
+			{X: []int{1}},
+			{X: []int{2}},
+		}},
+		&TestStruct{StructMap: map[string]*TestSubStruct{
+			"A": {X: []int{1}},
+			"B": {X: []int{2}},
+		}},
 	}
 
 	f := fuzz.New().RandSource(rand.NewSource(1)).NilChance(.5).NumElements(0, 100)
 	for i := range table {
-		out := table[i]
-		obj := reflect.New(reflect.TypeOf(out)).Interface()
-		f.Fuzz(obj)
-		table[i] = obj
+		f.Fuzz(table[i])
 	}
 
 	b.ResetTimer()
-	var r interface{}
+	var r TestObject
 	for i := 0; i < b.N; i++ {
 		for j := range table {
-			r, _ = NewCloner().DeepCopy(table[j])
+			r = table[j].DeepCopyTestObject()
 		}
 	}
 	result = r

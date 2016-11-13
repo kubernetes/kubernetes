@@ -233,4 +233,3 @@ type SelfLinker interface {
 // serializers to set the kind, version, and group the object is represented as. An Object may choose
 // to return a no-op ObjectKindAccessor in cases where it is not expected to be serialized.
 type Object unversioned.Object
-

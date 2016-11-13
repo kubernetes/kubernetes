@@ -388,7 +388,7 @@ func (g *genDeepCopy) DeepCopyableInterfaces(c *generator.Context, t *types.Type
 		return nil, nil
 	}
 
-	intfs := types.ExtractCommentTags("+", t.SecondClosestCommentLines)[interfacesTagName]
+	intfs := types.ExtractCommentTags("+", append(t.SecondClosestCommentLines, t.CommentLines...))[interfacesTagName]
 
 	var ts []*types.Type
 	for _, intf := range intfs {
@@ -462,7 +462,7 @@ func (g *genDeepCopy) GenerateType(c *generator.Context, t *types.Type, w io.Wri
 	}
 	for _, intf := range intfs {
 		sw.Do(fmt.Sprintf("// DeepCopy%s will perform a deep copy of the receiver, creating a new object.\n", intf.Name.Name), nil)
-		sw.Do("func (x *$.type|raw$) DeepCopyObject() $.type2|raw$ {\n", argsFromType(t, intf))
+		sw.Do(fmt.Sprintf("func (x *$.type|raw$) DeepCopy%s() $.type2|raw$ {\n", intf.Name.Name), argsFromType(t, intf))
 		sw.Do("if c := x.DeepCopy(); c != nil {\n", nil)
 		sw.Do("return c\n", nil)
 		sw.Do("} else {\n", nil)
@@ -563,6 +563,8 @@ func (g *genDeepCopy) doSlice(t *types.Type, sw *generator.SnippetWriter) {
 			sw.Do("(*out)[i] = (*in)[i]\n", nil)
 		} else if t.Elem.Kind == types.Interface {
 			sw.Do(fmt.Sprintf("(*out)[i] = (*in)[i].DeepCopy%s()\n", t.Elem.Name.Name), t)
+		} else if t.Elem.Kind == types.Pointer {
+			sw.Do("(*out)[i] = (*in)[i].DeepCopy()\n", nil)
 		} else {
 			sw.Do("(*in)[i].DeepCopyInto(&(*out)[i])\n", nil)
 		}

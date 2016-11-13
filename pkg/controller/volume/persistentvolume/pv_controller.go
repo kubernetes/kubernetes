@@ -462,12 +462,8 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *api.PersistentVolume)
 			// This speeds up binding of provisioned volumes - provisioner saves
 			// only the new PV and it expects that next syncClaim will bind the
 			// claim to it.
-			clone, err := conversion.NewCloner().DeepCopy(claim)
-			if err != nil {
-				return fmt.Errorf("error cloning claim %q: %v", claimToClaimKey(claim), err)
-			}
 			glog.V(5).Infof("requeueing claim %q for faster syncClaim", claimToClaimKey(claim))
-			err = ctrl.claimController.Requeue(clone)
+			err = ctrl.claimController.Requeue(claim.DeepCopy())
 			if err != nil {
 				return fmt.Errorf("error enqueing claim %q for faster sync: %v", claimToClaimKey(claim), err)
 			}
@@ -531,15 +527,7 @@ func (ctrl *PersistentVolumeController) updateClaimStatus(claim *api.PersistentV
 
 	dirty := false
 
-	clone, err := conversion.NewCloner().DeepCopy(claim)
-	if err != nil {
-		return nil, fmt.Errorf("Error cloning claim: %v", err)
-	}
-	claimClone, ok := clone.(*api.PersistentVolumeClaim)
-	if !ok {
-		return nil, fmt.Errorf("Unexpected claim cast error : %v", claimClone)
-	}
-
+	claimClone := claim.DeepCopy()
 	if claim.Status.Phase != phase {
 		claimClone.Status.Phase = phase
 		dirty = true
@@ -631,15 +619,7 @@ func (ctrl *PersistentVolumeController) updateVolumePhase(volume *api.Persistent
 		return volume, nil
 	}
 
-	clone, err := conversion.NewCloner().DeepCopy(volume)
-	if err != nil {
-		return nil, fmt.Errorf("Error cloning claim: %v", err)
-	}
-	volumeClone, ok := clone.(*api.PersistentVolume)
-	if !ok {
-		return nil, fmt.Errorf("Unexpected volume cast error : %v", volumeClone)
-	}
-
+	volumeClone := volume.DeepCopy()
 	volumeClone.Status.Phase = phase
 	volumeClone.Status.Message = message
 
@@ -696,14 +676,7 @@ func (ctrl *PersistentVolumeController) bindVolumeToClaim(volume *api.Persistent
 
 	// The volume from method args can be pointing to watcher cache. We must not
 	// modify these, therefore create a copy.
-	clone, err := conversion.NewCloner().DeepCopy(volume)
-	if err != nil {
-		return nil, fmt.Errorf("Error cloning pv: %v", err)
-	}
-	volumeClone, ok := clone.(*api.PersistentVolume)
-	if !ok {
-		return nil, fmt.Errorf("Unexpected volume cast error : %v", volumeClone)
-	}
+	volumeClone := volume.DeepCopy()
 
 	// Bind the volume to the claim if it is not bound yet
 	if volume.Spec.ClaimRef == nil ||
@@ -761,14 +734,7 @@ func (ctrl *PersistentVolumeController) bindClaimToVolume(claim *api.PersistentV
 
 	// The claim from method args can be pointing to watcher cache. We must not
 	// modify these, therefore create a copy.
-	clone, err := conversion.NewCloner().DeepCopy(claim)
-	if err != nil {
-		return nil, fmt.Errorf("Error cloning claim: %v", err)
-	}
-	claimClone, ok := clone.(*api.PersistentVolumeClaim)
-	if !ok {
-		return nil, fmt.Errorf("Unexpected claim cast error : %v", claimClone)
-	}
+	claimClone := claim.DeepCopy()
 
 	// Bind the claim to the volume if it is not bound yet
 	if claimClone.Spec.VolumeName != volume.Name {
@@ -861,14 +827,7 @@ func (ctrl *PersistentVolumeController) unbindVolume(volume *api.PersistentVolum
 	glog.V(4).Infof("updating PersistentVolume[%s]: rolling back binding from %q", volume.Name, claimrefToClaimKey(volume.Spec.ClaimRef))
 
 	// Save the PV only when any modification is neccessary.
-	clone, err := conversion.NewCloner().DeepCopy(volume)
-	if err != nil {
-		return fmt.Errorf("Error cloning pv: %v", err)
-	}
-	volumeClone, ok := clone.(*api.PersistentVolume)
-	if !ok {
-		return fmt.Errorf("Unexpected volume cast error : %v", volumeClone)
-	}
+	volumeClone := volume.DeepCopy()
 
 	if api.HasAnnotation(volume.ObjectMeta, annBoundByController) {
 		// The volume was bound by the controller.

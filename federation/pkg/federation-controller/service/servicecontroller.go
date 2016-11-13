@@ -42,8 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
-
-	"k8s.io/kubernetes/pkg/conversion"
 )
 
 const (
@@ -343,20 +341,13 @@ func (s *ServiceController) processServiceForCluster(cachedService *cachedServic
 // should be retried.
 func (s *ServiceController) updateFederationService(key string, cachedService *cachedService) (error, bool) {
 	// Clone federation service, and create them in underlying k8s cluster
-	clone, err := conversion.NewCloner().DeepCopy(cachedService.lastState)
-	if err != nil {
-		return err, !retryable
-	}
-	service, ok := clone.(*v1.Service)
-	if !ok {
-		return fmt.Errorf("Unexpected service cast error : %v\n", service), !retryable
-	}
+	service := cachedService.lastState.DeepCopy()
 
 	// handle available clusters one by one
 	var hasErr bool
 	for clusterName, cache := range s.clusterCache.clientMap {
 		go func(cache *clusterCache, clusterName string) {
-			err = s.processServiceForCluster(cachedService, clusterName, service, cache.clientset)
+			err := s.processServiceForCluster(cachedService, clusterName, service, cache.clientset)
 			if err != nil {
 				hasErr = true
 			}

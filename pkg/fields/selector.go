@@ -96,7 +96,7 @@ func (t *hasTerm) String() string {
 	return fmt.Sprintf("%v=%v", t.field, t.value)
 }
 
-func (t* hasTerm) DeepCopySelector() Selector {
+func (t *hasTerm) DeepCopySelector() Selector {
 	out := new(hasTerm)
 	*out = *t
 	return out
@@ -138,7 +138,7 @@ func (t *notHasTerm) String() string {
 	return fmt.Sprintf("%v!=%v", t.field, t.value)
 }
 
-func (t* notHasTerm) DeepCopySelector() Selector {
+func (t *notHasTerm) DeepCopySelector() Selector {
 	out := new(notHasTerm)
 	*out = *t
 	return out

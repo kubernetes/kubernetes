@@ -74,20 +74,11 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 			continue
 		}
 
-		clonedNode, err := conversion.NewCloner().DeepCopy(nodeObj)
-		if err != nil {
-			return fmt.Errorf("error cloning node %q: %v",
-				nodeName,
-				err)
+		node, ok := nodeObj.(*api.Node)
+		if !ok {
+			return fmt.Errorf("failed to cast %q object %#v to Node", nodeName, nodeObj)
 		}
-
-		node, ok := clonedNode.(*api.Node)
-		if !ok || node == nil {
-			return fmt.Errorf(
-				"failed to cast %q object %#v to Node",
-				nodeName,
-				clonedNode)
-		}
+		node = node.DeepCopy()
 
 		oldData, err := json.Marshal(node)
 		if err != nil {

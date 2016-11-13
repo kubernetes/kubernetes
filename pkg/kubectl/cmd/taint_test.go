@@ -52,11 +52,10 @@ func generateNodeAndTaintedNode(oldTaints []api.Taint, newTaints []api.Taint) (*
 		},
 		Status: api.NodeStatus{},
 	}
-	clone, _ := conversion.NewCloner().DeepCopy(node)
 
-	newTaintsData, _ := json.Marshal(newTaints)
 	// A copy of the same node, but tainted.
-	taintedNode = clone.(*api.Node)
+	taintedNode = node.DeepCopy()
+	newTaintsData, _ := json.Marshal(newTaints)
 	taintedNode.Annotations = map[string]string{
 		api.TaintsAnnotationKey: string(newTaintsData),
 	}

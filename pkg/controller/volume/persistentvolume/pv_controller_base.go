@@ -178,13 +178,7 @@ func (ctrl *PersistentVolumeController) initializeCaches(volumeSource, claimSour
 		// Ignore template volumes from kubernetes 1.2
 		deleted := ctrl.upgradeVolumeFrom1_2(&volume)
 		if !deleted {
-			clone, err := conversion.NewCloner().DeepCopy(&volume)
-			if err != nil {
-				glog.Errorf("error cloning volume %q: %v", volume.Name, err)
-				continue
-			}
-			volumeClone := clone.(*api.PersistentVolume)
-			ctrl.storeVolumeUpdate(volumeClone)
+			ctrl.storeVolumeUpdate(volume.DeepCopy())
 		}
 	}
 
@@ -199,13 +193,7 @@ func (ctrl *PersistentVolumeController) initializeCaches(volumeSource, claimSour
 		return
 	}
 	for _, claim := range claimList.Items {
-		clone, err := conversion.NewCloner().DeepCopy(&claim)
-		if err != nil {
-			glog.Errorf("error cloning claim %q: %v", claimToClaimKey(&claim), err)
-			continue
-		}
-		claimClone := clone.(*api.PersistentVolumeClaim)
-		ctrl.storeClaimUpdate(claimClone)
+		ctrl.storeClaimUpdate(claim.DeepCopy())
 	}
 	glog.V(4).Infof("controller initialized")
 }

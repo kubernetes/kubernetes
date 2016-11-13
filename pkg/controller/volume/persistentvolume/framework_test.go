@@ -314,8 +314,7 @@ func (r *volumeReactor) checkVolumes(expectedVolumes []*api.PersistentVolume) er
 	for _, v := range r.volumes {
 		// We must clone the volume because of golang race check - it was
 		// written by the controller without any locks on it.
-		clone, _ := conversion.NewCloner().DeepCopy(v)
-		v = clone.(*api.PersistentVolume)
+		v := v.DeepCopy()
 		v.ResourceVersion = ""
 		if v.Spec.ClaimRef != nil {
 			v.Spec.ClaimRef.ResourceVersion = ""
@@ -345,8 +344,7 @@ func (r *volumeReactor) checkClaims(expectedClaims []*api.PersistentVolumeClaim)
 	for _, c := range r.claims {
 		// We must clone the claim because of golang race check - it was
 		// written by the controller without any locks on it.
-		clone, _ := conversion.NewCloner().DeepCopy(c)
-		c = clone.(*api.PersistentVolumeClaim)
+		c = c.DeepCopy()
 		c.ResourceVersion = ""
 		gotMap[c.Name] = c
 	}
@@ -513,9 +511,7 @@ func (r *volumeReactor) deleteVolumeEvent(volume *api.PersistentVolume) {
 
 	// Generate deletion event. Cloned volume is needed to prevent races (and we
 	// would get a clone from etcd too).
-	clone, _ := conversion.NewCloner().DeepCopy(volume)
-	volumeClone := clone.(*api.PersistentVolume)
-	r.volumeSource.Delete(volumeClone)
+	r.volumeSource.Delete(volume.DeepCopy())
 }
 
 // deleteClaimEvent simulates that a claim has been deleted in etcd and the
@@ -529,9 +525,7 @@ func (r *volumeReactor) deleteClaimEvent(claim *api.PersistentVolumeClaim) {
 
 	// Generate deletion event. Cloned volume is needed to prevent races (and we
 	// would get a clone from etcd too).
-	clone, _ := conversion.NewCloner().DeepCopy(claim)
-	claimClone := clone.(*api.PersistentVolumeClaim)
-	r.claimSource.Delete(claimClone)
+	r.claimSource.Delete(claim.DeepCopy())
 }
 
 // addVolumeEvent simulates that a volume has been added in etcd and the
@@ -555,9 +549,7 @@ func (r *volumeReactor) modifyVolumeEvent(volume *api.PersistentVolume) {
 	r.volumes[volume.Name] = volume
 	// Generate deletion event. Cloned volume is needed to prevent races (and we
 	// would get a clone from etcd too).
-	clone, _ := conversion.NewCloner().DeepCopy(volume)
-	volumeClone := clone.(*api.PersistentVolume)
-	r.volumeSource.Modify(volumeClone)
+	r.volumeSource.Modify(volume.DeepCopy())
 }
 
 // addClaimEvent simulates that a claim has been deleted in etcd and the

@@ -187,11 +187,7 @@ func TestAdmission(t *testing.T) {
 		glog.V(4).Infof("starting test %q", test.name)
 
 		// clone the claim, it's going to be modified
-		clone, err := conversion.NewCloner().DeepCopy(test.claim)
-		if err != nil {
-			t.Fatalf("Cannot clone claim: %v", err)
-		}
-		claim := clone.(*api.PersistentVolumeClaim)
+		claim := test.claim.DeepCopy()
 
 		ctrl := newPlugin(nil)
 		for _, c := range test.classes {

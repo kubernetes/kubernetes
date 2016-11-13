@@ -88,7 +88,7 @@ func (e *InternalEvent) DeepCopyObject() unversioned.Object {
 	return (*InternalEvent)((*watch.Event)(e).DeepCopy())
 }
 
-func (e *Event) GetObjectKind() unversioned.ObjectKind         { return unversioned.EmptyObjectKind }
+func (e *Event) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
 func (e *Event) DeepCopyObject() unversioned.Object {
 	if e == nil {
 		return nil
