@@ -38,15 +38,16 @@ const (
 // ProxyServerConfig configures and runs a Kubernetes proxy server
 type ProxyServerConfig struct {
 	componentconfig.KubeProxyConfiguration
-	ResourceContainer string
-	ContentType       string
-	KubeAPIQPS        float32
-	KubeAPIBurst      int32
-	ConfigSyncPeriod  time.Duration
-	CleanupAndExit    bool
-	NodeRef           *api.ObjectReference
-	Master            string
-	Kubeconfig        string
+	ResourceContainer                 string
+	ContentType                       string
+	KubeAPIQPS                        float32
+	KubeAPIBurst                      int32
+	ConfigSyncPeriod                  time.Duration
+	CleanupAndExit                    bool
+	NodeRef                           *api.ObjectReference
+	Master                            string
+	Kubeconfig                        string
+	DisableExternalIPSecurityMeasures bool
 }
 
 func NewProxyConfig() *ProxyServerConfig {
@@ -99,6 +100,7 @@ func (s *ProxyServerConfig) AddFlags(fs *pflag.FlagSet) {
 		&s.ConntrackTCPCloseWaitTimeout.Duration, "conntrack-tcp-timeout-close-wait",
 		s.ConntrackTCPCloseWaitTimeout.Duration,
 		"NAT timeout for TCP connections in the CLOSE_WAIT state")
+	fs.BoolVar(&s.DisableExternalIPSecurityMeasures, "disable-externalip-security-measures", s.DisableExternalIPSecurityMeasures, "If true disables all security checks for traffic hitting external IPs.")
 
 	config.DefaultFeatureGate.AddFlag(fs)
 }
