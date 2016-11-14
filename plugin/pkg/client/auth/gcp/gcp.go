@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -74,6 +75,7 @@ func (g *gcpAuthProvider) WrapTransport(rt http.RoundTripper) http.RoundTripper 
 func (g *gcpAuthProvider) Login() error { return nil }
 
 type cachedTokenSource struct {
+	lk          sync.Mutex
 	source      oauth2.TokenSource
 	accessToken string
 	expiry      time.Time
@@ -99,11 +101,7 @@ func newCachedTokenSource(accessToken, expiry string, persister restclient.AuthP
 }
 
 func (t *cachedTokenSource) Token() (*oauth2.Token, error) {
-	tok := &oauth2.Token{
-		AccessToken: t.accessToken,
-		TokenType:   "Bearer",
-		Expiry:      t.expiry,
-	}
+	tok := t.cachedToken()
 	if tok.Valid() && !tok.Expiry.IsZero() {
 		return tok, nil
 	}
@@ -111,14 +109,37 @@ func (t *cachedTokenSource) Token() (*oauth2.Token, error) {
 	if err != nil {
 		return nil, err
 	}
+	cache := t.update(tok)
 	if t.persister != nil {
-		t.cache["access-token"] = tok.AccessToken
-		t.cache["expiry"] = tok.Expiry.Format(time.RFC3339Nano)
-		if err := t.persister.Persist(t.cache); err != nil {
+		if err := t.persister.Persist(cache); err != nil {
 			glog.V(4).Infof("Failed to persist token: %v", err)
 		}
 	}
 	return tok, nil
+}
+
+func (t *cachedTokenSource) cachedToken() *oauth2.Token {
+	t.lk.Lock()
+	defer t.lk.Unlock()
+	return &oauth2.Token{
+		AccessToken: t.accessToken,
+		TokenType:   "Bearer",
+		Expiry:      t.expiry,
+	}
+}
+
+func (t *cachedTokenSource) update(tok *oauth2.Token) map[string]string {
+	t.lk.Lock()
+	defer t.lk.Unlock()
+	t.accessToken = tok.AccessToken
+	t.expiry = tok.Expiry
+	ret := map[string]string{}
+	for k, v := range t.cache {
+		ret[k] = v
+	}
+	ret["access-token"] = t.accessToken
+	ret["expiry"] = t.expiry.Format(time.RFC3339Nano)
+	return ret
 }
 
 type commandTokenSource struct {
