@@ -271,7 +271,8 @@ func (m *Master) InstallLegacyAPI(c *Config, restOptionsGetter genericapiserver.
 	}
 
 	if c.EnableCoreControllers {
-		bootstrapController := c.NewBootstrapController(legacyRESTStorage)
+		serviceClient := coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+		bootstrapController := c.NewBootstrapController(legacyRESTStorage, serviceClient)
 		if err := m.GenericAPIServer.AddPostStartHook("bootstrap-controller", bootstrapController.PostStartHook); err != nil {
 			glog.Fatalf("Error registering PostStartHook %q: %v", "bootstrap-controller", err)
 		}
