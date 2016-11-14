@@ -143,7 +143,6 @@ func TestDeleteTriggerWatch(t *testing.T) {
 // TestWatchFromZero tests that
 // - watch from 0 should sync up and grab the object added before
 // - watch from 0 is able to return events for objects whose previous version has been compacted
-// - watch from non-0 should just watch changes after given version
 func TestWatchFromZero(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
