@@ -18,10 +18,6 @@ package kuberuntime
 
 import (
 	"fmt"
-	"strconv"
-
-	"github.com/gogo/protobuf/proto"
-	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
@@ -29,7 +25,7 @@ import (
 )
 
 // determineEffectiveSecurityContext gets container's security context from api.Pod and api.Container.
-func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *api.Pod, container *api.Container, imageUser string) *runtimeapi.LinuxContainerSecurityContext {
+func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *api.Pod, container *api.Container, uid *int64, username *string) *runtimeapi.LinuxContainerSecurityContext {
 	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
 	synthesized := convertToRuntimeSecurityContext(effectiveSc)
 	if synthesized == nil {
@@ -38,7 +34,8 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *api.P
 
 	// set RunAsUser.
 	if synthesized.RunAsUser == nil {
-		synthesized.RunAsUser = &imageUser
+		synthesized.RunAsUser = uid
+		synthesized.RunAsUsername = username
 	}
 
 	// set namespace options and supplemental groups.
@@ -65,7 +62,7 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *api.P
 }
 
 // verifyRunAsNonRoot verifies RunAsNonRoot.
-func verifyRunAsNonRoot(pod *api.Pod, container *api.Container, imageUser string) error {
+func verifyRunAsNonRoot(pod *api.Pod, container *api.Container, uid int64) error {
 	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
 	if effectiveSc == nil || effectiveSc.RunAsNonRoot == nil {
 		return nil
@@ -75,15 +72,6 @@ func verifyRunAsNonRoot(pod *api.Pod, container *api.Container, imageUser string
 		if *effectiveSc.RunAsUser == 0 {
 			return fmt.Errorf("container's runAsUser breaks non-root policy")
 		}
-		return nil
-	}
-
-	// Non-root verification only supports numeric user now. For non-numeric user,
-	// just return nil to by-pass the verfication.
-	// TODO: Support non-numeric user.
-	uid, err := strconv.ParseInt(imageUser, 10, 64)
-	if err != nil {
-		glog.Warningf("Non-root verification doesn't support non-numeric user (%s)", imageUser)
 		return nil
 	}
 
@@ -101,20 +89,12 @@ func convertToRuntimeSecurityContext(securityContext *api.SecurityContext) *runt
 	}
 
 	return &runtimeapi.LinuxContainerSecurityContext{
-		RunAsUser:      convertToRuntimeRunAsUser(securityContext.RunAsUser),
+		RunAsUser:      securityContext.RunAsUser,
 		Privileged:     securityContext.Privileged,
 		ReadonlyRootfs: securityContext.ReadOnlyRootFilesystem,
 		Capabilities:   convertToRuntimeCapabilities(securityContext.Capabilities),
 		SelinuxOptions: convertToRuntimeSELinuxOption(securityContext.SELinuxOptions),
 	}
-}
-
-// convertToRuntimeRunAsUser converts RunAsUser from *int64 to *string.
-func convertToRuntimeRunAsUser(runAsUser *int64) *string {
-	if runAsUser == nil {
-		return nil
-	}
-	return proto.String(strconv.FormatInt(*runAsUser, 10))
 }
 
 // convertToRuntimeSELinuxOption converts api.SELinuxOptions to runtimeapi.SELinuxOption.
