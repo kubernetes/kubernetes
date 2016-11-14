@@ -24,7 +24,6 @@ import (
 	serviceaccountregistry "k8s.io/kubernetes/pkg/registry/core/serviceaccount"
 	serviceaccountetcd "k8s.io/kubernetes/pkg/registry/core/serviceaccount/etcd"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 )
 
@@ -37,7 +36,7 @@ type clientGetter struct {
 // uses the specified client to retrieve service accounts and secrets.
 // The client should NOT authenticate using a service account token
 // the returned getter will be used to retrieve, or recursion will result.
-func NewGetterFromClient(c clientset.Interface) serviceaccount.ServiceAccountTokenGetter {
+func NewGetterFromClient(c clientset.Interface) ServiceAccountTokenGetter {
 	return clientGetter{c}
 }
 func (c clientGetter) GetServiceAccount(namespace, name string) (*api.ServiceAccount, error) {
@@ -55,7 +54,7 @@ type registryGetter struct {
 
 // NewGetterFromRegistries returns a ServiceAccountTokenGetter that
 // uses the specified registries to retrieve service accounts and secrets.
-func NewGetterFromRegistries(serviceAccounts serviceaccountregistry.Registry, secrets secret.Registry) serviceaccount.ServiceAccountTokenGetter {
+func NewGetterFromRegistries(serviceAccounts serviceaccountregistry.Registry, secrets secret.Registry) ServiceAccountTokenGetter {
 	return &registryGetter{serviceAccounts, secrets}
 }
 func (r *registryGetter) GetServiceAccount(namespace, name string) (*api.ServiceAccount, error) {
@@ -69,7 +68,7 @@ func (r *registryGetter) GetSecret(namespace, name string) (*api.Secret, error) 
 
 // NewGetterFromStorageInterface returns a ServiceAccountTokenGetter that
 // uses the specified storage to retrieve service accounts and secrets.
-func NewGetterFromStorageInterface(config *storagebackend.Config, saPrefix, secretPrefix string) serviceaccount.ServiceAccountTokenGetter {
+func NewGetterFromStorageInterface(config *storagebackend.Config, saPrefix, secretPrefix string) ServiceAccountTokenGetter {
 	return NewGetterFromRegistries(
 		serviceaccountregistry.NewRegistry(serviceaccountetcd.NewREST(generic.RESTOptions{StorageConfig: config, Decorator: generic.UndecoratedStorage, ResourcePrefix: saPrefix})),
 		secret.NewRegistry(secretetcd.NewREST(generic.RESTOptions{StorageConfig: config, Decorator: generic.UndecoratedStorage, ResourcePrefix: secretPrefix})),
