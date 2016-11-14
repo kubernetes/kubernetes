@@ -113,11 +113,11 @@ start_etcd() {
   local ETCDCTL_CMD="${ETCDCTL:-/usr/local/bin/etcdctl-${START_VERSION}}"
   local API_VERSION="$(echo ${START_STORAGE} | cut -c5-5)"
   if [ "${API_VERSION}" = "2" ]; then
-    ETCDCTL_CMD="${ETCDCTL_CMD} --endpoint=http://127.0.0.1:${ETCD_PORT} set"
+    ETCDCTL_CMD="${ETCDCTL_CMD} --debug --endpoint=http://127.0.0.1:${ETCD_PORT} set"
   else
-    ETCDCTL_CMD="${ETCDCTL_CMD} --endpoints=http://127.0.0.1:${ETCD_PORT} put"
+    ETCDCTL_CMD="${ETCDCTL_CMD} --debug --endpoints=http://127.0.0.1:${ETCD_PORT} put"
   fi
-  ${ETCD_CMD} --data-dir=${DATA_DIRECTORY} \
+  ${ETCD_CMD} --debug --data-dir=${DATA_DIRECTORY} \
     --listen-client-urls http://127.0.0.1:${ETCD_PORT} \
     --advertise-client-urls http://127.0.0.1:${ETCD_PORT} \
     --listen-peer-urls http://127.0.0.1:${ETCD_PEER_PORT} \
@@ -152,7 +152,7 @@ if [ "${CURRENT_VERSION}" = "2.2.1" -a ! -d "${BACKUP_DIR}" ]; then
   echo "Backup etcd before starting migration"
   mkdir ${BACKUP_DIR}
   ETCDCTL_CMD="/usr/local/bin/etcdctl-2.2.1"
-  ETCDCTL_API=2 ${ETCDCTL_CMD} backup --data-dir=${DATA_DIRECTORY} \
+  ETCDCTL_API=2 ${ETCDCTL_CMD} --debug backup --data-dir=${DATA_DIRECTORY} \
     --backup-dir=${BACKUP_DIR}
   echo "Backup done in ${BACKUP_DIR}"
 fi
@@ -190,7 +190,7 @@ for step in ${SUPPORTED_VERSIONS}; do
     START_VERSION="${step}"
     START_STORAGE="etcd3"
     ETCDCTL_CMD="${ETCDCTL:-/usr/local/bin/etcdctl-${START_VERSION}}"
-    ETCDCTL_API=3 ${ETCDCTL_CMD} migrate --data-dir=${DATA_DIRECTORY}
+    ETCDCTL_API=3 ${ETCDCTL_CMD} --debug migrate --data-dir=${DATA_DIRECTORY}
     echo "Attaching leases to TTL entries"
     # Now attach lease to all keys.
     # To do it, we temporarily start etcd on a random port (so that
