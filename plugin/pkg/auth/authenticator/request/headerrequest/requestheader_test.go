@@ -26,30 +26,36 @@ import (
 
 func TestRequestHeader(t *testing.T) {
 	testcases := map[string]struct {
-		nameHeaders    []string
-		requestHeaders http.Header
+		nameHeaders        []string
+		groupHeaders       []string
+		extraPrefixHeaders []string
+		requestHeaders     http.Header
 
 		expectedUser user.Info
 		expectedOk   bool
 	}{
 		"empty": {},
-		"no match": {
+		"user no match": {
 			nameHeaders: []string{"X-Remote-User"},
 		},
-		"match": {
+		"user match": {
 			nameHeaders:    []string{"X-Remote-User"},
 			requestHeaders: http.Header{"X-Remote-User": {"Bob"}},
-			expectedUser:   &user.DefaultInfo{Name: "Bob"},
-			expectedOk:     true,
+			expectedUser: &user.DefaultInfo{
+				Name:   "Bob",
+				Groups: []string{},
+				Extra:  map[string][]string{},
+			},
+			expectedOk: true,
 		},
-		"exact match": {
+		"user exact match": {
 			nameHeaders: []string{"X-Remote-User"},
 			requestHeaders: http.Header{
 				"Prefixed-X-Remote-User-With-Suffix": {"Bob"},
 				"X-Remote-User-With-Suffix":          {"Bob"},
 			},
 		},
-		"first match": {
+		"user first match": {
 			nameHeaders: []string{
 				"X-Remote-User",
 				"A-Second-X-Remote-User",
@@ -59,19 +65,83 @@ func TestRequestHeader(t *testing.T) {
 				"X-Remote-User":          {"", "First header, second value"},
 				"A-Second-X-Remote-User": {"Second header, first value", "Second header, second value"},
 				"Another-X-Remote-User":  {"Third header, first value"}},
-			expectedUser: &user.DefaultInfo{Name: "Second header, first value"},
-			expectedOk:   true,
+			expectedUser: &user.DefaultInfo{
+				Name:   "Second header, first value",
+				Groups: []string{},
+				Extra:  map[string][]string{},
+			},
+			expectedOk: true,
 		},
-		"case-insensitive": {
+		"user case-insensitive": {
 			nameHeaders:    []string{"x-REMOTE-user"},             // configured headers can be case-insensitive
 			requestHeaders: http.Header{"X-Remote-User": {"Bob"}}, // the parsed headers are normalized by the http package
-			expectedUser:   &user.DefaultInfo{Name: "Bob"},
-			expectedOk:     true,
+			expectedUser: &user.DefaultInfo{
+				Name:   "Bob",
+				Groups: []string{},
+				Extra:  map[string][]string{},
+			},
+			expectedOk: true,
+		},
+
+		"groups none": {
+			nameHeaders:  []string{"X-Remote-User"},
+			groupHeaders: []string{"X-Remote-Group"},
+			requestHeaders: http.Header{
+				"X-Remote-User": {"Bob"},
+			},
+			expectedUser: &user.DefaultInfo{
+				Name:   "Bob",
+				Groups: []string{},
+				Extra:  map[string][]string{},
+			},
+			expectedOk: true,
+		},
+		"groups all matches": {
+			nameHeaders:  []string{"X-Remote-User"},
+			groupHeaders: []string{"X-Remote-Group-1", "X-Remote-Group-2"},
+			requestHeaders: http.Header{
+				"X-Remote-User":    {"Bob"},
+				"X-Remote-Group-1": {"one-a", "one-b"},
+				"X-Remote-Group-2": {"two-a", "two-b"},
+			},
+			expectedUser: &user.DefaultInfo{
+				Name:   "Bob",
+				Groups: []string{"one-a", "one-b", "two-a", "two-b"},
+				Extra:  map[string][]string{},
+			},
+			expectedOk: true,
+		},
+
+		"extra prefix matches case-insensitive": {
+			nameHeaders:        []string{"X-Remote-User"},
+			groupHeaders:       []string{"X-Remote-Group-1", "X-Remote-Group-2"},
+			extraPrefixHeaders: []string{"X-Remote-Extra-1-", "X-Remote-Extra-2-"},
+			requestHeaders: http.Header{
+				"X-Remote-User":         {"Bob"},
+				"X-Remote-Group-1":      {"one-a", "one-b"},
+				"X-Remote-Group-2":      {"two-a", "two-b"},
+				"X-Remote-extra-1-key1": {"alfa", "bravo"},
+				"X-Remote-Extra-1-Key2": {"charlie", "delta"},
+				"X-Remote-Extra-1-":     {"india", "juliet"},
+				"X-Remote-extra-2-":     {"kilo", "lima"},
+				"X-Remote-extra-2-Key1": {"echo", "foxtrot"},
+				"X-Remote-Extra-2-key2": {"golf", "hotel"},
+			},
+			expectedUser: &user.DefaultInfo{
+				Name:   "Bob",
+				Groups: []string{"one-a", "one-b", "two-a", "two-b"},
+				Extra: map[string][]string{
+					"key1": {"alfa", "bravo", "echo", "foxtrot"},
+					"key2": {"charlie", "delta", "golf", "hotel"},
+					"":     {"india", "juliet", "kilo", "lima"},
+				},
+			},
+			expectedOk: true,
 		},
 	}
 
 	for k, testcase := range testcases {
-		auth, err := New(testcase.nameHeaders)
+		auth, err := New(testcase.nameHeaders, testcase.groupHeaders, testcase.extraPrefixHeaders)
 		if err != nil {
 			t.Fatal(err)
 		}
