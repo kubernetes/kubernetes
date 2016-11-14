@@ -48,6 +48,7 @@ const (
 		{{end -}}
 		{{" "}}{{index .Cfg.API.AdvertiseAddresses 0 -}}
 `
+	gcrPrefix = "gcr.io/google_containers"
 )
 
 var (
@@ -155,6 +156,10 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		"Port for JWS discovery service to bind to",
 	)
 
+	cmd.PersistentFlags().StringVar(
+		&cfg.ImagePrefix, "image-prefix", gcrPrefix,
+		"use specific images instead of gcr",
+	)
 	return cmd
 }
 
@@ -246,7 +251,7 @@ func (i *Init) Run(out io.Writer) error {
 		}
 	}
 
-	client, err := kubemaster.CreateClientAndWaitForAPI(kubeconfigs["admin"])
+	client, err := kubemaster.CreateClientAndWaitForAPI(i.cfg, kubeconfigs["admin"])
 	if err != nil {
 		return err
 	}
