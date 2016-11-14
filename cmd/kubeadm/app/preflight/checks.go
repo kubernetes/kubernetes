@@ -186,15 +186,15 @@ func (hc HostnameCheck) Check() (warnings, errors []error) {
 	return nil, errors
 }
 
-// HttpProxyCheck checks if https connection to specific host is going
+// HTTPProxyCheck checks if https connection to specific host is going
 // to be done directly or over proxy. If proxy detected, it will return warning.
-type HttpProxyCheck struct {
+type HTTPProxyCheck struct {
 	Proto string
 	Host  string
 	Port  int
 }
 
-func (hst HttpProxyCheck) Check() (warnings, errors []error) {
+func (hst HTTPProxyCheck) Check() (warnings, errors []error) {
 
 	url := fmt.Sprintf("%s://%s:%d", hst.Proto, hst.Host, hst.Port)
 
@@ -227,7 +227,7 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		PortOpenCheck{port: 10250},
 		PortOpenCheck{port: 10251},
 		PortOpenCheck{port: 10252},
-		HttpProxyCheck{Proto: "https", Host: cfg.API.AdvertiseAddresses[0], Port: int(cfg.API.BindPort)},
+		HTTPProxyCheck{Proto: "https", Host: cfg.API.AdvertiseAddresses[0], Port: int(cfg.API.BindPort)},
 		DirAvailableCheck{Path: "/etc/kubernetes/manifests"},
 		DirAvailableCheck{Path: "/etc/kubernetes/pki"},
 		DirAvailableCheck{Path: "/var/lib/etcd"},
@@ -256,8 +256,8 @@ func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 		ServiceCheck{Service: "docker"},
 		ServiceCheck{Service: "kubelet"},
 		PortOpenCheck{port: 10250},
-		HttpProxyCheck{Proto: "https", Host: cfg.MasterAddresses[0], Port: int(cfg.APIPort)},
-		HttpProxyCheck{Proto: "http", Host: cfg.MasterAddresses[0], Port: int(cfg.DiscoveryPort)},
+		HTTPProxyCheck{Proto: "https", Host: cfg.MasterAddresses[0], Port: int(cfg.APIPort)},
+		HTTPProxyCheck{Proto: "http", Host: cfg.MasterAddresses[0], Port: int(cfg.DiscoveryPort)},
 		DirAvailableCheck{Path: "/etc/kubernetes/manifests"},
 		DirAvailableCheck{Path: "/var/lib/kubelet"},
 		FileAvailableCheck{Path: "/etc/kubernetes/kubelet.conf"},
