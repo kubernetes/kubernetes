@@ -728,21 +728,34 @@ runTests() {
   kubectl delete -f hack/testdata/pod.yaml "${kube_flags[@]}"
 
   ### Create valid-pod POD
-  # Pre-condition: no POD exists
-  create_and_use_new_namespace
-  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
-  ## kubectl create --edit can update the image field of a POD. tmp-editor.sh is a fake editor
+  # Pre-condition: no services and no rcs exist
+  kube::test::get_object_assert service "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
+  ## kubectl create --edit can update the label filed of multiple resources. tmp-editor.sh is a fake editor
   TEMP=$(mktemp /tmp/tmp-editor-XXXXXXXX.sh)
-  echo -e "#!/bin/bash\n$SED -i \"s/gcr.io\/google_containers\/serve_hostname/nginx/g\" \$1" > ${TEMP}
+  echo -e "#!/bin/bash\n$SED -i \"s/mock/modified/g\" \$1" > ${TEMP}
   chmod +x ${TEMP}
   # Command
-  EDITOR=${TEMP} kubectl create --edit -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml "${kube_flags[@]}"
-  # Post-condition: valid-pod POD is created and has image gcr.io/google_containers/serve_hostname
-  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
-  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'nginx:'
+  EDITOR=${TEMP} kubectl create --edit -f hack/testdata/multi-resource-json.json "${kube_flags[@]}"
+  # Post-condition: service named modified and rc named modified are created
+  kube::test::get_object_assert service "{{range.items}}{{$id_field}}:{{end}}" 'modified:'
+  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'modified:'
+  # Clean up
+  kubectl delete service/modified "${kube_flags[@]}"
+  kubectl delete rc/modified "${kube_flags[@]}"
+
+  # Pre-condition: no services and no rcs exist
+  kube::test::get_object_assert service "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  EDITOR=${TEMP} kubectl create --edit -f hack/testdata/multi-resource-list.json "${kube_flags[@]}"
+  # Post-condition: service named modified and rc named modified are created
+  kube::test::get_object_assert service "{{range.items}}{{$id_field}}:{{end}}" 'modified:'
+  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'modified:'
   # Clean up
   rm ${TEMP}
-  kubectl delete pods/valid-pod "${kube_flags[@]}"
+  kubectl delete service/modified "${kube_flags[@]}"
+  kubectl delete rc/modified "${kube_flags[@]}"
 
   ## kubectl create --edit won't create anything if user makes no changes
   [ "$(EDITOR=cat kubectl create --edit -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml -o json 2>&1 | grep 'Edit cancelled')" ]
