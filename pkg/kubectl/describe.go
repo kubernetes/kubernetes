@@ -863,7 +863,7 @@ func describeContainers(label string, containers []api.Container, containerStatu
 		statuses[status.Name] = status
 	}
 
-	writer := PrefixWriter{out}
+	writer := &PrefixWriter{out}
 	describeContainersLabel(containers, label, space, writer)
 
 	for _, container := range containers {
@@ -880,7 +880,7 @@ func describeContainers(label string, containers []api.Container, containerStatu
 	}
 }
 
-func describeContainersLabel(containers []api.Container, label, space string, writer PrefixWriter) {
+func describeContainersLabel(containers []api.Container, label, space string, writer *PrefixWriter) {
 	none := ""
 	if len(containers) == 0 {
 		none = "<none>"
@@ -888,7 +888,7 @@ func describeContainersLabel(containers []api.Container, label, space string, wr
 	writer.Write(LEVEL_0, "%s%s: %s\n", space, label, none)
 }
 
-func describeContainerBasicInfo(container api.Container, status api.ContainerStatus, ok bool, space string, writer PrefixWriter) {
+func describeContainerBasicInfo(container api.Container, status api.ContainerStatus, ok bool, space string, writer *PrefixWriter) {
 	nameIndent := ""
 	if len(space) > 0 {
 		nameIndent = " "
@@ -917,7 +917,7 @@ func describeContainerPorts(cPorts []api.ContainerPort) string {
 	return strings.Join(ports, ", ")
 }
 
-func describeContainerCommand(container api.Container, writer PrefixWriter) {
+func describeContainerCommand(container api.Container, writer *PrefixWriter) {
 	if len(container.Command) > 0 {
 		writer.Write(LEVEL_2, "Command:\n")
 		for _, c := range container.Command {
@@ -932,7 +932,7 @@ func describeContainerCommand(container api.Container, writer PrefixWriter) {
 	}
 }
 
-func describeContainerResource(container api.Container, writer PrefixWriter) {
+func describeContainerResource(container api.Container, writer *PrefixWriter) {
 	resources := container.Resources
 	if len(resources.Limits) > 0 {
 		writer.Write(LEVEL_2, "Limits:\n")
@@ -951,7 +951,7 @@ func describeContainerResource(container api.Container, writer PrefixWriter) {
 	}
 }
 
-func describeContainerState(status api.ContainerStatus, out io.Writer, writer PrefixWriter) {
+func describeContainerState(status api.ContainerStatus, out io.Writer, writer *PrefixWriter) {
 	describeStatus("State", status.State, out)
 	if status.LastTerminationState.Terminated != nil {
 		describeStatus("Last State", status.LastTerminationState, out)
@@ -960,7 +960,7 @@ func describeContainerState(status api.ContainerStatus, out io.Writer, writer Pr
 	writer.Write(LEVEL_2, "Restart Count:\t%d\n", status.RestartCount)
 }
 
-func describeContainerProbe(container api.Container, writer PrefixWriter) {
+func describeContainerProbe(container api.Container, writer *PrefixWriter) {
 	if container.LivenessProbe != nil {
 		probe := DescribeProbe(container.LivenessProbe)
 		writer.Write(LEVEL_2, "Liveness:\t%s\n", probe)
@@ -971,7 +971,7 @@ func describeContainerProbe(container api.Container, writer PrefixWriter) {
 	}
 }
 
-func describeContainerVolumes(container api.Container, writer PrefixWriter) {
+func describeContainerVolumes(container api.Container, writer *PrefixWriter) {
 	none := ""
 	if len(container.VolumeMounts) == 0 {
 		none = "\t<none>"
@@ -993,7 +993,7 @@ func describeContainerVolumes(container api.Container, writer PrefixWriter) {
 	}
 }
 
-func describeContainerEnvVars(container api.Container, resolverFn EnvVarResolverFunc, writer PrefixWriter) {
+func describeContainerEnvVars(container api.Container, resolverFn EnvVarResolverFunc, writer *PrefixWriter) {
 	none := ""
 	if len(container.Env) == 0 {
 		none = "\t<none>"
