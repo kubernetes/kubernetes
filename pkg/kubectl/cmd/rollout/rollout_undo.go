@@ -72,12 +72,18 @@ func NewCmdRolloutUndo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    undo_long,
 		Example: undo_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := options.CompleteUndo(f, cmd, out, args); err != nil {
-				cmdutil.CheckErr(err)
+			completeErr := options.CompleteUndo(f, cmd, out, args)
+			if completeErr != nil {
+				// Allow to proceed with objects we were able to collect and fail later.
+				if len(options.Infos) == 0 {
+					cmdutil.CheckErr(completeErr)
+				}
 			}
-			if err := options.RunUndo(); err != nil {
-				cmdutil.CheckErr(err)
+			err := options.RunUndo()
+			if err == nil {
+				err = completeErr
 			}
+			cmdutil.CheckErr(err)
 		},
 		ValidArgs:  validArgs,
 		ArgAliases: argAliases,
