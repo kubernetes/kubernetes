@@ -223,7 +223,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 	}
 	if framework.TestContext.CgroupsPerQOS {
 		cmdArgs = append(cmdArgs,
-			"--cgroups-per-qos", "true",
+			"--experimental-cgroups-per-qos", "true",
 			"--cgroup-root", "/",
 		)
 	}

@@ -435,7 +435,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		nodeStatusUpdateFrequency: kubeCfg.NodeStatusUpdateFrequency.Duration,
 		os:                kubeDeps.OSInterface,
 		oomWatcher:        oomWatcher,
-		cgroupsPerQOS:     kubeCfg.CgroupsPerQOS,
+		cgroupsPerQOS:     kubeCfg.ExperimentalCgroupsPerQOS,
 		cgroupRoot:        kubeCfg.CgroupRoot,
 		mounter:           kubeDeps.Mounter,
 		writer:            kubeDeps.Writer,
