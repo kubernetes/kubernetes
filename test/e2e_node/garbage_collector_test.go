@@ -21,7 +21,6 @@ import (
 	"strings"
 	"time"
 
-	dockertypes "github.com/docker/engine-api/types"
 	"k8s.io/kubernetes/pkg/api"
 	docker "k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -34,6 +33,7 @@ const (
 	defaultDockerEndpoint = "unix:///var/run/docker.sock"
 
 	//TODO (dashpole): Once dynamic config is possible, test different values for maxPerPodContainer and maxContainers
+	// Currently using default values for maxPerPodContainer and maxTotalContainers
 	maxPerPodContainer = 1
 	maxTotalContainers = -1
 
@@ -53,8 +53,12 @@ type testPodSpec struct {
 	restartCount int32
 	// the number of containers in the test pod
 	numContainers int
-	// a function that returns the number of containers currently running on the node.
-	getContainerCount func() (int, error)
+	// a function that returns the number of containers currently on the node (including dead containers).
+	getContainerNames func() ([]string, error)
+}
+
+func (pod *testPodSpec) getContainerName(containerNumber int) string {
+	return fmt.Sprintf("%s%d", pod.containerPrefix, containerNumber)
 }
 
 type testRun struct {
@@ -172,19 +176,27 @@ func containerGCTest(f *framework.Framework, test testRun) {
 			Eventually(func() error {
 				total := 0
 				for _, pod := range test.testPods {
-					containerCount, err := pod.getContainerCount()
+					containerNames, err := pod.getContainerNames()
 					if err != nil {
 						return err
 					}
-					total += containerCount
-					// Check maxPerPodContainer
-					if containerCount > (maxPerPodContainer+1)*pod.numContainers {
-						return fmt.Errorf("expected total number of pod %v's containers: %v, to be <= (maxPerPodContainer+1)*numContainers %v",
-							pod.podName, containerCount, (maxPerPodContainer+1)*pod.numContainers)
+					total += len(containerNames)
+					// Check maxPerPodContainer for each container in the pod
+					for i := 0; i < pod.numContainers; i++ {
+						containerCount := 0
+						for _, containerName := range containerNames {
+							if strings.Contains(containerName, pod.getContainerName(i)) {
+								containerCount += 1
+							}
+						}
+						if containerCount > maxPerPodContainer+1 {
+							return fmt.Errorf("expected number of copies of container: %s, to be <= maxPerPodContainer%d; list of containers: %v",
+								pod.podName, pod.getContainerName(i), maxPerPodContainer, containerNames)
+						}
 					}
 				}
 				//Check maxTotalContainers
-				if (maxTotalContainers > 0 || totalContainers <= maxTotalContainers) && total > maxTotalContainers {
+				if maxTotalContainers > 0 && totalContainers <= maxTotalContainers && total > maxTotalContainers {
 					return fmt.Errorf("expected total number of containers: %v, to be <= maxTotalContainers: %v", total, maxTotalContainers)
 				}
 				return nil
@@ -194,14 +206,20 @@ func containerGCTest(f *framework.Framework, test testRun) {
 				By("Making sure the kubelet consistently keeps around an extra copy of each container.")
 				Consistently(func() error {
 					for _, pod := range test.testPods {
-						containerCount, err := pod.getContainerCount()
+						containerNames, err := pod.getContainerNames()
 						if err != nil {
 							return err
 						}
-						// TODO (dashpole): Find the number of each individual container, rather than the total containers in the pod.
-						// Make sure that each container has the appropriate number, rather than the pod having enough total containers.
-						if pod.restartCount > 0 && containerCount < pod.numContainers*2 {
-							return fmt.Errorf("expected pod %v to have extra copies of old containers", pod.podName)
+						for i := 0; i < pod.numContainers; i++ {
+							containerCount := 0
+							for _, containerName := range containerNames {
+								if strings.Contains(containerName, pod.getContainerName(i)) {
+									containerCount += 1
+								}
+							}
+							if pod.restartCount > 0 && containerCount < maxPerPodContainer+1 {
+								return fmt.Errorf("expected pod %v to have extra copies of old containers", pod.podName)
+							}
 						}
 					}
 					return nil
@@ -218,12 +236,12 @@ func containerGCTest(f *framework.Framework, test testRun) {
 			By("Making sure all containers get cleaned up")
 			Eventually(func() error {
 				for _, pod := range test.testPods {
-					containerCount, err := pod.getContainerCount()
+					containerNames, err := pod.getContainerNames()
 					if err != nil {
 						return err
 					}
-					if containerCount > 0 {
-						return fmt.Errorf("%v containers still remain", containerCount)
+					if len(containerNames) > 0 {
+						return fmt.Errorf("%v containers still remain", containerNames)
 					}
 				}
 				return nil
@@ -241,24 +259,21 @@ func containerGCTest(f *framework.Framework, test testRun) {
 func dockerContainerGCTest(f *framework.Framework, test testRun) {
 	runtime := docker.ConnectToDockerOrDie(defaultDockerEndpoint, defaultRuntimeRequestTimeoutDuration)
 	for _, pod := range test.testPods {
-		// Initialize the getContainerCount function to use the dockertools api
+		// Initialize the getContainerNames function to use the dockertools api
 		thisPrefix := pod.containerPrefix
-		pod.getContainerCount = func() (int, error) {
-			relevantContainers := []*dockertypes.Container{}
+		pod.getContainerNames = func() ([]string, error) {
+			relevantContainers := []string{}
 			dockerContainers, err := docker.GetKubeletDockerContainers(runtime, true)
 			if err != nil {
-				return 0, err
+				return relevantContainers, err
 			}
 			for _, container := range dockerContainers {
 				// only look for containers from this testspec
 				if strings.Contains(container.Names[0], thisPrefix) {
-					relevantContainers = append(relevantContainers, container)
+					relevantContainers = append(relevantContainers, container.Names[0])
 				}
 			}
-			for i, container := range relevantContainers {
-				framework.Logf("%v containers; looking for %v; number %v; found %v", len(relevantContainers), thisPrefix, i, container.Names[0])
-			}
-			return len(relevantContainers), nil
+			return relevantContainers, nil
 		}
 	}
 	containerGCTest(f, test)
@@ -271,7 +286,7 @@ func getPods(specs []*testPodSpec) (pods []*api.Pod) {
 		for i := 0; i < spec.numContainers; i++ {
 			containers = append(containers, api.Container{
 				Image: "gcr.io/google_containers/busybox:1.24",
-				Name:  fmt.Sprintf("%s%d", spec.containerPrefix, i),
+				Name:  spec.getContainerName(i),
 				Command: []string{
 					"sh",
 					"-c",
