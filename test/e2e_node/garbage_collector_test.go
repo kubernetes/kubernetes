@@ -195,7 +195,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 						}
 					}
 				}
-				//Check maxTotalContainers
+				//Check maxTotalContainers.  Currently, the default is -1, so this will never happen until we can configure maxTotalContainers
 				if maxTotalContainers > 0 && totalContainers <= maxTotalContainers && total > maxTotalContainers {
 					return fmt.Errorf("expected total number of containers: %v, to be <= maxTotalContainers: %v", total, maxTotalContainers)
 				}
