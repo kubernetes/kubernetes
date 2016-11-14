@@ -38,7 +38,7 @@ import (
 type ResumeConfig struct {
 	resource.FilenameOptions
 
-	Resumer func(object *resource.Info) (bool, error)
+	Resumer func(object *resource.Info) ([]byte, error)
 	Mapper  meta.RESTMapper
 	Typer   runtime.ObjectTyper
 	Encoder runtime.Encoder
