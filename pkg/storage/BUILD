@@ -87,6 +87,7 @@ go_test(
         "//pkg/storage/etcd:go_default_library",
         "//pkg/storage/etcd/etcdtest:go_default_library",
         "//pkg/storage/etcd/testing:go_default_library",
+        "//pkg/storage/etcd3:go_default_library",
         "//pkg/util/sets:go_default_library",
         "//pkg/util/wait:go_default_library",
         "//pkg/watch:go_default_library",
