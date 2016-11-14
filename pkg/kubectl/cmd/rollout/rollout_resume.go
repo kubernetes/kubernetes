@@ -39,7 +39,7 @@ type ResumeConfig struct {
 	resource.FilenameOptions
 
 	f       cmdutil.Factory
-	Resumer func(object *resource.Info) (bool, error)
+	Resumer func(object *resource.Info) ([]byte, error)
 	Mapper  meta.RESTMapper
 	Typer   runtime.ObjectTyper
 	Encoder runtime.Encoder

@@ -1906,6 +1906,19 @@ __EOF__
   # Describe command should print events information when show-events=true
   kube::test::describe_resource_events_assert services true
 
+  ### set selector
+  # prove role=master
+  kube::test::get_object_assert 'services redis-master' "{{range$service_selector_field}}{{.}}:{{end}}" "redis:master:backend:"
+
+  # Set command to change the selector.
+  kubectl set selector -f examples/guestbook/redis-master-service.yaml role=padawan
+  # prove role=padawan
+  kube::test::get_object_assert 'services redis-master' "{{range$service_selector_field}}{{.}}:{{end}}" "padawan:"
+  # Set command to reset the selector back to the original one.
+  kubectl set selector -f examples/guestbook/redis-master-service.yaml app=redis,role=master,tier=backend
+  # prove role=master
+  kube::test::get_object_assert 'services redis-master' "{{range$service_selector_field}}{{.}}:{{end}}" "redis:master:backend:"
+
   ### Dump current redis-master service
   output_service=$(kubectl get service redis-master -o json --output-version=v1 "${kube_flags[@]}")
 

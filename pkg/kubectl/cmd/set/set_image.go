@@ -165,7 +165,7 @@ func (o *ImageOptions) Validate() error {
 func (o *ImageOptions) Run() error {
 	allErrs := []error{}
 
-	patches := CalculatePatches(o.f, o.Infos, o.Encoder, o.Local, func(info *resource.Info) (bool, error) {
+	patches := CalculatePatches(o.f, o.Infos, o.Encoder, o.Local, func(info *resource.Info) ([]byte, error) {
 		transformed := false
 		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *api.PodSpec) error {
 			for name, image := range o.ContainerImages {
@@ -186,7 +186,10 @@ func (o *ImageOptions) Run() error {
 			}
 			return nil
 		})
-		return transformed, err
+		if transformed && err == nil {
+			return runtime.Encode(o.Encoder, info.Object)
+		}
+		return nil, err
 	})
 
 	smPatchVersion := strategicpatch.SMPatchVersionLatest
