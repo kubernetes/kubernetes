@@ -474,25 +474,41 @@ func (az *Cloud) reconcileLoadBalancer(lb network.LoadBalancer, pip *network.Pub
 func (az *Cloud) reconcileSecurityGroup(sg network.SecurityGroup, clusterName string, service *api.Service) (network.SecurityGroup, bool, error) {
 	serviceName := getServiceName(service)
 	wantLb := len(service.Spec.Ports) > 0
-	expectedSecurityRules := make([]network.SecurityRule, len(service.Spec.Ports))
+
+	sourceRanges, err := serviceapi.GetLoadBalancerSourceRanges(service)
+	if err != nil {
+		return sg, false, err
+	}
+	var sourceAddressPrefixes []string
+	if sourceRanges == nil || serviceapi.IsAllowAll(sourceRanges) {
+		sourceAddressPrefixes = []string{"Internet"}
+	} else {
+		for _, ip := range sourceRanges {
+			sourceAddressPrefixes = append(sourceAddressPrefixes, ip.String())
+		}
+	}
+	expectedSecurityRules := make([]network.SecurityRule, len(service.Spec.Ports)*len(sourceAddressPrefixes))
+
 	for i, port := range service.Spec.Ports {
 		securityRuleName := getRuleName(service, port)
 		_, securityProto, _, err := getProtocolsFromKubernetesProtocol(port.Protocol)
 		if err != nil {
 			return sg, false, err
 		}
-
-		expectedSecurityRules[i] = network.SecurityRule{
-			Name: to.StringPtr(securityRuleName),
-			Properties: &network.SecurityRulePropertiesFormat{
-				Protocol:                 securityProto,
-				SourcePortRange:          to.StringPtr("*"),
-				DestinationPortRange:     to.StringPtr(strconv.Itoa(int(port.Port))),
-				SourceAddressPrefix:      to.StringPtr("Internet"),
-				DestinationAddressPrefix: to.StringPtr("*"),
-				Access:    network.Allow,
-				Direction: network.Inbound,
-			},
+		for j := range sourceAddressPrefixes {
+			ix := i*len(sourceAddressPrefixes) + j
+			expectedSecurityRules[ix] = network.SecurityRule{
+				Name: to.StringPtr(securityRuleName),
+				Properties: &network.SecurityRulePropertiesFormat{
+					Protocol:                 securityProto,
+					SourcePortRange:          to.StringPtr("*"),
+					DestinationPortRange:     to.StringPtr(strconv.Itoa(int(port.Port))),
+					SourceAddressPrefix:      to.StringPtr(sourceAddressPrefixes[j]),
+					DestinationAddressPrefix: to.StringPtr("*"),
+					Access:    network.Allow,
+					Direction: network.Inbound,
+				},
+			}
 		}
 	}
 
