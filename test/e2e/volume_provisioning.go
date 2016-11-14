@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 
@@ -143,9 +144,21 @@ func testDynamicProvisioning(t storageClassTest, client clientset.Interface, cla
 func checkAWSEBS(volume *v1.PersistentVolume, volumeType string, encrypted bool) error {
 	diskName := volume.Spec.AWSElasticBlockStore.VolumeID
 
-	client := ec2.New(session.New())
+	var client *ec2.EC2
+
 	tokens := strings.Split(diskName, "/")
 	volumeID := tokens[len(tokens)-1]
+
+	zone := framework.TestContext.CloudConfig.Zone
+	if len(zone) > 0 {
+		region := zone[:len(zone)-1]
+		cfg := aws.Config{Region: &region}
+		framework.Logf("using region %s", region)
+		client = ec2.New(session.New(), &cfg)
+	} else {
+		framework.Logf("no region configured")
+		client = ec2.New(session.New())
+	}
 
 	request := &ec2.DescribeVolumesInput{
 		VolumeIds: []*string{&volumeID},
