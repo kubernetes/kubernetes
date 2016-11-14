@@ -62,6 +62,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	const pkgAPI = "k8s.io/kubernetes/pkg/api"
 	const pkgSerializer = "k8s.io/kubernetes/pkg/runtime/serializer"
 	const pkgUnversioned = "k8s.io/kubernetes/pkg/api/unversioned"
+	const pkgSchema = "k8s.io/kubernetes/pkg/runtime/schema"
 
 	apiPath := func(group string) string {
 		if len(g.apiPath) > 0 {
@@ -96,7 +97,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 		"Group":                      c.Universe.Variable(types.Name{Package: pkgRegistered, Name: "Group"}),
 		"GroupOrDie":                 c.Universe.Variable(types.Name{Package: pkgRegistered, Name: "GroupOrDie"}),
 		"IsEnabledVersion":           c.Universe.Variable(types.Name{Package: pkgRegistered, Name: "IsEnabledVersion"}),
-		"ParseGroupVersion":          c.Universe.Function(types.Name{Package: pkgUnversioned, Name: "ParseGroupVersion"}),
+		"ParseGroupVersion":          c.Universe.Function(types.Name{Package: pkgSchema, Name: "ParseGroupVersion"}),
 		"apiPath":                    apiPath(g.group),
 		"codecs":                     c.Universe.Variable(types.Name{Package: pkgAPI, Name: "Codecs"}),
 		"directCodecFactory":         c.Universe.Variable(types.Name{Package: pkgSerializer, Name: "DirectCodecFactory"}),

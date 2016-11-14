@@ -62,6 +62,7 @@ func New() *Generator {
 		Packages: strings.Join([]string{
 			`+k8s.io/kubernetes/pkg/util/intstr`,
 			`+k8s.io/kubernetes/pkg/api/resource`,
+			`+k8s.io/kubernetes/pkg/runtime/schema`,
 			`+k8s.io/kubernetes/pkg/runtime`,
 			`+k8s.io/kubernetes/pkg/watch/versioned`,
 			`k8s.io/kubernetes/pkg/api/unversioned`,
