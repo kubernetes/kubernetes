@@ -30,11 +30,11 @@ import (
 var (
 	// requestLatency is a Prometheus Summary metric type partitioned by
 	// "verb" and "url" labels. It is used for the rest client latency metrics.
-	requestLatency = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
-			Name:   "rest_client_request_latency_seconds",
-			Help:   "Request latency in seconds. Broken down by verb and URL.",
-			MaxAge: time.Hour,
+	requestLatency = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "rest_client_request_latency_seconds",
+			Help:    "Request latency in seconds. Broken down by verb and URL.",
+			Buckets: prometheus.ExponentialBuckets(0.001, 2, 10),
 		},
 		[]string{"verb", "url"},
 	)
@@ -55,7 +55,7 @@ func init() {
 }
 
 type latencyAdapter struct {
-	m *prometheus.SummaryVec
+	m *prometheus.HistogramVec
 }
 
 func (l *latencyAdapter) Observe(verb string, u url.URL, latency time.Duration) {
