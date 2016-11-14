@@ -64,7 +64,6 @@ go_test(
         "log_path_test.go",
         "memory_eviction_test.go",
         "mirror_pod_test.go",
-        "pod_deletion_test.go",
         "resource_usage_test.go",
         "restart_test.go",
         "runtime_conformance_test.go",
