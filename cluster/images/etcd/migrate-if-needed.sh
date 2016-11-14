@@ -100,7 +100,7 @@ fi
 # Returns 0 if etcd was successfully started, non-0 otherwise.
 start_etcd() {
   # Use random ports, so that apiserver cannot connect to etcd.
-  ETCD_PORT=18629
+  ETCD_PORT=2379
   ETCD_PEER_PORT=2380
   # Avoid collisions between etcd and event-etcd.
   case "${DATA_DIRECTORY}" in
