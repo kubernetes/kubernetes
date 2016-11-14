@@ -148,14 +148,14 @@ type EventSinkImpl struct {
 	Interface EventInterface
 }
 
-func (e *EventSinkImpl) Create(event *api.Event) (*api.Event, error) {
+func (e EventSinkImpl) Create(event *api.Event) (*api.Event, error) {
 	return e.Interface.CreateWithEventNamespace(event)
 }
 
-func (e *EventSinkImpl) Update(event *api.Event) (*api.Event, error) {
+func (e EventSinkImpl) Update(event *api.Event) (*api.Event, error) {
 	return e.Interface.UpdateWithEventNamespace(event)
 }
 
-func (e *EventSinkImpl) Patch(event *api.Event, data []byte) (*api.Event, error) {
+func (e EventSinkImpl) Patch(event *api.Event, data []byte) (*api.Event, error) {
 	return e.Interface.PatchWithEventNamespace(event, data)
 }
