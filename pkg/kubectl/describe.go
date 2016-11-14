@@ -846,7 +846,7 @@ func (this *PrefixWriter) Write(level int, format string, a ...interface{}) {
 	for i := 0; i < level; i++ {
 		prefix += levelSpace
 	}
-	fmt.Fprintf(this.out, prefix+format, a)
+	fmt.Fprintf(this.out, prefix+format, a...)
 }
 
 const (

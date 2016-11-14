@@ -362,6 +362,9 @@ func TestDescribeContainers(t *testing.T) {
 		}
 		describeContainers("Containers", pod.Spec.Containers, pod.Status.ContainerStatuses, EnvValueRetriever(&pod), out, "")
 		output := out.String()
+		if strings.Contains(output, "%!s(MISSING)") {
+			t.Errorf("Test case %d: some field didn't print out in output: %q", i, output)
+		}
 		for _, expected := range testCase.expectedElements {
 			if !strings.Contains(output, expected) {
 				t.Errorf("Test case %d: expected to find %q in output: %q", i, expected, output)
