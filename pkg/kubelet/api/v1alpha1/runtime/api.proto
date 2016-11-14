@@ -258,6 +258,16 @@ message PodSandboxConfig {
     //      * localhost/<profile-name>: the profile installed to the node's
     //        local seccomp profile root
     //
+    // 3. Sysctls
+    //
+    //      key: security.alpha.kubernetes.io/sysctls
+    //      description: list of safe sysctls which are set for the sandbox.
+    //      value: comma separated list of sysctl_name=value key-value pairs.
+    //
+    //      key: security.alpha.kubernetes.io/unsafe-sysctls
+    //      description: list of unsafe sysctls which are set for the sandbox.
+    //      value: comma separated list of sysctl_name=value key-value pairs.
+    //
     map<string, string> annotations = 7;
     // Optional configurations specific to Linux hosts.
     optional LinuxPodSandboxConfig linux = 8;
