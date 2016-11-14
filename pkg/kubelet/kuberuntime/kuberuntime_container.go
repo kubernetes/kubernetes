@@ -135,13 +135,17 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 		return nil, err
 	}
 
-	// Verify RunAsNonRoot.
-	imageUser, err := m.getImageUser(container.Image)
+	uid, username, err := m.getImageUser(container.Image)
 	if err != nil {
 		return nil, err
 	}
-	if err := verifyRunAsNonRoot(pod, container, imageUser); err != nil {
-		return nil, err
+	if uid != nil {
+		// Verify RunAsNonRoot. Non-root verification only supports numeric user.
+		if err := verifyRunAsNonRoot(pod, container, *uid); err != nil {
+			return nil, err
+		}
+	} else {
+		glog.Warningf("Non-root verification doesn't support non-numeric user (%s)", *username)
 	}
 
 	command, args := kubecontainer.ExpandContainerCommandAndArgs(container, opts.Envs)
@@ -164,7 +168,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 		Stdin:       &container.Stdin,
 		StdinOnce:   &container.StdinOnce,
 		Tty:         &container.TTY,
-		Linux:       m.generateLinuxContainerConfig(container, pod, imageUser),
+		Linux:       m.generateLinuxContainerConfig(container, pod, uid, username),
 	}
 
 	// set environment variables
@@ -182,10 +186,10 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 }
 
 // generateLinuxContainerConfig generates linux container config for kubelet runtime api.
-func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *api.Container, pod *api.Pod, imageUser string) *runtimeApi.LinuxContainerConfig {
+func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *api.Container, pod *api.Pod, uid *int64, username *string) *runtimeApi.LinuxContainerConfig {
 	lc := &runtimeApi.LinuxContainerConfig{
 		Resources:       &runtimeApi.LinuxContainerResources{},
-		SecurityContext: m.determineEffectiveSecurityContext(pod, container, imageUser),
+		SecurityContext: m.determineEffectiveSecurityContext(pod, container, uid, username),
 	}
 
 	// set linux container resources
