@@ -174,7 +174,7 @@ func (o *ResourcesOptions) Validate() error {
 
 func (o *ResourcesOptions) Run() error {
 	allErrs := []error{}
-	patches := CalculatePatches(o.Infos, o.Encoder, func(info *resource.Info) (bool, error) {
+	patches := CalculatePatches(o.Infos, o.Encoder, func(info *resource.Info) ([]byte, error) {
 		transformed := false
 		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *api.PodSpec) error {
 			containers, _ := selectContainers(spec.Containers, o.ContainerSelector)
@@ -200,7 +200,10 @@ func (o *ResourcesOptions) Run() error {
 			}
 			return nil
 		})
-		return transformed, err
+		if transformed && err == nil {
+			return runtime.Encode(o.Encoder, info.Object)
+		}
+		return nil, err
 	})
 
 	for _, patch := range patches {

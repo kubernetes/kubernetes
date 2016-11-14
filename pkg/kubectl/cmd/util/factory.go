@@ -147,9 +147,9 @@ type ClientAccessFactory interface {
 	// Returns a Printer for formatting objects of the given type or an error.
 	Printer(mapping *meta.RESTMapping, options kubectl.PrintOptions) (kubectl.ResourcePrinter, error)
 	// Pauser marks the object in the info as paused ie. it will not be reconciled by its controller.
-	Pauser(info *resource.Info) (bool, error)
+	Pauser(info *resource.Info) ([]byte, error)
 	// Resumer resumes a paused object inside the info ie. it will be reconciled by its controller.
-	Resumer(info *resource.Info) (bool, error)
+	Resumer(info *resource.Info) ([]byte, error)
 
 	// ResolveImage resolves the image names. For kubernetes this function is just
 	// passthrough but it allows to perform more sophisticated image name resolving for
