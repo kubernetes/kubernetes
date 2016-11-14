@@ -68,14 +68,6 @@ func TestDecode(t *testing.T) {
 			errFn:       func(err error) bool { return err.Error() == "fake error" },
 		},
 		{
-			data:       []byte("{}"),
-			defaultGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
-			creater:    &mockCreater{err: fmt.Errorf("fake error")},
-
-			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
-			errFn:       func(err error) bool { return err.Error() == "fake error" },
-		},
-		{
 			data:           []byte("{}"),
 			defaultGVK:     &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
 			creater:        &mockCreater{obj: &testDecodable{}},
