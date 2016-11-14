@@ -130,11 +130,12 @@ For more background see https://github.com/kubernetes/kubernetes/issues/30151
 
 ### LoadBalancer Provider Interface
 
-LoadBalancer Provider Interface an interface to Create/Update/Delete LoadBalancer.
+LoadBalancer Provider Interface is an interface to Create/Update/Delete LoadBalancer.
 There can be multiple LoadBalancer provider implementations, such as:
 * AWS loadbalancer provider
 * GCE loadbalancer provider
 * bare-metal nginx loadbalancer provider
+* bare-metal highly-available nginx loadbalancer provider
 * bare-metal haproxy loadbalancer provider
 * bare-metal highly-available haproxy loadbalancer provider
 
@@ -160,6 +161,16 @@ each request 500m bandwidth on it. In such case, we need to a 'scheduling' logic
 Further, we can eventually introduce the 'request/limit model' for network resource
 to acheieve functionalities already implemented in compute resource, for example,
 qos and overcommit.
+
+##### Manually assign LoadBalancerClaim to a LodBalancer
+User can also manually assign LoadBalancerClaim to a LodBalancer, instead of letting
+loadbalancer-controller schedule for him. In such a case, resource request of all
+loadbalancerclaims may excess the loadbalancer's capacity. We validate request and
+capacity when loadbalancer-controller updating the loadbalancing rules: sort all
+Ingress "consume" a same LoadBalancers by creation time, if the sum request excess
+loadbalancer's capacity, avoid updating rules for the last few Ingress and send a
+event. Just like how we validate request at kubelet's side for Pods.
+
 
 ## API
 
