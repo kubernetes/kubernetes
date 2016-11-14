@@ -18,6 +18,7 @@ package transport
 
 import (
 	"net/http"
+	"reflect"
 	"testing"
 )
 
@@ -97,5 +98,60 @@ func TestUserAgentRoundTripper(t *testing.T) {
 	}
 	if rt.Request.Header.Get("User-Agent") != "test" {
 		t.Errorf("unexpected user agent header: %#v", rt.Request)
+	}
+}
+
+func TestImpersonationRoundTripper(t *testing.T) {
+	tcs := []struct {
+		name                string
+		impersonationConfig ImpersonationConfig
+		expected            map[string][]string
+	}{
+		{
+			name: "all",
+			impersonationConfig: ImpersonationConfig{
+				UserName: "user",
+				Groups:   []string{"one", "two"},
+				Extra: map[string][]string{
+					"first":  {"A", "a"},
+					"second": {"B", "b"},
+				},
+			},
+			expected: map[string][]string{
+				ImpersonateUserHeader:                       {"user"},
+				ImpersonateGroupHeader:                      {"one", "two"},
+				ImpersonateUserExtraHeaderPrefix + "First":  {"A", "a"},
+				ImpersonateUserExtraHeaderPrefix + "Second": {"B", "b"},
+			},
+		},
+	}
+
+	for _, tc := range tcs {
+		rt := &testRoundTripper{}
+		req := &http.Request{
+			Header: make(http.Header),
+		}
+		NewImpersonatingRoundTripper(tc.impersonationConfig, rt).RoundTrip(req)
+
+		for k, v := range rt.Request.Header {
+			expected, ok := tc.expected[k]
+			if !ok {
+				t.Errorf("%v missing %v=%v", tc.name, k, v)
+				continue
+			}
+			if !reflect.DeepEqual(expected, v) {
+				t.Errorf("%v expected %v: %v, got %v", tc.name, k, expected, v)
+			}
+		}
+		for k, v := range tc.expected {
+			expected, ok := rt.Request.Header[k]
+			if !ok {
+				t.Errorf("%v missing %v=%v", tc.name, k, v)
+				continue
+			}
+			if !reflect.DeepEqual(expected, v) {
+				t.Errorf("%v expected %v: %v, got %v", tc.name, k, expected, v)
+			}
+		}
 	}
 }
