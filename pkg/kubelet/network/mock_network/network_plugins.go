@@ -78,6 +78,12 @@ func (_m *MockNetworkPlugin) GetPodNetworkStatus(_param0 string, _param1 string,
 	return ret0, ret1
 }
 
+func (_m *MockNetworkPlugin) VerifyPodInterface(_param0 string, _param1 string, _param2 container.ContainerID) (error) {
+	ret := _m.ctrl.Call(_m, "VerifyPodInterface", _param0, _param1, _param2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
 func (_mr *_MockNetworkPluginRecorder) GetPodNetworkStatus(arg0, arg1, arg2 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "GetPodNetworkStatus", arg0, arg1, arg2)
 }

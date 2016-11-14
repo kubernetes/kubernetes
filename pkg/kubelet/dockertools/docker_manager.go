@@ -1479,10 +1479,17 @@ func (dm *DockerManager) killPodWithSyncResult(pod *api.Pod, runningPod kubecont
 			teardownNetworkResult := kubecontainer.NewSyncResult(kubecontainer.TeardownNetwork, kubecontainer.BuildPodFullName(runningPod.Name, runningPod.Namespace))
 			result.AddSyncResult(teardownNetworkResult)
 			glog.V(3).Infof("Calling network plugin %s to tear down pod for %s", dm.networkPlugin.Name(), kubecontainer.BuildPodFullName(runningPod.Name, runningPod.Namespace))
-			if err := dm.networkPlugin.TearDownPod(runningPod.Namespace, runningPod.Name, networkContainer.ID); err != nil {
-				message := fmt.Sprintf("Failed to teardown network for pod %q using network plugins %q: %v", runningPod.ID, dm.networkPlugin.Name(), err)
-				teardownNetworkResult.Fail(kubecontainer.ErrTeardownNetwork, message)
+			err := dm.networkPlugin.VerifyPodInterface(runningPod.Namespace, runningPod.Name, networkContainer.ID)
+			if err != nil {
+				message := fmt.Sprintf("Failed to verify network interface for pod %q, skipping tearing down network", runningPod.ID, err)
 				glog.Error(message)
+			} else {
+				// A network may be deleted multi times because of graceful delete of pods, we only delete it when the network interface exists
+				if err := dm.networkPlugin.TearDownPod(runningPod.Namespace, runningPod.Name, networkContainer.ID); err != nil {
+					message := fmt.Sprintf("Failed to teardown network for pod %q using network plugins %q: %v", runningPod.ID, dm.networkPlugin.Name(), err)
+					teardownNetworkResult.Fail(kubecontainer.ErrTeardownNetwork, message)
+					glog.Error(message)
+				}
 			}
 		}
 		killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, networkContainer.Name)

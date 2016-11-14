@@ -75,9 +75,13 @@ type NetworkPlugin interface {
 	// TODO: rename podInfraContainerID to sandboxID
 	TearDownPod(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) error
 
-	// Status is the method called to obtain the ipv4 or ipv6 addresses of the container
+	// GetPodNetworkStatus is the method called to obtain the ipv4 or ipv6 addresses of the container
 	// TODO: rename podInfraContainerID to sandboxID
 	GetPodNetworkStatus(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) (*PodNetworkStatus, error)
+
+	// VerifyPodInterface is the method called to verify that the interface exists in container
+	// TODO: rename podInfraContainerID to sandboxID
+	VerifyPodInterface(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) (error)
 
 	// NetworkStatus returns error if the network plugin is in error state
 	Status() error
@@ -236,6 +240,10 @@ func (plugin *NoopNetworkPlugin) GetPodNetworkStatus(namespace string, name stri
 	return nil, nil
 }
 
+func (plugin *NoopNetworkPlugin) VerifyPodInterface(namespace string, name string, id kubecontainer.ContainerID) (error) {
+	return nil
+}
+
 func (plugin *NoopNetworkPlugin) Status() error {
 	return nil
 }
@@ -276,4 +284,19 @@ func GetPodIP(execer utilexec.Interface, nsenterPath, netnsPath, interfaceName s
 	}
 
 	return ip, nil
+}
+
+// VerifyInterface check whether the interface exists inside the pod's network namespace
+func VerifyPodInterface(execer utilexec.Interface, nsenterPath, netnsPath, interfaceName string) (error) {
+	// Try to retrieve ip inside container network namespace
+	output, err := execer.Command(nsenterPath, fmt.Sprintf("--net=%s", netnsPath), "-F", "--",
+		"ip", "link", "show", interfaceName).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("Unexpected command output %s with error: %v", output, err)
+	}
+	lines := strings.Split(string(output), "\n")
+	if len(lines) < 1 {
+		return fmt.Errorf("Unexpected command output %s", output)
+	}
+	return nil
 }
