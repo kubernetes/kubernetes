@@ -18,11 +18,15 @@ package deployment
 
 import (
 	"fmt"
+	"time"
 
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/retry"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 // rolloutRecreate implements the logic for recreating a replica set.
@@ -45,14 +49,18 @@ func (dc *DeploymentController) rolloutRecreate(deployment *extensions.Deploymen
 		return dc.syncRolloutStatus(allRSs, newRS, deployment)
 	}
 
-	// Wait for all old replica set to scale down to zero.
-	if err := dc.waitForInactiveReplicaSets(activeOldRSs); err != nil {
-		return err
-	}
-
 	// If we need to create a new RS, create it now
 	// TODO: Create a new RS without re-listing all RSs.
 	if newRS == nil {
+		// Wait for all old replica set to scale down to zero.
+		if err := dc.waitForInactiveReplicaSets(activeOldRSs); err != nil {
+			return err
+		}
+		// Wait for all pods to be deleted.
+		if err := dc.waitForNoPods(deployment); err != nil {
+			return err
+		}
+
 		newRS, oldRSs, err = dc.getAllReplicaSetsAndSyncRevision(deployment, true)
 		if err != nil {
 			return err
@@ -129,6 +137,38 @@ func (dc *DeploymentController) waitForInactiveReplicaSets(oldRSs []*extensions.
 		}
 	}
 	return nil
+}
+
+// waitForNoPods will wait until all pods for the provided deployment are deleted.
+func (dc *DeploymentController) waitForNoPods(deployment *extensions.Deployment) error {
+	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
+	if err != nil {
+		return err
+	}
+	pods, err := dc.podLister.Pods(deployment.Namespace).List(selector)
+	if err != nil {
+		return err
+	}
+	if len(pods) == 0 {
+		return nil
+	}
+	options := api.ListOptions{LabelSelector: selector, ResourceVersion: pods[0].ResourceVersion}
+	w, err := dc.client.Core().Pods(deployment.Namespace).Watch(options)
+	if err != nil {
+		return err
+	}
+	defer w.Stop()
+
+	deletionsNeeded := len(pods)
+	condition := func(event watch.Event) (bool, error) {
+		if event.Type == watch.Deleted {
+			deletionsNeeded--
+		}
+		return deletionsNeeded == 0, nil
+	}
+	// TODO: Wait some time proportionate to the size of deletionsNeeded.
+	_, err = watch.Until(2*time.Minute, w, condition)
+	return err
 }
 
 // scaleUpNewReplicaSetForRecreate scales up new replica set when deployment strategy is "Recreate"

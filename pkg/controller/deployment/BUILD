@@ -44,6 +44,7 @@ go_library(
         "//pkg/util/runtime:go_default_library",
         "//pkg/util/wait:go_default_library",
         "//pkg/util/workqueue:go_default_library",
+        "//pkg/watch:go_default_library",
         "//vendor:github.com/golang/glog",
     ],
 )
@@ -52,6 +53,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "deployment_controller_test.go",
+        "recreate_test.go",
         "rolling_test.go",
         "sync_test.go",
     ],
