@@ -21,7 +21,6 @@ import (
 	"strconv"
 
 	"github.com/gogo/protobuf/proto"
-	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
@@ -65,7 +64,7 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *api.P
 }
 
 // verifyRunAsNonRoot verifies RunAsNonRoot.
-func verifyRunAsNonRoot(pod *api.Pod, container *api.Container, imageUser string) error {
+func verifyRunAsNonRoot(pod *api.Pod, container *api.Container, uid int64) error {
 	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
 	if effectiveSc == nil || effectiveSc.RunAsNonRoot == nil {
 		return nil
@@ -75,15 +74,6 @@ func verifyRunAsNonRoot(pod *api.Pod, container *api.Container, imageUser string
 		if *effectiveSc.RunAsUser == 0 {
 			return fmt.Errorf("container's runAsUser breaks non-root policy")
 		}
-		return nil
-	}
-
-	// Non-root verification only supports numeric user now. For non-numeric user,
-	// just return nil to by-pass the verfication.
-	// TODO: Support non-numeric user.
-	uid, err := strconv.ParseInt(imageUser, 10, 64)
-	if err != nil {
-		glog.Warningf("Non-root verification doesn't support non-numeric user (%s)", imageUser)
 		return nil
 	}
 

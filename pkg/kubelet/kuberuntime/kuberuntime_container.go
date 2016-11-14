@@ -25,6 +25,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
@@ -135,13 +136,18 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 		return nil, err
 	}
 
-	// Verify RunAsNonRoot.
-	imageUser, err := m.getImageUser(container.Image)
+	uid, user, err := m.getImageUser(container.Image)
 	if err != nil {
 		return nil, err
 	}
-	if err := verifyRunAsNonRoot(pod, container, imageUser); err != nil {
-		return nil, err
+	if uid != nil {
+		// Verify RunAsNonRoot. Non-root verification only supports numeric user.
+		if err := verifyRunAsNonRoot(pod, container, *uid); err != nil {
+			return nil, err
+		}
+		user = strconv.FormatInt(*uid, 10)
+	} else {
+		glog.Warningf("Non-root verification doesn't support non-numeric user (%s)", user)
 	}
 
 	command, args := kubecontainer.ExpandContainerCommandAndArgs(container, opts.Envs)
@@ -164,7 +170,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 		Stdin:       &container.Stdin,
 		StdinOnce:   &container.StdinOnce,
 		Tty:         &container.TTY,
-		Linux:       m.generateLinuxContainerConfig(container, pod, imageUser),
+		Linux:       m.generateLinuxContainerConfig(container, pod, user),
 	}
 
 	// set environment variables
