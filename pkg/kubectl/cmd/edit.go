@@ -143,7 +143,7 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 		return err
 	}
 
-	infos, err := r.Infos()
+	normalEditInfos, err := r.Infos()
 	if err != nil {
 		return err
 	}
@@ -153,170 +153,192 @@ func runEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args 
 		edit               = editor.NewDefaultEditor(f.EditorEnvs())
 	)
 
-	var (
-		results  = editResults{}
-		original = []byte{}
-		edited   = []byte{}
-		file     string
-	)
+	editFn := func(info *resource.Info, err error) error {
+		var (
+			results  = editResults{}
+			original = []byte{}
+			edited   = []byte{}
+			file     string
+		)
 
-	containsError := false
-	for {
-		originalObj, err := resource.AsVersionedObject(infos, false, defaultVersion, encoder)
-		if err != nil {
-			return err
-		}
+		containsError := false
+		var infos []*resource.Info
+		for {
+			switch editMode {
+			case NormalEditMode:
+				infos = normalEditInfos
+			case EditBeforeCreateMode:
+				infos = []*resource.Info{info}
+			default:
+				err = fmt.Errorf("Not supported edit mode %q", editMode)
+			}
+			originalObj, err := resource.AsVersionedObject(infos, false, defaultVersion, encoder)
+			if err != nil {
+				return err
+			}
 
-		objToEdit := originalObj
+			objToEdit := originalObj
 
-		// generate the file to edit
-		buf := &bytes.Buffer{}
-		var w io.Writer = buf
-		if windowsLineEndings {
-			w = crlf.NewCRLFWriter(w)
-		}
+			// generate the file to edit
+			buf := &bytes.Buffer{}
+			var w io.Writer = buf
+			if windowsLineEndings {
+				w = crlf.NewCRLFWriter(w)
+			}
 
-		if o.addHeader {
-			results.header.writeTo(w)
-		}
+			if o.addHeader {
+				results.header.writeTo(w)
+			}
 
-		if !containsError {
-			if err := o.printer.PrintObj(objToEdit, w); err != nil {
+			if !containsError {
+				if err := o.printer.PrintObj(objToEdit, w); err != nil {
+					return preservedFile(err, results.file, errOut)
+				}
+				original = buf.Bytes()
+			} else {
+				// In case of an error, preserve the edited file.
+				// Remove the comments (header) from it since we already
+				// have included the latest header in the buffer above.
+				buf.Write(manualStrip(edited))
+			}
+
+			// launch the editor
+			editedDiff := edited
+			edited, file, err = edit.LaunchTempFile(fmt.Sprintf("%s-edit-", filepath.Base(os.Args[0])), o.ext, buf)
+			if err != nil {
 				return preservedFile(err, results.file, errOut)
 			}
-			original = buf.Bytes()
-		} else {
-			// In case of an error, preserve the edited file.
-			// Remove the comments (header) from it since we already
-			// have included the latest header in the buffer above.
-			buf.Write(manualStrip(edited))
-		}
-
-		// launch the editor
-		editedDiff := edited
-		edited, file, err = edit.LaunchTempFile(fmt.Sprintf("%s-edit-", filepath.Base(os.Args[0])), o.ext, buf)
-		if err != nil {
-			return preservedFile(err, results.file, errOut)
-		}
-		if editMode == NormalEditMode || containsError {
-			if bytes.Equal(stripComments(editedDiff), stripComments(edited)) {
-				// Ugly hack right here. We will hit this either (1) when we try to
-				// save the same changes we tried to save in the previous iteration
-				// which means our changes are invalid or (2) when we exit the second
-				// time. The second case is more usual so we can probably live with it.
-				// TODO: A less hacky fix would be welcome :)
-				return preservedFile(fmt.Errorf("%s", "Edit cancelled, no valid changes were saved."), file, errOut)
+			if editMode == NormalEditMode || containsError {
+				if bytes.Equal(stripComments(editedDiff), stripComments(edited)) {
+					// Ugly hack right here. We will hit this either (1) when we try to
+					// save the same changes we tried to save in the previous iteration
+					// which means our changes are invalid or (2) when we exit the second
+					// time. The second case is more usual so we can probably live with it.
+					// TODO: A less hacky fix would be welcome :)
+					return preservedFile(fmt.Errorf("%s", "Edit cancelled, no valid changes were saved."), file, errOut)
+				}
 			}
-		}
 
-		// cleanup any file from the previous pass
-		if len(results.file) > 0 {
-			os.Remove(results.file)
-		}
-		glog.V(4).Infof("User edited:\n%s", string(edited))
+			// cleanup any file from the previous pass
+			if len(results.file) > 0 {
+				os.Remove(results.file)
+			}
+			glog.V(4).Infof("User edited:\n%s", string(edited))
 
-		// Apply validation
-		schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
-		if err != nil {
-			return preservedFile(err, file, errOut)
-		}
-		err = schema.ValidateBytes(stripComments(edited))
-		if err != nil {
+			// Apply validation
+			schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
+			if err != nil {
+				return preservedFile(err, file, errOut)
+			}
+			err = schema.ValidateBytes(stripComments(edited))
+			if err != nil {
+				results = editResults{
+					file: file,
+				}
+				containsError = true
+				fmt.Fprintln(out, results.addError(errors.NewInvalid(api.Kind(""), "", field.ErrorList{field.Invalid(nil, "The edited file failed validation", fmt.Sprintf("%v", err))}), infos[0]))
+				continue
+			}
+
+			// Compare content without comments
+			if bytes.Equal(stripComments(original), stripComments(edited)) {
+				os.Remove(file)
+				fmt.Fprintln(errOut, "Edit cancelled, no changes made.")
+				return nil
+			}
+
+			lines, err := hasLines(bytes.NewBuffer(edited))
+			if err != nil {
+				return preservedFile(err, file, errOut)
+			}
+			if !lines {
+				os.Remove(file)
+				fmt.Fprintln(errOut, "Edit cancelled, saved file was empty.")
+				return nil
+			}
+
 			results = editResults{
 				file: file,
 			}
-			containsError = true
-			fmt.Fprintln(out, results.addError(errors.NewInvalid(api.Kind(""), "", field.ErrorList{field.Invalid(nil, "The edited file failed validation", fmt.Sprintf("%v", err))}), infos[0]))
-			continue
-		}
 
-		// Compare content without comments
-		if bytes.Equal(stripComments(original), stripComments(edited)) {
-			os.Remove(file)
-			fmt.Fprintln(errOut, "Edit cancelled, no changes made.")
-			return nil
-		}
-
-		lines, err := hasLines(bytes.NewBuffer(edited))
-		if err != nil {
-			return preservedFile(err, file, errOut)
-		}
-		if !lines {
-			os.Remove(file)
-			fmt.Fprintln(errOut, "Edit cancelled, saved file was empty.")
-			return nil
-		}
-
-		results = editResults{
-			file: file,
-		}
-
-		// parse the edited file
-		updates, err := resourceMapper.InfoForData(edited, "edited-file")
-		if err != nil {
-			// syntax error
-			containsError = true
-			results.header.reasons = append(results.header.reasons, editReason{head: fmt.Sprintf("The edited file had a syntax error: %v", err)})
-			continue
-		}
-		// not a syntax error as it turns out...
-		containsError = false
-
-		namespaceVisitor := resource.NewFlattenListVisitor(updates, resourceMapper)
-		// need to make sure the original namespace wasn't changed while editing
-		if err = namespaceVisitor.Visit(resource.RequireNamespace(cmdNamespace)); err != nil {
-			return preservedFile(err, file, errOut)
-		}
-
-		// iterate through all items to apply annotations
-		mutatedObjects, err := visitAnnotation(cmd, f, updates, resourceMapper, encoder)
-		if err != nil {
-			return preservedFile(err, file, errOut)
-		}
-
-		// if we mutated a list in the visitor, persist the changes on the overall object
-		if meta.IsListType(updates.Object) {
-			meta.SetList(updates.Object, mutatedObjects)
-		}
-
-		switch editMode {
-		case NormalEditMode:
-			err = visitToPatch(originalObj, updates, f, mapper, resourceMapper, encoder, out, errOut, defaultVersion, &results, file)
-		case EditBeforeCreateMode:
-			err = visitToCreate(updates, mapper, resourceMapper, out, errOut, defaultVersion, &results, file)
-		default:
-			err = fmt.Errorf("Not supported edit mode %q", editMode)
-		}
-		if err != nil {
-			return preservedFile(err, results.file, errOut)
-		}
-
-		// Handle all possible errors
-		//
-		// 1. retryable: propose kubectl replace -f
-		// 2. notfound: indicate the location of the saved configuration of the deleted resource
-		// 3. invalid: retry those on the spot by looping ie. reloading the editor
-		if results.retryable > 0 {
-			fmt.Fprintf(errOut, "You can run `%s replace -f %s` to try this update again.\n", filepath.Base(os.Args[0]), file)
-			return cmdutil.ErrExit
-		}
-		if results.notfound > 0 {
-			fmt.Fprintf(errOut, "The edits you made on deleted resources have been saved to %q\n", file)
-			return cmdutil.ErrExit
-		}
-
-		if len(results.edit) == 0 {
-			if results.notfound == 0 {
-				os.Remove(file)
-			} else {
-				fmt.Fprintf(out, "The edits you made on deleted resources have been saved to %q\n", file)
+			// parse the edited file
+			updates, err := resourceMapper.InfoForData(edited, "edited-file")
+			if err != nil {
+				// syntax error
+				containsError = true
+				results.header.reasons = append(results.header.reasons, editReason{head: fmt.Sprintf("The edited file had a syntax error: %v", err)})
+				continue
 			}
-			return nil
-		}
+			// not a syntax error as it turns out...
+			containsError = false
 
-		if len(results.header.reasons) > 0 {
-			containsError = true
+			namespaceVisitor := resource.NewFlattenListVisitor(updates, resourceMapper)
+			// need to make sure the original namespace wasn't changed while editing
+			if err = namespaceVisitor.Visit(resource.RequireNamespace(cmdNamespace)); err != nil {
+				return preservedFile(err, file, errOut)
+			}
+
+			// iterate through all items to apply annotations
+			mutatedObjects, err := visitAnnotation(cmd, f, updates, resourceMapper, encoder)
+			if err != nil {
+				return preservedFile(err, file, errOut)
+			}
+
+			// if we mutated a list in the visitor, persist the changes on the overall object
+			if meta.IsListType(updates.Object) {
+				meta.SetList(updates.Object, mutatedObjects)
+			}
+
+			switch editMode {
+			case NormalEditMode:
+				err = visitToPatch(originalObj, updates, f, mapper, resourceMapper, encoder, out, errOut, defaultVersion, &results, file)
+			case EditBeforeCreateMode:
+				err = visitToCreate(updates, mapper, resourceMapper, out, errOut, defaultVersion, &results, file)
+			default:
+				err = fmt.Errorf("Not supported edit mode %q", editMode)
+			}
+			if err != nil {
+				return preservedFile(err, results.file, errOut)
+			}
+
+			// Handle all possible errors
+			//
+			// 1. retryable: propose kubectl replace -f
+			// 2. notfound: indicate the location of the saved configuration of the deleted resource
+			// 3. invalid: retry those on the spot by looping ie. reloading the editor
+			if results.retryable > 0 {
+				fmt.Fprintf(errOut, "You can run `%s replace -f %s` to try this update again.\n", filepath.Base(os.Args[0]), file)
+				return cmdutil.ErrExit
+			}
+			if results.notfound > 0 {
+				fmt.Fprintf(errOut, "The edits you made on deleted resources have been saved to %q\n", file)
+				return cmdutil.ErrExit
+			}
+
+			if len(results.edit) == 0 {
+				if results.notfound == 0 {
+					os.Remove(file)
+				} else {
+					fmt.Fprintf(out, "The edits you made on deleted resources have been saved to %q\n", file)
+				}
+				return nil
+			}
+
+			if len(results.header.reasons) > 0 {
+				containsError = true
+			}
 		}
+	}
+
+	switch editMode {
+	// If doing normal edit we cannot use Visit because we need to edit a list for convenience. Ref: #20519
+	case NormalEditMode:
+		return editFn(nil, nil)
+	// If doing an edit before created, we don't want a list and instead want the normal behavior as kubectl create.
+	case EditBeforeCreateMode:
+		return r.Visit(editFn)
+	default:
+		return fmt.Errorf("Not supported edit mode %q", editMode)
 	}
 }
 
