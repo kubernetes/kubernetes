@@ -568,7 +568,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			podJson := readTestFileOrDie(kubectlInPodFilename)
 			By("validating api verions")
 			framework.RunKubectlOrDieInput(string(podJson), "create", "-f", "-", nsFlag)
-			err := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+			err := wait.PollImmediate(3*time.Second, 3*time.Minute, func() (bool, error) {
 				output := framework.RunKubectlOrDie("get", "pods/kubectl-in-pod", nsFlag)
 				if strings.Contains(output, "Running") {
 					return true, nil
