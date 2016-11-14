@@ -187,3 +187,43 @@ func TestGetSystclsFromAnnotations(t *testing.T) {
 		assert.Equal(t, test.expectedSysctls, actual, "TestCase[%d]", i)
 	}
 }
+
+// TestGetUserFromImageUser tests the logic of getting image uid or user name of image user.
+func TestGetUserFromImageUser(t *testing.T) {
+	newI64 := func(i int64) *int64 { return &i }
+	newStr := func(s string) *string { return &s }
+	for c, test := range map[string]struct {
+		user string
+		uid  *int64
+		name *string
+	}{
+		"no gid": {
+			user: "0",
+			uid:  newI64(0),
+		},
+		"uid/gid": {
+			user: "0:1",
+			uid:  newI64(0),
+		},
+		"empty user": {
+			user: "",
+		},
+		"multiple spearators": {
+			user: "1:2:3",
+			uid:  newI64(1),
+		},
+		"root username": {
+			user: "root:root",
+			name: newStr("root"),
+		},
+		"username": {
+			user: "test:test",
+			name: newStr("test"),
+		},
+	} {
+		t.Logf("TestCase - %q", c)
+		actualUID, actualName := getUserFromImageUser(test.user)
+		assert.Equal(t, test.uid, actualUID)
+		assert.Equal(t, test.name, actualName)
+	}
+}
