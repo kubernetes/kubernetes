@@ -10834,6 +10834,7 @@ go_library(
     deps = [
         "//vendor:github.com/davecgh/go-spew/spew",
         "//vendor:github.com/ghodss/yaml",
+        "//vendor:k8s.io/client-go/discovery",
         "//vendor:k8s.io/client-go/pkg/third_party/forked/golang/json",
         "//vendor:k8s.io/client-go/pkg/util/json",
     ],
