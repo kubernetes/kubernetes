@@ -97,15 +97,3 @@ func GetServiceHealthCheckNodePort(service *api.Service) int32 {
 	}
 	return 0
 }
-
-// GetServiceHealthCheckPathPort Return the path and nodePort programmed into the Cloud LB Health Check
-func GetServiceHealthCheckPathPort(service *api.Service) (string, int32) {
-	if !NeedsHealthCheck(service) {
-		return "", 0
-	}
-	port := GetServiceHealthCheckNodePort(service)
-	if port == 0 {
-		return "", 0
-	}
-	return "/healthz", port
-}
