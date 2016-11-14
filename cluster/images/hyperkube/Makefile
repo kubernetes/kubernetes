@@ -67,7 +67,11 @@ endif
 	cp ${TEMP_DIR}/addons/singlenode/*.yaml ${TEMP_DIR}/addons/multinode/
 	cp kube-proxy-ds.yaml ${TEMP_DIR}/addons/multinode/kube-proxy.yaml
 
+ifdef LOCAL
+	cp ../../../_output/local/bin/linux/${ARCH}/hyperkube ${TEMP_DIR}
+else
 	cp ../../../_output/dockerized/bin/linux/${ARCH}/hyperkube ${TEMP_DIR}
+endif
 
 	cd ${TEMP_DIR} && sed -i.back "s|VERSION|${VERSION}|g" addons/singlenode/*.yaml addons/multinode/*.yaml static-pods/*.json
 	cd ${TEMP_DIR} && sed -i.back "s|REGISTRY|${REGISTRY}|g" addons/singlenode/*.yaml addons/multinode/*.yaml static-pods/*.json
