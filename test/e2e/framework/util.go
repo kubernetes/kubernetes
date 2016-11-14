@@ -2162,6 +2162,10 @@ func (f *Framework) MatchContainerOutput(
 	podClient := f.PodClient()
 	ns := f.Namespace.Name
 
+	defer func() {
+		By("delete the pod")
+		podClient.Delete(pod.Name, nil)
+	}()
 	createdPod := podClient.Create(pod)
 
 	// Wait for client pod to complete.
