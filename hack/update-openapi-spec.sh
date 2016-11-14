@@ -63,6 +63,7 @@ kube::log::status "Starting kube-apiserver"
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --advertise-address="10.10.10.10" \
   --cert-dir="${TMP_DIR}/certs" \
+  --runtime-config="api/all=true" \
   --token-auth-file=$TMP_DIR/tokenauth.csv \
   --service-cluster-ip-range="10.0.0.0/24" >/tmp/openapi-api-server.log 2>&1 &
 APISERVER_PID=$!
