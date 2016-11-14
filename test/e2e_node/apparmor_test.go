@@ -26,9 +26,9 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/client-go/pkg/api/errors"
-	"k8s.io/client-go/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -151,7 +151,7 @@ func runAppArmorTest(f *framework.Framework, shouldRun bool, profile string) v1.
 		_, err = watch.Until(framework.PodStartTimeout, w, func(e watch.Event) (bool, error) {
 			switch e.Type {
 			case watch.Deleted:
-				return false, errors.NewNotFound(unversioned.GroupResource{Resource: "pods"}, pod.Name)
+				return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, pod.Name)
 			}
 			switch t := e.Object.(type) {
 			case *v1.Pod:
