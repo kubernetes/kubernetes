@@ -90,7 +90,7 @@ func Run(s *options.ServerRunOptions) error {
 	if err != nil {
 		glog.Fatalf("Error determining service IP ranges: %v", err)
 	}
-	if err := genericConfig.MaybeGenerateServingCerts(apiServerServiceIP); err != nil {
+	if err := genericConfig.MaybeGenerateServingCerts(s.GenericServerRunOptions.AdvertiseAddress.String(), apiServerServiceIP); err != nil {
 		glog.Fatalf("Failed to generate service certificate: %v", err)
 	}
 
@@ -306,7 +306,6 @@ func Run(s *options.ServerRunOptions) error {
 	genericConfig.Authenticator = apiAuthenticator
 	genericConfig.Authorizer = apiAuthorizer
 	genericConfig.AdmissionControl = admissionController
-	genericConfig.APIResourceConfigSource = storageFactory.APIResourceConfigSource
 	genericConfig.OpenAPIConfig.Info.Title = "Kubernetes"
 	genericConfig.OpenAPIConfig.Definitions = generatedopenapi.OpenAPIDefinitions
 	genericConfig.EnableOpenAPISupport = true
@@ -317,6 +316,8 @@ func Run(s *options.ServerRunOptions) error {
 		GenericConfig: genericConfig.Config,
 
 		StorageFactory:          storageFactory,
+		APIResourceConfigSource: storageFactory.APIResourceConfigSource,
+		EnableGarbageCollection: s.GenericServerRunOptions.EnableGarbageCollection,
 		EnableWatchCache:        s.GenericServerRunOptions.EnableWatchCache,
 		EnableCoreControllers:   true,
 		DeleteCollectionWorkers: s.GenericServerRunOptions.DeleteCollectionWorkers,
@@ -335,7 +336,8 @@ func Run(s *options.ServerRunOptions) error {
 		ServiceNodePortRange:      s.GenericServerRunOptions.ServiceNodePortRange,
 		KubernetesServiceNodePort: s.GenericServerRunOptions.KubernetesServiceNodePort,
 
-		MasterCount: s.GenericServerRunOptions.MasterCount,
+		MasterCount:   s.GenericServerRunOptions.MasterCount,
+		RBACSuperUser: s.GenericServerRunOptions.AuthorizationRBACSuperUser,
 	}
 
 	if s.GenericServerRunOptions.EnableWatchCache {

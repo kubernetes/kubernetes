@@ -50,7 +50,6 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	etcdServer, _ := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
 
 	config := NewConfig()
-	config.PublicAddress = net.ParseIP("192.168.10.4")
 	config.RequestContextMapper = api.NewRequestContextMapper()
 	config.LegacyAPIGroupPrefixes = sets.NewString("/api")
 
@@ -88,9 +87,6 @@ func TestNew(t *testing.T) {
 	assert.Equal(s.legacyAPIGroupPrefixes, config.LegacyAPIGroupPrefixes)
 	assert.Equal(s.admissionControl, config.AdmissionControl)
 	assert.Equal(s.RequestContextMapper(), config.RequestContextMapper)
-
-	// these values get defaulted
-	assert.Equal(s.ExternalAddress, net.JoinHostPort(config.PublicAddress.String(), "6443"))
 }
 
 // Verifies that AddGroupVersions works as expected.

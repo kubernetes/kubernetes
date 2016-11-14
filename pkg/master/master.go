@@ -76,7 +76,11 @@ const (
 type Config struct {
 	GenericConfig *genericapiserver.Config
 
-	StorageFactory           genericapiserver.StorageFactory
+	StorageFactory genericapiserver.StorageFactory
+	// APIResourceConfigSource controls which API GroupVersionResources should be enabled on this server.APIGroupPrefix.
+	APIResourceConfigSource genericapiserver.APIResourceConfigSource
+
+	EnableGarbageCollection  bool
 	EnableWatchCache         bool
 	EnableCoreControllers    bool
 	EndpointReconcilerConfig EndpointReconcilerConfig
@@ -97,6 +101,10 @@ type Config struct {
 	APIServerServiceIP net.IP
 	// Port for the apiserver service.
 	APIServerServicePort int
+	// PublicAddress is the IP address where members of the cluster (kubelet,
+	// kube-proxy, services, etc.) can reach the master API server.
+	// If nil or 0.0.0.0, the host's default interface will be used.
+	PublicAddress net.IP
 
 	// TODO, we can probably group service related items into a substruct to make it easier to configure
 	// the API server items and `Extra*` fields likely fit nicely together.
@@ -121,6 +129,9 @@ type Config struct {
 	// Number of masters running; all masters must be started with the
 	// same value for this field. (Numbers > 1 currently untested.)
 	MasterCount int
+
+	// RBACSuperUser is used by the RBAC storage for escalation computation
+	RBACSuperUser string
 }
 
 // EndpointReconcilerConfig holds the endpoint reconciler and endpoint reconciliation interval to be
@@ -219,7 +230,7 @@ func (c completedConfig) New() (*Master, error) {
 
 	restOptionsFactory := restOptionsFactory{
 		deleteCollectionWorkers: c.DeleteCollectionWorkers,
-		enableGarbageCollection: c.GenericConfig.EnableGarbageCollection,
+		enableGarbageCollection: c.EnableGarbageCollection,
 		storageFactory:          c.StorageFactory,
 	}
 
@@ -230,7 +241,7 @@ func (c completedConfig) New() (*Master, error) {
 	}
 
 	// install legacy rest storage
-	if c.GenericConfig.APIResourceConfigSource.AnyResourcesForVersionEnabled(apiv1.SchemeGroupVersion) {
+	if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(apiv1.SchemeGroupVersion) {
 		legacyRESTStorageProvider := corerest.LegacyRESTStorageProvider{
 			StorageFactory:       c.StorageFactory,
 			ProxyTransport:       c.ProxyTransport,
@@ -252,10 +263,10 @@ func (c completedConfig) New() (*Master, error) {
 		certificatesrest.RESTStorageProvider{},
 		extensionsrest.RESTStorageProvider{ResourceInterface: thirdparty.NewThirdPartyResourceServer(s, c.StorageFactory)},
 		policyrest.RESTStorageProvider{},
-		rbacrest.RESTStorageProvider{AuthorizerRBACSuperUser: c.GenericConfig.AuthorizerRBACSuperUser},
+		rbacrest.RESTStorageProvider{RBACSuperUser: c.RBACSuperUser},
 		storagerest.RESTStorageProvider{},
 	}
-	m.InstallAPIs(c.Config.GenericConfig.APIResourceConfigSource, restOptionsFactory.NewFor, restStorageProviders...)
+	m.InstallAPIs(c.Config.APIResourceConfigSource, restOptionsFactory.NewFor, restStorageProviders...)
 
 	if c.Tunneler != nil {
 		m.installTunneler(c.Tunneler, coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes())
