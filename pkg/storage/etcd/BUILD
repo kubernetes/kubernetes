@@ -63,7 +63,6 @@ go_test(
         "//pkg/storage/testing:go_default_library",
         "//pkg/watch:go_default_library",
         "//vendor:github.com/coreos/etcd/client",
-        "//vendor:github.com/stretchr/testify/assert",
         "//vendor:golang.org/x/net/context",
     ],
 )
