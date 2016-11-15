@@ -132,7 +132,7 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 						Resources: api.ResourceRequirements{
 							Limits: api.ResourceList{
 								api.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-								api.ResourceMemory: *resource.NewQuantity(10*1024*1024, resource.DecimalSI),
+								api.ResourceMemory: *resource.NewQuantity(30*1024*1024, resource.DecimalSI),
 							},
 						},
 					},
@@ -195,7 +195,7 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 						Resources: api.ResourceRequirements{
 							Limits: api.ResourceList{
 								api.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-								api.ResourceMemory: *resource.NewQuantity(10*1024*1024, resource.DecimalSI),
+								api.ResourceMemory: *resource.NewQuantity(30*1024*1024, resource.DecimalSI),
 							},
 						},
 					},
@@ -306,7 +306,7 @@ var _ = framework.KubeDescribe("InitContainer", func() {
 						Resources: api.ResourceRequirements{
 							Limits: api.ResourceList{
 								api.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-								api.ResourceMemory: *resource.NewQuantity(10*1024*1024, resource.DecimalSI),
+								api.ResourceMemory: *resource.NewQuantity(30*1024*1024, resource.DecimalSI),
 							},
 						},
 					},
