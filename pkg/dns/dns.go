@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	kcache "k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/dns/config"
 	"k8s.io/kubernetes/pkg/dns/treecache"
 	"k8s.io/kubernetes/pkg/dns/util"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -43,8 +44,6 @@ import (
 )
 
 const (
-	kubernetesSvcName = "kubernetes"
-
 	// A subdomain added to the user specified domain for all services.
 	serviceSubdomain = "svc"
 
@@ -67,77 +66,78 @@ type KubeDNS struct {
 	// to get Endpoints and Service objects.
 	kubeClient clientset.Interface
 
-	// The domain for which this DNS Server is authoritative.
+	// domain for which this DNS Server is authoritative.
 	domain string
+	// configMap where kube-dns dynamic configuration is store. If this
+	// is empty then getting configuration from a configMap will be
+	// disabled.
+	configMap string
 
-	// A cache that contains all the endpoints in the system.
+	// endpointsStore that contains all the endpoints in the system.
 	endpointsStore kcache.Store
-
-	// A cache that contains all the services in the system.
+	// servicesStore that contains all the services in the system.
 	servicesStore kcache.Store
+	// nodesStore contains some subset of nodes in the system so that we
+	// can retrieve the cluster zone annotation from the cached node
+	// instead of getting it from the API server every time.
+	nodesStore kcache.Store
 
-	// stores DNS records for the domain.
-	// A Records and SRV Records for (regular) services and headless Services.
-	// CNAME Records for ExternalName Services.
+	// cache stores DNS records for the domain.  A Records and SRV Records for
+	// (regular) services and headless Services.  CNAME Records for
+	// ExternalName Services.
 	cache treecache.TreeCache
-
-	// TODO(nikhiljindal): Remove this. It can be recreated using clusterIPServiceMap.
+	// TODO(nikhiljindal): Remove this. It can be recreated using
+	// clusterIPServiceMap.
 	reverseRecordMap map[string]*skymsg.Service
-
-	// Map of cluster IP to service object. Headless services are not part of this map.
-	// Used to get a service when given its cluster IP.
-	// Access to this is coordinated using cacheLock. We use the same lock for cache and this map
-	// to ensure that they don't get out of sync.
+	// clusterIPServiceMap to service object. Headless services are not
+	// part of this map. Used to get a service when given its cluster
+	// IP.  Access to this is coordinated using cacheLock. We use the
+	// same lock for cache and this map to ensure that they don't get
+	// out of sync.
 	clusterIPServiceMap map[string]*kapi.Service
-
-	// caller is responsible for using the cacheLock before invoking methods on cache
-	// the cache is not thread-safe, and the caller can guarantee thread safety by using
+	// cacheLock protecting the cache. caller is responsible for using
+	// the cacheLock before invoking methods on cache the cache is not
+	// thread-safe, and the caller can guarantee thread safety by using
 	// the cacheLock
 	cacheLock sync.RWMutex
 
-	// The domain for which this DNS Server is authoritative, in array format and reversed.
-	// e.g. if domain is "cluster.local", domainPath is []string{"local", "cluster"}
+	// The domain for which this DNS Server is authoritative, in array
+	// format and reversed.  e.g. if domain is "cluster.local",
+	// domainPath is []string{"local", "cluster"}
 	domainPath []string
 
 	// endpointsController  invokes registered callbacks when endpoints change.
 	endpointsController *kcache.Controller
-
 	// serviceController invokes registered callbacks when services change.
 	serviceController *kcache.Controller
 
-	// Map of federation names that the cluster in which this kube-dns is running belongs to, to
-	// the corresponding domain names.
-	federations map[string]string
-
-	// A TTL cache that contains some subset of nodes in the system so that we can retrieve the
-	// cluster zone annotation from the cached node instead of getting it from the API server
-	// every time.
-	nodesStore kcache.Store
+	// config set from the dynamic configuration source.
+	config *config.Config
+	// configLock protects the config below.
+	configLock sync.RWMutex
+	// configSync manages synchronization of the config map
+	configSync config.Sync
 }
 
-func NewKubeDNS(client clientset.Interface, domain string, federations map[string]string) (*KubeDNS, error) {
-	// Verify that federation names should not contain dots ('.')
-	// We can not allow dots since we use that as separator for path segments (svcname.nsname.fedname.svc.domain)
-	for key := range federations {
-		if strings.ContainsAny(key, ".") {
-			return nil, fmt.Errorf("invalid federation name: %s, cannot have '.'", key)
-		}
-	}
+func NewKubeDNS(client clientset.Interface, clusterDomain string, configSync config.Sync) *KubeDNS {
 	kd := &KubeDNS{
 		kubeClient:          client,
-		domain:              domain,
+		domain:              clusterDomain,
 		cache:               treecache.NewTreeCache(),
 		cacheLock:           sync.RWMutex{},
 		nodesStore:          kcache.NewStore(kcache.MetaNamespaceKeyFunc),
 		reverseRecordMap:    make(map[string]*skymsg.Service),
 		clusterIPServiceMap: make(map[string]*kapi.Service),
-		domainPath:          util.ReverseArray(strings.Split(strings.TrimRight(domain, "."), ".")),
-		federations:         federations,
+		domainPath:          util.ReverseArray(strings.Split(strings.TrimRight(clusterDomain, "."), ".")),
+
+		configLock: sync.RWMutex{},
+		configSync: configSync,
 	}
+
 	kd.setEndpointsStore()
 	kd.setServicesStore()
 
-	return kd, nil
+	return kd
 }
 
 func (kd *KubeDNS) Start() {
@@ -147,25 +147,29 @@ func (kd *KubeDNS) Start() {
 	glog.V(2).Infof("Starting serviceController")
 	go kd.serviceController.Run(wait.NeverStop)
 
-	// Wait synchronously for the Kubernetes service and add a DNS
-	// record for it. This ensures that the Start function returns only
-	// after having received Service objects from APIServer.
+	kd.startConfigMapSync()
+
+	// Wait synchronously for the Kubernetes service. This ensures that
+	// the Start function returns only after having received Service
+	// objects from APIServer.
 	//
 	// TODO: we might not have to wait for kubernetes service
 	// specifically. We should just wait for a list operation to be
 	// complete from APIServer.
-	glog.V(2).Infof("Waiting for Kubernetes service")
 	kd.waitForKubernetesService()
 }
 
-func (kd *KubeDNS) waitForKubernetesService() (svc *kapi.Service) {
+func (kd *KubeDNS) waitForKubernetesService() {
+	glog.V(2).Infof("Waiting for Kubernetes service")
+
+	const kubernetesSvcName = "kubernetes"
+	const servicePollInterval = 1 * time.Second
+
 	name := fmt.Sprintf("%v/%v", kapi.NamespaceDefault, kubernetesSvcName)
 	glog.V(2).Infof("Waiting for service: %v", name)
-	var err error
-	servicePollInterval := 1 * time.Second
 
 	for {
-		svc, err = kd.kubeClient.Core().Services(kapi.NamespaceDefault).Get(kubernetesSvcName)
+		svc, err := kd.kubeClient.Core().Services(kapi.NamespaceDefault).Get(kubernetesSvcName)
 		if err != nil || svc == nil {
 			glog.V(3).Infof(
 				"Ignoring error while waiting for service %v: %v. Sleeping %v before retrying.",
@@ -177,6 +181,30 @@ func (kd *KubeDNS) waitForKubernetesService() (svc *kapi.Service) {
 	}
 
 	return
+}
+
+func (kd *KubeDNS) startConfigMapSync() {
+	initialConfig, err := kd.configSync.Once()
+	if err != nil {
+		glog.Errorf(
+			"Error getting initial ConfigMap: %v, starting with default values", err)
+		kd.config = config.NewDefaultConfig()
+	} else {
+		kd.config = initialConfig
+	}
+
+	go kd.syncConfigMap(kd.configSync.Periodic())
+}
+
+func (kd *KubeDNS) syncConfigMap(syncChan <-chan *config.Config) {
+	for {
+		nextConfig := <-syncChan
+
+		kd.configLock.Lock()
+		kd.config = nextConfig
+		glog.V(2).Infof("Configuration updated: %+v", *kd.config)
+		kd.configLock.Unlock()
+	}
 }
 
 func (kd *KubeDNS) GetCacheAsJSON() (string, error) {
@@ -528,6 +556,9 @@ func (kd *KubeDNS) recordsForFederation(records []skymsg.Service, path []string,
 		// We know that a headless service has endpoints for sure if a
 		// record was returned for it. The record contains endpoint
 		// IPs. So nothing to check for headless services.
+		//
+		// TODO: this access to the cluster IP map does not seem to be
+		// threadsafe.
 		if !kd.isHeadlessServiceRecord(&val) {
 			ok, err := kd.serviceWithClusterIPHasEndpoints(&val)
 			if err != nil {
@@ -740,10 +771,15 @@ func (kd *KubeDNS) isFederationQuery(path []string) bool {
 			return false
 		}
 	}
-	if _, ok := kd.federations[path[2]]; !ok {
-		glog.V(4).Infof("Not a federation query: kd.federations[%q] not found", path[2])
+
+	kd.configLock.RLock()
+	defer kd.configLock.RUnlock()
+
+	if _, ok := kd.config.Federations[path[2]]; !ok {
+		glog.V(4).Infof("Not a federation query: label %q not found", path[2])
 		return false
 	}
+
 	return true
 }
 
@@ -775,7 +811,10 @@ func (kd *KubeDNS) federationRecords(queryPath []string) ([]skymsg.Service, erro
 
 	// We have already established that the map entry exists for the given federation,
 	// we just need to retrieve the domain name, validate it and append it to the path.
-	domain := kd.federations[path[2]]
+	kd.configLock.RLock()
+	domain := kd.config.Federations[path[2]]
+	kd.configLock.RUnlock()
+
 	// We accept valid subdomains as well, so just let all the valid subdomains.
 	if len(validation.IsDNS1123Subdomain(domain)) != 0 {
 		return nil, fmt.Errorf("%s is not a valid domain name for federation %s", domain, path[2])
