@@ -283,7 +283,7 @@ func (c *photonPersistentDiskUnmounter) TearDownAt(dir string) error {
 }
 
 func makeGlobalPDPath(host volume.VolumeHost, devName string) string {
-	return path.Join(host.GetPluginDir(photonPersistentDiskPluginName), "mounts", devName)
+	return path.Join(host.GetPluginDir(photonPersistentDiskPluginName), mount.MountsInGlobalPDPath, devName)
 }
 
 func (ppd *photonPersistentDisk) GetPath() string {
